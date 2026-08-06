@@ -1,0 +1,6 @@
+*.exe
+*.obj
+*.pdb
+model.bin
+train_log.txt
+*.log
