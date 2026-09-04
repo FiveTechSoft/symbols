@@ -14,6 +14,7 @@
 #include "dialog.h"
 #include "model.h"
 #include "stats.h"
+#include "transfer.h"
 
 #define CLI_BUFFER_SIZE 512
 
@@ -143,6 +144,51 @@ int main(void)
             tmp.graph = graph;
             tmp.embeddings = embeds;
             ModelPrintReport(&tmp);
+            continue;
+        }
+
+        if (strncmp(input, "/analogy ", 9) == 0)
+        {
+            char ent_a[64], ent_b[64];
+            if (sscanf(input + 9, "%63s %63s", ent_a, ent_b) == 2)
+            {
+                SYMBOL_ID id_a = SymbolFind(graph->symbols, ent_a);
+                SYMBOL_ID id_b = SymbolFind(graph->symbols, ent_b);
+                if (id_a == SYMBOL_INVALID || id_b == SYMBOL_INVALID)
+                {
+                    printf("IA > No conozco uno de esos conceptos.\n\n");
+                }
+                else
+                {
+                    float sim = TransferSimilarity(graph, id_a, id_b);
+                    printf("  Similitud estructural: %.2f\n\n", sim);
+
+                    TRANSFER_RESULT results[8];
+
+                    /* Apply rules to target */
+                    uint32_t n = TransferApply(graph, id_b, results, 8);
+                    if (n > 0)
+                    {
+                        printf("  Reglas aplicadas a %s:\n", ent_b);
+                        TransferPrintResults(graph, results, n);
+                    }
+
+                    /* Analogical transfer */
+                    n = TransferAnalogy(graph, id_a, id_b, results, 8);
+                    if (n > 0)
+                    {
+                        printf("  Analoga %s -> %s:\n", ent_a, ent_b);
+                        TransferPrintResults(graph, results, n);
+                    }
+
+                    if (n == 0 && TransferApply(graph, id_b, results, 8) == 0)
+                        printf("  No se encontraron transferencias.\n\n");
+                }
+            }
+            else
+            {
+                printf("IA > Uso: /analogy ENTIDAD_A ENTIDAD_B\n\n");
+            }
             continue;
         }
 
