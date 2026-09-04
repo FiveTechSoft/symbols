@@ -13,6 +13,7 @@
 #include "generator.h"
 #include "dialog.h"
 #include "model.h"
+#include "stats.h"
 
 #define CLI_BUFFER_SIZE 512
 
@@ -87,8 +88,8 @@ int main(void)
     printf("========================================================\n");
     printf("     SYMBOLIC LLM - ASISTENTE CONVERSACIONAL            \n");
     printf("  Conversacion natural sin backpropagation ni GPUs.     \n");
-    printf("  Comandos: /graph, /context, /synonyms, /alias,        \n");
-    printf("            /save, /load, /clear, /exit                 \n");
+    printf("  Comandos: /graph, /context, /stats, /synonyms,        \n");
+    printf("            /alias, /save, /load, /clear, /exit          \n");
     printf("========================================================\n\n");
 
     char input[CLI_BUFFER_SIZE];
@@ -132,6 +133,16 @@ int main(void)
             embeds = EmbeddingTableCreate(128);
             GraphSetEmbeddingTable(graph, embeds);
             printf("IA > Memoria reiniciada. Comencemos desde cero.\n\n");
+            continue;
+        }
+
+        if (strcmp(input, "/stats") == 0 || strcmp(input, "/info") == 0)
+        {
+            MODEL tmp;
+            memset(&tmp, 0, sizeof(tmp));
+            tmp.graph = graph;
+            tmp.embeddings = embeds;
+            ModelPrintReport(&tmp);
             continue;
         }
 
