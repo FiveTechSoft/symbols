@@ -25,6 +25,12 @@ int main(void)
     printf("   Text:      %llu triples, %u symbols\n",
            ir2.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 3. Ingest C knowledge */
+    printf("3. Ingesting c_knowledge.tsv (C programming)...\n");
+    INGEST_STATS ir3 = IngestTSV(graph, "data/samples/c_knowledge.tsv");
+    printf("   C code:    %llu triples, %u symbols\n",
+           ir3.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 
