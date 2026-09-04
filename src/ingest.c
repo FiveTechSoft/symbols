@@ -19,10 +19,8 @@ static void StrToUpperTrim(const char *src, char *dst, size_t max)
 
     while (*src && j < max - 1)
     {
-        if (!isspace((unsigned char)*src))
-        {
-            dst[j++] = (char)toupper((unsigned char)*src);
-        }
+        char c = (char)toupper((unsigned char)*src);
+        dst[j++] = c;
         src++;
     }
 

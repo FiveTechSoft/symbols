@@ -1,6 +1,6 @@
 """
-Wikipedia -> Symbolic LLM Pipeline v4 (Aggressive Extraction)
-Uses sentence-level subject-verb-object detection without strict patterns.
+Wikipedia -> Symbolic LLM Pipeline v5 (Pattern-Based Extraction)
+Uses regex patterns to extract clean subject-predicate-object triples.
 """
 
 import re
@@ -12,108 +12,235 @@ from collections import Counter
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# Verbs that indicate relationships
-VERBS = {
-    'es', 'era', 'fue', 'ser', 'son', 'estaba', 'esta', 'estan',
-    'tiene', 'posee', 'tenia', 'cuenta',
-    'fue fundado', 'fue creado', 'fue establecido', 'fue inaugurado',
-    'fue fundada', 'fue creada',
-    'vive', 'habita', 'reside', 'se encuentra', 'esta ubicado',
-    'produce', 'genera', 'fabrica', 'exporta', 'importa',
-    'necesita', 'requiere', 'usa', 'utiliza', 'emplea',
-    'pertenece', 'forma parte', 'depende',
-    'incluye', 'contiene', 'comprende', 'abarca',
-    'se llama', 'se conoce', 'se denomina', 'se le conoce',
-    'coviene', 'colinda', 'limita',
-    'causa', 'provoca', 'genera', 'produce',
-    'sufre', 'padisce', 'experimenta',
-    'existio', 'existia', 'existio',
-    'funciona', 'opera', 'trabaja',
+ARTICLES = {'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas'}
+PREPOSITIONS = {'de', 'del', 'en', 'por', 'para', 'con', 'sin', 'sobre',
+                'entre', 'hasta', 'desde', 'hacia', 'como', 'según'}
+CONNECTORS = {'y', 'o', 'e', 'ni', 'pero', 'sino', 'que'}
+
+PREDICATE_MAP = {
+    'es': 'ES', 'era': 'ES', 'fue': 'ES', 'son': 'ES', 'estaba': 'ES',
+    'esta': 'ES', 'estan': 'ES', 'ser': 'ES',
+    'tiene': 'TIENE', 'posee': 'TIENE', 'tenia': 'TIENE', 'cuenta': 'TIENE',
+    'vive': 'VIVE_EN', 'habita': 'VIVE_EN', 'reside': 'VIVE_EN',
+    'produce': 'PRODUCE', 'genera': 'PRODUCE', 'fabrica': 'PRODUCE',
+    'necesita': 'NECESITA', 'requiere': 'NECESITA',
+    'usa': 'USA', 'utiliza': 'USA', 'emplea': 'USA',
+    'pertenece': 'PERTENECE_A', 'forma': 'PARTE_DE',
+    'incluye': 'INCLUYE', 'contiene': 'INCLUYE',
+    'llama': 'SE_LLAMA', 'conoce': 'SE_LLAMA', 'denomina': 'SE_LLAMA',
+    'causa': 'CAUSA', 'provoca': 'CAUSA',
+    'sufre': 'SUFRE', 'padece': 'SUFRE',
+    'funciona': 'FUNCIONA', 'opera': 'FUNCIONA',
 }
 
+STOP_SUBJ = {'EL', 'LA', 'LOS', 'LAS', 'UN', 'UNA', 'EN', 'DE', 'DEL',
+             'POR', 'PARA', 'CON', 'QUE', 'SE', 'NO', 'AL', 'LO',
+             'SU', 'LES', 'LH', 'D', 'L'}
+
 def clean_text(text):
+    text = re.sub(r'\u200b', '', text)
     text = re.sub(r'\{\{[^}]*\}\}', '', text)
     text = re.sub(r'\[\[(?:[^|\]]*\|)?([^\]]+)\]\]', r'\1', text)
     text = re.sub(r'<ref[^>]*>.*?</ref>', '', text, flags=re.DOTALL)
     text = re.sub(r'<ref[^>]*/?>', '', text)
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'\'{2,}', '', text)
+    text = re.sub(r'\([^)]*\)', '', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 
 def split_sentences(text):
-    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    return [s.strip() for s in sentences if len(s.strip()) > 25]
+    sentences = re.split(r'(?<=[.!?;])\s+(?=[A-ZÁÉÍÓÚÑ])', text)
+    return [s.strip() for s in sentences if len(s.strip()) > 30]
 
 
-def extract_triples_aggressive(sentence):
-    """Aggressive extraction: find capitalized phrases near key verbs."""
+def is_valid_noun(phrase):
+    """Check if a phrase looks like a valid noun (not just articles/prepositions)."""
+    words = phrase.upper().split()
+    content_words = [w for w in words if w not in ARTICLES and w not in PREPOSITIONS and w not in CONNECTORS]
+    return len(content_words) >= 1 and len(content_words[0]) >= 3
+
+
+def extract_subject_before(sentence, verb_start):
+    """Extract the noun phrase that is the subject (before the verb)."""
+    before = sentence[:verb_start].strip().rstrip('.,;: ')
+
+    # Find the main noun phrase: look for the last comma or start
+    # Subject is typically: "El/La [noun phrase]"
+    # Try to find a clean noun phrase
+    words = before.split()
+    if not words:
+        return None
+
+    # Walk backwards from the end to find the subject boundary
+    # Skip trailing prepositions
+    end = len(words)
+    while end > 0 and words[end-1].lower().rstrip('.,;:') in PREPOSITIONS | CONNECTORS | {'que', 'quien', 'cual', 'donde', 'cuando'}:
+        end -= 1
+
+    # Now find the start of the subject
+    # Subject typically starts with article or capital letter
+    start = end - 1
+    while start > 0:
+        w = words[start].lower().rstrip('.,;:')
+        if w in PREPOSITIONS or w in CONNECTORS or w in {'que', 'quien', 'cual'}:
+            start += 1
+            break
+        start -= 1
+
+    if start >= end:
+        return None
+
+    subj_words = words[start:end]
+    subj = ' '.join(subj_words).strip('.,;: ')
+
+    # Clean up: remove leading articles if they make the noun vague
+    sw = subj.split()
+    if len(sw) > 1 and sw[0].upper() in ARTICLES:
+        # Keep article if it's part of a proper noun (e.g., "El Salvador")
+        if len(sw) > 2 or sw[0].upper() not in {'EL', 'LA', 'LOS', 'LAS'}:
+            pass  # Keep as-is for proper nouns
+        elif sw[0].upper() in ARTICLES and len(sw) <= 2:
+            # "El Salvador" -> keep, "El río" -> skip article
+            pass
+
+    return subj.strip() if subj.strip() else None
+
+
+def extract_object_after(sentence, verb_end):
+    """Extract the noun phrase that is the object (after the verb)."""
+    after = sentence[verb_end:].strip().lstrip('.,;: ')
+
+    if not after:
+        return None
+
+    words = after.split()
+    if not words:
+        return None
+
+    # Find the end of the object phrase
+    # Stop at next verb-like word, period, or conjunction that starts a new clause
+    end = min(len(words), 10)
+    for i, w in enumerate(words[:end]):
+        wl = w.lower().rstrip('.,;:')
+        if wl in {'que', 'quien', 'cual', 'donde', 'cuando', 'porque', 'pues'}:
+            end = i
+            break
+        if wl in PREPOSITIONS and i > 0:
+            # Check if this preposition starts a new phrase
+            # "en España" after "es un país" -> stop before "en"
+            end = i
+            break
+
+    obj_words = words[:end]
+    obj = ' '.join(obj_words).strip('.,;: ')
+
+    if len(obj) < 2:
+        return None
+
+    return obj
+
+
+def extract_triples_v5(sentence):
+    """Split-at-verb triple extraction for Spanish Wikipedia text."""
     triples = []
-    words = sentence.split()
 
-    for i, word in enumerate(words):
-        w_lower = word.lower().rstrip('.,;:')
+    # Split sentence into clauses at semicolons and period
+    clauses = re.split(r'[.;]', sentence)
 
-        for verb in VERBS:
-            if w_lower == verb or sentence.lower().find(verb) != -1:
-                # Look for capitalized subject before verb
-                subj_words = []
-                for j in range(max(0, i-5), i):
-                    if words[j][0:1].isupper() or words[j].lower() in {'de', 'del', 'la', 'el', 'los', 'las', 'en', 'por', 'para'}:
-                        subj_words.append(words[j])
-                    else:
-                        subj_words = []
+    for clause in clauses:
+        clause = clause.strip()
+        if len(clause) < 20:
+            continue
 
-                # Look for capitalized/meaningful object after verb
-                verb_pos = sentence.lower().find(verb)
-                if verb_pos == -1:
-                    continue
-                after_verb = sentence[verb_pos + len(verb):].strip()
-                obj_words = []
-                for ow in after_verb.split()[:8]:
-                    ow_clean = ow.rstrip('.,;:')
-                    if ow_clean and len(ow_clean) > 1:
-                        obj_words.append(ow_clean)
-                    if len(obj_words) >= 4:
-                        break
+        # For each clause, try to find a verb and split around it
+        for verb, pred in [
+            ('fue fundado', 'FUE_CREADO'), ('fue creada', 'FUE_CREADO'),
+            ('fue creado', 'FUE_CREADO'), ('fue establecido', 'FUE_CREADO'),
+            ('se encuentra', 'UBICADO_EN'), ('está ubicado', 'UBICADO_EN'),
+            ('se halla', 'UBICADO_EN'), ('se sitúa', 'UBICADO_EN'),
+            ('pertenece a', 'PERTENECE_A'),
+            ('forma parte de', 'PARTE_DE'),
+            ('tiene', 'TIENE'), ('posee', 'TIENE'),
+            ('produce', 'PRODUCE'), ('genera', 'PRODUCE'),
+            ('utiliza', 'USA'), ('usa', 'USA'), ('requiere', 'USA'),
+            ('incluye', 'INCLUYE'), ('contiene', 'INCLUYE'),
+            ('causa', 'CAUSA'), ('provoca', 'CAUSA'),
+            ('es', 'ES'), ('era', 'ES'), ('fue', 'ES'), ('son', 'ES'),
+        ]:
+            # Find the verb in the clause
+            idx = clause.lower().find(' ' + verb + ' ')
+            if idx == -1:
+                idx = clause.lower().find(' ' + verb + ',')
+            if idx == -1:
+                idx = clause.lower().find(' ' + verb + ' ')
+            if idx == -1:
+                continue
 
-                if len(subj_words) >= 1 and len(obj_words) >= 1:
-                    subj = ' '.join(subj_words).upper()
-                    obj = ' '.join(obj_words)
+            before = clause[:idx].strip()
+            after = clause[idx + len(verb) + 1:].strip().lstrip('.,;: ')
 
-                    # Skip very short or very long
-                    if len(subj) < 2 or len(obj) < 2:
-                        continue
-                    if len(subj) > 50 or len(obj) > 60:
-                        continue
+            # Extract subject: last noun phrase before verb
+            # Find the last comma that has meaningful text after it
+            last_comma = before.rfind(',')
+            while last_comma > 0:
+                candidate = before[last_comma + 1:].strip()
+                if len(candidate) >= 3:
+                    before = candidate
+                    break
+                last_comma = before.rfind(',', 0, last_comma)
 
-                    # Skip common false positives
-                    skip_subj = {'EL', 'LA', 'LOS', 'LAS', 'UN', 'UNA', 'EN', 'DE', 'DEL', 'POR', 'PARA', 'CON', 'QUE', 'SE', 'NO', 'AL', 'LO'}
-                    if subj in skip_subj:
-                        continue
+            subj_words = before.split()
+            if not subj_words:
+                continue
 
-                    # Map verb to predicate
-                    v = verb.split()[0] if ' ' in verb else verb
-                    pred_map = {
-                        'es': 'ES', 'era': 'ES', 'fue': 'ES', 'son': 'ES',
-                        'tiene': 'TIENE', 'posee': 'TIENE', 'tenia': 'TIENE', 'cuenta': 'TIENE',
-                        'vive': 'VIVE_EN', 'habita': 'VIVE_EN', 'reside': 'VIVE_EN',
-                        'encuentra': 'UBICADO_EN', 'ubicado': 'UBICADO_EN',
-                        'produce': 'PRODUCE', 'genera': 'PRODUCE', 'fabrica': 'PRODUCE',
-                        'necesita': 'NECESITA', 'requiere': 'NECESITA',
-                        'usa': 'USA', 'utiliza': 'USA', 'emplea': 'USA',
-                        'pertenece': 'PERTENECE_A', 'forma': 'PARTE_DE',
-                        'incluye': 'INCLUYE', 'contiene': 'INCLUYE',
-                        'llama': 'SE_LLAMA', 'conoce': 'SE_LLAMA', 'denomina': 'SE_LLAMA',
-                        'causa': 'CAUSA', 'provoca': 'CAUSA',
-                        'sufre': 'SUFRE',
-                        'funciona': 'FUNCIONA', 'opera': 'FUNCIONA',
-                    }
-                    pred = pred_map.get(v, 'ES')
+            # Trim trailing prepositions/connectors
+            while subj_words and subj_words[-1].lower().rstrip('.,;:') in \
+                    PREPOSITIONS | CONNECTORS | {'que', 'quien', 'cual', 'donde', 'cuando'}:
+                subj_words.pop()
 
-                    triples.append((subj, pred, obj))
-                break
+            # Find the start of the subject (skip leading articles if followed by lowercase)
+            start = 0
+            if len(subj_words) > 1 and subj_words[0].lower() in ARTICLES:
+                if subj_words[1][0:1].islower():
+                    start = 1
+
+            subj = ' '.join(subj_words[start:]).strip('.,;: ')
+
+            # Extract object: first meaningful phrase after verb
+            # Clean up leading articles that got stuck to the verb
+            after_clean = re.sub(r'^(?:\s*(?:es|un|una|el|la|los|las))+\s*', '', after)
+            if not after_clean:
+                after_clean = after
+
+            obj_words = []
+            for w in after_clean.split():
+                wl = w.lower().rstrip('.,;:')
+                # Stop at conjunctions that start new clauses
+                if wl in {'que', 'quien', 'cual', 'donde', 'cuando', 'porque',
+                          'pues', 'aunque', 'pero', 'sino', 'y', 'o'}:
+                    break
+                obj_words.append(w.rstrip('.,;:'))
+                if len(obj_words) >= 6:
+                    break
+
+            obj = ' '.join(obj_words).strip()
+
+            # Validate
+            if len(subj) < 3 or len(obj) < 3:
+                continue
+            if not subj[0].isalpha():
+                continue
+
+            # Skip if subject is just articles/prepositions
+            sw = subj.upper().split()
+            content = [w for w in sw if w not in ARTICLES and w not in PREPOSITIONS]
+            if len(content) == 0:
+                continue
+
+            triples.append((subj.upper(), pred, obj))
+            break  # One triple per clause
 
     return triples
 
@@ -222,7 +349,7 @@ def main():
         sentences = split_sentences(text)
 
         for sent in sentences:
-            for s, p, o in extract_triples_aggressive(sent):
+            for s, p, o in extract_triples_v5(sent):
                 all_triples.append((s, p, o))
                 stats_pred[p] += 1
 
