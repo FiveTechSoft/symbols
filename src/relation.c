@@ -1,22 +1,71 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "relation.h"
 
+#define HASH_LOAD_FACTOR_NUM 7
+#define HASH_LOAD_FACTOR_DEN 10
+#define EMPTY_BUCKET 0xFFFFFFFF
+
+static uint32_t NextPowerOfTwo(uint32_t n)
+{
+    if (n < 16) n = 16;
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return n + 1;
+}
+
+/* MurmurMix64 for (subject, predicate, object) triplet */
+static inline uint32_t HashTriplet(SYMBOL_ID s, SYMBOL_ID p, SYMBOL_ID o)
+{
+    uint64_t k = ((uint64_t)s) ^ ((uint64_t)p << 21) ^ ((uint64_t)o << 42);
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccdULL;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53ULL;
+    k ^= k >> 33;
+    return (uint32_t)k;
+}
+
+static void RehashBuckets(RELATION_TABLE *table, uint32_t new_cap)
+{
+    new_cap = NextPowerOfTwo(new_cap);
+    uint32_t *new_buckets = (uint32_t *)malloc(new_cap * sizeof(uint32_t));
+    if (new_buckets == NULL)
+        return;
+
+    uint32_t new_mask = new_cap - 1;
+    for (uint32_t i = 0; i < new_cap; i++)
+        new_buckets[i] = EMPTY_BUCKET;
+
+    for (uint32_t i = 0; i < table->count; i++)
+    {
+        RELATION *r = &table->items[i];
+        uint32_t h = HashTriplet(r->subject, r->predicate, r->object) & new_mask;
+        while (new_buckets[h] != EMPTY_BUCKET)
+            h = (h + 1) & new_mask;
+        new_buckets[h] = i;
+    }
+
+    free(table->buckets);
+    table->buckets = new_buckets;
+    table->capacity = new_cap;
+    table->mask = new_mask;
+}
 
 /* ============================================================
-   Crear tabla de relaciones
+   Create / Init / Destroy
    ============================================================ */
 
 RELATION_TABLE *RelationTableCreate(uint32_t capacity)
 {
-    RELATION_TABLE *table;
-
     if (capacity == 0)
         capacity = 16;
 
-    table = (RELATION_TABLE *)malloc(sizeof(RELATION_TABLE));
+    RELATION_TABLE *table = (RELATION_TABLE *)malloc(sizeof(RELATION_TABLE));
     if (table == NULL)
         return NULL;
 
@@ -26,18 +75,23 @@ RELATION_TABLE *RelationTableCreate(uint32_t capacity)
 
 void RelationTableInit(RELATION_TABLE *table, uint32_t capacity)
 {
+    if (table == NULL)
+        return;
+
     if (capacity == 0)
         capacity = 16;
 
+    capacity = NextPowerOfTwo(capacity);
+
     table->items = (RELATION *)calloc(capacity, sizeof(RELATION));
+    table->buckets = (uint32_t *)malloc(capacity * sizeof(uint32_t));
     table->count = 0;
     table->capacity = capacity;
+    table->mask = capacity - 1;
+
+    for (uint32_t i = 0; i < capacity; i++)
+        table->buckets[i] = EMPTY_BUCKET;
 }
-
-
-/* ============================================================
-   Destruir tabla
-   ============================================================ */
 
 void RelationTableDestroy(RELATION_TABLE *table)
 {
@@ -45,103 +99,60 @@ void RelationTableDestroy(RELATION_TABLE *table)
         return;
 
     free(table->items);
-    free(table);
+    free(table->buckets);
 }
 
-
 /* ============================================================
-   Ampliar tabla
+   Find O(1) average via hash
    ============================================================ */
 
-static int RelationTableGrow(RELATION_TABLE *table)
+RELATION *RelationFind(RELATION_TABLE *table,
+                       SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object)
 {
-    RELATION *new_items;
-    uint32_t new_capacity;
-
-    if (table == NULL)
-        return 0;
-
-    new_capacity = table->capacity * 2;
-
-    if (new_capacity < table->capacity)
-        return 0; /* overflow */
-
-    new_items = (RELATION *)realloc(
-        table->items,
-        new_capacity * sizeof(RELATION)
-    );
-
-    if (new_items == NULL)
-        return 0;
-
-    /*
-     * Inicializar la zona nueva.
-     */
-
-    memset(
-        new_items + table->capacity,
-        0,
-        (new_capacity - table->capacity) *
-        sizeof(RELATION)
-    );
-
-    table->items = new_items;
-    table->capacity = new_capacity;
-
-    return 1;
-}
-
-
-/* ============================================================
-   Buscar relacion exacta
-   ============================================================ */
-
-RELATION *RelationFind(
-    RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object)
-{
-    uint32_t i;
-
-    if (table == NULL)
+    if (table == NULL || table->count == 0)
         return NULL;
 
-    for (i = 0; i < table->count; i++)
-    {
-        RELATION *r = &table->items[i];
+    uint32_t h = HashTriplet(subject, predicate, object) & table->mask;
 
+    while (table->buckets[h] != EMPTY_BUCKET)
+    {
+        uint32_t idx = table->buckets[h];
+        RELATION *r = &table->items[idx];
         if (r->subject == subject &&
             r->predicate == predicate &&
             r->object == object)
         {
             return r;
         }
+        h = (h + 1) & table->mask;
     }
 
     return NULL;
 }
 
-
 /* ============================================================
-   Anadir relacion
+   Strengthen
    ============================================================ */
 
-int RelationAdd(
-    RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object)
+void RelationStrengthen(RELATION *relation, float amount)
 {
-    RELATION *relation;
+    if (relation == NULL)
+        return;
 
+    relation->weight += amount;
+    if (relation->weight > 1.0e9f)
+        relation->weight = 1.0e9f;
+}
+
+/* ============================================================
+   Add (with auto-rehash at 70% load)
+   ============================================================ */
+
+int RelationAdd(RELATION_TABLE *table,
+                SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object)
+{
     if (table == NULL)
         return 0;
-
-    /*
-     * Los IDs de simbolo 0 estan reservados
-     * para SYMBOL_INVALID.
-     */
 
     if (subject == SYMBOL_INVALID ||
         predicate == SYMBOL_INVALID ||
@@ -150,220 +161,127 @@ int RelationAdd(
         return 0;
     }
 
-    /*
-     * Comprobar si ya existe.
-     */
-
-    relation = RelationFind(
-        table,
-        subject,
-        predicate,
-        object
-    );
-
-    if (relation != NULL)
+    /* Check if already exists */
+    RELATION *existing = RelationFind(table, subject, predicate, object);
+    if (existing != NULL)
     {
-        relation->count++;
-
-        /*
-         * Aumentamos ligeramente la fuerza.
-         */
-
-        RelationStrengthen(
-            relation,
-            0.01f
-        );
-
+        existing->count++;
+        RelationStrengthen(existing, 0.01f);
         return 1;
     }
 
-    /*
-     * Necesitamos espacio.
-     */
-
+    /* Grow items array if full */
     if (table->count >= table->capacity)
     {
-        if (!RelationTableGrow(table))
+        uint32_t new_cap = table->capacity * 2;
+        RELATION *new_items = (RELATION *)realloc(
+            table->items, new_cap * sizeof(RELATION));
+        if (new_items == NULL)
             return 0;
+
+        memset(new_items + table->capacity, 0,
+               (new_cap - table->capacity) * sizeof(RELATION));
+        table->items = new_items;
+        table->capacity = new_cap;
+        table->mask = new_cap - 1;
     }
 
-    relation = &table->items[table->count];
+    /* Rehash if load factor exceeded */
+    if (table->count * HASH_LOAD_FACTOR_DEN >= table->capacity * HASH_LOAD_FACTOR_NUM)
+    {
+        RehashBuckets(table, table->capacity * 2);
+    }
 
-    relation->subject = subject;
-    relation->predicate = predicate;
-    relation->object = object;
-
-    relation->count = 1;
-    relation->weight = 1.0f;
-
+    /* Insert into dense array */
+    uint32_t idx = table->count;
+    RELATION *r = &table->items[idx];
+    r->subject = subject;
+    r->predicate = predicate;
+    r->object = object;
+    r->count = 1;
+    r->weight = 1.0f;
     table->count++;
+
+    /* Insert into hash table */
+    uint32_t h = HashTriplet(subject, predicate, object) & table->mask;
+    while (table->buckets[h] != EMPTY_BUCKET)
+        h = (h + 1) & table->mask;
+    table->buckets[h] = idx;
 
     return 1;
 }
 
-
 /* ============================================================
-   Reforzar relacion
+   Query by subject (scans dense array - unavoidable for partial keys)
    ============================================================ */
 
-void RelationStrengthen(
-    RELATION *relation,
-    float amount)
+uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
+                               RELATION **results, uint32_t max_results)
 {
-    if (relation == NULL)
-        return;
-
-    relation->weight += amount;
-
-    /*
-     * Evitamos que la fuerza crezca indefinidamente.
-     */
-
-    if (relation->weight > 1.0e9f)
-        relation->weight = 1.0e9f;
-}
-
-
-/* ============================================================
-   Buscar por sujeto
-   ============================================================ */
-
-uint32_t RelationFindBySubject(
-    const RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    RELATION **results,
-    uint32_t max_results)
-{
-    uint32_t i;
-    uint32_t found = 0;
-
-    if (table == NULL ||
-        results == NULL ||
-        max_results == 0)
-    {
+    if (table == NULL || results == NULL || max_results == 0)
         return 0;
-    }
 
-    for (i = 0; i < table->count; i++)
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].subject == subject)
         {
-            results[found] = &table->items[i];
-
-            found++;
-
+            results[found++] = &table->items[i];
             if (found >= max_results)
                 break;
         }
     }
-
     return found;
 }
 
-
-/* ============================================================
-   Buscar por sujeto + predicado
-   ============================================================ */
-
-uint32_t RelationFindBySubjectPredicate(
-    const RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    RELATION **results,
-    uint32_t max_results)
+uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject, SYMBOL_ID predicate,
+                                        RELATION **results, uint32_t max_results)
 {
-    uint32_t i;
-    uint32_t found = 0;
-
-    if (table == NULL ||
-        results == NULL ||
-        max_results == 0)
-    {
+    if (table == NULL || results == NULL || max_results == 0)
         return 0;
-    }
 
-    for (i = 0; i < table->count; i++)
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].subject == subject &&
             table->items[i].predicate == predicate)
         {
-            results[found] = &table->items[i];
-
-            found++;
-
+            results[found++] = &table->items[i];
             if (found >= max_results)
                 break;
         }
     }
-
     return found;
 }
 
-
-/* ============================================================
-   Buscar por objeto
-   ============================================================ */
-
-uint32_t RelationFindByObject(
-    const RELATION_TABLE *table,
-    SYMBOL_ID object,
-    RELATION **results,
-    uint32_t max_results)
+uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,
+                              RELATION **results, uint32_t max_results)
 {
-    uint32_t i;
-    uint32_t found = 0;
-
-    if (table == NULL ||
-        results == NULL ||
-        max_results == 0)
-    {
+    if (table == NULL || results == NULL || max_results == 0)
         return 0;
-    }
 
-    for (i = 0; i < table->count; i++)
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].object == object)
         {
-            results[found] = &table->items[i];
-
-            found++;
-
+            results[found++] = &table->items[i];
             if (found >= max_results)
                 break;
         }
     }
-
     return found;
 }
 
-
-/* ============================================================
-   Obtener relacion por indice
-   ============================================================ */
-
-const RELATION *RelationGet(
-    const RELATION_TABLE *table,
-    uint32_t index)
+const RELATION *RelationGet(const RELATION_TABLE *table, uint32_t index)
 {
-    if (table == NULL)
+    if (table == NULL || index >= table->count)
         return NULL;
-
-    if (index >= table->count)
-        return NULL;
-
     return &table->items[index];
 }
 
-
-/* ============================================================
-   Numero de relaciones
-   ============================================================ */
-
-uint32_t RelationCount(
-    const RELATION_TABLE *table)
+uint32_t RelationCount(const RELATION_TABLE *table)
 {
-    if (table == NULL)
-        return 0;
-
-    return table->count;
+    return table ? table->count : 0;
 }

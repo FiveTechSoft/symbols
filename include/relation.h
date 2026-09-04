@@ -4,75 +4,47 @@
 #include <stdint.h>
 #include "symbol.h"
 
-
 typedef struct
 {
     SYMBOL_ID subject;
     SYMBOL_ID predicate;
     SYMBOL_ID object;
-
-    uint64_t count;
-    float weight;
+    uint64_t  count;
+    float     weight;
 } RELATION;
-
 
 typedef struct
 {
     RELATION *items;
-
-    uint32_t count;
-    uint32_t capacity;
-
+    uint32_t *buckets;
+    uint32_t  count;
+    uint32_t  capacity;
+    uint32_t  mask;
 } RELATION_TABLE;
-
 
 RELATION_TABLE *RelationTableCreate(uint32_t capacity);
 void RelationTableInit(RELATION_TABLE *table, uint32_t capacity);
 void RelationTableDestroy(RELATION_TABLE *table);
 
-int RelationAdd(
-    RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object
-);
+int RelationAdd(RELATION_TABLE *table,
+                SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
 
-RELATION *RelationFind(
-    RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object
-);
+RELATION *RelationFind(RELATION_TABLE *table,
+                       SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
 
-uint32_t RelationFindBySubject(
-    const RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    RELATION **results,
-    uint32_t max_results
-);
+uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
+                               RELATION **results, uint32_t max_results);
 
-uint32_t RelationFindBySubjectPredicate(
-    const RELATION_TABLE *table,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    RELATION **results,
-    uint32_t max_results
-);
+uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject, SYMBOL_ID predicate,
+                                        RELATION **results, uint32_t max_results);
 
-uint32_t RelationFindByObject(
-    const RELATION_TABLE *table,
-    SYMBOL_ID object,
-    RELATION **results,
-    uint32_t max_results
-);
+uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,
+                              RELATION **results, uint32_t max_results);
 
 void RelationStrengthen(RELATION *relation, float amount);
 
-const RELATION *RelationGet(
-    const RELATION_TABLE *table,
-    uint32_t index
-);
-
+const RELATION *RelationGet(const RELATION_TABLE *table, uint32_t index);
 uint32_t RelationCount(const RELATION_TABLE *table);
 
 #endif
