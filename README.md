@@ -130,12 +130,22 @@ EMBEDDING BLOCK
 
 V1 files (without embeddings) are still loadable.
 
+## Hash Table Optimization (O(1))
+
+Both `SYMBOL_TABLE` and `RELATION_TABLE` use open-addressing hash tables with linear probing:
+
+- **Power-of-2 capacities**: Bitwise `& mask` instead of modulo `%`
+- **70% load factor**: Automatic rehash to keep collisions minimal
+- **DJB2a (XOR)**: Fast string hashing for symbols
+- **MurmurMix64**: High-dispersion integer hash for (subject, predicate, object) triplets
+- **Dual indexing**: Dense `items[]` array for sequential access + `buckets[]` for O(1) lookup
+
 ## Project Structure
 
 ```
 include/
-  symbol.h        SYMBOL_TABLE: Create, Add, Find, Get, Count
-  relation.h      RELATION_TABLE: Add, Find, Strengthen, queries
+  symbol.h        SYMBOL_TABLE with hash index: O(1) Find
+  relation.h      RELATION_TABLE with hash index: O(1) Find
   embedding.h     32D vectors: RandomInit, Cooccur, Cosine, FindSimilar
   graph.h         GRAPH: queries, transitive inference, fuzzy resolution
   learning.h      Sentence parsing, probabilistic prediction
@@ -144,8 +154,8 @@ include/
   model.h         MODEL: Create, Save V2, Load (V1+V2 compatible)
 
 src/
-  symbol.c        Symbol table implementation
-  relation.c      Relation table implementation
+  symbol.c        Hash table with DJB2a + linear probing
+  relation.c      Hash table with MurmurMix64 + linear probing
   embedding.c     32D embedding math + similarity search
   graph.c         Graph queries + hybrid fuzzy resolution
   learning.c      Corpus learning + prediction
@@ -164,10 +174,27 @@ tests/
   test_model.c         Persistence V1
   test_model_embeddings.c  Persistence V2 with vectors
   test_graph_fuzzy.c   Hybrid fuzzy query (H4)
-  bench_stress_50k.c   50K benchmark
+  bench_stress_50k.c   50K symbols+embeddings benchmark
+  bench_1m_relations.c 1M relations benchmark
 ```
 
 ## Benchmark Results
+
+### 1M Relations (hash O(1))
+
+```
+========================================================
+  SYMBOLIC LLM - BENCHMARK 1 MILLON DE RELACIONES
+========================================================
+
+  Relaciones insertadas  : 1,000,000
+  Velocidad de insercion : 5,399,568 rel/seg (0.185s)
+  Latencia de consulta   : 72 ns/query (13.8M queries/seg)
+  Memoria RAM            : 32.00 MB (32 bytes/relacion)
+  Integridad             : 100%
+```
+
+### 50K Symbols + Embeddings
 
 ```
 =========================================================

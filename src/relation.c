@@ -33,6 +33,17 @@ static inline uint32_t HashTriplet(SYMBOL_ID s, SYMBOL_ID p, SYMBOL_ID o)
 static void RehashBuckets(RELATION_TABLE *table, uint32_t new_cap)
 {
     new_cap = NextPowerOfTwo(new_cap);
+
+    /* Grow items array to match */
+    RELATION *new_items = (RELATION *)realloc(
+        table->items, new_cap * sizeof(RELATION));
+    if (new_items == NULL)
+        return;
+    memset(new_items + table->capacity, 0,
+           (new_cap - table->capacity) * sizeof(RELATION));
+    table->items = new_items;
+
+    /* Rebuild buckets */
     uint32_t *new_buckets = (uint32_t *)malloc(new_cap * sizeof(uint32_t));
     if (new_buckets == NULL)
         return;
@@ -170,23 +181,7 @@ int RelationAdd(RELATION_TABLE *table,
         return 1;
     }
 
-    /* Grow items array if full */
-    if (table->count >= table->capacity)
-    {
-        uint32_t new_cap = table->capacity * 2;
-        RELATION *new_items = (RELATION *)realloc(
-            table->items, new_cap * sizeof(RELATION));
-        if (new_items == NULL)
-            return 0;
-
-        memset(new_items + table->capacity, 0,
-               (new_cap - table->capacity) * sizeof(RELATION));
-        table->items = new_items;
-        table->capacity = new_cap;
-        table->mask = new_cap - 1;
-    }
-
-    /* Rehash if load factor exceeded */
+    /* Rehash at 70% load (grows both items and buckets) */
     if (table->count * HASH_LOAD_FACTOR_DEN >= table->capacity * HASH_LOAD_FACTOR_NUM)
     {
         RehashBuckets(table, table->capacity * 2);

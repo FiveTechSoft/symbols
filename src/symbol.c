@@ -31,6 +31,16 @@ static inline uint32_t HashString(const char *str)
 
 static void RehashBuckets(SYMBOL_TABLE *table, uint32_t new_cap)
 {
+    /* Grow items array to match new capacity */
+    SYMBOL *new_items = (SYMBOL *)realloc(
+        table->items, new_cap * sizeof(SYMBOL));
+    if (new_items == NULL)
+        return;
+    memset(new_items + table->capacity, 0,
+           (new_cap - table->capacity) * sizeof(SYMBOL));
+    table->items = new_items;
+
+    /* Rebuild buckets */
     uint32_t *new_buckets = (uint32_t *)malloc(new_cap * sizeof(uint32_t));
     if (new_buckets == NULL)
         return;
