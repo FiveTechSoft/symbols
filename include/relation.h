@@ -4,33 +4,50 @@
 #include <stdint.h>
 #include "symbol.h"
 
+typedef enum
+{
+    POLARITY_POSITIVE = 0,
+    POLARITY_NEGATIVE = 1
+} RELATION_POLARITY;
+
 typedef struct
 {
-    SYMBOL_ID subject;
-    SYMBOL_ID predicate;
-    SYMBOL_ID object;
-    uint64_t  count;
-    float     weight;
+    SYMBOL_ID         subject;
+    SYMBOL_ID         predicate;
+    SYMBOL_ID         object;
+    RELATION_POLARITY polarity;
+    uint64_t          count;
+    float             weight;
 } RELATION;
 
 typedef struct
 {
     RELATION *items;
-    uint32_t *buckets;
     uint32_t  count;
     uint32_t  capacity;
-    uint32_t  mask;
 } RELATION_TABLE;
 
 RELATION_TABLE *RelationTableCreate(uint32_t capacity);
 void RelationTableInit(RELATION_TABLE *table, uint32_t capacity);
 void RelationTableDestroy(RELATION_TABLE *table);
 
+int RelationAddPolar(RELATION_TABLE *table,
+                     SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                     RELATION_POLARITY polarity);
+
 int RelationAdd(RELATION_TABLE *table,
                 SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
 
+RELATION *RelationFindPolar(RELATION_TABLE *table,
+                            SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                            RELATION_POLARITY polarity);
+
 RELATION *RelationFind(RELATION_TABLE *table,
                        SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
+
+RELATION *RelationFindOpposite(RELATION_TABLE *table,
+                               SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                               RELATION_POLARITY polarity);
 
 uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
                                RELATION **results, uint32_t max_results);

@@ -39,49 +39,11 @@ PRUNE_STATS PruneByMinCount(GRAPH *graph, uint32_t min_count)
     stats.relations_after = write_idx;
     stats.relations_removed = removed;
 
-    /* Rebuild hash table for remaining relations */
+    /* Rebuild global relation index after pruning */
     if (removed > 0 && write_idx > 0)
     {
-        /* Force rehash by resetting capacity trigger */
-        uint32_t new_cap = graph->relations->capacity;
-        while (new_cap > 16 &&
-               write_idx * 10 < new_cap * 7)
-        {
-            new_cap /= 2;
-        }
-        if (new_cap < 16) new_cap = 16;
-
-        /* Rebuild buckets from scratch */
-        uint32_t *new_buckets = (uint32_t *)malloc(new_cap * sizeof(uint32_t));
-        if (new_buckets != NULL)
-        {
-            uint32_t mask = new_cap - 1;
-            for (uint32_t i = 0; i < new_cap; i++)
-                new_buckets[i] = 0xFFFFFFFF;
-
-            for (uint32_t i = 0; i < write_idx; i++)
-            {
-                RELATION *r = &graph->relations->items[i];
-                /* Simple hash for rebuild */
-                uint64_t k = ((uint64_t)r->subject) ^
-                             ((uint64_t)r->predicate << 21) ^
-                             ((uint64_t)r->object << 42);
-                k ^= k >> 33;
-                k *= 0xff51afd7ed558ccdULL;
-                k ^= k >> 33;
-                k *= 0xc4ceb9fe1a85ec53ULL;
-                k ^= k >> 33;
-                uint32_t h = (uint32_t)k & mask;
-                while (new_buckets[h] != 0xFFFFFFFF)
-                    h = (h + 1) & mask;
-                new_buckets[h] = i;
-            }
-
-            free(graph->relations->buckets);
-            graph->relations->buckets = new_buckets;
-            graph->relations->capacity = new_cap;
-            graph->relations->mask = mask;
-        }
+        extern void RelationIndexRebuild(RELATION_TABLE *table);
+        RelationIndexRebuild(graph->relations);
     }
 
     return stats;

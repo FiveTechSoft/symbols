@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "graph.h"
 
@@ -86,6 +87,84 @@ int GraphAddRelation(
     }
 
     return RelationAdd(graph->relations, subject, predicate, object);
+}
+
+
+int GraphAddRelationPolar(
+    GRAPH *graph,
+    SYMBOL_ID subject,
+    SYMBOL_ID predicate,
+    SYMBOL_ID object,
+    RELATION_POLARITY polarity,
+    CONFLICT_POLICY policy)
+{
+    if (!graph || subject == SYMBOL_INVALID || predicate == SYMBOL_INVALID || object == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *opposite = RelationFindOpposite(graph->relations, subject, predicate, object, polarity);
+
+    if (opposite != NULL)
+    {
+        switch (policy)
+        {
+            case CONFLICT_REJECT_NEW:
+                return 0;
+
+            case CONFLICT_OVERWRITE:
+                opposite->polarity = polarity;
+                opposite->count = 1;
+                opposite->weight = 1.0f;
+                return 1;
+
+            case CONFLICT_EVIDENCE_WINS:
+                opposite->count--;
+                if (opposite->count == 0)
+                {
+                    opposite->polarity = polarity;
+                    opposite->count = 1;
+                    opposite->weight = 1.0f;
+                }
+                else
+                {
+                    opposite->weight = 1.0f - (1.0f / (float)(opposite->count + 1));
+                }
+                return 1;
+
+            case CONFLICT_ALLOW_BOTH:
+            default:
+                opposite->weight *= 0.5f;
+                break;
+        }
+    }
+
+    return RelationAddPolar(graph->relations, subject, predicate, object, polarity);
+}
+
+
+CONTRADICTION_REPORT GraphCheckContradiction(
+    const GRAPH *graph,
+    SYMBOL_ID subject,
+    SYMBOL_ID predicate,
+    SYMBOL_ID object)
+{
+    CONTRADICTION_REPORT rep;
+    memset(&rep, 0, sizeof(rep));
+
+    if (!graph) return rep;
+
+    RELATION *pos = RelationFindPolar(graph->relations, subject, predicate, object, POLARITY_POSITIVE);
+    RELATION *neg = RelationFindPolar(graph->relations, subject, predicate, object, POLARITY_NEGATIVE);
+
+    if (pos != NULL && neg != NULL)
+    {
+        rep.has_conflict = 1;
+        rep.positive_evidence = pos->count;
+        rep.negative_evidence = neg->count;
+        rep.positive_weight = pos->weight;
+        rep.negative_weight = neg->weight;
+    }
+
+    return rep;
 }
 
 

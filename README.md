@@ -42,7 +42,7 @@ Capable of inferring unseen knowledge (e.g., Siamese → Cat → Mammal → Lung
 | --- | --- | --- |
 | **Memory Usage** | 8 GB to hundreds of GB of GPU VRAM. | **32 MB RAM** for 1 million complete relations. |
 | **Hardware Required** | Dedicated accelerators (NVIDIA GPUs / TPUs). | **Any standard CPU** (Windows, Linux, embedded). |
-| **Inference Speed** | 20 to 150 tokens/second (ms latency). | **> 13 million queries/second** (~70 ns per query). |
+| **Inference Speed** | 20 to 150 tokens/second (ms latency). | **> 13 million queries/second** (~70 ns per query). The entire dense mathematical machinery of deep learning has been replaced by discrete data structures and graph theory. |
 | **Continuous Learning** | Impossible at runtime (catastrophic forgetting; requires retraining or LoRA). | **Instant O(1) streaming insertion** without forgetting anything. |
 | **Hallucinations** | Frequent and hard to detect (stochastic black box). | **Zero hallucination**: if no path exists in the graph, it deterministically responds that it doesn't know. |
 | **Explainability** | Opaque (attention weights don't indicate logical causality). | **100% auditable**: exact logical trace of every deduction. |
@@ -88,6 +88,8 @@ PRUNE            -> Zipf pruning: remove low-count noise relations
 - **Anaphora resolution**: "Él compila" → "ANTONIO compila"
 - **Deep inference**: Siamese → Cat → Mammal → Lungs (72.9% confidence, 4 hops)
 - **Compositional rules**: ES + TIENE => TIENE (automatic materialization)
+- **Contradiction detection**: O(1) conflict detection with 4 resolution policies (reject, overwrite, evidence wins, allow both)
+- **Polarity support**: Explicit positive/negative facts (GATO COME PEZ / GATO NO_COME PLASTICO)
 - **Binary persistence V2**: graph + 32D vectors in a single file, V1 compatible
 - **Sharding**: corpus partitioning for parallel training + exact merge
 - **Noise pruning**: statistical filtering by Zipf's Law (removes 70-80% of noisy relations)

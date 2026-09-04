@@ -8,6 +8,23 @@
 
 #define SIMILARITY_THRESHOLD_DEFAULT 0.70f
 
+typedef enum
+{
+    CONFLICT_REJECT_NEW = 0,
+    CONFLICT_OVERWRITE,
+    CONFLICT_EVIDENCE_WINS,
+    CONFLICT_ALLOW_BOTH
+} CONFLICT_POLICY;
+
+typedef struct
+{
+    int      has_conflict;
+    uint64_t positive_evidence;
+    uint64_t negative_evidence;
+    float    positive_weight;
+    float    negative_weight;
+} CONTRADICTION_REPORT;
+
 typedef struct
 {
     SYMBOL_TABLE    *symbols;
@@ -28,6 +45,19 @@ int GraphAddRelation(GRAPH *graph,
                      SYMBOL_ID subject,
                      SYMBOL_ID predicate,
                      SYMBOL_ID object);
+
+int GraphAddRelationPolar(GRAPH *graph,
+                          SYMBOL_ID subject,
+                          SYMBOL_ID predicate,
+                          SYMBOL_ID object,
+                          RELATION_POLARITY polarity,
+                          CONFLICT_POLICY policy);
+
+CONTRADICTION_REPORT GraphCheckContradiction(
+    const GRAPH *graph,
+    SYMBOL_ID subject,
+    SYMBOL_ID predicate,
+    SYMBOL_ID object);
 
 RELATION *GraphFindRelation(GRAPH *graph,
                             SYMBOL_ID subject,
