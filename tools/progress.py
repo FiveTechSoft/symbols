@@ -53,7 +53,16 @@ def main():
         rows += stats["rows"]
         fixed += stats["fixed"]
         dropped += stats["dropped"]
-    # 4. commit
+    # 4. cobertura del modelo (P1): el binario regenera wiki_model.bin
+    # con bytes identicos (build determinista verificado gcc==msvc),
+    # asi que leer su TOTAL es seguro y sin efectos.
+    import re as _re2
+    model_rels = model_syms = 0
+    rc, out = run([str(build / "test_wikidata_ingest.exe")])
+    m = _re2.search(r"TOTAL:\s*(\d+)\s+relations,\s*(\d+)\s+symbols", out)
+    if m:
+        model_rels, model_syms = int(m.group(1)), int(m.group(2))
+    # 5. commit
     rc, commit = run(["git", "rev-parse", "--short", "HEAD"])
     commit = commit.strip() or "n/a"
 
@@ -64,13 +73,16 @@ def main():
         if is_new:
             w.writerow(["fecha", "commit", "suite_pass", "suite_total",
                         "eval_pass", "eval_total", "hygiene_ok",
-                        "lint_rows", "lint_fixed", "lint_dropped"])
+                        "lint_rows", "lint_fixed", "lint_dropped",
+                        "model_relations", "model_symbols"])
         w.writerow([date.today().isoformat(), commit, suite_pass,
                     suite_total, eval_pass, eval_total,
-                    1 if rc_h == 0 else 0, rows, fixed, dropped])
+                    1 if rc_h == 0 else 0, rows, fixed, dropped,
+                    model_rels, model_syms])
     print(f"{date.today().isoformat()} {commit} suite={suite_pass}/{suite_total} "
           f"eval={eval_pass}/{eval_total} hygiene={'OK' if rc_h == 0 else 'FAIL'} "
-          f"lint=rows:{rows} fixed:{fixed} dropped:{dropped}")
+          f"lint=rows:{rows} fixed:{fixed} dropped:{dropped} "
+          f"model={model_rels}rels/{model_syms}syms")
     print(f"-> anexado a tools/progress.csv")
 
 

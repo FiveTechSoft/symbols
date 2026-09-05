@@ -90,9 +90,15 @@ def repair_mojibake(field: str):
 def clean_field(field: str):
     """Devuelve (campo_limpio, accion) con accion en
     {'ok','fixed','drop'} y motivo aparte."""
-    # 1. wikimarkup: quita segmentos [[...]] y llaves sueltas
+    # 1. wikimarkup: quita segmentos [[...]] y llaves sueltas.
+    # Las colas sin cerrar ([[ARCHIVO:... sin ]] de cierre) son
+    # referencias a fichero, nunca contenido: se cortan.
     new = WIKILINK_RE.sub("", field)
+    new = re.sub(r"\[\[.*$", "", new)
     new = new.replace("{{", "").replace("}}", "")
+    new = re.sub(r"\{\{.*$", "", new)
+    # comillas angulares de lemas/citas: puro markup
+    new = new.replace("«", "").replace("»", "")
     # 2. asteriscos markdown + colapso de guiones
     new = new.replace("*", "")
     new = re.sub(r"__+", "_", new)
@@ -107,6 +113,53 @@ def clean_field(field: str):
     if not new:
         return new, "drop", "empty_after_clean"
     return new, ("fixed" if fixed else "ok"), ""
+
+
+def check_triple(s: str, p: str, o: str):
+    """Un triple (crudo) -> (accion, s2, p2, o2, regla).
+
+    accion: 'keep' (intacto), 'fixed' (reparado), 'drop' (regla=motivo).
+    Misma funcion que usa lint_file y los extractores: una sola
+    fuente de verdad para que lo extraido pase la puerta.
+    """
+    rule = ""
+    if not s.strip() or not p.strip() or not o.strip():
+        return "drop", s, p, o, "empty"
+    su = s.strip().upper()
+    if su in STOP_SUBJ or su.startswith(STOP_PREFIX):
+        return "drop", s, p, o, "anaphora"
+    if " " in p.strip():
+        return "drop", s, p, o, "spaced_pred"
+    ou = o.strip().upper()
+    if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
+        return "drop", s, p, o, "phrase_obj"
+
+    moji_fixed = False
+    flds = []
+    for fld in (s, p, o):
+        if MOJI_RE.search(fld):
+            fld, ok = repair_mojibake(fld)
+            if MOJI_RE.search(fld):
+                return "drop", s, p, o, "mojibake"
+            moji_fixed = moji_fixed or ok
+        flds.append(fld)
+    s, p, o = flds
+
+    fixed_any = moji_fixed
+    flds = []
+    for fld in (s, p, o):
+        fld, act, why = clean_field(fld)
+        if act == "drop":
+            return "drop", s, p, o, why
+        fixed_any = fixed_any or (act == "fixed")
+        flds.append(fld)
+    s, p, o = flds
+    ou = o.strip().upper()
+    if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
+        return "drop", s, p, o, "phrase_obj"
+    if fixed_any:
+        return "fixed", s.strip(), p.strip(), o.strip(), ""
+    return "keep", s.strip(), p.strip(), o.strip(), ""
 
 
 def lint_file(path: Path):
@@ -132,65 +185,16 @@ def lint_file(path: Path):
             continue
         s, p, o = split_row(stripped)
         stats["rows"] += 1
-        rule = ""
-
-        # vacios
-        if not s.strip() or not p.strip() or not o.strip():
-            rule = "empty"
-        # anafora en sujeto (sobre UPPER para listas en mayusculas)
-        su = s.strip().upper()
-        if not rule and (su in STOP_SUBJ or su.startswith(STOP_PREFIX)):
-            rule = "anaphora"
-        # predicado con espacios
-        if not rule and " " in p.strip():
-            rule = "spaced_pred"
-        # objeto-frase (tokens por espacio; los _ pegados son atomos)
-        ou = o.strip().upper()
-        if not rule and (len(ou.split()) > 4 or (len(ou) > 48 and " " in ou)):
-            rule = "phrase_obj"
-
-        # mojibake: intenta reparar cada campo
-        moji_fixed = False
-        if not rule:
-            flds = []
-            for fld in (s, p, o):
-                if MOJI_RE.search(fld):
-                    fld, ok = repair_mojibake(fld)
-                    if MOJI_RE.search(fld):
-                        rule = "mojibake"
-                        break
-                    moji_fixed = moji_fixed or ok
-                flds.append(fld)
-            if not rule:
-                s, p, o = flds
-
-        # limpieza mecanica por campo
-        fixed_any = moji_fixed
-        if not rule:
-            flds = []
-            for fld in (s, p, o):
-                fld, act, why = clean_field(fld)
-                if act == "drop":
-                    rule = why
-                    break
-                fixed_any = fixed_any or (act == "fixed")
-                flds.append(fld)
-            if not rule:
-                s, p, o = flds
-                # re-chequeo de frase tras limpiar (p.ej. quito markup)
-                ou = o.strip().upper()
-                if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
-                    rule = "phrase_obj"
-
-        if rule:
+        action, s2, p2, o2, rule = check_triple(s, p, o)
+        if action == "drop":
             stats["dropped"] += 1
             bump(rule)
             if len(dropped_examples) < 5:
-                dropped_examples.append((rule, s[:40], p[:25], o[:55]))
+                dropped_examples.append((rule, s2[:40], p2[:25], o2[:55]))
         else:
-            if fixed_any:
+            if action == "fixed":
                 stats["fixed"] += 1
-            out_lines.append(f"{s.strip()}\t{p.strip()}\t{o.strip()}")
+            out_lines.append(f"{s2}\t{p2}\t{o2}")
 
     return stats, dropped_examples, out_lines, newline
 
