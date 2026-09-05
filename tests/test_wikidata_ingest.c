@@ -60,6 +60,12 @@ int main(void)
     printf("   Geo:       %llu triples, %u symbols\n",
            ir7.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 8. Ingest Bible kinship (deterministic patterns, lint-gated) */
+    printf("8. Ingesting bible_relations.tsv (kinship)...\n");
+    INGEST_STATS ir8 = IngestTSV(graph, "data/bible/bible_relations.tsv");
+    printf("   Kinship:   %llu triples, %u symbols\n",
+           ir8.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 

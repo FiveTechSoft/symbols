@@ -361,12 +361,92 @@ QUESTION ParserDetectQuestion(const char *input)
                            strcmp(tokens.tokens[0], "QUIÉN") == 0);
     int starts_with_donde = (strcmp(tokens.tokens[0], "DONDE") == 0 ||
                              strcmp(tokens.tokens[0], "DÓNDE") == 0);
+    int starts_with_cuantos = (strcmp(tokens.tokens[0], "CUANTOS") == 0 ||
+                               strcmp(tokens.tokens[0], "CUANTAS") == 0 ||
+                               strcmp(tokens.tokens[0], "CUÁNTOS") == 0 ||
+                               strcmp(tokens.tokens[0], "CUÁNTAS") == 0);
 
     q.is_question = (has_question_mark || ends_with_es ||
-                     starts_with_que || starts_with_donde);
+                     starts_with_que || starts_with_donde ||
+                     starts_with_cuantos);
 
     if (!q.is_question)
         return q;
+
+    /* Strategy 0: kinship 2-hop "ABUELO DE X" (antes que la 1 y la 2,
+       que lo destrozarian: ABUELO no esta en PREDICATE_MAP).
+       e.g. "quien es el abuelo de David" / "el abuelo de David es"
+       → subject=DAVID, predicate=ABUELO */
+    {
+        int has_abuelo = 0, de_pos = -1;
+        for (uint32_t i = 0; i < tokens.count; i++)
+        {
+            if (strcmp(tokens.tokens[i], "ABUELO") == 0 ||
+                strcmp(tokens.tokens[i], "ABUELA") == 0 ||
+                strcmp(tokens.tokens[i], "ABUELOS") == 0 ||
+                strcmp(tokens.tokens[i], "ABUELAS") == 0)
+                has_abuelo = 1;
+            if ((strcmp(tokens.tokens[i], "DE") == 0 ||
+                 strcmp(tokens.tokens[i], "DEL") == 0) && de_pos < 0)
+                de_pos = (int)i;
+        }
+        if (has_abuelo && de_pos > 0)
+        {
+            /* Entidad: ultimo token tras DE sin articulos ni ES final */
+            char subj[128] = {0};
+            for (uint32_t i = (uint32_t)de_pos + 1; i < tokens.count; i++)
+            {
+                if (IsArticle(tokens.tokens[i]))
+                    continue;
+                if (i == tokens.count - 1 &&
+                    strcmp(tokens.tokens[i], "ES") == 0)
+                    continue;
+                strcpy(subj, tokens.tokens[i]);
+            }
+            if (strlen(subj) > 0)
+            {
+                strcpy(q.subject, subj);
+                strcpy(q.predicate, "ABUELO");
+                q.valid = 1;
+                return q;
+            }
+        }
+    }
+
+    /* Strategy 0b: conteo "CUANTOS HIJOS TIENE X"
+       → subject=X, predicate=CUENTA_HIJOS */
+    if (starts_with_cuantos)
+    {
+        int has_hijos = 0, tiene_pos = -1;
+        for (uint32_t i = 0; i < tokens.count; i++)
+        {
+            if (strcmp(tokens.tokens[i], "HIJOS") == 0 ||
+                strcmp(tokens.tokens[i], "HIJAS") == 0 ||
+                strcmp(tokens.tokens[i], "HIJO") == 0 ||
+                strcmp(tokens.tokens[i], "HIJA") == 0)
+                has_hijos = 1;
+            if (strcmp(tokens.tokens[i], "TIENE") == 0 ||
+                strcmp(tokens.tokens[i], "TIENEN") == 0)
+                tiene_pos = (int)i;
+        }
+        if (has_hijos && tiene_pos > 0)
+        {
+            char subj[128] = {0};
+            for (uint32_t i = (uint32_t)tiene_pos + 1; i < tokens.count; i++)
+            {
+                if (IsArticle(tokens.tokens[i]))
+                    continue;
+                strcpy(subj, tokens.tokens[i]);
+            }
+            if (strlen(subj) > 0)
+            {
+                strcpy(q.subject, subj);
+                strcpy(q.predicate, "CUENTA_HIJOS");
+                q.valid = 1;
+                return q;
+            }
+        }
+    }
 
     /* Strategy 1: "la PREDICATE de ENTITY es" pattern
      * e.g. "la CAPITAL de FRANCIA es" → subject=FRANCIA, predicate=CAPITAL
@@ -526,6 +606,98 @@ QUESTION ParserDetectQuestion(const char *input)
     return q;
 }
 
+/* Padres de X por ambas direcciones de la tabla:
+   (X,HIJO_DE,P) y (P,PADRE_DE,X). Sin duplicados. */
+static uint32_t FindParents(const GRAPH *graph, SYMBOL_ID xid,
+                            SYMBOL_ID *out, uint32_t max)
+{
+    uint32_t n = 0;
+    if (graph == NULL || xid == SYMBOL_INVALID || out == NULL || max == 0)
+        return 0;
+
+    SYMBOL_ID hijo = StemFindSymbol(graph->symbols, "HIJO_DE");
+    SYMBOL_ID padre = StemFindSymbol(graph->symbols, "PADRE_DE");
+    if (hijo == SYMBOL_INVALID && padre == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *rels[64];
+    if (hijo != SYMBOL_INVALID)
+    {
+        uint32_t m = GraphQuerySubject(graph, xid, rels, 64);
+        for (uint32_t i = 0; i < m && n < max; i++)
+            if (rels[i]->predicate == hijo)
+                out[n++] = rels[i]->object;
+    }
+    if (padre != SYMBOL_INVALID)
+    {
+        uint32_t m = GraphQueryObject(graph, xid, rels, 64);
+        for (uint32_t i = 0; i < m && n < max; i++)
+        {
+            if (rels[i]->predicate != padre)
+                continue;
+            int dup = 0;
+            for (uint32_t k = 0; k < n; k++)
+                if (out[k] == rels[i]->subject) { dup = 1; break; }
+            if (!dup)
+                out[n++] = rels[i]->subject;
+        }
+    }
+    return n;
+}
+
+/* Hijos de X: (C,HIJO_DE,X) y (X,PADRE_DE,C). Sin duplicados. */
+static uint32_t FindChildren(const GRAPH *graph, SYMBOL_ID xid,
+                             SYMBOL_ID *out, uint32_t max)
+{
+    uint32_t n = 0;
+    if (graph == NULL || xid == SYMBOL_INVALID || out == NULL || max == 0)
+        return 0;
+
+    SYMBOL_ID hijo = StemFindSymbol(graph->symbols, "HIJO_DE");
+    SYMBOL_ID padre = StemFindSymbol(graph->symbols, "PADRE_DE");
+    if (hijo == SYMBOL_INVALID && padre == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *rels[64];
+    if (hijo != SYMBOL_INVALID)
+    {
+        uint32_t m = GraphQueryObject(graph, xid, rels, 64);
+        for (uint32_t i = 0; i < m && n < max; i++)
+            if (rels[i]->predicate == hijo)
+                out[n++] = rels[i]->subject;
+    }
+    if (padre != SYMBOL_INVALID)
+    {
+        uint32_t m = GraphQuerySubject(graph, xid, rels, 64);
+        for (uint32_t i = 0; i < m && n < max; i++)
+        {
+            if (rels[i]->predicate != padre)
+                continue;
+            int dup = 0;
+            for (uint32_t k = 0; k < n; k++)
+                if (out[k] == rels[i]->object) { dup = 1; break; }
+            if (!dup)
+                out[n++] = rels[i]->object;
+        }
+    }
+    return n;
+}
+
+static uint32_t AppendName(const GRAPH *graph, SYMBOL_ID id,
+                           char *out, uint32_t pos, uint32_t max_len)
+{
+    const SYMBOL *sym = SymbolGet(graph->symbols, id);
+    if (!sym || !sym->name)
+        return pos;
+    uint32_t name_len = (uint32_t)strlen(sym->name);
+    if (pos + name_len < max_len)
+    {
+        memcpy(out + pos, sym->name, name_len);
+        pos += name_len;
+    }
+    return pos;
+}
+
 int ParserAnswerQuestion(
     const GRAPH *graph,
     const QUESTION *q,
@@ -536,6 +708,77 @@ int ParserAnswerQuestion(
         return 0;
 
     out_answer[0] = '\0';
+
+    /* Parentesco 2-hop: abuelos = padres(padres(X)) */
+    if (strcmp(q->predicate, "ABUELO") == 0)
+    {
+        SYMBOL_ID xid = StemFindSymbol(graph->symbols, q->subject);
+        if (xid == SYMBOL_INVALID)
+            return 0;
+        SYMBOL_ID pars[8], grans[8];
+        uint32_t np = FindParents(graph, xid, pars, 8);
+        uint32_t ng = 0;
+        for (uint32_t i = 0; i < np && ng < 8; i++)
+        {
+            SYMBOL_ID gp[8];
+            uint32_t n = FindParents(graph, pars[i], gp, 8);
+            for (uint32_t j = 0; j < n && ng < 8; j++)
+            {
+                int dup = 0;
+                for (uint32_t k = 0; k < ng; k++)
+                    if (grans[k] == gp[j]) { dup = 1; break; }
+                if (!dup)
+                    grans[ng++] = gp[j];
+            }
+        }
+        if (ng == 0)
+            return 0;
+        uint32_t pos = 0;
+        for (uint32_t i = 0; i < ng; i++)
+        {
+            if (i > 0 && pos + 2 < max_len)
+            {
+                out_answer[pos++] = ',';
+                out_answer[pos++] = ' ';
+            }
+            pos = AppendName(graph, grans[i], out_answer, pos, max_len);
+        }
+        out_answer[pos] = '\0';
+        return 1;
+    }
+
+    /* Conteo: "N: nombre1, nombre2, ..." (N=0 solo si X existe) */
+    if (strcmp(q->predicate, "CUENTA_HIJOS") == 0)
+    {
+        SYMBOL_ID xid = StemFindSymbol(graph->symbols, q->subject);
+        if (xid == SYMBOL_INVALID)
+            return 0;
+        SYMBOL_ID kids[16];
+        uint32_t n = FindChildren(graph, xid, kids, 16);
+        uint32_t pos = 0;
+        char num[16];
+        snprintf(num, sizeof(num), "%u", n);
+        uint32_t nlen = (uint32_t)strlen(num);
+        if (pos + nlen + 2 < max_len)
+        {
+            memcpy(out_answer + pos, num, nlen);
+            pos += nlen;
+            out_answer[pos++] = ':';
+            out_answer[pos++] = ' ';
+        }
+        uint32_t shown = (n > 8) ? 8 : n;
+        for (uint32_t i = 0; i < shown; i++)
+        {
+            if (i > 0 && pos + 2 < max_len)
+            {
+                out_answer[pos++] = ',';
+                out_answer[pos++] = ' ';
+            }
+            pos = AppendName(graph, kids[i], out_answer, pos, max_len);
+        }
+        out_answer[pos] = '\0';
+        return 1;
+    }
 
     /* Find subject symbol (exact first, then morphological fallback) */
     SYMBOL_ID subj_id = StemFindSymbol(graph->symbols, q->subject);

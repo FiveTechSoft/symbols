@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include "dialog.h"
 #include "stem.h"
+#include "parser.h"
 #include "generator.h"
 #include "nlg.h"
 #include "inference.h"
@@ -164,6 +165,26 @@ int DialogGenerateResponse(
                  "razonar por encadenamiento profundo y detectar sinonimos con embeddings 32D. "
                  "Comandos: /query, /find S P O, /why S P, /analogy A B, /stats, /export <file.dot|.ttl>.");
         return 1;
+    }
+
+    /* ---- Kinship/count: delegate to the parser QA (single source) ---- */
+    {
+        QUESTION pq = ParserDetectQuestion(user_input);
+        if (pq.valid && (strcmp(pq.predicate, "ABUELO") == 0 ||
+                         strcmp(pq.predicate, "CUENTA_HIJOS") == 0))
+        {
+            char answer[256] = {0};
+            if (ParserAnswerQuestion(graph, &pq, answer, sizeof(answer)))
+            {
+                if (strcmp(pq.predicate, "ABUELO") == 0)
+                    snprintf(out_response, max_len,
+                             "El abuelo de %s es %s.", pq.subject, answer);
+                else
+                    snprintf(out_response, max_len,
+                             "%s tiene estos hijos: %s.", pq.subject, answer);
+                return 1;
+            }
+        }
     }
 
     /* ---- Pattern: "X ES" at end → query graph directly ---- */

@@ -46,6 +46,15 @@ def main():
             eval_pass, eval_total = map(int, frac.split("/"))
     rc_h, _ = run([str(build / "test_qa_hygiene.exe"),
                    "tests/qa_eval.tsv", "wiki_model.bin"])
+    # 2b. hard aspiracional (sin umbral: el progreso es verlo subir).
+    # El exit code sera != 0 mientras falle: solo se parsea el numero.
+    hard_pass = hard_total = 0
+    _, out_h = run([str(build / "test_eval_qa.exe"),
+                    "tests/qa_eval_hard.tsv", "wiki_model.bin"])
+    for line in out_h.splitlines():
+        if line.startswith("QA eval:"):
+            frac = line.split()[2].split("=")[0]
+            hard_pass, hard_total = map(int, frac.split("/"))
     # 3. lint (reusa lint_file: mismo codigo que el gate de CI)
     rows = fixed = dropped = 0
     for fn in lint_corpus.FILES:
@@ -74,15 +83,17 @@ def main():
             w.writerow(["fecha", "commit", "suite_pass", "suite_total",
                         "eval_pass", "eval_total", "hygiene_ok",
                         "lint_rows", "lint_fixed", "lint_dropped",
-                        "model_relations", "model_symbols"])
+                        "model_relations", "model_symbols",
+                        "hard_pass", "hard_total"])
         w.writerow([date.today().isoformat(), commit, suite_pass,
                     suite_total, eval_pass, eval_total,
                     1 if rc_h == 0 else 0, rows, fixed, dropped,
-                    model_rels, model_syms])
+                    model_rels, model_syms, hard_pass, hard_total])
     print(f"{date.today().isoformat()} {commit} suite={suite_pass}/{suite_total} "
           f"eval={eval_pass}/{eval_total} hygiene={'OK' if rc_h == 0 else 'FAIL'} "
           f"lint=rows:{rows} fixed:{fixed} dropped:{dropped} "
-          f"model={model_rels}rels/{model_syms}syms")
+          f"model={model_rels}rels/{model_syms}syms "
+          f"hard={hard_pass}/{hard_total}")
     print(f"-> anexado a tools/progress.csv")
 
 

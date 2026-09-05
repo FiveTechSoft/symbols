@@ -702,6 +702,21 @@ int main(void)
             continue;
         }
 
+        /* Kinship/count shapes bypass the attention scorer: ES/TIENE
+           always match there and would hijack the question with a
+           1-hop guess. These shapes have exact 2-hop/count answers. */
+        {
+            QUESTION kq = ParserDetectQuestion(input);
+            if (kq.valid && (strcmp(kq.predicate, "ABUELO") == 0 ||
+                             strcmp(kq.predicate, "CUENTA_HIJOS") == 0))
+            {
+                DialogGenerateResponse(graph, ctx, input,
+                                       response, sizeof(response));
+                printf("IA > %s\n\n", response);
+                continue;
+            }
+        }
+
         /* Attention + token-match hybrid query */
         if (graph != NULL && embeds != NULL)
         {
