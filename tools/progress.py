@@ -62,9 +62,9 @@ def main():
         rows += stats["rows"]
         fixed += stats["fixed"]
         dropped += stats["dropped"]
-    # 4. cobertura del modelo (P1): el binario regenera wiki_model.bin
-    # con bytes identicos (build determinista verificado gcc==msvc),
-    # asi que leer su TOTAL es seguro y sin efectos.
+    # 4. cobertura del modelo (P1): el binario corre el corpus en
+    # memoria (salida a scratch bin, wiki_model.bin intacto desde
+    # el aislamiento de 69f8d54); leer su TOTAL es seguro y sin efectos.
     import re as _re2
     model_rels = model_syms = 0
     rc, out = run([str(build / "test_wikidata_ingest.exe")])

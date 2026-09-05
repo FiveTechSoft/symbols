@@ -17,14 +17,14 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 25/25, eval 98/98, hygiene 98/98, lint 7724/0/0.
-- Model: 13,600 symbols / 6,870 relations (math + Iconclass included).
+- Suite 25/25, eval 87/87, hygiene 87/87, lint 3923/0/0.
+- Model: 5,576 symbols / 3,192 relations (math + Iconclass included).
 - Dynamic vocabulary: question tokens resolve against used relations
   (exact, stemmed, affix-ranked, embedding-ranked); learned words
   work immediately.
 - Trust tiers: curated triples (with provenance) outrank grown noise.
   Bulk text (Quijote, 3513 lines) ingests without degrading curated
-  answers (98/98 on clean and grown maps alike).
+  answers (87/87 on clean and grown maps alike).
 - Tree ingest: input → clauses → symbols → relations, positional,
   multi-triple per input, coordination splitting via census.
   Anaphora wired in: file ingest resolves across sentences and
@@ -102,7 +102,7 @@ symbols.
 
 1. Frequency-purity creation gate: novel spans join only rare tokens,
    so bulk literary text stops gluing articles. Unlocks whole books.
-   Gate: grown-map eval stays 98/98.
+    Gate: grown-map eval stays 87/87.
 2. CLDR Spanish annotations: Spanish symbol→word vocabulary at scale.
 3. Feedback-driven ranking weights (bandit over corrections + eval):
    today's hand-ordered ranks become learned, auditable numbers.
