@@ -54,17 +54,25 @@ symbols.
   eval por categorías. Multi-hop y numérico quedan fuera del core por
   diseño: se implementan como sidecars tipados colgados de símbolos,
   igual que `source`.
-- [ ] P3 — NLG acotada y honesta ("no lo sé" como feature) + i18n:
-  - Pasar UI y respuestas de QA a **EN por defecto**.
-  - Capa i18n de ES/FR (conectores, aperturas, respuestas, desconocidos),
-    conmutable en caliente sin tocar el modelo ni sus datos.
-  - Entrada agnóstica de idioma: sin detección de idioma; la resolución
-    es por similitud semántica contra el mapa vivo.
+- [x] P3 — NLG acotada y honesta ("no lo sé" como feature) + i18n:
+  - [x] Pasar UI y respuestas de QA a **EN por defecto** (`c1df0c6`:
+    prefijo "AI >", UI de main_cli y todos los conectores de
+    `nlg.c`/`dialog.c` en inglés vía `i18n.c`).
+  - [x] Capa i18n de ES/FR (conectores, aperturas, respuestas,
+    desconocidos), conmutable en caliente sin tocar el modelo ni sus
+    datos: comando `/lang EN|ES|FR` + `LangSet/LangGet` global.
+  - [x] Entrada agnóstica de idioma: sin detección de idioma; la
+    resolución es por similitud semántica contra el mapa vivo
+    (exacto → stemmeado → embedding → atención; ya existía en el parser).
 - [ ] P4 — Razonamiento con confianza: exponer pesos y contradicciones
   en las respuestas (infraestructura ya existe: `RELATION.weight`,
   `GraphCheckContradiction`, `CONFLICT_POLICY`).
-- [ ] P5 — Set held-out con verdad humana (deuda explícita:
-  `tests/qa_eval_hard.tsv` lo referencia `tools/progress.py` y aún no existe).
+- [x] P5 — Set held-out con verdad humana: `tests/qa_eval_hard.tsv` creado
+  (40 hechos verificados a mano, sin solapes con `qa_eval.tsv`, solo para
+  medir). `tools/progress.py` portado a Linux (detecta `build/` y binarios
+  sin `.exe`). Aspiracional sin umbral: hoy 35/40 = 87,5%; los 5 gaps
+  documentados (Noruega oslo/krona, idioma PL/SV/HU) son el objetivo de
+  P1/P4. El progreso = ver `hard_pass` subir sin tocar este set.
 
 ## Language & i18n
 
@@ -135,3 +143,12 @@ symbols.
   cosine "attention"; no positional encodings, no learned self-attention.
 - 2026-09-05: i18n English by default (ES/FR); input is
   language-agnostic, resolved by semantic similarity against the map.
+- 2026-09-05: P3 implemented in `c1df0c6` — `include/i18n.h` +
+  `src/i18n.c` (15 template keys x 3 languages), connector strings no
+  longer hardcoded in `nlg.c`/`dialog.c`, new `/lang EN|ES|FR` CLI
+  command, `tests/test_i18n.c` (suite now 26).
+- 2026-09-05: P5 baselines set — `tests/qa_eval_hard.tsv` (40
+  human-verified held-out facts, 35/40 aspirational today; the 5 misses
+  are the target: NO capital/currency, PL/SV/HU language).
+  `tools/progress.py` now port-detects `build/` (Linux) vs
+  `build-gcc/*.exe` (Windows).

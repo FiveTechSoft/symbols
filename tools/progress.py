@@ -24,8 +24,23 @@ def run(cmd):
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
+def find_build():
+    """Detecta el directorio de build y el sufijo de binario.
+    Sonda en orden: build-gcc/*.exe (historico Windows), build/* (Linux/CI)."""
+    for nombre, sufijo in (("build-gcc", ".exe"), ("build", "")):
+        p = ROOT / nombre
+        if (p / ("test_eval_qa" + sufijo)).is_file():
+            return p, sufijo
+    sys.exit("ERROR: no hay binarios de test. Compilar: cmake -S . -B build "
+             "&& cmake --build build")
+
+
+def binario(build, suf, name):
+    return str(build / (name + suf))
+
+
 def main():
-    build = ROOT / "build-gcc"
+    build, suf = find_build()
     # 1. suite
     import re as _re
     rc, out = run(["ctest", "--test-dir", str(build)])
@@ -36,7 +51,7 @@ def main():
         suite_total = int(m.group(2))
         suite_pass = suite_total - int(m.group(1))
     # 2. eval + hygiene (binarios sueltos, no ctest: queremos el numero)
-    rc, out = run([str(build / "test_eval_qa.exe"),
+    rc, out = run([binario(build, suf, "test_eval_qa"),
                    "tests/qa_eval.tsv", "wiki_model.bin"])
     eval_pass = eval_total = 0
     for line in out.splitlines():
@@ -44,12 +59,12 @@ def main():
             # "QA eval: 99/99 = 100.0% (umbral 90%)"
             frac = line.split()[2].split("=")[0]
             eval_pass, eval_total = map(int, frac.split("/"))
-    rc_h, _ = run([str(build / "test_qa_hygiene.exe"),
+    rc_h, _ = run([binario(build, suf, "test_qa_hygiene"),
                    "tests/qa_eval.tsv", "wiki_model.bin"])
     # 2b. hard aspiracional (sin umbral: el progreso es verlo subir).
     # El exit code sera != 0 mientras falle: solo se parsea el numero.
     hard_pass = hard_total = 0
-    _, out_h = run([str(build / "test_eval_qa.exe"),
+    _, out_h = run([binario(build, suf, "test_eval_qa"),
                     "tests/qa_eval_hard.tsv", "wiki_model.bin"])
     for line in out_h.splitlines():
         if line.startswith("QA eval:"):
@@ -67,7 +82,7 @@ def main():
     # asi que leer su TOTAL es seguro y sin efectos.
     import re as _re2
     model_rels = model_syms = 0
-    rc, out = run([str(build / "test_wikidata_ingest.exe")])
+    rc, out = run([binario(build, suf, "test_wikidata_ingest")])
     m = _re2.search(r"TOTAL:\s*(\d+)\s+relations,\s*(\d+)\s+symbols", out)
     if m:
         model_rels, model_syms = int(m.group(1)), int(m.group(2))
