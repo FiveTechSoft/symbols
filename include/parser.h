@@ -47,4 +47,8 @@ int ParserAnswerQuestion(
     char *out_answer,
     uint32_t max_len);
 
+/* Order relations by semantic-area coherence around center. */
+void ParserRankByArea(const GRAPH *graph, SYMBOL_ID center,
+                      RELATION **rels, uint32_t n);
+
 #endif

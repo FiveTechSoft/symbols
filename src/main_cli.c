@@ -127,7 +127,7 @@ int main(void)
     printf("     SYMBOLIC LLM\n");
     printf("  Natural conversation without backpropagation or GPUs.\n");
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
-  printf("            /find S P O (*), /export <f.dot|f.ttl>,\n");
+  printf("            /find S P O (*), /area SYMBOL, /export <f.dot|f.ttl>,\n");
   printf("            /synonyms, /alias, /analogy A B,\n");
   printf("            /learn S P O, /save, /load, /clear, /exit\n");
     printf("========================================================\n\n");
@@ -515,6 +515,108 @@ int main(void)
             {
                 printf("IA > Error loading '%s'.\n\n", path);
             }
+            continue;
+        }
+
+        /* Semantic area: extractive neighborhood report. Relations
+           touching the symbol, ordered by area coherence (composed
+           vectors). No summaries invented: only stored triples. */
+        if (strncmp(input, "/area ", 6) == 0)
+        {
+            char target[64] = {0};
+            if (sscanf(input + 6, "%63s", target) == 1)
+            {
+                SYMBOL_ID tid = StemFindSymbol(graph->symbols, target);
+                if (tid == SYMBOL_INVALID)
+                {
+                    printf("IA > Unknown symbol '%s'.\n\n", target);
+                    continue;
+                }
+                RELATION *rels[64];
+                uint32_t n = 0;
+                n += GraphQuerySubject(graph, tid, rels + n, 64 - n);
+                {
+                    RELATION *objs[64];
+                    uint32_t m = GraphQueryObject(graph, tid, objs, 64);
+                    for (uint32_t i = 0; i < m && n < 64; i++)
+                    {
+                        int dup = 0;
+                        for (uint32_t k = 0; k < n; k++)
+                            if (rels[k] == objs[i]) { dup = 1; break; }
+                        if (!dup)
+                            rels[n++] = objs[i];
+                    }
+                }
+                ParserRankByArea(graph, tid, rels, n);
+                uint32_t shown = (n > 12) ? 12 : n;
+                printf("  Area of '%s': %u relations (showing %u)\n",
+                       target, n, shown);
+                for (uint32_t i = 0; i < shown; i++)
+                {
+                    const SYMBOL *ss = SymbolGet(graph->symbols,
+                                                 rels[i]->subject);
+                    const SYMBOL *pp = SymbolGet(graph->symbols,
+                                                 rels[i]->relation);
+                    const SYMBOL *oo = SymbolGet(graph->symbols,
+                                                 rels[i]->object);
+                    if (ss && pp && oo)
+                        printf("  %s --%s--> %s\n",
+                               ss->name, pp->name, oo->name);
+                }
+                printf("\n");
+            }
+            else
+                printf("IA > Usage: /area SYMBOL\n\n");
+            continue;
+        }
+
+        /* Map topics: relation symbols by stored mass, with one example
+           each. Global questions start here: what the map is about, by
+           count of stored triples. Statistics, not semantics. */
+        if (strcmp(input, "/about") == 0)
+        {
+            typedef struct { SYMBOL_ID rid; uint32_t count; } TOP;
+            TOP tops[1024];
+            uint32_t ntops = 0;
+            uint32_t total = RelationCount(graph->relations);
+            for (uint32_t i = 0; i < total; i++)
+            {
+                const RELATION *r = RelationGet(graph->relations, i);
+                if (!r || r->relation == SYMBOL_INVALID)
+                    continue;
+                uint32_t k = 0;
+                while (k < ntops && tops[k].rid != r->relation)
+                    k++;
+                if (k >= ntops)
+                {
+                    if (ntops >= 1024)
+                        continue;
+                    tops[ntops].rid = r->relation;
+                    tops[ntops].count = 0;
+                    ntops++;
+                }
+                tops[k].count++;
+            }
+            for (uint32_t i = 1; i < ntops; i++)
+            {
+                TOP t = tops[i];
+                uint32_t j = i;
+                while (j > 0 && tops[j - 1].count < t.count)
+                {
+                    tops[j] = tops[j - 1];
+                    j--;
+                }
+                tops[j] = t;
+            }
+            uint32_t shown = (ntops > 8) ? 8 : ntops;
+            printf("  Map topics: %u relation kinds\n", ntops);
+            for (uint32_t i = 0; i < shown; i++)
+            {
+                const SYMBOL *p = SymbolGet(graph->symbols, tops[i].rid);
+                printf("  %s (%u)\n", p ? p->name : "?",
+                       tops[i].count);
+            }
+            printf("\n");
             continue;
         }
 

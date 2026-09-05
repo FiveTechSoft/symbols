@@ -37,6 +37,7 @@ FILES = [
     "data/samples/love_knowledge.tsv",
     "data/samples/geo_knowledge.tsv",
     "data/samples/math_knowledge.tsv",
+    "data/samples/iconclass_trees.tsv",
 ]
 
 STOP_SUBJ = {

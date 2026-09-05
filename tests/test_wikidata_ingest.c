@@ -72,6 +72,12 @@ int main(void)
     printf("   Math:      %llu triples, %u symbols\n",
            ir9.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 8c. Ingest Iconclass tree symbolism (structural hierarchy) */
+    printf("8c. Ingesting iconclass_trees.tsv (symbols)...\n");
+    INGEST_STATS ir10 = IngestTSV(graph, "data/samples/iconclass_trees.tsv");
+    printf("   Symbols:   %llu triples, %u symbols\n",
+           ir10.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 

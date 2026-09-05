@@ -86,41 +86,41 @@ void ModelPrintReport(const MODEL *model)
     MODEL_STATS st = ModelGetStats(model);
 
     printf("========================================================\n");
-    printf("        REPORTE DE CAPACIDAD Y ESTADO DEL MODELO        \n");
+    printf("        MODEL CAPACITY AND STATE REPORT        \n");
     printf("========================================================\n");
 
-    printf("\n  1. Volumen de Conocimiento:\n");
-    printf("     - Vocabulario (Simbolos unicos) : %u\n", st.total_symbols);
-    printf("     - Hechos (Relaciones unicas)    : %u\n", st.total_relations);
-    printf("     - Evidencia total observada     : %llu muestras\n",
+    printf("\n  1. Knowledge volume:\n");
+    printf("     - Vocabulary (unique symbols) : %u\n", st.total_symbols);
+    printf("     - Facts (unique relations)    : %u\n", st.total_relations);
+    printf("     - Total observed evidence     : %llu samples\n",
            (unsigned long long)st.total_evidence_observations);
-    printf("     - Vectores semanticos en 32D    : %u\n", st.total_embeddings_32d);
+    printf("     - 32D semantic vectors        : %u\n", st.total_embeddings_32d);
 
-    printf("\n  2. Topologia del Grafo:\n");
-    printf("     - Densidad media de conexiones  : %.2f relaciones/simbolo\n",
+    printf("\n  2. Graph topology:\n");
+    printf("     - Mean connection density     : %.2f relations/symbol\n",
            st.average_degree);
-    printf("     - Concepto central ('Hub')      : %s (%u conexiones)\n",
+    printf("     - Central concept ('Hub')     : %s (%u connections)\n",
            st.most_connected_symbol[0] ? st.most_connected_symbol : "N/A",
            st.max_out_degree);
 
-    printf("\n  3. Eficiencia Computacional:\n");
-    printf("     - Consumo de RAM en caliente    : %.2f KB (%.4f MB)\n",
+    printf("\n  3. Compute efficiency:\n");
+    printf("     - Hot RAM usage               : %.2f KB (%.4f MB)\n",
            (double)st.memory_footprint_bytes / 1024.0,
            (double)st.memory_footprint_bytes / (1024.0 * 1024.0));
 
-    printf("\n  4. Calidad del Conocimiento:\n");
+    printf("\n  4. Knowledge quality:\n");
     if (st.total_symbols > 0 && st.average_degree >= 3.0f)
-        printf("     - Estado: DENSO (habilita inferencia multihop)\n");
+        printf("     - State: DENSE (coherent semantic areas)\n");
     else if (st.total_symbols > 0 && st.average_degree >= 1.0f)
-        printf("     - Estado: MODERADO (inferencia limitada a 1-2 saltos)\n");
+        printf("     - State: MODERATE (sparse areas)\n");
     else
-        printf("     - Estado: ESCASO (conocimiento fragmentado en islas)\n");
+        printf("     - State: SCARCE (knowledge fragmented in islands)\n");
 
     if (st.total_evidence_observations > 0 && st.total_relations > 0)
     {
         double avg_count = (double)st.total_evidence_observations
                          / (double)st.total_relations;
-        printf("     - Promedio de observaciones/hecho: %.1f\n", avg_count);
+        printf("     - Mean observations/fact: %.1f\n", avg_count);
     }
 
     printf("========================================================\n\n");

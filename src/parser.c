@@ -1000,6 +1000,67 @@ static uint32_t AppendName(const GRAPH *graph, SYMBOL_ID id,
     return pos;
 }
 
+/* Order relations by semantic-area coherence around center: each
+   candidate scores by similarity between its composed vector and the
+   mean of center's composed subject-relations (the area). Insertion
+   sort, in place. Order only; membership stays exact. No-op without
+   embeddings or with fewer than 2 items. */
+void ParserRankByArea(const GRAPH *graph, SYMBOL_ID center,
+                      RELATION **rels, uint32_t n)
+{
+    if (graph == NULL || graph->embeddings == NULL || rels == NULL || n < 2)
+        return;
+    if (center == SYMBOL_INVALID)
+        return;
+
+    float area[EMBEDDING_DIM] = {0};
+    int area_n = 0;
+    RELATION *area_rels[32];
+    uint32_t na = GraphQuerySubject(graph, center, area_rels, 32);
+    for (uint32_t a = 0; a < na; a++)
+    {
+        float comp[EMBEDDING_DIM];
+        if (EmbeddingComposeRelation(graph->embeddings,
+                                     area_rels[a]->subject,
+                                     area_rels[a]->relation,
+                                     area_rels[a]->object, comp))
+        {
+            for (int d = 0; d < EMBEDDING_DIM; d++)
+                area[d] += comp[d];
+            area_n++;
+        }
+    }
+    if (area_n == 0)
+        return;
+    for (int d = 0; d < EMBEDDING_DIM; d++)
+        area[d] /= (float)area_n;
+
+    for (uint32_t i = 1; i < n; i++)
+    {
+        RELATION *rk = rels[i];
+        float ck[EMBEDDING_DIM];
+        if (!EmbeddingComposeRelation(graph->embeddings, rk->subject,
+                                      rk->relation, rk->object, ck))
+            continue;
+        float sk = EmbeddingCosineSimilarity(ck, area);
+        uint32_t j = i;
+        while (j > 0)
+        {
+            float cj[EMBEDDING_DIM];
+            if (!EmbeddingComposeRelation(graph->embeddings,
+                                          rels[j - 1]->subject,
+                                          rels[j - 1]->relation,
+                                          rels[j - 1]->object, cj))
+                break;
+            if (EmbeddingCosineSimilarity(cj, area) >= sk)
+                break;
+            rels[j] = rels[j - 1];
+            j--;
+        }
+        rels[j] = rk;
+    }
+}
+
 int ParserAnswerQuestion(
     const GRAPH *graph,
     const QUESTION *q,
@@ -1028,63 +1089,8 @@ int ParserAnswerQuestion(
 
             if (n > 0)
             {
-                /* Order answers by semantic-area coherence: candidate
-                   triples rank by similarity to the subject's area
-                   (mean of its composed relation vectors). Relations
-                   establish meanings, so the most coherent triple
-                   answers first. Order only; membership is exact. */
-                if (graph->embeddings != NULL && n > 1)
-                {
-                    float area[EMBEDDING_DIM] = {0};
-                    int area_n = 0;
-                    RELATION *area_rels[32];
-                    uint32_t na = GraphQuerySubject(graph, subj_id,
-                                                    area_rels, 32);
-                    for (uint32_t a = 0; a < na; a++)
-                    {
-                        float comp[EMBEDDING_DIM];
-                        if (EmbeddingComposeRelation(
-                                graph->embeddings,
-                                area_rels[a]->subject,
-                                area_rels[a]->relation,
-                                area_rels[a]->object, comp))
-                        {
-                            for (int d = 0; d < EMBEDDING_DIM; d++)
-                                area[d] += comp[d];
-                            area_n++;
-                        }
-                    }
-                    if (area_n > 0)
-                    {
-                        for (int d = 0; d < EMBEDDING_DIM; d++)
-                            area[d] /= (float)area_n;
-                        for (uint32_t i = 1; i < n; i++)
-                        {
-                            RELATION *rk = results[i];
-                            float ck[EMBEDDING_DIM];
-                            if (!EmbeddingComposeRelation(
-                                    graph->embeddings, subj_id, rel_id,
-                                    rk->object, ck))
-                                continue;
-                            float sk = EmbeddingCosineSimilarity(ck, area);
-                            uint32_t j = i;
-                            while (j > 0)
-                            {
-                                float cj[EMBEDDING_DIM];
-                                if (!EmbeddingComposeRelation(
-                                        graph->embeddings, subj_id, rel_id,
-                                        results[j - 1]->object, cj))
-                                    break;
-                                float sj = EmbeddingCosineSimilarity(cj, area);
-                                if (sj >= sk)
-                                    break;
-                                results[j] = results[j - 1];
-                                j--;
-                            }
-                            results[j] = rk;
-                        }
-                    }
-                }
+                /* Order answers by semantic-area coherence. */
+                ParserRankByArea(graph, subj_id, results, n);
 
                 /* Build answer from objects */
                 uint32_t pos = 0;
