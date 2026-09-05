@@ -469,7 +469,7 @@ int main(void)
                         lines++;
                     if (lines > 20000)
                         break;
-                    ParserIngestSentence(graph, line);
+                    ParserIngestSentenceCtx(graph, ctx, line);
                 }
             }
             fclose(f);
@@ -717,7 +717,7 @@ int main(void)
                 }
 
                 uint32_t base = RelationCount(graph->relations);
-                ParserIngestSentence(graph, input);
+                ParserIngestSentenceCtx(graph, ctx, input);
                 uint32_t added = RelationCount(graph->relations) - base;
                 if (added > 0)
                     printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
@@ -736,7 +736,7 @@ int main(void)
         {
             /* Syntax tree ingest: input → tree → symbols → relations */
             uint32_t base = RelationCount(graph->relations);
-            ParserIngestSentence(graph, input);
+            ParserIngestSentenceCtx(graph, ctx, input);
             uint32_t added = RelationCount(graph->relations) - base;
             if (added > 0)
                 printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");

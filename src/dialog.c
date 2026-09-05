@@ -294,11 +294,10 @@ int DialogGenerateResponse(
         return 1;
     }
 
-    /* Learning statements: input → syntax tree → symbols → relations */
-    char resolved_buf[256];
-    ContextPreprocessSentence(ctx, graph, user_input, resolved_buf, sizeof(resolved_buf));
-
-    if (ParserIngestSentence(graph, resolved_buf))
+    /* Learning statements: input → syntax tree → symbols → relations,
+       with discourse tracking (the context variant preprocesses and
+       pushes entities itself). */
+    if (ParserIngestSentenceCtx(graph, ctx, user_input))
     {
         static const char *learn_confirms[] = {
             "Stored.",

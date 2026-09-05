@@ -11,10 +11,12 @@
 /* Forward: descriptor and entity resolution live with the query
    path below; the ingest tree above needs them. */
 static int ResolveRelationPass(const GRAPH *graph, const char *token,
-                                int use_stem, char *out, size_t out_size);
+                                char *out, size_t out_size,
+                                int *out_trusted);
 static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                          uint32_t start, char *out, size_t out_size);
 static uint64_t TokenRarity(const GRAPH *graph, const char *token);
+static uint64_t EffFreq(const GRAPH *graph, const char *token);
 
 /* ============================================================
    Utility
@@ -186,19 +188,51 @@ static uint32_t FindSplits(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     for (uint32_t i = 2; i + 2 < tokens->count && n < maxouts; i++)
     {
-        uint64_t f = TokenRarity(graph, tokens->tokens[i]);
+        uint64_t f = EffFreq(graph, tokens->tokens[i]);
         if (f == 0)
             continue;
-        uint64_t fl = TokenRarity(graph, tokens->tokens[i - 1]);
-        uint64_t fr = TokenRarity(graph, tokens->tokens[i + 1]);
+        uint64_t fl = EffFreq(graph, tokens->tokens[i - 1]);
+        uint64_t fr = EffFreq(graph, tokens->tokens[i + 1]);
         if (f > fl && f > fr)
             outs[n++] = i;
     }
     return n;
 }
 
-/* Rarity of a token: its symbol frequency, 0 when unknown. Content
-   bears rarity; glue repeats everywhere. */
+/* Session token census: raw occurrence counts per token hash. Glue
+   never stands alone as a symbol, so graph frequencies miss it; the
+   census sees every token as read, letting splitters find coordinators
+   (Y) once they recur. Saturating, order-deterministic per input.
+   Effective frequency = max(graph, census). */
+#define CENSUS_BUCKETS 65536
+static uint32_t tok_census[CENSUS_BUCKETS];
+
+static uint32_t CensusHash(const char *s)
+{
+    uint32_t h = 5381u;
+    while (s && *s)
+    {
+        h = h * 33u + (unsigned char)*s;
+        s++;
+    }
+    return h % CENSUS_BUCKETS;
+}
+
+static void CensusAdd(const char *token)
+{
+    if (token == NULL)
+        return;
+    uint32_t b = CensusHash(token);
+    if (tok_census[b] < 60000u)
+        tok_census[b]++;
+}
+
+static uint64_t EffFreq(const GRAPH *graph, const char *token)
+{
+    uint64_t gf = TokenRarity(graph, token);
+    uint64_t cf = (uint64_t)tok_census[CensusHash(token)];
+    return (gf > cf) ? gf : cf;
+}
 static uint64_t TokenRarity(const GRAPH *graph, const char *token)
 {
     if (graph == NULL || token == NULL)
@@ -220,6 +254,11 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
 
     if (n_tokens < 2)
         return 0;
+
+    /* Every token read feeds the session census, so recurrence itself
+       becomes visible (coordinators never stand alone as symbols). */
+    for (uint32_t ci = 0; ci < tokens.count; ci++)
+        CensusAdd(tokens.tokens[ci]);
 
     /* Segments first: split at local frequency maxima (glue betrayed
        by repetition), then parse each segment recursively on its own.
@@ -256,22 +295,49 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
 
     /* Clause roots: tokens describing used relations (exact, then
        stemmed), in token order. Each root splits the input by position,
-       so nested clauses each contribute their relation. */
+       so nested clauses each contribute their relation. Untrusted
+       (sourceless) roots are dropped when any trusted root exists:
+       bulk-grown noise must not partition clean input. */
     uint32_t roots[8];
     char names[8][64];
+    int trusted[8];
     uint32_t nroots = 0;
-    for (int pass = 0; pass < 2 && nroots < 8; pass++)
+    for (uint32_t i = 0; i < tokens.count && nroots < 8; i++)
     {
-        for (uint32_t i = 0; i < tokens.count && nroots < 8; i++)
+        int known = 0;
+        for (uint32_t k = 0; k < nroots; k++)
+            if (roots[k] == i) { known = 1; break; }
+        if (known)
+            continue;
+        int tr = 0;
+        if (ResolveRelationPass(graph, tokens.tokens[i],
+                                 names[nroots], sizeof(names[0]), &tr))
         {
-            int known = 0;
+            roots[nroots] = i;
+            trusted[nroots] = tr;
+            nroots++;
+        }
+    }
+    {
+        int any_trusted = 0;
+        for (uint32_t k = 0; k < nroots; k++)
+            if (trusted[k]) { any_trusted = 1; break; }
+        if (any_trusted)
+        {
+            uint32_t w = 0;
             for (uint32_t k = 0; k < nroots; k++)
-                if (roots[k] == i) { known = 1; break; }
-            if (known)
-                continue;
-            if (ResolveRelationPass(graph, tokens.tokens[i], pass,
-                                     names[nroots], sizeof(names[0])))
-                roots[nroots++] = i;
+            {
+                if (!trusted[k])
+                    continue;
+                if (w != k)
+                {
+                    roots[w] = roots[k];
+                    strcpy(names[w], names[k]);
+                    trusted[w] = trusted[k];
+                }
+                w++;
+            }
+            nroots = w;
         }
     }
 
@@ -312,56 +378,127 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
         if (left_a >= left_b || right_a >= right_b)
             continue;
 
-        char subj[128] = {0}, obj[128] = {0};
-        if (SpanToSymbol(graph, &tokens, left_a, left_b, 1,
-                         subj, sizeof(subj)) < 0)
-            continue;
+        char obj[128] = {0};
         if (SpanToSymbol(graph, &tokens, right_a, right_b, 0,
                          obj, sizeof(obj)) < 0)
             continue;
 
-        SYMBOL_ID s = GraphAddSymbol(graph, subj);
-        SYMBOL_ID p = GraphAddSymbol(graph, names[c]);
-        SYMBOL_ID o = GraphAddSymbol(graph, obj);
-
-        if (s == SYMBOL_INVALID || p == SYMBOL_INVALID || o == SYMBOL_INVALID)
-            continue;
-
-        int added = GraphAddRelation(graph, s, p, o);
-        if (!added)
-            continue;
-        stored++;
-
-        /* Update embeddings on every co-occurrence */
-        if (graph->embeddings != NULL)
+        /* Left-span regions: coordinated subjects each contribute one
+           triple sharing predicate and object. Cuts at interior
+           effective-frequency maxima (the same Zipf glue signal as
+           clause splits, one level down). */
+        uint32_t cuts[8];
+        uint32_t ncut = 0;
+        for (uint32_t k = left_a + 1; k + 1 < left_b && ncut < 8; k++)
         {
-            EMBEDDING_TABLE *emb = graph->embeddings;
+            uint64_t f = EffFreq(graph, tokens.tokens[k]);
+            if (f == 0)
+                continue;
+            if (f > EffFreq(graph, tokens.tokens[k - 1]) &&
+                f > EffFreq(graph, tokens.tokens[k + 1]))
+                cuts[ncut++] = k;
+        }
 
-            if (EmbeddingGetVector(emb, s) == NULL)
+        uint32_t r0 = left_a;
+        for (uint32_t r = 0; ; r++)
+        {
+            uint32_t r1 = (r < ncut) ? cuts[r] : left_b;
+            if (r1 > r0)
             {
-                float v[EMBEDDING_DIM];
-                EmbeddingRandomInit(v, (uint32_t)s * 2654435761u);
-                EmbeddingSetVector(emb, s, v);
-            }
-            if (EmbeddingGetVector(emb, o) == NULL)
-            {
-                float v[EMBEDDING_DIM];
-                EmbeddingRandomInit(v, (uint32_t)o * 2654435761u);
-                EmbeddingSetVector(emb, o, v);
-            }
+                char subj[128] = {0};
+                if (SpanToSymbol(graph, &tokens, r0, r1, 1,
+                                 subj, sizeof(subj)) >= 0)
+                {
+                    SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                    SYMBOL_ID p = GraphAddSymbol(graph, names[c]);
+                    SYMBOL_ID o = GraphAddSymbol(graph, obj);
 
-            float *target  = (float *)EmbeddingGetVector(emb, s);
-            float *context = (float *)EmbeddingGetVector(emb, o);
-            if (target && context)
-            {
-                EmbeddingCooccur(target, context, 0.1f);
-                EmbeddingCooccur(context, target, 0.1f);
-                EmbeddingNormalize(target);
-                EmbeddingNormalize(context);
+                    if (s != SYMBOL_INVALID && p != SYMBOL_INVALID &&
+                        o != SYMBOL_INVALID &&
+                        GraphAddRelation(graph, s, p, o))
+                    {
+                        stored++;
+
+                        /* Update embeddings on every co-occurrence */
+                        if (graph->embeddings != NULL)
+                        {
+                            EMBEDDING_TABLE *emb = graph->embeddings;
+
+                            if (EmbeddingGetVector(emb, s) == NULL)
+                            {
+                                float v[EMBEDDING_DIM];
+                                EmbeddingRandomInit(
+                                    v, (uint32_t)s * 2654435761u);
+                                EmbeddingSetVector(emb, s, v);
+                            }
+                            if (EmbeddingGetVector(emb, o) == NULL)
+                            {
+                                float v[EMBEDDING_DIM];
+                                EmbeddingRandomInit(
+                                    v, (uint32_t)o * 2654435761u);
+                                EmbeddingSetVector(emb, o, v);
+                            }
+
+                            float *target =
+                                (float *)EmbeddingGetVector(emb, s);
+                            float *context =
+                                (float *)EmbeddingGetVector(emb, o);
+                            if (target && context)
+                            {
+                                EmbeddingCooccur(target, context, 0.1f);
+                                EmbeddingCooccur(context, target, 0.1f);
+                                EmbeddingNormalize(target);
+                                EmbeddingNormalize(context);
+                            }
+                        }
+                    }
+                }
             }
+            if (r >= ncut)
+                break;
+            r0 = cuts[r] + 1;
         }
     }
 
+    return stored;
+}
+
+/* Tracked ingest: preprocess through the discourse context, ingest,
+   then push the stored entities back (subjects first). New triples
+   append in storage order, so the [base, total) range is exactly what
+   this call stored. Later sentences resolve pronouns against them. */
+int ParserIngestSentenceCtx(GRAPH *graph, CONTEXT *ctx, const char *sentence)
+{
+    if (graph == NULL || sentence == NULL)
+        return 0;
+
+    char resolved[2048];
+    const char *text = sentence;
+    if (ctx != NULL)
+    {
+        ContextPreprocessSentence(ctx, graph, sentence,
+                                  resolved, sizeof(resolved));
+        text = resolved;
+    }
+
+    uint32_t base = RelationCount(graph->relations);
+    int stored = ParserIngestSentence(graph, text);
+    if (ctx != NULL && stored > 0)
+    {
+        uint32_t total = RelationCount(graph->relations);
+        for (uint32_t i = base; i < total; i++)
+        {
+            const RELATION *r = RelationGet(graph->relations, i);
+            if (r == NULL)
+                continue;
+            const SYMBOL *s = SymbolGet(graph->symbols, r->subject);
+            const SYMBOL *o = SymbolGet(graph->symbols, r->object);
+            if (s != NULL && s->name != NULL)
+                ContextPushEntity(ctx, r->subject, s->name, 1);
+            if (o != NULL && o->name != NULL)
+                ContextPushEntity(ctx, r->object, o->name, 0);
+        }
+    }
     return stored;
 }
 
@@ -498,34 +635,69 @@ static uint32_t RelCacheFill(const GRAPH *graph)
     return rel_cache_n;
 }
 
+/* Longest common prefix length: morphological closeness, no lists. */
+static size_t LcpLen(const char *a, const char *b)
+{
+    size_t n = 0;
+    if (a == NULL || b == NULL)
+        return 0;
+    while (a[n] != '\0' && a[n] == b[n])
+        n++;
+    return n;
+}
+
+/* Best relation described by the token: every cache key matching the
+   exact token or its stem is a candidate; the winner maximizes shared
+   affix with the token, then predicate frequency (established use),
+   then graph order. "COMEN" picks COME over COMAR (affix 4 over 3);
+   "HIJOS" picks HIJO_DE; exact hits win naturally by full length.
+  Stem collisions resolve by description quality, never by position. */
 static int ResolveRelationPass(const GRAPH *graph, const char *token,
-                                int use_stem, char *out, size_t out_size)
+                                char *out, size_t out_size,
+                                int *out_trusted)
 {
     if (graph == NULL || token == NULL || out == NULL || out_size == 0)
         return 0;
 
     char stem[64];
-    const char *want = token;
-    if (use_stem)
-    {
-        StemWord(token, stem, sizeof(stem));
-        want = stem;
-    }
+    StemWord(token, stem, sizeof(stem));
 
     uint32_t n = RelCacheFill(graph);
+    int found = 0;
+    size_t best_affix = 0;
+    uint64_t best_freq = 0;
+    const char *best_name = NULL;
+    int best_trusted = 0;
+
     for (uint32_t k = 0; k < n; k++)
     {
         for (uint32_t j = 0; j < rel_cache[k].nkeys; j++)
         {
-            if (strcmp(rel_cache[k].keys[j], want) == 0)
+            if (strcmp(rel_cache[k].keys[j], token) != 0 &&
+                strcmp(rel_cache[k].keys[j], stem) != 0)
+                continue;
+            size_t affix = LcpLen(token, rel_cache[k].name);
+            uint64_t freq = TokenRarity(graph, rel_cache[k].name);
+            if (!found || affix > best_affix ||
+                (affix == best_affix && freq > best_freq))
             {
-                strncpy(out, rel_cache[k].name, out_size - 1);
-                out[out_size - 1] = '\0';
-                return 1;
+                found = 1;
+                best_affix = affix;
+                best_freq = freq;
+                best_name = rel_cache[k].name;
+                best_trusted = rel_cache[k].trusted;
             }
+            break;
         }
     }
-    return 0;
+
+    if (!found || best_name == NULL)
+        return 0;
+    strncpy(out, best_name, out_size - 1);
+    out[out_size - 1] = '\0';
+    if (out_trusted != NULL)
+        *out_trusted = best_trusted;
+    return 1;
 }
 
 /* Embedding description: the (token, relation) pair with the highest
@@ -699,19 +871,44 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
        tried, trailing first. No separator word, no copula check, no
        opener check: the shape validates itself because both ends
        resolve against the live map. Descriptor search runs exact, then
-       stemmed, then by embedding description. */
+       stemmed, then by embedding description. Among resolving tokens
+       the winner is ranked, not positional: trusted vocabulary first,
+       then rarest token, then earliest position. */
     {
-        /* Per token, exact then stemmed: position outranks inflection.
-           The descriptor precedes the copula structurally, so an early
-           stem hit (CAPITALES->CAPITAL) wins over a later exact one. */
+        /* Ranked descriptor: every resolving token scores
+           (untrusted, rarity, pass, position), lowest wins. Trust beats
+           rarity (bulk-grown noise loses to curated words even standing
+           earlier); rarity beats morphology (a novel stem hit like
+           CAPITALES->CAPITAL outranks the copula); morphology beats
+           position. No word lists, no thresholds. */
+        /* Single ranking over all tokens: morphology lives inside
+           resolution (affix ranking), so no pass loop is needed here. */
+        int best_pos = -1;
+        char best_rel[64] = {0};
+        int best_untrusted = 1;
+        uint64_t best_freq = UINT64_MAX;
         for (uint32_t i = 0; i < tokens.count; i++)
         {
-            for (int pass = 0; pass < 2; pass++)
+            char rel[64] = {0};
+            int trusted = 0;
+            if (!ResolveRelationPass(graph, tokens.tokens[i],
+                                      rel, sizeof(rel), &trusted))
+                continue;
+            int untrusted = trusted ? 0 : 1;
+            uint64_t freq = TokenRarity(graph, tokens.tokens[i]);
+            if (best_pos < 0 || untrusted < best_untrusted ||
+                (untrusted == best_untrusted && freq < best_freq))
             {
-                char rel[64] = {0};
-                if (!ResolveRelationPass(graph, tokens.tokens[i], pass,
-                                          rel, sizeof(rel)))
-                    continue;
+                best_pos = (int)i;
+                strcpy(best_rel, rel);
+                best_untrusted = untrusted;
+                best_freq = freq;
+            }
+        }
+        if (best_pos >= 0)
+        {
+            uint32_t i = (uint32_t)best_pos;
+            {
                 char subj[128] = {0};
                 int spos = ResolveEntity(graph, &tokens, i + 1,
                                          subj, sizeof(subj));
@@ -729,12 +926,18 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                          subj, sizeof(subj));
                 }
                 if (spos < 0 || strlen(subj) == 0)
-                    continue;
-                strcpy(q.subject, subj);
-                strcpy(q.relation, rel);
-                q.valid = 1;
-                q.is_question = 1;
-                return q;
+                {
+                    /* Winner has no entity: fall through to the
+                       embedding pass rather than trying worse winners. */
+                }
+                else
+                {
+                    strcpy(q.subject, subj);
+                    strcpy(q.relation, best_rel);
+                    q.valid = 1;
+                    q.is_question = 1;
+                    return q;
+                }
             }
         }
         {
