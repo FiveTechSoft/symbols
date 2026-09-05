@@ -42,11 +42,8 @@ int main(void)
     printf("   Psalms:    %llu triples, %u symbols\n",
            ir4.relations_inserted, SymbolCount(graph->symbols));
 
-    /* 5. Ingest full Bible knowledge */
-    printf("5. Ingesting bible_knowledge.tsv (full Bible)...\n");
-    INGEST_STATS ir5 = IngestTSV(graph, "data/bible/bible_knowledge.tsv");
-    printf("   Bible:     %llu triples, %u symbols\n",
-           ir5.relations_inserted, SymbolCount(graph->symbols));
+    /* 5. Ingest full Bible knowledge (dropped: 90% noise on audit;
+       bible_relations.tsv carries the clean kinship instead) */
 
     /* 6. Ingest love knowledge */
     printf("6. Ingesting love_knowledge.tsv (love/amor)...\n");

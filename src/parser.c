@@ -79,7 +79,10 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     uint32_t span = end - start;
     char cand[128];
-    for (uint32_t len = (span < 4 ? span : 4); len >= 1; len--)
+    /* Tier 0: longest known compound (length 2+). Single known tokens
+       wait for the purity tier below, so known glue (DE, EL) can never
+       swallow novel content sitting next to it. */
+    for (uint32_t len = (span < 4 ? span : 4); len >= 2; len--)
     {
         if (trailing)
         {
@@ -123,7 +126,9 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     /* Purity tier: longest run using only the span's rarest tier.
        Known glue (DE, EL) carries huge frequency; novel content sits
-       at zero. This keeps MARIA out of DE_MARIA without naming either. */
+       at zero. This keeps MARIA out of DE_MARIA without naming either.
+       Always resolves (single tokens are trivially pure), so no
+       fallthrough join exists: every creation is rarity-filtered. */
     {
         uint64_t floor = UINT64_MAX;
         for (uint32_t k = start; k < end; k++)
@@ -162,13 +167,7 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
         }
     }
 
-    out[0] = '\0';
-    for (uint32_t k = start; k < end; k++)
-    {
-        if (k > start) strcat(out, "_");
-        strncat(out, tokens->tokens[k], out_size - strlen(out) - 1);
-    }
-    return (int)start;
+    return -1;
 }
 
 /* Clause boundaries: local frequency maxima with content on both

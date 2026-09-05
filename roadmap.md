@@ -7,27 +7,32 @@ admitted, never fabricated.
 
 ## Measured state
 
-- Suite 25/25, eval 98/98, hygiene 98/98, lint 7609/0/0.
-- Model: 13,392 symbols / 6,755 relations (math corpus included).
+- Suite 25/25, eval 98/98, hygiene 98/98, lint 7724/0/0.
+- Model: 13,600 symbols / 6,870 relations (math + Iconclass included).
 - Dynamic vocabulary: question tokens resolve against used relations
-  (exact, stemmed, embedding-ranked); learned words work immediately.
+  (exact, stemmed, affix-ranked, embedding-ranked); learned words
+  work immediately.
 - Trust tiers: curated triples (with provenance) outrank grown noise.
+  Bulk text (Quijote, 3513 lines) ingests without degrading curated
+  answers (98/98 on clean and grown maps alike).
 - Tree ingest: input → clauses → symbols → relations, positional,
   multi-triple per input, coordination splitting via census.
+  Anaphora wired in: file ingest resolves across sentences and
+  pushes entities back.
 - Honest answers: exact triples or unknown; unknowns route to storage.
-- Bulk text (Quijote, 3513 lines) ingests without degrading curated
-  answers (98/98 on clean and grown maps alike).
+- Descriptors ranked (trust, rarity, affix); answers ordered by
+  semantic-area coherence (composed relation vectors).
+- Commands: `/find`, `/area` (neighborhood), `/about` (topic mass),
+  `/learn`, `/ingest` (2 passes), `/alias`, `/synonyms`, `/analogy`.
 
 ## Whole-text processing
 
 - Units keep storage order (chronology is free, no schema change).
-- Cross-sentence anaphora: structural topic tracking; TODO: wire it
-  into the `/ingest` file path (today only the dialog path resolves).
+- Cross-sentence anaphora wired into `/ingest` and dialog.
 - Corpus gate: 50-triple precision sample before bulk ingest.
-- Areas: ranking by area coherence exists; TODO: `/area` command
-  (extractive neighborhood report, no generative summaries).
-- Global questions ("what is this text about"): aggregate by
-  relation mass per area. Statistics, not semantics.
+- Areas: coherence ranking + `/area` command (extractive only).
+- Global questions: `/about` aggregates relation mass. Statistics,
+  not semantics.
 
 ## Symbol datasets
 
@@ -35,10 +40,22 @@ admitted, never fabricated.
   English text against a Spanish map yields preposition predicates.
 - Quijote (Gutenberg, public domain): piloted, rejected for bulk —
   literary syntax overwhelms the tree; short canonical input wins.
-- Iconclass 25G subtree (open data): 115 triples fetched, not wired.
+- Iconclass 25G subtree (open data): 115 triples wired in.
 - CLDR Spanish annotations: proposed, not fetched.
 - Jung: gray area (borrow-only scans, copyrighted translations).
   Process local copies only.
+
+## Next (in order)
+
+1. Frequency-purity creation gate: novel spans join only rare tokens,
+   so bulk literary text stops gluing articles. Unlocks whole books.
+   Gate: grown-map eval stays 98/98.
+2. CLDR Spanish annotations: Spanish symbol→word vocabulary at scale.
+3. Feedback-driven ranking weights (bandit over corrections + eval):
+   today's hand-ordered ranks become learned, auditable numbers.
+4. Retrieval scale: predicate-indexed prefilter past ~100k relations.
+5. Sidecars (order beyond storage, numeric compare, n-ary): typed,
+   hanging off symbols, never core changes.
 
 ## Known limits (sidecars, never core changes)
 

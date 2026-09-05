@@ -32,7 +32,6 @@ FILES = [
     "wiki_corpus.tsv",
     "data/samples/c_knowledge.tsv",
     "data/samples/psalms_knowledge.tsv",
-    "data/bible/bible_knowledge.tsv",
     "data/bible/bible_relations.tsv",
     "data/samples/love_knowledge.tsv",
     "data/samples/geo_knowledge.tsv",
