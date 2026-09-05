@@ -5,6 +5,7 @@
 #include "parser.h"
 #include "compat.h"
 #include "stem.h"
+#include "embedding.h"
 #include "learning.h"
 
 /* ============================================================
@@ -331,6 +332,10 @@ static const KEYWORD_MAP PREDICATE_MAP[] = {
     {"VIVE",       "VIVE"},
     {"DUERME",     "DUERME"},
     {"TIENE",      "TIENE"},
+    {"HIJO",       "HIJO_DE"},
+    {"HIJOS",      "HIJO_DE"},
+    {"HIJA",       "HIJO_DE"},
+    {"HIJAS",      "HIJO_DE"},
     {"USO",        "USA"},
     {"CONOCIDO_POR", "CONOCIDO_POR"},
     {NULL, NULL}
@@ -413,37 +418,71 @@ QUESTION ParserDetectQuestion(const char *input)
         }
     }
 
-    /* Strategy 0b: conteo "CUANTOS HIJOS TIENE X"
-       → subject=X, predicate=CUENTA_HIJOS */
+    /* Strategy 0b: conteo generico "CUANTOS <PRED> VERBO X"
+       e.g. "cuantos hijos tiene David" / "cuantos idiomas habla David"
+       → subject=X, predicate=CUENTA:<PRED> (resuelto via PREDICATE_MAP
+       exacto o stemeado). X = ultimo token tras el verbo/preposicion. */
     if (starts_with_cuantos)
     {
-        int has_hijos = 0, tiene_pos = -1;
-        for (uint32_t i = 0; i < tokens.count; i++)
+        char pred[64] = {0};
+        int kw_pos = -1;
+        /* Two passes: exact keywords first over ALL tokens, then
+           stemmed. Otherwise an early stem match (HIJOS->HIJO)
+           shadows an exact entry later in the table (HIJOS->HIJO_DE). */
+        for (int pass = 0; pass < 2 && strlen(pred) == 0; pass++)
         {
-            if (strcmp(tokens.tokens[i], "HIJOS") == 0 ||
-                strcmp(tokens.tokens[i], "HIJAS") == 0 ||
-                strcmp(tokens.tokens[i], "HIJO") == 0 ||
-                strcmp(tokens.tokens[i], "HIJA") == 0)
-                has_hijos = 1;
-            if (strcmp(tokens.tokens[i], "TIENE") == 0 ||
-                strcmp(tokens.tokens[i], "TIENEN") == 0)
-                tiene_pos = (int)i;
-        }
-        if (has_hijos && tiene_pos > 0)
-        {
-            char subj[128] = {0};
-            for (uint32_t i = (uint32_t)tiene_pos + 1; i < tokens.count; i++)
+            for (uint32_t i = 0; i < tokens.count && strlen(pred) == 0; i++)
             {
-                if (IsArticle(tokens.tokens[i]))
-                    continue;
-                strcpy(subj, tokens.tokens[i]);
+                char stem[64];
+                StemWord(tokens.tokens[i], stem, sizeof(stem));
+                for (int k = 0; PREDICATE_MAP[k].keyword; k++)
+                {
+                    int hit = (pass == 0) ?
+                        (strcmp(tokens.tokens[i],
+                                PREDICATE_MAP[k].keyword) == 0) :
+                        (strcmp(stem, PREDICATE_MAP[k].keyword) == 0);
+                    if (hit)
+                    {
+                        strcpy(pred, PREDICATE_MAP[k].predicate);
+                        kw_pos = (int)i;
+                        break;
+                    }
+                }
             }
-            if (strlen(subj) > 0)
+        }
+        if (strlen(pred) > 0 && kw_pos >= 0)
+        {
+            int verb_pos = -1;
+            for (uint32_t i = (uint32_t)kw_pos + 1; i < tokens.count; i++)
             {
-                strcpy(q.subject, subj);
-                strcpy(q.predicate, "CUENTA_HIJOS");
-                q.valid = 1;
-                return q;
+                if (strcmp(tokens.tokens[i], "TIENE") == 0 ||
+                    strcmp(tokens.tokens[i], "TIENEN") == 0 ||
+                    strcmp(tokens.tokens[i], "HABLA") == 0 ||
+                    strcmp(tokens.tokens[i], "HABLAN") == 0 ||
+                    strcmp(tokens.tokens[i], "DE") == 0 ||
+                    strcmp(tokens.tokens[i], "DEL") == 0)
+                {
+                    verb_pos = (int)i;
+                    break;
+                }
+            }
+            if (verb_pos > 0)
+            {
+                char subj[128] = {0};
+                for (uint32_t i = (uint32_t)verb_pos + 1; i < tokens.count; i++)
+                {
+                    if (IsArticle(tokens.tokens[i]))
+                        continue;
+                    strcpy(subj, tokens.tokens[i]);
+                }
+                if (strlen(subj) > 0)
+                {
+                    strcpy(q.subject, subj);
+                    snprintf(q.predicate, sizeof(q.predicate),
+                             "CUENTA:%s", pred);
+                    q.valid = 1;
+                    return q;
+                }
             }
         }
     }
@@ -747,14 +786,74 @@ int ParserAnswerQuestion(
         return 1;
     }
 
-    /* Conteo: "N: nombre1, nombre2, ..." (N=0 solo si X existe) */
-    if (strcmp(q->predicate, "CUENTA_HIJOS") == 0)
+    /* Conteo: "N: nombre1, nombre2, ..." (N=0 solo si X existe).
+       CUENTA_HIJOS (legado) == CUENTA:HIJO_DE: ambas direcciones.
+       Otros predicados: direccion sujeto (X,P,*). */
+    if (strcmp(q->predicate, "CUENTA_HIJOS") == 0 ||
+        strncmp(q->predicate, "CUENTA:", 7) == 0)
     {
         SYMBOL_ID xid = StemFindSymbol(graph->symbols, q->subject);
         if (xid == SYMBOL_INVALID)
             return 0;
         SYMBOL_ID kids[16];
-        uint32_t n = FindChildren(graph, xid, kids, 16);
+        uint32_t n = 0;
+        if (strcmp(q->predicate, "CUENTA_HIJOS") == 0 ||
+            strcmp(q->predicate + 7, "HIJO_DE") == 0 ||
+            strcmp(q->predicate + 7, "HIJO") == 0)
+        {
+            n = FindChildren(graph, xid, kids, 16);
+        }
+        else
+        {
+            SYMBOL_ID pid = StemFindSymbol(graph->symbols, q->predicate + 7);
+            if (pid != SYMBOL_INVALID)
+            {
+                RELATION *rels[16];
+                uint32_t m = GraphQuerySubjectPredicate(
+                    graph, xid, pid, rels, 16);
+                for (uint32_t i = 0; i < m && n < 16; i++)
+                    kids[n++] = rels[i]->object;
+            }
+        }
+        /* Dedup por embeddings (mismo campo semantico, sin tocar corpus):
+           todos los candidatos ya comparten campo (objetos de X con el
+           mismo predicado); se colapsa solo si el coseno es >= 0.97.
+           Medido en wiki_model.bin: EN~INGLES 0.979 (colapsa),
+           INGLES~FRANCES 0.382 y EN~FRANCES 0.393 (no colapsan).
+           Umbral alto a proposito: los embeddings mezclan predicados
+           (EN~MIEMBRO_DE 0.945) y un umbral bajo fusionaria todo. */
+        {
+            SYMBOL_ID seen[16];
+            uint32_t u = 0;
+            for (uint32_t i = 0; i < n; i++)
+            {
+                int dup = 0;
+                const float *vi = (graph->embeddings != NULL)
+                    ? EmbeddingGetVector(graph->embeddings, kids[i])
+                    : NULL;
+                for (uint32_t j = 0; j < u && !dup; j++)
+                {
+                    if (kids[i] == seen[j])
+                    {
+                        dup = 1;
+                        break;
+                    }
+                    if (vi != NULL && graph->embeddings != NULL)
+                    {
+                        const float *vj = EmbeddingGetVector(
+                            graph->embeddings, seen[j]);
+                        if (vj != NULL && EmbeddingCosineSimilarity(vi, vj)
+                            >= 0.97f)
+                            dup = 1;
+                    }
+                }
+                if (!dup && u < 16)
+                    seen[u++] = kids[i];
+            }
+            for (uint32_t i = 0; i < u; i++)
+                kids[i] = seen[i];
+            n = u;
+        }
         uint32_t pos = 0;
         char num[16];
         snprintf(num, sizeof(num), "%u", n);

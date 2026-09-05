@@ -37,7 +37,7 @@ def main():
         s, p, o = parts[0], parts[1], "\t".join(parts[2:])
         if p not in KEEP:
             continue
-        action, s2, p2, o2, rule = check_triple(s, p, o)
+        action, s2, p2, o2, _, rule = check_triple(s, p, o)
         if action == "drop" or len(o2) >= 80:
             dropped[rule or "too_long"] += 1
             continue

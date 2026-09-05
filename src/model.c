@@ -114,7 +114,8 @@ int ModelSave(const MODEL *model, const char *filepath)
             fwrite(&r->predicate, sizeof(SYMBOL_ID), 1, f) != 1 ||
             fwrite(&r->object,    sizeof(SYMBOL_ID), 1, f) != 1 ||
             fwrite(&r->count,     sizeof(uint64_t), 1, f) != 1 ||
-            fwrite(&r->weight,    sizeof(float), 1, f) != 1)
+            fwrite(&r->weight,    sizeof(float), 1, f) != 1 ||
+            fwrite(&r->source,    sizeof(SYMBOL_ID), 1, f) != 1)
         {
             fclose(f);
             return 0;
@@ -252,10 +253,10 @@ MODEL *ModelLoad(const char *filepath)
         free(name);
     }
 
-    /* Cargar Relaciones */
+    /* Cargar Relaciones (V3 anade procedencia; V1/V2 => desconocida) */
     for (uint32_t i = 0; i < rel_count; i++)
     {
-        SYMBOL_ID subj, pred, obj;
+        SYMBOL_ID subj, pred, obj, src = SYMBOL_INVALID;
         uint64_t count;
         float weight;
 
@@ -263,7 +264,8 @@ MODEL *ModelLoad(const char *filepath)
             fread(&pred,   sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&obj,    sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&count,  sizeof(uint64_t), 1, f) != 1 ||
-            fread(&weight, sizeof(float), 1, f) != 1)
+            fread(&weight, sizeof(float), 1, f) != 1 ||
+            (version >= 3 && fread(&src, sizeof(SYMBOL_ID), 1, f) != 1))
         {
             ModelDestroy(model);
             fclose(f);
@@ -277,6 +279,9 @@ MODEL *ModelLoad(const char *filepath)
             {
                 r->count = count;
                 r->weight = weight;
+                /* src valida solo si apunta a un simbolo del fichero */
+                if (version >= 3 && src != SYMBOL_INVALID && src <= sym_count)
+                    r->source = src;
             }
         }
     }

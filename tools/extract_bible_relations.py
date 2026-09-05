@@ -41,29 +41,34 @@ def main():
     verses = INPUT.read_text(encoding="utf-8").splitlines()
     found = []
     for verse in verses:
-        text = verse.split("\t", 1)[1] if "\t" in verse else verse
+        if "\t" in verse:
+            ref, text = verse.split("\t", 1)
+        else:
+            ref, text = "", verse
         for rx, pred, (a, b) in PATTERNS:
             for m in rx.finditer(text):
                 s = m.group(a).upper()
                 o = m.group(b).upper()
                 if m.group(a) in STOP:
                     continue
-                action, s2, p2, o2, _ = check_triple(s, pred, o)
+                action, s2, p2, o2, _, _ = check_triple(s, pred, o)
                 if action != "drop":
-                    found.append((s2, p2, o2))
+                    # 4a columna = procedencia (versiculo); el ingest la
+                    # guarda en RELATION.source, el resto la ignora
+                    found.append((s2, p2, o2, ref.strip()))
 
     print(f"matches: {len(found)}")
     unique = sorted(set(found))
     print(f"unique: {len(unique)}")
-    by_pred = Counter(p for _, p, _ in unique)
+    by_pred = Counter(p for _, p, _, _ in unique)
     for p, c in by_pred.most_common():
         print(f"  {p:15s} {c:5d}")
 
     # CRLF como el resto de corpus
     with open(OUTPUT, "w", encoding="utf-8") as f:
-        for s, p, o in unique:
-            f.write(f"{s}\t{p}\t{o}\n")
-    print(f"-> {OUTPUT} ({len(unique)} triples)")
+        for s, p, o, ref in unique:
+            f.write(f"{s}\t{p}\t{o}\t{ref}\n")
+    print(f"-> {OUTPUT} ({len(unique)} triples con procedencia)")
 
 
 if __name__ == "__main__":

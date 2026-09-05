@@ -171,7 +171,7 @@ int DialogGenerateResponse(
     {
         QUESTION pq = ParserDetectQuestion(user_input);
         if (pq.valid && (strcmp(pq.predicate, "ABUELO") == 0 ||
-                         strcmp(pq.predicate, "CUENTA_HIJOS") == 0))
+                         strncmp(pq.predicate, "CUENTA", 6) == 0))
         {
             char answer[256] = {0};
             if (ParserAnswerQuestion(graph, &pq, answer, sizeof(answer)))
@@ -179,9 +179,13 @@ int DialogGenerateResponse(
                 if (strcmp(pq.predicate, "ABUELO") == 0)
                     snprintf(out_response, max_len,
                              "El abuelo de %s es %s.", pq.subject, answer);
-                else
+                else if (strcmp(pq.predicate, "CUENTA_HIJOS") == 0 ||
+                         strcmp(pq.predicate, "CUENTA:HIJO_DE") == 0)
                     snprintf(out_response, max_len,
                              "%s tiene estos hijos: %s.", pq.subject, answer);
+                else
+                    snprintf(out_response, max_len,
+                             "He contado en %s: %s.", pq.subject, answer);
                 return 1;
             }
         }

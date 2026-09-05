@@ -24,7 +24,6 @@ add_library(symbolic STATIC
     src/transfer.c
     src/export.c
     src/stem.c
-    src/sudoku.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -72,7 +71,7 @@ sllm_test(test_deep_inference  tests/test_deep_inference.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
 sllm_test(test_stem           tests/test_stem.c)
-sllm_test(test_sudoku         tests/test_sudoku.c)
+sllm_test(test_provenance     tests/test_provenance.c)
 sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)
 sllm_test(test_qa_debug        test_qa_debug.c)

@@ -18,7 +18,20 @@
 #include "parser.h"
 #include "stem.h"
 #include "export.h"
-#include "sudoku.h"
+
+/* Sufijo " [FUENTE]" para una relacion con procedencia, "" si no. */
+static void SourceSuffix(const GRAPH *graph, const RELATION *r,
+                         char *out, size_t size)
+{
+    if (out == NULL || size == 0)
+        return;
+    out[0] = '\0';
+    if (graph == NULL || r == NULL || r->source == SYMBOL_INVALID)
+        return;
+    const SYMBOL *s = SymbolGet(graph->symbols, r->source);
+    if (s != NULL && s->name != NULL)
+        snprintf(out, size, " [%s]", s->name);
+}
 
 #define CLI_BUFFER_SIZE 512
 
@@ -115,7 +128,7 @@ int main(void)
     printf("  Natural conversation without backpropagation or GPUs.\n");
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
   printf("            /find S P O (*), /why S P O, /export <f.dot|f.ttl>,\n");
-  printf("            /synonyms, /alias, /analogy A B, /sudoku <81 chars>,\n");
+  printf("            /synonyms, /alias, /analogy A B,\n");
     printf("            /save, /load, /clear, /exit                  \n");
     printf("========================================================\n\n");
 
@@ -523,7 +536,12 @@ int main(void)
                     const SYMBOL *pp = SymbolGet(graph->symbols, r->predicate);
                     const SYMBOL *oo = SymbolGet(graph->symbols, r->object);
                     if (ss && pp && oo)
-                        printf("  %s --%s--> %s\n", ss->name, pp->name, oo->name);
+                    {
+                        char src[144];
+                        SourceSuffix(graph, r, src, sizeof(src));
+                        printf("  %s --%s--> %s%s\n",
+                               ss->name, pp->name, oo->name, src);
+                    }
                     shown++;
                 }
                 printf("IA > %u matching relation(s).\n\n", shown);
@@ -548,167 +566,13 @@ int main(void)
             continue;
         }
 
-        /* Sudoku: /sudoku <81 chars, 0/. = vacia> */
-        if (strncmp(input, "/sudoku ", 8) == 0)
-        {
-            SUDOKU b;
-            if (!SudokuParse(input + 8, &b))
-            {
-                printf("IA > Dame 81 caracteres ('1'-'9', '0' o '.' para vacia).\n\n");
-                continue;
-            }
-            int givens = SudokuGivens(&b);
-            clock_t t0 = clock();
-            uint64_t nodes = 0;
-            SUDOKU_TRACE trace;
-            int ok = SudokuSolveSteps(&b, &nodes, &trace);
-            double secs = (double)(clock() - t0) / CLOCKS_PER_SEC;
-            if (!ok)
-            {
-                printf("IA > Ese sudoku no tiene solucion (contradiccion).\n\n");
-                continue;
-            }
-            char sol[82];
-            SudokuToString(&b, sol);
-            printf("IA > Resuelto en %.3fs (%s):\n", secs,
-                   SudokuDifficulty(nodes, givens));
-            for (int r = 0; r < 9; r++)
-            {
-                printf("    %.3s | %.3s | %.3s\n",
-                       sol + r * 9, sol + r * 9 + 3, sol + r * 9 + 6);
-                if (r == 2 || r == 5)
-                    printf("    ------+-------+------\n");
-            }
-            /* Memoria: 81 celdas como triples SUDOKU --RnCm--> d */
-            SYMBOL_ID subj = GraphAddSymbol(graph, "SUDOKU");
-            if (subj != SYMBOL_INVALID)
-            {
-                for (int i = 0; i < 81; i++)
-                {
-                    char pred[8], obj[2];
-                    snprintf(pred, sizeof(pred), "R%dC%d", i / 9 + 1, i % 9 + 1);
-                    obj[0] = sol[i]; obj[1] = '\0';
-                    SYMBOL_ID pid = GraphAddSymbol(graph, pred);
-                    SYMBOL_ID oid = GraphAddSymbol(graph, obj);
-                    if (pid != SYMBOL_INVALID && oid != SYMBOL_INVALID)
-                        GraphAddRelation(graph, subj, pid, oid);
-                }
-            }
-            /* Razonamiento: pasos deducidos como triples
-               SUDOKU_PASO_k --TECNICA--> ... / --CELDA--> RnCm_d */
-            SYMBOL_ID p_tec = GraphAddSymbol(graph, "TECNICA");
-            SYMBOL_ID p_cel = GraphAddSymbol(graph, "CELDA");
-            SYMBOL_ID p_link = GraphAddSymbol(graph, "TIENE_PASO");
-            int nsteps = 0;
-            if (subj != SYMBOL_INVALID && p_tec != SYMBOL_INVALID &&
-                p_cel != SYMBOL_INVALID && p_link != SYMBOL_INVALID)
-            {
-                for (int k = 0; k < trace.n; k++)
-                {
-                    if (trace.steps[k].tech == SSTEP_GIVEN)
-                        continue;
-                    char sno[24], cobj[12];
-                    snprintf(sno, sizeof(sno), "SUDOKU_PASO_%d", nsteps);
-                    snprintf(cobj, sizeof(cobj), "R%dC%d_%d",
-                             trace.steps[k].cell / 9 + 1,
-                             trace.steps[k].cell % 9 + 1,
-                             trace.steps[k].digit + 1);
-                    SYMBOL_ID sid = GraphAddSymbol(graph, sno);
-                    SYMBOL_ID tid = GraphAddSymbol(
-                        graph, SudokuTechName(trace.steps[k].tech));
-                    SYMBOL_ID cid = GraphAddSymbol(graph, cobj);
-                    if (sid == SYMBOL_INVALID || tid == SYMBOL_INVALID ||
-                        cid == SYMBOL_INVALID)
-                        break;
-                    GraphAddRelation(graph, sid, p_tec, tid);
-                    GraphAddRelation(graph, sid, p_cel, cid);
-                    GraphAddRelation(graph, subj, p_link, sid);
-                    nsteps++;
-                }
-            }
-            /* Historial de aprendizaje: coste de este caso contra
-               la distribucion de casos previos (umbrales vivos) */
-            int nguess = 0;
-            for (int k = 0; k < trace.n; k++)
-                if (trace.steps[k].tech == SSTEP_GUESS)
-                    nguess++;
-
-            uint64_t hist[256];
-            int n_hist = 0, maxcase = 0;
-            uint32_t nsym = SymbolCount(graph->symbols);
-            for (uint32_t id = 1; id <= nsym; id++)
-            {
-                const SYMBOL *sm = SymbolGet(graph->symbols, id);
-                if (!sm || !sm->name ||
-                    strncmp(sm->name, "SUDOKU_CASO_", 12) != 0)
-                    continue;
-                int k = atoi(sm->name + 12);
-                if (k > maxcase)
-                    maxcase = k;
-                if (n_hist < 256)
-                {
-                    RELATION *rr[8];
-                    uint32_t nq = GraphQuerySubject(graph, id, rr, 8);
-                    for (uint32_t q = 0; q < nq; q++)
-                    {
-                        const SYMBOL *pp = SymbolGet(graph->symbols,
-                                                     rr[q]->predicate);
-                        const SYMBOL *oo = SymbolGet(graph->symbols,
-                                                     rr[q]->object);
-                        if (pp && pp->name && oo && oo->name &&
-                            strcmp(pp->name, "NODOS") == 0)
-                            hist[n_hist++] =
-                                (uint64_t)strtoull(oo->name, NULL, 10);
-                    }
-                }
-            }
-            const char *calibrada =
-                SudokuDifficultyCalibrated(nodes, hist, n_hist);
-
-            /* Ingiere este caso: PISTAS / NODOS / RAMAS */
-            {
-                char cname[24], gbuf[16], nbuf[24], rbuf[16];
-                snprintf(cname, sizeof(cname), "SUDOKU_CASO_%d", maxcase + 1);
-                snprintf(gbuf, sizeof(gbuf), "%d", givens);
-                snprintf(nbuf, sizeof(nbuf), "%llu",
-                         (unsigned long long)nodes);
-                snprintf(rbuf, sizeof(rbuf), "%d", nguess);
-                SYMBOL_ID cid = GraphAddSymbol(graph, cname);
-                SYMBOL_ID pg = GraphAddSymbol(graph, "PISTAS");
-                SYMBOL_ID pn = GraphAddSymbol(graph, "NODOS");
-                SYMBOL_ID pr = GraphAddSymbol(graph, "RAMAS");
-                SYMBOL_ID og = GraphAddSymbol(graph, gbuf);
-                SYMBOL_ID on = GraphAddSymbol(graph, nbuf);
-                SYMBOL_ID orr = GraphAddSymbol(graph, rbuf);
-                if (cid != SYMBOL_INVALID && pg != SYMBOL_INVALID &&
-                    pn != SYMBOL_INVALID && pr != SYMBOL_INVALID &&
-                    og != SYMBOL_INVALID && on != SYMBOL_INVALID &&
-                    orr != SYMBOL_INVALID)
-                {
-                    GraphAddRelation(graph, cid, pg, og);
-                    GraphAddRelation(graph, cid, pn, on);
-                    GraphAddRelation(graph, cid, pr, orr);
-                }
-            }
-            printf("IA > Solucion guardada: 81 celdas + %d pasos de "
-                   "razonamiento. Prueba /find SUDOKU R3C5 * o "
-                   "/find SUDOKU_PASO_0 * *\n", nsteps);
-            if (n_hist >= 3)
-                printf("IA > Dificultad calibrada (%d casos previos): %s\n\n",
-                       n_hist, calibrada);
-            else
-                printf("IA > Historial: %d/3 casos para calibrar "
-                       "dificultad con tu experiencia.\n\n", n_hist);
-            continue;
-        }
-
         /* Kinship/count shapes bypass the attention scorer: ES/TIENE
            always match there and would hijack the question with a
            1-hop guess. These shapes have exact 2-hop/count answers. */
         {
             QUESTION kq = ParserDetectQuestion(input);
             if (kq.valid && (strcmp(kq.predicate, "ABUELO") == 0 ||
-                             strcmp(kq.predicate, "CUENTA_HIJOS") == 0))
+                             strncmp(kq.predicate, "CUENTA", 6) == 0))
             {
                 DialogGenerateResponse(graph, ctx, input,
                                        response, sizeof(response));
@@ -792,8 +656,14 @@ int main(void)
                     const SYMBOL *s = SymbolGet(graph->symbols, best_subj);
                     const SYMBOL *p = SymbolGet(graph->symbols, best_pred);
                     if (s && p)
-                        printf("IA > %s (because %s --%s--> %s)\n\n",
-                               o->name, s->name, p->name, o->name);
+                    {
+                        char src[144];
+                        RELATION *br = GraphFindRelation(graph, best_subj,
+                                                         best_pred, best_obj);
+                        SourceSuffix(graph, br, src, sizeof(src));
+                        printf("IA > %s (because %s --%s--> %s%s)\n\n",
+                               o->name, s->name, p->name, o->name, src);
+                    }
                     else
                         printf("IA > %s\n\n", o->name);
                 }

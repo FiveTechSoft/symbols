@@ -63,11 +63,14 @@ def detect_newline(raw: bytes) -> str:
 
 
 def split_row(line: str):
-    """Mimica ParseTSVLine: 2 primeros tabs parten; resto = objeto."""
+    """Mimica ParseTSVLine: 2 primeros tabs parten; 3er tab (opcional)
+    separa objeto de procedencia. Devuelve (s, p, o, src)."""
     parts = line.split("\t")
     if len(parts) < 3:
         return None
-    return parts[0], parts[1], "\t".join(parts[2:])
+    if len(parts) > 3:
+        return parts[0], parts[1], parts[2], "\t".join(parts[3:])
+    return parts[0], parts[1], parts[2], ""
 
 
 def is_data_line(line: str) -> bool:
@@ -116,24 +119,29 @@ def clean_field(field: str):
     return new, ("fixed" if fixed else "ok"), ""
 
 
-def check_triple(s: str, p: str, o: str):
-    """Un triple (crudo) -> (accion, s2, p2, o2, regla).
+def check_triple(s: str, p: str, o: str, src: str = ""):
+    """Un triple (crudo) -> (accion, s2, p2, o2, src2, regla).
 
     accion: 'keep' (intacto), 'fixed' (reparado), 'drop' (regla=motivo).
+    src es la procedencia explicita (4a columna, p.ej. "GEN 1:1"):
+    se valida leve (sin tabs, <128 chars) y se preserva tal cual.
     Misma funcion que usa lint_file y los extractores: una sola
     fuente de verdad para que lo extraido pase la puerta.
     """
     rule = ""
+    src2 = src.strip()
+    if "\t" in src2 or "\n" in src2 or len(src2) >= 128:
+        return "drop", s, p, o, src2, "bad_source"
     if not s.strip() or not p.strip() or not o.strip():
-        return "drop", s, p, o, "empty"
+        return "drop", s, p, o, src2, "empty"
     su = s.strip().upper()
     if su in STOP_SUBJ or su.startswith(STOP_PREFIX):
-        return "drop", s, p, o, "anaphora"
+        return "drop", s, p, o, src2, "anaphora"
     if " " in p.strip():
-        return "drop", s, p, o, "spaced_pred"
+        return "drop", s, p, o, src2, "spaced_pred"
     ou = o.strip().upper()
     if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
-        return "drop", s, p, o, "phrase_obj"
+        return "drop", s, p, o, src2, "phrase_obj"
 
     moji_fixed = False
     flds = []
@@ -141,7 +149,7 @@ def check_triple(s: str, p: str, o: str):
         if MOJI_RE.search(fld):
             fld, ok = repair_mojibake(fld)
             if MOJI_RE.search(fld):
-                return "drop", s, p, o, "mojibake"
+                return "drop", s, p, o, src2, "mojibake"
             moji_fixed = moji_fixed or ok
         flds.append(fld)
     s, p, o = flds
@@ -151,13 +159,13 @@ def check_triple(s: str, p: str, o: str):
     for fld in (s, p, o):
         fld, act, why = clean_field(fld)
         if act == "drop":
-            return "drop", s, p, o, why
+            return "drop", s, p, o, src2, why
         fixed_any = fixed_any or (act == "fixed")
         flds.append(fld)
     s, p, o = flds
     ou = o.strip().upper()
     if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
-        return "drop", s, p, o, "phrase_obj"
+        return "drop", s, p, o, src2, "phrase_obj"
 
     # Sujetos/objetos con espacio: frase larga -> drop (simetrico a
     # phrase_obj); resto -> guion bajo (convencion del proyecto:
@@ -168,7 +176,7 @@ def check_triple(s: str, p: str, o: str):
         fu = fld.strip().upper()
         if " " in fu:
             if len(fu.split()) > 4 or len(fu) > 48:
-                return "drop", s, p, o, "phrase_subj" if which == "s" else "phrase_obj"
+                return "drop", s, p, o, src2, ("phrase_subj" if which == "s" else "phrase_obj")
             norm = re.sub(r" +", "_", fld.strip())
             if norm != fld:
                 fixed_any = True
@@ -179,8 +187,8 @@ def check_triple(s: str, p: str, o: str):
                 o = fld
 
     if fixed_any:
-        return "fixed", s.strip(), p.strip(), o.strip(), ""
-    return "keep", s.strip(), p.strip(), o.strip(), ""
+        return "fixed", s.strip(), p.strip(), o.strip(), src2, ""
+    return "keep", s.strip(), p.strip(), o.strip(), src2, ""
 
 
 def lint_file(path: Path):
@@ -204,9 +212,9 @@ def lint_file(path: Path):
         if not is_data_line(stripped):
             out_lines.append(stripped)  # comentarios/blancos: intactos
             continue
-        s, p, o = split_row(stripped)
+        s, p, o, src = split_row(stripped)
         stats["rows"] += 1
-        action, s2, p2, o2, rule = check_triple(s, p, o)
+        action, s2, p2, o2, src2, rule = check_triple(s, p, o, src)
         if action == "drop":
             stats["dropped"] += 1
             bump(rule)
@@ -215,7 +223,7 @@ def lint_file(path: Path):
         else:
             if action == "fixed":
                 stats["fixed"] += 1
-            out_lines.append(f"{s2}\t{p2}\t{o2}")
+            out_lines.append(f"{s2}\t{p2}\t{o2}" + (f"\t{src2}" if src2 else ""))
 
     return stats, dropped_examples, out_lines, newline
 

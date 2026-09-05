@@ -39,6 +39,13 @@ static void StrToUpperTrim(const char *src, char *dst, size_t max)
 int IngestTriple(GRAPH *graph,
                  const char *subject, const char *predicate, const char *object)
 {
+    return IngestTripleSource(graph, subject, predicate, object, NULL);
+}
+
+int IngestTripleSource(GRAPH *graph,
+                       const char *subject, const char *predicate,
+                       const char *object, const char *source)
+{
     if (graph == NULL || subject == NULL || predicate == NULL || object == NULL)
         return 0;
 
@@ -68,6 +75,24 @@ int IngestTriple(GRAPH *graph,
     int added = GraphAddRelation(graph, s_id, p_id, o_id);
     if (!added)
         return 0;
+
+    /* Procedencia: solo en insercion nueva (no pisa la original).
+       El simbolo fuente vive en la misma tabla (visible en /find). */
+    if (existing == NULL && source != NULL && source[0] != '\0')
+    {
+        char src_upper[128];
+        StrToUpperTrim(source, src_upper, sizeof(src_upper));
+        if (src_upper[0] != '\0')
+        {
+            SYMBOL_ID src_id = GraphAddSymbol(graph, src_upper);
+            if (src_id != SYMBOL_INVALID)
+            {
+                RELATION *r = GraphFindRelation(graph, s_id, p_id, o_id);
+                if (r != NULL)
+                    RelationSetSource(r, src_id);
+            }
+        }
+    }
 
     /* Update embeddings on every co-occurrence (not just new relations) */
     if (graph->embeddings != NULL)
@@ -125,8 +150,12 @@ int IngestTriple(GRAPH *graph,
    Parse one TSV line: "subject\tpredicate\tobject"
    ============================================================ */
 
-static int ParseTSVLine(const char *line, char *subj, char *pred, char *obj,
-                        size_t field_max)
+/* Parse one TSV line: "subject\tpredicate\tobject[\tsource]".
+   La 4a columna (opcional) es la procedencia explicita (p.ej. "GEN 1:1");
+   sin ella el llamador aporta "fichero:linea". Devuelve 1 y deja src
+   vacio ("") si no hay 4a columna. */
+static int ParseTSVLineSrc(const char *line, char *subj, char *pred, char *obj,
+                           char *src, size_t field_max)
 {
     /* Skip leading whitespace */
     while (*line && isspace((unsigned char)*line))
@@ -160,18 +189,42 @@ static int ParseTSVLine(const char *line, char *subj, char *pred, char *obj,
 
     line = tab2 + 1;
 
-    /* Rest is object (trim trailing newline/whitespace) */
-    const char *end = line + strlen(line);
-    while (end > line && (*(end - 1) == '\n' || *(end - 1) == '\r' ||
-                          *(end - 1) == ' '))
-        end--;
+    /* Third tab (optional): splits object from explicit source */
+    const char *tab3 = strchr(line, '\t');
+    const char *obj_end = (tab3 != NULL) ? tab3 : line + strlen(line);
+    while (obj_end > line && (*(obj_end - 1) == '\n' || *(obj_end - 1) == '\r' ||
+                              *(obj_end - 1) == ' '))
+        obj_end--;
 
-    size_t len3 = (size_t)(end - line);
+    size_t len3 = (size_t)(obj_end - line);
     if (len3 >= field_max) len3 = field_max - 1;
     memcpy(obj, line, len3);
     obj[len3] = '\0';
 
+    src[0] = '\0';
+    if (tab3 != NULL)
+    {
+        const char *sbegin = tab3 + 1;
+        while (*sbegin == ' ' || *sbegin == '\t')
+            sbegin++;
+        const char *send = sbegin + strlen(sbegin);
+        while (send > sbegin && (*(send - 1) == '\n' || *(send - 1) == '\r' ||
+                                 *(send - 1) == ' ' || *(send - 1) == '\t'))
+            send--;
+        size_t len4 = (size_t)(send - sbegin);
+        if (len4 >= field_max) len4 = field_max - 1;
+        memcpy(src, sbegin, len4);
+        src[len4] = '\0';
+    }
+
     return 1;
+}
+
+static int ParseTSVLine(const char *line, char *subj, char *pred, char *obj,
+                        size_t field_max)
+{
+    char src[128];
+    return ParseTSVLineSrc(line, subj, pred, obj, src, field_max);
 }
 
 /* ============================================================
@@ -180,6 +233,11 @@ static int ParseTSVLine(const char *line, char *subj, char *pred, char *obj,
 
 INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f)
 {
+    return IngestTSVStreamSrc(graph, f, NULL);
+}
+
+INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath)
+{
     INGEST_STATS stats;
     memset(&stats, 0, sizeof(stats));
 
@@ -187,7 +245,8 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f)
         return stats;
 
     char line[1024];
-    char subj[128], pred[128], obj[128];
+    char subj[128], pred[128], obj[128], src[128];
+    char defsrc[256];
 
     while (fgets(line, sizeof(line), f) != NULL)
     {
@@ -201,7 +260,7 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f)
             len--;
         }
 
-        if (!ParseTSVLine(line, subj, pred, obj, sizeof(subj)))
+        if (!ParseTSVLineSrc(line, subj, pred, obj, src, sizeof(subj)))
         {
             stats.lines_failed++;
             continue;
@@ -209,7 +268,17 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f)
 
         stats.lines_parsed++;
 
-        int rc = IngestTriple(graph, subj, pred, obj);
+        /* Procedencia: 4a columna explicita, o "fichero:linea" */
+        const char *source = (src[0] != '\0') ? src : NULL;
+        defsrc[0] = '\0';
+        if (source == NULL && filepath != NULL && filepath[0] != '\0')
+        {
+            snprintf(defsrc, sizeof(defsrc), "%s:%llu",
+                     filepath, (unsigned long long)stats.lines_read);
+            source = defsrc;
+        }
+
+        int rc = IngestTripleSource(graph, subj, pred, obj, source);
         if (rc == 1)
             stats.relations_inserted++;
         else if (rc == 2)
@@ -235,7 +304,7 @@ INGEST_STATS IngestTSV(GRAPH *graph, const char *filepath)
     if (f == NULL)
         return stats;
 
-    stats = IngestTSVStream(graph, f);
+    stats = IngestTSVStreamSrc(graph, f, filepath);
     fclose(f);
     return stats;
 }

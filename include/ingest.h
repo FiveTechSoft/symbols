@@ -28,6 +28,12 @@ INGEST_STATS IngestTSV(GRAPH *graph, const char *filepath);
 INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f);
 
 /*
+ * Igual, con procedencia: filepath (puede ser NULL) forma el
+ * "fichero:linea" por defecto cuando la linea no trae 4a columna.
+ */
+INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath);
+
+/*
  * Ingest raw text: one triple per line, tab-separated.
  * Trims whitespace, converts to uppercase, skips empty/comments.
  * Returns: 0 = error (invalid args / graph full),
@@ -36,5 +42,14 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f);
  */
 int IngestTriple(GRAPH *graph,
                  const char *subject, const char *predicate, const char *object);
+
+/*
+ * Igual, con procedencia (p.ej. "GEN 1:1", NULL = desconocida).
+ * Solo se fija en insercion nueva; no pisa la original.
+ * Mismo codigo de retorno que IngestTriple.
+ */
+int IngestTripleSource(GRAPH *graph,
+                       const char *subject, const char *predicate,
+                       const char *object, const char *source);
 
 #endif

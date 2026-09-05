@@ -44,7 +44,7 @@ static uint64_t TrainFromTSV(MODEL *model, const char *tsv_path)
     char file_buf[BUFFER_SIZE];
     setvbuf(f, file_buf, _IOFBF, sizeof(file_buf));
 
-    INGEST_STATS stats = IngestTSVStream(model->graph, f);
+    INGEST_STATS stats = IngestTSVStreamSrc(model->graph, f, tsv_path);
 
     fclose(f);
     return stats.relations_inserted + stats.relations_updated;

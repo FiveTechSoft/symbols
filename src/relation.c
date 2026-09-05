@@ -208,6 +208,12 @@ void RelationStrengthen(RELATION *relation, float amount)
         relation->weight = 1.0e9f;
 }
 
+void RelationSetSource(RELATION *relation, SYMBOL_ID source)
+{
+    if (!relation) return;
+    relation->source = source;
+}
+
 int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
                      SYMBOL_ID predicate, SYMBOL_ID object,
                      RELATION_POLARITY polarity)
