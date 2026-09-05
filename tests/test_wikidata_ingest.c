@@ -43,11 +43,17 @@ int main(void)
     printf("   Bible:     %llu triples, %u symbols\n",
            ir5.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 6. Ingest love knowledge */
+    printf("6. Ingesting love_knowledge.tsv (love/amor)...\n");
+    INGEST_STATS ir6 = IngestTSV(graph, "data/samples/love_knowledge.tsv");
+    printf("   Love:      %llu triples, %u symbols\n",
+           ir6.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 
-    /* 6. Show sample relations */
-    printf("\n6. Sample relations:\n");
+    /* 7. Show sample relations */
+    printf("\n7. Sample relations:\n");
     uint32_t shown = 0;
     for (uint32_t i = 0; i < RelationCount(graph->relations) && shown < 15; i++)
     {
@@ -65,8 +71,8 @@ int main(void)
         }
     }
 
-    /* 7. Save model */
-    printf("\n7. Saving model...\n");
+    /* 8. Save model */
+    printf("\n8. Saving model...\n");
     MODEL *model = ModelCreate(1024, 1024);
     if (model)
     {
@@ -78,8 +84,8 @@ int main(void)
         ModelDestroy(model);
     }
 
-    /* 8. Load and test queries */
-    printf("\n8. Loading and querying...\n");
+    /* 9. Load and test queries */
+    printf("\n9. Loading and querying...\n");
     MODEL *m2 = ModelLoad("wiki_model.bin");
     if (m2 && m2->graph)
     {
