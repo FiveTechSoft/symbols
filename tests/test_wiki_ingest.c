@@ -52,7 +52,7 @@ int main(void)
     {
         GraphDestroy(model->graph);
         model->graph = graph;
-        if (ModelSave(model, "wiki_model.bin"))
+        if (ModelSave(model, "wiki_model_ingest_test.bin"))
             printf("   OK\n");
         else
             printf("   FAIL\n");
@@ -61,7 +61,7 @@ int main(void)
     }
 
     printf("\n5. Loading model and testing inference...\n");
-    MODEL *m2 = ModelLoad("wiki_model.bin");
+    MODEL *m2 = ModelLoad("wiki_model_ingest_test.bin");
     if (m2 && m2->graph)
     {
         GRAPH *g2 = m2->graph;
@@ -98,6 +98,7 @@ int main(void)
     }
 
     GraphDestroy(graph);
+    remove("wiki_model_ingest_test.bin");
     printf("\n=== TEST COMPLETE ===\n");
     return 0;
 }

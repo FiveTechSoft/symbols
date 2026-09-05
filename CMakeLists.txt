@@ -74,7 +74,7 @@ sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)
 sllm_test(test_qa_debug        test_qa_debug.c)
 
-# Readers of wiki_model.bin must run BEFORE the tests that regenerate it
+# Read-only queries against the tracked golden wiki_model.bin
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
 add_test(NAME test_wiki_inference COMMAND test_wiki_inference wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -87,5 +87,8 @@ add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
 target_link_libraries(test_qa_hygiene symbolic)
 add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+# test_wiki_ingest / test_wikidata_ingest write to their own scratch files
+# (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the tracked
+# wiki_model.bin, so the golden model is never clobbered by a test.
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)

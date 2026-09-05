@@ -19,6 +19,23 @@ jobs:
       - name: Corpus lint (gate)
         run: python tools/lint_corpus.py --check
 
+  build-test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake python3
+      - name: Configure (gcc)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j4
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Corpus lint (gate)
+        run: python3 tools/lint_corpus.py --check
+
   asan-msvc:
     runs-on: windows-latest
     steps:

@@ -118,7 +118,7 @@ int main(void)
         model.graph = graph;
         model.embeddings = embeddings;
         model.config = LearningConfigDefault();
-        int ok = ModelSave(&model, "wiki_model.bin");
+        int ok = ModelSave(&model, "wikidata_model_test.bin");
         printf("   %s\n", ok ? "OK" : "FAIL");
         model.graph = NULL;
         model.embeddings = NULL;
@@ -126,7 +126,7 @@ int main(void)
 
     /* 10. Load and test queries */
     printf("\n10. Loading and querying...\n");
-    MODEL *m2 = ModelLoad("wiki_model.bin");
+    MODEL *m2 = ModelLoad("wikidata_model_test.bin");
     if (m2 && m2->graph)
     {
         GRAPH *g2 = m2->graph;
@@ -161,6 +161,7 @@ int main(void)
     }
 
     GraphDestroy(graph);
+    remove("wikidata_model_test.bin");
     printf("\n=== COMPLETE ===\n");
     return 0;
 }

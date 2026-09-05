@@ -12,6 +12,7 @@ static double GetTimeSeconds(void)
     return (double)counter.QuadPart / (double)freq.QuadPart;
 }
 #else
+#include <time.h>
 static double GetTimeSeconds(void)
 {
     struct timespec ts;

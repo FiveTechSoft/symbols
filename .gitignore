@@ -32,6 +32,8 @@ out.txt
 err.txt
 bench_out.txt
 bench_err.txt
+wiki_model_ingest_test.bin
+wikidata_model_test.bin
 
 # Python tooling
 __pycache__/
