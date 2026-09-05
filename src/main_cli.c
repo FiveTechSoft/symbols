@@ -89,8 +89,9 @@ int main(void)
     printf("========================================================\n");
     printf("     SYMBOLIC LLM - ASISTENTE CONVERSACIONAL            \n");
     printf("  Conversacion natural sin backpropagation ni GPUs.     \n");
-    printf("  Comandos: /graph, /context, /stats, /synonyms,        \n");
-    printf("            /alias, /save, /load, /clear, /exit          \n");
+    printf("  Comandos: /graph, /context, /stats, /query <palabra>,\n");
+    printf("            /synonyms, /alias, /analogy A B,\n");
+    printf("            /save, /load, /clear, /exit                  \n");
     printf("========================================================\n\n");
 
     char input[CLI_BUFFER_SIZE];
@@ -144,6 +145,63 @@ int main(void)
             tmp.graph = graph;
             tmp.embeddings = embeds;
             ModelPrintReport(&tmp);
+            continue;
+        }
+
+        if (strncmp(input, "/query ", 7) == 0)
+        {
+            const char *term = input + 7;
+            SYMBOL_ID sid = SymbolFind(graph->symbols, term);
+            if (sid == SYMBOL_INVALID)
+            {
+                printf("IA > No conozco '%s'.\n\n", term);
+            }
+            else
+            {
+                /* Relations as subject */
+                RELATION *as_subj[64];
+                uint32_t n_subj = GraphQuerySubject(graph, sid, as_subj, 64);
+
+                /* Relations as object */
+                RELATION *as_obj[64];
+                uint32_t n_obj = GraphQueryObject(graph, sid, as_obj, 64);
+
+                printf("\n=== Relaciones de '%s' ===\n", term);
+                printf("  Como SUJETO (%u):\n", n_subj);
+                for (uint32_t i = 0; i < n_subj && i < 30; i++)
+                {
+                    const SYMBOL *pred = SymbolGet(graph->symbols, as_subj[i]->predicate);
+                    const SYMBOL *obj  = SymbolGet(graph->symbols, as_subj[i]->object);
+                    if (pred && obj)
+                        printf("    --%s--> %s\n", pred->name, obj->name);
+                }
+
+                printf("  Como OBJETO (%u):\n", n_obj);
+                for (uint32_t i = 0; i < n_obj && i < 30; i++)
+                {
+                    const SYMBOL *subj = SymbolGet(graph->symbols, as_obj[i]->subject);
+                    const SYMBOL *pred = SymbolGet(graph->symbols, as_obj[i]->predicate);
+                    if (subj && pred)
+                        printf("    %s --%s-->\n", subj->name, pred->name);
+                }
+
+                /* Semantic similar words */
+                EMBEDDING_MATCH matches[8];
+                uint32_t n_sim = EmbeddingFindSimilar(graph->embeddings, sid, matches, 8);
+                if (n_sim > 0)
+                {
+                    printf("  Palabras similares (vectorial):\n");
+                    for (uint32_t i = 0; i < n_sim; i++)
+                    {
+                        const SYMBOL *s = SymbolGet(graph->symbols, matches[i].id);
+                        if (s)
+                            printf("    %s (%.2f)\n", s->name, matches[i].score);
+                    }
+                }
+
+                printf("\n  Total: %u como sujeto, %u como objeto, %u similares\n\n",
+                       n_subj, n_obj, n_sim);
+            }
             continue;
         }
 
