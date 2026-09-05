@@ -158,6 +158,26 @@ def check_triple(s: str, p: str, o: str):
     ou = o.strip().upper()
     if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
         return "drop", s, p, o, "phrase_obj"
+
+    # Sujetos/objetos con espacio: frase larga -> drop (simetrico a
+    # phrase_obj); resto -> guion bajo (convencion del proyecto:
+    # SAN_MARINO, no SAN MARINO). Los predicados con espacio ya
+    # cayeron en spaced_pred (vocabulario cerrado, no se normaliza).
+    for which in ("s", "o"):
+        fld = s if which == "s" else o
+        fu = fld.strip().upper()
+        if " " in fu:
+            if len(fu.split()) > 4 or len(fu) > 48:
+                return "drop", s, p, o, "phrase_subj" if which == "s" else "phrase_obj"
+            norm = re.sub(r" +", "_", fld.strip())
+            if norm != fld:
+                fixed_any = True
+            fld = norm
+            if which == "s":
+                s = fld
+            else:
+                o = fld
+
     if fixed_any:
         return "fixed", s.strip(), p.strip(), o.strip(), ""
     return "keep", s.strip(), p.strip(), o.strip(), ""
