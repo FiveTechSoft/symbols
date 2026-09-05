@@ -32,18 +32,14 @@ int main(void)
     SYMBOL_ID antonio = GraphAddSymbol(graph, "ANTONIO");
     SYMBOL_ID harbour = GraphAddSymbol(graph, "HARBOUR");
 
-    ContextPushEntity(ctx, antonio, "ANTONIO",
-                       GENDER_MASCULINE, NUMBER_SINGULAR,
-                       ENTITY_TYPE_PERSON, 1);
-    ContextPushEntity(ctx, harbour, "HARBOUR",
-                       GENDER_MASCULINE, NUMBER_SINGULAR,
-                       ENTITY_TYPE_OBJECT, 0);
+    ContextPushEntity(ctx, antonio, "ANTONIO", 1);
+    ContextPushEntity(ctx, harbour, "HARBOUR", 0);
 
     /* Frase 2: "El compila con hbmk2." */
     printf("\n2. Frase con pronombre: \"El compila con hbmk2.\"\n");
 
     char resolved[256];
-    ContextPreprocessSentence(ctx, "El compila con hbmk2.",
+    ContextPreprocessSentence(ctx, graph, "El compila con hbmk2.",
                               resolved, sizeof(resolved));
     printf("   Frase resuelta: \"%s\"\n", resolved);
     Assert(strstr(resolved, "ANTONIO") != NULL,
@@ -53,12 +49,8 @@ int main(void)
 
     ContextStepTurn(ctx);
     SYMBOL_ID hbmk2 = GraphAddSymbol(graph, "HBMK2");
-    ContextPushEntity(ctx, antonio, "ANTONIO",
-                       GENDER_MASCULINE, NUMBER_SINGULAR,
-                       ENTITY_TYPE_PERSON, 1);
-    ContextPushEntity(ctx, hbmk2, "HBMK2",
-                       GENDER_MASCULINE, NUMBER_SINGULAR,
-                       ENTITY_TYPE_OBJECT, 0);
+    ContextPushEntity(ctx, antonio, "ANTONIO", 1);
+    ContextPushEntity(ctx, hbmk2, "HBMK2", 0);
 
     /* Sentence 3: elided subject */
     printf("\n3. Sujeto eliptico:\n");

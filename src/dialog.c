@@ -296,7 +296,7 @@ int DialogGenerateResponse(
 
     /* Learning statements: input → syntax tree → symbols → relations */
     char resolved_buf[256];
-    ContextPreprocessSentence(ctx, user_input, resolved_buf, sizeof(resolved_buf));
+    ContextPreprocessSentence(ctx, graph, user_input, resolved_buf, sizeof(resolved_buf));
 
     if (ParserIngestSentence(graph, resolved_buf))
     {

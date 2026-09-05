@@ -64,9 +64,6 @@ void ContextPushEntity(
     CONTEXT *ctx,
     SYMBOL_ID symbol,
     const char *name,
-    ENTITY_GENDER gender,
-    ENTITY_NUMBER number,
-    ENTITY_TYPE type,
     int is_subject)
 {
     if (ctx == NULL || symbol == SYMBOL_INVALID || name == NULL)
@@ -111,9 +108,6 @@ void ContextPushEntity(
     e->symbol = symbol;
     strncpy(e->name, name, sizeof(e->name) - 1);
     e->name[sizeof(e->name) - 1] = '\0';
-    e->gender = gender;
-    e->number = number;
-    e->type = type;
     e->activation = 1.0f;
     e->turns_ago = 0;
     e->was_subject = is_subject;
@@ -139,51 +133,23 @@ static void StrToUpper(const char *src, char *dst, size_t max_len)
     dst[i] = '\0';
 }
 
-SYMBOL_ID ContextResolvePronoun(const CONTEXT *ctx, const char *pronoun)
+/* A lead token that names no symbol takes the top discourse entity
+   (activation x subjecthood). Known tokens are kept as written:
+   names are learned, pronouns resolve. No gender, no number,
+   no entity types: only symbols, relations and recency. */
+SYMBOL_ID ContextResolvePronoun(
+    const GRAPH *graph,
+    const CONTEXT *ctx,
+    const char *pronoun)
 {
-    if (ctx == NULL || pronoun == NULL || ctx->count == 0)
+    if (graph == NULL || ctx == NULL || pronoun == NULL || ctx->count == 0)
         return SYMBOL_INVALID;
 
     char p[32];
     StrToUpper(pronoun, p, sizeof(p));
 
-    ENTITY_GENDER req_gender = GENDER_UNKNOWN;
-    ENTITY_NUMBER req_number = NUMBER_SINGULAR;
-
-    if (strcmp(p, "EL") == 0)
-    {
-        req_gender = GENDER_MASCULINE;
-        req_number = NUMBER_SINGULAR;
-    }
-    else if (strcmp(p, "ELLA") == 0)
-    {
-        req_gender = GENDER_FEMININE;
-        req_number = NUMBER_SINGULAR;
-    }
-    else if (strcmp(p, "ELLOS") == 0)
-    {
-        req_gender = GENDER_MASCULINE;
-        req_number = NUMBER_PLURAL;
-    }
-    else if (strcmp(p, "ELLAS") == 0)
-    {
-        req_gender = GENDER_FEMININE;
-        req_number = NUMBER_PLURAL;
-    }
-    else if (strcmp(p, "ESTE") == 0)
-    {
-        req_gender = GENDER_MASCULINE;
-        req_number = NUMBER_SINGULAR;
-    }
-    else if (strcmp(p, "ESTA") == 0)
-    {
-        req_gender = GENDER_FEMININE;
-        req_number = NUMBER_SINGULAR;
-    }
-    else
-    {
+    if (SymbolFind(graph->symbols, p) != SYMBOL_INVALID)
         return SYMBOL_INVALID;
-    }
 
     SYMBOL_ID best_symbol = SYMBOL_INVALID;
     float best_score = -1.0f;
@@ -191,14 +157,6 @@ SYMBOL_ID ContextResolvePronoun(const CONTEXT *ctx, const char *pronoun)
     for (uint32_t i = 0; i < ctx->count; i++)
     {
         const CONTEXT_ENTITY *e = &ctx->entities[i];
-
-        if (req_gender != GENDER_UNKNOWN &&
-            e->gender != GENDER_UNKNOWN &&
-            e->gender != req_gender)
-            continue;
-
-        if (e->number != req_number)
-            continue;
 
         float score = e->activation * (e->was_subject ? 1.3f : 1.0f);
 
@@ -241,11 +199,12 @@ SYMBOL_ID ContextResolveImplicitSubject(const CONTEXT *ctx)
 
 int ContextPreprocessSentence(
     CONTEXT *ctx,
+    const GRAPH *graph,
     const char *input_sentence,
     char *out_resolved,
     size_t out_size)
 {
-    if (ctx == NULL || input_sentence == NULL ||
+    if (ctx == NULL || graph == NULL || input_sentence == NULL ||
         out_resolved == NULL || out_size == 0)
         return 0;
 
@@ -260,7 +219,7 @@ int ContextPreprocessSentence(
         return 1;
     }
 
-    SYMBOL_ID resolved_id = ContextResolvePronoun(ctx, first_word);
+    SYMBOL_ID resolved_id = ContextResolvePronoun(graph, ctx, first_word);
 
     if (resolved_id != SYMBOL_INVALID)
     {

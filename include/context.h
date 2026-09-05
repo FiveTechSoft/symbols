@@ -7,35 +7,14 @@
 
 #define CONTEXT_MAX_ENTITIES 16
 
-typedef enum
-{
-    GENDER_UNKNOWN = 0,
-    GENDER_MASCULINE,
-    GENDER_FEMININE,
-    GENDER_NEUTER
-} ENTITY_GENDER;
-
-typedef enum
-{
-    NUMBER_SINGULAR = 0,
-    NUMBER_PLURAL
-} ENTITY_NUMBER;
-
-typedef enum
-{
-    ENTITY_TYPE_GENERIC = 0,
-    ENTITY_TYPE_PERSON,
-    ENTITY_TYPE_OBJECT,
-    ENTITY_TYPE_ACTION
-} ENTITY_TYPE;
-
+/* Working memory holds recent SYMBOLS, nothing else. No gender, no
+   number, no entity types: those live in the map as symbols and
+   relations, or nowhere. Anaphora resolves by discourse dynamics
+   (activation x subjecthood); an unknown lead token takes the top. */
 typedef struct
 {
     SYMBOL_ID     symbol;
     char          name[64];
-    ENTITY_GENDER gender;
-    ENTITY_NUMBER number;
-    ENTITY_TYPE   type;
     float         activation;
     uint32_t      turns_ago;
     int           was_subject;
@@ -61,13 +40,11 @@ void ContextPushEntity(
     CONTEXT *ctx,
     SYMBOL_ID symbol,
     const char *name,
-    ENTITY_GENDER gender,
-    ENTITY_NUMBER number,
-    ENTITY_TYPE type,
     int is_subject
 );
 
 SYMBOL_ID ContextResolvePronoun(
+    const GRAPH *graph,
     const CONTEXT *ctx,
     const char *pronoun
 );
@@ -76,6 +53,7 @@ SYMBOL_ID ContextResolveImplicitSubject(const CONTEXT *ctx);
 
 int ContextPreprocessSentence(
     CONTEXT *ctx,
+    const GRAPH *graph,
     const char *input_sentence,
     char *out_resolved,
     size_t out_size
