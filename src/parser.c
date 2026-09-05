@@ -17,6 +17,12 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                          uint32_t start, char *out, size_t out_size);
 static uint64_t TokenRarity(const GRAPH *graph, const char *token);
 static uint64_t EffFreq(const GRAPH *graph, const char *token);
+static int TokenNamesRelation(const GRAPH *graph, const char *token);
+static void SurfaceRecord(const PARSED_SENTENCE *tokens,
+                          uint32_t subj_a, uint32_t subj_b,
+                          uint32_t pred_pos,
+                          uint32_t obj_a, uint32_t obj_b,
+                          const char *pred);
 
 /* ============================================================
    Utility
@@ -77,6 +83,21 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
     if (start >= end || end > tokens->count)
         return -1;
 
+    /* Copula slots: strip leading/trailing tokens that name a used
+       relation ("Roma es _", "_ es capital"). Positional, never
+       lexical: the copula sits at the span edge by definition. */
+    while (end > start + 1 &&
+           TokenNamesRelation(graph, tokens->tokens[start]))
+        start++;
+    while (end > start + 1 &&
+           TokenNamesRelation(graph, tokens->tokens[end - 1]))
+        end--;
+
+    /* No frequency-ratio edge strip here: raw standalone frequency
+       cannot tell glue from popular content (ITALIA 44 vs DE 4 would
+       eat the content). Relation-naming edges are already gone via
+       the copula strip above; the tiers below resolve the rest. */
+
     uint32_t span = end - start;
     char cand[128];
     /* Tier 0: longest known compound (length 2+). Single known tokens
@@ -124,33 +145,28 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
         }
     }
 
-    /* Purity tier: longest run using only the span's rarest tier.
-       Known glue (DE, EL) carries huge frequency; novel content sits
-       at zero. This keeps MARIA out of DE_MARIA without naming either.
-       Always resolves (single tokens are trivially pure), so no
-       fallthrough join exists: every creation is rarity-filtered. */
+    /* Novelty tier: longest run of never-seen tokens, anchor-ordered.
+       Novel content (MARIA, PAN) outranks known glue (DE, CON) without
+       naming either: what the map never saw cannot be glue. */
+    for (uint32_t len = (span < 4 ? span : 4); len >= 1; len--)
     {
-        uint64_t floor = UINT64_MAX;
-        for (uint32_t k = start; k < end; k++)
+        if (trailing)
         {
-            uint64_t r = TokenRarity(graph, tokens->tokens[k]);
-            if (r < floor)
-                floor = r;
-        }
-        for (uint32_t len = (span < 4 ? span : 4); len >= 1; len--)
-        {
-            for (uint32_t s = start; s + len <= end; s++)
+            uint32_t s = end - len + 1;
+            while (s > start)
             {
-                int pure = 1;
+                s--;
+                int novel = 1;
                 for (uint32_t k = 0; k < len; k++)
                 {
-                    if (TokenRarity(graph, tokens->tokens[s + k]) != floor)
+                    if (SymbolFind(graph->symbols,
+                                   tokens->tokens[s + k]) != SYMBOL_INVALID)
                     {
-                        pure = 0;
+                        novel = 0;
                         break;
                     }
                 }
-                if (!pure)
+                if (!novel)
                     continue;
                 cand[0] = '\0';
                 for (uint32_t k = 0; k < len; k++)
@@ -162,8 +178,54 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                 out[out_size - 1] = '\0';
                 return (int)s;
             }
-            if (len == 1)
-                break;
+        }
+        else
+        {
+            for (uint32_t s = start; s + len <= end; s++)
+            {
+                int novel = 1;
+                for (uint32_t k = 0; k < len; k++)
+                {
+                    if (SymbolFind(graph->symbols,
+                                   tokens->tokens[s + k]) != SYMBOL_INVALID)
+                    {
+                        novel = 0;
+                        break;
+                    }
+                }
+                if (!novel)
+                    continue;
+                cand[0] = '\0';
+                for (uint32_t k = 0; k < len; k++)
+                {
+                    if (k > 0) strcat(cand, "_");
+                    strcat(cand, tokens->tokens[s + k]);
+                }
+                strncpy(out, cand, out_size - 1);
+                out[out_size - 1] = '\0';
+                return (int)s;
+            }
+        }
+        if (len == 1)
+            break;
+    }
+
+    /* Known singles, trailing-first always (same as the query side):
+       nothing novel here, take the last thing that exists. Unifies
+       ingest and query entity rules. */
+    {
+        uint32_t s = end;
+        while (s > start)
+        {
+            s--;
+            cand[0] = '\0';
+            strcat(cand, tokens->tokens[s]);
+            if (SymbolFind(graph->symbols, cand) != SYMBOL_INVALID)
+            {
+                strncpy(out, cand, out_size - 1);
+                out[out_size - 1] = '\0';
+                return (int)s;
+            }
         }
     }
 
@@ -308,15 +370,15 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
             if (roots[k] == i) { known = 1; break; }
         if (known)
             continue;
-        int tr = 0;
-        if (ResolveRelationPass(graph, tokens.tokens[i],
-                                 names[nroots], sizeof(names[0]), &tr))
-        {
-            roots[nroots] = i;
-            trusted[nroots] = tr;
-            nroots++;
+            int tr = 0;
+            if (ResolveRelationPass(graph, tokens.tokens[i],
+                                     names[nroots], sizeof(names[0]), &tr))
+            {
+                roots[nroots] = i;
+                trusted[nroots] = tr;
+                nroots++;
+            }
         }
-    }
     {
         int any_trusted = 0;
         for (uint32_t k = 0; k < nroots; k++)
@@ -338,6 +400,38 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
             }
             nroots = w;
         }
+    }
+
+    /* Adjacent roots compete for the same slots ("es capital"):
+       keep the rarest of each adjacent run. The copula is frequent;
+       content is rare. No names involved. */
+    {
+        uint32_t w = 0;
+        for (uint32_t k = 0; k < nroots; k++)
+        {
+            if (w > 0 && roots[k] == roots[w - 1] + 1)
+            {
+                uint64_t f_old = TokenRarity(graph, names[w - 1]);
+                uint64_t f_new = TokenRarity(graph, names[k]);
+                if (f_new < f_old)
+                {
+                    roots[w - 1] = roots[k];
+                    strcpy(names[w - 1], names[k]);
+                    trusted[w - 1] = trusted[k];
+                }
+            }
+            else
+            {
+                if (w != k)
+                {
+                    roots[w] = roots[k];
+                    strcpy(names[w], names[k]);
+                    trusted[w] = trusted[k];
+                }
+                w++;
+            }
+        }
+        nroots = w;
     }
 
     /* Bootstrap on a virgin map: the rarest token nearest the middle
@@ -417,6 +511,8 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
                         GraphAddRelation(graph, s, p, o))
                     {
                         stored++;
+                        SurfaceRecord(&tokens, r0, r1, roots[c],
+                                      right_a, right_b, names[c]);
 
                         /* Update embeddings on every co-occurrence */
                         if (graph->embeddings != NULL)
@@ -499,6 +595,145 @@ int ParserIngestSentenceCtx(GRAPH *graph, CONTEXT *ctx, const char *sentence)
         }
     }
     return stored;
+}
+
+/* ============================================================
+   Surface patterns: learned molds, never rules
+   ============================================================ */
+
+/* A mold records how one stored triple was laid out in its input:
+   which token slots held subject span (1), predicate (2), object
+   span (3); the rest is glue kept literally. Rendering fills a mold
+   of the same predicate with new symbols. Fluency grows with use;
+   virgin maps echo bare triples. Session table (not persisted). */
+#define SURFACE_MAX_PATTERNS 256
+#define SURFACE_MAX_TOKENS 12
+
+typedef struct
+{
+    char     pred[64];
+    uint8_t  roles[SURFACE_MAX_TOKENS];
+    char     glue[SURFACE_MAX_TOKENS][32];
+    uint32_t ntok;
+    uint32_t uses;
+} SURFACE_PATTERN;
+
+static SURFACE_PATTERN surface_pats[SURFACE_MAX_PATTERNS];
+static uint32_t surface_n = 0;
+
+static void SurfaceRecord(const PARSED_SENTENCE *tokens,
+                          uint32_t subj_a, uint32_t subj_b,
+                          uint32_t pred_pos,
+                          uint32_t obj_a, uint32_t obj_b,
+                          const char *pred)
+{
+    if (tokens == NULL || pred == NULL)
+        return;
+    uint32_t a = subj_a < obj_a ? subj_a : obj_a;
+    uint32_t b = subj_b > obj_b ? subj_b : obj_b;
+    if (b <= a || b - a > SURFACE_MAX_TOKENS)
+        return;
+
+    uint8_t roles[SURFACE_MAX_TOKENS] = {0};
+    char glue[SURFACE_MAX_TOKENS][32];
+    memset(glue, 0, sizeof(glue));
+    for (uint32_t k = a; k < b; k++)
+    {
+        uint32_t j = k - a;
+        if (k >= subj_a && k < subj_b)
+            roles[j] = 1;
+        else if (k == pred_pos)
+            roles[j] = 2;
+        else if (k >= obj_a && k < obj_b)
+            roles[j] = 3;
+        else
+        {
+            roles[j] = 0;
+            strncpy(glue[j], tokens->tokens[k], sizeof(glue[j]) - 1);
+        }
+    }
+
+    for (uint32_t i = 0; i < surface_n; i++)
+    {
+        SURFACE_PATTERN *p = &surface_pats[i];
+        if (strcmp(p->pred, pred) != 0 || p->ntok != b - a)
+            continue;
+        int same = 1;
+        for (uint32_t j = 0; j < p->ntok; j++)
+        {
+            if (p->roles[j] != roles[j] ||
+                (roles[j] == 0 && strcmp(p->glue[j], glue[j]) != 0))
+            {
+                same = 0;
+                break;
+            }
+        }
+        if (same)
+        {
+            p->uses++;
+            return;
+        }
+    }
+
+    if (surface_n >= SURFACE_MAX_PATTERNS)
+        return;
+    SURFACE_PATTERN *p = &surface_pats[surface_n++];
+    strncpy(p->pred, pred, sizeof(p->pred) - 1);
+    p->ntok = b - a;
+    p->uses = 1;
+    for (uint32_t j = 0; j < p->ntok; j++)
+    {
+        p->roles[j] = roles[j];
+        strcpy(p->glue[j], glue[j]);
+    }
+}
+
+/* Render (subj, pred, obj) through the most-used mold of pred.
+   Returns 1 on success, 0 when no mold exists (caller echoes). */
+int SurfaceRender(const char *pred, const char *subj, const char *obj,
+                  char *out, size_t out_size)
+{
+    if (pred == NULL || subj == NULL || obj == NULL ||
+        out == NULL || out_size == 0)
+        return 0;
+
+    SURFACE_PATTERN *best = NULL;
+    for (uint32_t i = 0; i < surface_n; i++)
+    {
+        if (strcmp(surface_pats[i].pred, pred) != 0)
+            continue;
+        if (best == NULL || surface_pats[i].uses > best->uses)
+            best = &surface_pats[i];
+    }
+    if (best == NULL)
+        return 0;
+
+    out[0] = '\0';
+    for (uint32_t j = 0; j < best->ntok; j++)
+    {
+        const char *w = best->glue[j];
+        char tmp[128];
+        if (best->roles[j] == 1)
+        {
+            strncpy(tmp, subj, sizeof(tmp) - 1);
+            w = tmp;
+        }
+        else if (best->roles[j] == 2)
+        {
+            strncpy(tmp, pred, sizeof(tmp) - 1);
+            w = tmp;
+        }
+        else if (best->roles[j] == 3)
+        {
+            strncpy(tmp, obj, sizeof(tmp) - 1);
+            w = tmp;
+        }
+        tmp[sizeof(tmp) - 1] = '\0';
+        if (j > 0)
+            strncat(out, " ", out_size - strlen(out) - 1);
+        strncat(out, w, out_size - strlen(out) - 1);
+    }
+    return (out[0] != '\0');
 }
 
 /* ============================================================

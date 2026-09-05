@@ -95,7 +95,24 @@ int DialogGenerateResponse(
             char answer[256] = {0};
             if (ParserAnswerQuestion(graph, &pq, answer, sizeof(answer)))
             {
-                snprintf(out_response, max_len, "%s", answer);
+                /* Verbalize through a learned mold when one exists;
+                   otherwise echo the bare answer. */
+                char first[128] = {0};
+                uint32_t k = 0;
+                while (answer[k] != '\0' && answer[k] != ',' &&
+                       k < sizeof(first) - 1)
+                {
+                    first[k] = answer[k];
+                    k++;
+                }
+                first[k] = '\0';
+                char sent[512] = {0};
+                if (first[0] != '\0' &&
+                    SurfaceRender(pq.relation, pq.subject, first,
+                                  sent, sizeof(sent)))
+                    snprintf(out_response, max_len, "%s", sent);
+                else
+                    snprintf(out_response, max_len, "%s", answer);
                 return 1;
             }
         }

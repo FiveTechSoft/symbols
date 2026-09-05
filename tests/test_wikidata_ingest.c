@@ -75,6 +75,12 @@ int main(void)
     printf("   Symbols:   %llu triples, %u symbols\n",
            ir10.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 8d. Ingest Jung symbol seed (hand-curated, Gutenberg 65903) */
+    printf("8d. Ingesting jung_symbols.tsv (archetypes)...\n");
+    INGEST_STATS ir11 = IngestTSV(graph, "data/samples/jung_symbols.tsv");
+    printf("   Archetypes: %llu triples, %u symbols\n",
+           ir11.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 

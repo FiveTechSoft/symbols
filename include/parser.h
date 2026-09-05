@@ -51,4 +51,9 @@ int ParserAnswerQuestion(
 void ParserRankByArea(const GRAPH *graph, SYMBOL_ID center,
                       RELATION **rels, uint32_t n);
 
+/* Render (subj, pred, obj) through the most-used learned mold of
+   pred. Returns 1 on success, 0 when no mold exists. */
+int SurfaceRender(const char *pred, const char *subj, const char *obj,
+                  char *out, size_t out_size);
+
 #endif

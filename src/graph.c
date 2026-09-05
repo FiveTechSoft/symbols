@@ -70,7 +70,7 @@ SYMBOL_ID GraphAddSymbol(GRAPH *graph, const char *name)
 
 
 /* ============================================================
-   Anadir relacion
+   Add relation
    ============================================================ */
 
 int GraphAddRelation(
@@ -89,7 +89,16 @@ int GraphAddRelation(
         return 0;
     }
 
-    return RelationAdd(graph->relations, subject, relation, object);
+    int rc = RelationAdd(graph->relations, subject, relation, object);
+    if (rc)
+    {
+        /* Frequency = occurrences in triples. This single choke point
+           feeds every rarity/Zipf mechanism in the engine. */
+        SymbolIncrementFrequency(graph->symbols, subject);
+        SymbolIncrementFrequency(graph->symbols, relation);
+        SymbolIncrementFrequency(graph->symbols, object);
+    }
+    return rc;
 }
 
 
@@ -140,7 +149,15 @@ int GraphAddRelationPolar(
         }
     }
 
-    return RelationAddPolar(graph->relations, subject, relation, object, polarity);
+    int rc = RelationAddPolar(graph->relations, subject, relation,
+                              object, polarity);
+    if (rc)
+    {
+        SymbolIncrementFrequency(graph->symbols, subject);
+        SymbolIncrementFrequency(graph->symbols, relation);
+        SymbolIncrementFrequency(graph->symbols, object);
+    }
+    return rc;
 }
 
 
