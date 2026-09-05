@@ -93,4 +93,43 @@ uint32_t GraphQuerySubjectPredicateFuzzy(
     float min_similarity,
     SYMBOL_ID *out_resolved_subject);
 
+/* ============================================================
+   Attention: rank relations by embedding similarity to a query
+   ============================================================ */
+
+typedef struct
+{
+    RELATION *relation;
+    float     attention_score;  /* cosine(query, object) */
+} ATTENDED_RELATION;
+
+uint32_t GraphQueryAttended(
+    const GRAPH *graph,
+    SYMBOL_ID query_id,
+    RELATION **out_relations,
+    float *out_scores,
+    uint32_t max_results);
+
+/* ============================================================
+   Embed query: average token embeddings into a query vector
+   ============================================================ */
+
+int GraphEmbedQuery(
+    const GRAPH *graph,
+    const char *query_text,
+    float *out_vector,       /* EMBEDDING_DIM output */
+    SYMBOL_ID *out_matched,  /* matched symbol IDs */
+    uint32_t *out_count);    /* how many tokens matched */
+
+/* ============================================================
+   Full-graph attention: score ALL relations by cosine with query
+   ============================================================ */
+
+uint32_t GraphQueryByEmbedding(
+    const GRAPH *graph,
+    const float *query_vector,
+    RELATION **out_relations,
+    float *out_scores,
+    uint32_t max_results);
+
 #endif

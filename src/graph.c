@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "graph.h"
+#include "learning.h"
 
 
 /* ============================================================
@@ -385,4 +387,245 @@ uint32_t GraphQuerySubjectPredicateFuzzy(
     if (out_resolved_subject != NULL)
         *out_resolved_subject = subject;
     return 0;
+}
+
+/* ============================================================
+   Attention: rank all relations of a concept by embedding
+   similarity between query and each relation's object.
+   ============================================================ */
+
+uint32_t GraphQueryAttended(
+    const GRAPH *graph,
+    SYMBOL_ID query_id,
+    RELATION **out_relations,
+    float *out_scores,
+    uint32_t max_results)
+{
+    if (graph == NULL || query_id == SYMBOL_INVALID ||
+        out_relations == NULL || out_scores == NULL || max_results == 0)
+        return 0;
+
+    /* Get query embedding */
+    const float *q_vec = NULL;
+    if (graph->embeddings != NULL)
+        q_vec = EmbeddingGetVector(graph->embeddings, query_id);
+
+    /* Get all relations where query is subject */
+    RELATION *all[256];
+    uint32_t n = GraphQuerySubject((GRAPH *)graph, query_id, all, 256);
+
+    if (n == 0)
+        return 0;
+
+    /* Score each relation */
+    uint32_t count = (n < max_results) ? n : max_results;
+
+    for (uint32_t i = 0; i < n; i++)
+    {
+        float score = 0.0f;
+
+        if (q_vec != NULL && graph->embeddings != NULL)
+        {
+            const float *o_vec = EmbeddingGetVector(
+                graph->embeddings, all[i]->object);
+            if (o_vec != NULL)
+                score = EmbeddingCosineSimilarity(q_vec, o_vec);
+        }
+
+        out_relations[i] = all[i];
+        out_scores[i] = score;
+    }
+
+    /* Insertion sort by score descending (small N, fine) */
+    for (uint32_t i = 1; i < n; i++)
+    {
+        RELATION *r_key = out_relations[i];
+        float s_key = out_scores[i];
+        int j = (int)i - 1;
+        while (j >= 0 && out_scores[j] < s_key)
+        {
+            out_relations[j + 1] = out_relations[j];
+            out_scores[j + 1] = out_scores[j];
+            j--;
+        }
+        out_relations[j + 1] = r_key;
+        out_scores[j + 1] = s_key;
+    }
+
+    return count;
+}
+
+/* ============================================================
+   Embed a text query: average embeddings of matched tokens
+   ============================================================ */
+
+int GraphEmbedQuery(
+    const GRAPH *graph,
+    const char *query_text,
+    float *out_vector,
+    SYMBOL_ID *out_matched,
+    uint32_t *out_count)
+{
+    if (graph == NULL || query_text == NULL || out_vector == NULL)
+        return 0;
+
+    memset(out_vector, 0, sizeof(float) * EMBEDDING_DIM);
+    if (out_count) *out_count = 0;
+    uint32_t matched = 0;
+
+    /* Tokenize: split on spaces, strip articles */
+    char buffer[1024];
+    strncpy(buffer, query_text, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    NormalizeDiacritics(buffer);
+
+    char *saveptr = NULL;
+    char *token = strtok_r(buffer, " \t\n,;:!?.()\"'¿¡", &saveptr);
+
+    while (token != NULL)
+    {
+        /* Skip short tokens and articles */
+        if (strlen(token) < 2)
+        {
+            token = strtok_r(NULL, " \t\n,;:!?.()\"'¿¡", &saveptr);
+            continue;
+        }
+
+        /* Skip common Spanish stop words */
+        if (strcmp(token, "el") == 0 || strcmp(token, "la") == 0 ||
+            strcmp(token, "los") == 0 || strcmp(token, "las") == 0 ||
+            strcmp(token, "de") == 0 || strcmp(token, "del") == 0 ||
+            strcmp(token, "en") == 0 || strcmp(token, "un") == 0 ||
+            strcmp(token, "una") == 0 || strcmp(token, "que") == 0 ||
+            strcmp(token, "es") == 0 || strcmp(token, "y") == 0 ||
+            strcmp(token, "a") == 0 || strcmp(token, "por") == 0 ||
+            strcmp(token, "con") == 0 || strcmp(token, "para") == 0)
+        {
+            token = strtok_r(NULL, " \t\n,;:!?.()\"'¿¡", &saveptr);
+            continue;
+        }
+
+        /* Uppercase and look up */
+        char upper[64];
+        size_t len = strlen(token);
+        for (size_t i = 0; i < len && i < 63; i++)
+            upper[i] = (char)toupper((unsigned char)token[i]);
+        upper[len] = '\0';
+
+        SYMBOL_ID sid = SymbolFind(graph->symbols, upper);
+        if (sid != SYMBOL_INVALID && graph->embeddings != NULL)
+        {
+            const float *vec = EmbeddingGetVector(graph->embeddings, sid);
+            if (vec != NULL)
+            {
+                for (int d = 0; d < EMBEDDING_DIM; d++)
+                    out_vector[d] += vec[d];
+                matched++;
+                if (out_matched && matched <= 32)
+                    out_matched[matched - 1] = sid;
+            }
+        }
+
+        token = strtok_r(NULL, " \t\n,;:!?.()\"'¿¡", &saveptr);
+    }
+
+    /* Average */
+    if (matched > 0)
+    {
+        float inv = 1.0f / (float)matched;
+        for (int d = 0; d < EMBEDDING_DIM; d++)
+            out_vector[d] *= inv;
+    }
+
+    if (out_count) *out_count = matched;
+    return matched > 0 ? 1 : 0;
+}
+
+/* ============================================================
+   Score ALL relations by cosine similarity with query vector
+   ============================================================ */
+
+uint32_t GraphQueryByEmbedding(
+    const GRAPH *graph,
+    const float *query_vector,
+    RELATION **out_relations,
+    float *out_scores,
+    uint32_t max_results)
+{
+    if (graph == NULL || query_vector == NULL ||
+        out_relations == NULL || out_scores == NULL || max_results == 0)
+        return 0;
+
+    uint32_t total = RelationCount(graph->relations);
+    if (total == 0)
+        return 0;
+
+    /* Temporary arrays for all scored relations */
+    float *scores = (float *)calloc(total, sizeof(float));
+    RELATION **rels = (RELATION **)calloc(total, sizeof(RELATION *));
+    if (scores == NULL || rels == NULL)
+    {
+        free(scores);
+        free(rels);
+        return 0;
+    }
+
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < total; i++)
+    {
+        RELATION *r = RelationGet(graph->relations, i);
+        if (r == NULL) continue;
+
+        /* Score = average cosine of subject and object embeddings with query */
+        float score = 0.0f;
+        int components = 0;
+
+        if (graph->embeddings != NULL)
+        {
+            const float *s_vec = EmbeddingGetVector(graph->embeddings, r->subject);
+            const float *o_vec = EmbeddingGetVector(graph->embeddings, r->object);
+
+            if (s_vec != NULL)
+            {
+                score += EmbeddingCosineSimilarity(query_vector, s_vec);
+                components++;
+            }
+            if (o_vec != NULL)
+            {
+                score += EmbeddingCosineSimilarity(query_vector, o_vec);
+                components++;
+            }
+        }
+
+        if (components > 0)
+            score /= (float)components;
+
+        rels[count] = r;
+        scores[count] = score;
+        count++;
+    }
+
+    /* Partial sort: find top max_results */
+    uint32_t result_count = (count < max_results) ? count : max_results;
+
+    for (uint32_t i = 0; i < result_count; i++)
+    {
+        uint32_t best = i;
+        for (uint32_t j = i + 1; j < count; j++)
+        {
+            if (scores[j] > scores[best])
+                best = j;
+        }
+        if (best != i)
+        {
+            float ts = scores[i]; scores[i] = scores[best]; scores[best] = ts;
+            RELATION *tr = rels[i]; rels[i] = rels[best]; rels[best] = tr;
+        }
+        out_relations[i] = rels[i];
+        out_scores[i] = scores[i];
+    }
+
+    free(scores);
+    free(rels);
+    return result_count;
 }

@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "ingest.h"
+#include "embedding.h"
 
 /* ============================================================
    Utilities
@@ -60,7 +61,40 @@ int IngestTriple(GRAPH *graph,
     if (s_id == SYMBOL_INVALID || p_id == SYMBOL_INVALID || o_id == SYMBOL_INVALID)
         return 0;
 
-    return GraphAddRelation(graph, s_id, p_id, o_id);
+    int added = GraphAddRelation(graph, s_id, p_id, o_id);
+
+    /* Update embeddings on every co-occurrence (not just new relations) */
+    if (graph->embeddings != NULL)
+    {
+        EMBEDDING_TABLE *emb = graph->embeddings;
+
+        /* Ensure both embeddings are initialized */
+        if (EmbeddingGetVector(emb, s_id) == NULL)
+        {
+            float v[EMBEDDING_DIM];
+            EmbeddingRandomInit(v, (uint32_t)s_id * 2654435761u);
+            EmbeddingSetVector(emb, s_id, v);
+        }
+        if (EmbeddingGetVector(emb, o_id) == NULL)
+        {
+            float v[EMBEDDING_DIM];
+            EmbeddingRandomInit(v, (uint32_t)o_id * 2654435761u);
+            EmbeddingSetVector(emb, o_id, v);
+        }
+
+        /* Hebbian co-occurrence update */
+        float *target  = (float *)EmbeddingGetVector(emb, s_id);
+        float *context = (float *)EmbeddingGetVector(emb, o_id);
+        if (target && context)
+        {
+            EmbeddingCooccur(target, context, 0.1f);
+            EmbeddingCooccur(context, target, 0.1f);
+            EmbeddingNormalize(target);
+            EmbeddingNormalize(context);
+        }
+    }
+
+    return added;
 }
 
 /* ============================================================

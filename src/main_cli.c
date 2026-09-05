@@ -15,6 +15,7 @@
 #include "model.h"
 #include "stats.h"
 #include "transfer.h"
+#include "parser.h"
 
 #define CLI_BUFFER_SIZE 512
 
@@ -31,8 +32,8 @@ static void CleanString(char *str)
 static void DumpGraph(const GRAPH *graph)
 {
     printf("\n=== Estado del Grafo de Conocimiento ===\n");
-    printf("Simbolos registrados  : %u\n", SymbolCount(graph->symbols));
-    printf("Relaciones en memoria : %u\n\n", RelationCount(graph->relations));
+    printf("Symbols loaded     : %u\n", SymbolCount(graph->symbols));
+    printf("Relations in memory: %u\n\n", RelationCount(graph->relations));
 
     for (uint32_t i = 0; i < RelationCount(graph->relations); i++)
     {
@@ -56,7 +57,7 @@ static void DumpGraph(const GRAPH *graph)
 
 static void DumpContext(const CONTEXT *ctx)
 {
-    printf("\n=== Memoria de Corto Plazo (Contexto) ===\n");
+    printf("\n=== Working Memory (Context) ===\n");
     printf("Entidades activas: %u (Tasa decaimiento: %.2f)\n\n",
            ctx->count, ctx->decay_rate);
 
@@ -86,10 +87,30 @@ int main(void)
 
     GraphSetEmbeddingTable(graph, embeds);
 
+    /* Auto-load default model if it exists */
+    {
+        FILE *ftest = fopen("wiki_model.bin", "rb");
+        if (ftest != NULL)
+        {
+            fclose(ftest);
+            MODEL *loaded = ModelLoad("wiki_model.bin");
+            if (loaded != NULL)
+            {
+                GraphDestroy(graph);
+                EmbeddingTableDestroy(embeds);
+                graph = loaded->graph;
+                embeds = loaded->embeddings;
+                GraphSetEmbeddingTable(graph, embeds);
+                ctx = ContextCreate();
+                printf("IA > Model loaded from 'wiki_model.bin'.\n\n");
+            }
+        }
+    }
+
     printf("========================================================\n");
-    printf("     SYMBOLIC LLM - ASISTENTE CONVERSACIONAL            \n");
-    printf("  Conversacion natural sin backpropagation ni GPUs.     \n");
-    printf("  Comandos: /graph, /context, /stats, /query <palabra>,\n");
+    printf("     SYMBOLIC LLM\n");
+    printf("  Natural conversation without backpropagation or GPUs.\n");
+    printf("  Commands: /graph, /context, /stats, /query <word>,\n");
     printf("            /synonyms, /alias, /analogy A B,\n");
     printf("            /save, /load, /clear, /exit                  \n");
     printf("========================================================\n\n");
@@ -99,7 +120,7 @@ int main(void)
 
     while (1)
     {
-        printf("Tu > ");
+        printf("You> ");
         if (fgets(input, sizeof(input), stdin) == NULL)
             break;
 
@@ -109,7 +130,7 @@ int main(void)
 
         if (strcmp(input, "/exit") == 0 || strcmp(input, "/quit") == 0)
         {
-            printf("\nIA > Hasta luego! Todo el conocimiento aprendido queda listo.\n");
+            printf("\nIA > Goodbye! All learned knowledge is saved.\n");
             break;
         }
 
@@ -134,7 +155,7 @@ int main(void)
             graph = GraphCreate(128, 256);
             embeds = EmbeddingTableCreate(128);
             GraphSetEmbeddingTable(graph, embeds);
-            printf("IA > Memoria reiniciada. Comencemos desde cero.\n\n");
+            printf("IA > Memory cleared. Starting fresh.\n\n");
             continue;
         }
 
@@ -154,29 +175,35 @@ int main(void)
             SYMBOL_ID sid = SymbolFind(graph->symbols, term);
             if (sid == SYMBOL_INVALID)
             {
-                printf("IA > No conozco '%s'.\n\n", term);
+                printf("IA > I don't know '%s'.\n\n", term);
             }
             else
             {
-                /* Relations as subject */
-                RELATION *as_subj[64];
-                uint32_t n_subj = GraphQuerySubject(graph, sid, as_subj, 64);
+                printf("\n=== Relations of '%s' ===\n", term);
+
+                /* Attended relations: sorted by embedding relevance */
+                RELATION *att_rel[64];
+                float att_scores[64];
+                uint32_t n_att = GraphQueryAttended(graph, sid, att_rel, att_scores, 64);
+
+                if (n_att > 0)
+                {
+                    printf("  Attended (by relevance):\n");
+                    for (uint32_t i = 0; i < n_att && i < 20; i++)
+                    {
+                        const SYMBOL *pred = SymbolGet(graph->symbols, att_rel[i]->predicate);
+                        const SYMBOL *obj  = SymbolGet(graph->symbols, att_rel[i]->object);
+                        if (pred && obj)
+                            printf("    [%5.1f%%] --%s--> %s\n",
+                                   att_scores[i] * 100.0f, pred->name, obj->name);
+                    }
+                }
 
                 /* Relations as object */
                 RELATION *as_obj[64];
                 uint32_t n_obj = GraphQueryObject(graph, sid, as_obj, 64);
 
-                printf("\n=== Relaciones de '%s' ===\n", term);
-                printf("  Como SUJETO (%u):\n", n_subj);
-                for (uint32_t i = 0; i < n_subj && i < 30; i++)
-                {
-                    const SYMBOL *pred = SymbolGet(graph->symbols, as_subj[i]->predicate);
-                    const SYMBOL *obj  = SymbolGet(graph->symbols, as_subj[i]->object);
-                    if (pred && obj)
-                        printf("    --%s--> %s\n", pred->name, obj->name);
-                }
-
-                printf("  Como OBJETO (%u):\n", n_obj);
+                printf("  As OBJECT (%u):\n", n_obj);
                 for (uint32_t i = 0; i < n_obj && i < 30; i++)
                 {
                     const SYMBOL *subj = SymbolGet(graph->symbols, as_obj[i]->subject);
@@ -190,7 +217,7 @@ int main(void)
                 uint32_t n_sim = EmbeddingFindSimilar(graph->embeddings, sid, matches, 8);
                 if (n_sim > 0)
                 {
-                    printf("  Palabras similares (vectorial):\n");
+                    printf("  Similar words (vectorial):\n");
                     for (uint32_t i = 0; i < n_sim; i++)
                     {
                         const SYMBOL *s = SymbolGet(graph->symbols, matches[i].id);
@@ -199,9 +226,61 @@ int main(void)
                     }
                 }
 
-                printf("\n  Total: %u como sujeto, %u como objeto, %u similares\n\n",
-                       n_subj, n_obj, n_sim);
+                printf("\n  Total: %u attended, %u as object, %u similar\n\n",
+                       n_att, n_obj, n_sim);
             }
+            continue;
+        }
+
+        /* /ask <query> — embed query, attend over ALL relations */
+        if (strncmp(input, "/ask ", 5) == 0)
+        {
+            const char *query = input + 5;
+
+            float qvec[EMBEDDING_DIM];
+            SYMBOL_ID matched[32];
+            uint32_t n_matched = 0;
+
+            if (!GraphEmbedQuery(graph, query, qvec, matched, &n_matched))
+            {
+                printf("IA > No known concepts found in your query.\n\n");
+                continue;
+            }
+
+            printf("\n=== Asking: \"%s\" ===\n", query);
+            printf("  Matched %u concepts: ", n_matched);
+            for (uint32_t i = 0; i < n_matched && i < 8; i++)
+            {
+                const SYMBOL *s = SymbolGet(graph->symbols, matched[i]);
+                if (s) printf("%s ", s->name);
+            }
+            printf("\n\n");
+
+            /* Full-graph attention */
+            RELATION *att_rel[32];
+            float att_scores[32];
+            uint32_t n_att = GraphQueryByEmbedding(
+                graph, qvec, att_rel, att_scores, 32);
+
+            if (n_att > 0)
+            {
+                printf("  Most relevant facts:\n");
+                for (uint32_t i = 0; i < n_att && i < 15; i++)
+                {
+                    const SYMBOL *s = SymbolGet(graph->symbols, att_rel[i]->subject);
+                    const SYMBOL *p = SymbolGet(graph->symbols, att_rel[i]->predicate);
+                    const SYMBOL *o = SymbolGet(graph->symbols, att_rel[i]->object);
+                    if (s && p && o)
+                        printf("    [%5.1f%%] %s --%s--> %s\n",
+                               att_scores[i] * 100.0f,
+                               s->name, p->name, o->name);
+                }
+            }
+            else
+            {
+                printf("  No relevant facts found.\n");
+            }
+            printf("\n");
             continue;
         }
 
@@ -214,7 +293,7 @@ int main(void)
                 SYMBOL_ID id_b = SymbolFind(graph->symbols, ent_b);
                 if (id_a == SYMBOL_INVALID || id_b == SYMBOL_INVALID)
                 {
-                    printf("IA > No conozco uno de esos conceptos.\n\n");
+                    printf("IA > I don't know one of those concepts.\n\n");
                 }
                 else
                 {
@@ -240,12 +319,12 @@ int main(void)
                     }
 
                     if (n == 0 && TransferApply(graph, id_b, results, 8) == 0)
-                        printf("  No se encontraron transferencias.\n\n");
+                        printf("  No transfer rules found.\n\n");
                 }
             }
             else
             {
-                printf("IA > Uso: /analogy ENTIDAD_A ENTIDAD_B\n\n");
+                    printf("IA > Usage: /analogy ENTITY_A ENTITY_B\n\n");
             }
             continue;
         }
@@ -273,7 +352,7 @@ int main(void)
                 EmbeddingSetVector(embeds, id_new, clone_v);
 
                 float sim = EmbeddingCosineSimilarity(base_v, clone_v);
-                printf("IA > Alias: '%s' ~ '%s' (similitud: %.1f%%).\n\n",
+                    printf("IA > Alias: '%s' ~ '%s' (similarity: %.1f%%).\n\n",
                        new_term, base_term, sim * 100.0f);
             }
             else
@@ -290,7 +369,7 @@ int main(void)
             SYMBOL_ID tid = SymbolFind(graph->symbols, target);
             if (tid == SYMBOL_INVALID || !EmbeddingGetVector(embeds, tid))
             {
-                printf("IA > '%s' no tiene vector asignado.\n\n", target);
+                    printf("IA > '%s' has no embedding assigned.\n\n", target);
             }
             else
             {
@@ -319,9 +398,9 @@ int main(void)
             temp.config = LearningConfigDefault();
 
             if (ModelSave(&temp, path))
-                printf("IA > Modelo guardado en '%s'.\n\n", path);
+                printf("IA > Model saved to '%s'.\n\n", path);
             else
-                printf("IA > Error al guardar en '%s'.\n\n", path);
+                printf("IA > Error saving to '%s'.\n\n", path);
             continue;
         }
 
@@ -340,11 +419,11 @@ int main(void)
                 ContextReset(ctx);
                 free(loaded);
 
-                printf("IA > Modelo cargado desde '%s'.\n\n", path);
+                printf("IA > Model loaded from '%s'.\n\n", path);
             }
             else
             {
-                printf("IA > Error al cargar '%s'.\n\n", path);
+                printf("IA > Error loading '%s'.\n\n", path);
             }
             continue;
         }
@@ -353,10 +432,38 @@ int main(void)
         if (DialogGenerateResponse(graph, ctx, input, response, sizeof(response)))
         {
             printf("IA > %s\n\n", response);
+
+            /* Also try to extract structured S-P-O for better knowledge */
+            int parsed = ParserIngestSentence(graph, input);
+            if (parsed)
+            {
+                PARSED_SENTENCE toks;
+                ParserTokenize(input, &toks);
+                PARSE_RESULT spo = ParserExtractSPO(&toks);
+                if (spo.valid)
+                    printf("   Parsed: %s --%s--> %s\n\n",
+                           spo.subject, spo.predicate, spo.object);
+            }
         }
         else
         {
-            printf("IA > No logre comprender. Reformula la oracion.\n\n");
+            /* Try natural language parser */
+            int parsed = ParserIngestSentence(graph, input);
+            if (parsed)
+            {
+                PARSED_SENTENCE toks;
+                ParserTokenize(input, &toks);
+                PARSE_RESULT spo = ParserExtractSPO(&toks);
+                if (spo.valid)
+                    printf("IA > Learned: %s --%s--> %s\n\n",
+                           spo.subject, spo.predicate, spo.object);
+                else
+                    printf("IA > Noted. I'll remember that.\n\n");
+            }
+            else
+            {
+                printf("IA > Could not understand. Please rephrase.\n\n");
+            }
         }
     }
 

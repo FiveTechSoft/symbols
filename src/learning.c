@@ -27,6 +27,111 @@ static void StrToUpper(const char *src, char *dst, size_t max_len)
     dst[i] = '\0';
 }
 
+void NormalizeDiacritics(char *str)
+{
+    char *dst = str;
+    for (char *p = str; *p; )
+    {
+        unsigned char c = (unsigned char)*p;
+        char replacement = 0;
+
+        if (c < 0x80) { *dst++ = *p++; continue; }
+
+        if (c == 0xC2)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x82) replacement = 'A';      /* Â */
+            else if (next == 0xAA) replacement = 'A';  /* ª */
+            else if (next == 0xB0) replacement = 'O';  /* º */
+            if (replacement) { *dst++ = replacement; p += 2; continue; }
+        }
+        else if (c == 0xC3)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x80) replacement = 'A';       else if (next == 0xA0) replacement = 'A';
+            else if (next == 0x81) replacement = 'A';  else if (next == 0xA1) replacement = 'A';
+            else if (next == 0x82) replacement = 'A';  else if (next == 0xA2) replacement = 'A';
+            else if (next == 0x83) replacement = 'A';  else if (next == 0xA3) replacement = 'A';
+            else if (next == 0x84) replacement = 'A';  else if (next == 0xA4) replacement = 'A';
+            else if (next == 0x85) replacement = 'A';  else if (next == 0xA5) replacement = 'A';
+            else if (next == 0x86) { *dst++ = 'A'; *dst++ = 'E'; p += 2; continue; }
+            else if (next == 0xA6) { *dst++ = 'A'; *dst++ = 'E'; p += 2; continue; }
+            else if (next == 0x87) replacement = 'C';  else if (next == 0xA7) replacement = 'C';
+            else if (next == 0x88) replacement = 'E';  else if (next == 0xA8) replacement = 'E';
+            else if (next == 0x89) replacement = 'E';  else if (next == 0xA9) replacement = 'E';
+            else if (next == 0x8A) replacement = 'E';  else if (next == 0xAA) replacement = 'E';
+            else if (next == 0x8B) replacement = 'E';  else if (next == 0xAB) replacement = 'E';
+            else if (next == 0x8C) replacement = 'I';  else if (next == 0xAC) replacement = 'I';
+            else if (next == 0x8D) replacement = 'I';  else if (next == 0xAD) replacement = 'I';
+            else if (next == 0x8E) replacement = 'I';  else if (next == 0xAE) replacement = 'I';
+            else if (next == 0x8F) replacement = 'I';  else if (next == 0xAF) replacement = 'I';
+            else if (next == 0x90) replacement = 'D';  else if (next == 0xB0) replacement = 'D';
+            else if (next == 0x91) replacement = 'N';  else if (next == 0xB1) replacement = 'N';
+            else if (next == 0x92) replacement = 'O';  else if (next == 0xB2) replacement = 'O';
+            else if (next == 0x93) replacement = 'O';  else if (next == 0xB3) replacement = 'O';
+            else if (next == 0x94) replacement = 'O';  else if (next == 0xB4) replacement = 'O';
+            else if (next == 0x95) replacement = 'O';  else if (next == 0xB5) replacement = 'O';
+            else if (next == 0x96) replacement = 'O';  else if (next == 0xB6) replacement = 'O';
+            else if (next == 0x98) replacement = 'O';  else if (next == 0xB8) replacement = 'O';
+            else if (next == 0x99) replacement = 'U';  else if (next == 0xB9) replacement = 'U';
+            else if (next == 0x9A) replacement = 'U';  else if (next == 0xBA) replacement = 'U';
+            else if (next == 0x9B) replacement = 'U';  else if (next == 0xBB) replacement = 'U';
+            else if (next == 0x9C) replacement = 'U';  else if (next == 0xBC) replacement = 'U';
+            else if (next == 0x9D) replacement = 'Y';  else if (next == 0xBD) replacement = 'Y';
+            else if (next == 0x9E) { *dst++ = 'T'; *dst++ = 'H'; p += 2; continue; }
+            else if (next == 0x9F) { *dst++ = 'S'; *dst++ = 'S'; p += 2; continue; }
+            else if (next == 0xBE) { *dst++ = 'T'; *dst++ = 'H'; p += 2; continue; }
+            else if (next == 0xBF) replacement = 'Y';
+            if (replacement) { *dst++ = replacement; p += 2; continue; }
+        }
+        else if (c == 0xC4)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x80 || next == 0x81) replacement = 'A';
+            else if (next == 0x84 || next == 0x85 || next == 0x86 || next == 0x87) replacement = 'C';
+            else if (next == 0x8C) replacement = 'D';
+            else if (next == 0x8E || next == 0x90 || next == 0x92) replacement = 'E';
+            else if (next == 0x98 || next == 0x9A || next == 0x9B) replacement = 'G';
+            else if (next == 0xA3 || next == 0xA4 || next == 0xA6) replacement = 'I';
+            else if (next == 0xB0) replacement = 'I';
+            else if (next == 0xA7 || next == 0xA8) replacement = 'K';
+            else if (next == 0xA9 || next == 0xAA || next == 0xAB || next == 0xAC) replacement = 'L';
+            else if (next == 0xAF || next == 0xB1 || next == 0xB2 || next == 0xB3) replacement = 'N';
+            else if (next == 0xB4 || next == 0xB5) replacement = 'O';
+            else if (next == 0xB9 || next == 0xBA || next == 0xBB) replacement = 'R';
+            else if (next == 0xBC || next == 0xBD || next == 0xBE || next == 0xBF) replacement = 'S';
+            if (replacement) { *dst++ = replacement; p += 2; continue; }
+        }
+        else if (c == 0xC5)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x82) replacement = 'S';
+            else if (next == 0x92) replacement = 'Z';
+            else if (next == 0x94) replacement = 'Z';
+            if (replacement) { *dst++ = replacement; p += 2; continue; }
+        }
+        else if (c == 0xC6)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x8E) { *dst++ = 'A'; *dst++ = 'E'; p += 2; continue; }
+            else if (next == 0x92) { *dst++ = 'O'; *dst++ = 'E'; p += 2; continue; }
+        }
+        else if (c == 0xC9)
+        {
+            unsigned char next = (unsigned char)*(p + 1);
+            if (next == 0x91 || next == 0x93 || next == 0x94 || next == 0x96) replacement = 'A';
+            else if (next == 0x9B || next == 0x9D) replacement = 'E';
+            else if (next == 0xA5) replacement = 'I';
+            else if (next == 0xB2 || next == 0xB4) replacement = 'O';
+            else if (next == 0xBE || next == 0xC0) replacement = 'U';
+            if (replacement) { *dst++ = replacement; p += 2; continue; }
+        }
+
+        *dst++ = *p++;
+    }
+    *dst = '\0';
+}
+
 static int IsStopWord(const char *w)
 {
     static const char *stopwords[] = {

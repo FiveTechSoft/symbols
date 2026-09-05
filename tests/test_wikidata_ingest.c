@@ -5,6 +5,7 @@
 #include "ingest.h"
 #include "prune.h"
 #include "model.h"
+#include "embedding.h"
 
 int main(void)
 {
@@ -12,6 +13,10 @@ int main(void)
 
     GRAPH *graph = GraphCreate(4096, 64);
     if (!graph) { printf("FAIL: GraphCreate\n"); return 1; }
+
+    /* Attach embeddings for co-occurrence learning during ingestion */
+    EMBEDDING_TABLE *embeddings = EmbeddingTableCreate(16384);
+    GraphSetEmbeddingTable(graph, embeddings);
 
     /* 1. Ingest infobox triples */
     printf("1. Ingesting wikidata_clean.tsv (infoboxes)...\n");
@@ -49,11 +54,17 @@ int main(void)
     printf("   Love:      %llu triples, %u symbols\n",
            ir6.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 7. Ingest geographic knowledge */
+    printf("7. Ingesting geo_knowledge.tsv (capitals, languages, currencies)...\n");
+    INGEST_STATS ir7 = IngestTSV(graph, "data/samples/geo_knowledge.tsv");
+    printf("   Geo:       %llu triples, %u symbols\n",
+           ir7.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 
-    /* 7. Show sample relations */
-    printf("\n7. Sample relations:\n");
+    /* 8. Show sample relations */
+    printf("\n8. Sample relations:\n");
     uint32_t shown = 0;
     for (uint32_t i = 0; i < RelationCount(graph->relations) && shown < 15; i++)
     {
@@ -71,21 +82,35 @@ int main(void)
         }
     }
 
-    /* 8. Save model */
-    printf("\n8. Saving model...\n");
-    MODEL *model = ModelCreate(1024, 1024);
-    if (model)
+    /* 9. Save model */
+    printf("\n9. Saving model...\n");
+    printf("   DEBUG: embeddings=%p count=%u\n", (void*)embeddings, embeddings ? embeddings->count : 0);
+    fflush(stdout);
     {
-        GraphDestroy(model->graph);
-        model->graph = graph;
-        int ok = ModelSave(model, "wiki_model.bin");
+        /* Debug: count initialized embeddings */
+        int emb_init = 0;
+        uint32_t emb_count = 0;
+        if (embeddings) {
+            emb_count = embeddings->count;
+            for (uint32_t i = 0; i < embeddings->count; i++)
+                if (embeddings->items[i].initialized) emb_init++;
+        }
+        printf("   Embedding table: %u items, %d initialized\n", emb_count, emb_init);
+        fflush(stdout);
+
+        /* Build MODEL manually to preserve the populated embedding table */
+        MODEL model;
+        model.graph = graph;
+        model.embeddings = embeddings;
+        model.config = LearningConfigDefault();
+        int ok = ModelSave(&model, "wiki_model.bin");
         printf("   %s\n", ok ? "OK" : "FAIL");
-        model->graph = NULL;
-        ModelDestroy(model);
+        model.graph = NULL;
+        model.embeddings = NULL;
     }
 
-    /* 9. Load and test queries */
-    printf("\n9. Loading and querying...\n");
+    /* 10. Load and test queries */
+    printf("\n10. Loading and querying...\n");
     MODEL *m2 = ModelLoad("wiki_model.bin");
     if (m2 && m2->graph)
     {

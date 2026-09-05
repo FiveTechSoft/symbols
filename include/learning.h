@@ -40,4 +40,6 @@ uint32_t LearningPredictText(
     uint32_t max_predictions
 );
 
+void NormalizeDiacritics(char *str);
+
 #endif

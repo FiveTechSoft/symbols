@@ -22,6 +22,10 @@ typedef struct
     uint32_t   count;
     uint32_t   capacity;
     uint32_t   mask;
+    /* Diacritics index: normalized_name → SYMBOL_ID */
+    uint32_t  *norm_buckets;
+    uint32_t   norm_capacity;
+    uint32_t   norm_mask;
 } SYMBOL_TABLE;
 
 SYMBOL_TABLE *SymbolTableCreate(uint32_t capacity);
