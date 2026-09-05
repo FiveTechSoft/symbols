@@ -51,9 +51,25 @@ static void CanonicalizePredicate(char *w)
         strcpy(w, "COME");
     }
     else if (strcmp(w, "ES") == 0 || strcmp(w, "SON") == 0 ||
-             strcmp(w, "ERA") == 0 || strcmp(w, "SER") == 0)
+             strcmp(w, "ERA") == 0 || strcmp(w, "SER") == 0 ||
+             strcmp(w, "FUE") == 0 || strcmp(w, "ESO") == 0)
     {
         strcpy(w, "ES");
+    }
+    else if (strcmp(w, "TIENE") == 0 || strcmp(w, "TIENEN") == 0 ||
+             strcmp(w, "TENER") == 0 || strcmp(w, "TENIA") == 0)
+    {
+        strcpy(w, "TIENE");
+    }
+    else if (strcmp(w, "HACE") == 0 || strcmp(w, "HACEN") == 0 ||
+             strcmp(w, "HACER") == 0 || strcmp(w, "HACIENDO") == 0)
+    {
+        strcpy(w, "HACE");
+    }
+    else if (strcmp(w, "NECESITA") == 0 || strcmp(w, "NECESITAN") == 0 ||
+             strcmp(w, "NECESITAR") == 0)
+    {
+        strcpy(w, "NECESITA");
     }
     else if (strcmp(w, "VIVE") == 0 || strcmp(w, "VIVEN") == 0 ||
              strcmp(w, "VIVIENDO") == 0 || strcmp(w, "VIVIR") == 0)
@@ -64,11 +80,6 @@ static void CanonicalizePredicate(char *w)
              strcmp(w, "DORMIR") == 0)
     {
         strcpy(w, "DUERME_EN");
-    }
-    else if (strcmp(w, "NECESITA") == 0 || strcmp(w, "NECESITAN") == 0 ||
-             strcmp(w, "NECESITAR") == 0)
-    {
-        strcpy(w, "NECESITA");
     }
 }
 
@@ -94,6 +105,108 @@ int LearningSentence(GRAPH *graph, const char *sentence)
             buffer[i] = ' ';
         }
     }
+
+    /* ---- Pattern matching for natural Spanish ---- */
+    /* Patterns: "el X es Y", "X es Y", "X tiene Y", "X esta en Y" */
+    {
+        char upper_buf[512];
+        size_t slen = strlen(buffer);
+        for (size_t i = 0; i < slen; i++)
+            upper_buf[i] = (char)toupper((unsigned char)buffer[i]);
+        upper_buf[slen] = '\0';
+
+        /* Pattern: "EL X ES Y" or "LA X ES Y" */
+        const char *pref_el = "EL ";
+        const char *pref_la = "LA ";
+        const char *pref_los = "LOS ";
+        const char *pref_las = "LAS ";
+        const char *rest = NULL;
+
+        if (strncmp(upper_buf, pref_el, 3) == 0) rest = upper_buf + 3;
+        else if (strncmp(upper_buf, pref_la, 3) == 0) rest = upper_buf + 3;
+        else if (strncmp(upper_buf, pref_los, 4) == 0) rest = upper_buf + 4;
+        else if (strncmp(upper_buf, pref_las, 4) == 0) rest = upper_buf + 4;
+
+        if (rest)
+        {
+            /* "X ES Y" */
+            char subj[64] = {0}, pred[64] = {0}, obj[64] = {0};
+            if (sscanf(rest, "%63s ES %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "ES");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            /* "X TIENE Y" */
+            if (sscanf(rest, "%63s TIENE %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "TIENE");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            /* "X ESTA EN Y" */
+            if (sscanf(rest, "%63s ESTA EN %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "ESTA_EN");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            /* "X HACE Y" */
+            if (sscanf(rest, "%63s HACE %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "HACE");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+        }
+
+        /* Pattern without article: "X ES Y", "X TIENE Y" */
+        {
+            char subj[64] = {0}, pred[64] = {0}, obj[64] = {0};
+            if (sscanf(upper_buf, "%63s ES %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "ES");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            if (sscanf(upper_buf, "%63s TIENE %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "TIENE");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            if (sscanf(upper_buf, "%63s ESTA EN %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "ESTA_EN");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+            if (sscanf(upper_buf, "%63s HACE %63[^\n]", subj, obj) == 2 && obj[0])
+            {
+                strcpy(pred, "HACE");
+                SYMBOL_ID s = GraphAddSymbol(graph, subj);
+                SYMBOL_ID p = GraphAddSymbol(graph, pred);
+                SYMBOL_ID o = GraphAddSymbol(graph, obj);
+                return GraphAddRelation(graph, s, p, o);
+            }
+        }
+    }
+
+    /* ---- Fallback: original S-P-O token extraction ---- */
 
     char tokens[16][64];
     uint32_t token_count = 0;
