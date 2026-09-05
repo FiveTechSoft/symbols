@@ -31,11 +31,23 @@ int main(void)
     printf("   C code:    %llu triples, %u symbols\n",
            ir3.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 4. Ingest Psalms knowledge */
+    printf("4. Ingesting psalms_knowledge.tsv (Bible Psalms)...\n");
+    INGEST_STATS ir4 = IngestTSV(graph, "data/samples/psalms_knowledge.tsv");
+    printf("   Psalms:    %llu triples, %u symbols\n",
+           ir4.relations_inserted, SymbolCount(graph->symbols));
+
+    /* 5. Ingest full Bible knowledge */
+    printf("5. Ingesting bible_knowledge.tsv (full Bible)...\n");
+    INGEST_STATS ir5 = IngestTSV(graph, "data/bible/bible_knowledge.tsv");
+    printf("   Bible:     %llu triples, %u symbols\n",
+           ir5.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 
-    /* 3. Show sample relations */
-    printf("\n3. Sample relations:\n");
+    /* 6. Show sample relations */
+    printf("\n6. Sample relations:\n");
     uint32_t shown = 0;
     for (uint32_t i = 0; i < RelationCount(graph->relations) && shown < 15; i++)
     {
@@ -53,8 +65,8 @@ int main(void)
         }
     }
 
-    /* 4. Save model */
-    printf("\n4. Saving model...\n");
+    /* 7. Save model */
+    printf("\n7. Saving model...\n");
     MODEL *model = ModelCreate(1024, 1024);
     if (model)
     {
@@ -66,8 +78,8 @@ int main(void)
         ModelDestroy(model);
     }
 
-    /* 5. Load and test queries */
-    printf("\n5. Loading and querying...\n");
+    /* 8. Load and test queries */
+    printf("\n8. Loading and querying...\n");
     MODEL *m2 = ModelLoad("wiki_model.bin");
     if (m2 && m2->graph)
     {
@@ -78,7 +90,7 @@ int main(void)
         /* Query some known entities */
         const char *queries[] = {
             "ESPAÑA", "FRANCIA", "ALEMANIA", "MADRID", "BARCELONA",
-            "ALBERT_EINSTEIN", "HARBOUR", NULL
+            "ALBERT_EINSTEIN", "HARBOUR", "DAVID", "JESUS", "MOSES", NULL
         };
 
         for (int qi = 0; queries[qi]; qi++)
