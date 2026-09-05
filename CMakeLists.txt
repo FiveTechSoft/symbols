@@ -23,6 +23,7 @@ add_library(symbolic STATIC
     src/transfer.c
     src/export.c
     src/stem.c
+    src/i18n.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -69,6 +70,7 @@ sllm_test(test_contradictions  tests/test_contradictions.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
 sllm_test(test_stem           tests/test_stem.c)
+sllm_test(test_i18n           tests/test_i18n.c)
 sllm_test(test_provenance     tests/test_provenance.c)
 sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)

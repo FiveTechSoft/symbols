@@ -2,30 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "nlg.h"
-
-static const char *CONNECTORS_POSITIVE[] = {
-    "Stored: ",
-    "From the map: ",
-    "Recorded: ",
-    "Found: ",
-    "On record: ",
-    "Listed: "
-};
-#define NUM_CONNECTORS_POS 6
-
-static const char *CONNECTORS_SUGGEST[] = {
-    "Also stored about ",
-    "See also ",
-    "Related: "
-};
-#define NUM_CONNECTORS_SUG 3
-
-static const char *NO_RESULTS_PREFIX[] = {
-    "No direct record of that. ",
-    "That fact is not stored. ",
-    "No stored evidence for that. "
-};
-#define NUM_NO_RES 3
+#include "i18n.h"
 
 static uint32_t PickIndex(uint32_t range, const char *seed)
 {
@@ -77,9 +54,9 @@ uint32_t NLGGenerateDirect(
     const char *subj_name = subj_sym ? subj_sym->name : "?";
     const char *rel_name = rel_sym ? rel_sym->name : "?";
 
-    /* Connector */
-    uint32_t idx = PickIndex(NUM_CONNECTORS_POS, subj_name);
-    AppendStr(out, out_size, CONNECTORS_POSITIVE[idx]);
+    /* Connector (i18n) */
+    uint32_t idx = PickIndex((uint32_t)LangVariantCount(I18N_POSITIVE), subj_name);
+    AppendStr(out, out_size, LangString(I18N_POSITIVE, (int)idx));
 
     /* Subject */
     AppendStr(out, out_size, subj_name);
@@ -115,7 +92,7 @@ uint32_t NLGGenerateDirect(
             float pct = total_weight > 0 ? (results[i]->weight / total_weight * 100.0f) : 0.0f;
 
             if (i > 0 && i == count - 1)
-                AppendStr(out, out_size, " y ");
+                AppendStr(out, out_size, LangString(I18N_AND, 0));
             else if (i > 0)
                 AppendStr(out, out_size, ", ");
 
@@ -141,8 +118,8 @@ void NLGGenerateNoResults(
 {
     out[0] = '\0';
 
-    uint32_t idx = PickIndex(NUM_NO_RES, "?");
-    AppendStr(out, out_size, NO_RESULTS_PREFIX[idx]);
+    uint32_t idx = PickIndex((uint32_t)LangVariantCount(I18N_NO_RESULTS), "?");
+    AppendStr(out, out_size, LangString(I18N_NO_RESULTS, (int)idx));
 
     /* Suggest related queries */
     RELATION *related[8];
@@ -150,8 +127,8 @@ void NLGGenerateNoResults(
 
     if (n > 0)
     {
-        idx = PickIndex(NUM_CONNECTORS_SUG, "?");
-        AppendStr(out, out_size, CONNECTORS_SUGGEST[idx]);
+        idx = PickIndex((uint32_t)LangVariantCount(I18N_SUGGEST), "?");
+        AppendStr(out, out_size, LangString(I18N_SUGGEST, (int)idx));
 
         for (uint32_t i = 0; i < n && i < 3; i++)
         {
@@ -164,7 +141,18 @@ void NLGGenerateNoResults(
     }
     else
     {
-        AppendStr(out, out_size, "Teach new facts with /learn S P O.");
+        switch (LangGet())
+        {
+        case LANG_ES:
+            AppendStr(out, out_size, "Enseña hechos nuevos con /learn S P O.");
+            break;
+        case LANG_FR:
+            AppendStr(out, out_size, "Enseignez de nouveaux faits avec /learn S P O.");
+            break;
+        default:
+            AppendStr(out, out_size, "Teach new facts with /learn S P O.");
+            break;
+        }
     }
 }
 
@@ -184,7 +172,7 @@ void NLGGenerateCompound(
     const char *name = subj ? subj->name : "?";
 
     /* Opening with what we know */
-    AppendStr(out, out_size, "De los datos que tengo sobre ");
+    AppendStr(out, out_size, LangString(I18N_COMPOUND_HEAD, 0));
     AppendStr(out, out_size, name);
     AppendStr(out, out_size, ": ");
 
@@ -198,11 +186,11 @@ void NLGGenerateCompound(
             const SYMBOL *rel = SymbolGet(graph->symbols, taxonomic[i]->relation);
             const SYMBOL *obj = SymbolGet(graph->symbols, taxonomic[i]->object);
             if (i > 0) AppendStr(out, out_size, ", ");
-            AppendStr(out, out_size, "es ");
+            AppendStr(out, out_size, LangString(I18N_IS, 0));
             if (rel && strcmp(rel->name, "ES") != 0)
             {
                 AppendStr(out, out_size, rel->name);
-                AppendStr(out, out_size, " de ");
+                AppendStr(out, out_size, LangString(I18N_OF, 0));
             }
             AppendStr(out, out_size, obj ? obj->name : "?");
         }

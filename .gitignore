@@ -41,3 +41,6 @@ __pycache__/
 
 # Local agent state
 .abacusai/
+
+# Local conversation backups (user session exports)
+session-*.md
