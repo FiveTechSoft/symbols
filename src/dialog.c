@@ -7,6 +7,8 @@
 #include "parser.h"
 #include "generator.h"
 #include "nlg.h"
+#include "i18n.h"
+#include "i18n.h"
 
 static void StrToUpper(const char *src, char *dst, size_t max_len)
 {
@@ -54,12 +56,9 @@ DIALOG_INTENT DialogClassify(const char *input)
 
 static void GetUnknownResponse(char *out, size_t size, const char *subj, const char *rel)
 {
-    static const char *templates[] = {
-        "No record of %s %s yet. Teach it to me.",
-        "Nothing stored about %s %s.",
-        "Unknown: %s %s. Use /learn S P O to store it."
-    };
-    snprintf(out, size, templates[rand() % 3], subj, rel);
+    int n = LangVariantCount(I18N_UNKNOWN);
+    const char *fmt = LangString(I18N_UNKNOWN, rand() % (n > 0 ? n : 1));
+    snprintf(out, size, fmt, subj, rel);
 }
 
 int DialogGenerateResponse(
@@ -77,12 +76,9 @@ int DialogGenerateResponse(
     /* Social input: short, nothing to store. Minimal ack. */
     if (intent.act == SPEECH_ACT_SOCIAL)
     {
-        static const char *resp[] = {
-            "Hello.",
-            "Noted.",
-            "I store symbols and relations. Teach me with /learn S P O."
-        };
-        snprintf(out_response, max_len, "%s", resp[rand() % 3]);
+        int n = LangVariantCount(I18N_SOCIAL);
+        snprintf(out_response, max_len, "%s",
+                 LangString(I18N_SOCIAL, rand() % (n > 0 ? n : 1)));
         return 1;
     }
 
@@ -191,14 +187,13 @@ int DialogGenerateResponse(
         {
             if (strchr(clean, '?'))
             {
-                snprintf(out_response, max_len,
-                         "No record of that. Ask about something stored.");
+                snprintf(out_response, max_len, "%s",
+                         LangString(I18N_NO_RECORD, 0));
             }
             else
             {
-                snprintf(out_response, max_len,
-                         "Could not identify symbols and relation. "
-                         "Rephrase it.");
+                snprintf(out_response, max_len, "%s",
+                         LangString(I18N_REPHRASE, 0));
             }
             return 1;
         }
@@ -222,17 +217,11 @@ int DialogGenerateResponse(
 
         if (found > 0)
         {
-            /* Direct answer with confidence */
-            uint32_t idx = rand() % 6;
-            static const char *openers[] = {
-                "Segun lo que he aprendido, ",
-                "Tengo registrado que ",
-                "Efectivamente, ",
-                "Por la informacion que manejo, ",
-                "La evidencia indica que ",
-                "He encontrado que "
-            };
-            snprintf(out_response, max_len, "%s", openers[idx]);
+            /* Direct answer with confidence (i18n openers) */
+            int n_open = LangVariantCount(I18N_OPENER);
+            int idx_open = (int)(rand() % (n_open > 0 ? n_open : 1));
+            snprintf(out_response, max_len, "%s",
+                     LangString(I18N_OPENER, idx_open));
 
             /* Subject name */
             const SYMBOL *subj_sym = SymbolGet(graph->symbols, resolved);
@@ -265,7 +254,8 @@ int DialogGenerateResponse(
 
                 w = out_response + strlen(out_response);
                 if (i > 0 && i == found - 1)
-                    snprintf(w, max_len - strlen(out_response), " y ");
+                    snprintf(w, max_len - strlen(out_response), "%s",
+                             LangString(I18N_AND, 0));
                 else if (i > 0)
                     snprintf(w, max_len - strlen(out_response), ", ");
 
@@ -294,7 +284,7 @@ int DialogGenerateResponse(
                     {
                         w = out_response + strlen(out_response);
                         snprintf(w, max_len - strlen(out_response),
-                                 " (que es un %s)", parent->name);
+                                 LangString(I18N_TAXO, 0), parent->name);
                     }
                 }
             }
@@ -316,17 +306,12 @@ int DialogGenerateResponse(
        pushes entities itself). */
     if (ParserIngestSentenceCtx(graph, ctx, user_input))
     {
-        static const char *learn_confirms[] = {
-            "Stored.",
-            "Noted. Symbols and relation saved.",
-            "Saved. Ask me about it."
-        };
-        snprintf(out_response, max_len, "%s", learn_confirms[rand() % 3]);
+        int n = LangVariantCount(I18N_LEARNED);
+        snprintf(out_response, max_len, "%s",
+                 LangString(I18N_LEARNED, rand() % (n > 0 ? n : 1)));
         return 1;
     }
 
-    snprintf(out_response, max_len,
-             "Could not extract a clear relation. "
-             "Try it as 'symbol relation symbol'.");
+    snprintf(out_response, max_len, "%s", LangString(I18N_EXTRACT, 0));
     return 1;
 }

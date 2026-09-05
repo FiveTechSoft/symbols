@@ -1,0 +1,51 @@
+# QA held-out set HARD: pregunta<TAB>respuesta_esperada (substring).
+# P5 (roadmap): set held-out con verdad humana, aspiracional (sin umbral).
+# - Verdad humana: cada fila es un hecho real verificado a mano (no
+#   extraido del modelo); la respuesta esperada es la del mundo real.
+# - Held-out: ninguna pregunta aparece en qa_eval.tsv ni en el corpus de
+#   entrenamiento; solo se usa para medir, nunca para aprender.
+# - Aspiracional: test_eval_qa corria aqui SIN umbral (tools/progress.py
+#   parsea hard_pass/hard_total). Las fallas de hoy son el objetivo; el
+#   progreso es ver la cifra subir sin tocar este archivo.
+# Formatos de pregunta identicos al eval suelto (el capital de X es),
+# entities con acentos tal como estan en el mapa o con _ en multiword.
+el capital de España es	MADRID
+el capital de México es	CIUDAD_DE_MÉXICO
+el capital de Suecia es	ESTOCOLMO
+el capital de Hungría es	BUDAPEST
+el capital de Polonia es	VARSOVIA
+el capital de Turquía es	ANKARA
+el capital de Nigeria es	ABUYA
+el capital de Canadá es	OTTAWA
+el capital de Australia es	CANBERRA
+el capital de Austria es	VIENA
+el capital de Bulgaria es	SOFÍA
+el capital de Finlandia es	HELSINKI
+el capital de Haití es	PUERTO_PRÍNCIPE
+el capital de Kenia es	NAIROBI
+el capital de Marruecos es	RABAT
+el capital de Israel es	JERUSALÉN
+el capital de Cuba es	LA_HABANA
+el capital de Honduras es	TEGUCIGALPA
+el capital de Guatemala es	CIUDAD_DE_GUATEMALA
+el capital de Colombia es	BOGOTÁ
+el capital de Croacia es	ZAGREB
+el capital de Corea_del_sur es	SEÚL
+el capital de Estados_unidos es	WASHINGTON
+la moneda de España es	EURO
+la moneda de Nigeria es	NAIRA
+la moneda de Turquía es	LIRA_TURCA
+la moneda de Japón es	YEN
+la moneda de Estados_unidos es	DÓLAR
+la moneda de Perú es	SOL
+la idioma de España es	ESPAÑOL
+la idioma de Turquía es	TURCO
+la idioma de Japón es	JAPONÉS
+la idioma de Canadá es	INGLÉS
+la idioma de Australia es	INGLÉS
+la idioma de Nigeria es	INGLÉS
+el capital de Noruega es	OSLO
+la moneda de Noruega es	KORONA
+la idioma de Polonia es	POLACO
+la idioma de Suecia es	SUECO
+la idioma de Hungría es	HUNGRARO

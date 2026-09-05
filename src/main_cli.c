@@ -18,6 +18,7 @@
 #include "stem.h"
 #include "export.h"
 #include "ingest.h"
+#include "i18n.h"
 
 /* " [SOURCE]" suffix for a relation with provenance, "" without. */
 static void SourceSuffix(const GRAPH *graph, const RELATION *r,
@@ -80,9 +81,9 @@ static void DumpContext(const CONTEXT *ctx)
     for (uint32_t i = 0; i < ctx->count; i++)
     {
         const CONTEXT_ENTITY *e = &ctx->entities[i];
-        printf("  - %-12s | Activacion: %5.1f%% | Hace %u turnos | Rol: %s\n",
+        printf("  - %-12s | Activation: %5.1f%% | %u turns ago | Role: %s\n",
                e->name, e->activation * 100.0f, e->turns_ago,
-               e->was_subject ? "Sujeto" : "Objeto");
+               e->was_subject ? "Subject" : "Object");
     }
     printf("=========================================\n\n");
 }
@@ -97,7 +98,7 @@ int main(void)
 
     if (!graph || !ctx || !embeds)
     {
-        fprintf(stderr, "Error critico: no se pudieron inicializar las estructuras.\n");
+        fprintf(stderr, "Critical error: could not initialize structures.\n");
         return EXIT_FAILURE;
     }
 
@@ -118,7 +119,7 @@ int main(void)
                 embeds = loaded->embeddings;
                 GraphSetEmbeddingTable(graph, embeds);
                 ContextReset(ctx);
-                printf("IA > Model loaded from 'wiki_model.bin'.\n\n");
+                printf("AI > Model loaded from 'wiki_model.bin'.\n\n");
             }
         }
     }
@@ -129,7 +130,7 @@ int main(void)
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
   printf("            /find S P O (*), /area SYMBOL, /export <f.dot|f.ttl>,\n");
   printf("            /synonyms, /alias, /analogy A B,\n");
-  printf("            /learn S P O, /save, /load, /clear, /exit\n");
+  printf("            /learn S P O, /save, /load, /lang, /clear, /exit\n");
     printf("========================================================\n\n");
 
     char input[CLI_BUFFER_SIZE];
@@ -152,9 +153,9 @@ int main(void)
             temp.embeddings = embeds;
             temp.config = LearningConfigDefault();
             if (ModelSave(&temp, "wiki_model.bin"))
-                printf("\nIA > Goodbye! All learned knowledge is saved.\n");
+                printf("\nAI > Goodbye! All learned knowledge is saved.\n");
             else
-                printf("\nIA > Goodbye! (Warning: could not save wiki_model.bin).\n");
+                printf("\nAI > Goodbye! (Warning: could not save wiki_model.bin).\n");
             break;
         }
 
@@ -177,7 +178,7 @@ int main(void)
 
             if (!new_graph || !new_embeds)
             {
-                printf("IA > Error: out of memory, keeping previous graph.\n\n");
+                printf("AI > Error: out of memory, keeping previous graph.\n\n");
                 GraphDestroy(new_graph);
                 EmbeddingTableDestroy(new_embeds);
                 continue;
@@ -189,7 +190,37 @@ int main(void)
             embeds = new_embeds;
             GraphSetEmbeddingTable(graph, embeds);
             ContextReset(ctx);
-            printf("IA > Memory cleared. Starting fresh.\n\n");
+            printf("AI > Memory cleared. Starting fresh.\n\n");
+            continue;
+        }
+
+        /* Language switch: /lang EN|ES|FR (case-insensitive). */
+        if (strcmp(input, "/lang") == 0 || strncmp(input, "/lang ", 6) == 0)
+        {
+            if (strncmp(input, "/lang ", 6) == 0)
+            {
+                char code[8] = {0};
+                if (sscanf(input + 6, "%7s", code) == 1)
+                {
+                    LANG_ID target = LangFindByCode(code);
+                    if (target < LANG_COUNT)
+                    {
+                        LangSet(target);
+                        printf("AI > Language set to %s (%s).\n\n",
+                               LangShortName(target), LangName(target));
+                    }
+                    else
+                    {
+                        printf("AI > Unknown language '%s'. Use EN, ES or FR.\n\n",
+                               code);
+                    }
+                }
+            }
+            else
+            {
+                printf("AI > Language: %s (%s). Switch with /lang EN|ES|FR.\n\n",
+                       LangShortName(LangGet()), LangName(LangGet()));
+            }
             continue;
         }
 
@@ -209,7 +240,7 @@ int main(void)
             SYMBOL_ID sid = StemFindSymbol(graph->symbols, term);
             if (sid == SYMBOL_INVALID)
             {
-                printf("IA > I don't know '%s'.\n\n", term);
+                printf("AI > I don't know '%s'.\n\n", term);
             }
             else
             {
@@ -277,7 +308,7 @@ int main(void)
 
             if (!GraphEmbedQuery(graph, query, qvec, matched, &n_matched))
             {
-                printf("IA > No known concepts found in your query.\n\n");
+                printf("AI > No known concepts found in your query.\n\n");
                 continue;
             }
 
@@ -327,7 +358,7 @@ int main(void)
                 SYMBOL_ID id_b = SymbolFind(graph->symbols, ent_b);
                 if (id_a == SYMBOL_INVALID || id_b == SYMBOL_INVALID)
                 {
-                    printf("IA > I don't know one of those concepts.\n\n");
+                    printf("AI > I don't know one of those concepts.\n\n");
                 }
                 else
                 {
@@ -349,7 +380,7 @@ int main(void)
             }
             else
             {
-                    printf("IA > Usage: /analogy ENTITY_A ENTITY_B\n\n");
+                    printf("AI > Usage: /analogy ENTITY_A ENTITY_B\n\n");
             }
             continue;
         }
@@ -377,12 +408,12 @@ int main(void)
                 EmbeddingSetVector(embeds, id_new, clone_v);
 
                 float sim = EmbeddingCosineSimilarity(base_v, clone_v);
-                    printf("IA > Alias: '%s' ~ '%s' (similarity: %.1f%%).\n\n",
+                    printf("AI > Alias: '%s' ~ '%s' (similarity: %.1f%%).\n\n",
                        new_term, base_term, sim * 100.0f);
             }
             else
             {
-                printf("Uso: /alias [nuevo] [existente]\n\n");
+                printf("Usage: /alias NEW EXISTING\n\n");
             }
             continue;
         }
@@ -394,21 +425,21 @@ int main(void)
             SYMBOL_ID tid = SymbolFind(graph->symbols, target);
             if (tid == SYMBOL_INVALID || !EmbeddingGetVector(embeds, tid))
             {
-                    printf("IA > '%s' has no embedding assigned.\n\n", target);
+                    printf("AI > '%s' has no embedding assigned.\n\n", target);
             }
             else
             {
                 EMBEDDING_MATCH matches[8];
                 uint32_t m_count = EmbeddingFindSimilar(embeds, tid, matches, 8);
-                printf("\nSinonimos de '%s':\n", target);
+                printf("\nSynonyms of '%s':\n", target);
                 for (uint32_t i = 0; i < m_count; i++)
                 {
                     const SYMBOL *sym = SymbolGet(graph->symbols, matches[i].id);
-                    printf("  - %-12s | coseno=%.1f%%\n",
+                    printf("  - %-12s | cosine=%.1f%%\n",
                            sym ? sym->name : "?", matches[i].score * 100.0f);
                 }
                 if (m_count == 0)
-                    printf("  (ninguno cercano)\n");
+                    printf("  (none close enough)\n");
                 printf("\n");
             }
             continue;
@@ -425,15 +456,15 @@ int main(void)
             {
                 int rc = IngestTripleSource(graph, s, p, o, "CLI");
                 if (rc == 1)
-                    printf("IA > Learned: %s --%s--> %s.\n\n", s, p, o);
+                    printf("AI > Learned: %s --%s--> %s.\n\n", s, p, o);
                 else if (rc == 2)
-                    printf("IA > Known already, strengthened: %s --%s--> %s.\n\n",
+                    printf("AI > Known already, strengthened: %s --%s--> %s.\n\n",
                            s, p, o);
                 else
-                    printf("IA > Could not learn that triple.\n\n");
+                    printf("AI > Could not learn that triple.\n\n");
             }
             else
-                printf("IA > Usage: /learn SUBJECT RELATION OBJECT\n\n");
+                printf("AI > Usage: /learn SUBJECT RELATION OBJECT\n\n");
             continue;
         }
 
@@ -448,7 +479,7 @@ int main(void)
             FILE *f = fopen(path, "r");
             if (f == NULL)
             {
-                printf("IA > Cannot open '%s'.\n\n", path);
+                printf("AI > Cannot open '%s'.\n\n", path);
                 continue;
             }
             uint32_t base = RelationCount(graph->relations);
@@ -474,7 +505,7 @@ int main(void)
             }
             fclose(f);
             uint32_t added = RelationCount(graph->relations) - base;
-            printf("IA > Ingested %u lines, %u new relations (2 passes).\n\n",
+            printf("AI > Ingested %u lines, %u new relations (2 passes).\n\n",
                    lines, added);
             continue;
         }
@@ -488,9 +519,9 @@ int main(void)
             temp.config = LearningConfigDefault();
 
             if (ModelSave(&temp, path))
-                printf("IA > Model saved to '%s'.\n\n", path);
+                printf("AI > Model saved to '%s'.\n\n", path);
             else
-                printf("IA > Error saving to '%s'.\n\n", path);
+                printf("AI > Error saving to '%s'.\n\n", path);
             continue;
         }
 
@@ -509,11 +540,11 @@ int main(void)
                 ContextReset(ctx);
                 free(loaded);
 
-                printf("IA > Model loaded from '%s'.\n\n", path);
+                printf("AI > Model loaded from '%s'.\n\n", path);
             }
             else
             {
-                printf("IA > Error loading '%s'.\n\n", path);
+                printf("AI > Error loading '%s'.\n\n", path);
             }
             continue;
         }
@@ -529,7 +560,7 @@ int main(void)
                 SYMBOL_ID tid = StemFindSymbol(graph->symbols, target);
                 if (tid == SYMBOL_INVALID)
                 {
-                    printf("IA > Unknown symbol '%s'.\n\n", target);
+                    printf("AI > Unknown symbol '%s'.\n\n", target);
                     continue;
                 }
                 RELATION *rels[64];
@@ -566,7 +597,7 @@ int main(void)
                 printf("\n");
             }
             else
-                printf("IA > Usage: /area SYMBOL\n\n");
+                printf("AI > Usage: /area SYMBOL\n\n");
             continue;
         }
 
@@ -683,10 +714,10 @@ int main(void)
                     }
                     shown++;
                 }
-                printf("IA > %u matching relation(s).\n\n", shown);
+                printf("AI > %u matching relation(s).\n\n", shown);
             }
             else
-                printf("IA > Usage: /find SUBJECT RELATION OBJECT  ('*' = any)\n\n");
+                printf("AI > Usage: /find SUBJECT RELATION OBJECT  ('*' = any)\n\n");
             continue;
         }
 
@@ -700,7 +731,7 @@ int main(void)
                 ok = GraphExportTurtle(graph, path);
             else
                 ok = GraphExportDot(graph, path);
-            printf("IA > %s '%s'.\n\n", ok ? "Exported to" :
+            printf("AI > %s '%s'.\n\n", ok ? "Exported to" :
                    "Export failed for", path);
             continue;
         }
@@ -714,7 +745,7 @@ int main(void)
             {
                 DialogGenerateResponse(graph, ctx, input,
                                        response, sizeof(response));
-                printf("IA > %s\n\n", response);
+                printf("AI > %s\n\n", response);
                 continue;
             }
         }
@@ -799,11 +830,11 @@ int main(void)
                         RELATION *br = GraphFindRelation(graph, best_subj,
                                                          best_rel, best_obj);
                         SourceSuffix(graph, br, src, sizeof(src));
-                        printf("IA > %s (because %s --%s--> %s%s)\n\n",
+                        printf("AI > %s (because %s --%s--> %s%s)\n\n",
                                o->name, s->name, p->name, o->name, src);
                     }
                     else
-                        printf("IA > %s\n\n", o->name);
+                        printf("AI > %s\n\n", o->name);
                 }
             }
             else
@@ -814,7 +845,7 @@ int main(void)
                 {
                     DialogGenerateResponse(graph, ctx, input,
                                            response, sizeof(response));
-                    printf("IA > %s\n\n", response);
+                    printf("AI > %s\n\n", response);
                     continue;
                 }
 
@@ -822,9 +853,9 @@ int main(void)
                 ParserIngestSentenceCtx(graph, ctx, input);
                 uint32_t added = RelationCount(graph->relations) - base;
                 if (added > 0)
-                    printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
+                    printf("AI > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
                 else
-                    printf("IA > I don't know. Teach me and I'll remember.\n\n");
+                    printf("AI > I don't know. Teach me and I'll remember.\n\n");
             }
             continue;
         }
@@ -832,7 +863,7 @@ int main(void)
         /* Dialog engine */
         if (DialogGenerateResponse(graph, ctx, input, response, sizeof(response)))
         {
-            printf("IA > %s\n\n", response);
+            printf("AI > %s\n\n", response);
         }
         else
         {
@@ -841,9 +872,9 @@ int main(void)
             ParserIngestSentenceCtx(graph, ctx, input);
             uint32_t added = RelationCount(graph->relations) - base;
             if (added > 0)
-                printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
+                printf("AI > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
             else
-                printf("IA > Could not understand. Please rephrase.\n\n");
+                printf("AI > Could not understand. Please rephrase.\n\n");
         }
     }
 
