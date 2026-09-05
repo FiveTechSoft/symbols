@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Snapshot de progreso hacia el objetivo (QA en conocimiento ruidoso).
+
+Mide los 4 numeros independientes y los anexa a tools/progress.csv:
+  fecha, commit, suite_pass, suite_total, eval_pass, eval_total,
+  hygiene_pass(1/0), lint_rows, lint_fixed, lint_dropped
+
+Uso: python3 tools/progress.py   (desde la raiz del repo)
+"""
+import csv
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+import lint_corpus
+
+
+def run(cmd):
+    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    return p.returncode, (p.stdout or "") + (p.stderr or "")
+
+
+def main():
+    build = ROOT / "build-gcc"
+    # 1. suite
+    import re as _re
+    rc, out = run(["ctest", "--test-dir", str(build)])
+    suite_pass = suite_total = 0
+    m = _re.search(r"(\d+) tests failed out of (\d+)", out)
+    if m:
+        # "96% tests passed, 1 tests failed out of 26"
+        suite_total = int(m.group(2))
+        suite_pass = suite_total - int(m.group(1))
+    # 2. eval + hygiene (binarios sueltos, no ctest: queremos el numero)
+    rc, out = run([str(build / "test_eval_qa.exe"),
+                   "tests/qa_eval.tsv", "wiki_model.bin"])
+    eval_pass = eval_total = 0
+    for line in out.splitlines():
+        if line.startswith("QA eval:"):
+            # "QA eval: 99/99 = 100.0% (umbral 90%)"
+            frac = line.split()[2].split("=")[0]
+            eval_pass, eval_total = map(int, frac.split("/"))
+    rc_h, _ = run([str(build / "test_qa_hygiene.exe"),
+                   "tests/qa_eval.tsv", "wiki_model.bin"])
+    # 3. lint (reusa lint_file: mismo codigo que el gate de CI)
+    rows = fixed = dropped = 0
+    for fn in lint_corpus.FILES:
+        stats, _, _, _ = lint_corpus.lint_file(ROOT / fn)
+        rows += stats["rows"]
+        fixed += stats["fixed"]
+        dropped += stats["dropped"]
+    # 4. commit
+    rc, commit = run(["git", "rev-parse", "--short", "HEAD"])
+    commit = commit.strip() or "n/a"
+
+    log = ROOT / "tools" / "progress.csv"
+    is_new = not log.exists()
+    with open(log, "a", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        if is_new:
+            w.writerow(["fecha", "commit", "suite_pass", "suite_total",
+                        "eval_pass", "eval_total", "hygiene_ok",
+                        "lint_rows", "lint_fixed", "lint_dropped"])
+        w.writerow([date.today().isoformat(), commit, suite_pass,
+                    suite_total, eval_pass, eval_total,
+                    1 if rc_h == 0 else 0, rows, fixed, dropped])
+    print(f"{date.today().isoformat()} {commit} suite={suite_pass}/{suite_total} "
+          f"eval={eval_pass}/{eval_total} hygiene={'OK' if rc_h == 0 else 'FAIL'} "
+          f"lint=rows:{rows} fixed:{fixed} dropped:{dropped}")
+    print(f"-> anexado a tools/progress.csv")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Linter de corpus TSV para Symbolic LLM.
+
+Revisa los 7 TSV que ingiere test_wikidata_ingest con las MISMAS
+reglas de skip que ParseTSVLine (comentarios #, lineas sin 2 tabs)
+y estas categorias:
+
+  mojibake   doble-codificacion UTF-8 (patron estrecho). Intenta
+             reparar via latin-1 -> utf-8; si no, DROP.
+  wikimarkup [[...]], {{, }}            -> quita segmento/corta (FIX)
+  asterisk   '*' residual de markdown   -> quita + colapsa _ (FIX)
+  paren      parentetico final _(1921)  -> quita (FIX con perdida
+             documentada); parentesis desbalanceados -> DROP
+  anaphora   sujeto anaforico (SU/TU/THE/SHE/SONS OF...) -> DROP
+  spaced_pred predicado con espacios    -> DROP (irrecuperable)
+  phrase_obj  objeto >4 tokens o >48 chars con espacio -> DROP
+  empty      campo vacio                -> DROP
+  whitespace espacios multiples         -> colapsa (FIX)
+
+Uso:
+  python3 tools/lint_corpus.py --check   # informa, exit 1 si hay issues
+  python3 tools/lint_corpus.py --clean   # reescribe in-place (git = backup),
+                                         # preserva comentarios y fin de linea
+"""
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+FILES = [
+    "data/samples/wikidata_clean.tsv",
+    "wiki_corpus.tsv",
+    "data/samples/c_knowledge.tsv",
+    "data/samples/psalms_knowledge.tsv",
+    "data/bible/bible_knowledge.tsv",
+    "data/samples/love_knowledge.tsv",
+    "data/samples/geo_knowledge.tsv",
+]
+
+STOP_SUBJ = {
+    "SU", "SUS", "TU", "TUS", "MI", "MIS", "YO", "EL", "ELLA", "ELLO",
+    "ELLOS", "ELLAS", "NOSOTROS", "USTED", "ESTE", "ESTA", "ESTO",
+    "ESE", "ESA", "ESO", "AQUEL", "QUE", "QUIEN", "CUAL", "CUALES",
+    "DONDE", "CUANDO", "THE", "A", "AN", "SHE", "HE", "IT", "THEY",
+    "WE", "YOU", "HIS", "HER", "THEIR", "ITS",
+}
+STOP_PREFIX = ("SU ", "SUS ", "TU ", "TUS ", "MI ", "MIS ", "THE ",
+               "AN ", "SONS OF", "DAUGHTERS OF", "KINGS OF")
+
+MOJI_RE = re.compile(r"Ã[©±²³­¯º-¼]|Â[¿¡]|â€")
+WIKILINK_RE = re.compile(r"\[\[.*?\]\]")
+TRAILING_PAREN_RE = re.compile(r"\s*_?\(.*?\)\s*$")
+MULTISPACE_RE = re.compile(r" {2,}")
+
+
+def detect_newline(raw: bytes) -> str:
+    crlf = raw.count(b"\r\n")
+    lf = raw.count(b"\n")
+    if crlf and crlf == lf:
+        return "\r\n"
+    return "\n"
+
+
+def split_row(line: str):
+    """Mimica ParseTSVLine: 2 primeros tabs parten; resto = objeto."""
+    parts = line.split("\t")
+    if len(parts) < 3:
+        return None
+    return parts[0], parts[1], "\t".join(parts[2:])
+
+
+def is_data_line(line: str) -> bool:
+    s = line.lstrip(" \t")
+    return bool(s) and not s.startswith("#") and split_row(line) is not None
+
+
+def repair_mojibake(field: str):
+    """Devuelve (campo, reparado: bool). Solo toca patron estrecho."""
+    if not MOJI_RE.search(field):
+        return field, False
+    try:
+        fixed = field.encode("latin-1").decode("utf-8")
+    except (UnicodeError, ValueError):
+        return field, False
+    if MOJI_RE.search(fixed):
+        return field, False
+    return fixed, True
+
+
+def clean_field(field: str):
+    """Devuelve (campo_limpio, accion) con accion en
+    {'ok','fixed','drop'} y motivo aparte."""
+    # 1. wikimarkup: quita segmentos [[...]] y llaves sueltas
+    new = WIKILINK_RE.sub("", field)
+    new = new.replace("{{", "").replace("}}", "")
+    # 2. asteriscos markdown + colapso de guiones
+    new = new.replace("*", "")
+    new = re.sub(r"__+", "_", new)
+    # 3. parentetico final _(1921) / (nota)
+    new = TRAILING_PAREN_RE.sub("", new)
+    # 4. colapsa espacios
+    new = MULTISPACE_RE.sub(" ", new).strip(" \t_")
+    fixed = new != field
+    # 5. parentesis desbalanceados -> irrecuperable
+    if new.count("(") != new.count(")"):
+        return new, "drop", "paren_unbalanced"
+    if not new:
+        return new, "drop", "empty_after_clean"
+    return new, ("fixed" if fixed else "ok"), ""
+
+
+def lint_file(path: Path):
+    raw = path.read_bytes()
+    newline = detect_newline(raw)
+    text = raw.decode("utf-8", errors="replace")
+    lines = text.split("\n")
+    # quita el '' fantasma del split final (el newline real se repone al escribir)
+    if lines and lines[-1] == "":
+        lines.pop()
+
+    stats = {"rows": 0, "fixed": 0, "dropped": 0, "by_rule": {}}
+    out_lines = []
+    dropped_examples = []
+
+    def bump(rule):
+        stats["by_rule"][rule] = stats["by_rule"].get(rule, 0) + 1
+
+    for line in lines:
+        stripped = line.rstrip("\r")
+        if not is_data_line(stripped):
+            out_lines.append(stripped)  # comentarios/blancos: intactos
+            continue
+        s, p, o = split_row(stripped)
+        stats["rows"] += 1
+        rule = ""
+
+        # vacios
+        if not s.strip() or not p.strip() or not o.strip():
+            rule = "empty"
+        # anafora en sujeto (sobre UPPER para listas en mayusculas)
+        su = s.strip().upper()
+        if not rule and (su in STOP_SUBJ or su.startswith(STOP_PREFIX)):
+            rule = "anaphora"
+        # predicado con espacios
+        if not rule and " " in p.strip():
+            rule = "spaced_pred"
+        # objeto-frase (tokens por espacio; los _ pegados son atomos)
+        ou = o.strip().upper()
+        if not rule and (len(ou.split()) > 4 or (len(ou) > 48 and " " in ou)):
+            rule = "phrase_obj"
+
+        # mojibake: intenta reparar cada campo
+        moji_fixed = False
+        if not rule:
+            flds = []
+            for fld in (s, p, o):
+                if MOJI_RE.search(fld):
+                    fld, ok = repair_mojibake(fld)
+                    if MOJI_RE.search(fld):
+                        rule = "mojibake"
+                        break
+                    moji_fixed = moji_fixed or ok
+                flds.append(fld)
+            if not rule:
+                s, p, o = flds
+
+        # limpieza mecanica por campo
+        fixed_any = moji_fixed
+        if not rule:
+            flds = []
+            for fld in (s, p, o):
+                fld, act, why = clean_field(fld)
+                if act == "drop":
+                    rule = why
+                    break
+                fixed_any = fixed_any or (act == "fixed")
+                flds.append(fld)
+            if not rule:
+                s, p, o = flds
+                # re-chequeo de frase tras limpiar (p.ej. quito markup)
+                ou = o.strip().upper()
+                if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
+                    rule = "phrase_obj"
+
+        if rule:
+            stats["dropped"] += 1
+            bump(rule)
+            if len(dropped_examples) < 5:
+                dropped_examples.append((rule, s[:40], p[:25], o[:55]))
+        else:
+            if fixed_any:
+                stats["fixed"] += 1
+            out_lines.append(f"{s.strip()}\t{p.strip()}\t{o.strip()}")
+
+    return stats, dropped_examples, out_lines, newline
+
+
+def main(argv):
+    mode = "--check" if "--check" in argv else ("--clean" if "--clean" in argv else "")
+    if not mode:
+        print(__doc__)
+        return 2
+    total_rows = total_fixed = total_dropped = 0
+    total_rules = {}
+    failed = False
+    for fn in FILES:
+        path = ROOT / fn
+        stats, examples, out_lines, newline = lint_file(path)
+        total_rows += stats["rows"]
+        total_fixed += stats["fixed"]
+        total_dropped += stats["dropped"]
+        for k, v in stats["by_rule"].items():
+            total_rules[k] = total_rules.get(k, 0) + v
+        issues = stats["fixed"] + stats["dropped"]
+        if issues:
+            failed = True
+        print(f"{fn}: rows={stats['rows']} fixed={stats['fixed']} "
+              f"dropped={stats['dropped']} {stats['by_rule']}")
+        for rule, s, p, o in examples:
+            print(f"    ej [{rule}] {s!r} | {p!r} | {o!r}")
+        if mode == "--clean" and issues:
+            raw_nl = newline.encode()
+            data = newline.join(out_lines) + newline
+            path.write_bytes(data.encode("utf-8"))
+            print(f"    -> reescrito ({len(out_lines)} lineas, fin {newline!r})")
+    print(f"TOTAL: rows={total_rows} fixed={total_fixed} "
+          f"dropped={total_dropped} {total_rules}")
+    if mode == "--check":
+        return 1 if failed else 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

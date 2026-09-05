@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include "compat.h"
 #include "symbol.h"
 #include "learning.h"
 

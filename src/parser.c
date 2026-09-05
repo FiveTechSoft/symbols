@@ -3,6 +3,8 @@
 #include <string.h>
 #include <ctype.h>
 #include "parser.h"
+#include "compat.h"
+#include "stem.h"
 #include "learning.h"
 
 /* ============================================================
@@ -385,12 +387,16 @@ QUESTION ParserDetectQuestion(const char *input)
 
         if (de_pos > 0)
         {
-            /* Predicate = keyword(s) between articles and DE */
+            /* Predicate = keyword(s) between articles and DE.
+               Exact keyword first, then stemmed form (MONEDAS->MONEDA). */
             for (uint32_t i = 0; i < (uint32_t)de_pos; i++)
             {
+                char stem[64];
+                StemWord(tokens.tokens[i], stem, sizeof(stem));
                 for (int k = 0; PREDICATE_MAP[k].keyword; k++)
                 {
-                    if (strcmp(tokens.tokens[i], PREDICATE_MAP[k].keyword) == 0)
+                    if (strcmp(tokens.tokens[i], PREDICATE_MAP[k].keyword) == 0 ||
+                        strcmp(stem, PREDICATE_MAP[k].keyword) == 0)
                     {
                         strcpy(q.predicate, PREDICATE_MAP[k].predicate);
                         break;
@@ -419,12 +425,15 @@ QUESTION ParserDetectQuestion(const char *input)
     /* Strategy 2: "X es" at end → search for concept X */
     if (ends_with_es && tokens.count >= 3)
     {
-        /* Try to find a matching predicate keyword */
+        /* Try to find a matching predicate keyword (exact, then stemmed) */
         for (uint32_t i = 0; i < tokens.count - 1; i++)
         {
+            char stem[64];
+            StemWord(tokens.tokens[i], stem, sizeof(stem));
             for (int k = 0; PREDICATE_MAP[k].keyword; k++)
             {
-                if (strcmp(tokens.tokens[i], PREDICATE_MAP[k].keyword) == 0)
+                if (strcmp(tokens.tokens[i], PREDICATE_MAP[k].keyword) == 0 ||
+                    strcmp(stem, PREDICATE_MAP[k].keyword) == 0)
                 {
                     strcpy(q.predicate, PREDICATE_MAP[k].predicate);
                     break;
@@ -528,14 +537,14 @@ int ParserAnswerQuestion(
 
     out_answer[0] = '\0';
 
-    /* Find subject symbol */
-    SYMBOL_ID subj_id = SymbolFind(graph->symbols, q->subject);
+    /* Find subject symbol (exact first, then morphological fallback) */
+    SYMBOL_ID subj_id = StemFindSymbol(graph->symbols, q->subject);
 
     /* Try direct match first */
     if (subj_id != SYMBOL_INVALID)
     {
         /* Find predicate */
-        SYMBOL_ID pred_id = SymbolFind(graph->symbols, q->predicate);
+        SYMBOL_ID pred_id = StemFindSymbol(graph->symbols, q->predicate);
 
         if (pred_id != SYMBOL_INVALID)
         {

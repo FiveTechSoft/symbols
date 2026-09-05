@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "dialog.h"
+#include "stem.h"
 #include "generator.h"
 #include "nlg.h"
 #include "inference.h"
@@ -212,7 +213,7 @@ int DialogGenerateResponse(
                     char *word = strtok(work, " ");
                     while (word != NULL)
                     {
-                        sid = SymbolFind(graph->symbols, word);
+                        sid = StemFindSymbol(graph->symbols, word);
                         if (sid != SYMBOL_INVALID) break;
                         word = strtok(NULL, " ");
                     }
@@ -288,7 +289,7 @@ int DialogGenerateResponse(
                     char *word = strtok(work, " ");
                     while (word != NULL)
                     {
-                        sid = SymbolFind(graph->symbols, word);
+                        sid = StemFindSymbol(graph->symbols, word);
                         if (sid != SYMBOL_INVALID) break;
                         word = strtok(NULL, " ");
                     }
@@ -432,8 +433,8 @@ int DialogGenerateResponse(
             return 1;
         }
 
-        SYMBOL_ID sid = SymbolFind(graph->symbols, subj);
-        SYMBOL_ID pid = SymbolFind(graph->symbols, pred);
+        SYMBOL_ID sid = StemFindSymbol(graph->symbols, subj);
+        SYMBOL_ID pid = StemFindSymbol(graph->symbols, pred);
 
         if (sid == SYMBOL_INVALID || pid == SYMBOL_INVALID)
         {

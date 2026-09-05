@@ -19,6 +19,7 @@ build.ninja
 .ninja_log
 compile_commands.json
 build/
+build-*/
 out/
 
 # Shard pipeline leftovers (train_shard cleans these up, keep guarded)

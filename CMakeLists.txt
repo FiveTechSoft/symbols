@@ -23,10 +23,14 @@ add_library(symbolic STATIC
     src/stats.c
     src/transfer.c
     src/export.c
+    src/stem.c
+    src/sudoku.c
 )
 
 target_include_directories(symbolic PUBLIC include)
-target_link_libraries(symbolic PUBLIC m)
+if(NOT MSVC)
+    target_link_libraries(symbolic PUBLIC m)
+endif()
 
 add_executable(sllm_cli src/main_cli.c)
 target_link_libraries(sllm_cli symbolic)
@@ -67,6 +71,8 @@ sllm_test(test_contradictions  tests/test_contradictions.c)
 sllm_test(test_deep_inference  tests/test_deep_inference.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
+sllm_test(test_stem           tests/test_stem.c)
+sllm_test(test_sudoku         tests/test_sudoku.c)
 sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)
 sllm_test(test_qa_debug        test_qa_debug.c)
@@ -75,6 +81,14 @@ sllm_test(test_qa_debug        test_qa_debug.c)
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
 add_test(NAME test_wiki_inference COMMAND test_wiki_inference wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_eval_qa tests/test_eval_qa.c)
+target_link_libraries(test_eval_qa symbolic)
+add_test(NAME test_eval_qa COMMAND test_eval_qa tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
+target_link_libraries(test_qa_hygiene symbolic)
+add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)

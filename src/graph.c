@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "compat.h"
 #include "graph.h"
 #include "learning.h"
 

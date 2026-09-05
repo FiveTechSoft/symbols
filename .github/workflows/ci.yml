@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-test-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (MSVC)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release -j4
+      - name: Tests
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Corpus lint (gate)
+        run: python tools/lint_corpus.py --check
+
+  asan-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (MSVC + ASan)
+        run: cmake -S . -B build-asan -DCMAKE_C_FLAGS="/fsanitize=address"
+      - name: Build
+        run: cmake --build build-asan --config Debug -j4
+      - name: Tests under ASan
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse -Filter "clang_rt.asan_dbg_dynamic-x86_64.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $dll) { throw "ASan runtime DLL not found" }
+          $env:PATH = "$($dll.DirectoryName);$env:PATH"
+          ctest --test-dir build-asan -C Debug --output-on-failure

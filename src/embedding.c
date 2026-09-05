@@ -4,6 +4,38 @@
 #include <math.h>
 #include "embedding.h"
 
+static uint32_t EmbeddingNextPow2(uint32_t n)
+{
+    if (n < 16)
+        return 16;
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return n + 1;
+}
+
+/* Grow by_id so index [id] is addressable. 0 = absent elsewhere. */
+static int EmbeddingEnsureId(EMBEDDING_TABLE *table, SYMBOL_ID id)
+{
+    if (id < table->id_capacity)
+        return 1;
+
+    uint32_t new_cap = EmbeddingNextPow2(id + 1);
+    uint32_t *new_by_id = (uint32_t *)realloc(
+        table->by_id, new_cap * sizeof(uint32_t));
+    if (new_by_id == NULL)
+        return 0;
+
+    memset(new_by_id + table->id_capacity, 0,
+           (new_cap - table->id_capacity) * sizeof(uint32_t));
+    table->by_id = new_by_id;
+    table->id_capacity = new_cap;
+    return 1;
+}
+
 EMBEDDING_TABLE *EmbeddingTableCreate(uint32_t capacity)
 {
     if (capacity == 0)
@@ -22,6 +54,8 @@ EMBEDDING_TABLE *EmbeddingTableCreate(uint32_t capacity)
 
     table->count = 0;
     table->capacity = capacity;
+    table->by_id = NULL;
+    table->id_capacity = 0;
     return table;
 }
 
@@ -30,17 +64,15 @@ void EmbeddingTableDestroy(EMBEDDING_TABLE *table)
     if (table == NULL)
         return;
 
+    free(table->by_id);
     free(table->items);
     free(table);
 }
 
 static SYMBOL_EMBEDDING *FindOrAlloc(EMBEDDING_TABLE *table, SYMBOL_ID id)
 {
-    for (uint32_t i = 0; i < table->count; i++)
-    {
-        if (table->items[i].id == id)
-            return &table->items[i];
-    }
+    if (id < table->id_capacity && table->by_id[id] != 0)
+        return &table->items[table->by_id[id] - 1];
 
     if (table->count >= table->capacity)
     {
@@ -56,10 +88,15 @@ static SYMBOL_EMBEDDING *FindOrAlloc(EMBEDDING_TABLE *table, SYMBOL_ID id)
         table->capacity = new_cap;
     }
 
-    SYMBOL_EMBEDDING *item = &table->items[table->count++];
+    if (!EmbeddingEnsureId(table, id))
+        return NULL;
+
+    SYMBOL_EMBEDDING *item = &table->items[table->count];
     item->id = id;
     item->initialized = 0;
     memset(item->vector, 0, sizeof(item->vector));
+    table->by_id[id] = table->count + 1;
+    table->count++;
     return item;
 }
 
@@ -82,6 +119,17 @@ const float *EmbeddingGetVector(const EMBEDDING_TABLE *table, SYMBOL_ID id)
     if (table == NULL || id == SYMBOL_INVALID)
         return NULL;
 
+    if (table->by_id != NULL && id < table->id_capacity && table->by_id[id] != 0)
+    {
+        const SYMBOL_EMBEDDING *item = &table->items[table->by_id[id] - 1];
+        if (item->initialized)
+            return item->vector;
+        return NULL;
+    }
+
+    /* Fallback: index not yet built for this id (e.g. EnsureId failed
+       under OOM while the item itself exists). Linear scan keeps the
+       lookup total instead of losing the vector. */
     for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].id == id && table->items[i].initialized)
