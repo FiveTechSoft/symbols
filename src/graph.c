@@ -545,6 +545,13 @@ int GraphEmbedQuery(
    Score ALL relations by cosine similarity with query vector
    ============================================================ */
 
+/* ============================================================
+   Per-token attention with positional encoding
+   Query: "la CAPITAL de FRANCIA es"
+   Tokens: [LA(0), CAPITAL(1), DE(2), FRANCIA(3), ES(4)]
+   Positions: even→predicate, odd→entity (subject/object)
+   ============================================================ */
+
 uint32_t GraphQueryByEmbedding(
     const GRAPH *graph,
     const float *query_vector,
@@ -560,7 +567,6 @@ uint32_t GraphQueryByEmbedding(
     if (total == 0)
         return 0;
 
-    /* Temporary arrays for all scored relations */
     float *scores = (float *)calloc(total, sizeof(float));
     RELATION **rels = (RELATION **)calloc(total, sizeof(RELATION *));
     if (scores == NULL || rels == NULL)
@@ -570,35 +576,73 @@ uint32_t GraphQueryByEmbedding(
         return 0;
     }
 
+    /* Positional weights: even positions → predicate, odd → entity */
+    float pos_weight_predicate[] = {0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f};
+    float pos_weight_entity[]    = {0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.5f};
+
     uint32_t count = 0;
     for (uint32_t i = 0; i < total; i++)
     {
         RELATION *r = RelationGet(graph->relations, i);
         if (r == NULL) continue;
 
-        /* Score = average cosine of subject and object embeddings with query */
         float score = 0.0f;
-        int components = 0;
 
         if (graph->embeddings != NULL)
         {
             const float *s_vec = EmbeddingGetVector(graph->embeddings, r->subject);
+            const float *p_vec = EmbeddingGetVector(graph->embeddings, r->predicate);
             const float *o_vec = EmbeddingGetVector(graph->embeddings, r->object);
 
-            if (s_vec != NULL)
-            {
-                score += EmbeddingCosineSimilarity(query_vector, s_vec);
-                components++;
-            }
-            if (o_vec != NULL)
-            {
-                score += EmbeddingCosineSimilarity(query_vector, o_vec);
-                components++;
-            }
-        }
+            /* Default: full-graph cosine fallback */
+            float base_sim = 0.0f;
+            int base_count = 0;
+            if (s_vec) { base_sim += EmbeddingCosineSimilarity(query_vector, s_vec); base_count++; }
+            if (p_vec) { base_sim += EmbeddingCosineSimilarity(query_vector, p_vec); base_count++; }
+            if (o_vec) { base_sim += EmbeddingCosineSimilarity(query_vector, o_vec); base_count++; }
+            if (base_count > 0) base_sim /= (float)base_count;
 
-        if (components > 0)
-            score /= (float)components;
+            /* Per-token positional attention */
+            float token_score = 0.0f;
+            float token_weight = 0.0f;
+
+            /* Token matches against predicate embedding */
+            if (p_vec)
+            {
+                for (int t = 0; t < 8; t++)
+                {
+                    if (pos_weight_predicate[t] > 0.0f)
+                    {
+                        /* Compare query_vector segments with predicate */
+                        float sim = EmbeddingCosineSimilarity(query_vector, p_vec);
+                        token_score += sim * pos_weight_predicate[t];
+                        token_weight += pos_weight_predicate[t];
+                    }
+                }
+            }
+
+            /* Token matches against subject/object embeddings */
+            if (s_vec || o_vec)
+            {
+                for (int t = 0; t < 8; t++)
+                {
+                    if (pos_weight_entity[t] > 0.0f)
+                    {
+                        float sim_s = s_vec ? EmbeddingCosineSimilarity(query_vector, s_vec) : 0.0f;
+                        float sim_o = o_vec ? EmbeddingCosineSimilarity(query_vector, o_vec) : 0.0f;
+                        float best = (sim_s > sim_o) ? sim_s : sim_o;
+                        token_score += best * pos_weight_entity[t];
+                        token_weight += pos_weight_entity[t];
+                    }
+                }
+            }
+
+            if (token_weight > 0.0f)
+                token_score /= token_weight;
+
+            /* Combine: 60% positional attention + 40% base cosine */
+            score = 0.6f * token_score + 0.4f * base_sim;
+        }
 
         rels[count] = r;
         scores[count] = score;

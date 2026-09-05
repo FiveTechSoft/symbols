@@ -68,12 +68,18 @@ int IngestTriple(GRAPH *graph,
     {
         EMBEDDING_TABLE *emb = graph->embeddings;
 
-        /* Ensure both embeddings are initialized */
+        /* Ensure all three embeddings are initialized */
         if (EmbeddingGetVector(emb, s_id) == NULL)
         {
             float v[EMBEDDING_DIM];
             EmbeddingRandomInit(v, (uint32_t)s_id * 2654435761u);
             EmbeddingSetVector(emb, s_id, v);
+        }
+        if (EmbeddingGetVector(emb, p_id) == NULL)
+        {
+            float v[EMBEDDING_DIM];
+            EmbeddingRandomInit(v, (uint32_t)p_id * 2654435761u);
+            EmbeddingSetVector(emb, p_id, v);
         }
         if (EmbeddingGetVector(emb, o_id) == NULL)
         {
@@ -82,16 +88,28 @@ int IngestTriple(GRAPH *graph,
             EmbeddingSetVector(emb, o_id, v);
         }
 
-        /* Hebbian co-occurrence update */
-        float *target  = (float *)EmbeddingGetVector(emb, s_id);
-        float *context = (float *)EmbeddingGetVector(emb, o_id);
-        if (target && context)
+        /* Hebbian co-occurrence: all pairs */
+        float *s_vec = (float *)EmbeddingGetVector(emb, s_id);
+        float *p_vec = (float *)EmbeddingGetVector(emb, p_id);
+        float *o_vec = (float *)EmbeddingGetVector(emb, o_id);
+        if (s_vec && p_vec)
         {
-            EmbeddingCooccur(target, context, 0.1f);
-            EmbeddingCooccur(context, target, 0.1f);
-            EmbeddingNormalize(target);
-            EmbeddingNormalize(context);
+            EmbeddingCooccur(s_vec, p_vec, 0.1f);
+            EmbeddingCooccur(p_vec, s_vec, 0.1f);
         }
+        if (p_vec && o_vec)
+        {
+            EmbeddingCooccur(p_vec, o_vec, 0.1f);
+            EmbeddingCooccur(o_vec, p_vec, 0.1f);
+        }
+        if (s_vec && o_vec)
+        {
+            EmbeddingCooccur(s_vec, o_vec, 0.1f);
+            EmbeddingCooccur(o_vec, s_vec, 0.1f);
+        }
+        if (s_vec) EmbeddingNormalize(s_vec);
+        if (p_vec) EmbeddingNormalize(p_vec);
+        if (o_vec) EmbeddingNormalize(o_vec);
     }
 
     return added;

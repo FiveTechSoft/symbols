@@ -428,22 +428,99 @@ int main(void)
             continue;
         }
 
+        /* Attention + token-match hybrid query */
+        if (graph != NULL && embeds != NULL)
+        {
+            PARSED_SENTENCE toks;
+            ParserTokenize(input, &toks);
+
+            float best_score = 0.0f;
+            uint32_t best_subj = SYMBOL_INVALID;
+            uint32_t best_pred = SYMBOL_INVALID;
+            uint32_t best_obj  = SYMBOL_INVALID;
+
+            /* For each query token, check if it matches a predicate name */
+            for (uint32_t t = 0; t < toks.count; t++)
+            {
+                SYMBOL_ID pred_id = SymbolFind(graph->symbols, toks.tokens[t]);
+                if (pred_id == SYMBOL_INVALID) continue;
+
+                /* Check if this symbol is actually used as a predicate */
+                int used_as_pred = 0;
+                for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
+                {
+                    RELATION *rel = RelationGet(graph->relations, r);
+                    if (rel && rel->predicate == pred_id) { used_as_pred = 1; break; }
+                }
+                if (!used_as_pred) continue;
+
+                /* Found predicate match! Score each relation with this predicate */
+                for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
+                {
+                    RELATION *rel = RelationGet(graph->relations, r);
+                    if (rel == NULL || rel->predicate != pred_id) continue;
+
+                    /* Score entity match against other query tokens */
+                    float entity_score = 0.0f;
+                    int ec = 0;
+                    for (uint32_t u = 0; u < toks.count; u++)
+                    {
+                        if (u == t) continue;
+                        SYMBOL_ID token_id = SymbolFind(graph->symbols, toks.tokens[u]);
+                        if (token_id == SYMBOL_INVALID) continue;
+
+                        const float *t_vec = EmbeddingGetVector(embeds, token_id);
+                        const float *o_vec = EmbeddingGetVector(embeds, rel->object);
+                        const float *s_vec = EmbeddingGetVector(embeds, rel->subject);
+
+                        if (t_vec && o_vec)
+                        {
+                            float sim = EmbeddingCosineSimilarity(t_vec, o_vec);
+                            if (sim > entity_score) entity_score = sim;
+                            ec++;
+                        }
+                        if (t_vec && s_vec)
+                        {
+                            float sim = EmbeddingCosineSimilarity(t_vec, s_vec);
+                            if (sim > entity_score) entity_score = sim;
+                            ec++;
+                        }
+                    }
+
+                    float total = 0.5f + entity_score * 0.5f;
+                    if (total > best_score)
+                    {
+                        best_score = total;
+                        best_subj = rel->subject;
+                        best_pred = rel->predicate;
+                        best_obj  = rel->object;
+                    }
+                }
+            }
+
+            if (best_score > 0.5f && best_obj != SYMBOL_INVALID)
+            {
+                const SYMBOL *o = SymbolGet(graph->symbols, best_obj);
+                if (o)
+                    printf("IA > %s\n\n", o->name);
+            }
+            else
+            {
+                uint32_t base = RelationCount(graph->relations);
+                ParserIngestSentence(graph, input);
+                uint32_t added = RelationCount(graph->relations) - base;
+                if (added > 0)
+                    printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
+                else
+                    printf("IA > I don't know. Teach me and I'll remember.\n\n");
+            }
+            continue;
+        }
+
         /* Dialog engine */
         if (DialogGenerateResponse(graph, ctx, input, response, sizeof(response)))
         {
             printf("IA > %s\n\n", response);
-
-            /* Also try to extract structured S-P-O for better knowledge */
-            int parsed = ParserIngestSentence(graph, input);
-            if (parsed)
-            {
-                PARSED_SENTENCE toks;
-                ParserTokenize(input, &toks);
-                PARSE_RESULT spo = ParserExtractSPO(&toks);
-                if (spo.valid)
-                    printf("   Parsed: %s --%s--> %s\n\n",
-                           spo.subject, spo.predicate, spo.object);
-            }
         }
         else
         {
