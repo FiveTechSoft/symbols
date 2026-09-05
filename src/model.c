@@ -111,7 +111,7 @@ int ModelSave(const MODEL *model, const char *filepath)
         }
 
         if (fwrite(&r->subject,   sizeof(SYMBOL_ID), 1, f) != 1 ||
-            fwrite(&r->predicate, sizeof(SYMBOL_ID), 1, f) != 1 ||
+            fwrite(&r->relation, sizeof(SYMBOL_ID), 1, f) != 1 ||
             fwrite(&r->object,    sizeof(SYMBOL_ID), 1, f) != 1 ||
             fwrite(&r->count,     sizeof(uint64_t), 1, f) != 1 ||
             fwrite(&r->weight,    sizeof(float), 1, f) != 1 ||
@@ -256,12 +256,12 @@ MODEL *ModelLoad(const char *filepath)
     /* Load relations (V3 adds provenance; V1/V2 => unknown) */
     for (uint32_t i = 0; i < rel_count; i++)
     {
-        SYMBOL_ID subj, pred, obj, src = SYMBOL_INVALID;
+        SYMBOL_ID subj, rel, obj, src = SYMBOL_INVALID;
         uint64_t count;
         float weight;
 
         if (fread(&subj,   sizeof(SYMBOL_ID), 1, f) != 1 ||
-            fread(&pred,   sizeof(SYMBOL_ID), 1, f) != 1 ||
+            fread(&rel,   sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&obj,    sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&count,  sizeof(uint64_t), 1, f) != 1 ||
             fread(&weight, sizeof(float), 1, f) != 1 ||
@@ -272,9 +272,9 @@ MODEL *ModelLoad(const char *filepath)
             return NULL;
         }
 
-        if (GraphAddRelation(model->graph, subj, pred, obj))
+        if (GraphAddRelation(model->graph, subj, rel, obj))
         {
-            RELATION *r = GraphFindRelation(model->graph, subj, pred, obj);
+            RELATION *r = GraphFindRelation(model->graph, subj, rel, obj);
             if (r != NULL)
             {
                 r->count = count;

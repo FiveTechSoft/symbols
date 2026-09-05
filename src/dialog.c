@@ -52,14 +52,14 @@ DIALOG_INTENT DialogClassify(const char *input)
     return intent;
 }
 
-static void GetUnknownResponse(char *out, size_t size, const char *subj, const char *pred)
+static void GetUnknownResponse(char *out, size_t size, const char *subj, const char *rel)
 {
     static const char *templates[] = {
         "No record of %s %s yet. Teach it to me.",
         "Nothing stored about %s %s.",
         "Unknown: %s %s. Use /learn S P O to store it."
     };
-    snprintf(out, size, templates[rand() % 3], subj, pred);
+    snprintf(out, size, templates[rand() % 3], subj, rel);
 }
 
 int DialogGenerateResponse(
@@ -115,7 +115,7 @@ int DialogGenerateResponse(
         StrToUpper(clean, upper, sizeof(upper));
 
         char subj[64] = "";
-        char pred[64] = "";
+        char rel[64] = "";
 
         /* Find all matching symbols */
         char matches[16][64];
@@ -151,15 +151,15 @@ int DialogGenerateResponse(
                 for (uint32_t j = 0; j < match_count && !found_pair; j++)
                 {
                     if (i == j) continue;
-                    SYMBOL_ID try_pred = SymbolFind(graph->symbols, matches[j]);
-                    if (try_pred == SYMBOL_INVALID) continue;
+                    SYMBOL_ID try_rel = SymbolFind(graph->symbols, matches[j]);
+                    if (try_rel == SYMBOL_INVALID) continue;
 
                     RELATION *r[1];
-                    uint32_t n = GraphQuerySubjectPredicate(graph, try_subj, try_pred, r, 1);
+                    uint32_t n = GraphQuerySubjectRelation(graph, try_subj, try_rel, r, 1);
                     if (n > 0)
                     {
                         strncpy(subj, matches[i], sizeof(subj) - 1);
-                        strncpy(pred, matches[j], sizeof(pred) - 1);
+                        strncpy(rel, matches[j], sizeof(rel) - 1);
                         found_pair = 1;
                     }
                 }
@@ -170,7 +170,7 @@ int DialogGenerateResponse(
             (void)found_pair;
         }
 
-        if (subj[0] == '\0' || pred[0] == '\0')
+        if (subj[0] == '\0' || rel[0] == '\0')
         {
             if (strchr(clean, '?'))
             {
@@ -187,12 +187,12 @@ int DialogGenerateResponse(
         }
 
         SYMBOL_ID sid = StemFindSymbol(graph->symbols, subj);
-        SYMBOL_ID pid = StemFindSymbol(graph->symbols, pred);
+        SYMBOL_ID rid = StemFindSymbol(graph->symbols, rel);
 
-        if (sid == SYMBOL_INVALID || pid == SYMBOL_INVALID)
+        if (sid == SYMBOL_INVALID || rid == SYMBOL_INVALID)
         {
             char unk[256];
-            GetUnknownResponse(unk, sizeof(unk), subj, pred);
+            GetUnknownResponse(unk, sizeof(unk), subj, rel);
             snprintf(out_response, max_len, "%s", unk);
             return 1;
         }
@@ -200,8 +200,8 @@ int DialogGenerateResponse(
         RELATION *results[8];
         SYMBOL_ID resolved = sid;
 
-        uint32_t found = GraphQuerySubjectPredicateFuzzy(
-            graph, sid, pid, results, 8, 0.70f, &resolved);
+        uint32_t found = GraphQuerySubjectRelationFuzzy(
+            graph, sid, rid, results, 8, 0.70f, &resolved);
 
         if (found > 0)
         {
@@ -224,16 +224,16 @@ int DialogGenerateResponse(
             char *w = out_response + strlen(out_response);
             snprintf(w, max_len - strlen(out_response), "%s ", subj_name);
 
-            /* Lowercase predicate for grammar */
-            const SYMBOL *pred_sym = SymbolGet(graph->symbols, pid);
-            if (pred_sym && pred_sym->name[0])
+            /* Lowercase relation for grammar */
+            const SYMBOL *rel_sym = SymbolGet(graph->symbols, rid);
+            if (rel_sym && rel_sym->name[0])
             {
                 w = out_response + strlen(out_response);
-                char lc_pred[128];
-                lc_pred[0] = (char)tolower((unsigned char)pred_sym->name[0]);
-                strncpy(lc_pred + 1, pred_sym->name + 1, sizeof(lc_pred) - 2);
-                lc_pred[sizeof(lc_pred) - 1] = '\0';
-                snprintf(w, max_len - strlen(out_response), "%s ", lc_pred);
+                char lc_rel[128];
+                lc_rel[0] = (char)tolower((unsigned char)rel_sym->name[0]);
+                strncpy(lc_rel + 1, rel_sym->name + 1, sizeof(lc_rel) - 2);
+                lc_rel[sizeof(lc_rel) - 1] = '\0';
+                snprintf(w, max_len - strlen(out_response), "%s ", lc_rel);
             }
 
             /* Objects with percentages */
@@ -268,9 +268,9 @@ int DialogGenerateResponse(
             /* Try inference for extra context */
             RELATION *taxo[2];
             SYMBOL_ID es_sym = SymbolFind(graph->symbols, "ES");
-            if (es_sym != SYMBOL_INVALID && pid != es_sym)
+            if (es_sym != SYMBOL_INVALID && rid != es_sym)
             {
-                if (GraphQuerySubjectPredicate(graph, resolved, es_sym, taxo, 1) > 0)
+                if (GraphQuerySubjectRelation(graph, resolved, es_sym, taxo, 1) > 0)
                 {
                     const SYMBOL *parent = SymbolGet(graph->symbols, taxo[0]->object);
                     if (parent)
@@ -288,7 +288,7 @@ int DialogGenerateResponse(
         /* No direct results: report unknown, keep it honest. */
         {
             char unk[256];
-            GetUnknownResponse(unk, sizeof(unk), subj, pred);
+            GetUnknownResponse(unk, sizeof(unk), subj, rel);
             snprintf(out_response, max_len, "%s", unk);
         }
         return 1;

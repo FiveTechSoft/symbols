@@ -25,7 +25,7 @@ static void PrintRelation(
         return;
 
     s = SymbolGet(symbols, r->subject);
-    p = SymbolGet(symbols, r->predicate);
+    p = SymbolGet(symbols, r->relation);
     o = SymbolGet(symbols, r->object);
 
     printf(
@@ -88,7 +88,7 @@ int main(void)
 
     printf("--- Que es GATO? ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, "GATO", "ES", results, 32);
+    n = GraphQuerySubjectRelation(graph, "GATO", "ES", results, 32);
 
     for (i = 0; i < n; i++)
         PrintRelation(results[i], graph->symbols);
@@ -102,7 +102,7 @@ int main(void)
 
     printf("\n--- Que come GATO? ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, "GATO", "COME", results, 32);
+    n = GraphQuerySubjectRelation(graph, "GATO", "COME", results, 32);
 
     for (i = 0; i < n; i++)
         PrintRelation(results[i], graph->symbols);
@@ -116,7 +116,7 @@ int main(void)
 
     printf("\n--- Que come PERRO? ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, "PERRO", "COME", results, 32);
+    n = GraphQuerySubjectRelation(graph, "PERRO", "COME", results, 32);
 
     for (i = 0; i < n; i++)
         PrintRelation(results[i], graph->symbols);
@@ -131,7 +131,7 @@ int main(void)
 
     printf("\n--- Que animales conocemos? ---\n\n");
 
-    n = GraphQueryPredicateObject(graph, "ES", "ANIMAL", results, 32);
+    n = GraphQueryRelationObject(graph, "ES", "ANIMAL", results, 32);
 
     for (i = 0; i < n; i++)
         PrintRelation(results[i], graph->symbols);
@@ -145,7 +145,7 @@ int main(void)
 
     printf("\n--- Quien come CARNE? ---\n\n");
 
-    n = GraphQueryPredicateObject(graph, "COME", "CARNE", results, 32);
+    n = GraphQueryRelationObject(graph, "COME", "CARNE", results, 32);
 
     for (i = 0; i < n; i++)
         PrintRelation(results[i], graph->symbols);

@@ -14,7 +14,7 @@ typedef struct
 } INGEST_STATS;
 
 /*
- * Ingest a TSV file line-by-line (subject\tpredicate\tobject).
+ * Ingest a TSV file line-by-line (subject\trelation\tobject).
  * Each line is parsed and inserted into the graph O(1) via hash table.
  * Skips empty lines, comments (#), and malformed lines.
  * Returns stats about the ingestion.
@@ -41,7 +41,7 @@ INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath);
  *          2 = existing relation strengthened (count++).
  */
 int IngestTriple(GRAPH *graph,
-                 const char *subject, const char *predicate, const char *object);
+                 const char *subject, const char *relation, const char *object);
 
 /*
  * Same, with provenance (e.g. "GEN 1:1", NULL = unknown).
@@ -49,7 +49,7 @@ int IngestTriple(GRAPH *graph,
  * Same return code as IngestTriple.
  */
 int IngestTripleSource(GRAPH *graph,
-                       const char *subject, const char *predicate,
+                       const char *subject, const char *relation,
                        const char *object, const char *source);
 
 #endif

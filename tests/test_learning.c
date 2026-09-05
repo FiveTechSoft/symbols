@@ -43,29 +43,29 @@ int main(void)
     printf("Simbolos unicos en memoria: %u\n", SymbolCount(graph->symbols));
     printf("Relaciones en el grafo    : %u\n\n", RelationCount(graph->relations));
 
-    PREDICTION preds[8];
+    PREDICTION rels[8];
     uint32_t n;
 
     printf("--- Que come el gato? ---\n\n");
-    n = LearningPredictText(graph, "GATO", "COME", preds, 8);
+    n = LearningPredictText(graph, "GATO", "COME", rels, 8);
     for (uint32_t i = 0; i < n; i++)
     {
         printf("  Top %u: %-10s | count=%2llu | P = %5.1f%%\n",
                i + 1,
-               preds[i].name,
-               (unsigned long long)preds[i].count,
-               preds[i].probability * 100.0f);
+               rels[i].name,
+               (unsigned long long)rels[i].count,
+               rels[i].probability * 100.0f);
     }
 
     printf("\n--- Que come el perro? ---\n\n");
-    n = LearningPredictText(graph, "PERRO", "COME", preds, 8);
+    n = LearningPredictText(graph, "PERRO", "COME", rels, 8);
     for (uint32_t i = 0; i < n; i++)
     {
         printf("  Top %u: %-10s | count=%2llu | P = %5.1f%%\n",
                i + 1,
-               preds[i].name,
-               (unsigned long long)preds[i].count,
-               preds[i].probability * 100.0f);
+               rels[i].name,
+               (unsigned long long)rels[i].count,
+               rels[i].probability * 100.0f);
     }
 
     printf("\n--- Razonamiento tras aprendizaje ---\n\n");

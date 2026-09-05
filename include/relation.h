@@ -13,7 +13,7 @@ typedef enum
 typedef struct
 {
     SYMBOL_ID         subject;
-    SYMBOL_ID         predicate;
+    SYMBOL_ID         relation;
     SYMBOL_ID         object;
     RELATION_POLARITY polarity;
     uint64_t          count;
@@ -42,28 +42,28 @@ void RelationTableInit(RELATION_TABLE *table, uint32_t capacity);
 void RelationTableDestroy(RELATION_TABLE *table);
 
 int RelationAddPolar(RELATION_TABLE *table,
-                     SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                     SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
                      RELATION_POLARITY polarity);
 
 int RelationAdd(RELATION_TABLE *table,
-                SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
+                SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object);
 
 RELATION *RelationFindPolar(RELATION_TABLE *table,
-                            SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                            SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
                             RELATION_POLARITY polarity);
 
 RELATION *RelationFind(RELATION_TABLE *table,
-                       SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object);
+                       SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object);
 
 RELATION *RelationFindOpposite(RELATION_TABLE *table,
-                               SYMBOL_ID subject, SYMBOL_ID predicate, SYMBOL_ID object,
+                               SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
                                RELATION_POLARITY polarity);
 
 uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
                                RELATION **results, uint32_t max_results);
 
-uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
-                                        SYMBOL_ID subject, SYMBOL_ID predicate,
+uint32_t RelationFindBySubjectRelation(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject, SYMBOL_ID relation,
                                         RELATION **results, uint32_t max_results);
 
 uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,

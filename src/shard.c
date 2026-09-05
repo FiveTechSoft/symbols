@@ -133,16 +133,16 @@ MODEL *ShardMerge(const char **shard_paths, uint32_t num_shards,
 
             SYMBOL_ID mid = GraphAddSymbol(merged->graph,
                                            SymbolGet(shard->graph->symbols, r->subject)->name);
-            SYMBOL_ID pid = GraphAddSymbol(merged->graph,
-                                           SymbolGet(shard->graph->symbols, r->predicate)->name);
+            SYMBOL_ID rid = GraphAddSymbol(merged->graph,
+                                           SymbolGet(shard->graph->symbols, r->relation)->name);
             SYMBOL_ID oid = GraphAddSymbol(merged->graph,
                                            SymbolGet(shard->graph->symbols, r->object)->name);
 
-            if (mid == SYMBOL_INVALID || pid == SYMBOL_INVALID ||
+            if (mid == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
                 oid == SYMBOL_INVALID)
                 continue;
 
-            RELATION *existing = RelationFind(merged->graph->relations, mid, pid, oid);
+            RELATION *existing = RelationFind(merged->graph->relations, mid, rid, oid);
             if (existing != NULL)
             {
                 existing->count += r->count;
@@ -150,8 +150,8 @@ MODEL *ShardMerge(const char **shard_paths, uint32_t num_shards,
             }
             else
             {
-                RelationAdd(merged->graph->relations, mid, pid, oid);
-                RELATION *added = RelationFind(merged->graph->relations, mid, pid, oid);
+                RelationAdd(merged->graph->relations, mid, rid, oid);
+                RELATION *added = RelationFind(merged->graph->relations, mid, rid, oid);
                 if (added != NULL)
                 {
                     added->count = r->count;

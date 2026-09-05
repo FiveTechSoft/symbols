@@ -16,7 +16,7 @@ typedef struct
 typedef struct
 {
     char subject[128];      /* concept to look up */
-    char predicate[64];     /* relation naming a stored triple slot */
+    char relation[64];     /* relation naming a stored triple slot */
     int  is_question;
     int  valid;
 } QUESTION;

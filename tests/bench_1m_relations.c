@@ -159,7 +159,7 @@ int main(void)
         RELATION *r = RelationFind(relations, s, p, o);
         if (r != NULL)
         {
-            if (r->subject != s || r->predicate != p || r->object != o)
+            if (r->subject != s || r->relation != p || r->object != o)
             {
                 printf("   ERROR: tripleta corrupta en indice %u\n", i);
                 errors++;

@@ -76,35 +76,35 @@ SYMBOL_ID GraphAddSymbol(GRAPH *graph, const char *name)
 int GraphAddRelation(
     GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object)
 {
     if (graph == NULL)
         return 0;
 
     if (subject == SYMBOL_INVALID ||
-        predicate == SYMBOL_INVALID ||
+        relation == SYMBOL_INVALID ||
         object == SYMBOL_INVALID)
     {
         return 0;
     }
 
-    return RelationAdd(graph->relations, subject, predicate, object);
+    return RelationAdd(graph->relations, subject, relation, object);
 }
 
 
 int GraphAddRelationPolar(
     GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object,
     RELATION_POLARITY polarity,
     CONFLICT_POLICY policy)
 {
-    if (!graph || subject == SYMBOL_INVALID || predicate == SYMBOL_INVALID || object == SYMBOL_INVALID)
+    if (!graph || subject == SYMBOL_INVALID || relation == SYMBOL_INVALID || object == SYMBOL_INVALID)
         return 0;
 
-    RELATION *opposite = RelationFindOpposite(graph->relations, subject, predicate, object, polarity);
+    RELATION *opposite = RelationFindOpposite(graph->relations, subject, relation, object, polarity);
 
     if (opposite != NULL)
     {
@@ -140,14 +140,14 @@ int GraphAddRelationPolar(
         }
     }
 
-    return RelationAddPolar(graph->relations, subject, predicate, object, polarity);
+    return RelationAddPolar(graph->relations, subject, relation, object, polarity);
 }
 
 
 CONTRADICTION_REPORT GraphCheckContradiction(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object)
 {
     CONTRADICTION_REPORT rep;
@@ -155,8 +155,8 @@ CONTRADICTION_REPORT GraphCheckContradiction(
 
     if (!graph) return rep;
 
-    RELATION *pos = RelationFindPolar(graph->relations, subject, predicate, object, POLARITY_POSITIVE);
-    RELATION *neg = RelationFindPolar(graph->relations, subject, predicate, object, POLARITY_NEGATIVE);
+    RELATION *pos = RelationFindPolar(graph->relations, subject, relation, object, POLARITY_POSITIVE);
+    RELATION *neg = RelationFindPolar(graph->relations, subject, relation, object, POLARITY_NEGATIVE);
 
     if (pos != NULL && neg != NULL)
     {
@@ -178,13 +178,13 @@ CONTRADICTION_REPORT GraphCheckContradiction(
 RELATION *GraphFindRelation(
     GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object)
 {
     if (graph == NULL)
         return NULL;
 
-    return RelationFind(graph->relations, subject, predicate, object);
+    return RelationFind(graph->relations, subject, relation, object);
 }
 
 
@@ -207,21 +207,21 @@ uint32_t GraphQuerySubject(
 
 
 /* ============================================================
-   Query: subject --predicate--> ?
+   Query: subject --relation--> ?
    ============================================================ */
 
-uint32_t GraphQuerySubjectPredicate(
+uint32_t GraphQuerySubjectRelation(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     RELATION **results,
     uint32_t max_results)
 {
     if (graph == NULL)
         return 0;
 
-    return RelationFindBySubjectPredicate(
-        graph->relations, subject, predicate, results, max_results);
+    return RelationFindBySubjectRelation(
+        graph->relations, subject, relation, results, max_results);
 }
 
 
@@ -250,7 +250,7 @@ uint32_t GraphQueryObject(
 int GraphInferTransitive(
     GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object)
 {
     RELATION *chain[256];
@@ -261,25 +261,25 @@ int GraphInferTransitive(
         return 0;
 
     if (subject == SYMBOL_INVALID ||
-        predicate == SYMBOL_INVALID ||
+        relation == SYMBOL_INVALID ||
         object == SYMBOL_INVALID)
     {
         return 0;
     }
 
-    if (RelationFind(graph->relations, subject, predicate, object) != NULL)
+    if (RelationFind(graph->relations, subject, relation, object) != NULL)
         return 0;
 
-    n = RelationFindBySubjectPredicate(
-        graph->relations, subject, predicate, chain, 256);
+    n = RelationFindBySubjectRelation(
+        graph->relations, subject, relation, chain, 256);
 
     for (i = 0; i < n; i++)
     {
         SYMBOL_ID middle = chain[i]->object;
 
-        if (RelationFind(graph->relations, middle, predicate, object) != NULL)
+        if (RelationFind(graph->relations, middle, relation, object) != NULL)
         {
-            RelationAdd(graph->relations, subject, predicate, object);
+            RelationAdd(graph->relations, subject, relation, object);
             return 1;
         }
     }
@@ -347,10 +347,10 @@ SYMBOL_ID GraphResolveSynonym(const GRAPH *graph,
    Consulta hibrida tolerante a sinonimos
    ============================================================ */
 
-uint32_t GraphQuerySubjectPredicateFuzzy(
+uint32_t GraphQuerySubjectRelationFuzzy(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     RELATION **results,
     uint32_t max_results,
     float min_similarity,
@@ -360,8 +360,8 @@ uint32_t GraphQuerySubjectPredicateFuzzy(
         return 0;
 
     /* Intento exacto primero */
-    uint32_t n = RelationFindBySubjectPredicate(
-        graph->relations, subject, predicate, results, max_results);
+    uint32_t n = RelationFindBySubjectRelation(
+        graph->relations, subject, relation, results, max_results);
 
     if (n > 0)
     {
@@ -377,8 +377,8 @@ uint32_t GraphQuerySubjectPredicateFuzzy(
 
     if (resolved != subject && resolved != SYMBOL_INVALID)
     {
-        n = RelationFindBySubjectPredicate(
-            graph->relations, resolved, predicate, results, max_results);
+        n = RelationFindBySubjectRelation(
+            graph->relations, resolved, relation, results, max_results);
 
         if (out_resolved_subject != NULL)
             *out_resolved_subject = resolved;
@@ -550,7 +550,7 @@ int GraphEmbedQuery(
    Per-token attention with positional encoding
    Query: "la CAPITAL de FRANCIA es"
    Tokens: [LA(0), CAPITAL(1), DE(2), FRANCIA(3), ES(4)]
-   Positions: even→predicate, odd→entity (subject/object)
+   Positions: even→relation, odd→entity (subject/object)
    ============================================================ */
 
 uint32_t GraphQueryByEmbedding(
@@ -577,8 +577,8 @@ uint32_t GraphQueryByEmbedding(
         return 0;
     }
 
-    /* Positional weights: even positions → predicate, odd → entity */
-    float pos_weight_predicate[] = {0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f};
+    /* Positional weights: even positions → relation, odd → entity */
+    float pos_weight_relation[] = {0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f, 0.3f, 0.0f};
     float pos_weight_entity[]    = {0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.5f, 0.0f, 0.5f};
 
     uint32_t count = 0;
@@ -593,7 +593,7 @@ uint32_t GraphQueryByEmbedding(
         if (graph->embeddings != NULL)
         {
             const float *s_vec = EmbeddingGetVector(graph->embeddings, r->subject);
-            const float *p_vec = EmbeddingGetVector(graph->embeddings, r->predicate);
+            const float *p_vec = EmbeddingGetVector(graph->embeddings, r->relation);
             const float *o_vec = EmbeddingGetVector(graph->embeddings, r->object);
 
             /* Default: full-graph cosine fallback */
@@ -608,17 +608,17 @@ uint32_t GraphQueryByEmbedding(
             float token_score = 0.0f;
             float token_weight = 0.0f;
 
-            /* Token matches against predicate embedding */
+            /* Token matches against relation embedding */
             if (p_vec)
             {
                 for (int t = 0; t < 8; t++)
                 {
-                    if (pos_weight_predicate[t] > 0.0f)
+                    if (pos_weight_relation[t] > 0.0f)
                     {
-                        /* Compare query_vector segments with predicate */
+                        /* Compare query_vector segments with relation */
                         float sim = EmbeddingCosineSimilarity(query_vector, p_vec);
-                        token_score += sim * pos_weight_predicate[t];
-                        token_weight += pos_weight_predicate[t];
+                        token_score += sim * pos_weight_relation[t];
+                        token_weight += pos_weight_relation[t];
                     }
                 }
             }

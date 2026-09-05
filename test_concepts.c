@@ -24,10 +24,10 @@ int main(void)
             uint32_t n = GraphQuerySubject(graph, sid, rels, 32);
             for (uint32_t j = 0; j < n; j++)
             {
-                const SYMBOL *pred = SymbolGet(graph->symbols, rels[j]->predicate);
+                const SYMBOL *rel = SymbolGet(graph->symbols, rels[j]->relation);
                 const SYMBOL *obj = SymbolGet(graph->symbols, rels[j]->object);
-                if (pred && obj)
-                    printf("  %s -> %s\n", pred->name, obj->name);
+                if (rel && obj)
+                    printf("  %s -> %s\n", rel->name, obj->name);
             }
             if (n == 0) printf("  (no relations)\n");
             printf("\n");

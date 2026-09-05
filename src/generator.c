@@ -40,7 +40,7 @@ int GeneratorFromRelation(
 
     out_text[0] = '\0';
     AppendName(graph, relation->subject, out_text, max_len);
-    AppendName(graph, relation->predicate, out_text, max_len);
+    AppendName(graph, relation->relation, out_text, max_len);
     AppendName(graph, relation->object, out_text, max_len);
     return (out_text[0] != '\0');
 }
@@ -62,7 +62,7 @@ int GeneratorAggregateRelations(
 
     out_text[0] = '\0';
     const SYMBOL *s = SymbolGet(graph->symbols, relations[0]->subject);
-    const SYMBOL *p = SymbolGet(graph->symbols, relations[0]->predicate);
+    const SYMBOL *p = SymbolGet(graph->symbols, relations[0]->relation);
     if (!s || !p) return 0;
 
     strncat(out_text, s->name, max_len - strlen(out_text) - 1);
@@ -84,17 +84,17 @@ int GeneratorAggregateRelations(
 int GeneratorFromPredictions(
     const GRAPH *graph,
     const char *subject_name,
-    const char *predicate_name,
+    const char *relation_name,
     const PREDICTION *predictions,
     uint32_t count,
     char *out_text,
     size_t max_len)
 {
-    if (!graph || !subject_name || !predicate_name || !predictions ||
+    if (!graph || !subject_name || !relation_name || !predictions ||
         count == 0 || !out_text || max_len == 0)
         return 0;
 
-    snprintf(out_text, max_len, "%s %s", subject_name, predicate_name);
+    snprintf(out_text, max_len, "%s %s", subject_name, relation_name);
     for (uint32_t i = 0; i < count; i++)
     {
         char cell[128];
@@ -110,23 +110,23 @@ int GeneratorFromPredictions(
 int GeneratorAnswerQuery(
     const GRAPH *graph,
     const char *subject_name,
-    const char *predicate_name,
+    const char *relation_name,
     char *out_text,
     size_t max_len)
 {
-    if (!graph || !subject_name || !predicate_name || !out_text)
+    if (!graph || !subject_name || !relation_name || !out_text)
         return 0;
 
-    PREDICTION preds[16];
-    uint32_t n = LearningPredictText(graph, subject_name, predicate_name,
-                                     preds, 16);
+    PREDICTION rels[16];
+    uint32_t n = LearningPredictText(graph, subject_name, relation_name,
+                                     rels, 16);
 
     if (n == 0)
     {
-        snprintf(out_text, max_len, "%s %s ?", subject_name, predicate_name);
+        snprintf(out_text, max_len, "%s %s ?", subject_name, relation_name);
         return 1;
     }
 
-    return GeneratorFromPredictions(graph, subject_name, predicate_name,
-                                    preds, n, out_text, max_len);
+    return GeneratorFromPredictions(graph, subject_name, relation_name,
+                                    rels, n, out_text, max_len);
 }

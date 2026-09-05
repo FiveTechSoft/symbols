@@ -27,7 +27,7 @@ uint32_t LearningCorpus(GRAPH *graph, const char **sentences, uint32_t count);
 uint32_t LearningPredict(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     PREDICTION *out_predictions,
     uint32_t max_predictions
 );
@@ -35,7 +35,7 @@ uint32_t LearningPredict(
 uint32_t LearningPredictText(
     const GRAPH *graph,
     const char *subject_name,
-    const char *predicate_name,
+    const char *relation_name,
     PREDICTION *out_predictions,
     uint32_t max_predictions
 );

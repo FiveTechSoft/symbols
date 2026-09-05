@@ -21,7 +21,7 @@ typedef struct
 {
     SPEECH_ACT act;
     char       subject[64];
-    char       predicate[64];
+    char       relation[64];
     char       object[64];
     int        is_social_only;
 } DIALOG_INTENT;

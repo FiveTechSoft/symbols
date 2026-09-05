@@ -28,8 +28,8 @@ int main(void)
     MODEL *original = ModelCreate(32, 64);
     Assert(original != NULL, "ModelCreate");
 
-    LearningSentence(original->graph, "El gato come pescado.");
-    LearningSentence(original->graph, "El gato come carne.");
+    LearningSentence(original->graph, "Gato come pescado.");
+    LearningSentence(original->graph, "Gato come carne.");
 
     SYMBOL_ID gato   = SymbolFind(original->graph->symbols, "GATO");
     SYMBOL_ID felino = GraphAddSymbol(original->graph, "FELINO");
@@ -95,7 +95,7 @@ int main(void)
     RELATION *fuzzy_results[8];
     SYMBOL_ID resolved = SYMBOL_INVALID;
 
-    uint32_t n = GraphQuerySubjectPredicateFuzzy(
+    uint32_t n = GraphQuerySubjectRelationFuzzy(
         loaded->graph, l_felino, l_come,
         fuzzy_results, 8, 0.75f, &resolved);
 

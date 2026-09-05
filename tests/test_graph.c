@@ -25,7 +25,7 @@ static void PrintRelation(
         return;
 
     s = SymbolGet(symbols, r->subject);
-    p = SymbolGet(symbols, r->predicate);
+    p = SymbolGet(symbols, r->relation);
     o = SymbolGet(symbols, r->object);
 
     printf(
@@ -121,7 +121,7 @@ int main(void)
 
     printf("--- Que es GATO? ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, gato, es, results, 32);
+    n = GraphQuerySubjectRelation(graph, gato, es, results, 32);
     Assert(n == 1, "GATO tiene 1 relacion ES");
 
     for (uint32_t i = 0; i < n; i++)
@@ -134,7 +134,7 @@ int main(void)
 
     printf("\n--- Que come GATO? ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, gato, come, results, 32);
+    n = GraphQuerySubjectRelation(graph, gato, come, results, 32);
     Assert(n == 2, "GATO tiene 2 relaciones COME");
 
     for (uint32_t i = 0; i < n; i++)
@@ -232,7 +232,7 @@ int main(void)
 
     printf("--- Que es GATO ahora? (con inferencia) ---\n\n");
 
-    n = GraphQuerySubjectPredicate(graph, gato, es, results, 32);
+    n = GraphQuerySubjectRelation(graph, gato, es, results, 32);
     Assert(n == 2, "GATO ahora tiene 2 relaciones ES");
 
     for (uint32_t i = 0; i < n; i++)

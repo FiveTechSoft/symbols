@@ -85,7 +85,7 @@ static void RelationIndexRehash(RELATION_INDEX *idx, const RELATION *items,
     for (uint32_t i = 0; i < count; i++)
     {
         const RELATION *r = &items[i];
-        uint32_t h = HashTripletPolar(r->subject, r->predicate, r->object, r->polarity) & new_mask;
+        uint32_t h = HashTripletPolar(r->subject, r->relation, r->object, r->polarity) & new_mask;
         while (new_buckets[h] != EMPTY_BUCKET)
         {
             h = (h + 1) & new_mask;
@@ -157,7 +157,7 @@ void RelationTableDestroy(RELATION_TABLE *table)
 }
 
 RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
-                            SYMBOL_ID predicate, SYMBOL_ID object,
+                            SYMBOL_ID relation, SYMBOL_ID object,
                             RELATION_POLARITY polarity)
 {
     if (!table || table->count == 0 || !table->idx)
@@ -165,7 +165,7 @@ RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
 
     RELATION_INDEX *idx = table->idx;
     uint32_t mask = idx->mask;
-    uint32_t h = HashTripletPolar(subject, predicate, object, polarity) & mask;
+    uint32_t h = HashTripletPolar(subject, relation, object, polarity) & mask;
 
     uint32_t probes = 0;
     while (probes < idx->capacity)
@@ -175,7 +175,7 @@ RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
             return NULL;
 
         RELATION *r = &table->items[item_idx];
-        if (r->subject == subject && r->predicate == predicate &&
+        if (r->subject == subject && r->relation == relation &&
             r->object == object && r->polarity == polarity)
         {
             return r;
@@ -187,17 +187,17 @@ RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
 }
 
 RELATION *RelationFind(RELATION_TABLE *table, SYMBOL_ID subject,
-                       SYMBOL_ID predicate, SYMBOL_ID object)
+                       SYMBOL_ID relation, SYMBOL_ID object)
 {
-    return RelationFindPolar(table, subject, predicate, object, POLARITY_POSITIVE);
+    return RelationFindPolar(table, subject, relation, object, POLARITY_POSITIVE);
 }
 
 RELATION *RelationFindOpposite(RELATION_TABLE *table, SYMBOL_ID subject,
-                               SYMBOL_ID predicate, SYMBOL_ID object,
+                               SYMBOL_ID relation, SYMBOL_ID object,
                                RELATION_POLARITY polarity)
 {
     RELATION_POLARITY opp = (polarity == POLARITY_POSITIVE) ? POLARITY_NEGATIVE : POLARITY_POSITIVE;
-    return RelationFindPolar(table, subject, predicate, object, opp);
+    return RelationFindPolar(table, subject, relation, object, opp);
 }
 
 void RelationStrengthen(RELATION *relation, float amount)
@@ -215,12 +215,12 @@ void RelationSetSource(RELATION *relation, SYMBOL_ID source)
 }
 
 int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
-                     SYMBOL_ID predicate, SYMBOL_ID object,
+                     SYMBOL_ID relation, SYMBOL_ID object,
                      RELATION_POLARITY polarity)
 {
     if (!table || !table->items || table->capacity == 0)
         return 0;
-    if (subject == SYMBOL_INVALID || predicate == SYMBOL_INVALID || object == SYMBOL_INVALID)
+    if (subject == SYMBOL_INVALID || relation == SYMBOL_INVALID || object == SYMBOL_INVALID)
         return 0;
 
     if (!table->idx)
@@ -230,7 +230,7 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
             return 0;
     }
 
-    RELATION *existing = RelationFindPolar(table, subject, predicate, object, polarity);
+    RELATION *existing = RelationFindPolar(table, subject, relation, object, polarity);
     if (existing != NULL)
     {
         existing->count++;
@@ -260,7 +260,7 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
     uint32_t new_idx = table->count;
     RELATION *r = &table->items[new_idx];
     r->subject = subject;
-    r->predicate = predicate;
+    r->relation = relation;
     r->object = object;
     r->polarity = polarity;
     r->count = 1;
@@ -268,7 +268,7 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
     table->count++;
 
     uint32_t mask = table->idx->mask;
-    uint32_t h = HashTripletPolar(subject, predicate, object, polarity) & mask;
+    uint32_t h = HashTripletPolar(subject, relation, object, polarity) & mask;
     while (table->idx->buckets[h] != EMPTY_BUCKET)
     {
         h = (h + 1) & mask;
@@ -280,9 +280,9 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
 }
 
 int RelationAdd(RELATION_TABLE *table, SYMBOL_ID subject,
-                SYMBOL_ID predicate, SYMBOL_ID object)
+                SYMBOL_ID relation, SYMBOL_ID object)
 {
-    return RelationAddPolar(table, subject, predicate, object, POLARITY_POSITIVE);
+    return RelationAddPolar(table, subject, relation, object, POLARITY_POSITIVE);
 }
 
 uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
@@ -309,8 +309,8 @@ uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
     return found;
 }
 
-uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
-                                        SYMBOL_ID subject, SYMBOL_ID predicate,
+uint32_t RelationFindBySubjectRelation(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject, SYMBOL_ID relation,
                                         RELATION **results, uint32_t max_results)
 {
     if (!table || !results || max_results == 0) return 0;
@@ -325,7 +325,7 @@ uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
             uint32_t found = 0;
             for (uint32_t i = 0; i < n && found < max_results; i++)
             {
-                if (chain[i]->predicate == predicate)
+                if (chain[i]->relation == relation)
                     results[found++] = chain[i];
             }
             return found;
@@ -335,7 +335,7 @@ uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
     uint32_t found = 0;
     for (uint32_t i = 0; i < table->count; i++)
     {
-        if (table->items[i].subject == subject && table->items[i].predicate == predicate)
+        if (table->items[i].subject == subject && table->items[i].relation == relation)
         {
             results[found++] = (RELATION *)&table->items[i];
             if (found >= max_results) break;

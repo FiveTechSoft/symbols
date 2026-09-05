@@ -37,7 +37,7 @@ int GraphExportDot(const GRAPH *graph, const char *filepath)
         if (!r)
             continue;
         const SYMBOL *s = SymbolGet(graph->symbols, r->subject);
-        const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
+        const SYMBOL *p = SymbolGet(graph->symbols, r->relation);
         const SYMBOL *o = SymbolGet(graph->symbols, r->object);
         if (!s || !p || !o)
             continue;
@@ -66,7 +66,7 @@ int GraphExportTurtle(const GRAPH *graph, const char *filepath)
         if (!r)
             continue;
         const SYMBOL *s = SymbolGet(graph->symbols, r->subject);
-        const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
+        const SYMBOL *p = SymbolGet(graph->symbols, r->relation);
         const SYMBOL *o = SymbolGet(graph->symbols, r->object);
         if (!s || !p || !o)
             continue;

@@ -14,8 +14,8 @@ int main(void)
     GENERATOR_CONFIG cfg = GeneratorConfigDefault();
     char output[256];
 
-    /* 1. Oracion simple */
-    printf("--- 1. Oracion simple desde relacion ---\n");
+    /* 1. Simple sentence */
+    printf("--- 1. Simple sentence from relation ---\n");
     SYMBOL_ID antonio = GraphAddSymbol(graph, "ANTONIO");
     SYMBOL_ID prog    = GraphAddSymbol(graph, "PROGRAMA");
     SYMBOL_ID harbour = GraphAddSymbol(graph, "HARBOUR");
@@ -23,10 +23,10 @@ int main(void)
 
     RELATION *r1 = GraphFindRelation(graph, antonio, prog, harbour);
     GeneratorFromRelation(graph, r1, &cfg, output, sizeof(output));
-    printf("Generado: \"%s\"\n\n", output);
+    printf("Generated: \"%s\"\n\n", output);
 
-    /* 2. Agregacion y coordinacion */
-    printf("--- 2. Agregacion sintactica ---\n");
+    /* 2. Aggregation and coordination */
+    printf("--- 2. Syntactic aggregation ---\n");
     SYMBOL_ID gato  = GraphAddSymbol(graph, "GATO");
     SYMBOL_ID come  = GraphAddSymbol(graph, "COME");
     SYMBOL_ID pez   = GraphAddSymbol(graph, "PEZ");
@@ -41,22 +41,22 @@ int main(void)
 
     GeneratorAggregateRelations(graph, (const RELATION **)cat_food, 2,
                                 &cfg, output, sizeof(output));
-    printf("Generado: \"%s\"\n\n", output);
+    printf("Generated: \"%s\"\n\n", output);
 
-    /* 3. Generacion probabilistica */
-    printf("--- 3. Generacion discursiva con probabilidad ---\n");
+    /* 3. Probabilistic generation */
+    printf("--- 3. Discursive generation with probability ---\n");
     for (int i = 0; i < 6; i++) GraphAddRelation(graph, gato, come, pez);
     for (int i = 0; i < 2; i++) GraphAddRelation(graph, gato, come, carne);
 
-    PREDICTION preds[8];
-    uint32_t n = LearningPredict(graph, gato, come, preds, 8);
+    PREDICTION rels[8];
+    uint32_t n = LearningPredict(graph, gato, come, rels, 8);
 
-    GeneratorFromPredictions(graph, "GATO", "COME", preds, n,
+    GeneratorFromPredictions(graph, "GATO", "COME", rels, n,
                              output, sizeof(output));
-    printf("Generado: \"%s\"\n\n", output);
+    printf("Generated: \"%s\"\n\n", output);
 
     /* 4. Query and answer */
-    printf("--- 4. Pregunta -> Respuesta textual ---\n");
+    printf("--- 4. Question -> Text answer ---\n");
     GeneratorAnswerQuery(graph, "GATO", "COME", output, sizeof(output));
     printf("Q: Que come GATO?\nA: \"%s\"\n\n", output);
 
@@ -66,7 +66,7 @@ int main(void)
     GraphDestroy(graph);
 
     printf("========================================\n");
-    printf("Generacion verificada con exito.\n");
+    printf("Generation verified.\n");
     printf("========================================\n");
 
     return EXIT_SUCCESS;

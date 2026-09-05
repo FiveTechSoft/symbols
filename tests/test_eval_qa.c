@@ -57,9 +57,9 @@ int main(int argc, char **argv)
         if (ok)
             pass++;
         else
-            printf("  MISS #%u: '%s' -> '%s' (esperaba '%s', subj='%s' pred='%s')\n",
+            printf("  MISS #%u: '%s' -> '%s' (esperaba '%s', subj='%s' rel='%s')\n",
                    total, question, found ? answer : "<sin respuesta>",
-                   expected, q.subject, q.predicate);
+                   expected, q.subject, q.relation);
     }
     fclose(f);
 

@@ -42,7 +42,7 @@ int GeneratorAggregateRelations(
 int GeneratorFromPredictions(
     const GRAPH *graph,
     const char *subject_name,
-    const char *predicate_name,
+    const char *relation_name,
     const PREDICTION *predictions,
     uint32_t count,
     char *out_text,
@@ -52,7 +52,7 @@ int GeneratorFromPredictions(
 int GeneratorAnswerQuery(
     const GRAPH *graph,
     const char *subject_name,
-    const char *predicate_name,
+    const char *relation_name,
     char *out_text,
     size_t max_len
 );

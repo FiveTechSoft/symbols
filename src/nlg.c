@@ -61,7 +61,7 @@ static void AppendFloat1(char *out, uint32_t size, float v)
 uint32_t NLGGenerateDirect(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     RELATION **results,
     uint32_t count,
     char *out,
@@ -73,9 +73,9 @@ uint32_t NLGGenerateDirect(
         return 0;
 
     const SYMBOL *subj_sym = SymbolGet(graph->symbols, subject);
-    const SYMBOL *pred_sym = SymbolGet(graph->symbols, predicate);
+    const SYMBOL *rel_sym = SymbolGet(graph->symbols, relation);
     const char *subj_name = subj_sym ? subj_sym->name : "?";
-    const char *pred_name = pred_sym ? pred_sym->name : "?";
+    const char *rel_name = rel_sym ? rel_sym->name : "?";
 
     /* Connector */
     uint32_t idx = PickIndex(NUM_CONNECTORS_POS, subj_name);
@@ -85,12 +85,12 @@ uint32_t NLGGenerateDirect(
     AppendStr(out, out_size, subj_name);
     AppendStr(out, out_size, " ");
 
-    /* Lowercase first letter of predicate for grammar */
-    if (pred_name[0])
+    /* Lowercase first letter of relation for grammar */
+    if (rel_name[0])
     {
         char lc[128];
-        lc[0] = (char)tolower((unsigned char)pred_name[0]);
-        strncpy(lc + 1, pred_name + 1, sizeof(lc) - 2);
+        lc[0] = (char)tolower((unsigned char)rel_name[0]);
+        strncpy(lc + 1, rel_name + 1, sizeof(lc) - 2);
         lc[sizeof(lc) - 1] = '\0';
         AppendStr(out, out_size, lc);
         AppendStr(out, out_size, " ");
@@ -135,7 +135,7 @@ uint32_t NLGGenerateDirect(
 void NLGGenerateNoResults(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     char *out,
     uint32_t out_size)
 {
@@ -155,10 +155,10 @@ void NLGGenerateNoResults(
 
         for (uint32_t i = 0; i < n && i < 3; i++)
         {
-            const SYMBOL *pred = SymbolGet(graph->symbols, related[i]->predicate);
+            const SYMBOL *rel = SymbolGet(graph->symbols, related[i]->relation);
             if (i > 0)
                 AppendStr(out, out_size, ", ");
-            AppendStr(out, out_size, pred ? pred->name : "?");
+            AppendStr(out, out_size, rel ? rel->name : "?");
         }
         AppendStr(out, out_size, ".");
     }
@@ -195,13 +195,13 @@ void NLGGenerateCompound(
     {
         for (uint32_t i = 0; i < tax_count && i < 3; i++)
         {
-            const SYMBOL *pred = SymbolGet(graph->symbols, taxonomic[i]->predicate);
+            const SYMBOL *rel = SymbolGet(graph->symbols, taxonomic[i]->relation);
             const SYMBOL *obj = SymbolGet(graph->symbols, taxonomic[i]->object);
             if (i > 0) AppendStr(out, out_size, ", ");
             AppendStr(out, out_size, "es ");
-            if (pred && strcmp(pred->name, "ES") != 0)
+            if (rel && strcmp(rel->name, "ES") != 0)
             {
-                AppendStr(out, out_size, pred->name);
+                AppendStr(out, out_size, rel->name);
                 AppendStr(out, out_size, " de ");
             }
             AppendStr(out, out_size, obj ? obj->name : "?");
@@ -218,9 +218,9 @@ void NLGGenerateCompound(
         for (uint32_t i = 0; i < func_count && i < 4; i++)
         {
             if (i > 0) AppendStr(out, out_size, ", ");
-            const SYMBOL *pred = SymbolGet(graph->symbols, functional[i]->predicate);
+            const SYMBOL *rel = SymbolGet(graph->symbols, functional[i]->relation);
             const SYMBOL *obj = SymbolGet(graph->symbols, functional[i]->object);
-            AppendStr(out, out_size, pred ? pred->name : "?");
+            AppendStr(out, out_size, rel ? rel->name : "?");
             AppendStr(out, out_size, " ");
             AppendStr(out, out_size, obj ? obj->name : "?");
         }

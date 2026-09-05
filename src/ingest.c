@@ -37,25 +37,25 @@ static void StrToUpperTrim(const char *src, char *dst, size_t max)
    ============================================================ */
 
 int IngestTriple(GRAPH *graph,
-                 const char *subject, const char *predicate, const char *object)
+                 const char *subject, const char *relation, const char *object)
 {
-    return IngestTripleSource(graph, subject, predicate, object, NULL);
+    return IngestTripleSource(graph, subject, relation, object, NULL);
 }
 
 int IngestTripleSource(GRAPH *graph,
-                       const char *subject, const char *predicate,
+                       const char *subject, const char *relation,
                        const char *object, const char *source)
 {
-    if (graph == NULL || subject == NULL || predicate == NULL || object == NULL)
+    if (graph == NULL || subject == NULL || relation == NULL || object == NULL)
         return 0;
 
     /* Skip empty fields */
-    if (subject[0] == '\0' || predicate[0] == '\0' || object[0] == '\0')
+    if (subject[0] == '\0' || relation[0] == '\0' || object[0] == '\0')
         return 0;
 
     char s_upper[128], p_upper[128], o_upper[128];
     StrToUpperTrim(subject, s_upper, sizeof(s_upper));
-    StrToUpperTrim(predicate, p_upper, sizeof(p_upper));
+    StrToUpperTrim(relation, p_upper, sizeof(p_upper));
     StrToUpperTrim(object, o_upper, sizeof(o_upper));
 
     if (s_upper[0] == '\0' || p_upper[0] == '\0' || o_upper[0] == '\0')
@@ -147,14 +147,14 @@ int IngestTripleSource(GRAPH *graph,
 }
 
 /* ============================================================
-   Parse one TSV line: "subject\tpredicate\tobject"
+   Parse one TSV line: "subject\trelation\tobject"
    ============================================================ */
 
-/* Parse one TSV line: "subject\tpredicate\tobject[\tsource]".
+/* Parse one TSV line: "subject\trelation\tobject[\tsource]".
    La 4a columna (opcional) es la procedencia explicita (p.ej. "GEN 1:1");
    sin ella el llamador aporta "fichero:linea". Devuelve 1 y deja src
    vacio ("") si no hay 4a columna. */
-static int ParseTSVLineSrc(const char *line, char *subj, char *pred, char *obj,
+static int ParseTSVLineSrc(const char *line, char *subj, char *rel, char *obj,
                            char *src, size_t field_max)
 {
     /* Skip leading whitespace */
@@ -184,8 +184,8 @@ static int ParseTSVLineSrc(const char *line, char *subj, char *pred, char *obj,
 
     size_t len2 = (size_t)(tab2 - line);
     if (len2 >= field_max) len2 = field_max - 1;
-    memcpy(pred, line, len2);
-    pred[len2] = '\0';
+    memcpy(rel, line, len2);
+    rel[len2] = '\0';
 
     line = tab2 + 1;
 
@@ -220,11 +220,11 @@ static int ParseTSVLineSrc(const char *line, char *subj, char *pred, char *obj,
     return 1;
 }
 
-static int ParseTSVLine(const char *line, char *subj, char *pred, char *obj,
+static int ParseTSVLine(const char *line, char *subj, char *rel, char *obj,
                         size_t field_max)
 {
     char src[128];
-    return ParseTSVLineSrc(line, subj, pred, obj, src, field_max);
+    return ParseTSVLineSrc(line, subj, rel, obj, src, field_max);
 }
 
 /* ============================================================
@@ -245,7 +245,7 @@ INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath)
         return stats;
 
     char line[1024];
-    char subj[128], pred[128], obj[128], src[128];
+    char subj[128], rel[128], obj[128], src[128];
     char defsrc[256];
 
     while (fgets(line, sizeof(line), f) != NULL)
@@ -260,7 +260,7 @@ INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath)
             len--;
         }
 
-        if (!ParseTSVLineSrc(line, subj, pred, obj, src, sizeof(subj)))
+        if (!ParseTSVLineSrc(line, subj, rel, obj, src, sizeof(subj)))
         {
             stats.lines_failed++;
             continue;
@@ -278,7 +278,7 @@ INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath)
             source = defsrc;
         }
 
-        int rc = IngestTripleSource(graph, subj, pred, obj, source);
+        int rc = IngestTripleSource(graph, subj, rel, obj, source);
         if (rc == 1)
             stats.relations_inserted++;
         else if (rc == 2)

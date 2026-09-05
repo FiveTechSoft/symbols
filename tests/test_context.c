@@ -25,9 +25,10 @@ int main(void)
     CONTEXT *ctx = ContextCreate();
     Assert(graph != NULL && ctx != NULL, "Initialization");
 
-    /* Frase 1: "Antonio programa en Harbour." */
-    printf("1. Procesando: \"Antonio programa en Harbour.\"\n");
-    LearningSentence(graph, "Antonio programa en Harbour.");
+    /* Sentence 1: canonical shape (no medial preposition) so the
+       syntax tree roots PROGRAMA on a virgin map. */
+    printf("1. Processing: \"Antonio usa Harbour.\"\n");
+    LearningSentence(graph, "Antonio usa Harbour.");
 
     SYMBOL_ID antonio = GraphAddSymbol(graph, "ANTONIO");
     SYMBOL_ID harbour = GraphAddSymbol(graph, "HARBOUR");
@@ -35,15 +36,16 @@ int main(void)
     ContextPushEntity(ctx, antonio, "ANTONIO", 1);
     ContextPushEntity(ctx, harbour, "HARBOUR", 0);
 
-    /* Frase 2: "El compila con hbmk2." */
-    printf("\n2. Frase con pronombre: \"El compila con hbmk2.\"\n");
+    /* Sentence 2: pronoun lead resolves structurally (unknown "El"
+       takes the topicalized subject). Canonical shape, no preposition. */
+    printf("\n2. Pronoun sentence: \"El compila hbmk2.\"\n");
 
     char resolved[256];
-    ContextPreprocessSentence(ctx, graph, "El compila con hbmk2.",
+    ContextPreprocessSentence(ctx, graph, "El compila hbmk2.",
                               resolved, sizeof(resolved));
-    printf("   Frase resuelta: \"%s\"\n", resolved);
+    printf("   Resolved sentence: \"%s\"\n", resolved);
     Assert(strstr(resolved, "ANTONIO") != NULL,
-           "El debe resolver a ANTONIO");
+           "El must resolve to ANTONIO");
 
     LearningSentence(graph, resolved);
 
@@ -53,12 +55,12 @@ int main(void)
     ContextPushEntity(ctx, hbmk2, "HBMK2", 0);
 
     /* Sentence 3: elided subject */
-    printf("\n3. Sujeto eliptico:\n");
+    printf("\n3. Elided subject:\n");
     SYMBOL_ID implicit_subj = ContextResolveImplicitSubject(ctx);
     const SYMBOL *s = SymbolGet(graph->symbols, implicit_subj);
-    printf("   Sujeto tacito: %s\n", s ? s->name : "?");
+    printf("   Tacit subject: %s\n", s ? s->name : "?");
     Assert(implicit_subj == antonio,
-           "El sujeto tacito debe ser ANTONIO");
+           "Tacit subject must be ANTONIO");
 
     /* Check against the graph */
     printf("\n--- Relaciones aprendidas ---\n");
@@ -69,7 +71,7 @@ int main(void)
     for (uint32_t i = 0; i < n; i++)
     {
         const SYMBOL *sub = SymbolGet(graph->symbols, results[i]->subject);
-        const SYMBOL *prd = SymbolGet(graph->symbols, results[i]->predicate);
+        const SYMBOL *prd = SymbolGet(graph->symbols, results[i]->relation);
         const SYMBOL *obj = SymbolGet(graph->symbols, results[i]->object);
 
         printf("  %s --%s--> %s\n", sub->name, prd->name, obj->name);

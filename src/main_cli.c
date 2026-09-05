@@ -57,7 +57,7 @@ static void DumpGraph(const GRAPH *graph)
         if (!r) continue;
 
         const SYMBOL *s = SymbolGet(graph->symbols, r->subject);
-        const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
+        const SYMBOL *p = SymbolGet(graph->symbols, r->relation);
         const SYMBOL *o = SymbolGet(graph->symbols, r->object);
 
         if (s && p && o)
@@ -225,11 +225,11 @@ int main(void)
                     printf("  Attended (by relevance):\n");
                     for (uint32_t i = 0; i < n_att && i < 20; i++)
                     {
-                        const SYMBOL *pred = SymbolGet(graph->symbols, att_rel[i]->predicate);
+                        const SYMBOL *rel = SymbolGet(graph->symbols, att_rel[i]->relation);
                         const SYMBOL *obj  = SymbolGet(graph->symbols, att_rel[i]->object);
-                        if (pred && obj)
+                        if (rel && obj)
                             printf("    [%5.1f%%] --%s--> %s\n",
-                                   att_scores[i] * 100.0f, pred->name, obj->name);
+                                   att_scores[i] * 100.0f, rel->name, obj->name);
                     }
                 }
 
@@ -241,9 +241,9 @@ int main(void)
                 for (uint32_t i = 0; i < n_obj && i < 30; i++)
                 {
                     const SYMBOL *subj = SymbolGet(graph->symbols, as_obj[i]->subject);
-                    const SYMBOL *pred = SymbolGet(graph->symbols, as_obj[i]->predicate);
-                    if (subj && pred)
-                        printf("    %s --%s-->\n", subj->name, pred->name);
+                    const SYMBOL *rel = SymbolGet(graph->symbols, as_obj[i]->relation);
+                    if (subj && rel)
+                        printf("    %s --%s-->\n", subj->name, rel->name);
                 }
 
                 /* Semantic similar words */
@@ -302,7 +302,7 @@ int main(void)
                 for (uint32_t i = 0; i < n_att && i < 15; i++)
                 {
                     const SYMBOL *s = SymbolGet(graph->symbols, att_rel[i]->subject);
-                    const SYMBOL *p = SymbolGet(graph->symbols, att_rel[i]->predicate);
+                    const SYMBOL *p = SymbolGet(graph->symbols, att_rel[i]->relation);
                     const SYMBOL *o = SymbolGet(graph->symbols, att_rel[i]->object);
                     if (s && p && o)
                         printf("    [%5.1f%%] %s --%s--> %s\n",
@@ -332,28 +332,19 @@ int main(void)
                 else
                 {
                     float sim = TransferSimilarity(graph, id_a, id_b);
-                    printf("  Similitud estructural: %.2f\n\n", sim);
+                    printf("  Structural similarity: %.2f\n\n", sim);
 
                     TRANSFER_RESULT results[8];
 
-                    /* Apply rules to target */
-                    uint32_t n = TransferApply(graph, id_b, results, 8);
-                    if (n > 0)
-                    {
-                        printf("  Reglas aplicadas a %s:\n", ent_b);
-                        TransferPrintResults(graph, results, n);
-                    }
-
                     /* Analogical transfer */
-                    n = TransferAnalogy(graph, id_a, id_b, results, 8);
+                    uint32_t n = TransferAnalogy(graph, id_a, id_b, results, 8);
                     if (n > 0)
                     {
-                        printf("  Analoga %s -> %s:\n", ent_a, ent_b);
+                        printf("  Analogy %s -> %s:\n", ent_a, ent_b);
                         TransferPrintResults(graph, results, n);
                     }
-
-                    if (n == 0 && TransferApply(graph, id_b, results, 8) == 0)
-                        printf("  No transfer rules found.\n\n");
+                    else
+                        printf("  No analogical transfer found.\n\n");
                 }
             }
             else
@@ -425,7 +416,7 @@ int main(void)
 
         /* Raw triple ingest: /learn S P O. No patterns, no verb lists:
            any three tokens become a relation, uppercased by ingest.
-           This is how new predicates and depth words enter the live
+           This is how new relations and depth words enter the live
            map (e.g. /learn TRASABUELO HOPS 5). */
         if (strncmp(input, "/learn ", 7) == 0)
         {
@@ -442,7 +433,49 @@ int main(void)
                     printf("IA > Could not learn that triple.\n\n");
             }
             else
-                printf("IA > Usage: /learn SUBJECT PREDICATE OBJECT\n\n");
+                printf("IA > Usage: /learn SUBJECT RELATION OBJECT\n\n");
+            continue;
+        }
+
+        /* Full-text ingest: /ingest FILE. Two passes over the file
+           (bootstrap with positional roots, then re-parse with the
+           grown vocabulary). Lines are sentences. Whole texts go
+           through the same tree as single inputs. */
+        if (strncmp(input, "/ingest ", 8) == 0)
+        {
+            const char *path = input + 8;
+            while (*path == ' ') path++;
+            FILE *f = fopen(path, "r");
+            if (f == NULL)
+            {
+                printf("IA > Cannot open '%s'.\n\n", path);
+                continue;
+            }
+            uint32_t base = RelationCount(graph->relations);
+            uint32_t lines = 0;
+            char line[2048];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                rewind(f);
+                while (fgets(line, sizeof(line), f) != NULL)
+                {
+                    size_t L = strlen(line);
+                    while (L > 0 && (line[L - 1] == '\n' ||
+                                    line[L - 1] == '\r'))
+                        line[--L] = '\0';
+                    if (L == 0)
+                        continue;
+                    if (pass == 0)
+                        lines++;
+                    if (lines > 20000)
+                        break;
+                    ParserIngestSentence(graph, line);
+                }
+            }
+            fclose(f);
+            uint32_t added = RelationCount(graph->relations) - base;
+            printf("IA > Ingested %u lines, %u new relations (2 passes).\n\n",
+                   lines, added);
             continue;
         }
 
@@ -500,8 +533,8 @@ int main(void)
                 char pcanon[64] = {0}, ocanon[64] = {0};
                 if (strcmp(p, "*") != 0)
                 {
-                    SYMBOL_ID tpid = StemFindSymbol(graph->symbols, p);
-                    const SYMBOL *ps = SymbolGet(graph->symbols, tpid);
+                    SYMBOL_ID trid = StemFindSymbol(graph->symbols, p);
+                    const SYMBOL *ps = SymbolGet(graph->symbols, trid);
                     if (ps && ps->name)
                     {
                         strncpy(pcanon, ps->name, sizeof(pcanon) - 1);
@@ -529,15 +562,15 @@ int main(void)
                         RelationGet(graph->relations, i);
                     if (!r) continue;
                     if (strcmp(p, "*") != 0 &&
-                        SymbolGet(graph->symbols, r->predicate) &&
-                        strcmp(SymbolGet(graph->symbols, r->predicate)->name, pname) != 0)
+                        SymbolGet(graph->symbols, r->relation) &&
+                        strcmp(SymbolGet(graph->symbols, r->relation)->name, pname) != 0)
                         continue;
                     if (strcmp(o, "*") != 0 &&
                         SymbolGet(graph->symbols, r->object) &&
                         strcmp(SymbolGet(graph->symbols, r->object)->name, oname) != 0)
                         continue;
                     const SYMBOL *ss = SymbolGet(graph->symbols, r->subject);
-                    const SYMBOL *pp = SymbolGet(graph->symbols, r->predicate);
+                    const SYMBOL *pp = SymbolGet(graph->symbols, r->relation);
                     const SYMBOL *oo = SymbolGet(graph->symbols, r->object);
                     if (ss && pp && oo)
                     {
@@ -551,7 +584,7 @@ int main(void)
                 printf("IA > %u matching relation(s).\n\n", shown);
             }
             else
-                printf("IA > Usage: /find SUBJECT PREDICATE OBJECT  ('*' = any)\n\n");
+                printf("IA > Usage: /find SUBJECT RELATION OBJECT  ('*' = any)\n\n");
             continue;
         }
 
@@ -592,29 +625,29 @@ int main(void)
 
             float best_score = 0.0f;
             uint32_t best_subj = SYMBOL_INVALID;
-            uint32_t best_pred = SYMBOL_INVALID;
+            uint32_t best_rel = SYMBOL_INVALID;
             uint32_t best_obj  = SYMBOL_INVALID;
 
-            /* For each query token, check if it matches a predicate name */
+            /* For each query token, check if it matches a relation name */
             for (uint32_t t = 0; t < toks.count; t++)
             {
-                SYMBOL_ID pred_id = SymbolFind(graph->symbols, toks.tokens[t]);
-                if (pred_id == SYMBOL_INVALID) continue;
+                SYMBOL_ID rel_id = SymbolFind(graph->symbols, toks.tokens[t]);
+                if (rel_id == SYMBOL_INVALID) continue;
 
-                /* Check if this symbol is actually used as a predicate */
-                int used_as_pred = 0;
+                /* Check if this symbol is actually used as a relation */
+                int used_as_rel = 0;
                 for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
                 {
                     const RELATION *rel = RelationGet(graph->relations, r);
-                    if (rel && rel->predicate == pred_id) { used_as_pred = 1; break; }
+                    if (rel && rel->relation == rel_id) { used_as_rel = 1; break; }
                 }
-                if (!used_as_pred) continue;
+                if (!used_as_rel) continue;
 
-                /* Found predicate match! Score each relation with this predicate */
+                /* Found relation match! Score each relation with this relation */
                 for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
                 {
                     const RELATION *rel = RelationGet(graph->relations, r);
-                    if (rel == NULL || rel->predicate != pred_id) continue;
+                    if (rel == NULL || rel->relation != rel_id) continue;
 
                     /* Score entity match against other query tokens */
                     float entity_score = 0.0f;
@@ -645,7 +678,7 @@ int main(void)
                     {
                         best_score = total;
                         best_subj = rel->subject;
-                        best_pred = rel->predicate;
+                        best_rel = rel->relation;
                         best_obj  = rel->object;
                     }
                 }
@@ -657,12 +690,12 @@ int main(void)
                 if (o)
                 {
                     const SYMBOL *s = SymbolGet(graph->symbols, best_subj);
-                    const SYMBOL *p = SymbolGet(graph->symbols, best_pred);
+                    const SYMBOL *p = SymbolGet(graph->symbols, best_rel);
                     if (s && p)
                     {
                         char src[144];
                         RELATION *br = GraphFindRelation(graph, best_subj,
-                                                         best_pred, best_obj);
+                                                         best_rel, best_obj);
                         SourceSuffix(graph, br, src, sizeof(src));
                         printf("IA > %s (because %s --%s--> %s%s)\n\n",
                                o->name, s->name, p->name, o->name, src);

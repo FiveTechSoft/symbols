@@ -26,10 +26,10 @@ int main(void)
     GRAPH *graph = GraphCreate(64, 64);
     Assert(graph != NULL, "GraphCreate");
 
-    LearningSentence(graph, "El gato come pescado.");
-    LearningSentence(graph, "El gato es animal.");
+    LearningSentence(graph, "Gato come pescado.");
+    LearningSentence(graph, "Gato es animal.");
 
-    printf("Grafo inicial: %u relaciones\n", RelationCount(graph->relations));
+    printf("Initial graph: %u relations\n", RelationCount(graph->relations));
 
     SYMBOL_ID s_gato = SymbolFind(graph->symbols, "GATO");
     SYMBOL_ID s_felino = SymbolAdd(graph->symbols, "FELINO");
@@ -41,7 +41,7 @@ int main(void)
     EMBEDDING_TABLE *embeds = EmbeddingTableCreate(64);
     GraphSetEmbeddingTable(graph, embeds);
 
-    /* Vectores iniciales aleatorios */
+    /* Random initial vectors */
     float v_gato[EMBEDDING_DIM];
     float v_felino[EMBEDDING_DIM];
     EmbeddingRandomInit(v_gato, 42);
@@ -50,7 +50,7 @@ int main(void)
     EmbeddingSetVector(embeds, s_felino, v_felino);
 
     /* 3. Train co-occurrence so FELINO ~ GATO */
-    printf("Entrenando coocurrencia FELINO ~ GATO...\n");
+    printf("Training FELINO ~ GATO co-occurrence...\n");
     for (int i = 0; i < 10; i++)
     {
         float buf_gato[EMBEDDING_DIM];
@@ -68,38 +68,38 @@ int main(void)
     float sim = EmbeddingCosineSimilarity(
         EmbeddingGetVector(embeds, s_gato),
         EmbeddingGetVector(embeds, s_felino));
-    printf("Coseno(FELINO, GATO) = %.3f\n\n", sim);
-    Assert(sim > 0.70f, "FELINO y GATO deben ser similares");
+    printf("Cosine(FELINO, GATO) = %.3f\n\n", sim);
+    Assert(sim > 0.70f, "FELINO and GATO must be similar");
 
     /* 4. Consulta exacta: GATO + COME -> PEZ */
     RELATION *results[16];
-    uint32_t n = GraphQuerySubjectPredicate(graph, s_gato,
+    uint32_t n = GraphQuerySubjectRelation(graph, s_gato,
         SymbolFind(graph->symbols, "COME"), results, 16);
 
-    printf("Consulta exacta GATO+COME: %u resultados\n", n);
-    Assert(n > 0, "GATO debe tener relaciones COME");
+    printf("Exact query GATO+COME: %u results\n", n);
+    Assert(n > 0, "GATO must have COME relations");
 
     const SYMBOL *obj = SymbolGet(graph->symbols, results[0]->object);
     printf("  GATO --COME--> %s\n\n", obj->name);
 
     /* 5. Consulta fuzzy: FELINO + COME -> debe resolver a GATO */
-    SYMBOL_ID pred_come = SymbolFind(graph->symbols, "COME");
+    SYMBOL_ID rel_come = SymbolFind(graph->symbols, "COME");
     SYMBOL_ID resolved = SYMBOL_INVALID;
 
-    n = GraphQuerySubjectPredicateFuzzy(
-        graph, s_felino, pred_come, results, 16,
+    n = GraphQuerySubjectRelationFuzzy(
+        graph, s_felino, rel_come, results, 16,
         SIMILARITY_THRESHOLD_DEFAULT, &resolved);
 
-    printf("Consulta fuzzy FELINO+COME:\n");
-    printf("  Resolved a: %s\n",
+    printf("Fuzzy query FELINO+COME:\n");
+    printf("  Resolved to: %s\n",
            SymbolGet(graph->symbols, resolved)->name);
-    printf("  Resultados: %u\n", n);
-    Assert(n > 0, "FELINO+COME debe resolver via embedding");
-    Assert(resolved == s_gato, "Debe resolver a GATO");
+    printf("  Results: %u\n", n);
+    Assert(n > 0, "FELINO+COME must resolve via embedding");
+    Assert(resolved == s_gato, "Must resolve to GATO");
 
     obj = SymbolGet(graph->symbols, results[0]->object);
     printf("  FELINO --COME--> %s\n\n", obj->name);
-    Assert(strcmp(obj->name, "PESCADO") == 0, "Objeto debe ser PESCADO");
+    Assert(strcmp(obj->name, "PESCADO") == 0, "Object must be PESCADO");
 
     /* 6. AUTOMOVIL must not resolve */
     SYMBOL_ID s_auto = SymbolAdd(graph->symbols, "AUTOMOVIL");
@@ -107,19 +107,19 @@ int main(void)
     EmbeddingRandomInit(v_auto, 777);
     EmbeddingSetVector(embeds, s_auto, v_auto);
 
-    n = GraphQuerySubjectPredicateFuzzy(
-        graph, s_auto, pred_come, results, 16,
+    n = GraphQuerySubjectRelationFuzzy(
+        graph, s_auto, rel_come, results, 16,
         SIMILARITY_THRESHOLD_DEFAULT, &resolved);
 
-    printf("Consulta fuzzy AUTOMOVIL+COME: %u resultados\n", n);
-    Assert(n == 0, "AUTOMOVIL no debe resolver a nada");
+    printf("Fuzzy query AUTOMOVIL+COME: %u results\n", n);
+    Assert(n == 0, "AUTOMOVIL must not resolve");
 
     /* Limpieza */
     EmbeddingTableDestroy(embeds);
     GraphDestroy(graph);
 
     printf("\n========================================\n");
-    printf("Consulta hibrida simbolico-vectorial OK.\n");
+    printf("Hybrid symbolic-vector query OK.\n");
     printf("========================================\n");
 
     return EXIT_SUCCESS;

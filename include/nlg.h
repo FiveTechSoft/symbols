@@ -16,7 +16,7 @@ typedef struct
 uint32_t NLGGenerateDirect(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     RELATION **results,
     uint32_t count,
     char *out,
@@ -26,7 +26,7 @@ uint32_t NLGGenerateDirect(
 void NLGGenerateNoResults(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     char *out,
     uint32_t out_size);
 

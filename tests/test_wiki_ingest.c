@@ -30,7 +30,7 @@ int main(void)
         if (r)
         {
             const SYMBOL *s = SymbolGet(graph->symbols, r->subject);
-            const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
+            const SYMBOL *p = SymbolGet(graph->symbols, r->relation);
             const SYMBOL *o = SymbolGet(graph->symbols, r->object);
             if (s && p && o)
             {
@@ -77,10 +77,10 @@ int main(void)
             printf("   Found %u direct relations:\n", n);
             for (uint32_t i = 0; i < n; i++)
             {
-                const SYMBOL *pred = SymbolGet(g2->symbols, results[i]->predicate);
+                const SYMBOL *rel = SymbolGet(g2->symbols, results[i]->relation);
                 const SYMBOL *obj = SymbolGet(g2->symbols, results[i]->object);
-                if (pred && obj)
-                    printf("     ESPAÑA --%s--> %s\n", pred->name, obj->name);
+                if (rel && obj)
+                    printf("     ESPAÑA --%s--> %s\n", rel->name, obj->name);
             }
         }
         else

@@ -10,10 +10,11 @@
 
 /* Forward: descriptor and entity resolution live with the query
    path below; the ingest tree above needs them. */
-static int ResolvePredicatePass(const GRAPH *graph, const char *token,
+static int ResolveRelationPass(const GRAPH *graph, const char *token,
                                 int use_stem, char *out, size_t out_size);
 static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                          uint32_t start, char *out, size_t out_size);
+static uint64_t TokenRarity(const GRAPH *graph, const char *token);
 
 /* ============================================================
    Utility
@@ -25,22 +26,6 @@ static void ToUpperCopy(const char *src, char *dst, size_t dst_size)
     for (i = 0; src[i] && i < dst_size - 1; i++)
         dst[i] = (char)toupper((unsigned char)src[i]);
     dst[i] = '\0';
-}
-
-static int IsArticle(const char *word)
-{
-    return (strcmp(word, "EL") == 0 || strcmp(word, "LA") == 0 ||
-            strcmp(word, "LOS") == 0 || strcmp(word, "LAS") == 0 ||
-            strcmp(word, "UN") == 0 || strcmp(word, "UNA") == 0);
-}
-
-static int IsPreposition(const char *word)
-{
-    return (strcmp(word, "DE") == 0 || strcmp(word, "DEL") == 0 ||
-            strcmp(word, "EN") == 0 || strcmp(word, "POR") == 0 ||
-            strcmp(word, "PARA") == 0 || strcmp(word, "CON") == 0 ||
-            strcmp(word, "A") == 0 || strcmp(word, "AL") == 0 ||
-            strcmp(word, "SOBRE") == 0);
 }
 
 /* ============================================================
@@ -76,8 +61,8 @@ int ParserTokenize(const char *input, PARSED_SENTENCE *out)
     return (int)out->count;
 }
 
-/* Span to symbol for INGEST: nearest-to-predicate wins. In statements
-   arguments sit adjacent to their predicate (SVO adjacency), so the
+/* Span to symbol for INGEST: nearest-to-relation wins. In statements
+   arguments sit adjacent to their relation (SVO adjacency), so the
    leading run wins in right spans and the trailing run in left spans.
    (Query entities behave the opposite way: see ResolveEntity.)
    Unknown spans join whole: symbols are generated. */
@@ -134,6 +119,47 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
         }
     }
 
+    /* Purity tier: longest run using only the span's rarest tier.
+       Known glue (DE, EL) carries huge frequency; novel content sits
+       at zero. This keeps MARIA out of DE_MARIA without naming either. */
+    {
+        uint64_t floor = UINT64_MAX;
+        for (uint32_t k = start; k < end; k++)
+        {
+            uint64_t r = TokenRarity(graph, tokens->tokens[k]);
+            if (r < floor)
+                floor = r;
+        }
+        for (uint32_t len = (span < 4 ? span : 4); len >= 1; len--)
+        {
+            for (uint32_t s = start; s + len <= end; s++)
+            {
+                int pure = 1;
+                for (uint32_t k = 0; k < len; k++)
+                {
+                    if (TokenRarity(graph, tokens->tokens[s + k]) != floor)
+                    {
+                        pure = 0;
+                        break;
+                    }
+                }
+                if (!pure)
+                    continue;
+                cand[0] = '\0';
+                for (uint32_t k = 0; k < len; k++)
+                {
+                    if (k > 0) strcat(cand, "_");
+                    strcat(cand, tokens->tokens[s + k]);
+                }
+                strncpy(out, cand, out_size - 1);
+                out[out_size - 1] = '\0';
+                return (int)s;
+            }
+            if (len == 1)
+                break;
+        }
+    }
+
     out[0] = '\0';
     for (uint32_t k = start; k < end; k++)
     {
@@ -141,6 +167,34 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
         strncat(out, tokens->tokens[k], out_size - strlen(out) - 1);
     }
     return (int)start;
+}
+
+/* Clause boundaries: local frequency maxima with content on both
+   sides. Glue betrays itself by repetition (Zipf), never by name: a
+   token far more frequent than both neighbors splits the input, and
+   belongs to neither clause. On virgin maps nothing splits (graceful
+   degradation to one clause). Bounds-checked interior only, so edge
+   articles can never shatter an entity. */
+static uint32_t FindSplits(const GRAPH *graph, const PARSED_SENTENCE *tokens,
+                           uint32_t *outs, uint32_t maxouts)
+{
+    uint32_t n = 0;
+    if (graph == NULL || tokens == NULL || outs == NULL || maxouts == 0)
+        return 0;
+    if (tokens->count < 5)
+        return 0;
+
+    for (uint32_t i = 2; i + 2 < tokens->count && n < maxouts; i++)
+    {
+        uint64_t f = TokenRarity(graph, tokens->tokens[i]);
+        if (f == 0)
+            continue;
+        uint64_t fl = TokenRarity(graph, tokens->tokens[i - 1]);
+        uint64_t fr = TokenRarity(graph, tokens->tokens[i + 1]);
+        if (f > fl && f > fr)
+            outs[n++] = i;
+    }
+    return n;
 }
 
 /* Rarity of a token: its symbol frequency, 0 when unknown. Content
@@ -167,7 +221,40 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
     if (n_tokens < 2)
         return 0;
 
-    /* Clause roots: tokens describing used predicates (exact, then
+    /* Segments first: split at local frequency maxima (glue betrayed
+       by repetition), then parse each segment recursively on its own.
+       Short inputs never split; virgin maps never split. */
+    {
+        uint32_t splits[8];
+        uint32_t nsplit = FindSplits(graph, &tokens, splits, 8);
+        if (nsplit > 0)
+        {
+            int stored = 0;
+            char buf[4096];
+            uint32_t seg_a = 0;
+            for (uint32_t sg = 0; ; sg++)
+            {
+                uint32_t seg_b = (sg < nsplit) ? splits[sg] : tokens.count;
+                if (seg_b > seg_a + 1)
+                {
+                    buf[0] = '\0';
+                    for (uint32_t k = seg_a; k < seg_b; k++)
+                    {
+                        if (k > seg_a) strcat(buf, " ");
+                        strncat(buf, tokens.tokens[k],
+                                sizeof(buf) - strlen(buf) - 1);
+                    }
+                    stored += ParserIngestSentence(graph, buf);
+                }
+                if (sg >= nsplit)
+                    break;
+                seg_a = splits[sg] + 1;
+            }
+            return stored;
+        }
+    }
+
+    /* Clause roots: tokens describing used relations (exact, then
        stemmed), in token order. Each root splits the input by position,
        so nested clauses each contribute their relation. */
     uint32_t roots[8];
@@ -182,7 +269,7 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
                 if (roots[k] == i) { known = 1; break; }
             if (known)
                 continue;
-            if (ResolvePredicatePass(graph, tokens.tokens[i], pass,
+            if (ResolveRelationPass(graph, tokens.tokens[i], pass,
                                      names[nroots], sizeof(names[0])))
                 roots[nroots++] = i;
         }
@@ -282,49 +369,139 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
    Question Detection & Answering
    ============================================================ */
 
-/* Dynamic predicate vocabulary: no word lists. A question token describes
-   a graph predicate iff the wanted form (exact token or its stem) matches
-   the predicate name or a stemmed compound part of it (HIJOS->HIJO via
-   HIJO_DE, REYES->REY via REY_DE). Resolved against the live graph, so
-   predicates learned at runtime become queryable immediately. Glue words
-   (articles, prepositions, single letters) never match. */
-static int PredNameMatches(const char *pname, const char *want)
+/* Relation vocabulary cache: distinct used relations with precomputed
+   match keys (full name plus stemmed compound parts). Rebuilt whenever
+   the relation count changes, so growth invalidates it. The cache is
+   what makes whole-text ingest affordable: per-token scans drop from
+   thousands of relations with repeated stemming to ~1k flat entries.
+   Single-threaded use. */
+#define REL_CACHE_MAX 1024
+#define REL_CACHE_KEYS 9
+
+typedef struct
 {
-    if (pname == NULL || want == NULL || want[0] == '\0')
-        return 0;
+    SYMBOL_ID rid;
+    char      name[64];
+    char      keys[REL_CACHE_KEYS][64];
+    uint32_t  nkeys;
+    int       trusted;
+} REL_CACHE_ENTRY;
 
-    if (strcmp(pname, want) == 0)
-        return 1;
+static REL_CACHE_ENTRY rel_cache[REL_CACHE_MAX];
+static uint32_t rel_cache_n = 0;
+static uint32_t rel_cache_gen = 0xFFFFFFFFu;
 
-    char parts[64];
-    strncpy(parts, pname, sizeof(parts) - 1);
-    parts[sizeof(parts) - 1] = '\0';
-    char *saveptr = NULL;
-    char *part = strtok_r(parts, "_", &saveptr);
-    while (part != NULL)
-    {
-        /* Short parts (LA, DE, EN) are glue collisions, never meaning. */
-        if (strlen(part) > 2 && !IsPreposition(part) && !IsArticle(part))
-        {
-            if (strcmp(part, want) == 0)
-                return 1;
-            char pstem[64];
-            StemWord(part, pstem, sizeof(pstem));
-            if (strcmp(pstem, want) == 0)
-                return 1;
-        }
-        part = strtok_r(NULL, "_", &saveptr);
-    }
-    return 0;
+static void RelCacheAddKey(REL_CACHE_ENTRY *e, const char *key)
+{
+    if (e == NULL || key == NULL || key[0] == '\0')
+        return;
+    for (uint32_t k = 0; k < e->nkeys; k++)
+        if (strcmp(e->keys[k], key) == 0)
+            return;
+    if (e->nkeys >= REL_CACHE_KEYS)
+        return;
+    strncpy(e->keys[e->nkeys], key, sizeof(e->keys[0]) - 1);
+    e->keys[e->nkeys][sizeof(e->keys[0]) - 1] = '\0';
+    e->nkeys++;
 }
 
-/* First predicate (in graph order) described by the token. Pass 0 tries
-   the exact token, pass 1 its stem. Returns 1 and the predicate name. */
-static int ResolvePredicatePass(const GRAPH *graph, const char *token,
+static uint32_t RelCacheFill(const GRAPH *graph)
+{
+    if (graph == NULL || graph->relations == NULL)
+        return 0;
+
+    uint32_t rc = RelationCount(graph->relations);
+    if (rc == rel_cache_gen)
+        return rel_cache_n;
+
+    rel_cache_n = 0;
+    for (uint32_t i = 0; i < rc && rel_cache_n < REL_CACHE_MAX; i++)
+    {
+        const RELATION *r = RelationGet(graph->relations, i);
+        if (r == NULL || r->relation == SYMBOL_INVALID)
+            continue;
+
+        int known = -1;
+        for (uint32_t k = 0; k < rel_cache_n; k++)
+            if (rel_cache[k].rid == r->relation) { known = (int)k; break; }
+
+        /* Trust: a relation is trusted iff some relation carries
+           provenance. Sourceless triples (grown on the fly, bulk
+           noise) never outrank curated words. Presence alone decides. */
+        int curated = (r->source != SYMBOL_INVALID);
+        if (curated && known >= 0)
+            rel_cache[(uint32_t)known].trusted = 1;
+        if (known >= 0)
+            continue;
+
+        const SYMBOL *p = SymbolGet(graph->symbols, r->relation);
+        if (p == NULL || p->name == NULL || p->name[0] == '\0')
+            continue;
+
+        REL_CACHE_ENTRY *e = &rel_cache[rel_cache_n];
+        e->rid = r->relation;
+        e->nkeys = 0;
+        e->trusted = curated;
+        strncpy(e->name, p->name, sizeof(e->name) - 1);
+        e->name[sizeof(e->name) - 1] = '\0';
+        RelCacheAddKey(e, p->name);
+
+        /* Glue check without word lists: a part far more frequent
+           than the rarest sibling is repetition, not meaning
+           (DE inside HIJO_DE). Global minimum first, so order never
+           matters. Zipf gap, documented factor. */
+        uint64_t minfreq = UINT64_MAX;
+        {
+            char probe[64];
+            strncpy(probe, p->name, sizeof(probe) - 1);
+            probe[sizeof(probe) - 1] = '\0';
+            char *psave = NULL;
+            char *ppart = strtok_r(probe, "_", &psave);
+            while (ppart != NULL)
+            {
+                if (strlen(ppart) > 2)
+                {
+                    uint64_t fr = TokenRarity(graph, ppart);
+                    if (fr < minfreq)
+                        minfreq = fr;
+                }
+                ppart = strtok_r(NULL, "_", &psave);
+            }
+        }
+        char parts[64];
+        strncpy(parts, p->name, sizeof(parts) - 1);
+        parts[sizeof(parts) - 1] = '\0';
+        char *saveptr = NULL;
+        char *part = strtok_r(parts, "_", &saveptr);
+        while (part != NULL)
+        {
+            if (strlen(part) <= 2)
+            {
+                part = strtok_r(NULL, "_", &saveptr);
+                continue;
+            }
+            uint64_t fr = TokenRarity(graph, part);
+            if (minfreq != UINT64_MAX && fr > minfreq * 8)
+            {
+                part = strtok_r(NULL, "_", &saveptr);
+                continue;
+            }
+            RelCacheAddKey(e, part);
+            char pstem[64];
+            StemWord(part, pstem, sizeof(pstem));
+            RelCacheAddKey(e, pstem);
+            part = strtok_r(NULL, "_", &saveptr);
+        }
+        rel_cache_n++;
+    }
+    rel_cache_gen = rc;
+    return rel_cache_n;
+}
+
+static int ResolveRelationPass(const GRAPH *graph, const char *token,
                                 int use_stem, char *out, size_t out_size)
 {
-    if (graph == NULL || graph->relations == NULL || token == NULL ||
-        out == NULL || out_size == 0)
+    if (graph == NULL || token == NULL || out == NULL || out_size == 0)
         return 0;
 
     char stem[64];
@@ -335,32 +512,29 @@ static int ResolvePredicatePass(const GRAPH *graph, const char *token,
         want = stem;
     }
 
-    uint32_t total = RelationCount(graph->relations);
-    for (uint32_t i = 0; i < total; i++)
+    uint32_t n = RelCacheFill(graph);
+    for (uint32_t k = 0; k < n; k++)
     {
-        const RELATION *r = RelationGet(graph->relations, i);
-        if (r == NULL || r->predicate == SYMBOL_INVALID)
-            continue;
-        const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
-        if (p == NULL || p->name == NULL || p->name[0] == '\0')
-            continue;
-        if (PredNameMatches(p->name, want))
+        for (uint32_t j = 0; j < rel_cache[k].nkeys; j++)
         {
-            strncpy(out, p->name, out_size - 1);
-            out[out_size - 1] = '\0';
-            return 1;
+            if (strcmp(rel_cache[k].keys[j], want) == 0)
+            {
+                strncpy(out, rel_cache[k].name, out_size - 1);
+                out[out_size - 1] = '\0';
+                return 1;
+            }
         }
     }
     return 0;
 }
 
-/* Embedding description: the (token, predicate) pair with the highest
-   cosine similarity across all used predicates. No threshold: the ranking
+/* Embedding description: the (token, relation) pair with the highest
+   cosine similarity across all used relations. No threshold: the ranking
    IS the answer, and it sharpens as the model learns (rich model -> rich
    embeddings). Consulted only when symbolic resolution fails, so it can
    only turn past misses into hits, never override a symbolic hit. Tokens
    without a vector are skipped. */
-static int ResolvePredicateEmbed(const GRAPH *graph,
+static int ResolveRelationEmbed(const GRAPH *graph,
                                  const PARSED_SENTENCE *tokens,
                                  char *out, size_t out_size, int *out_pos)
 {
@@ -368,25 +542,16 @@ static int ResolvePredicateEmbed(const GRAPH *graph,
         out == NULL || out_size == 0)
         return 0;
 
-    SYMBOL_ID pids[1024];
+    SYMBOL_ID rids[1024];
     uint32_t np = 0;
-    uint32_t total = RelationCount(graph->relations);
-    for (uint32_t i = 0; i < total && np < 1024; i++)
-    {
-        const RELATION *r = RelationGet(graph->relations, i);
-        if (r == NULL || r->predicate == SYMBOL_INVALID)
-            continue;
-        int known = 0;
-        for (uint32_t k = 0; k < np; k++)
-            if (pids[k] == r->predicate) { known = 1; break; }
-        if (!known)
-            pids[np++] = r->predicate;
-    }
+    uint32_t nc = RelCacheFill(graph);
+    for (uint32_t k = 0; k < nc && np < 1024; k++)
+        rids[np++] = rel_cache[k].rid;
     if (np == 0)
         return 0;
 
     float best_score = -2.0f;
-    SYMBOL_ID best_pid = SYMBOL_INVALID;
+    SYMBOL_ID best_rid = SYMBOL_INVALID;
     int best_pos = -1;
     for (uint32_t t = 0; t < tokens->count; t++)
     {
@@ -398,22 +563,22 @@ static int ResolvePredicateEmbed(const GRAPH *graph,
             continue;
         for (uint32_t k = 0; k < np; k++)
         {
-            const float *pv = EmbeddingGetVector(graph->embeddings, pids[k]);
+            const float *pv = EmbeddingGetVector(graph->embeddings, rids[k]);
             if (pv == NULL)
                 continue;
             float s = EmbeddingCosineSimilarity(tv, pv);
             if (s > best_score)
             {
                 best_score = s;
-                best_pid = pids[k];
+                best_rid = rids[k];
                 best_pos = (int)t;
             }
         }
     }
 
-    if (best_pid == SYMBOL_INVALID)
+    if (best_rid == SYMBOL_INVALID)
         return 0;
-    const SYMBOL *p = SymbolGet(graph->symbols, best_pid);
+    const SYMBOL *p = SymbolGet(graph->symbols, best_rid);
     if (p == NULL || p->name == NULL || p->name[0] == '\0')
         return 0;
     strncpy(out, p->name, out_size - 1);
@@ -423,29 +588,23 @@ static int ResolvePredicateEmbed(const GRAPH *graph,
     return 1;
 }
 
-/* Does the token name a used predicate exactly (no stemming)? Used for
-   the entity rule: the entity is never a predicate name ("... David es"
+/* Does the token name a used relation exactly (no stemming)? Used for
+   the entity rule: the entity is never a relation name ("... David es"
    must resolve to DAVID, not ES). */
-static int TokenNamesPredicate(const GRAPH *graph, const char *token)
+static int TokenNamesRelation(const GRAPH *graph, const char *token)
 {
-    if (graph == NULL || graph->relations == NULL || token == NULL)
+    if (graph == NULL || token == NULL)
         return 0;
 
-    uint32_t total = RelationCount(graph->relations);
-    for (uint32_t i = 0; i < total; i++)
-    {
-        const RELATION *r = RelationGet(graph->relations, i);
-        if (r == NULL || r->predicate == SYMBOL_INVALID)
-            continue;
-        const SYMBOL *p = SymbolGet(graph->symbols, r->predicate);
-        if (p != NULL && p->name != NULL && strcmp(p->name, token) == 0)
+    uint32_t n = RelCacheFill(graph);
+    for (uint32_t k = 0; k < n; k++)
+        if (strcmp(rel_cache[k].name, token) == 0)
             return 1;
-    }
     return 0;
 }
 
 /* Entity = longest trailing token run (up to 4) naming an existing
-   symbol. Trailing tokens that name used predicates are skipped first
+   symbol. Trailing tokens that name used relations are skipped first
    (dynamic copula-skip: "... David es" resolves to DAVID, never ES).
    Falls back to the last token so unknown entities still yield
    unanswerable questions instead of invalid ones. Returns the run start
@@ -460,7 +619,7 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     uint32_t end = tokens->count;
     if (end > start + 1 &&
-        TokenNamesPredicate(graph, tokens->tokens[end - 1]))
+        TokenNamesRelation(graph, tokens->tokens[end - 1]))
         end--;
 
     uint32_t span = (end > start) ? end - start : 0;
@@ -534,7 +693,7 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
 
     q.is_question = has_question_mark;
 
-    /* Fact shape: descriptor token pointing to a graph predicate plus an
+    /* Fact shape: descriptor token pointing to a graph relation plus an
        entity. The entity usually trails the descriptor ("la CAPITAL de
        FRANCIA es") but may precede it ("Paris es"): both directions are
        tried, trailing first. No separator word, no copula check, no
@@ -549,9 +708,9 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         {
             for (int pass = 0; pass < 2; pass++)
             {
-                char pred[64] = {0};
-                if (!ResolvePredicatePass(graph, tokens.tokens[i], pass,
-                                          pred, sizeof(pred)))
+                char rel[64] = {0};
+                if (!ResolveRelationPass(graph, tokens.tokens[i], pass,
+                                          rel, sizeof(rel)))
                     continue;
                 char subj[128] = {0};
                 int spos = ResolveEntity(graph, &tokens, i + 1,
@@ -572,7 +731,7 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                 if (spos < 0 || strlen(subj) == 0)
                     continue;
                 strcpy(q.subject, subj);
-                strcpy(q.predicate, pred);
+                strcpy(q.relation, rel);
                 q.valid = 1;
                 q.is_question = 1;
                 return q;
@@ -587,9 +746,9 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                 strcpy(desc.tokens[desc.count], tokens.tokens[i]);
                 desc.count++;
             }
-            char pred[64] = {0};
+            char rel[64] = {0};
             int epos = -1;
-            if (ResolvePredicateEmbed(graph, &desc, pred, sizeof(pred),
+            if (ResolveRelationEmbed(graph, &desc, rel, sizeof(rel),
                                       &epos) && epos >= 0)
             {
                 char subj[128] = {0};
@@ -611,7 +770,7 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                 if (spos >= 0 && strlen(subj) > 0)
                 {
                     strcpy(q.subject, subj);
-                    strcpy(q.predicate, pred);
+                    strcpy(q.relation, rel);
                     q.valid = 1;
                     q.is_question = 1;
                     return q;
@@ -655,14 +814,14 @@ int ParserAnswerQuestion(
     /* Try direct match first */
     if (subj_id != SYMBOL_INVALID)
     {
-        /* Find predicate */
-        SYMBOL_ID pred_id = StemFindSymbol(graph->symbols, q->predicate);
+        /* Find relation */
+        SYMBOL_ID rel_id = StemFindSymbol(graph->symbols, q->relation);
 
-        if (pred_id != SYMBOL_INVALID)
+        if (rel_id != SYMBOL_INVALID)
         {
             RELATION *results[8];
-            uint32_t n = GraphQuerySubjectPredicate(
-                graph, subj_id, pred_id, results, 8);
+            uint32_t n = GraphQuerySubjectRelation(
+                graph, subj_id, rel_id, results, 8);
 
             if (n > 0)
             {
@@ -684,7 +843,7 @@ int ParserAnswerQuestion(
                         if (EmbeddingComposeRelation(
                                 graph->embeddings,
                                 area_rels[a]->subject,
-                                area_rels[a]->predicate,
+                                area_rels[a]->relation,
                                 area_rels[a]->object, comp))
                         {
                             for (int d = 0; d < EMBEDDING_DIM; d++)
@@ -701,7 +860,7 @@ int ParserAnswerQuestion(
                             RELATION *rk = results[i];
                             float ck[EMBEDDING_DIM];
                             if (!EmbeddingComposeRelation(
-                                    graph->embeddings, subj_id, pred_id,
+                                    graph->embeddings, subj_id, rel_id,
                                     rk->object, ck))
                                 continue;
                             float sk = EmbeddingCosineSimilarity(ck, area);
@@ -710,7 +869,7 @@ int ParserAnswerQuestion(
                             {
                                 float cj[EMBEDDING_DIM];
                                 if (!EmbeddingComposeRelation(
-                                        graph->embeddings, subj_id, pred_id,
+                                        graph->embeddings, subj_id, rel_id,
                                         results[j - 1]->object, cj))
                                     break;
                                 float sj = EmbeddingCosineSimilarity(cj, area);

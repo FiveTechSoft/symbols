@@ -59,7 +59,7 @@ int main(void)
     for (uint32_t i = 0; i < n; i++)
     {
         const SYMBOL *s = SymbolGet(g->symbols, rels[i]->subject);
-        const SYMBOL *p = SymbolGet(g->symbols, rels[i]->predicate);
+        const SYMBOL *p = SymbolGet(g->symbols, rels[i]->relation);
         const SYMBOL *o = SymbolGet(g->symbols, rels[i]->object);
         printf("  %.3f  %s -> %s -> %s\n", scores[i],
             s ? s->name : "?", p ? p->name : "?", o ? o->name : "?");

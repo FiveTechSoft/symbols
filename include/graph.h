@@ -43,12 +43,12 @@ SYMBOL_ID GraphAddSymbol(GRAPH *graph, const char *name);
 
 int GraphAddRelation(GRAPH *graph,
                      SYMBOL_ID subject,
-                     SYMBOL_ID predicate,
+                     SYMBOL_ID relation,
                      SYMBOL_ID object);
 
 int GraphAddRelationPolar(GRAPH *graph,
                           SYMBOL_ID subject,
-                          SYMBOL_ID predicate,
+                          SYMBOL_ID relation,
                           SYMBOL_ID object,
                           RELATION_POLARITY polarity,
                           CONFLICT_POLICY policy);
@@ -56,19 +56,19 @@ int GraphAddRelationPolar(GRAPH *graph,
 CONTRADICTION_REPORT GraphCheckContradiction(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     SYMBOL_ID object);
 
 RELATION *GraphFindRelation(GRAPH *graph,
                             SYMBOL_ID subject,
-                            SYMBOL_ID predicate,
+                            SYMBOL_ID relation,
                             SYMBOL_ID object);
 
 uint32_t GraphQuerySubject(const GRAPH *graph, SYMBOL_ID subject,
                            RELATION **results, uint32_t max_results);
 
-uint32_t GraphQuerySubjectPredicate(const GRAPH *graph, SYMBOL_ID subject,
-                                    SYMBOL_ID predicate,
+uint32_t GraphQuerySubjectRelation(const GRAPH *graph, SYMBOL_ID subject,
+                                    SYMBOL_ID relation,
                                     RELATION **results, uint32_t max_results);
 
 uint32_t GraphQueryObject(const GRAPH *graph, SYMBOL_ID object,
@@ -76,7 +76,7 @@ uint32_t GraphQueryObject(const GRAPH *graph, SYMBOL_ID object,
 
 int GraphInferTransitive(GRAPH *graph,
                          SYMBOL_ID subject,
-                         SYMBOL_ID predicate,
+                         SYMBOL_ID relation,
                          SYMBOL_ID object);
 
 SYMBOL_ID GraphResolveSynonym(const GRAPH *graph,
@@ -84,10 +84,10 @@ SYMBOL_ID GraphResolveSynonym(const GRAPH *graph,
                               float min_similarity,
                               float *out_similarity);
 
-uint32_t GraphQuerySubjectPredicateFuzzy(
+uint32_t GraphQuerySubjectRelationFuzzy(
     const GRAPH *graph,
     SYMBOL_ID subject,
-    SYMBOL_ID predicate,
+    SYMBOL_ID relation,
     RELATION **results,
     uint32_t max_results,
     float min_similarity,
