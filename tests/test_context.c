@@ -60,7 +60,7 @@ int main(void)
                        GENDER_MASCULINE, NUMBER_SINGULAR,
                        ENTITY_TYPE_OBJECT, 0);
 
-    /* Frase 3: Sujeto eliptico */
+    /* Sentence 3: elided subject */
     printf("\n3. Sujeto eliptico:\n");
     SYMBOL_ID implicit_subj = ContextResolveImplicitSubject(ctx);
     const SYMBOL *s = SymbolGet(graph->symbols, implicit_subj);
@@ -68,7 +68,7 @@ int main(void)
     Assert(implicit_subj == antonio,
            "El sujeto tacito debe ser ANTONIO");
 
-    /* Verificacion en el grafo */
+    /* Check against the graph */
     printf("\n--- Relaciones aprendidas ---\n");
 
     RELATION *results[16];

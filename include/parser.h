@@ -15,35 +15,23 @@ typedef struct
 
 typedef struct
 {
-    char subject[128];
-    char predicate[64];
-    char object[128];
-    int  valid;
-} PARSE_RESULT;
-
-/* Tokenize and normalize a Spanish sentence */
-int ParserTokenize(const char *input, PARSED_SENTENCE *out);
-
-/* Extract S-P-O from a tokenized sentence */
-PARSE_RESULT ParserExtractSPO(const PARSED_SENTENCE *tokens);
-
-/* Parse a free-form sentence and ingest into graph */
-int ParserIngestSentence(GRAPH *graph, const char *sentence);
-
-/* ============================================================
-   Question Answering: detect questions, extract intent, answer
-   ============================================================ */
-
-typedef struct
-{
     char subject[128];      /* concept to look up */
-    char predicate[64];     /* what to ask about (CAPITAL, TIENE, etc.) */
+    char predicate[64];     /* relation naming a stored triple slot */
     int  is_question;
     int  valid;
 } QUESTION;
 
-/* Detect if input is a question and extract intent */
-QUESTION ParserDetectQuestion(const char *input);
+/* Detect if input is a question and extract intent. The graph provides
+   the live vocabulary: descriptors resolve against the relations it
+   actually holds, so learned words work immediately. */
+QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input);
+
+/* Tokenize and normalize input (prose, code, formulas alike) */
+int ParserTokenize(const char *input, PARSED_SENTENCE *out);
+
+/* Parse a free-form sentence and ingest into graph.
+   Input → syntax tree → symbols → relations. */
+int ParserIngestSentence(GRAPH *graph, const char *sentence);
 
 /* Answer a question from the graph */
 int ParserAnswerQuestion(

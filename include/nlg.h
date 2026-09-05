@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include "graph.h"
-#include "inference.h"
 
 #define NLG_MAX_RESPONSE 2048
 
@@ -23,16 +22,6 @@ uint32_t NLGGenerateDirect(
     char *out,
     uint32_t out_size);
 
-/* Generate a natural language response from inference path */
-void NLGGenerateInference(
-    const GRAPH *graph,
-    const INFERENCE_PATH *path,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object,
-    char *out,
-    uint32_t out_size);
-
 /* Generate a "no results" response with proactive suggestions */
 void NLGGenerateNoResults(
     const GRAPH *graph,
@@ -49,8 +38,6 @@ void NLGGenerateCompound(
     uint32_t tax_count,
     RELATION **functional,
     uint32_t func_count,
-    const INFERENCE_PATH *inferred,
-    int has_inferred,
     char *out,
     uint32_t out_size);
 

@@ -4,34 +4,26 @@
 #include "nlg.h"
 
 static const char *CONNECTORS_POSITIVE[] = {
-    "Segun lo que he aprendido, ",
-    "De los datos que poseo, ",
-    "Segun el grafo de conocimiento, ",
-    "La evidencia almacenada indica que ",
-    "He encontrado que ",
-    "Deduzco que "
+    "Stored: ",
+    "From the map: ",
+    "Recorded: ",
+    "Found: ",
+    "On record: ",
+    "Listed: "
 };
 #define NUM_CONNECTORS_POS 6
 
-static const char *CONNECTORS_INFERENCE[] = {
-    "Razonando por encadenamiento, ",
-    "Por deduccion transitiva, ",
-    "Siguiendo la cadena logica, ",
-    "Mediante razonamiento profundo, "
-};
-#define NUM_CONNECTORS_INF 4
-
 static const char *CONNECTORS_SUGGEST[] = {
-    "Podrias preguntar tambien sobre ",
-    "Te sugiero consultar sobre ",
-    "Quizas te interese saber sobre "
+    "Also stored about ",
+    "See also ",
+    "Related: "
 };
 #define NUM_CONNECTORS_SUG 3
 
 static const char *NO_RESULTS_PREFIX[] = {
-    "No poseo informacion directa sobre eso. ",
-    "Ese hecho no esta registrado en el grafo. ",
-    "No tengo evidencia almacenada al respecto. "
+    "No direct record of that. ",
+    "That fact is not stored. ",
+    "No stored evidence for that. "
 };
 #define NUM_NO_RES 3
 
@@ -140,64 +132,6 @@ uint32_t NLGGenerateDirect(
     return 1;
 }
 
-void NLGGenerateInference(
-    const GRAPH *graph,
-    const INFERENCE_PATH *path,
-    SYMBOL_ID subject,
-    SYMBOL_ID predicate,
-    SYMBOL_ID object,
-    char *out,
-    uint32_t out_size)
-{
-    out[0] = '\0';
-
-    const SYMBOL *subj_sym = SymbolGet(graph->symbols, subject);
-    const SYMBOL *pred_sym = SymbolGet(graph->symbols, predicate);
-    const SYMBOL *obj_sym = SymbolGet(graph->symbols, object);
-
-    /* Inference connector */
-    uint32_t idx = PickIndex(NUM_CONNECTORS_INF, subj_sym ? subj_sym->name : "");
-    AppendStr(out, out_size, CONNECTORS_INFERENCE[idx]);
-
-    AppendStr(out, out_size, subj_sym ? subj_sym->name : "?");
-    AppendStr(out, out_size, " ");
-
-    if (pred_sym && pred_sym->name[0])
-    {
-        char lc[128];
-        lc[0] = (char)tolower((unsigned char)pred_sym->name[0]);
-        strncpy(lc + 1, pred_sym->name + 1, sizeof(lc) - 2);
-        lc[sizeof(lc) - 1] = '\0';
-        AppendStr(out, out_size, lc);
-        AppendStr(out, out_size, " ");
-    }
-
-    AppendStr(out, out_size, obj_sym ? obj_sym->name : "?");
-    AppendStr(out, out_size, ".");
-
-    /* Confidence and hop count */
-    char conf_buf[64];
-    snprintf(conf_buf, sizeof(conf_buf),
-             " (confianza: %.0f%%, %u saltos)",
-             path->accumulated_confidence * 100.0f,
-             path->depth > 0 ? path->depth - 1 : 0);
-    AppendStr(out, out_size, conf_buf);
-
-    /* Justification trace */
-    if (path->depth >= 2)
-    {
-        AppendStr(out, out_size, " Cadena: ");
-        for (uint32_t i = 0; i < path->depth; i++)
-        {
-            const SYMBOL *node = SymbolGet(graph->symbols, path->step_nodes[i]);
-            if (i > 0)
-                AppendStr(out, out_size, " -> ");
-            AppendStr(out, out_size, node ? node->name : "?");
-        }
-        AppendStr(out, out_size, ".");
-    }
-}
-
 void NLGGenerateNoResults(
     const GRAPH *graph,
     SYMBOL_ID subject,
@@ -230,7 +164,7 @@ void NLGGenerateNoResults(
     }
     else
     {
-        AppendStr(out, out_size, "Puedes ensenarme hechos nuevos escribiendo una frase.");
+        AppendStr(out, out_size, "Teach new facts with /learn S P O.");
     }
 }
 
@@ -241,8 +175,6 @@ void NLGGenerateCompound(
     uint32_t tax_count,
     RELATION **functional,
     uint32_t func_count,
-    const INFERENCE_PATH *inferred,
-    int has_inferred,
     char *out,
     uint32_t out_size)
 {
@@ -295,22 +227,8 @@ void NLGGenerateCompound(
         need_separator = 1;
     }
 
-    /* Inferred knowledge */
-    if (has_inferred && inferred != NULL && inferred->depth >= 2)
-    {
-        if (need_separator)
-            AppendStr(out, out_size, ". Ademas, por razonamiento deduje que ");
-
-        const SYMBOL *obj = SymbolGet(graph->symbols, inferred->step_nodes[inferred->depth - 1]);
-        const SYMBOL *pred = SymbolGet(graph->symbols, inferred->step_predicates[inferred->depth - 2]);
-        AppendStr(out, out_size, pred ? pred->name : "?");
-        AppendStr(out, out_size, " ");
-        AppendStr(out, out_size, obj ? obj->name : "?");
-
-        char conf[32];
-        snprintf(conf, sizeof(conf), " (%.0f%%)", inferred->accumulated_confidence * 100.0f);
-        AppendStr(out, out_size, conf);
-    }
+    /* Inferred knowledge: not stored, not shown. Only identified
+       relations are reported. */
 
     AppendStr(out, out_size, ".");
 }

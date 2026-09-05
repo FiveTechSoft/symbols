@@ -15,7 +15,6 @@ add_library(symbolic STATIC
     src/context.c
     src/dialog.c
     src/generator.c
-    src/inference.c
     src/ingest.c
     src/nlg.c
     src/prune.c
@@ -67,7 +66,6 @@ sllm_test(test_conversation    tests/test_conversation.c)
 sllm_test(test_generator       tests/test_generator.c)
 sllm_test(test_ingest          tests/test_ingest.c)
 sllm_test(test_contradictions  tests/test_contradictions.c)
-sllm_test(test_deep_inference  tests/test_deep_inference.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
 sllm_test(test_stem           tests/test_stem.c)

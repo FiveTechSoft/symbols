@@ -305,7 +305,7 @@ SYMBOL_ID GraphResolveSynonym(const GRAPH *graph,
         return subject;
     }
 
-    /* Si el simbolo ya tiene relaciones, usarlo directamente */
+    /* If the symbol already has relations, use it directly */
     RELATION *dummy[1];
     uint32_t direct = RelationFindBySubject(
         graph->relations, subject, dummy, 1);
@@ -317,7 +317,7 @@ SYMBOL_ID GraphResolveSynonym(const GRAPH *graph,
         return subject;
     }
 
-    /* Buscar el sinonimo mas cercano */
+    /* Find the closest synonym */
     EMBEDDING_MATCH matches[8];
     uint32_t n = EmbeddingFindSimilar(graph->embeddings, subject, matches, 8);
 
@@ -370,7 +370,7 @@ uint32_t GraphQuerySubjectPredicateFuzzy(
         return n;
     }
 
-    /* Fallback hibrido: buscar sinonimo vectorial */
+    /* Hybrid fallback: look up vector synonym */
     float sim = 0.0f;
     SYMBOL_ID resolved = GraphResolveSynonym(
         graph, subject, min_similarity, &sim);

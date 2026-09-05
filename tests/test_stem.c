@@ -43,7 +43,7 @@ int main(void)
     CheckStem("COMIENDO", "COM");
     CheckStem("RAPIDAMENTE", "RAPIDA");
     CheckStem("CANCIONES", "CANCION");
-    /* Cortas y nombres: intactos */
+    /* Short words and names: untouched */
     CheckStem("PARIS", "PARIS");
     CheckStem("SOL", "SOL");
     CheckStem("MAR", "MAR");
@@ -61,7 +61,7 @@ int main(void)
                "SOL no se toca (minimo 3)");
     }
 
-    /* 3. Fallback de busqueda: solo consulta, no crea simbolos */
+    /* 3. Lookup fallback: queries only, never creates symbols */
     printf("-- StemFindSymbol --\n");
     SYMBOL_TABLE *t = SymbolTableCreate(64);
     SYMBOL_ID s_gato = SymbolAdd(t, "GATO");

@@ -6,11 +6,10 @@
 #include "symbol.h"
 #include "model.h"
 
-/* Higiene de respuestas QA: ninguna respuesta puede contener
-   marcadores de basura del corpus (restos de markdown, llaves
-   wiki, mojibake, parentesis desbalanceados). Lee el mismo set
-   que test_eval_qa. Solo juzga preguntas CON respuesta; las
-   misses las cubre el umbral de test_eval_qa. */
+/* QA answer hygiene: no answer may contain corpus junk markers
+   (markdown leftovers, wiki braces, mojibake, unbalanced parens).
+   Reads the same set as test_eval_qa. Only judges answered
+   questions; misses are covered by the test_eval_qa threshold. */
 static const char *JUNK[] = {
     "}}", "{{", "[[", "]]", "*", "Ã", "Â", "_(", "(_", NULL
 };
@@ -56,7 +55,7 @@ int main(int argc, char **argv)
         if (!tab)
             continue;
         *tab = '\0';
-        QUESTION q = ParserDetectQuestion(line);
+        QUESTION q = ParserDetectQuestion(graph, line);
         char answer[256] = {0};
         int found = (q.valid && q.is_question) ?
             ParserAnswerQuestion(graph, &q, answer, sizeof(answer)) : 0;

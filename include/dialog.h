@@ -5,20 +5,16 @@
 #include <stdint.h>
 #include "graph.h"
 #include "context.h"
-#include "inference.h"
 
+/* Intent is structural, never lexical: short content-free input is
+   social, "?" marks a query, everything else is a statement to store.
+   No word lists: only symbols and relations carry meaning. */
 typedef enum
 {
     SPEECH_ACT_UNKNOWN = 0,
-    SPEECH_ACT_GREETING,
-    SPEECH_ACT_FAREWELL,
-    SPEECH_ACT_GRATITUDE,
+    SPEECH_ACT_SOCIAL,
     SPEECH_ACT_STATEMENT,
-    SPEECH_ACT_QUERY_FACT,
-    SPEECH_ACT_QUERY_WHY,
-    SPEECH_ACT_QUERY_WHAT_IS,
-    SPEECH_ACT_IDENTITY,
-    SPEECH_ACT_CAPABILITY
+    SPEECH_ACT_QUERY
 } SPEECH_ACT;
 
 typedef struct

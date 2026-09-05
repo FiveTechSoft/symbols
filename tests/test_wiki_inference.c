@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "model.h"
-#include "inference.h"
 
 int main(int argc, char *argv[])
 {
@@ -18,7 +17,7 @@ int main(int argc, char *argv[])
     const char *object_name = argc > 4 ? argv[4] : NULL;
 
     printf("========================================================\n");
-    printf("  WIKIPEDIA INFERENCE TEST\n");
+    printf("  WIKIPEDIA STORED-FACT TEST\n");
     printf("========================================================\n\n");
 
     /* Load model */
@@ -73,7 +72,7 @@ int main(int argc, char *argv[])
     }
     printf("\n");
 
-    /* Inference prove if object provided */
+    /* Stored-fact check if object provided: exists or not, nothing derived */
     if (object_name)
     {
         SYMBOL_ID obj = SymbolFind(model->graph->symbols, object_name);
@@ -84,22 +83,17 @@ int main(int argc, char *argv[])
             return EXIT_SUCCESS;
         }
 
-        printf("--- Prove: %s --%s--> %s ---\n", subject_name, predicate_name, object_name);
+        printf("--- Stored: %s --%s--> %s ---\n", subject_name, predicate_name, object_name);
 
-        INFERENCE_CONFIG cfg = InferenceConfigDefault();
-        INFERENCE_PATH path;
-
-        int proven = InferenceProve(model->graph, subj, pred, obj, &cfg, &path);
-
-        if (proven)
+        RELATION *stored = GraphFindRelation(model->graph, subj, pred, obj);
+        if (stored)
         {
-            printf("  PROVEN (confidence: %.1f%%, hops: %u)\n",
-                   path.accumulated_confidence * 100.0f, path.depth - 1);
-            InferencePrintExplanation(model->graph, &path);
+            printf("  STORED (count=%llu, weight=%.3f)\n",
+                   (unsigned long long)stored->count, stored->weight);
         }
         else
         {
-            printf("  NOT PROVEN (no logical path found)\n");
+            printf("  NOT STORED (no such relation)\n");
         }
         printf("\n");
     }

@@ -16,8 +16,8 @@ static void Assert(int cond, const char *msg)
     }
 }
 
-/* V2 minimo escrito a mano: header + 1 simbolo + 1 relacion sin source.
-   Verifica que V3 lee V1/V2 con procedencia desconocida. */
+/* Hand-written minimal V2: header + 1 symbol + 1 relation, no source.
+   Verifies V3 reads V1/V2 with unknown provenance. */
 static void WriteV2Fixture(const char *path)
 {
     FILE *f = fopen(path, "wb");
@@ -62,14 +62,14 @@ int main(void)
     printf("     SYMBOLIC LLM - PROCEDENCIA        \n");
     printf("========================================\n\n");
 
-    /* 1. Ingesta con fuente explicita */
+    /* 1. Ingest with explicit source */
     GRAPH *g = GraphCreate(64, 64);
     Assert(g != NULL, "GraphCreate");
     Assert(IngestTripleSource(g, "ADAN", "PADRE_DE", "SET", "GEN 5:3") == 1,
            "ingesta con fuente");
     Assert(IngestTriple(g, "EVA", "MADRE_DE", "SET") == 1,
            "ingesta sin fuente");
-    /* Re-ingesta no pisa la fuente original */
+    /* Re-ingest keeps the original source */
     Assert(IngestTripleSource(g, "ADAN", "PADRE_DE", "SET", "OTRO") == 2,
            "update detectado");
     RELATION *r = GraphFindRelation(g,

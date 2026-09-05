@@ -1,9 +1,9 @@
 #ifndef COMPAT_H
 #define COMPAT_H
 
-/* Cuñas de portabilidad MSVC para funciones POSIX.
-   strtok_s tiene la misma firma y semantica que strtok_r
-   (str, delimitadores, contexto); _strdup equivale a strdup. */
+/* MSVC portability shims for POSIX functions.
+   strtok_s has the same signature and semantics as strtok_r
+   (str, delimiters, context); _strdup matches strdup. */
 #ifdef _MSC_VER
 #define strtok_r strtok_s
 #define strdup _strdup

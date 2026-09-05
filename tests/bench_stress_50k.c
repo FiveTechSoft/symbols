@@ -35,7 +35,7 @@ int main(void)
 
     double t0, t1;
 
-    /* 1. Creacion e Insercion Masiva */
+    /* 1. Bulk creation and insertion */
     printf("1. Reservando e insertando %u simbolos con vectores 32D...\n", NUM_SYMBOLS);
     t0 = GetTimeSeconds();
 
@@ -91,7 +91,7 @@ int main(void)
     printf("   -> Tamano de archivo: %.2f MB (%ld bytes)\n", file_size_mb, file_size);
     printf("   -> Velocidad de escritura: %.2f MB/s\n\n", write_speed);
 
-    /* 3. Destruccion de la instancia */
+    /* 3. Instance teardown */
     printf("3. Liberando completamente la memoria RAM original...\n");
     t0 = GetTimeSeconds();
     ModelDestroy(model);
@@ -120,7 +120,7 @@ int main(void)
     printf("   -> Tasa de ingesta: %.0f simbolos/segundo\n", NUM_SYMBOLS / load_time);
     printf("   -> Velocidad de lectura: %.2f MB/s\n\n", read_speed);
 
-    /* 5. Verificacion de Integridad */
+    /* 5. Integrity spot-check */
     printf("5. Comprobando integridad en muestras aleatorias...\n");
     uint32_t test_indices[] = {0, 100, 1234, 25000, 49999};
     uint32_t num_checks = sizeof(test_indices) / sizeof(test_indices[0]);

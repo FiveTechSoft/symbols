@@ -71,8 +71,8 @@ uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,
 
 void RelationStrengthen(RELATION *relation, float amount);
 
-/* Fija la procedencia (p.ej. "GEN 1:1" o "fichero.tsv:42").
-   source==SYMBOL_INVALID la borra. Sin efecto con relation NULL. */
+/* Sets provenance (e.g. "GEN 1:1" or "file.tsv:42").
+   source==SYMBOL_INVALID clears it. No effect on NULL relation. */
 void RelationSetSource(RELATION *relation, SYMBOL_ID source);
 
 const RELATION *RelationGet(const RELATION_TABLE *table, uint32_t index);

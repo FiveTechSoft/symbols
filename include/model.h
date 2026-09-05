@@ -7,7 +7,7 @@
 #include "embedding.h"
 
 #define MODEL_MAGIC   0x53594D42
-#define MODEL_VERSION 3 /* V3: procedencia (source) por relacion; V1/V2 leibles */
+#define MODEL_VERSION 3 /* V3: per-relation provenance (source); V1/V2 readable */
 
 typedef struct
 {

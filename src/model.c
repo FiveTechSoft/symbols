@@ -78,7 +78,7 @@ int ModelSave(const MODEL *model, const char *filepath)
         return 0;
     }
 
-    /* 2. Bloque de Simbolos */
+    /* 2. Symbol block */
     for (uint32_t i = 0; i < sym_count; i++)
     {
         const SYMBOL *s = SymbolGet(model->graph->symbols, i + 1);
@@ -100,7 +100,7 @@ int ModelSave(const MODEL *model, const char *filepath)
         }
     }
 
-    /* 3. Bloque de Relaciones */
+    /* 3. Relation block */
     for (uint32_t i = 0; i < rel_count; i++)
     {
         const RELATION *r = RelationGet(model->graph->relations, i);
@@ -122,7 +122,7 @@ int ModelSave(const MODEL *model, const char *filepath)
         }
     }
 
-    /* 4. Bloque de Embeddings (32D) */
+    /* 4. Embeddings block (32D) */
     if (model->embeddings != NULL)
     {
         for (uint32_t i = 0; i < model->embeddings->count; i++)
@@ -202,7 +202,7 @@ MODEL *ModelLoad(const char *filepath)
         return NULL;
     }
 
-    /* Cargar Simbolos */
+    /* Load symbols */
     for (uint32_t i = 0; i < sym_count; i++)
     {
         SYMBOL_ID id;
@@ -253,7 +253,7 @@ MODEL *ModelLoad(const char *filepath)
         free(name);
     }
 
-    /* Cargar Relaciones (V3 anade procedencia; V1/V2 => desconocida) */
+    /* Load relations (V3 adds provenance; V1/V2 => unknown) */
     for (uint32_t i = 0; i < rel_count; i++)
     {
         SYMBOL_ID subj, pred, obj, src = SYMBOL_INVALID;
@@ -279,14 +279,14 @@ MODEL *ModelLoad(const char *filepath)
             {
                 r->count = count;
                 r->weight = weight;
-                /* src valida solo si apunta a un simbolo del fichero */
+                /* src counts only if it points at a symbol from the file */
                 if (version >= 3 && src != SYMBOL_INVALID && src <= sym_count)
                     r->source = src;
             }
         }
     }
 
-    /* Cargar Embeddings (solo V2) */
+    /* Load embeddings (V2 only) */
     if (version >= 2 && emb_count > 0 && model->embeddings != NULL)
     {
         for (uint32_t i = 0; i < emb_count; i++)

@@ -26,7 +26,7 @@ int main(void)
     for (int i = 0; tests[i]; i++)
     {
         printf("Input: \"%s\"\n", tests[i]);
-        QUESTION q = ParserDetectQuestion(tests[i]);
+        QUESTION q = ParserDetectQuestion(graph, tests[i]);
         printf("  is_question=%d valid=%d subject='%s' predicate='%s'\n",
             q.is_question, q.valid, q.subject, q.predicate);
 

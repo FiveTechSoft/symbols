@@ -91,7 +91,7 @@ int main(void)
     printf("\nSinonimo detectado: %s\n", top_match->name);
     Assert(strcmp(top_match->name, "FELINO") == 0, "FELINO debe ser el mas cercano");
 
-    /* 5. Verificar que AUTOMOVIL queda lejos */
+    /* 5. AUTOMOVIL must stay far */
     float sim_auto = EmbeddingCosineSimilarity(
         EmbeddingGetVector(embeds, s_gato),
         EmbeddingGetVector(embeds, s_auto));

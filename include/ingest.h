@@ -28,8 +28,8 @@ INGEST_STATS IngestTSV(GRAPH *graph, const char *filepath);
 INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f);
 
 /*
- * Igual, con procedencia: filepath (puede ser NULL) forma el
- * "fichero:linea" por defecto cuando la linea no trae 4a columna.
+ * Same, with provenance: filepath (may be NULL) forms the
+ * "file:line" default when the line carries no 4th column.
  */
 INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath);
 
@@ -44,9 +44,9 @@ int IngestTriple(GRAPH *graph,
                  const char *subject, const char *predicate, const char *object);
 
 /*
- * Igual, con procedencia (p.ej. "GEN 1:1", NULL = desconocida).
- * Solo se fija en insercion nueva; no pisa la original.
- * Mismo codigo de retorno que IngestTriple.
+ * Same, with provenance (e.g. "GEN 1:1", NULL = unknown).
+ * Set only on fresh insert; never overwrites the original.
+ * Same return code as IngestTriple.
  */
 int IngestTripleSource(GRAPH *graph,
                        const char *subject, const char *predicate,

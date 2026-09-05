@@ -36,6 +36,7 @@ FILES = [
     "data/bible/bible_relations.tsv",
     "data/samples/love_knowledge.tsv",
     "data/samples/geo_knowledge.tsv",
+    "data/samples/math_knowledge.tsv",
 ]
 
 STOP_SUBJ = {

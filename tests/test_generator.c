@@ -55,7 +55,7 @@ int main(void)
                              output, sizeof(output));
     printf("Generado: \"%s\"\n\n", output);
 
-    /* 4. Consulta y respuesta */
+    /* 4. Query and answer */
     printf("--- 4. Pregunta -> Respuesta textual ---\n");
     GeneratorAnswerQuery(graph, "GATO", "COME", output, sizeof(output));
     printf("Q: Que come GATO?\nA: \"%s\"\n\n", output);

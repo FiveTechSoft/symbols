@@ -22,7 +22,7 @@ int main(void)
     printf("  SYMBOLIC LLM - FUZZY QUERY (H4)      \n");
     printf("========================================\n\n");
 
-    /* 1. Crear grafo con solo GATO */
+    /* 1. Graph with only GATO */
     GRAPH *graph = GraphCreate(64, 64);
     Assert(graph != NULL, "GraphCreate");
 
@@ -37,7 +37,7 @@ int main(void)
     Assert(s_gato != SYMBOL_INVALID, "GATO registrado");
     Assert(s_felino != SYMBOL_INVALID, "FELINO registrado");
 
-    /* 2. Crear tabla de embeddings y asociarla al grafo */
+    /* 2. Create embedding table and attach it to the graph */
     EMBEDDING_TABLE *embeds = EmbeddingTableCreate(64);
     GraphSetEmbeddingTable(graph, embeds);
 
@@ -49,7 +49,7 @@ int main(void)
     EmbeddingSetVector(embeds, s_gato, v_gato);
     EmbeddingSetVector(embeds, s_felino, v_felino);
 
-    /* 3. Entrenar coocurrencia para que FELINO ~ GATO */
+    /* 3. Train co-occurrence so FELINO ~ GATO */
     printf("Entrenando coocurrencia FELINO ~ GATO...\n");
     for (int i = 0; i < 10; i++)
     {
@@ -101,7 +101,7 @@ int main(void)
     printf("  FELINO --COME--> %s\n\n", obj->name);
     Assert(strcmp(obj->name, "PESCADO") == 0, "Objeto debe ser PESCADO");
 
-    /* 6. Verificar que AUTOMOVIL no resuelve */
+    /* 6. AUTOMOVIL must not resolve */
     SYMBOL_ID s_auto = SymbolAdd(graph->symbols, "AUTOMOVIL");
     float v_auto[EMBEDDING_DIM];
     EmbeddingRandomInit(v_auto, 777);

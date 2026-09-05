@@ -66,6 +66,12 @@ int main(void)
     printf("   Kinship:   %llu triples, %u symbols\n",
            ir8.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 8b. Ingest math knowledge (definitions, types, symbols) */
+    printf("8b. Ingesting math_knowledge.tsv (math)...\n");
+    INGEST_STATS ir9 = IngestTSV(graph, "data/samples/math_knowledge.tsv");
+    printf("   Math:      %llu triples, %u symbols\n",
+           ir9.relations_inserted, SymbolCount(graph->symbols));
+
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));
 

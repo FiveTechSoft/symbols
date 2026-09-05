@@ -9,7 +9,6 @@
 #include "graph.h"
 #include "learning.h"
 #include "context.h"
-#include "inference.h"
 #include "generator.h"
 #include "dialog.h"
 #include "model.h"
@@ -18,8 +17,9 @@
 #include "parser.h"
 #include "stem.h"
 #include "export.h"
+#include "ingest.h"
 
-/* Sufijo " [FUENTE]" para una relacion con procedencia, "" si no. */
+/* " [SOURCE]" suffix for a relation with provenance, "" without. */
 static void SourceSuffix(const GRAPH *graph, const RELATION *r,
                          char *out, size_t size)
 {
@@ -47,7 +47,7 @@ static void CleanString(char *str)
 
 static void DumpGraph(const GRAPH *graph)
 {
-    printf("\n=== Estado del Grafo de Conocimiento ===\n");
+    printf("\n=== Symbol Map ===\n");
     printf("Symbols loaded     : %u\n", SymbolCount(graph->symbols));
     printf("Relations in memory: %u\n\n", RelationCount(graph->relations));
 
@@ -74,7 +74,7 @@ static void DumpGraph(const GRAPH *graph)
 static void DumpContext(const CONTEXT *ctx)
 {
     printf("\n=== Working Memory (Context) ===\n");
-    printf("Entidades activas: %u (Tasa decaimiento: %.2f)\n\n",
+    printf("Active entities: %u (decay rate: %.2f)\n\n",
            ctx->count, ctx->decay_rate);
 
     for (uint32_t i = 0; i < ctx->count; i++)
@@ -127,9 +127,9 @@ int main(void)
     printf("     SYMBOLIC LLM\n");
     printf("  Natural conversation without backpropagation or GPUs.\n");
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
-  printf("            /find S P O (*), /why S P O, /export <f.dot|f.ttl>,\n");
-  printf("            /synonyms, /alias, /analogy A B, /infer,\n");
-    printf("            /save, /load, /clear, /exit                  \n");
+  printf("            /find S P O (*), /export <f.dot|f.ttl>,\n");
+  printf("            /synonyms, /alias, /analogy A B,\n");
+  printf("            /learn S P O, /save, /load, /clear, /exit\n");
     printf("========================================================\n\n");
 
     char input[CLI_BUFFER_SIZE];
@@ -423,6 +423,29 @@ int main(void)
             continue;
         }
 
+        /* Raw triple ingest: /learn S P O. No patterns, no verb lists:
+           any three tokens become a relation, uppercased by ingest.
+           This is how new predicates and depth words enter the live
+           map (e.g. /learn TRASABUELO HOPS 5). */
+        if (strncmp(input, "/learn ", 7) == 0)
+        {
+            char s[64], p[64], o[64];
+            if (sscanf(input + 7, "%63s %63s %63s", s, p, o) == 3)
+            {
+                int rc = IngestTripleSource(graph, s, p, o, "CLI");
+                if (rc == 1)
+                    printf("IA > Learned: %s --%s--> %s.\n\n", s, p, o);
+                else if (rc == 2)
+                    printf("IA > Known already, strengthened: %s --%s--> %s.\n\n",
+                           s, p, o);
+                else
+                    printf("IA > Could not learn that triple.\n\n");
+            }
+            else
+                printf("IA > Usage: /learn SUBJECT PREDICATE OBJECT\n\n");
+            continue;
+        }
+
         if (strncmp(input, "/save ", 6) == 0)
         {
             const char *path = input + 6;
@@ -459,75 +482,6 @@ int main(void)
             {
                 printf("IA > Error loading '%s'.\n\n", path);
             }
-            continue;
-        }
-
-        /* Inference dry-run: /infer (read-only, nothing is written).
-           Applies the compositional rules and lists what WOULD be written. */
-        if (strcmp(input, "/infer") == 0)
-        {
-            static const struct { const char *first, *second, *result; } RULES[] = {
-                { "ES", "TIENE", "TIENE" },       /* property inheritance */
-                { "ES", "ES", "ES" },             /* transitive taxonomy */
-                { "ES", "NECESITA", "NECESITA" }, /* needs inheritance */
-            };
-            INFERENCE_CONFIG cfg = InferenceConfigDefault();
-            INFERRED_TRIPLE out[64];
-            uint32_t total = 0;
-            printf("\n/infer dry-run (0 written):\n");
-            for (size_t ri = 0; ri < sizeof(RULES) / sizeof(RULES[0]); ri++)
-            {
-                SYMBOL_ID f = SymbolFind(graph->symbols, RULES[ri].first);
-                SYMBOL_ID s = SymbolFind(graph->symbols, RULES[ri].second);
-                SYMBOL_ID r = SymbolFind(graph->symbols, RULES[ri].result);
-                if (f == SYMBOL_INVALID || s == SYMBOL_INVALID ||
-                    r == SYMBOL_INVALID)
-                    continue;
-                COMPOSITION_RULE rule = { f, s, r, 0.95f };
-                uint32_t n = InferenceDryRun(graph, &rule, &cfg, out, 64);
-                for (uint32_t i = 0; i < n && total < 64; i++, total++)
-                {
-                    const SYMBOL *ss = SymbolGet(graph->symbols, out[i].subject);
-                    const SYMBOL *pp = SymbolGet(graph->symbols, out[i].predicate);
-                    const SYMBOL *oo = SymbolGet(graph->symbols, out[i].object);
-                    if (total < 32)
-                        printf("  %s --%s--> %s  [conf %.0f%% | %s+%s=>%s]\n",
-                               ss ? ss->name : "?", pp ? pp->name : "?",
-                               oo ? oo->name : "?",
-                               out[i].confidence * 100.0f,
-                               RULES[ri].first, RULES[ri].second,
-                               RULES[ri].result);
-                }
-            }
-            if (total > 32)
-                printf("  ... and %u more (showing 32)\n", total - 32);
-            printf("IA > %u candidates, 0 written (dry-run).\n\n", total);
-            continue;
-        }
-
-        /* Multi-hop inference trace: /why S P O */
-        if (strncmp(input, "/why ", 5) == 0)
-        {
-            char s[64] = {0}, p[64] = {0}, o[64] = {0};
-            if (sscanf(input + 5, "%63s %63s %63s", s, p, o) == 3)
-            {
-                SYMBOL_ID sid = StemFindSymbol(graph->symbols, s);
-                SYMBOL_ID pid = StemFindSymbol(graph->symbols, p);
-                SYMBOL_ID oid = StemFindSymbol(graph->symbols, o);
-                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID &&
-                    oid != SYMBOL_INVALID)
-                {
-                    INFERENCE_PATH path;
-                    if (InferenceProve(graph, sid, pid, oid, NULL, &path))
-                        InferencePrintExplanation(graph, &path);
-                    else
-                        printf("IA > No proof found: %s -/-> %s.\n\n", s, o);
-                }
-                else
-                    printf("IA > Unknown symbol in /why arguments.\n\n");
-            }
-            else
-                printf("IA > Usage: /why SUBJECT PREDICATE OBJECT\n\n");
             continue;
         }
 
@@ -616,13 +570,12 @@ int main(void)
             continue;
         }
 
-        /* Kinship/count shapes bypass the attention scorer: ES/TIENE
-           always match there and would hijack the question with a
-           1-hop guess. These shapes have exact 2-hop/count answers. */
+        /* Structured questions bypass the attention scorer: it would
+           hijack them with a 1-hop guess. Valid parses have exact
+           answers from the symbol map. */
         {
-            QUESTION kq = ParserDetectQuestion(input);
-            if (kq.valid && (strcmp(kq.predicate, "ABUELO") == 0 ||
-                             strncmp(kq.predicate, "CUENTA", 6) == 0))
+            QUESTION kq = ParserDetectQuestion(graph, input);
+            if (kq.valid)
             {
                 DialogGenerateResponse(graph, ctx, input,
                                        response, sizeof(response));
@@ -720,13 +673,9 @@ int main(void)
             }
             else
             {
-                /* Social / identity acts never reach the attention scorer */
+                /* Social input never reaches the attention scorer */
                 DIALOG_INTENT di = DialogClassify(input);
-                if (di.act == SPEECH_ACT_IDENTITY ||
-                    di.act == SPEECH_ACT_CAPABILITY ||
-                    ((di.act == SPEECH_ACT_GREETING ||
-                      di.act == SPEECH_ACT_GRATITUDE ||
-                      di.act == SPEECH_ACT_FAREWELL) && di.is_social_only))
+                if (di.act == SPEECH_ACT_SOCIAL && di.is_social_only)
                 {
                     DialogGenerateResponse(graph, ctx, input,
                                            response, sizeof(response));
@@ -752,23 +701,14 @@ int main(void)
         }
         else
         {
-            /* Try natural language parser */
-            int parsed = ParserIngestSentence(graph, input);
-            if (parsed)
-            {
-                PARSED_SENTENCE toks;
-                ParserTokenize(input, &toks);
-                PARSE_RESULT spo = ParserExtractSPO(&toks);
-                if (spo.valid)
-                    printf("IA > Learned: %s --%s--> %s\n\n",
-                           spo.subject, spo.predicate, spo.object);
-                else
-                    printf("IA > Noted. I'll remember that.\n\n");
-            }
+            /* Syntax tree ingest: input → tree → symbols → relations */
+            uint32_t base = RelationCount(graph->relations);
+            ParserIngestSentence(graph, input);
+            uint32_t added = RelationCount(graph->relations) - base;
+            if (added > 0)
+                printf("IA > Learned %u new %s.\n\n", added, added == 1 ? "fact" : "facts");
             else
-            {
                 printf("IA > Could not understand. Please rephrase.\n\n");
-            }
         }
     }
 

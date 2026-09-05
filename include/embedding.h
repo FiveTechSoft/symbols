@@ -48,4 +48,11 @@ uint32_t EmbeddingFindSimilar(
     uint32_t max_matches
 );
 
+/* Composed relation embedding: normalized mean of the symbol vectors
+   present in the triple. Returns 1 with a unit vector in out, 0 with
+   out zeroed when nothing is present. */
+int EmbeddingComposeRelation(const EMBEDDING_TABLE *table,
+                             SYMBOL_ID s, SYMBOL_ID p, SYMBOL_ID o,
+                             float *out);
+
 #endif

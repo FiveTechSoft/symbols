@@ -7,7 +7,6 @@
 #include "parser.h"
 #include "generator.h"
 #include "nlg.h"
-#include "inference.h"
 
 static void StrToUpper(const char *src, char *dst, size_t max_len)
 {
@@ -25,77 +24,28 @@ DIALOG_INTENT DialogClassify(const char *input)
     DIALOG_INTENT intent;
     memset(&intent, 0, sizeof(intent));
 
-    char upper[512];
-    StrToUpper(input, upper, sizeof(upper));
+    if (input == NULL)
+        return intent;
 
-    if (strstr(upper, "HOLA") || strstr(upper, "BUENOS DIAS") || strstr(upper, "BUENAS"))
+    PARSED_SENTENCE tokens;
+    ParserTokenize(input, &tokens);
+
+    if (tokens.count == 0)
+        return intent;
+
+    if (strchr(input, '?') != NULL)
     {
-        intent.act = SPEECH_ACT_GREETING;
-        intent.is_social_only = (strlen(input) <= 12);
+        intent.act = SPEECH_ACT_QUERY;
         return intent;
     }
 
-    if (strstr(upper, "GRACIAS") || strstr(upper, "EXCELENTE") || strstr(upper, "GENIAL"))
+    /* Short input with nothing to store is social. Longer input is a
+       statement: the tree pass will identify its symbols and relations. */
+    if (tokens.count <= 2)
     {
-        intent.act = SPEECH_ACT_GRATITUDE;
+        intent.act = SPEECH_ACT_SOCIAL;
         intent.is_social_only = 1;
         return intent;
-    }
-
-    if (strstr(upper, "ADIOS") || strstr(upper, "HASTA LUEGO") || strstr(upper, "CHAO"))
-    {
-        intent.act = SPEECH_ACT_FAREWELL;
-        intent.is_social_only = 1;
-        return intent;
-    }
-
-    if (strstr(upper, "POR QUE") || strstr(upper, "POR QUÉ"))
-    {
-        intent.act = SPEECH_ACT_QUERY_WHY;
-        return intent;
-    }
-
-    /* Identity questions: "quien eres", "como te llamas", ... */
-    if (strstr(upper, "QUIEN ERES") || strstr(upper, "QUÉ ERES") ||
-        strstr(upper, "QUE ERES") || strstr(upper, "COMO TE LLAMAS") ||
-        strstr(upper, "CÓMO TE LLAMAS") || strstr(upper, "TU NOMBRE"))
-    {
-        intent.act = SPEECH_ACT_IDENTITY;
-        return intent;
-    }
-
-    /* Capability questions: "que puedes hacer", "para que sirves", ... */
-    if (strstr(upper, "QUE PUEDES") || strstr(upper, "QUÉ PUEDES") ||
-        strstr(upper, "PARA QUE SIRVES") || strstr(upper, "PARA QUÉ SIRVES") ||
-        strstr(upper, "QUE SABES HACER") || strstr(upper, "QUÉ SABES HACER") ||
-        strstr(upper, "QUE HACES") || strstr(upper, "QUÉ HACES"))
-    {
-        intent.act = SPEECH_ACT_CAPABILITY;
-        return intent;
-    }
-
-    if (strchr(input, '?') || strstr(input, "\xC2\xBF") || strstr(upper, "QUE ") || strstr(upper, "QUIEN "))
-    {
-        if (strstr(upper, "QUE ES") || strstr(upper, "QUÉ ES"))
-            intent.act = SPEECH_ACT_QUERY_WHAT_IS;
-        else
-            intent.act = SPEECH_ACT_QUERY_FACT;
-        return intent;
-    }
-
-    /* Pattern: "X ES" or "X TIENE" at end → question */
-    {
-        size_t slen = strlen(upper);
-        if (slen >= 3 && strcmp(upper + slen - 3, " ES") == 0)
-        {
-            intent.act = SPEECH_ACT_QUERY_FACT;
-            return intent;
-        }
-        if (slen >= 7 && strcmp(upper + slen - 7, " TIENE") == 0)
-        {
-            intent.act = SPEECH_ACT_QUERY_FACT;
-            return intent;
-        }
     }
 
     intent.act = SPEECH_ACT_STATEMENT;
@@ -105,9 +55,9 @@ DIALOG_INTENT DialogClassify(const char *input)
 static void GetUnknownResponse(char *out, size_t size, const char *subj, const char *pred)
 {
     static const char *templates[] = {
-        "Aun no tengo informacion sobre si %s %s. Te gustaria ensenarmelo?",
-        "Ese dato aun no lo conozco. Nada sobre que %s %s.",
-        "No dispongo de registros para %s y la accion %s. Si me lo explicas, lo recordare."
+        "No record of %s %s yet. Teach it to me.",
+        "Nothing stored about %s %s.",
+        "Unknown: %s %s. Use /learn S P O to store it."
     };
     snprintf(out, size, templates[rand() % 3], subj, pred);
 }
@@ -124,233 +74,38 @@ int DialogGenerateResponse(
 
     DIALOG_INTENT intent = DialogClassify(user_input);
 
-    /* Pure social acts */
-    if (intent.act == SPEECH_ACT_GREETING && intent.is_social_only)
-    {
-        snprintf(out_response, max_len,
-                 "Hola! En que te puedo ayudar? Puedes ensenarme datos o hacerme preguntas.");
-        return 1;
-    }
-
-    if (intent.act == SPEECH_ACT_GRATITUDE)
+    /* Social input: short, nothing to store. Minimal ack. */
+    if (intent.act == SPEECH_ACT_SOCIAL)
     {
         static const char *resp[] = {
-            "De nada! Aqui estoy para lo que necesites razonar o consultar.",
-            "Un placer ayudarte. Hay algo mas que quieras verificar?",
-            "Para eso estoy! Preguntame lo que quieras."
+            "Hello.",
+            "Noted.",
+            "I store symbols and relations. Teach me with /learn S P O."
         };
         snprintf(out_response, max_len, "%s", resp[rand() % 3]);
         return 1;
     }
 
-    if (intent.act == SPEECH_ACT_FAREWELL)
-    {
-        snprintf(out_response, max_len, "Hasta luego! Todo lo que me has ensenado queda listo.");
-        return 1;
-    }
 
-    if (intent.act == SPEECH_ACT_IDENTITY)
+    /* ---- Structured QA: delegate to the parser (single source) ---- */
     {
-        snprintf(out_response, max_len,
-                 "Soy un sistema de razonamiento simbolico basado en grafos de conocimiento. "
-                 "No uso redes neuronales: mi conocimiento vive en relaciones explicitas "
-                 "<Sujeto, Predicado, Objeto> y razono por encadenamiento con confianza atenuada.");
-        return 1;
-    }
-
-    if (intent.act == SPEECH_ACT_CAPABILITY)
-    {
-        snprintf(out_response, max_len,
-                 "Puedo aprender hechos nuevos, responder preguntas sobre el grafo, "
-                 "razonar por encadenamiento profundo y detectar sinonimos con embeddings 32D. "
-                  "Comandos: /query, /find S P O, /why S P, /analogy A B, /infer, /stats, /export <file.dot|.ttl>.");
-        return 1;
-    }
-
-    /* ---- Kinship/count: delegate to the parser QA (single source) ---- */
-    {
-        QUESTION pq = ParserDetectQuestion(user_input);
-        if (pq.valid && (strcmp(pq.predicate, "ABUELO") == 0 ||
-                         strncmp(pq.predicate, "CUENTA", 6) == 0))
+        QUESTION pq = ParserDetectQuestion(graph, user_input);
+        if (pq.valid)
         {
             char answer[256] = {0};
             if (ParserAnswerQuestion(graph, &pq, answer, sizeof(answer)))
             {
-                if (strcmp(pq.predicate, "ABUELO") == 0)
-                    snprintf(out_response, max_len,
-                             "El abuelo de %s es %s.", pq.subject, answer);
-                else if (strcmp(pq.predicate, "CUENTA_HIJOS") == 0 ||
-                         strcmp(pq.predicate, "CUENTA:HIJO_DE") == 0)
-                    snprintf(out_response, max_len,
-                             "%s tiene estos hijos: %s.", pq.subject, answer);
-                else
-                    snprintf(out_response, max_len,
-                             "He contado en %s: %s.", pq.subject, answer);
+                snprintf(out_response, max_len, "%s", answer);
                 return 1;
             }
         }
     }
 
-    /* ---- Pattern: "X ES" at end → query graph directly ---- */
-    if (intent.act == SPEECH_ACT_QUERY_FACT)
-    {
-        char upper_input[512];
-        size_t ulen = strlen(user_input);
-        for (size_t i = 0; i < ulen; i++)
-            upper_input[i] = (char)toupper((unsigned char)user_input[i]);
-        upper_input[ulen] = '\0';
-
-        /* Check if ends with " ES" */
-        size_t slen = strlen(upper_input);
-        if (slen >= 3 && strcmp(upper_input + slen - 3, " ES") == 0)
-        {
-            /* Extract subject: everything before " ES" */
-            char subj[64] = {0};
-            size_t subj_len = slen - 3;
-            /* Remove leading article */
-            const char *start = upper_input;
-            if (strncmp(start, "EL ", 3) == 0) start += 3;
-            else if (strncmp(start, "LA ", 3) == 0) start += 3;
-            else if (strncmp(start, "LOS ", 4) == 0) start += 4;
-            else if (strncmp(start, "LAS ", 4) == 0) start += 4;
-
-            subj_len = strlen(start);
-            if (subj_len >= 63) subj_len = 63;
-            memcpy(subj, start, subj_len);
-            subj[subj_len] = '\0';
-            /* Remove trailing spaces */
-            while (subj_len > 0 && subj[subj_len - 1] == ' ') { subj[--subj_len] = '\0'; }
-            /* Normalize diacritics (ñ→n, á→a, etc.) */
-            NormalizeDiacritics(subj);
-
-            if (subj_len > 0)
-            {
-                /* Try exact match first */
-                SYMBOL_ID sid = SymbolFind(graph->symbols, subj);
-                SYMBOL_ID pid = SymbolFind(graph->symbols, "ES");
-
-                /* If not found, try to find any symbol from the subject words */
-                if (sid == SYMBOL_INVALID)
-                {
-                    char work[64];
-                    strncpy(work, subj, sizeof(work) - 1);
-                    work[sizeof(work) - 1] = '\0';
-                    char *word = strtok(work, " ");
-                    while (word != NULL)
-                    {
-                        sid = StemFindSymbol(graph->symbols, word);
-                        if (sid != SYMBOL_INVALID) break;
-                        word = strtok(NULL, " ");
-                    }
-                }
-
-                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID)
-                {
-                    RELATION *results[8];
-                    uint32_t found = GraphQuerySubjectPredicate(graph, sid, pid, results, 8);
-                    if (found > 0)
-                    {
-                        uint32_t idx = rand() % 4;
-                        static const char *openers[] = {
-                            "Segun lo que se, ",
-                            "Tengo registrado que ",
-                            "La respuesta es: ",
-                            "Segun mi conocimiento, "
-                        };
-                        snprintf(out_response, max_len, "%s", openers[idx]);
-                        char *w = out_response + strlen(out_response);
-
-                        const SYMBOL *subj_sym = SymbolGet(graph->symbols, sid);
-                        snprintf(w, max_len - strlen(out_response), "%s es ", subj_sym ? subj_sym->name : subj);
-                        w += strlen(w);
-
-                        for (uint32_t i = 0; i < found && i < 5; i++)
-                        {
-                            const SYMBOL *obj_sym = SymbolGet(graph->symbols, results[i]->object);
-                            if (i > 0) { snprintf(w, max_len - strlen(out_response), ", "); w += 2; }
-                            snprintf(w, max_len - strlen(out_response), "%s", obj_sym ? obj_sym->name : "?");
-                            w += strlen(w);
-                        }
-                        snprintf(w, max_len - strlen(out_response), ".");
-                        return 1;
-                    }
-                    else
-                    {
-                        snprintf(out_response, max_len,
-                                 "No tengo informacion sobre eso. Ensename y lo recordare.");
-                        return 1;
-                    }
-                }
-            }
-        }
-
-        /* Check if ends with " TIENE" */
-        if (slen >= 7 && strcmp(upper_input + slen - 7, " TIENE") == 0)
-        {
-            char subj[64] = {0};
-            const char *start = upper_input;
-            if (strncmp(start, "EL ", 3) == 0) start += 3;
-            else if (strncmp(start, "LA ", 3) == 0) start += 3;
-            else if (strncmp(start, "LOS ", 4) == 0) start += 4;
-            else if (strncmp(start, "LAS ", 4) == 0) start += 4;
-
-            size_t subj_len = strlen(start) - 7;
-            if (subj_len >= 63) subj_len = 63;
-            memcpy(subj, start, subj_len);
-            subj[subj_len] = '\0';
-            while (subj_len > 0 && subj[subj_len - 1] == ' ') { subj[--subj_len] = '\0'; }
-            NormalizeDiacritics(subj);
-
-            if (subj_len > 0)
-            {
-                SYMBOL_ID sid = SymbolFind(graph->symbols, subj);
-                SYMBOL_ID pid = SymbolFind(graph->symbols, "TIENE");
-
-                if (sid == SYMBOL_INVALID)
-                {
-                    char work[64];
-                    strncpy(work, subj, sizeof(work) - 1);
-                    work[sizeof(work) - 1] = '\0';
-                    char *word = strtok(work, " ");
-                    while (word != NULL)
-                    {
-                        sid = StemFindSymbol(graph->symbols, word);
-                        if (sid != SYMBOL_INVALID) break;
-                        word = strtok(NULL, " ");
-                    }
-                }
-
-                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID)
-                {
-                    RELATION *results[8];
-                    uint32_t found = GraphQuerySubjectPredicate(graph, sid, pid, results, 8);
-                    if (found > 0)
-                    {
-                        snprintf(out_response, max_len, "%s tiene: ", subj);
-                        char *w = out_response + strlen(out_response);
-                        for (uint32_t i = 0; i < found && i < 5; i++)
-                        {
-                            const SYMBOL *obj_sym = SymbolGet(graph->symbols, results[i]->object);
-                            if (i > 0) { snprintf(w, max_len - strlen(out_response), ", "); w += 2; }
-                            snprintf(w, max_len - strlen(out_response), "%s", obj_sym ? obj_sym->name : "?");
-                            w += strlen(w);
-                        }
-                        snprintf(w, max_len - strlen(out_response), ".");
-                        return 1;
-                    }
-                    else
-                    {
-                        snprintf(out_response, max_len,
-                                 "No tengo informacion sobre eso. Ensename y lo recordare.");
-                        return 1;
-                    }
-                }
-            }
-        }
-    }
+    /* Suffix query blocks removed: the parser FACT shape resolves
+       descriptor+entity in both orders with no word lists. */
 
     /* Knowledge queries */
-    if (intent.act == SPEECH_ACT_QUERY_FACT || intent.act == SPEECH_ACT_QUERY_WHAT_IS)
+    if (intent.act == SPEECH_ACT_QUERY)
     {
         char clean[256];
         strncpy(clean, user_input, sizeof(clean) - 1);
@@ -410,50 +165,23 @@ int DialogGenerateResponse(
                 }
             }
 
-            /* Fallback: just pick the one with most relations as subject */
-            if (!found_pair)
-            {
-                uint32_t best_count = 0;
-                for (uint32_t i = 0; i < match_count; i++)
-                {
-                    SYMBOL_ID try_subj = SymbolFind(graph->symbols, matches[i]);
-                    if (try_subj == SYMBOL_INVALID) continue;
-
-                    RELATION *dummy[4];
-                    uint32_t n = GraphQuerySubject(graph, try_subj, dummy, 4);
-                    if (n > best_count)
-                    {
-                        best_count = n;
-                        strncpy(subj, matches[i], sizeof(subj) - 1);
-                    }
-                }
-                /* Predicate = any other match */
-                for (uint32_t i = 0; i < match_count; i++)
-                {
-                    if (strcmp(matches[i], subj) != 0)
-                    {
-                        strncpy(pred, matches[i], sizeof(pred) - 1);
-                        break;
-                    }
-                }
-            }
+            /* No exact pair stored: admit unknown. Guessing from
+               relation counts fabricates answers. */
+            (void)found_pair;
         }
 
         if (subj[0] == '\0' || pred[0] == '\0')
         {
-            /* If looks like a question, respond with polite ignorance */
-            if (strstr(upper, "QUE ") || strstr(upper, "CUAL ") ||
-                strchr(clean, '?'))
+            if (strchr(clean, '?'))
             {
                 snprintf(out_response, max_len,
-                         "No dispongo de informacion sobre eso. "
-                         "Preguntame algo que haya ensenado antes.");
+                         "No record of that. Ask about something stored.");
             }
             else
             {
                 snprintf(out_response, max_len,
-                         "No logre identificar el sujeto y predicado. "
-                         "Reformula la pregunta.");
+                         "Could not identify symbols and relation. "
+                         "Rephrase it.");
             }
             return 1;
         }
@@ -557,49 +285,7 @@ int DialogGenerateResponse(
             return 1;
         }
 
-        /* No direct results, try inference */
-        INFERENCE_CONFIG cfg = InferenceConfigDefault();
-        INFERENCE_PATH path;
-        int proven = InferenceProve(graph, sid, pid, SYMBOL_INVALID, &cfg, &path);
-
-        if (proven && path.depth >= 2)
-        {
-            uint32_t idx = rand() % 4;
-            static const char *inf_openers[] = {
-                "Razonando por encadenamiento, ",
-                "Por deduccion transitiva, ",
-                "Siguiendo la cadena logica, ",
-                "Mediante razonamiento profundo, "
-            };
-            snprintf(out_response, max_len, "%s", inf_openers[idx]);
-
-            char *w = out_response + strlen(out_response);
-            const SYMBOL *s = SymbolGet(graph->symbols, path.step_nodes[0]);
-            snprintf(w, max_len - strlen(out_response), "%s ", s ? s->name : subj);
-
-            for (uint32_t i = 0; i < path.depth; i++)
-            {
-                const SYMBOL *p = SymbolGet(graph->symbols, path.step_predicates[i]);
-                const SYMBOL *o = SymbolGet(graph->symbols, path.step_nodes[i + 1]);
-
-                w = out_response + strlen(out_response);
-                if (p && p->name[0])
-                {
-                    char lc[128];
-                    lc[0] = (char)tolower((unsigned char)p->name[0]);
-                    strncpy(lc + 1, p->name + 1, sizeof(lc) - 2);
-                    lc[sizeof(lc) - 1] = '\0';
-                    snprintf(w, max_len - strlen(out_response), "%s %s ", lc, o ? o->name : "?");
-                }
-            }
-
-            w = out_response + strlen(out_response);
-            snprintf(w, max_len - strlen(out_response),
-                     " (confianza: %.0f%%, %u saltos).",
-                     path.accumulated_confidence * 100.0f, path.depth - 1);
-            return 1;
-        }
-
+        /* No direct results: report unknown, keep it honest. */
         {
             char unk[256];
             GetUnknownResponse(unk, sizeof(unk), subj, pred);
@@ -608,32 +294,23 @@ int DialogGenerateResponse(
         return 1;
     }
 
-    /* WHY queries */
-    if (intent.act == SPEECH_ACT_QUERY_WHY)
-    {
-        snprintf(out_response, max_len,
-                 "Para responder necesito un hecho concreto. Reformula como: 'Por que X tiene Y?'");
-        return 1;
-    }
-
-    /* Learning statements */
+    /* Learning statements: input → syntax tree → symbols → relations */
     char resolved_buf[256];
     ContextPreprocessSentence(ctx, user_input, resolved_buf, sizeof(resolved_buf));
 
-    if (LearningSentence(graph, resolved_buf))
+    if (ParserIngestSentence(graph, resolved_buf))
     {
         static const char *learn_confirms[] = {
-            "Entendido, he incorporado esa relacion a mi conocimiento.",
-            "Tomo nota. He actualizado mi memoria con ese dato.",
-            "Dato guardado. Ahora puedo razonar sobre ello si me preguntas.",
-            "Anotado! Ya forma parte de lo que se."
+            "Stored.",
+            "Noted. Symbols and relation saved.",
+            "Saved. Ask me about it."
         };
-        snprintf(out_response, max_len, "%s", learn_confirms[rand() % 4]);
+        snprintf(out_response, max_len, "%s", learn_confirms[rand() % 3]);
         return 1;
     }
 
     snprintf(out_response, max_len,
-             "Disculpa, no logre extraer una relacion clara. "
-             "Podrias expresarlo como 'Sujeto Predicado Objeto'?");
+             "Could not extract a clear relation. "
+             "Try it as 'symbol relation symbol'.");
     return 1;
 }

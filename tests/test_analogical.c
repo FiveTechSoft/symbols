@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "model.h"
-#include "inference.h"
 #include "transfer.h"
 
 void query_subject(GRAPH *g, const char *name)

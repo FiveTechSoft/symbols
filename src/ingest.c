@@ -76,8 +76,8 @@ int IngestTripleSource(GRAPH *graph,
     if (!added)
         return 0;
 
-    /* Procedencia: solo en insercion nueva (no pisa la original).
-       El simbolo fuente vive en la misma tabla (visible en /find). */
+    /* Provenance: only on fresh insert (never overwrites the original).
+       The source symbol lives in the same table (visible in /find). */
     if (existing == NULL && source != NULL && source[0] != '\0')
     {
         char src_upper[128];
@@ -268,7 +268,7 @@ INGEST_STATS IngestTSVStreamSrc(GRAPH *graph, FILE *f, const char *filepath)
 
         stats.lines_parsed++;
 
-        /* Procedencia: 4a columna explicita, o "fichero:linea" */
+        /* Provenance: explicit 4th column, or "file:line" */
         const char *source = (src[0] != '\0') ? src : NULL;
         defsrc[0] = '\0';
         if (source == NULL && filepath != NULL && filepath[0] != '\0')

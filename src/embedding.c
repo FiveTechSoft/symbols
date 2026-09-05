@@ -262,3 +262,40 @@ uint32_t EmbeddingFindSimilar(
 
     return found;
 }
+
+/* Composed relation embedding: normalized mean of the symbol vectors
+   present in the triple. Relations establish symbol meanings, so a
+   relation reads as the composition of its symbols. Nothing present
+   (unknown ids or missing vectors) -> out zeroed, returns 0. */
+int EmbeddingComposeRelation(const EMBEDDING_TABLE *table,
+                             SYMBOL_ID s, SYMBOL_ID p, SYMBOL_ID o,
+                             float *out)
+{
+    if (table == NULL || out == NULL)
+        return 0;
+
+    for (int i = 0; i < EMBEDDING_DIM; i++)
+        out[i] = 0.0f;
+
+    SYMBOL_ID ids[3] = { s, p, o };
+    int present = 0;
+    for (int k = 0; k < 3; k++)
+    {
+        if (ids[k] == SYMBOL_INVALID)
+            continue;
+        const float *v = EmbeddingGetVector(table, ids[k]);
+        if (v == NULL)
+            continue;
+        for (int i = 0; i < EMBEDDING_DIM; i++)
+            out[i] += v[i];
+        present++;
+    }
+
+    if (present == 0)
+        return 0;
+
+    for (int i = 0; i < EMBEDDING_DIM; i++)
+        out[i] /= (float)present;
+    EmbeddingNormalize(out);
+    return 1;
+}

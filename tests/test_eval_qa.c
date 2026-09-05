@@ -49,7 +49,7 @@ int main(int argc, char **argv)
             continue;
 
         total++;
-        QUESTION q = ParserDetectQuestion(question);
+        QUESTION q = ParserDetectQuestion(graph, question);
         char answer[256] = {0};
         int found = (q.valid && q.is_question) ?
             ParserAnswerQuestion(graph, &q, answer, sizeof(answer)) : 0;

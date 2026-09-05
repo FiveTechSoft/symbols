@@ -27,7 +27,7 @@ static const char *SUFFIXES[] = {
     "AR",       /* HABLAR -> HABL */
     "ER",       /* COMER -> COM */
     "IR",       /* VIVIR -> VIV */
-    /* personas verbales cortas y plurales */
+    /* short verb persons and plurals */
     "AN",       /* HABLAN -> HABL */
     "EN",       /* COMEN -> COM */
     "AS",       /* HABLAS -> HABL */
@@ -52,7 +52,7 @@ int StemStep(const char *word, char *out, uint32_t out_size)
     if (len >= out_size)
         len = out_size - 1;
 
-    /* Palabras cortas: ya son raiz */
+    /* Short words: already roots */
     if (len <= STEM_MIN_ROOT)
     {
         memcpy(out, word, len);
@@ -112,10 +112,10 @@ void StemWord(const char *word, char *out, uint32_t out_size)
     out[out_size - 1] = '\0';
 }
 
-/* BFS sobre reducciones: en cada nivel prueba TODOS los sufijos
-   aplicables, no solo el primero. Asi COMEN alcanza COME (via N)
-   y COM (via EN), y HABLAN alcanza HABL (via AN) y HABLA (via
-   N). Gana la forma mas larga presente en el grafo. */
+/* BFS over reductions: each level tries ALL applicable suffixes,
+   not just the first. So COMEN reaches COME (via N) and COM (via EN),
+   and HABLAN reaches HABL (via AN) and HABLA (via N). The longest
+   form present in the graph wins. */
 SYMBOL_ID StemFindSymbol(const SYMBOL_TABLE *table, const char *word)
 {
     if (table == NULL || word == NULL || word[0] == '\0')
@@ -156,7 +156,7 @@ SYMBOL_ID StemFindSymbol(const SYMBOL_TABLE *table, const char *word)
                     if (id != SYMBOL_INVALID)
                         return id;
 
-                    /* Encolar si hay sitio (evita duplicados simples) */
+                    /* Enqueue if there is room (skips simple duplicates) */
                     if (nnxt < 32)
                     {
                         int dup = 0;
