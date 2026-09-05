@@ -28,6 +28,12 @@ typedef struct
     uint32_t  count;
     uint32_t  capacity;
     RELATION_INDEX *idx;
+
+    /* Subject chain index: subject -> item list (insertion order) */
+    uint32_t *subj_heads;
+    uint32_t *subj_next;    /* per-item next index in chain */
+    uint32_t  subj_capacity;
+    uint32_t  subj_mask;
 } RELATION_TABLE;
 
 RELATION_TABLE *RelationTableCreate(uint32_t capacity);

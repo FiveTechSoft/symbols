@@ -64,14 +64,14 @@ RELATION *GraphFindRelation(GRAPH *graph,
                             SYMBOL_ID predicate,
                             SYMBOL_ID object);
 
-uint32_t GraphQuerySubject(GRAPH *graph, SYMBOL_ID subject,
+uint32_t GraphQuerySubject(const GRAPH *graph, SYMBOL_ID subject,
                            RELATION **results, uint32_t max_results);
 
-uint32_t GraphQuerySubjectPredicate(GRAPH *graph, SYMBOL_ID subject,
+uint32_t GraphQuerySubjectPredicate(const GRAPH *graph, SYMBOL_ID subject,
                                     SYMBOL_ID predicate,
                                     RELATION **results, uint32_t max_results);
 
-uint32_t GraphQueryObject(GRAPH *graph, SYMBOL_ID object,
+uint32_t GraphQueryObject(const GRAPH *graph, SYMBOL_ID object,
                           RELATION **results, uint32_t max_results);
 
 int GraphInferTransitive(GRAPH *graph,

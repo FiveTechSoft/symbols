@@ -30,18 +30,6 @@ static const char *VERBS[] = {
     NULL
 };
 
-/* Prepositions and articles to strip from edges */
-static const char *STRIP_WORDS[] = {
-    "EL", "LA", "LOS", "LAS", "UN", "UNA", "UNOS", "UNAS",
-    "DE", "DEL", "DELA", "DELOS", "DELAS",
-    "EN", "EN_EL", "EN_LA", "EN_LOS", "EN_LAS",
-    "POR", "PARA", "CON", "SIN", "SOBRE",
-    "A", "AL", "ALA",
-    "QUE", "COMO",
-    "Y", "O",
-    NULL
-};
-
 /* ============================================================
    Utility
    ============================================================ */
@@ -73,14 +61,6 @@ static void AppendToken(char *dst, size_t dst_size, const char *token)
 
     memcpy(dst + used, token, len);
     dst[used + len] = '\0';
-}
-
-static int IsStripWord(const char *word)
-{
-    for (int i = 0; STRIP_WORDS[i]; i++)
-        if (strcmp(word, STRIP_WORDS[i]) == 0)
-            return 1;
-    return 0;
 }
 
 static int IsVerb(const char *word)

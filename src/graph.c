@@ -192,7 +192,7 @@ RELATION *GraphFindRelation(
    ============================================================ */
 
 uint32_t GraphQuerySubject(
-    GRAPH *graph,
+    const GRAPH *graph,
     SYMBOL_ID subject,
     RELATION **results,
     uint32_t max_results)
@@ -210,7 +210,7 @@ uint32_t GraphQuerySubject(
    ============================================================ */
 
 uint32_t GraphQuerySubjectPredicate(
-    GRAPH *graph,
+    const GRAPH *graph,
     SYMBOL_ID subject,
     SYMBOL_ID predicate,
     RELATION **results,
@@ -229,7 +229,7 @@ uint32_t GraphQuerySubjectPredicate(
    ============================================================ */
 
 uint32_t GraphQueryObject(
-    GRAPH *graph,
+    const GRAPH *graph,
     SYMBOL_ID object,
     RELATION **results,
     uint32_t max_results)
@@ -583,7 +583,8 @@ uint32_t GraphQueryByEmbedding(
     uint32_t count = 0;
     for (uint32_t i = 0; i < total; i++)
     {
-        RELATION *r = RelationGet(graph->relations, i);
+        /* items live in a mutable table; RelationGet returns const for readers */
+        RELATION *r = (RELATION *)RelationGet(graph->relations, i);
         if (r == NULL) continue;
 
         float score = 0.0f;

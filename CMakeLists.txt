@@ -14,7 +14,6 @@ add_library(symbolic STATIC
     src/parser.c
     src/context.c
     src/dialog.c
-    src/dialogue.c
     src/generator.c
     src/inference.c
     src/ingest.c
@@ -23,6 +22,7 @@ add_library(symbolic STATIC
     src/shard.c
     src/stats.c
     src/transfer.c
+    src/export.c
 )
 
 target_include_directories(symbolic PUBLIC include)

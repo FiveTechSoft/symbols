@@ -16,6 +16,7 @@
 #include "stats.h"
 #include "transfer.h"
 #include "parser.h"
+#include "export.h"
 
 #define CLI_BUFFER_SIZE 512
 
@@ -111,6 +112,7 @@ int main(void)
     printf("     SYMBOLIC LLM\n");
     printf("  Natural conversation without backpropagation or GPUs.\n");
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
+    printf("            /find S P O (*), /why S P O, /export <f.dot|f.ttl>,\n");
     printf("            /synonyms, /alias, /analogy A B,\n");
     printf("            /save, /load, /clear, /exit                  \n");
     printf("========================================================\n\n");
@@ -242,7 +244,7 @@ int main(void)
             continue;
         }
 
-        /* /ask <query> — embed query, attend over ALL relations */
+        /* /ask <query> â€” embed query, attend over ALL relations */
         if (strncmp(input, "/ask ", 5) == 0)
         {
             const char *query = input + 5;
@@ -438,6 +440,87 @@ int main(void)
             continue;
         }
 
+        /* Multi-hop inference trace: /why S P O */
+        if (strncmp(input, "/why ", 5) == 0)
+        {
+            char s[64] = {0}, p[64] = {0}, o[64] = {0};
+            if (sscanf(input + 5, "%63s %63s %63s", s, p, o) == 3)
+            {
+                SYMBOL_ID sid = SymbolFind(graph->symbols, s);
+                SYMBOL_ID pid = SymbolFind(graph->symbols, p);
+                SYMBOL_ID oid = SymbolFind(graph->symbols, o);
+                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID &&
+                    oid != SYMBOL_INVALID)
+                {
+                    INFERENCE_PATH path;
+                    if (InferenceProve(graph, sid, pid, oid, NULL, &path))
+                        InferencePrintExplanation(graph, &path);
+                    else
+                        printf("IA > No proof found: %s -/-> %s.\n\n", s, o);
+                }
+                else
+                    printf("IA > Unknown symbol in /why arguments.\n\n");
+            }
+            else
+                printf("IA > Usage: /why SUBJECT PREDICATE OBJECT\n\n");
+            continue;
+        }
+
+        /* Wildcard triple search: /find S P O ('*' allowed) */
+        if (strncmp(input, "/find ", 6) == 0)
+        {
+            char s[64] = {0}, p[64] = {0}, o[64] = {0};
+            if (sscanf(input + 6, "%63s %63s %63s", s, p, o) == 3)
+            {
+                SYMBOL_ID sid = (strcmp(s, "*") == 0) ?
+                    SYMBOL_INVALID : SymbolFind(graph->symbols, s);
+                RELATION *rels[64];
+                uint32_t n = (sid != SYMBOL_INVALID) ?
+                    GraphQuerySubject(graph, sid, rels, 64) :
+                    RelationCount(graph->relations);
+                uint32_t shown = 0;
+                for (uint32_t i = 0; i < n && shown < 32; i++)
+                {
+                    const RELATION *r = (sid != SYMBOL_INVALID) ? rels[i] :
+                        RelationGet(graph->relations, i);
+                    if (!r) continue;
+                    if (strcmp(p, "*") != 0 &&
+                        SymbolGet(graph->symbols, r->predicate) &&
+                        strcmp(SymbolGet(graph->symbols, r->predicate)->name, p) != 0)
+                        continue;
+                    if (strcmp(o, "*") != 0 &&
+                        SymbolGet(graph->symbols, r->object) &&
+                        strcmp(SymbolGet(graph->symbols, r->object)->name, o) != 0)
+                        continue;
+                    const SYMBOL *ss = SymbolGet(graph->symbols, r->subject);
+                    const SYMBOL *pp = SymbolGet(graph->symbols, r->predicate);
+                    const SYMBOL *oo = SymbolGet(graph->symbols, r->object);
+                    if (ss && pp && oo)
+                        printf("  %s --%s--> %s\n", ss->name, pp->name, oo->name);
+                    shown++;
+                }
+                printf("IA > %u matching relation(s).\n\n", shown);
+            }
+            else
+                printf("IA > Usage: /find SUBJECT PREDICATE OBJECT  ('*' = any)\n\n");
+            continue;
+        }
+
+        /* Graph export: /export file.dot | file.ttl */
+        if (strncmp(input, "/export ", 8) == 0)
+        {
+            const char *path = input + 8;
+            size_t plen = strlen(path);
+            int ok = 0;
+            if (plen > 4 && strcmp(path + plen - 4, ".ttl") == 0)
+                ok = GraphExportTurtle(graph, path);
+            else
+                ok = GraphExportDot(graph, path);
+            printf("IA > %s '%s'.\n\n", ok ? "Exported to" :
+                   "Export failed for", path);
+            continue;
+        }
+
         /* Attention + token-match hybrid query */
         if (graph != NULL && embeds != NULL)
         {
@@ -459,7 +542,7 @@ int main(void)
                 int used_as_pred = 0;
                 for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
                 {
-                    RELATION *rel = RelationGet(graph->relations, r);
+                    const RELATION *rel = RelationGet(graph->relations, r);
                     if (rel && rel->predicate == pred_id) { used_as_pred = 1; break; }
                 }
                 if (!used_as_pred) continue;
@@ -467,12 +550,11 @@ int main(void)
                 /* Found predicate match! Score each relation with this predicate */
                 for (uint32_t r = 0; r < RelationCount(graph->relations); r++)
                 {
-                    RELATION *rel = RelationGet(graph->relations, r);
+                    const RELATION *rel = RelationGet(graph->relations, r);
                     if (rel == NULL || rel->predicate != pred_id) continue;
 
                     /* Score entity match against other query tokens */
                     float entity_score = 0.0f;
-                    int ec = 0;
                     for (uint32_t u = 0; u < toks.count; u++)
                     {
                         if (u == t) continue;
@@ -487,13 +569,11 @@ int main(void)
                         {
                             float sim = EmbeddingCosineSimilarity(t_vec, o_vec);
                             if (sim > entity_score) entity_score = sim;
-                            ec++;
                         }
                         if (t_vec && s_vec)
                         {
                             float sim = EmbeddingCosineSimilarity(t_vec, s_vec);
                             if (sim > entity_score) entity_score = sim;
-                            ec++;
                         }
                     }
 
@@ -512,10 +592,32 @@ int main(void)
             {
                 const SYMBOL *o = SymbolGet(graph->symbols, best_obj);
                 if (o)
-                    printf("IA > %s\n\n", o->name);
+                {
+                    const SYMBOL *s = SymbolGet(graph->symbols, best_subj);
+                    const SYMBOL *p = SymbolGet(graph->symbols, best_pred);
+                    if (s && p)
+                        printf("IA > %s (because %s --%s--> %s)\n\n",
+                               o->name, s->name, p->name, o->name);
+                    else
+                        printf("IA > %s\n\n", o->name);
+                }
             }
             else
             {
+                /* Social / identity acts never reach the attention scorer */
+                DIALOG_INTENT di = DialogClassify(input);
+                if (di.act == SPEECH_ACT_IDENTITY ||
+                    di.act == SPEECH_ACT_CAPABILITY ||
+                    ((di.act == SPEECH_ACT_GREETING ||
+                      di.act == SPEECH_ACT_GRATITUDE ||
+                      di.act == SPEECH_ACT_FAREWELL) && di.is_social_only))
+                {
+                    DialogGenerateResponse(graph, ctx, input,
+                                           response, sizeof(response));
+                    printf("IA > %s\n\n", response);
+                    continue;
+                }
+
                 uint32_t base = RelationCount(graph->relations);
                 ParserIngestSentence(graph, input);
                 uint32_t added = RelationCount(graph->relations) - base;

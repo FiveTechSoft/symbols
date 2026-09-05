@@ -53,6 +53,25 @@ DIALOG_INTENT DialogClassify(const char *input)
         return intent;
     }
 
+    /* Identity questions: "quien eres", "como te llamas", ... */
+    if (strstr(upper, "QUIEN ERES") || strstr(upper, "QUÉ ERES") ||
+        strstr(upper, "QUE ERES") || strstr(upper, "COMO TE LLAMAS") ||
+        strstr(upper, "CÓMO TE LLAMAS") || strstr(upper, "TU NOMBRE"))
+    {
+        intent.act = SPEECH_ACT_IDENTITY;
+        return intent;
+    }
+
+    /* Capability questions: "que puedes hacer", "para que sirves", ... */
+    if (strstr(upper, "QUE PUEDES") || strstr(upper, "QUÉ PUEDES") ||
+        strstr(upper, "PARA QUE SIRVES") || strstr(upper, "PARA QUÉ SIRVES") ||
+        strstr(upper, "QUE SABES HACER") || strstr(upper, "QUÉ SABES HACER") ||
+        strstr(upper, "QUE HACES") || strstr(upper, "QUÉ HACES"))
+    {
+        intent.act = SPEECH_ACT_CAPABILITY;
+        return intent;
+    }
+
     if (strchr(input, '?') || strstr(input, "\xC2\xBF") || strstr(upper, "QUE ") || strstr(upper, "QUIEN "))
     {
         if (strstr(upper, "QUE ES") || strstr(upper, "QUÉ ES"))
@@ -125,6 +144,24 @@ int DialogGenerateResponse(
     if (intent.act == SPEECH_ACT_FAREWELL)
     {
         snprintf(out_response, max_len, "Hasta luego! Todo lo que me has ensenado queda listo.");
+        return 1;
+    }
+
+    if (intent.act == SPEECH_ACT_IDENTITY)
+    {
+        snprintf(out_response, max_len,
+                 "Soy un sistema de razonamiento simbolico basado en grafos de conocimiento. "
+                 "No uso redes neuronales: mi conocimiento vive en relaciones explicitas "
+                 "<Sujeto, Predicado, Objeto> y razono por encadenamiento con confianza atenuada.");
+        return 1;
+    }
+
+    if (intent.act == SPEECH_ACT_CAPABILITY)
+    {
+        snprintf(out_response, max_len,
+                 "Puedo aprender hechos nuevos, responder preguntas sobre el grafo, "
+                 "razonar por encadenamiento profundo y detectar sinonimos con embeddings 32D. "
+                 "Comandos: /query, /find S P O, /why S P, /analogy A B, /stats, /export <file.dot|.ttl>.");
         return 1;
     }
 
@@ -326,8 +363,8 @@ int DialogGenerateResponse(
                 SYMBOL_ID try_subj = SymbolFind(graph->symbols, matches[i]);
                 if (try_subj == SYMBOL_INVALID) continue;
 
-                RELATION *dummy[1];
-                uint32_t has_rels = GraphQuerySubject((GRAPH *)graph, try_subj, dummy, 1);
+                    RELATION *dummy[1];
+                    uint32_t has_rels = GraphQuerySubject(graph, try_subj, dummy, 1);
                 if (has_rels == 0) continue;
 
                 for (uint32_t j = 0; j < match_count && !found_pair; j++)
@@ -337,7 +374,7 @@ int DialogGenerateResponse(
                     if (try_pred == SYMBOL_INVALID) continue;
 
                     RELATION *r[1];
-                    uint32_t n = GraphQuerySubjectPredicate((GRAPH *)graph, try_subj, try_pred, r, 1);
+                    uint32_t n = GraphQuerySubjectPredicate(graph, try_subj, try_pred, r, 1);
                     if (n > 0)
                     {
                         strncpy(subj, matches[i], sizeof(subj) - 1);
@@ -357,7 +394,7 @@ int DialogGenerateResponse(
                     if (try_subj == SYMBOL_INVALID) continue;
 
                     RELATION *dummy[4];
-                    uint32_t n = GraphQuerySubject((GRAPH *)graph, try_subj, dummy, 4);
+                    uint32_t n = GraphQuerySubject(graph, try_subj, dummy, 4);
                     if (n > best_count)
                     {
                         best_count = n;

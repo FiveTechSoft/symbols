@@ -216,6 +216,14 @@ MODEL *ModelLoad(const char *filepath)
             return NULL;
         }
 
+        /* Hard cap: a corrupted file must not request huge allocations */
+        if (name_len == 0 || name_len > 255)
+        {
+            ModelDestroy(model);
+            fclose(f);
+            return NULL;
+        }
+
         char *name = (char *)malloc(name_len + 1);
         if (name == NULL)
         {

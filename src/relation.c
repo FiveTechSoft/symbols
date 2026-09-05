@@ -37,6 +37,13 @@ typedef struct RELATION_INDEX
     uint32_t  mask;
 } RELATION_INDEX;
 
+static void SubjectIndexRebuild(RELATION_TABLE *table);
+static int SubjectIndexInsert(RELATION_TABLE *table, uint32_t item_idx);
+static uint32_t SubjectIndexCollect(const RELATION_TABLE *table,
+                                     SYMBOL_ID subject,
+                                     RELATION **results,
+                                     uint32_t max_results);
+
 static RELATION_INDEX *RelationIndexCreate(uint32_t capacity)
 {
     capacity = NextPowerOfTwo(capacity * 2);
@@ -116,6 +123,10 @@ void RelationTableInit(RELATION_TABLE *table, uint32_t capacity)
     table->count = 0;
     table->capacity = capacity;
     table->idx = NULL;
+    table->subj_heads = NULL;
+    table->subj_next = NULL;
+    table->subj_capacity = 0;
+    table->subj_mask = 0;
 
     if (table->items == NULL)
     {
@@ -135,6 +146,12 @@ void RelationTableDestroy(RELATION_TABLE *table)
         RelationIndexDestroy(table->idx);
         table->idx = NULL;
     }
+    free(table->subj_heads);
+    free(table->subj_next);
+    table->subj_heads = NULL;
+    table->subj_next = NULL;
+    table->subj_capacity = 0;
+    table->subj_mask = 0;
     free(table->items);
     free(table);
 }
@@ -251,6 +268,7 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
         h = (h + 1) & mask;
     }
     table->idx->buckets[h] = new_idx;
+    SubjectIndexInsert(table, new_idx);
 
     return 1;
 }
@@ -266,12 +284,19 @@ uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
 {
     if (!table || !results || max_results == 0) return 0;
 
+    if (table->subj_capacity > 0 && subject != SYMBOL_INVALID)
+    {
+        uint32_t n = SubjectIndexCollect(table, subject, results, max_results);
+        if (n != 0xFFFFFFFF)
+            return n;
+    }
+
     uint32_t found = 0;
     for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].subject == subject)
         {
-            results[found++] = &table->items[i];
+            results[found++] = (RELATION *)&table->items[i];
             if (found >= max_results) break;
         }
     }
@@ -284,12 +309,29 @@ uint32_t RelationFindBySubjectPredicate(const RELATION_TABLE *table,
 {
     if (!table || !results || max_results == 0) return 0;
 
+    /* Use the subject chain to limit the scan to this subject's relations */
+    if (table->subj_capacity > 0 && subject != SYMBOL_INVALID)
+    {
+        RELATION *chain[64];
+        uint32_t n = SubjectIndexCollect(table, subject, chain, 64);
+        if (n != 0xFFFFFFFF)
+        {
+            uint32_t found = 0;
+            for (uint32_t i = 0; i < n && found < max_results; i++)
+            {
+                if (chain[i]->predicate == predicate)
+                    results[found++] = chain[i];
+            }
+            return found;
+        }
+    }
+
     uint32_t found = 0;
     for (uint32_t i = 0; i < table->count; i++)
     {
         if (table->items[i].subject == subject && table->items[i].predicate == predicate)
         {
-            results[found++] = &table->items[i];
+            results[found++] = (RELATION *)&table->items[i];
             if (found >= max_results) break;
         }
     }
@@ -324,6 +366,96 @@ uint32_t RelationCount(const RELATION_TABLE *table)
     return table ? table->count : 0;
 }
 
+/* ============================================================
+   Subject chain index: hash(subject) -> chain of item indices.
+   Chains are LIFO on insert; lookups reverse them so results
+   keep insertion order (same semantics as the old linear scan).
+   ============================================================ */
+
+static void SubjectIndexRebuild(RELATION_TABLE *table)
+{
+    uint32_t cap = NextPowerOfTwo((table->capacity > table->count ? table->capacity : table->count) * 2);
+    if (cap < 16) cap = 16;
+
+    uint32_t *heads = (uint32_t *)malloc(cap * sizeof(uint32_t));
+    uint32_t *next = (uint32_t *)realloc(table->subj_next, cap * sizeof(uint32_t));
+    if (heads == NULL || next == NULL)
+    {
+        free(heads);
+        free(table->subj_heads); /* keep next: realloc keeps old block on fail */
+        table->subj_heads = NULL;
+        table->subj_next = next;
+        table->subj_capacity = 0;
+        table->subj_mask = 0;
+        return;
+    }
+
+    memset(heads, 0xFF, cap * sizeof(uint32_t));
+    table->subj_heads = heads;
+    table->subj_next = next;
+    table->subj_capacity = cap;
+    table->subj_mask = cap - 1;
+
+    for (uint32_t i = 0; i < table->count; i++)
+    {
+        uint32_t h = table->items[i].subject & table->subj_mask;
+        table->subj_next[i] = table->subj_heads[h];
+        table->subj_heads[h] = i;
+    }
+}
+
+static int SubjectIndexInsert(RELATION_TABLE *table, uint32_t item_idx)
+{
+    if (table->subj_capacity == 0)
+        SubjectIndexRebuild(table);
+    if (table->subj_capacity == 0)
+        return 0;
+
+    if ((table->count + 1) * HASH_LOAD_FACTOR_DEN >=
+        table->subj_capacity * HASH_LOAD_FACTOR_NUM)
+    {
+        SubjectIndexRebuild(table);
+        if (table->subj_capacity == 0)
+            return 0;
+    }
+
+    uint32_t h = table->items[item_idx].subject & table->subj_mask;
+    table->subj_next[item_idx] = table->subj_heads[h];
+    table->subj_heads[h] = item_idx;
+    return 1;
+}
+
+/* Collect all items with matching subject, oldest first (insertion order).
+   Returns found count, or 0xFFFFFFFF to signal "too long, use linear". */
+static uint32_t SubjectIndexCollect(const RELATION_TABLE *table,
+                                    SYMBOL_ID subject,
+                                    RELATION **results,
+                                    uint32_t max_results)
+{
+    if (table->subj_capacity == 0)
+        return 0xFFFFFFFF;
+
+    uint32_t chain[64];
+    uint32_t n = 0;
+    uint32_t i = table->subj_heads[subject & table->subj_mask];
+    while (i != EMPTY_BUCKET)
+    {
+        if (n >= 64) return 0xFFFFFFFF;
+        chain[n++] = i;
+        i = table->subj_next[i];
+    }
+
+    /* chain[] is newest-first; emit oldest-first */
+    uint32_t found = 0;
+    for (uint32_t k = n; k > 0 && found < max_results; k--)
+    {
+        uint32_t idx = chain[k - 1];
+        if (table->items[idx].subject == subject)
+            results[found++] = (RELATION *)&table->items[idx];
+    }
+    return found;
+}
+
 void RelationIndexRebuild(RELATION_TABLE *table)
 {
     if (!table || !table->idx || !table->items) return;
@@ -332,4 +464,5 @@ void RelationIndexRebuild(RELATION_TABLE *table)
         cap /= 2;
     if (cap < 16) cap = 16;
     RelationIndexRehash(table->idx, table->items, table->count, cap);
+    SubjectIndexRebuild(table);
 }
