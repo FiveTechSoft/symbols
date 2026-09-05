@@ -20,11 +20,14 @@ typedef struct
     float             weight;
 } RELATION;
 
+typedef struct RELATION_INDEX RELATION_INDEX;
+
 typedef struct
 {
     RELATION *items;
     uint32_t  count;
     uint32_t  capacity;
+    RELATION_INDEX *idx;
 } RELATION_TABLE;
 
 RELATION_TABLE *RelationTableCreate(uint32_t capacity);

@@ -10,27 +10,71 @@ add_library(symbolic STATIC
     src/graph.c
     src/learning.c
     src/model.c
+    src/embedding.c
+    src/parser.c
+    src/context.c
+    src/dialog.c
+    src/dialogue.c
+    src/generator.c
+    src/inference.c
+    src/ingest.c
+    src/nlg.c
+    src/prune.c
+    src/shard.c
+    src/stats.c
+    src/transfer.c
 )
 
 target_include_directories(symbolic PUBLIC include)
+target_link_libraries(symbolic PUBLIC m)
 
-add_executable(sllm_demo src/main.c)
-target_link_libraries(sllm_demo symbolic)
+add_executable(sllm_cli src/main_cli.c)
+target_link_libraries(sllm_cli symbolic)
+
+add_executable(train_shard src/train_shard.c)
+target_link_libraries(train_shard symbolic)
+
+add_executable(train_massive src/train_massive.c)
+target_link_libraries(train_massive symbolic)
+
+add_executable(bench_1m tests/bench_1m_relations.c)
+target_link_libraries(bench_1m symbolic)
+
+add_executable(bench_stress tests/bench_stress_50k.c)
+target_link_libraries(bench_stress symbolic)
 
 enable_testing()
 
-add_executable(test_symbol tests/test_symbol.c)
-target_link_libraries(test_symbol symbolic)
-add_test(NAME test_symbol COMMAND test_symbol)
+function(sllm_test name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} symbolic)
+    add_test(NAME ${name} COMMAND ${name} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endfunction()
 
-add_executable(test_tokenizer tests/test_tokenizer.c)
-target_link_libraries(test_tokenizer symbolic)
-add_test(NAME test_tokenizer COMMAND test_tokenizer)
+sllm_test(test_symbol          tests/test_symbol.c)
+sllm_test(test_tokenizer       tests/test_tokenizer.c)
+sllm_test(test_graph           tests/test_graph.c)
+sllm_test(test_learning        tests/test_learning.c)
+sllm_test(test_model           tests/test_model.c)
+sllm_test(test_embedding       tests/test_embedding.c)
+sllm_test(test_model_embeddings tests/test_model_embeddings.c)
+sllm_test(test_graph_fuzzy     tests/test_graph_fuzzy.c)
+sllm_test(test_context         tests/test_context.c)
+sllm_test(test_conversation    tests/test_conversation.c)
+sllm_test(test_generator       tests/test_generator.c)
+sllm_test(test_ingest          tests/test_ingest.c)
+sllm_test(test_contradictions  tests/test_contradictions.c)
+sllm_test(test_deep_inference  tests/test_deep_inference.c)
+sllm_test(test_stats           tests/test_stats.c)
+sllm_test(test_analogical      tests/test_analogical.c)
+sllm_test(test_attention       test_attention.c)
+sllm_test(test_concepts        test_concepts.c)
+sllm_test(test_qa_debug        test_qa_debug.c)
 
-add_executable(test_graph tests/test_graph.c)
-target_link_libraries(test_graph symbolic)
-add_test(NAME test_graph COMMAND test_graph)
+# Readers of wiki_model.bin must run BEFORE the tests that regenerate it
+add_executable(test_wiki_inference tests/test_wiki_inference.c)
+target_link_libraries(test_wiki_inference symbolic)
+add_test(NAME test_wiki_inference COMMAND test_wiki_inference wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_executable(test_learning tests/test_learning.c)
-target_link_libraries(test_learning symbolic)
-add_test(NAME test_learning COMMAND test_learning)
+sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
+sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)

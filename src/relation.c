@@ -30,14 +30,12 @@ static inline uint32_t HashTripletPolar(SYMBOL_ID s, SYMBOL_ID p, SYMBOL_ID o, R
     return (uint32_t)k;
 }
 
-typedef struct
+typedef struct RELATION_INDEX
 {
     uint32_t *buckets;
     uint32_t  capacity;
     uint32_t  mask;
 } RELATION_INDEX;
-
-static RELATION_INDEX *g_rel_idx = NULL;
 
 static RELATION_INDEX *RelationIndexCreate(uint32_t capacity)
 {
@@ -101,6 +99,11 @@ RELATION_TABLE *RelationTableCreate(uint32_t capacity)
     if (!table) return NULL;
 
     RelationTableInit(table, capacity);
+    if (table->items == NULL)
+    {
+        free(table);
+        return NULL;
+    }
     return table;
 }
 
@@ -112,20 +115,25 @@ void RelationTableInit(RELATION_TABLE *table, uint32_t capacity)
     table->items = (RELATION *)calloc(capacity, sizeof(RELATION));
     table->count = 0;
     table->capacity = capacity;
+    table->idx = NULL;
 
-    if (g_rel_idx)
-        RelationIndexDestroy(g_rel_idx);
-    g_rel_idx = RelationIndexCreate(capacity);
+    if (table->items == NULL)
+    {
+        table->capacity = 0;
+        return;
+    }
+
+    table->idx = RelationIndexCreate(capacity);
 }
 
 void RelationTableDestroy(RELATION_TABLE *table)
 {
     if (!table) return;
 
-    if (g_rel_idx)
+    if (table->idx)
     {
-        RelationIndexDestroy(g_rel_idx);
-        g_rel_idx = NULL;
+        RelationIndexDestroy(table->idx);
+        table->idx = NULL;
     }
     free(table->items);
     free(table);
@@ -135,15 +143,17 @@ RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
                             SYMBOL_ID predicate, SYMBOL_ID object,
                             RELATION_POLARITY polarity)
 {
-    if (!table || table->count == 0 || !g_rel_idx)
+    if (!table || table->count == 0 || !table->idx)
         return NULL;
 
-    uint32_t mask = g_rel_idx->mask;
+    RELATION_INDEX *idx = table->idx;
+    uint32_t mask = idx->mask;
     uint32_t h = HashTripletPolar(subject, predicate, object, polarity) & mask;
 
-    while (1)
+    uint32_t probes = 0;
+    while (probes < idx->capacity)
     {
-        uint32_t item_idx = g_rel_idx->buckets[h];
+        uint32_t item_idx = idx->buckets[h];
         if (item_idx == EMPTY_BUCKET)
             return NULL;
 
@@ -154,7 +164,9 @@ RELATION *RelationFindPolar(RELATION_TABLE *table, SYMBOL_ID subject,
             return r;
         }
         h = (h + 1) & mask;
+        probes++;
     }
+    return NULL;
 }
 
 RELATION *RelationFind(RELATION_TABLE *table, SYMBOL_ID subject,
@@ -183,11 +195,17 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
                      SYMBOL_ID predicate, SYMBOL_ID object,
                      RELATION_POLARITY polarity)
 {
-    if (!table || subject == SYMBOL_INVALID || predicate == SYMBOL_INVALID || object == SYMBOL_INVALID)
+    if (!table || !table->items || table->capacity == 0)
+        return 0;
+    if (subject == SYMBOL_INVALID || predicate == SYMBOL_INVALID || object == SYMBOL_INVALID)
         return 0;
 
-    if (!g_rel_idx)
-        g_rel_idx = RelationIndexCreate(table->capacity);
+    if (!table->idx)
+    {
+        table->idx = RelationIndexCreate(table->capacity);
+        if (!table->idx)
+            return 0;
+    }
 
     RELATION *existing = RelationFindPolar(table, subject, predicate, object, polarity);
     if (existing != NULL)
@@ -208,10 +226,13 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
         table->capacity = new_cap;
     }
 
-    if (table->count * HASH_LOAD_FACTOR_DEN >= g_rel_idx->capacity * HASH_LOAD_FACTOR_NUM)
+    if (table->count * HASH_LOAD_FACTOR_DEN >= table->idx->capacity * HASH_LOAD_FACTOR_NUM)
     {
-        RelationIndexRehash(g_rel_idx, table->items, table->count, g_rel_idx->capacity * 2);
+        RelationIndexRehash(table->idx, table->items, table->count, table->idx->capacity * 2);
     }
+
+    if (table->count >= table->idx->capacity)
+        return 0;
 
     uint32_t new_idx = table->count;
     RELATION *r = &table->items[new_idx];
@@ -223,13 +244,13 @@ int RelationAddPolar(RELATION_TABLE *table, SYMBOL_ID subject,
     r->weight = 1.0f;
     table->count++;
 
-    uint32_t mask = g_rel_idx->mask;
+    uint32_t mask = table->idx->mask;
     uint32_t h = HashTripletPolar(subject, predicate, object, polarity) & mask;
-    while (g_rel_idx->buckets[h] != EMPTY_BUCKET)
+    while (table->idx->buckets[h] != EMPTY_BUCKET)
     {
         h = (h + 1) & mask;
     }
-    g_rel_idx->buckets[h] = new_idx;
+    table->idx->buckets[h] = new_idx;
 
     return 1;
 }
@@ -305,10 +326,10 @@ uint32_t RelationCount(const RELATION_TABLE *table)
 
 void RelationIndexRebuild(RELATION_TABLE *table)
 {
-    if (!table || !g_rel_idx) return;
-    uint32_t cap = g_rel_idx->capacity;
+    if (!table || !table->idx || !table->items) return;
+    uint32_t cap = table->idx->capacity;
     while (cap > 16 && table->count * 10 < cap * 7)
         cap /= 2;
     if (cap < 16) cap = 16;
-    RelationIndexRehash(g_rel_idx, table->items, table->count, cap);
+    RelationIndexRehash(table->idx, table->items, table->count, cap);
 }

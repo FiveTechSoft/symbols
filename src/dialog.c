@@ -62,6 +62,21 @@ DIALOG_INTENT DialogClassify(const char *input)
         return intent;
     }
 
+    /* Pattern: "X ES" or "X TIENE" at end → question */
+    {
+        size_t slen = strlen(upper);
+        if (slen >= 3 && strcmp(upper + slen - 3, " ES") == 0)
+        {
+            intent.act = SPEECH_ACT_QUERY_FACT;
+            return intent;
+        }
+        if (slen >= 7 && strcmp(upper + slen - 7, " TIENE") == 0)
+        {
+            intent.act = SPEECH_ACT_QUERY_FACT;
+            return intent;
+        }
+    }
+
     intent.act = SPEECH_ACT_STATEMENT;
     return intent;
 }
@@ -111,6 +126,164 @@ int DialogGenerateResponse(
     {
         snprintf(out_response, max_len, "Hasta luego! Todo lo que me has ensenado queda listo.");
         return 1;
+    }
+
+    /* ---- Pattern: "X ES" at end → query graph directly ---- */
+    if (intent.act == SPEECH_ACT_QUERY_FACT)
+    {
+        char upper_input[512];
+        size_t ulen = strlen(user_input);
+        for (size_t i = 0; i < ulen; i++)
+            upper_input[i] = (char)toupper((unsigned char)user_input[i]);
+        upper_input[ulen] = '\0';
+
+        /* Check if ends with " ES" */
+        size_t slen = strlen(upper_input);
+        if (slen >= 3 && strcmp(upper_input + slen - 3, " ES") == 0)
+        {
+            /* Extract subject: everything before " ES" */
+            char subj[64] = {0};
+            size_t subj_len = slen - 3;
+            /* Remove leading article */
+            const char *start = upper_input;
+            if (strncmp(start, "EL ", 3) == 0) start += 3;
+            else if (strncmp(start, "LA ", 3) == 0) start += 3;
+            else if (strncmp(start, "LOS ", 4) == 0) start += 4;
+            else if (strncmp(start, "LAS ", 4) == 0) start += 4;
+
+            subj_len = strlen(start);
+            if (subj_len >= 63) subj_len = 63;
+            memcpy(subj, start, subj_len);
+            subj[subj_len] = '\0';
+            /* Remove trailing spaces */
+            while (subj_len > 0 && subj[subj_len - 1] == ' ') { subj[--subj_len] = '\0'; }
+            /* Normalize diacritics (ñ→n, á→a, etc.) */
+            NormalizeDiacritics(subj);
+
+            if (subj_len > 0)
+            {
+                /* Try exact match first */
+                SYMBOL_ID sid = SymbolFind(graph->symbols, subj);
+                SYMBOL_ID pid = SymbolFind(graph->symbols, "ES");
+
+                /* If not found, try to find any symbol from the subject words */
+                if (sid == SYMBOL_INVALID)
+                {
+                    char work[64];
+                    strncpy(work, subj, sizeof(work) - 1);
+                    work[sizeof(work) - 1] = '\0';
+                    char *word = strtok(work, " ");
+                    while (word != NULL)
+                    {
+                        sid = SymbolFind(graph->symbols, word);
+                        if (sid != SYMBOL_INVALID) break;
+                        word = strtok(NULL, " ");
+                    }
+                }
+
+                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID)
+                {
+                    RELATION *results[8];
+                    uint32_t found = GraphQuerySubjectPredicate(graph, sid, pid, results, 8);
+                    if (found > 0)
+                    {
+                        uint32_t idx = rand() % 4;
+                        static const char *openers[] = {
+                            "Segun lo que se, ",
+                            "Tengo registrado que ",
+                            "La respuesta es: ",
+                            "Segun mi conocimiento, "
+                        };
+                        snprintf(out_response, max_len, "%s", openers[idx]);
+                        char *w = out_response + strlen(out_response);
+
+                        const SYMBOL *subj_sym = SymbolGet(graph->symbols, sid);
+                        snprintf(w, max_len - strlen(out_response), "%s es ", subj_sym ? subj_sym->name : subj);
+                        w += strlen(w);
+
+                        for (uint32_t i = 0; i < found && i < 5; i++)
+                        {
+                            const SYMBOL *obj_sym = SymbolGet(graph->symbols, results[i]->object);
+                            if (i > 0) { snprintf(w, max_len - strlen(out_response), ", "); w += 2; }
+                            snprintf(w, max_len - strlen(out_response), "%s", obj_sym ? obj_sym->name : "?");
+                            w += strlen(w);
+                        }
+                        snprintf(w, max_len - strlen(out_response), ".");
+                        return 1;
+                    }
+                    else
+                    {
+                        snprintf(out_response, max_len,
+                                 "No tengo informacion sobre eso. Ensename y lo recordare.");
+                        return 1;
+                    }
+                }
+            }
+        }
+
+        /* Check if ends with " TIENE" */
+        if (slen >= 7 && strcmp(upper_input + slen - 7, " TIENE") == 0)
+        {
+            char subj[64] = {0};
+            const char *start = upper_input;
+            if (strncmp(start, "EL ", 3) == 0) start += 3;
+            else if (strncmp(start, "LA ", 3) == 0) start += 3;
+            else if (strncmp(start, "LOS ", 4) == 0) start += 4;
+            else if (strncmp(start, "LAS ", 4) == 0) start += 4;
+
+            size_t subj_len = strlen(start) - 7;
+            if (subj_len >= 63) subj_len = 63;
+            memcpy(subj, start, subj_len);
+            subj[subj_len] = '\0';
+            while (subj_len > 0 && subj[subj_len - 1] == ' ') { subj[--subj_len] = '\0'; }
+            NormalizeDiacritics(subj);
+
+            if (subj_len > 0)
+            {
+                SYMBOL_ID sid = SymbolFind(graph->symbols, subj);
+                SYMBOL_ID pid = SymbolFind(graph->symbols, "TIENE");
+
+                if (sid == SYMBOL_INVALID)
+                {
+                    char work[64];
+                    strncpy(work, subj, sizeof(work) - 1);
+                    work[sizeof(work) - 1] = '\0';
+                    char *word = strtok(work, " ");
+                    while (word != NULL)
+                    {
+                        sid = SymbolFind(graph->symbols, word);
+                        if (sid != SYMBOL_INVALID) break;
+                        word = strtok(NULL, " ");
+                    }
+                }
+
+                if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID)
+                {
+                    RELATION *results[8];
+                    uint32_t found = GraphQuerySubjectPredicate(graph, sid, pid, results, 8);
+                    if (found > 0)
+                    {
+                        snprintf(out_response, max_len, "%s tiene: ", subj);
+                        char *w = out_response + strlen(out_response);
+                        for (uint32_t i = 0; i < found && i < 5; i++)
+                        {
+                            const SYMBOL *obj_sym = SymbolGet(graph->symbols, results[i]->object);
+                            if (i > 0) { snprintf(w, max_len - strlen(out_response), ", "); w += 2; }
+                            snprintf(w, max_len - strlen(out_response), "%s", obj_sym ? obj_sym->name : "?");
+                            w += strlen(w);
+                        }
+                        snprintf(w, max_len - strlen(out_response), ".");
+                        return 1;
+                    }
+                    else
+                    {
+                        snprintf(out_response, max_len,
+                                 "No tengo informacion sobre eso. Ensename y lo recordare.");
+                        return 1;
+                    }
+                }
+            }
+        }
     }
 
     /* Knowledge queries */

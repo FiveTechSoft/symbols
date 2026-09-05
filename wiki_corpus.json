@@ -1,0 +1,1806 @@
+{
+  "articles": 192,
+  "total_triples": 298,
+  "unique_triples": 298,
+  "top_predicates": {
+    "ES": 260,
+    "TIENE": 17,
+    "UBICADO_EN": 6,
+    "INCLUYE": 5,
+    "USA": 4,
+    "FUE_CREADO": 2,
+    "PRODUCE": 2,
+    "CAUSA": 1,
+    "PARTE_DE": 1
+  },
+  "triples": [
+    {
+      "subject": "TRAMPOSO AMOR",
+      "predicate": "ES",
+      "object": "primer álbum de la banda chilena",
+      "count": 1
+    },
+    {
+      "subject": "SU BASE PRINCIPAL",
+      "predicate": "ES",
+      "object": "aeropuerto de East Midlands",
+      "count": 1
+    },
+    {
+      "subject": "SU CAPITAL",
+      "predicate": "ES",
+      "object": "Taiz la",
+      "count": 1
+    },
+    {
+      "subject": "QUE EN TÉRMINOS DE EXTENSIÓN",
+      "predicate": "ES",
+      "object": "similar a la del Líbano",
+      "count": 1
+    },
+    {
+      "subject": "HUIDA DESESPERADA",
+      "predicate": "ES",
+      "object": "telefilme estadounidense de aventura drama",
+      "count": 1
+    },
+    {
+      "subject": "FLINN III Y LOS PROTAGONISTAS",
+      "predicate": "ES",
+      "object": "Christopher Plummer Jonathan Banks",
+      "count": 1
+    },
+    {
+      "subject": "ESTE LARGOMETRAJE",
+      "predicate": "ES",
+      "object": "realizado por Barry Weitz Films",
+      "count": 1
+    },
+    {
+      "subject": "POR ELLO HOFFMAN",
+      "predicate": "ES",
+      "object": "conocido como el padre del cuadro",
+      "count": 1
+    },
+    {
+      "subject": "SU INVENTO",
+      "predicate": "ES",
+      "object": "utilizado hasta la actualidad en todo",
+      "count": 1
+    },
+    {
+      "subject": "MÁS CONOCIDO COMO OSCARCITO O YAKOZUKI",
+      "predicate": "ES",
+      "object": "productor musical cantante compositor",
+      "count": 1
+    },
+    {
+      "subject": "EL REINO DE RYŪKYŪ",
+      "predicate": "ES",
+      "object": "reino independiente",
+      "count": 1
+    },
+    {
+      "subject": "TREVOR STINES",
+      "predicate": "ES",
+      "object": "actor",
+      "count": 1
+    },
+    {
+      "subject": "CUAL TAMBIÉN",
+      "predicate": "INCLUYE",
+      "object": "modelo de 8,4 pulgadas la Samsung",
+      "count": 1
+    },
+    {
+      "subject": "ESTA",
+      "predicate": "ES",
+      "object": "primera tableta de 10,5 pulgadas de",
+      "count": 1
+    },
+    {
+      "subject": "TAMBIÉN CONOCIDA COMO LA CRUZADA POPULAR O DE LOS CAMPESINOS",
+      "predicate": "ES",
+      "object": "a peregrinación espontánea popular surgida en",
+      "count": 1
+    },
+    {
+      "subject": "LIDERADA POR MIEMBROS DEL CLERO BAJO COMO PEDRO EL ERMITAÑO Y WALTER EL INDIGENTE",
+      "predicate": "ES",
+      "object": "rechazada por las fuerzas de los",
+      "count": 1
+    },
+    {
+      "subject": "MARZIA RITA GISELA PIAZZA SUPRANI",
+      "predicate": "ES",
+      "object": "a reina de belleza",
+      "count": 1
+    },
+    {
+      "subject": "PUES",
+      "predicate": "ES",
+      "object": "primera finalista del certamen",
+      "count": 1
+    },
+    {
+      "subject": "COLUMBIA",
+      "predicate": "ES",
+      "object": "pueblo ubicado en el condado de",
+      "count": 1
+    },
+    {
+      "subject": "POR LO QUE SU TAMAÑO",
+      "predicate": "ES",
+      "object": "«pequeño» para una estrella de sus",
+      "count": 1
+    },
+    {
+      "subject": "PÓLUX —LA GIGANTE NARANJA MÁS PRÓXIMA AL SOL—",
+      "predicate": "ES",
+      "object": "66% mayor mientras",
+      "count": 1
+    },
+    {
+      "subject": "AL IGUAL QUE EL SOL, NO",
+      "predicate": "TIENE",
+      "object": "ninguna compañera estelar",
+      "count": 1
+    },
+    {
+      "subject": "ZDENĚK ŠTĚPÁNEK",
+      "predicate": "ES",
+      "object": "dramaturgo",
+      "count": 1
+    },
+    {
+      "subject": "EN FRANCÉS LA \"BESOIGNE\" DE LA BROSSINIÈRE",
+      "predicate": "ES",
+      "object": "a batalla de la Guerra de",
+      "count": 1
+    },
+    {
+      "subject": "THE BOOK OF SOULS: LIVE CHAPTER",
+      "predicate": "ES",
+      "object": "álbum en vivo de la banda",
+      "count": 1
+    },
+    {
+      "subject": "ÁLBUM",
+      "predicate": "ES",
+      "object": "producido por Tony Newton con Steve",
+      "count": 1
+    },
+    {
+      "subject": "SE TRATA DEL PRIMER ÁLBUM EN VIVO DE LA BANDA DESDE BEAST OVER HAMMERSMITH DE 2002 QUE NO",
+      "predicate": "ES",
+      "object": "producido por Kevin Shirley",
+      "count": 1
+    },
+    {
+      "subject": "EN EL ÁMBITO EMPRESARIAL",
+      "predicate": "ES",
+      "object": "aquel conjunto de actividades",
+      "count": 1
+    },
+    {
+      "subject": "BEBIDA REFRESCANTE",
+      "predicate": "TIENE",
+      "object": "valor por su marca imagen etc",
+      "count": 1
+    },
+    {
+      "subject": "MIENTRAS EL PRIMERO",
+      "predicate": "TIENE",
+      "object": "por objeto hacer llegar el producto",
+      "count": 1
+    },
+    {
+      "subject": "OTRO EJEMPLO SERÍA UNA OPERACIÓN DIRECTA ENTRE FABRICANTE Y CONSUMIDOR DONDE LA COMPETENCIA",
+      "predicate": "ES",
+      "object": "nula por características técnicas el distribuidor",
+      "count": 1
+    },
+    {
+      "subject": "CANCIÓN",
+      "predicate": "ES",
+      "object": "grabada en Air Studios de George",
+      "count": 1
+    },
+    {
+      "subject": "MCCARTNEY HA DICHO QUE LA CANCIÓN TAMBIÉN",
+      "predicate": "ES",
+      "object": "inspirada por su entonces esposa Heather",
+      "count": 1
+    },
+    {
+      "subject": "ADESMUS DELAHAYEI",
+      "predicate": "ES",
+      "object": "a especie de escarabajo longicornio del",
+      "count": 1
+    },
+    {
+      "subject": "BRETT HICKS-MAITLAND",
+      "predicate": "ES",
+      "object": "actor australiano conocido por haber interpretado",
+      "count": 1
+    },
+    {
+      "subject": "KHATCHATURIAN",
+      "predicate": "ES",
+      "object": "asteroide perteneciente al cinturón de asteroides",
+      "count": 1
+    },
+    {
+      "subject": "CHARLES RABEMANANJARA",
+      "predicate": "ES",
+      "object": "político de Madagascar primer ministro del",
+      "count": 1
+    },
+    {
+      "subject": "RABEMANANJARA OCUPÓ EL CARGO DE DIRECTOR DEL GABINETE MILITAR DE LA PRESIDENCIA EN 2004 Y TAMBIÉN",
+      "predicate": "ES",
+      "object": "Ministro de Interior",
+      "count": 1
+    },
+    {
+      "subject": "CIUDAD DE ETAH",
+      "predicate": "ES",
+      "object": "centro administrativo del distrito de Etah",
+      "count": 1
+    },
+    {
+      "subject": "JUAN MONEO LARA «EL TORTA»",
+      "predicate": "ES",
+      "object": "cantante flamenco español de etnia gitana",
+      "count": 1
+    },
+    {
+      "subject": "JUAN MONEO",
+      "predicate": "ES",
+      "object": "hermano de Manuel Moneo",
+      "count": 1
+    },
+    {
+      "subject": "EPIGMENIO DE LA PIEDRA AUREOLES",
+      "predicate": "ES",
+      "object": "presbítero",
+      "count": 1
+    },
+    {
+      "subject": "EPIGMENIO",
+      "predicate": "ES",
+      "object": "hijo de Lorenzo de la Piedra",
+      "count": 1
+    },
+    {
+      "subject": "TAMBIÉN DENOMINADO FRUTERO DE CEJAS RUFAS O HEMISPINGO DE CEJA RUFA",
+      "predicate": "ES",
+      "object": "a especie de ave paseriforme de",
+      "count": 1
+    },
+    {
+      "subject": "BAICHENG LÉASE BÁI-CHENG",
+      "predicate": "ES",
+      "object": "a ciudad-prefectura de la provincia de",
+      "count": 1
+    },
+    {
+      "subject": "SU ÁREA",
+      "predicate": "ES",
+      "object": "de 25 683 km²",
+      "count": 1
+    },
+    {
+      "subject": "CLORURO MERCÚRICO O CLORURO DE MERCURIO",
+      "predicate": "ES",
+      "object": "compuesto inorgánico de fórmula HgCl2",
+      "count": 1
+    },
+    {
+      "subject": "TELLICO VILLAGE",
+      "predicate": "ES",
+      "object": "lugar designado por el censo ubicado",
+      "count": 1
+    },
+    {
+      "subject": "AURORA BADO",
+      "predicate": "ES",
+      "object": "a deportista de Italia",
+      "count": 1
+    },
+    {
+      "subject": "BOUZOA",
+      "predicate": "ES",
+      "object": "a aldea española situada en la",
+      "count": 1
+    },
+    {
+      "subject": "CALLIONYMUS ERYTHRAEUS",
+      "predicate": "ES",
+      "object": "a especie de peces de la",
+      "count": 1
+    },
+    {
+      "subject": "KLEBANG",
+      "predicate": "ES",
+      "object": "a localidad",
+      "count": 1
+    },
+    {
+      "subject": "BLUEPOINT GAMES TRABAJÓ EN LAS VERSIONES EN ALTA DEFINICIÓN DEL JUEGO",
+      "predicate": "ES",
+      "object": "nzado el 17 de noviembre de",
+      "count": 1
+    },
+    {
+      "subject": "EN OTRAS REGIONES",
+      "predicate": "ES",
+      "object": "nzado entre los meses de marzo",
+      "count": 1
+    },
+    {
+      "subject": "SIN EMBARGO ESTA ÚLTIMA VERSIÓN NO",
+      "predicate": "INCLUYE",
+      "object": "Peace Walker",
+      "count": 1
+    },
+    {
+      "subject": "EN EL E3 DE 2017",
+      "predicate": "ES",
+      "object": "anunciado un remake del juego Shadow",
+      "count": 1
+    },
+    {
+      "subject": "SE ANUNCIÓ UN REMAKE DE DEMON'S SOULS QUE LE LANZARÍA COMO EXCLUSIVA PARA LA FUTURA CONSOLA PLAYSTATION 5, SE",
+      "predicate": "TIENE",
+      "object": "planeado un lanzamiento para el 12",
+      "count": 1
+    },
+    {
+      "subject": "VAR",
+      "predicate": "ES",
+      "object": "a Ásynjur una diosa de los",
+      "count": 1
+    },
+    {
+      "subject": "BRACON GLAPHYRUS",
+      "predicate": "ES",
+      "object": "a especie de insecto del género",
+      "count": 1
+    },
+    {
+      "subject": "OLIVIER PARDINI",
+      "predicate": "ES",
+      "object": "ciclista belga",
+      "count": 1
+    },
+    {
+      "subject": "O DA STAPEL ,,)",
+      "predicate": "ES",
+      "object": "botánico neerlandés conocido por sus comentarios",
+      "count": 1
+    },
+    {
+      "subject": "DE LAS PLANTAS Y SUS PARTES",
+      "predicate": "ES",
+      "object": "muy esquemáticos",
+      "count": 1
+    },
+    {
+      "subject": "OLIVER BINEY",
+      "predicate": "ES",
+      "object": "luchador profesional británico actualmente firmado con",
+      "count": 1
+    },
+    {
+      "subject": "ACTUALMENTE",
+      "predicate": "ES",
+      "object": "entrenador de New Generation Wrestling en",
+      "count": 1
+    },
+    {
+      "subject": "ASPINATIMONOMMA GLYPHYSTERNUM MADRASENSE",
+      "predicate": "ES",
+      "object": "a subespecie de coleóptero de la",
+      "count": 1
+    },
+    {
+      "subject": "PALO GACHO",
+      "predicate": "ES",
+      "object": "a localidad de México localizada en",
+      "count": 1
+    },
+    {
+      "subject": "OLMOSALBOS",
+      "predicate": "ES",
+      "object": "a localidad española del municipio de",
+      "count": 1
+    },
+    {
+      "subject": "MARCILLY-EN-BEAUCE",
+      "predicate": "ES",
+      "object": "a comuna",
+      "count": 1
+    },
+    {
+      "subject": "ARTOSILLA",
+      "predicate": "ES",
+      "object": "a localidad española perteneciente al municipio",
+      "count": 1
+    },
+    {
+      "subject": "MEIR MARGALIT",
+      "predicate": "ES",
+      "object": "activista por los derechos humanos historiador",
+      "count": 1
+    },
+    {
+      "subject": "ACTUALMENTE",
+      "predicate": "ES",
+      "object": "miembro de la dirección del Center",
+      "count": 1
+    },
+    {
+      "subject": "LA SECCIÓN BOLCHEVIQUE-LENINISTA DE ESPAÑA",
+      "predicate": "ES",
+      "object": "a pequeña organización trotskista española creada",
+      "count": 1
+    },
+    {
+      "subject": "MUNICIPIO DE TODD",
+      "predicate": "ES",
+      "object": "municipio ubicado en el condado de",
+      "count": 1
+    },
+    {
+      "subject": "ELEOSCYTALOPUS",
+      "predicate": "ES",
+      "object": "género de aves paseriformes perteneciente a",
+      "count": 1
+    },
+    {
+      "subject": "LOUIS DE BÉCHAMEIL MARQUÉS DE NOINTEL",
+      "predicate": "ES",
+      "object": "financiero francés",
+      "count": 1
+    },
+    {
+      "subject": "SALSA BÉCHAMEL QUE LLEVA HOY EN DÍA SU NOMBRE",
+      "predicate": "ES",
+      "object": "en realidad el resultado del perfeccionamiento",
+      "count": 1
+    },
+    {
+      "subject": "EL AVRO 552",
+      "predicate": "ES",
+      "object": "biplano ligero británico producido a principios",
+      "count": 1
+    },
+    {
+      "subject": "ESZTERHÁZA",
+      "predicate": "ES",
+      "object": "palacio construido en Fertőd Hungría por",
+      "count": 1
+    },
+    {
+      "subject": "PUES",
+      "predicate": "ES",
+      "object": "edificio de estilo rococó más importante",
+      "count": 1
+    },
+    {
+      "subject": "MATÍAS LESCANO",
+      "predicate": "ES",
+      "object": "exjugador de baloncesto argentino",
+      "count": 1
+    },
+    {
+      "subject": "OFICIALMENTE RUTA NACIONAL TERCIARIA 725",
+      "predicate": "ES",
+      "object": "a ruta nacional de Costa Rica",
+      "count": 1
+    },
+    {
+      "subject": "ODESSA",
+      "predicate": "ES",
+      "object": "a villa ubicada en el condado",
+      "count": 1
+    },
+    {
+      "subject": "ROCÍO",
+      "predicate": "ES",
+      "object": "nombre propio femenino de origen español",
+      "count": 1
+    },
+    {
+      "subject": "EN ALGUNAS PARTES SE AFIRMA QUE EL SIGNIFICADO DE ESTE NOMBRE SERÍA: AQUELLA QUE ES REFRESCANTE O JUVENIL",
+      "predicate": "TIENE",
+      "object": "gracia",
+      "count": 1
+    },
+    {
+      "subject": "EUPHAEDRA DARGEI",
+      "predicate": "ES",
+      "object": "a especie de Lepidoptera de la",
+      "count": 1
+    },
+    {
+      "subject": "MANUEL SÁTIRO DE OLIVEIRA DIAS",
+      "predicate": "ES",
+      "object": "médico",
+      "count": 1
+    },
+    {
+      "subject": "CANEDO DE BASTO E CORGO",
+      "predicate": "ES",
+      "object": "a freguesia portuguesa del municipio de",
+      "count": 1
+    },
+    {
+      "subject": "LA CELESTINA",
+      "predicate": "ES",
+      "object": "a película española dirigida por Gerardo",
+      "count": 1
+    },
+    {
+      "subject": "SIMON THEODOR AUFRECHT",
+      "predicate": "ES",
+      "object": "indólogo alemán",
+      "count": 1
+    },
+    {
+      "subject": "AUFRECHT NACIÓ EN LESCHNITZ",
+      "predicate": "ES",
+      "object": "educado en Berlín",
+      "count": 1
+    },
+    {
+      "subject": "ENTRE 1862 Y 1875",
+      "predicate": "ES",
+      "object": "profesor en la Universidad de Edimburgo",
+      "count": 1
+    },
+    {
+      "subject": "AUFRECHT",
+      "predicate": "ES",
+      "object": "nombrado a la cátedra de Indología",
+      "count": 1
+    },
+    {
+      "subject": "ESTE",
+      "predicate": "ES",
+      "object": "primer intento de catalogar todos los",
+      "count": 1
+    },
+    {
+      "subject": "VUELO 8 DE REEVE ALEUTIAN AIRWAYS",
+      "predicate": "ES",
+      "object": "vuelo nacional americano de Cold Bay",
+      "count": 1
+    },
+    {
+      "subject": "THE VEIL",
+      "predicate": "ES",
+      "object": "a miniserie de televisión estadounidense de",
+      "count": 1
+    },
+    {
+      "subject": "ROLESVILLE",
+      "predicate": "ES",
+      "object": "pueblo ubicado en el Condado de",
+      "count": 1
+    },
+    {
+      "subject": "CELESTINO VEGA MATEOS",
+      "predicate": "ES",
+      "object": "médico humanista",
+      "count": 1
+    },
+    {
+      "subject": "SU OBRA MÁS DESTACADA",
+      "predicate": "ES",
+      "object": "El juguete caído publicado en 1970",
+      "count": 1
+    },
+    {
+      "subject": "EN 1955",
+      "predicate": "ES",
+      "object": "incluido en la relación de Poetas",
+      "count": 1
+    },
+    {
+      "subject": "LEWISVILLE",
+      "predicate": "ES",
+      "object": "a ciudad ubicada en el condado",
+      "count": 1
+    },
+    {
+      "subject": "WINSEN",
+      "predicate": "ES",
+      "object": "municipio situado en el distrito de",
+      "count": 1
+    },
+    {
+      "subject": "LA COPA COSAFA 2003",
+      "predicate": "ES",
+      "object": "séptima edición del torneo de fútbol",
+      "count": 1
+    },
+    {
+      "subject": "FRANCISCO DE ZABÁLBURU Y BASABE",
+      "predicate": "ES",
+      "object": "mecenas financiero terrateniente bibliófilo",
+      "count": 1
+    },
+    {
+      "subject": "SHEILA LEIRNER",
+      "predicate": "ES",
+      "object": "a curadora de arte periodista",
+      "count": 1
+    },
+    {
+      "subject": "SU MADRE",
+      "predicate": "ES",
+      "object": "artista Giselda Leirner",
+      "count": 1
+    },
+    {
+      "subject": "NDELELE",
+      "predicate": "ES",
+      "object": "a comuna camerunesa perteneciente al departamento",
+      "count": 1
+    },
+    {
+      "subject": "EN 2005",
+      "predicate": "TIENE",
+      "object": "26 127 habitantes de los",
+      "count": 1
+    },
+    {
+      "subject": "SU TERRITORIO",
+      "predicate": "ES",
+      "object": "fronterizo con la República Centroafricana",
+      "count": 1
+    },
+    {
+      "subject": "CHARCO",
+      "predicate": "ES",
+      "object": "lugar designado por el censo ubicado",
+      "count": 1
+    },
+    {
+      "subject": "THE PAST AND NOW",
+      "predicate": "ES",
+      "object": "álbum recopilatorio de la banda finlandesa",
+      "count": 1
+    },
+    {
+      "subject": "ESTE DISCO",
+      "predicate": "ES",
+      "object": "nzado en 1997 como promoción en",
+      "count": 1
+    },
+    {
+      "subject": "CANCIÓN \"FIRE DANCE SUITE\"",
+      "predicate": "ES",
+      "object": "perteneciente del disco en solitario Timo",
+      "count": 1
+    },
+    {
+      "subject": "DISCO",
+      "predicate": "ES",
+      "object": "nzado en edición limitada",
+      "count": 1
+    },
+    {
+      "subject": "ÉRIZE-LA-PETITE",
+      "predicate": "ES",
+      "object": "a población",
+      "count": 1
+    },
+    {
+      "subject": "LUCAS GAMBARTE",
+      "predicate": "ES",
+      "object": "piloto argentino de automovilismo de velocidad",
+      "count": 1
+    },
+    {
+      "subject": "SU PADRE CARLOS ALBERTO",
+      "predicate": "ES",
+      "object": "arquitecto en su ciudad natal mientras",
+      "count": 1
+    },
+    {
+      "subject": "PICO VIEJO O MONTAÑA CHAHORRA",
+      "predicate": "ES",
+      "object": "volcán situado en la isla de",
+      "count": 1
+    },
+    {
+      "subject": "PICO VIEJO Y EL TEIDE",
+      "predicate": "ES",
+      "object": "s dos únicas montañas canarias",
+      "count": 1
+    },
+    {
+      "subject": "RAFAEL MOTA MURILLO",
+      "predicate": "ES",
+      "object": "sacerdote franciscano",
+      "count": 1
+    },
+    {
+      "subject": "LEONARDO ESTEBAN MONJE VALENZUELA",
+      "predicate": "ES",
+      "object": "exfutbolista chileno",
+      "count": 1
+    },
+    {
+      "subject": "JUGABA DE DELANTERO Y SU ÚLTIMO EQUIPO PROFESIONAL",
+      "predicate": "ES",
+      "object": "Coquimbo Unido",
+      "count": 1
+    },
+    {
+      "subject": "RAFAEL FONTANEDA IBÁÑEZ",
+      "predicate": "ES",
+      "object": "empresario industrial",
+      "count": 1
+    },
+    {
+      "subject": "EL FONDO MONETARIO INTERNACIONAL",
+      "predicate": "ES",
+      "object": "a organización financiera internacional de las",
+      "count": 1
+    },
+    {
+      "subject": "CUOTAS",
+      "predicate": "ES",
+      "object": "aportes realizados por los países miembros",
+      "count": 1
+    },
+    {
+      "subject": "MIRALI SHARIPOV",
+      "predicate": "ES",
+      "object": "deportista uzbeko",
+      "count": 1
+    },
+    {
+      "subject": "LA ROTONDA DE LOS JALISCIENSES ILUSTRES",
+      "predicate": "ES",
+      "object": "monumento de la ciudad de Guadalajara",
+      "count": 1
+    },
+    {
+      "subject": "CONSTA DE DIECISIETE COLUMNAS ESTRIADAS SIN BASE NI CAPITEL Y QUE SOSTIENEN UN ANILLO DE CANTERA",
+      "predicate": "TIENE",
+      "object": "grabado en uno de sus lados",
+      "count": 1
+    },
+    {
+      "subject": "EL RÍO NUEVO",
+      "predicate": "ES",
+      "object": "río producto de aguas residuales del",
+      "count": 1
+    },
+    {
+      "subject": "SURBERG",
+      "predicate": "ES",
+      "object": "municipio situado en el distrito de",
+      "count": 1
+    },
+    {
+      "subject": "CICLÓN",
+      "predicate": "ES",
+      "object": "alias de una serie de personajes",
+      "count": 1
+    },
+    {
+      "subject": "QUE EN REALIDAD",
+      "predicate": "ES",
+      "object": "a ilusión creada por una serie",
+      "count": 1
+    },
+    {
+      "subject": "MICRORRELATO",
+      "predicate": "ES",
+      "object": "texto breve en prosa de naturaleza",
+      "count": 1
+    },
+    {
+      "subject": "MICRORRELATO Y MINICUENTO SON LAS DENOMINACIONES DADAS PARA UN CONJUNTO DE OBRAS DIVERSAS CUYA PRINCIPAL CARACTERÍSTICA",
+      "predicate": "ES",
+      "object": "brevedad de su contenido",
+      "count": 1
+    },
+    {
+      "subject": "MÁS CONOCIDO POR SU APODO «TULA»",
+      "predicate": "ES",
+      "object": "futbolista argentino",
+      "count": 1
+    },
+    {
+      "subject": "TRAS DESTACADAS ACTUACIONES",
+      "predicate": "ES",
+      "object": "transferido al Club Atlético Boca Juniors",
+      "count": 1
+    },
+    {
+      "subject": "IGUALANDO DE ESA MANERA EL RÉCORD QUE TAMBIÉN",
+      "predicate": "TIENE",
+      "object": "futbolista brasileño Paulo Valentim",
+      "count": 1
+    },
+    {
+      "subject": "Y RELACION DE LA EMBAJADA QUE RUY GONZALEZ DE CLAVIJO LE HIZO POR MANDADO DEL REY ENRIQUE III DE CASTILLA",
+      "predicate": "ES",
+      "object": "libro de viaje",
+      "count": 1
+    },
+    {
+      "subject": "ESTE LIBRO",
+      "predicate": "ES",
+      "object": "crónica del viaje",
+      "count": 1
+    },
+    {
+      "subject": "POR TANTO",
+      "predicate": "ES",
+      "object": "a obra veraz en cuanto a",
+      "count": 1
+    },
+    {
+      "subject": "RÍO GUANIPA ES UN RÍO",
+      "predicate": "UBICADO_EN",
+      "object": "en la zona nororiental de Venezuela",
+      "count": 1
+    },
+    {
+      "subject": "SUS NACIENTES",
+      "predicate": "UBICADO_EN",
+      "object": "a una altitud de unos 260",
+      "count": 1
+    },
+    {
+      "subject": "JEAN-NICOLAS NISSAGE SAGET",
+      "predicate": "ES",
+      "object": "político",
+      "count": 1
+    },
+    {
+      "subject": "LOS '90S: LA ÚLTIMA GRAN DÉCADA",
+      "predicate": "ES",
+      "object": "documental del National Geographic Channel",
+      "count": 1
+    },
+    {
+      "subject": "CAPUCHINO CABECIESTRIADO",
+      "predicate": "ES",
+      "object": "a especie de ave paseriforme de",
+      "count": 1
+    },
+    {
+      "subject": "TEENAGE MUTANT NINJA TURTLES: TURTLES IN TIME RE-SHELLED",
+      "predicate": "ES",
+      "object": "a nueva versión mejorada del clásico",
+      "count": 1
+    },
+    {
+      "subject": "JUEGO",
+      "predicate": "ES",
+      "object": "del género Beat'em up",
+      "count": 1
+    },
+    {
+      "subject": "JUEGO",
+      "predicate": "ES",
+      "object": "más tarde retirado de ambos sistemas",
+      "count": 1
+    },
+    {
+      "subject": "JUEGO",
+      "predicate": "ES",
+      "object": "éxito comercial fue descargado más de",
+      "count": 1
+    },
+    {
+      "subject": "CRÍTICA",
+      "predicate": "ES",
+      "object": "en general mediocre",
+      "count": 1
+    },
+    {
+      "subject": "VERSIÓN DE PLAYSTATION 3",
+      "predicate": "TIENE",
+      "object": "a puntuación de 56,50% en GameRankings",
+      "count": 1
+    },
+    {
+      "subject": "INTERPOLADOR CÚBICO DE HERMITE",
+      "predicate": "ES",
+      "object": "tipo de spline en el",
+      "count": 1
+    },
+    {
+      "subject": "DEFINIDOS POR TRES SPLINES BICÚBICOS",
+      "predicate": "ES",
+      "object": "a herramienta esencial en gráficos por",
+      "count": 1
+    },
+    {
+      "subject": "LA DELEGACIÓN DEL GOBIERNO EN LA COMUNIDAD DE MADRID",
+      "predicate": "ES",
+      "object": "organismo de la Administración Pública de",
+      "count": 1
+    },
+    {
+      "subject": "ESTE ORGANISMO",
+      "predicate": "ES",
+      "object": "encargado de ejercer la representación del",
+      "count": 1
+    },
+    {
+      "subject": "SEGÚN EL ARTÍCULO 154 DE LA CONSTITUCIÓN ESPAÑOLA",
+      "predicate": "ES",
+      "object": "s de dirigir",
+      "count": 1
+    },
+    {
+      "subject": "EL JURADO PROVINCIAL DE EXPROPIACIÓN FORZOSA",
+      "predicate": "ES",
+      "object": "órgano colegiado de la Administración General",
+      "count": 1
+    },
+    {
+      "subject": "ESTA UNIDAD",
+      "predicate": "TIENE",
+      "object": "dos funciones diferenciadas una de seguimiento",
+      "count": 1
+    },
+    {
+      "subject": "GESTIÓN DE CONTRATOS EN ORIGEN PARA LA CONTRATACIÓN TEMPORAL DE TRABAJADORES EXTRANJEROS NO COMUNITARIOS",
+      "predicate": "ES",
+      "object": "otras de las competencias llevadas a",
+      "count": 1
+    },
+    {
+      "subject": "MÁS CONOCIDO SIMPLEMENTE COMO \"U\" CLUJ",
+      "predicate": "ES",
+      "object": "club de fútbol de Cluj-Napoca Rumania",
+      "count": 1
+    },
+    {
+      "subject": "EL \"U\" CLUJ",
+      "predicate": "ES",
+      "object": "parte del CS Universitatea Cluj un",
+      "count": 1
+    },
+    {
+      "subject": "ÚNICO TÍTULO QUE GANÓ EN SU HISTORIA",
+      "predicate": "ES",
+      "object": "Copa de Rumania en 1965",
+      "count": 1
+    },
+    {
+      "subject": "ÚNICA EXCEPCIÓN",
+      "predicate": "ES",
+      "object": "durante 1941",
+      "count": 1
+    },
+    {
+      "subject": "JUGADORES DEL EQUIPO \"U\" CLUJ",
+      "predicate": "ES",
+      "object": "conocidos como los șepcile roșii",
+      "count": 1
+    },
+    {
+      "subject": "ENICOSPILUS RUFUS",
+      "predicate": "ES",
+      "object": "a especie de insecto del género",
+      "count": 1
+    },
+    {
+      "subject": "FUMAREL CARIBLANCO ES UN AVE MARINA DE LA FAMILIA STERNIDAE",
+      "predicate": "INCLUYE",
+      "object": "fumareles",
+      "count": 1
+    },
+    {
+      "subject": "GUZMANIA SANGUINEA ANDRÉ EX MEZ",
+      "predicate": "ES",
+      "object": "a especie de planta de la",
+      "count": 1
+    },
+    {
+      "subject": "LICENCIA MIT",
+      "predicate": "ES",
+      "object": "a licencia de software",
+      "count": 1
+    },
+    {
+      "subject": "SU TEXTO",
+      "predicate": "ES",
+      "object": "idéntico",
+      "count": 1
+    },
+    {
+      "subject": "ESTA LICENCIA ES UNA LICENCIA DE SOFTWARE LIBRE PERMISIVA LO QUE SIGNIFICA QUE IMPONE MUY POCAS LIMITACIONES EN LA REUTILIZACIÓN Y POR TANTO",
+      "predicate": "TIENE",
+      "object": "a excelente Compatibilidad de licencia",
+      "count": 1
+    },
+    {
+      "subject": "LICENCIA MIT",
+      "predicate": "ES",
+      "object": "compatible con muchas licencias copyleft como",
+      "count": 1
+    },
+    {
+      "subject": "TEXTO DE LA LICENCIA NO",
+      "predicate": "TIENE",
+      "object": "copyright lo",
+      "count": 1
+    },
+    {
+      "subject": "A NO SER QUE SE INDIQUE",
+      "predicate": "ES",
+      "object": "a modificación",
+      "count": 1
+    },
+    {
+      "subject": "LICENCIA MIT",
+      "predicate": "ES",
+      "object": "muy parecida a la licencia BSD",
+      "count": 1
+    },
+    {
+      "subject": "LICENCIA MIT SIEMPRE HA SIDO UNA LICENCIA IMPORTANTE Y SE",
+      "predicate": "USA",
+      "object": "muy a menudo en el Software",
+      "count": 1
+    },
+    {
+      "subject": "ALEXIS RICARDO ROJAS VILLALBA",
+      "predicate": "ES",
+      "object": "futbolista paraguayo",
+      "count": 1
+    },
+    {
+      "subject": "JUEGA DE MEDIOCAMPISTA OFENSIVO Y ACTUALMENTE NO",
+      "predicate": "TIENE",
+      "object": "equipo",
+      "count": 1
+    },
+    {
+      "subject": "CONOCIDO TAMBIÉN COMO MONO CHORONGO",
+      "predicate": "ES",
+      "object": "a especie de primate catarrino perteneciente",
+      "count": 1
+    },
+    {
+      "subject": "EL PARTIDO LABORISTA MEXICANO",
+      "predicate": "ES",
+      "object": "partido político socialdemócrata en México",
+      "count": 1
+    },
+    {
+      "subject": "LA CAPILLA DE LA VIRGEN DEL ROSARIO",
+      "predicate": "ES",
+      "object": "templo católico ubicado en el Rancho",
+      "count": 1
+    },
+    {
+      "subject": "RESERVA NATURAL DE BUREYA",
+      "predicate": "ES",
+      "object": "a reserva natural estricta de Rusia",
+      "count": 1
+    },
+    {
+      "subject": "RESERVA",
+      "predicate": "FUE_CREADO",
+      "object": "12 de agosto de 1987",
+      "count": 1
+    },
+    {
+      "subject": "MUNICIPIO DE FURLOW",
+      "predicate": "ES",
+      "object": "municipio ubicado en el condado de",
+      "count": 1
+    },
+    {
+      "subject": "NICHOLAS BARRY \"NICKY\" CHINN",
+      "predicate": "ES",
+      "object": "compositor",
+      "count": 1
+    },
+    {
+      "subject": "SUZI QUATRO Y MUD DURANTE LA",
+      "predicate": "ES",
+      "object": "dorada del género creando un sonido",
+      "count": 1
+    },
+    {
+      "subject": "TEMNOSTERNUS MOSAICUS",
+      "predicate": "ES",
+      "object": "a especie de escarabajo longicornio del",
+      "count": 1
+    },
+    {
+      "subject": "LITERALMENTE \"SOMBRILLA DE PATHEIN\"",
+      "predicate": "ES",
+      "object": "a sombrilla tradicional de Birmania elaborada",
+      "count": 1
+    },
+    {
+      "subject": "HOY EN DÍA",
+      "predicate": "ES",
+      "object": "ementos decorativos esenciales en festivales",
+      "count": 1
+    },
+    {
+      "subject": "LA COMUNIDAD DE AGLOMERACIÓN LANNION-TRÉGOR COMUNIDAD O LANNION-TRÉGOR COMUNIDAD EN FRANCÉS ORIGINAL",
+      "predicate": "ES",
+      "object": "a estructura intercomunal",
+      "count": 1
+    },
+    {
+      "subject": "NYARLATHOTEP",
+      "predicate": "ES",
+      "object": "dios primordial ideado por el escritor",
+      "count": 1
+    },
+    {
+      "subject": "APARECE EN UN GRAN NÚMERO DE SUS RELATOS",
+      "predicate": "ES",
+      "object": "al parecer una gran masa poliposa",
+      "count": 1
+    },
+    {
+      "subject": "TERREMOTO DE CHILCA DE 2022",
+      "predicate": "ES",
+      "object": "terremoto de 5,4",
+      "count": 1
+    },
+    {
+      "subject": "VARIAS CASAS SE DERRUMBARON A",
+      "predicate": "CAUSA",
+      "object": "del terremoto",
+      "count": 1
+    },
+    {
+      "subject": "LA “ZONA LIBRE DE RUTA POR DEFECTO” O DEFAULT-FREE ZONE",
+      "predicate": "ES",
+      "object": "a colección de todos los Sistemas",
+      "count": 1
+    },
+    {
+      "subject": "QUINTO HIJO DE ENRIQUE IV Y MARÍA DE BOHUN",
+      "predicate": "ES",
+      "object": "hermano del duque de Clarence",
+      "count": 1
+    },
+    {
+      "subject": "COMBATIÓ A LAS ÓRDENES DE SU HERMANO EN LA GUERRA DE LOS CIEN AÑOS",
+      "predicate": "ES",
+      "object": "gravemente herido en la célebre batalla",
+      "count": 1
+    },
+    {
+      "subject": "CUYO TÍTULO ECLESIÁSTICO FUE PHRA PHROM MONGKHON Y CUYO NOMBRE LAICO",
+      "predicate": "ES",
+      "object": "Thong Phromsaen  fue un monje",
+      "count": 1
+    },
+    {
+      "subject": "AJAHN TONG",
+      "predicate": "ES",
+      "object": "además el primer monje elevado a",
+      "count": 1
+    },
+    {
+      "subject": "NUMA PERRIER",
+      "predicate": "ES",
+      "object": "a actriz artista directora escritora",
+      "count": 1
+    },
+    {
+      "subject": "SALMO 137",
+      "predicate": "ES",
+      "object": "según la numeración hebrea el centésimo",
+      "count": 1
+    },
+    {
+      "subject": "EN LATÍN",
+      "predicate": "ES",
+      "object": "conocido por el íncipit \"Super flumina",
+      "count": 1
+    },
+    {
+      "subject": "SALMO",
+      "predicate": "ES",
+      "object": "mento comunal sobre recordar a Sion",
+      "count": 1
+    },
+    {
+      "subject": "ESTE CAPÍTULO",
+      "predicate": "INCLUYE",
+      "object": "s genealogías de las tribus asentadas",
+      "count": 1
+    },
+    {
+      "subject": "EL M'HIR",
+      "predicate": "ES",
+      "object": "municipio de la provincia",
+      "count": 1
+    },
+    {
+      "subject": "PAMELA STUPIA",
+      "predicate": "ES",
+      "object": "a youtuber periodista",
+      "count": 1
+    },
+    {
+      "subject": "YO ANTES DE TI",
+      "predicate": "ES",
+      "object": "a novela romántica de la escritora",
+      "count": 1
+    },
+    {
+      "subject": "CUP NOODLE",
+      "predicate": "ES",
+      "object": "a marca de fideos instantáneos en",
+      "count": 1
+    },
+    {
+      "subject": "EL ARAKS YEREVAN",
+      "predicate": "ES",
+      "object": "equipo de fútbol de Armenia",
+      "count": 1
+    },
+    {
+      "subject": "HIDACIO DE CHAVES NO DICE EN SU CRÓNICA CUÁL",
+      "predicate": "ES",
+      "object": "destino de la población del reino",
+      "count": 1
+    },
+    {
+      "subject": "TROMEN",
+      "predicate": "ES",
+      "object": "tratovolcán en Argentina de 3",
+      "count": 1
+    },
+    {
+      "subject": "AL PIE DEL VOLCÁN",
+      "predicate": "UBICADO_EN",
+      "object": "localidad de Buta Ranquil",
+      "count": 1
+    },
+    {
+      "subject": "LAGUNA TROMEN",
+      "predicate": "UBICADO_EN",
+      "object": "al pie de la ladera noroeste",
+      "count": 1
+    },
+    {
+      "subject": "EN BASE AL ANÁLISIS DE REPORTES HISTÓRICOS EN CONJUNTO CON DATOS GEOMORFOLÓGICOS Y UNA EDAD RADIOCARBONO SE DETERMINÓ QUE LOS ÚLTIMOS PERÍODOS DE ACTIVIDAD VOLCÁNICA DEL VOLCÁN TROMEN",
+      "predicate": "ES",
+      "object": "posteriores al siglo XV d",
+      "count": 1
+    },
+    {
+      "subject": "COE FINCH AUSTIN",
+      "predicate": "ES",
+      "object": "botánico estadounidense",
+      "count": 1
+    },
+    {
+      "subject": "MUNICIPIO DE PERRY",
+      "predicate": "ES",
+      "object": "municipio ubicado en el condado de",
+      "count": 1
+    },
+    {
+      "subject": "BARONESA D'AULNOY",
+      "predicate": "ES",
+      "object": "a escritora francesa conocida por sus",
+      "count": 1
+    },
+    {
+      "subject": "E INCLUYÓ EL PRIMER RELATO",
+      "predicate": "USA",
+      "object": "al personaje “Prince Charmant” conocido en",
+      "count": 1
+    },
+    {
+      "subject": "OLSENELLA INTESTINALIS",
+      "predicate": "ES",
+      "object": "a especie de bacteria grampositiva del",
+      "count": 1
+    },
+    {
+      "subject": "SEGÚN ÞORSTEINS SAGA VÍKINGSSONAR",
+      "predicate": "ES",
+      "object": "caudillo vikingo rey de Oppland Noruega",
+      "count": 1
+    },
+    {
+      "subject": "UNO DE LOS SUPERVIVIENTES",
+      "predicate": "ES",
+      "object": "hechicero instruido en el seidr",
+      "count": 1
+    },
+    {
+      "subject": "ANTONIO PEÑA Y GOÑI",
+      "predicate": "ES",
+      "object": "compositor crítico musical musicólogo",
+      "count": 1
+    },
+    {
+      "subject": "EL AIRE",
+      "predicate": "ES",
+      "object": "a banda peruana de rock experimental",
+      "count": 1
+    },
+    {
+      "subject": "EL AIRE",
+      "predicate": "ES",
+      "object": "considerada como una banda de culto",
+      "count": 1
+    },
+    {
+      "subject": "DEUTSCHE DENDROLOGIE",
+      "predicate": "ES",
+      "object": "libro con ilustraciones",
+      "count": 1
+    },
+    {
+      "subject": "PATRIMONIO CULTURAL INMATERIAL O PATRIMONIO CULTURAL INTANGIBLE",
+      "predicate": "PARTE_DE",
+      "object": "s declaraciones de la Unesco para",
+      "count": 1
+    },
+    {
+      "subject": "Y UNA CONVENCIÓN",
+      "predicate": "ES",
+      "object": "adoptada en 2003 para su protección",
+      "count": 1
+    },
+    {
+      "subject": "EVERY BEST SINGLE 2",
+      "predicate": "ES",
+      "object": "tercer álbum compilatorio de grandes éxitos",
+      "count": 1
+    },
+    {
+      "subject": "EUPITHECIA KAMBURONGA",
+      "predicate": "ES",
+      "object": "a especie de polilla de la",
+      "count": 1
+    },
+    {
+      "subject": "ESPECIE",
+      "predicate": "ES",
+      "object": "descrita por primera vez por John",
+      "count": 1
+    },
+    {
+      "subject": "ES UNA POLILLA DE COLOR MARRÓN PÁLIDO CON UNA ENVERGADURA",
+      "predicate": "ES",
+      "object": "de unos 20 milímetros",
+      "count": 1
+    },
+    {
+      "subject": "HOLOTIPO DE LA ESPECIE",
+      "predicate": "ES",
+      "object": "descrita en el sector Kamburongoh del",
+      "count": 1
+    },
+    {
+      "subject": "EL PALACETE DEL EMBARCADERO",
+      "predicate": "ES",
+      "object": "edificio de la ciudad de Santander",
+      "count": 1
+    },
+    {
+      "subject": "EDIFICIO",
+      "predicate": "ES",
+      "object": "obra de Javier González de Riancho",
+      "count": 1
+    },
+    {
+      "subject": "MÁS TARDE",
+      "predicate": "ES",
+      "object": "usado más tarde como cuartel de",
+      "count": 1
+    },
+    {
+      "subject": "EN EL QUE COLABORAN DIFERENTES INSTITUCIONES Y FUNDACIONES LOCALES Y NACIONALES",
+      "predicate": "INCLUYE",
+      "object": "a artistas contemporáneos cántabros nacionales e",
+      "count": 1
+    },
+    {
+      "subject": "PRUNUS HERTHAE",
+      "predicate": "ES",
+      "object": "a especie de árbol perteneciente a",
+      "count": 1
+    },
+    {
+      "subject": "ES EL PEQUEÑO ORIFICIO QUE SE",
+      "predicate": "PRODUCE",
+      "object": "en la capa fibrosa del ovario",
+      "count": 1
+    },
+    {
+      "subject": "POR TANTO",
+      "predicate": "PRODUCE",
+      "object": "infertilidad en la mujer",
+      "count": 1
+    },
+    {
+      "subject": "MOTORES CON MÚLTIPLES BANCADAS",
+      "predicate": "ES",
+      "object": "más cortos",
+      "count": 1
+    },
+    {
+      "subject": "TÍTULO DE DUQUE DE IRLANDA",
+      "predicate": "FUE_CREADO",
+      "object": "en 1386 para Robert de Vere",
+      "count": 1
+    },
+    {
+      "subject": "GENERALMENTE SE CONSIDERA QUE EL DUCADO DE IRLANDA HA SIDO UNO DE LA NOBLEZA DE INGLATERRA",
+      "predicate": "ES",
+      "object": "primera vez",
+      "count": 1
+    },
+    {
+      "subject": "EVALDAS ŠIŠKEVICIUS",
+      "predicate": "ES",
+      "object": "ciclista lituano",
+      "count": 1
+    },
+    {
+      "subject": "ROBERTO ESTRADA GARIBAY",
+      "predicate": "ES",
+      "object": "deportista mexicano",
+      "count": 1
+    },
+    {
+      "subject": "CONOCIDO COMO SANTARÚA",
+      "predicate": "ES",
+      "object": "pintor",
+      "count": 1
+    },
+    {
+      "subject": "JOEL BRANDON LÓPEZ PISSANO",
+      "predicate": "ES",
+      "object": "futbolista argentino",
+      "count": 1
+    },
+    {
+      "subject": "DEXTER: PECADO ORIGINAL",
+      "predicate": "ES",
+      "object": "a serie de televisión estadounidense de",
+      "count": 1
+    },
+    {
+      "subject": "QUE COMERCIALIZA COMO HITACHI RAIL",
+      "predicate": "ES",
+      "object": "división de fabricación de material rodante",
+      "count": 1
+    },
+    {
+      "subject": "HITACHI",
+      "predicate": "ES",
+      "object": "a de las tres únicas empresas",
+      "count": 1
+    },
+    {
+      "subject": "QUE SE",
+      "predicate": "USA",
+      "object": "en diez sistemas de monorraíl a",
+      "count": 1
+    },
+    {
+      "subject": "LA MARCHA POR ISRAEL",
+      "predicate": "ES",
+      "object": "a manifestación proisraelí",
+      "count": 1
+    },
+    {
+      "subject": "HEATHER PETRI",
+      "predicate": "ES",
+      "object": "a jugadora de waterpolo de Estados",
+      "count": 1
+    },
+    {
+      "subject": "WALZBACHTAL",
+      "predicate": "ES",
+      "object": "municipio situado en el distrito de",
+      "count": 1
+    },
+    {
+      "subject": "CHRISTINA PICKLES",
+      "predicate": "ES",
+      "object": "a actriz de origen británico",
+      "count": 1
+    },
+    {
+      "subject": "MAYLAND",
+      "predicate": "ES",
+      "object": "a localidad peruana ubicada en el",
+      "count": 1
+    },
+    {
+      "subject": "JRIASHCHEVSKI",
+      "predicate": "ES",
+      "object": "jútor del raión de Konstantínovsk del",
+      "count": 1
+    },
+    {
+      "subject": "SU POBLACIÓN EN 2010",
+      "predicate": "ES",
+      "object": "de 497 habitantes",
+      "count": 1
+    },
+    {
+      "subject": "BALDE DEL ROSARIO O BALDES DEL ROSARIO",
+      "predicate": "ES",
+      "object": "a localidad",
+      "count": 1
+    },
+    {
+      "subject": "LA IDEALIZACIÓN",
+      "predicate": "ES",
+      "object": "proceso por el",
+      "count": 1
+    },
+    {
+      "subject": "LOVE IS PAIN",
+      "predicate": "ES",
+      "object": "Primer mixtape de los artistas de",
+      "count": 1
+    },
+    {
+      "subject": "EN LA CANCIÓN 5 LA ARTISTA FEMENINA QUE COMPARTE LA CANCIÓN \"A DONDE IRA TU CORAZON\" JUNTO AL INTÉRPRETE DON OMAR",
+      "predicate": "ES",
+      "object": "Jeven Wagner del grupo Mamajuana",
+      "count": 1
+    },
+    {
+      "subject": "SEDE DE HSBC MÉXICO",
+      "predicate": "UBICADO_EN",
+      "object": "en la Torre HSBC en el",
+      "count": 1
+    },
+    {
+      "subject": "MASACRE DE VÍNNYTSIA",
+      "predicate": "ES",
+      "object": "a ejecución masiva de personas en",
+      "count": 1
+    },
+    {
+      "subject": "MARÍA PAZ GORDILLO",
+      "predicate": "ES",
+      "object": "a deportista española",
+      "count": 1
+    },
+    {
+      "subject": "DICRAEOPETALUM",
+      "predicate": "ES",
+      "object": "género de plantas con flores perteneciente",
+      "count": 1
+    },
+    {
+      "subject": "CIRCUNFERENCIAS DE SODDY DE UN TRIÁNGULO",
+      "predicate": "ES",
+      "object": "dos circunferencias tangentes cada una de",
+      "count": 1
+    },
+    {
+      "subject": "CUALQUIER TRIÁNGULO",
+      "predicate": "TIENE",
+      "object": "tres circunferencias centradas en sus vértices",
+      "count": 1
+    },
+    {
+      "subject": "SUS CIRCUNFERENCIAS DE SODDY",
+      "predicate": "ES",
+      "object": "tangentes a las mencionadas tres circunferencias",
+      "count": 1
+    },
+    {
+      "subject": "RECTA QUE PASA POR LOS DOS CENTROS DE SODDY",
+      "predicate": "ES",
+      "object": "recta de Soddy del triángulo",
+      "count": 1
+    },
+    {
+      "subject": "DARÍO",
+      "predicate": "ES",
+      "object": "nombre de origen persa",
+      "count": 1
+    },
+    {
+      "subject": "SIGNIFICADOS DEL NOMBRE SON: \"EL",
+      "predicate": "TIENE",
+      "object": "Bien\" \"el",
+      "count": 1
+    },
+    {
+      "subject": "CARTAN",
+      "predicate": "ES",
+      "object": "pequeño cráter de impacto situado cerca",
+      "count": 1
+    },
+    {
+      "subject": "BORDE",
+      "predicate": "ES",
+      "object": "circular con un pequeño cráter superpuesto",
+      "count": 1
+    },
+    {
+      "subject": "SUELO INTERIOR",
+      "predicate": "TIENE",
+      "object": "aproximadamente la mitad del diámetro del",
+      "count": 1
+    },
+    {
+      "subject": "CARTAN",
+      "predicate": "ES",
+      "object": "designado Apollonius D antes de ser",
+      "count": 1
+    },
+    {
+      "subject": "UBIQUITINA CARBOXIL-TERMINAL HIDROLASA 8",
+      "predicate": "ES",
+      "object": "a enzima",
+      "count": 1
+    },
+    {
+      "subject": "ALAN LOUIS CHARLES BULLOCK",
+      "predicate": "ES",
+      "object": "historiador británico célebre por su trabajo",
+      "count": 1
+    },
+    {
+      "subject": "VIKTOR GALOVIĆ (NACIDO EL 19 DE SEPTIEMBRE DE 1990",
+      "predicate": "ES",
+      "object": "tenista profesional croata nacido en la",
+      "count": 1
+    },
+    {
+      "subject": "EN LA CULTURA CRISTIANA",
+      "predicate": "ES",
+      "object": "a breve oración",
+      "count": 1
+    },
+    {
+      "subject": "DISTRITO DE CHARLEVILLE-MÉZIÈRES",
+      "predicate": "ES",
+      "object": "distrito de Francia",
+      "count": 1
+    },
+    {
+      "subject": "ZAL BATMANGLIJ",
+      "predicate": "ES",
+      "object": "director",
+      "count": 1
+    },
+    {
+      "subject": "DELGADO",
+      "predicate": "ES",
+      "object": "distrito ubicado en el departamento de",
+      "count": 1
+    },
+    {
+      "subject": "MÁS CONOCIDO COMO FRIÐRIK ÓMAR",
+      "predicate": "ES",
+      "object": "cantante islandés",
+      "count": 1
+    },
+    {
+      "subject": "DE NOMBRE VULGAR RETAMA NEGRA O ESCOBA RUBIA",
+      "predicate": "ES",
+      "object": "a especie perteneciente a la familia",
+      "count": 1
+    },
+    {
+      "subject": "AUTOUR DE LA MAISON ROSE",
+      "predicate": "ES",
+      "object": "a película dramática de 1999 codirigida",
+      "count": 1
+    },
+    {
+      "subject": "LÝ THÁI TỔ",
+      "predicate": "ES",
+      "object": "fundador de la dinastía Lý de",
+      "count": 1
+    },
+    {
+      "subject": "ĐÌNH BANG, TU",
+      "predicate": "ES",
+      "object": "Bắc Ninh en el año 974",
+      "count": 1
+    },
+    {
+      "subject": "DICHO NOMBRE TODAVÍA SE",
+      "predicate": "USA",
+      "object": "poéticamente en nuestros días",
+      "count": 1
+    },
+    {
+      "subject": "CHAC MOOL",
+      "predicate": "ES",
+      "object": "a banda mexicana de rock son",
+      "count": 1
+    },
+    {
+      "subject": "SU DISCOGRAFÍA",
+      "predicate": "ES",
+      "object": "amplia",
+      "count": 1
+    },
+    {
+      "subject": "VUELO 825 DE AIR RHODESIA",
+      "predicate": "ES",
+      "object": "vuelo regular de pasajeros",
+      "count": 1
+    },
+    {
+      "subject": "VUELO 825",
+      "predicate": "ES",
+      "object": "atacado por guerrilleros ZIPRA quienes impactaron",
+      "count": 1
+    },
+    {
+      "subject": "INCIDENTE",
+      "predicate": "ES",
+      "object": "percibido por la mayoría de los",
+      "count": 1
+    },
+    {
+      "subject": "PACHYBRACHIS SEMIDESERTUS",
+      "predicate": "ES",
+      "object": "a especie de insecto coleóptero de",
+      "count": 1
+    },
+    {
+      "subject": "EL AZKAR LUGO B",
+      "predicate": "ES",
+      "object": "segundo equipo",
+      "count": 1
+    },
+    {
+      "subject": "DE PEDRO I DE CASTILLA",
+      "predicate": "ES",
+      "object": "a moneda realizada en oro acuñada",
+      "count": 1
+    },
+    {
+      "subject": "LA GUARDIA REAL NORUEGA",
+      "predicate": "ES",
+      "object": "batallón del Ejército de Noruega",
+      "count": 1
+    },
+    {
+      "subject": "BATALLÓN",
+      "predicate": "TIENE",
+      "object": "dos roles principales",
+      "count": 1
+    },
+    {
+      "subject": "Y TAMBIÉN",
+      "predicate": "ES",
+      "object": "principal unidad de infantería responsable de",
+      "count": 1
+    },
+    {
+      "subject": "EL HMKG",
+      "predicate": "UBICADO_EN",
+      "object": "en la base militar Huseby Leir",
+      "count": 1
+    }
+  ]
+}

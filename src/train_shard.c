@@ -41,29 +41,10 @@ static uint64_t TrainShardFromTSV(MODEL *model, const char *tsv_path)
     char file_buf[BUFFER_SIZE];
     setvbuf(f, file_buf, _IOFBF, sizeof(file_buf));
 
-    char line[512];
-    uint64_t lines = 0;
-    char s[128], p[128], o[128];
-
-    while (fgets(line, sizeof(line), f) != NULL)
-    {
-        if (sscanf(line, "%127[^\t]\t%127[^\t]\t%127[^\n]", s, p, o) == 3)
-        {
-            SYMBOL_ID sid = GraphAddSymbol(model->graph, s);
-            SYMBOL_ID pid = GraphAddSymbol(model->graph, p);
-            SYMBOL_ID oid = GraphAddSymbol(model->graph, o);
-
-            if (sid != SYMBOL_INVALID && pid != SYMBOL_INVALID &&
-                oid != SYMBOL_INVALID)
-            {
-                RelationAdd(model->graph->relations, sid, pid, oid);
-                lines++;
-            }
-        }
-    }
+    INGEST_STATS stats = IngestTSVStream(model->graph, f);
 
     fclose(f);
-    return lines;
+    return stats.relations_inserted + stats.relations_updated;
 }
 
 int main(int argc, char *argv[])

@@ -61,7 +61,13 @@ int IngestTriple(GRAPH *graph,
     if (s_id == SYMBOL_INVALID || p_id == SYMBOL_INVALID || o_id == SYMBOL_INVALID)
         return 0;
 
+    /* Was this relation already in the graph? (GraphAddRelation returns 1
+       for both new inserts and re-strengthening of existing ones) */
+    RELATION *existing = GraphFindRelation(graph, s_id, p_id, o_id);
+
     int added = GraphAddRelation(graph, s_id, p_id, o_id);
+    if (!added)
+        return 0;
 
     /* Update embeddings on every co-occurrence (not just new relations) */
     if (graph->embeddings != NULL)
@@ -112,7 +118,7 @@ int IngestTriple(GRAPH *graph,
         if (o_vec) EmbeddingNormalize(o_vec);
     }
 
-    return added;
+    return existing != NULL ? 2 : 1;
 }
 
 /* ============================================================
@@ -203,25 +209,11 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f)
 
         stats.lines_parsed++;
 
-        /* Check if relation already exists to count updates */
-        char s_up[128], p_up[128], o_up[128];
-        StrToUpperTrim(subj, s_up, sizeof(s_up));
-        StrToUpperTrim(pred, p_up, sizeof(p_up));
-        StrToUpperTrim(obj, o_up, sizeof(o_up));
-
-        SYMBOL_ID s_id = SymbolFind(graph->symbols, s_up);
-        SYMBOL_ID p_id = SymbolFind(graph->symbols, p_up);
-        SYMBOL_ID o_id = SymbolFind(graph->symbols, o_up);
-
-        if (s_id != SYMBOL_INVALID && p_id != SYMBOL_INVALID && o_id != SYMBOL_INVALID)
-        {
-            RELATION *existing = GraphFindRelation(graph, s_id, p_id, o_id);
-            if (existing != NULL)
-                stats.relations_updated++;
-        }
-
-        if (IngestTriple(graph, subj, pred, obj))
+        int rc = IngestTriple(graph, subj, pred, obj);
+        if (rc == 1)
             stats.relations_inserted++;
+        else if (rc == 2)
+            stats.relations_updated++;
     }
 
     return stats;

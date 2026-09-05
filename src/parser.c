@@ -54,6 +54,27 @@ static void ToUpperCopy(const char *src, char *dst, size_t dst_size)
     dst[i] = '\0';
 }
 
+static void AppendToken(char *dst, size_t dst_size, const char *token)
+{
+    size_t used = strlen(dst);
+    if (used + 1 >= dst_size)
+        return;
+
+    if (used > 0)
+    {
+        dst[used++] = '_';
+        dst[used] = '\0';
+    }
+
+    size_t space = dst_size - used - 1;
+    size_t len = strlen(token);
+    if (len > space)
+        len = space;
+
+    memcpy(dst + used, token, len);
+    dst[used + len] = '\0';
+}
+
 static int IsStripWord(const char *word)
 {
     for (int i = 0; STRIP_WORDS[i]; i++)
@@ -144,16 +165,10 @@ PARSE_RESULT ParserExtractSPO(const PARSED_SENTENCE *tokens)
         {
             /* Everything before verb = subject */
             char subj[128] = {0};
-            int first_real = -1;
             for (uint32_t j = 0; j < i; j++)
             {
                 if (!IsArticle(tokens->tokens[j]))
-                {
-                    if (first_real >= 0)
-                        strcat(subj, "_");
-                    strcat(subj, tokens->tokens[j]);
-                    if (first_real < 0) first_real = (int)j;
-                }
+                    AppendToken(subj, sizeof(subj), tokens->tokens[j]);
             }
 
             /* Verb = predicate */
@@ -162,16 +177,10 @@ PARSE_RESULT ParserExtractSPO(const PARSED_SENTENCE *tokens)
 
             /* Everything after verb = object */
             char obj[128] = {0};
-            int last_real = -1;
             for (uint32_t j = i + 1; j < tokens->count; j++)
             {
                 if (!IsArticle(tokens->tokens[j]))
-                {
-                    if (last_real >= 0)
-                        strcat(obj, "_");
-                    strcat(obj, tokens->tokens[j]);
-                    last_real = (int)j;
-                }
+                    AppendToken(obj, sizeof(obj), tokens->tokens[j]);
             }
 
             if (strlen(subj) > 0 && strlen(obj) > 0)
@@ -194,20 +203,14 @@ PARSE_RESULT ParserExtractSPO(const PARSED_SENTENCE *tokens)
             for (uint32_t j = 0; j < i; j++)
             {
                 if (!IsArticle(tokens->tokens[j]))
-                {
-                    if (strlen(subj) > 0) strcat(subj, "_");
-                    strcat(subj, tokens->tokens[j]);
-                }
+                    AppendToken(subj, sizeof(subj), tokens->tokens[j]);
             }
 
             char obj[128] = {0};
             for (uint32_t j = i + 1; j < tokens->count; j++)
             {
                 if (!IsArticle(tokens->tokens[j]) && !IsPreposition(tokens->tokens[j]))
-                {
-                    if (strlen(obj) > 0) strcat(obj, "_");
-                    strcat(obj, tokens->tokens[j]);
-                }
+                    AppendToken(obj, sizeof(obj), tokens->tokens[j]);
             }
 
             if (strlen(subj) > 0 && strlen(obj) > 0)
@@ -233,10 +236,7 @@ PARSE_RESULT ParserExtractSPO(const PARSED_SENTENCE *tokens)
 
         char obj[128] = {0};
         for (uint32_t j = start + 1; j < tokens->count; j++)
-        {
-            if (strlen(obj) > 0) strcat(obj, "_");
-            strcat(obj, tokens->tokens[j]);
-        }
+            AppendToken(obj, sizeof(obj), tokens->tokens[j]);
 
         strcpy(result.subject, subj);
         strcpy(result.predicate, "ES");
@@ -386,20 +386,59 @@ QUESTION ParserDetectQuestion(const char *input)
     if (!q.is_question)
         return q;
 
-    /* Strategy 1: "X es" at end → search for concept X */
-    if (ends_with_es && tokens.count >= 3)
+    /* Strategy 1: "la PREDICATE de ENTITY es" pattern
+     * e.g. "la CAPITAL de FRANCIA es" → subject=FRANCIA, predicate=CAPITAL
+     * Find "DE" separator: tokens before DE = predicate keywords, after DE = entity */
+    if (ends_with_es && tokens.count >= 4)
     {
-        /* Build subject from tokens before "ES", skip articles */
-        char subj[128] = {0};
+        /* Look for "DE" token */
+        int de_pos = -1;
         for (uint32_t i = 0; i < tokens.count - 1; i++)
         {
-            if (!IsArticle(tokens.tokens[i]))
+            if (strcmp(tokens.tokens[i], "DE") == 0 ||
+                strcmp(tokens.tokens[i], "DEL") == 0)
             {
-                if (strlen(subj) > 0) strcat(subj, "_");
-                strcat(subj, tokens.tokens[i]);
+                de_pos = (int)i;
+                break;
             }
         }
 
+        if (de_pos > 0)
+        {
+            /* Predicate = keyword(s) between articles and DE */
+            for (uint32_t i = 0; i < (uint32_t)de_pos; i++)
+            {
+                for (int k = 0; PREDICATE_MAP[k].keyword; k++)
+                {
+                    if (strcmp(tokens.tokens[i], PREDICATE_MAP[k].keyword) == 0)
+                    {
+                        strcpy(q.predicate, PREDICATE_MAP[k].predicate);
+                        break;
+                    }
+                }
+                if (strlen(q.predicate) > 0) break;
+            }
+
+            /* Subject = tokens after DE, before ES */
+            char subj[128] = {0};
+            for (uint32_t i = (uint32_t)de_pos + 1; i < tokens.count - 1; i++)
+            {
+                if (!IsArticle(tokens.tokens[i]))
+                    AppendToken(subj, sizeof(subj), tokens.tokens[i]);
+            }
+
+            if (strlen(subj) > 0 && strlen(q.predicate) > 0)
+            {
+                strcpy(q.subject, subj);
+                q.valid = 1;
+                return q;
+            }
+        }
+    }
+
+    /* Strategy 2: "X es" at end → search for concept X */
+    if (ends_with_es && tokens.count >= 3)
+    {
         /* Try to find a matching predicate keyword */
         for (uint32_t i = 0; i < tokens.count - 1; i++)
         {
@@ -414,19 +453,57 @@ QUESTION ParserDetectQuestion(const char *input)
             if (strlen(q.predicate) > 0) break;
         }
 
-        /* If no predicate found, use "ES" */
         if (strlen(q.predicate) == 0)
             strcpy(q.predicate, "ES");
+
+        /* Build subject: last non-ES token, skip articles */
+        char subj[128] = {0};
+        for (uint32_t i = tokens.count - 2; i > 0; i--)
+        {
+            if (!IsArticle(tokens.tokens[i]))
+            {
+                strcpy(subj, tokens.tokens[i]);
+                break;
+            }
+        }
+        if (strlen(subj) == 0)
+            strcpy(subj, tokens.tokens[0]);
 
         strcpy(q.subject, subj);
         q.valid = 1;
         return q;
     }
 
-    /* Strategy 2: "que es X" / "quien es X" */
+    /* Strategy 3: "donde esta X" → ESTA as predicate */
+    if (starts_with_donde && tokens.count >= 3)
+    {
+        for (uint32_t i = 1; i < tokens.count; i++)
+        {
+            if (strcmp(tokens.tokens[i], "ESTA") == 0 ||
+                strcmp(tokens.tokens[i], "VIVE") == 0)
+            {
+                strcpy(q.predicate, tokens.tokens[i]);
+                /* Subject = tokens after verb */
+                for (uint32_t j = i + 1; j < tokens.count; j++)
+                {
+                    if (!IsArticle(tokens.tokens[j]))
+                    {
+                        strcpy(q.subject, tokens.tokens[j]);
+                        break;
+                    }
+                }
+                if (strlen(q.subject) > 0)
+                {
+                    q.valid = 1;
+                    return q;
+                }
+            }
+        }
+    }
+
+    /* Strategy 4: "que es X" / "quien es X" */
     if (starts_with_que || starts_with_donde)
     {
-        /* Find "ES" position */
         for (uint32_t i = 0; i < tokens.count; i++)
         {
             if (strcmp(tokens.tokens[i], "ES") == 0 && i + 1 < tokens.count)
@@ -435,13 +512,9 @@ QUESTION ParserDetectQuestion(const char *input)
                 for (uint32_t j = i + 1; j < tokens.count; j++)
                 {
                     if (!IsArticle(tokens.tokens[j]))
-                    {
-                        if (strlen(subj) > 0) strcat(subj, "_");
-                        strcat(subj, tokens.tokens[j]);
-                    }
+                        AppendToken(subj, sizeof(subj), tokens.tokens[j]);
                 }
 
-                /* Check if question word maps to a predicate */
                 for (int k = 0; PREDICATE_MAP[k].keyword; k++)
                 {
                     if (strcmp(tokens.tokens[0], PREDICATE_MAP[k].keyword) == 0)

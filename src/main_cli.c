@@ -101,7 +101,7 @@ int main(void)
                 graph = loaded->graph;
                 embeds = loaded->embeddings;
                 GraphSetEmbeddingTable(graph, embeds);
-                ctx = ContextCreate();
+                ContextReset(ctx);
                 printf("IA > Model loaded from 'wiki_model.bin'.\n\n");
             }
         }
@@ -148,13 +148,23 @@ int main(void)
 
         if (strcmp(input, "/clear") == 0)
         {
-            GraphDestroy(graph);
-            ContextReset(ctx);
-            EmbeddingTableDestroy(embeds);
+            GRAPH *new_graph = GraphCreate(128, 256);
+            EMBEDDING_TABLE *new_embeds = EmbeddingTableCreate(128);
 
-            graph = GraphCreate(128, 256);
-            embeds = EmbeddingTableCreate(128);
+            if (!new_graph || !new_embeds)
+            {
+                printf("IA > Error: out of memory, keeping previous graph.\n\n");
+                GraphDestroy(new_graph);
+                EmbeddingTableDestroy(new_embeds);
+                continue;
+            }
+
+            GraphDestroy(graph);
+            EmbeddingTableDestroy(embeds);
+            graph = new_graph;
+            embeds = new_embeds;
             GraphSetEmbeddingTable(graph, embeds);
+            ContextReset(ctx);
             printf("IA > Memory cleared. Starting fresh.\n\n");
             continue;
         }

@@ -161,6 +161,29 @@ MODEL *ShardMerge(const char **shard_paths, uint32_t num_shards,
             total_triples++;
         }
 
+        /* Copy shard embeddings into merged, mapping symbol IDs by name
+           (first shard with the symbol wins) */
+        if (shard->embeddings != NULL && merged->embeddings != NULL)
+        {
+            for (uint32_t i = 0; i < shard->embeddings->count; i++)
+            {
+                const SYMBOL_EMBEDDING *e = &shard->embeddings->items[i];
+                if (!e->initialized)
+                    continue;
+
+                const SYMBOL *sym = SymbolGet(shard->graph->symbols, e->id);
+                if (sym == NULL || sym->name == NULL)
+                    continue;
+
+                SYMBOL_ID mid = SymbolFind(merged->graph->symbols, sym->name);
+                if (mid == SYMBOL_INVALID)
+                    continue;
+
+                if (EmbeddingGetVector(merged->embeddings, mid) == NULL)
+                    EmbeddingSetVector(merged->embeddings, mid, e->vector);
+            }
+        }
+
         ModelDestroy(shard);
     }
 

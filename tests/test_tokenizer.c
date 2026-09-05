@@ -27,7 +27,7 @@ static void test_basic(void)
 
     t = TokenizerNext(tok);
     assert(t.type == TOKEN_WORD);
-    assert(t.length == 8);
+    assert(t.length == 7);
     assert(strncmp(t.text, "pescado", 7) == 0);
 
     t = TokenizerNext(tok);

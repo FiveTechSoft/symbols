@@ -30,6 +30,9 @@ INGEST_STATS IngestTSVStream(GRAPH *graph, FILE *f);
 /*
  * Ingest raw text: one triple per line, tab-separated.
  * Trims whitespace, converts to uppercase, skips empty/comments.
+ * Returns: 0 = error (invalid args / graph full),
+ *          1 = new relation inserted,
+ *          2 = existing relation strengthened (count++).
  */
 int IngestTriple(GRAPH *graph,
                  const char *subject, const char *predicate, const char *object);

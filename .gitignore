@@ -1,1 +1,40 @@
+# Object files / link artifacts
+*.o
+*.obj
 *.exe
+*.a
+*.lib
+*.dll
+
+# Generated model binaries (wiki_model.bin is tracked: see negation below)
+*.bin
+!wiki_model.bin
+
+# In-source CMake/Ninja leftovers
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+build/
+out/
+
+# Shard pipeline leftovers (train_shard cleans these up, keep guarded)
+shard_*.tsv
+
+# Test scratch files generated at repo root
+test_corpus.tsv
+test_*.txt
+out.txt
+err.txt
+bench_out.txt
+bench_err.txt
+
+# Python tooling
+__pycache__/
+*.pyc
+
+# Local agent state
+.abacusai/

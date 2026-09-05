@@ -32,17 +32,20 @@ static inline uint32_t HashString(const char *str)
 
 static void RehashBuckets(SYMBOL_TABLE *table, uint32_t new_cap)
 {
-    SYMBOL *new_items = (SYMBOL *)realloc(
-        table->items, new_cap * sizeof(SYMBOL));
-    if (new_items == NULL)
-        return;
-    memset(new_items + table->capacity, 0,
-           (new_cap - table->capacity) * sizeof(SYMBOL));
-    table->items = new_items;
-
     uint32_t *new_buckets = (uint32_t *)malloc(new_cap * sizeof(uint32_t));
     if (new_buckets == NULL)
         return;
+
+    SYMBOL *new_items = (SYMBOL *)realloc(
+        table->items, new_cap * sizeof(SYMBOL));
+    if (new_items == NULL)
+    {
+        free(new_buckets);
+        return;
+    }
+    memset(new_items + table->capacity, 0,
+           (new_cap - table->capacity) * sizeof(SYMBOL));
+    table->items = new_items;
 
     uint32_t mask = new_cap - 1;
     for (uint32_t i = 0; i < new_cap; i++)
@@ -102,6 +105,8 @@ static void NormIndexInsert(SYMBOL_TABLE *table, const char *normalized, SYMBOL_
     for (uint32_t i = 0; i < table->norm_capacity; i++)
         if (table->norm_buckets[i] != EMPTY_BUCKET)
             used++;
+    if (used >= table->norm_capacity)
+        return;
     if (used * HASH_LOAD_FACTOR_DEN >= table->norm_capacity * HASH_LOAD_FACTOR_NUM)
         RehashNormBuckets(table, table->norm_capacity * 2);
 
@@ -121,6 +126,11 @@ SYMBOL_TABLE *SymbolTableCreate(uint32_t capacity)
         return NULL;
 
     SymbolTableInit(table, capacity);
+    if (table->items == NULL)
+    {
+        free(table);
+        return NULL;
+    }
     return table;
 }
 
@@ -133,6 +143,13 @@ void SymbolTableInit(SYMBOL_TABLE *table, uint32_t capacity)
 
     table->items = (SYMBOL *)calloc(capacity, sizeof(SYMBOL));
     table->buckets = (uint32_t *)malloc(capacity * sizeof(uint32_t));
+    if (table->items == NULL || table->buckets == NULL)
+    {
+        free(table->items);
+        free(table->buckets);
+        memset(table, 0, sizeof(*table));
+        return;
+    }
     table->count = 0;
     table->capacity = capacity;
     table->mask = capacity - 1;
@@ -144,6 +161,12 @@ void SymbolTableInit(SYMBOL_TABLE *table, uint32_t capacity)
     table->norm_capacity = capacity;
     table->norm_mask = capacity - 1;
     table->norm_buckets = (uint32_t *)malloc(capacity * sizeof(uint32_t));
+    if (table->norm_buckets == NULL)
+    {
+        table->norm_capacity = 0;
+        table->norm_mask = 0;
+        return;
+    }
     for (uint32_t i = 0; i < capacity; i++)
         table->norm_buckets[i] = EMPTY_BUCKET;
 }
@@ -167,6 +190,8 @@ SYMBOL_ID SymbolAdd(SYMBOL_TABLE *table, const char *name)
 {
     if (table == NULL || name == NULL)
         return SYMBOL_INVALID;
+    if (table->items == NULL || table->buckets == NULL || table->capacity == 0)
+        return SYMBOL_INVALID;
 
     /* Try exact match first */
     SYMBOL_ID existing = SymbolFind(table, name);
@@ -180,10 +205,15 @@ SYMBOL_ID SymbolAdd(SYMBOL_TABLE *table, const char *name)
         RehashNormBuckets(table, table->norm_capacity * 2);
     }
 
+    if (table->count >= table->capacity)
+        return SYMBOL_INVALID;
+
     uint32_t idx = table->count;
     SYMBOL *sym = &table->items[idx];
     sym->id = idx + 1;
     sym->name = strdup(name);
+    if (sym->name == NULL)
+        return SYMBOL_INVALID;
     sym->frequency = 1;
     table->count++;
 
@@ -219,6 +249,8 @@ SYMBOL_ID SymbolFind(const SYMBOL_TABLE *table, const char *name)
     }
 
     /* 2. Diacritics fallback: normalize input, look up in norm index */
+    if (table->norm_capacity == 0 || table->norm_buckets == NULL)
+        return SYMBOL_INVALID;
     char norm[256];
     strncpy(norm, name, sizeof(norm) - 1);
     norm[sizeof(norm) - 1] = '\0';
