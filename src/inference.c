@@ -143,8 +143,60 @@ uint32_t InferenceApplyCompositionRule(
     return inferred_total;
 }
 
-uint32_t InferenceMaterializeTransitive(
+/* Dry-run: same traversal as ApplyCompositionRule, but collects the
+   candidates into `out` instead of writing them. Zero graph writes. */
+uint32_t InferenceDryRun(
     GRAPH *graph,
+    const COMPOSITION_RULE *rule,
+    const INFERENCE_CONFIG *config,
+    INFERRED_TRIPLE *out,
+    uint32_t max_out)
+{
+    if (!graph || !rule || !out || max_out == 0)
+        return 0;
+
+    INFERENCE_CONFIG cfg = config ? *config : InferenceConfigDefault();
+    uint32_t count = RelationCount(graph->relations);
+    uint32_t found = 0;
+
+    for (uint32_t i = 0; i < count && found < max_out; i++)
+    {
+        const RELATION *r1 = RelationGet(graph->relations, i);
+        if (!r1 || r1->predicate != rule->pred_first)
+            continue;
+
+        SYMBOL_ID a = r1->subject;
+        SYMBOL_ID b = r1->object;
+
+        RELATION *second_hop[32];
+        uint32_t n2 = RelationFindBySubjectPredicate(graph->relations, b, rule->pred_second, second_hop, 32);
+
+        for (uint32_t j = 0; j < n2 && found < max_out; j++)
+        {
+            SYMBOL_ID c = second_hop[j]->object;
+            if (a == c)
+                continue;
+
+            RELATION *existing = RelationFind(graph->relations, a, rule->pred_result, c);
+            if (existing == NULL)
+            {
+                float conf = r1->weight * second_hop[j]->weight * rule->rule_weight * cfg.decay_factor;
+                if (conf >= cfg.min_confidence)
+                {
+                    out[found].subject = a;
+                    out[found].predicate = rule->pred_result;
+                    out[found].object = c;
+                    out[found].confidence = conf;
+                    found++;
+                }
+            }
+        }
+    }
+
+    return found;
+}
+
+uint32_t InferenceMaterializeTransitive(    GRAPH *graph,
     SYMBOL_ID predicate,
     const INFERENCE_CONFIG *config)
 {

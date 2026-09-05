@@ -128,7 +128,7 @@ int main(void)
     printf("  Natural conversation without backpropagation or GPUs.\n");
     printf("  Commands: /graph, /context, /stats, /query <word>,\n");
   printf("            /find S P O (*), /why S P O, /export <f.dot|f.ttl>,\n");
-  printf("            /synonyms, /alias, /analogy A B,\n");
+  printf("            /synonyms, /alias, /analogy A B, /infer,\n");
     printf("            /save, /load, /clear, /exit                  \n");
     printf("========================================================\n\n");
 
@@ -147,7 +147,14 @@ int main(void)
 
         if (strcmp(input, "/exit") == 0 || strcmp(input, "/quit") == 0)
         {
-            printf("\nIA > Goodbye! All learned knowledge is saved.\n");
+            MODEL temp;
+            temp.graph = graph;
+            temp.embeddings = embeds;
+            temp.config = LearningConfigDefault();
+            if (ModelSave(&temp, "wiki_model.bin"))
+                printf("\nIA > Goodbye! All learned knowledge is saved.\n");
+            else
+                printf("\nIA > Goodbye! (Warning: could not save wiki_model.bin).\n");
             break;
         }
 
@@ -452,6 +459,49 @@ int main(void)
             {
                 printf("IA > Error loading '%s'.\n\n", path);
             }
+            continue;
+        }
+
+        /* Inference dry-run: /infer (read-only, nothing is written).
+           Applies the compositional rules and lists what WOULD be written. */
+        if (strcmp(input, "/infer") == 0)
+        {
+            static const struct { const char *first, *second, *result; } RULES[] = {
+                { "ES", "TIENE", "TIENE" },       /* property inheritance */
+                { "ES", "ES", "ES" },             /* transitive taxonomy */
+                { "ES", "NECESITA", "NECESITA" }, /* needs inheritance */
+            };
+            INFERENCE_CONFIG cfg = InferenceConfigDefault();
+            INFERRED_TRIPLE out[64];
+            uint32_t total = 0;
+            printf("\n/infer dry-run (0 written):\n");
+            for (size_t ri = 0; ri < sizeof(RULES) / sizeof(RULES[0]); ri++)
+            {
+                SYMBOL_ID f = SymbolFind(graph->symbols, RULES[ri].first);
+                SYMBOL_ID s = SymbolFind(graph->symbols, RULES[ri].second);
+                SYMBOL_ID r = SymbolFind(graph->symbols, RULES[ri].result);
+                if (f == SYMBOL_INVALID || s == SYMBOL_INVALID ||
+                    r == SYMBOL_INVALID)
+                    continue;
+                COMPOSITION_RULE rule = { f, s, r, 0.95f };
+                uint32_t n = InferenceDryRun(graph, &rule, &cfg, out, 64);
+                for (uint32_t i = 0; i < n && total < 64; i++, total++)
+                {
+                    const SYMBOL *ss = SymbolGet(graph->symbols, out[i].subject);
+                    const SYMBOL *pp = SymbolGet(graph->symbols, out[i].predicate);
+                    const SYMBOL *oo = SymbolGet(graph->symbols, out[i].object);
+                    if (total < 32)
+                        printf("  %s --%s--> %s  [conf %.0f%% | %s+%s=>%s]\n",
+                               ss ? ss->name : "?", pp ? pp->name : "?",
+                               oo ? oo->name : "?",
+                               out[i].confidence * 100.0f,
+                               RULES[ri].first, RULES[ri].second,
+                               RULES[ri].result);
+                }
+            }
+            if (total > 32)
+                printf("  ... and %u more (showing 32)\n", total - 32);
+            printf("IA > %u candidates, 0 written (dry-run).\n\n", total);
             continue;
         }
 

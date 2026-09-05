@@ -25,6 +25,14 @@ typedef struct
 
 typedef struct
 {
+    SYMBOL_ID subject;
+    SYMBOL_ID predicate;
+    SYMBOL_ID object;
+    float     confidence;
+} INFERRED_TRIPLE;
+
+typedef struct
+{
     uint32_t max_depth;
     float    min_confidence;
     float    decay_factor;
@@ -52,6 +60,16 @@ uint32_t InferenceApplyCompositionRule(
     const COMPOSITION_RULE *rule,
     const INFERENCE_CONFIG *config
 );
+
+/* Read-only dry-run: collects what ApplyCompositionRule would write
+   under the same rule and config, without modifying the graph. Results
+   are capped at max_out. Returns the number of candidates collected. */
+uint32_t InferenceDryRun(
+    GRAPH *graph,
+    const COMPOSITION_RULE *rule,
+    const INFERENCE_CONFIG *config,
+    INFERRED_TRIPLE *out,
+    uint32_t max_out);
 
 void InferencePrintExplanation(
     const GRAPH *graph,

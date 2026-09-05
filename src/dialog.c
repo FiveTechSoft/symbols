@@ -163,7 +163,7 @@ int DialogGenerateResponse(
         snprintf(out_response, max_len,
                  "Puedo aprender hechos nuevos, responder preguntas sobre el grafo, "
                  "razonar por encadenamiento profundo y detectar sinonimos con embeddings 32D. "
-                 "Comandos: /query, /find S P O, /why S P, /analogy A B, /stats, /export <file.dot|.ttl>.");
+                  "Comandos: /query, /find S P O, /why S P, /analogy A B, /infer, /stats, /export <file.dot|.ttl>.");
         return 1;
     }
 
