@@ -1,0 +1,20 @@
+# Human-true negatives, one declarative sentence per line.
+# Ingested via the tree (polarity from bare NO), never as TSV:
+# denial is syntax over a sentence, not a fourth column.
+# Every entity below exists in the map; every claim verified true
+# (the negated fact is absent AND false in the world).
+# Curated once, by hand. 14 rows.
+Japón no es miembro de la OTAN
+Brasil no es miembro de la OTAN
+Australia no es miembro de la OTAN
+Suiza no es miembro de la OTAN
+El sueco no es idioma de Noruega
+El inglés no es idioma de Polonia
+Oslo no es capital de Suecia
+Madrid no es capital de Italia
+El euro no es moneda de Polonia
+El francés no es idioma de Alemania
+París no es capital de Italia
+El dólar no es moneda de Japón
+El castellano no es idioma de Noruega
+Berlín no es capital de Francia

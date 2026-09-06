@@ -18,7 +18,10 @@ typedef struct
 {
     char subject[128];      /* concept to look up */
     char relation[64];     /* relation naming a stored triple slot */
+    char object[128];      /* second entity for (S,R,O) verification */
     int  is_question;
+    int  is_count;         /* CUÁNTO-form: answer with the numeral */
+    int  is_negative;      /* NO-form: verify (S,R,O), answer Sí/No */
     int  valid;
 } QUESTION;
 

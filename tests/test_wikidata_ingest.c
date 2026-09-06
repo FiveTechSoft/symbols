@@ -6,6 +6,8 @@
 #include "prune.h"
 #include "model.h"
 #include "embedding.h"
+#include "context.h"
+#include "parser.h"
 
 int main(void)
 {
@@ -80,6 +82,40 @@ int main(void)
     INGEST_STATS ir11 = IngestTSV(graph, "data/samples/jung_symbols.tsv");
     printf("   Archetypes: %llu triples, %u symbols\n",
            ir11.relations_inserted, SymbolCount(graph->symbols));
+
+    /* 8e. Ingest grammar seed (closed-class glue as linguistic facts) */
+    printf("8e. Ingesting grammar_seed.tsv (glue words)...\n");
+    INGEST_STATS ir12 = IngestTSV(graph, "data/samples/grammar_seed.tsv");
+    printf("   Glue:      %llu triples, %u symbols\n",
+           ir12.relations_inserted, SymbolCount(graph->symbols));
+
+    /* 8f. Ingest negation seeds (true denials -> polar triples) */
+    printf("8f. Ingesting negation_seed.txt (denials)...\n");
+    {
+        CONTEXT *nctx = ContextCreate();
+        FILE *nf = fopen("data/samples/negation_seed.txt", "r");
+        uint32_t nstored = 0, nlines = 0;
+        if (nf != NULL)
+        {
+            char line[1024];
+            while (fgets(line, sizeof(line), nf) != NULL)
+            {
+                size_t L = strlen(line);
+                while (L > 0 && (line[L - 1] == '\n' ||
+                                 line[L - 1] == '\r'))
+                    line[--L] = '\0';
+                if (L == 0 || line[0] == '#')
+                    continue;
+                nlines++;
+                if (ParserIngestSentenceCtx(graph, nctx, line) > 0)
+                    nstored++;
+            }
+            fclose(nf);
+        }
+        ContextDestroy(nctx);
+        printf("   Denials:   %u/%u stored, %u symbols\n",
+               nstored, nlines, SymbolCount(graph->symbols));
+    }
 
     printf("\n   TOTAL: %u relations, %u symbols\n",
            RelationCount(graph->relations), SymbolCount(graph->symbols));

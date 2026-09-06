@@ -63,8 +63,21 @@ uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
                                RELATION **results, uint32_t max_results);
 
 uint32_t RelationFindBySubjectRelation(const RELATION_TABLE *table,
-                                        SYMBOL_ID subject, SYMBOL_ID relation,
-                                        RELATION **results, uint32_t max_results);
+                                         SYMBOL_ID subject, SYMBOL_ID relation,
+                                         RELATION **results, uint32_t max_results);
+
+/* Exact count of (subject, relation) triples. Counting answers need
+   totals, not capped samples: a truncated count would lie. */
+uint32_t RelationCountBySubjectRelation(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject,
+                                        SYMBOL_ID relation);
+
+/* Same, restricted to one polarity: counting what IS (positives)
+   must not include what is DENIED (negatives). */
+uint32_t RelationCountBySubjectRelationPolar(const RELATION_TABLE *table,
+                                             SYMBOL_ID subject,
+                                             SYMBOL_ID relation,
+                                             RELATION_POLARITY polarity);
 
 uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,
                               RELATION **results, uint32_t max_results);

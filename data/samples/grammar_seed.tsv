@@ -1,0 +1,19 @@
+# Closed-class glue as honest linguistic facts (doctrine: closed-class
+# is syntax, and "X is a Y" about the word itself is true data).
+# Purpose: glue symbols must EXIST so the novelty tier never crowns
+# novel glue over known content (ROMA/CAPITAL/DE class). Low frequency
+# keeps Zipf dynamics sane; the census sees live recurrence.
+# Curated once, by hand. 12 rows (EL excluded on purpose: the lint
+# anaphora rule owns bare EL; edge articles strip structurally anyway).
+DE	ES	PREPOSICION
+EN	ES	PREPOSICION
+DEL	ES	PREPOSICION
+AL	ES	PREPOSICION
+CON	ES	PREPOSICION
+LA	ES	ARTICULO
+LOS	ES	ARTICULO
+LAS	ES	ARTICULO
+UN	ES	ARTICULO
+UNA	ES	ARTICULO
+Y	ES	CONJUNCION
+E	ES	CONJUNCION

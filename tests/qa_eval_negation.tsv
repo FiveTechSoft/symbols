@@ -1,0 +1,27 @@
+# QA negation set (M1 roadmap): pregunta<TAB>respuesta_esperada.
+# Preguntas ¿X no es Y? verifican el triple (S,R,O): negación guardada
+# -> No.; afirmación guardada (negación refutada) -> Yes.; sin evidencia
+# -> sin respuesta (estas filas no entran: el set mide lo decidible).
+# Curadas + verificadas por ejecución (20/20 hoy). Umbral 90%.
+# Nota: el binario corre en EN por defecto; las confirmaciones esperan
+# "Yes." ("No." coincide en ambos). No muta el modelo.
+¿Japon no es miembro de la OTAN?	No.
+¿Brasil no es miembro de la OTAN?	No.
+¿Australia no es miembro de la OTAN?	No.
+¿Suiza no es miembro de la OTAN?	No.
+¿El sueco no es idioma de Noruega?	No.
+¿El inglés no es idioma de Polonia?	No.
+¿No es Oslo la capital de Suecia?	No.
+¿Madrid no es capital de Italia?	No.
+¿El euro no es moneda de Polonia?	No.
+¿El francés no es idioma de Alemania?	No.
+¿París no es capital de Italia?	No.
+¿El dólar no es moneda de Japón?	No.
+¿El castellano no es idioma de Noruega?	No.
+¿Berlín no es capital de Francia?	No.
+¿Noruega no es miembro de la ONU?	Yes.
+¿No es Oslo la capital de Noruega?	Yes.
+¿El sueco no es idioma de Suecia?	Yes.
+¿Madrid no es capital de España?	Yes.
+¿El euro no es moneda de España?	Yes.
+¿París no es capital de Francia?	Yes.

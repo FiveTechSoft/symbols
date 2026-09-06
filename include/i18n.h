@@ -37,6 +37,8 @@ typedef enum
     I18N_SOCIAL,         /* "Hello." small-talk ack */
     I18N_LEARNED,        /* "Stored." learn confirmation */
     I18N_EXTRACT,        /* "Could not extract a clear relation..." */
+    I18N_YES,            /* "Yes." verification confirm (ASCII-only) */
+    I18N_NO,             /* "No." verification refute (ASCII-only) */
     I18N_COUNT
 } I18N_KEY;
 
