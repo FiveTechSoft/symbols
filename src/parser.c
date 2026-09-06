@@ -7,6 +7,7 @@
 #include "stem.h"
 #include "embedding.h"
 #include "learning.h"
+#include "i18n.h"
 
 /* Forward: descriptor and entity resolution live with the query
    path below; the ingest tree above needs them. */
@@ -18,6 +19,7 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 static uint64_t TokenRarity(const GRAPH *graph, const char *token);
 static uint64_t EffFreq(const GRAPH *graph, const char *token);
 static int TokenNamesRelation(const GRAPH *graph, const char *token);
+static int IsGlueToken(const char *token);
 static void SurfaceRecord(const PARSED_SENTENCE *tokens,
                           uint32_t subj_a, uint32_t subj_b,
                           uint32_t pred_pos,
@@ -85,12 +87,18 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     /* Copula slots: strip leading/trailing tokens that name a used
        relation ("Roma es _", "_ es capital"). Positional, never
-       lexical: the copula sits at the span edge by definition. */
+       lexical: the copula sits at the span edge by definition. Bare
+       NO is edge glue too (closed-class, like delimiters): negation
+       marks the clause, never an entity ("Roma no _" resolves ROMA).
+       Closed articles likewise (EL/LA/...: syntax, same license as
+       the query-side run skip and the lint STOP_SUBJ list). */
     while (end > start + 1 &&
-           TokenNamesRelation(graph, tokens->tokens[start]))
+           (TokenNamesRelation(graph, tokens->tokens[start]) ||
+            IsGlueToken(tokens->tokens[start])))
         start++;
     while (end > start + 1 &&
-           TokenNamesRelation(graph, tokens->tokens[end - 1]))
+           (TokenNamesRelation(graph, tokens->tokens[end - 1]) ||
+            IsGlueToken(tokens->tokens[end - 1])))
         end--;
 
     /* No frequency-ratio edge strip here: raw standalone frequency
@@ -102,7 +110,9 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
     char cand[128];
     /* Tier 0: longest known compound (length 2+). Single known tokens
        wait for the purity tier below, so known glue (DE, EL) can never
-       swallow novel content sitting next to it. */
+       swallow novel content sitting next to it. Candidates naming a
+       used relation are skipped (a relation name is not an entity:
+       "MIEMBRO_DE" inside a span must not resolve the object). */
     for (uint32_t len = (span < 4 ? span : 4); len >= 2; len--)
     {
         if (trailing)
@@ -117,6 +127,8 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                     if (k > 0) strcat(cand, "_");
                     strcat(cand, tokens->tokens[s + k]);
                 }
+                if (TokenNamesRelation(graph, cand))
+                    continue;
                 if (SymbolFind(graph->symbols, cand) != SYMBOL_INVALID)
                 {
                     strncpy(out, cand, out_size - 1);
@@ -135,6 +147,8 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                     if (k > 0) strcat(cand, "_");
                     strcat(cand, tokens->tokens[s + k]);
                 }
+                if (TokenNamesRelation(graph, cand))
+                    continue;
                 if (SymbolFind(graph->symbols, cand) != SYMBOL_INVALID)
                 {
                     strncpy(out, cand, out_size - 1);
@@ -237,7 +251,29 @@ static int SpanToSymbol(const GRAPH *graph, const PARSED_SENTENCE *tokens,
    token far more frequent than both neighbors splits the input, and
    belongs to neither clause. On virgin maps nothing splits (graceful
    degradation to one clause). Bounds-checked interior only, so edge
-   articles can never shatter an entity. */
+   articles can never shatter an entity. A maximum splits ONLY between
+   two relation roots: a frequent copula inside one clause ("Noruega
+   no es miembro ...") must never strand the subject in another
+   segment. Roots must be trusted (sourced vocabulary): bulk noise
+   partitions nothing. */
+static int TrustedRootInRange(const GRAPH *graph,
+                              const PARSED_SENTENCE *tokens,
+                              uint32_t a, uint32_t b)
+{
+    char rel[64];
+    int trusted = 0;
+    for (uint32_t i = a; i < b && i < tokens->count; i++)
+    {
+        rel[0] = '\0';
+        trusted = 0;
+        if (ResolveRelationPass(graph, tokens->tokens[i],
+                                rel, sizeof(rel), &trusted) &&
+            trusted)
+            return 1;
+    }
+    return 0;
+}
+
 static uint32_t FindSplits(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                            uint32_t *outs, uint32_t maxouts)
 {
@@ -254,10 +290,58 @@ static uint32_t FindSplits(const GRAPH *graph, const PARSED_SENTENCE *tokens,
             continue;
         uint64_t fl = EffFreq(graph, tokens->tokens[i - 1]);
         uint64_t fr = EffFreq(graph, tokens->tokens[i + 1]);
-        if (f > fl && f > fr)
+        if (f > fl && f > fr &&
+            TrustedRootInRange(graph, tokens, 0, i) &&
+            TrustedRootInRange(graph, tokens, i + 1, tokens->count))
             outs[n++] = i;
     }
     return n;
+}
+
+/* Does the relation touch the subject directly or through ES
+   ancestry? Redirect evidence must see inherited claims (Piolín holds
+   no direct CAPAZ_DE triple, but PINGÜINO denies for it): direct-only
+   checks strand inheritable questions at the winner. BFS over ES,
+   depth-capped, visited; any polarity touches. */
+static int TouchesInherited(const GRAPH *graph, SYMBOL_ID subj,
+                            SYMBOL_ID rel)
+{
+    if (graph == NULL || subj == SYMBOL_INVALID || rel == SYMBOL_INVALID)
+        return 0;
+    SYMBOL_ID es = SymbolFind(graph->symbols, "ES");
+    SYMBOL_ID seen[16];
+    uint32_t nseen = 0;
+    SYMBOL_ID queue[16];
+    uint32_t qh = 0, qt = 0;
+    seen[nseen++] = subj;
+    queue[qt++] = subj;
+    RELATION *probe[1];
+    while (qh < qt)
+    {
+        SYMBOL_ID cur = queue[qh++];
+        if (GraphQuerySubjectRelation(graph, cur, rel, probe, 1) > 0)
+            return 1;
+        if (es == SYMBOL_INVALID)
+            continue;
+        RELATION *up[16];
+        uint32_t nu = GraphQuerySubjectRelation(graph, cur, es, up, 16);
+        for (uint32_t u = 0; u < nu && qt < 16; u++)
+        {
+            int known = 0;
+            for (uint32_t v = 0; v < nseen; v++)
+                if (seen[v] == up[u]->object)
+                {
+                    known = 1;
+                    break;
+                }
+            if (known)
+                continue;
+            if (nseen < 16)
+                seen[nseen++] = up[u]->object;
+            queue[qt++] = up[u]->object;
+        }
+    }
+    return 0;
 }
 
 /* Session token census: raw occurrence counts per token hash. Glue
@@ -447,14 +531,26 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
     }
 
     /* Adjacent roots compete for the same slots ("es capital"):
-       keep the rarest of each adjacent run. The copula is frequent;
-       content is rare. No names involved. */
+       keep the LONGEST name. Symbol frequency is corrupt here (it
+       counts relation-slot occurrences, so popular predicates look
+       "common" and the copula would eat content roots); name length
+       approximates specificity structurally: compounds outrank bare
+       copulas, ties fall back to rarity. No names involved. */
     {
         uint32_t w = 0;
         for (uint32_t k = 0; k < nroots; k++)
         {
             if (w > 0 && roots[k] == roots[w - 1] + 1)
             {
+                size_t l_old = strlen(names[w - 1]);
+                size_t l_new = strlen(names[k]);
+                if (l_new > l_old)
+                {
+                    roots[w - 1] = roots[k];
+                    strcpy(names[w - 1], names[k]);
+                    trusted[w - 1] = trusted[k];
+                    continue;
+                }
                 uint64_t f_old = TokenRarity(graph, names[w - 1]);
                 uint64_t f_new = TokenRarity(graph, names[k]);
                 if (f_new < f_old)
@@ -550,16 +646,40 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
                     SYMBOL_ID p = GraphAddSymbol(graph, names[c]);
                     SYMBOL_ID o = GraphAddSymbol(graph, obj);
 
+                    /* Negation marks the clause, never the entity: a
+                       bare NO anywhere between the region start and
+                       the relation root stores a NEGATIVE triple
+                       ("Roma no es ...", "Noruega no es miembro ...").
+                       Per-region scan, so coordinated positives
+                       ("Madrid sí") beside a negated region stay
+                       positive. ALLOW_BOTH keeps history auditable;
+                       weights duel it out. Negatives skip embedding
+                       co-occurrence (non-co-occurrence must not train
+                       association) but keep the surface mold
+                       (positions, not truth). */
+                    int neg = 0;
+                    for (uint32_t nk = r0; nk < roots[c]; nk++)
+                        if (strcmp(tokens.tokens[nk], "NO") == 0)
+                        {
+                            neg = 1;
+                            break;
+                        }
+                    int added = 0;
                     if (s != SYMBOL_INVALID && p != SYMBOL_INVALID &&
-                        o != SYMBOL_INVALID &&
-                        GraphAddRelation(graph, s, p, o))
+                        o != SYMBOL_INVALID)
+                        added = neg ?
+                            GraphAddRelationPolar(graph, s, p, o,
+                                                  POLARITY_NEGATIVE,
+                                                  CONFLICT_ALLOW_BOTH) :
+                            GraphAddRelation(graph, s, p, o);
+                    if (added)
                     {
                         stored++;
                         SurfaceRecord(&tokens, r0, r1, roots[c],
                                       right_a, right_b, names[c]);
 
                         /* Update embeddings on every co-occurrence */
-                        if (graph->embeddings != NULL)
+                        if (!neg && graph->embeddings != NULL)
                         {
                             EMBEDDING_TABLE *emb = graph->embeddings;
 
@@ -974,6 +1094,16 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
     char stem[64];
     StemWord(token, stem, sizeof(stem));
 
+    /* NO is reserved (polarity marker): it never resolves, and no
+       relation named NO answers (junk-vocabulary from the fragment
+       era: a negation marker must not root clauses or qualify
+       splits). Articles and bare glue as relation names are reserved
+       likewise (EL/LA/DE/... never predicate: bulk junk like
+       (X, EL, Y) must not win descriptor contests). The copula strip
+       still sees them as edge glue. */
+    if (strcmp(token, "NO") == 0 || IsGlueToken(token))
+        return 0;
+
     uint32_t n = RelCacheFill(graph);
     int found = 0;
     size_t best_affix = 0;
@@ -984,6 +1114,8 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
 
     for (uint32_t k = 0; k < n; k++)
     {
+        if (strcmp(rel_cache[k].name, "NO") == 0)
+            continue;
         for (uint32_t j = 0; j < rel_cache[k].nkeys; j++)
         {
             if (strcmp(rel_cache[k].keys[j], token) != 0 &&
@@ -1061,6 +1193,30 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
     return 0;
 }
 
+/* Closed-class edge glue: negation marker, articles, and the
+   prepositions/conjunctions that never name entities (DE/EN/Y have
+   zero entity lives in the map: every occurrence is fragment-era
+   residue or bulk glue; measured breaking subject resolution on
+   grown maps). Never an entity, never a descriptor; shared by
+   ingest spans and query runs so both sides agree. Same license as
+   delimiters and the lint STOP_SUBJ list: syntax, not vocabulary. */
+static int IsGlueToken(const char *token)
+{
+    static const char *const GLUE[] = {
+        "NO",
+        "EL", "LA", "LOS", "LAS", "UN", "UNA", "UNOS", "UNAS", "LO",
+        "AL", "DEL",
+        "DE", "EN", "Y",
+        NULL
+    };
+    if (token == NULL)
+        return 0;
+    for (int i = 0; GLUE[i] != NULL; i++)
+        if (strcmp(token, GLUE[i]) == 0)
+            return 1;
+    return 0;
+}
+
 /* Embedding description: the (token, relation) pair with the highest
    cosine similarity across all used relations. No threshold: the ranking
    IS the answer, and it sharpens as the model learns (rich model -> rich
@@ -1096,6 +1252,13 @@ static int ResolveRelationEmbed(const GRAPH *graph,
             continue;
         for (uint32_t k = 0; k < np; k++)
         {
+            /* Reserved/glue relations never answer, not even by
+               vectors (bulk junk like EL wins on co-occurrence
+               similarity alone). */
+            const SYMBOL *pr = SymbolGet(graph->symbols, rids[k]);
+            if (pr == NULL || pr->name == NULL || pr->name[0] == '\0' ||
+                strcmp(pr->name, "NO") == 0 || IsGlueToken(pr->name))
+                continue;
             const float *pv = EmbeddingGetVector(graph->embeddings, rids[k]);
             if (pv == NULL)
                 continue;
@@ -1139,9 +1302,14 @@ static int TokenNamesRelation(const GRAPH *graph, const char *token)
 /* Entity = longest trailing token run (up to 4) naming an existing
    symbol. Trailing tokens that name used relations are skipped first
    (dynamic copula-skip: "... David es" resolves to DAVID, never ES).
-   Falls back to the last token so unknown entities still yield
-   unanswerable questions instead of invalid ones. Returns the run start
-   (or -1) and writes the _-joined name. */
+   Bare NO never joins an entity run (null-marker doctrine: negation
+   marks, never names — otherwise the leftover NO symbol from the
+   fragment era poisons resolution). Closed-class articles never join
+   runs either (LA/EL/LOS/...: syntax, same license as delimiters and
+   the lint STOP_SUBJ list; a trailing article would otherwise beat
+   content by position). Falls back to the last token so unknown
+   entities still yield unanswerable questions instead of invalid
+   ones. Returns the run start (or -1) and writes the _-joined name. */
 static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
                          uint32_t start, char *out, size_t out_size)
 {
@@ -1171,11 +1339,30 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
         for (uint32_t s = start; s + len <= end; s++)
         {
             cand[0] = '\0';
+            int has_no = 0;
             for (uint32_t k = 0; k < len; k++)
             {
+                /* Glue and copulas never join entity runs: a bare NO
+                   or article, or a token naming a used relation, would
+                   otherwise beat content by position (ES in
+                   "ES OSLO LA" outranks OSLO). Same license as the
+                   ingest edge strip. */
+                const char *tok = tokens->tokens[s + k];
+                if (IsGlueToken(tok) || TokenNamesRelation(graph, tok))
+                {
+                    has_no = 1;
+                    break;
+                }
                 if (k > 0) strcat(cand, "_");
                 strcat(cand, tokens->tokens[s + k]);
             }
+            if (has_no)
+                continue;
+            /* A run naming a used relation is not an entity (mirror
+               of the ingest Tier0 skip): "MIEMBRO_DE" inside a span
+               must not resolve the subject. */
+            if (TokenNamesRelation(graph, cand))
+                continue;
             if (SymbolFind(graph->symbols, cand) != SYMBOL_INVALID &&
                 (len > best_len || (len == best_len && s + len == end)))
             {
@@ -1189,9 +1376,24 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
 
     if (best_len == 0)
     {
-        strncpy(out, tokens->tokens[end - 1], out_size - 1);
+        /* Last resort: walk back past relations and glue to the last
+           content-or-novel token (a bare relation name like ES is
+           never an entity). Unknowns still return, so unanswerable
+           questions stay valid instead of invalid. */
+        uint32_t w = end;
+        while (w > start)
+        {
+            w--;
+            if (!IsGlueToken(tokens->tokens[w]) &&
+                !TokenNamesRelation(graph, tokens->tokens[w]))
+                break;
+        }
+        if (IsGlueToken(tokens->tokens[w]) ||
+            TokenNamesRelation(graph, tokens->tokens[w]))
+            return -1;
+        strncpy(out, tokens->tokens[w], out_size - 1);
         out[out_size - 1] = '\0';
-        return (int)(end - 1);
+        return (int)w;
     }
 
     out[0] = '\0';
@@ -1260,6 +1462,23 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
 
     q.is_question = has_question_mark;
 
+    /* Counting form: CUÁNTO/CUÁNTOS/CUÁNTA/CUÁNTAS (closed
+       interrogatives, normalized already) turn the answer into the
+       numeral. Subject and relation resolve exactly as usual; only
+       the verbalization aggregates. */
+    for (uint32_t ci = 0; ci < tokens.count; ci++)
+    {
+        const char *tok = tokens.tokens[ci];
+        if (strncmp(tok, "CUANT", 5) == 0 &&
+            (strcmp(tok + 5, "O") == 0 || strcmp(tok + 5, "OS") == 0 ||
+             strcmp(tok + 5, "A") == 0 || strcmp(tok + 5, "AS") == 0))
+        {
+            q.is_count = 1;
+            q.is_question = 1;
+            break;
+        }
+    }
+
     /* Fact shape: descriptor token pointing to a graph relation plus an
        entity. The entity usually trails the descriptor ("la CAPITAL de
        FRANCIA es") but may precede it ("Paris es"): both directions are
@@ -1271,11 +1490,15 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
        then rarest token, then earliest position. */
     {
         /* Ranked descriptor: every resolving token scores
-           (untrusted, rarity, pass, position), lowest wins. Trust beats
-           rarity (bulk-grown noise loses to curated words even standing
+           (untrusted, rarity), lowest wins. Trust beats rarity
+           (bulk-grown noise loses to curated words even standing
            earlier); rarity beats morphology (a novel stem hit like
-           CAPITALES->CAPITAL outranks the copula); morphology beats
-           position. No word lists, no thresholds. */
+           CAPITALES->CAPITAL outranks the copula). The evidence
+           redirect below repairs the cases a bare ranking cannot
+           (entity words naming curated relations, verbs that must
+           lose to co-occurring nouns): a resolving descriptor that
+           yields no triple with the asked entity is useless, so
+           co-occurrence decides. No word lists, no thresholds. */
         /* Single ranking over all tokens: morphology lives inside
            resolution (affix ranking), so no pass loop is needed here. */
         int best_pos = -1;
@@ -1284,6 +1507,14 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         uint64_t best_freq = UINT64_MAX;
         for (uint32_t i = 0; i < tokens.count; i++)
         {
+            /* Bare NO is the polarity marker, never a descriptor:
+               it flags negative verification instead of resolving
+               (closed-class, like the CUANT forms above). */
+            if (strcmp(tokens.tokens[i], "NO") == 0)
+            {
+                q.is_negative = 1;
+                continue;
+            }
             char rel[64] = {0};
             int trusted = 0;
             if (!ResolveRelationPass(graph, tokens.tokens[i],
@@ -1307,6 +1538,34 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
             if (ResolveQuestionSubject(graph, &tokens, i,
                                        subj, sizeof(subj)))
             {
+                /* Second entity for (S,R,O) verification: whichever
+                   side the subject did not come from. Empty when the
+                   question names a single entity (slot mode). */
+                {
+                    char trail[128] = {0};
+                    if (ResolveEntity(graph, &tokens, i + 1,
+                                      trail, sizeof(trail)) >= 0 &&
+                        strcmp(trail, subj) != 0)
+                        strcpy(q.object, trail);
+                    else
+                    {
+                        PARSED_SENTENCE pre;
+                        memset(&pre, 0, sizeof(pre));
+                        for (uint32_t k = 0; k < i &&
+                                            pre.count < PARSER_MAX_TOKENS;
+                             k++)
+                        {
+                            strcpy(pre.tokens[pre.count],
+                                   tokens.tokens[k]);
+                            pre.count++;
+                        }
+                        char pre_ent[128] = {0};
+                        if (ResolveEntity(graph, &pre, 0,
+                                          pre_ent, sizeof(pre_ent)) >= 0 &&
+                            strcmp(pre_ent, subj) != 0)
+                            strcpy(q.object, pre_ent);
+                    }
+                }
                 {
                     /* Subject-aware descriptor: the winning relation
                        may never touch this subject (bare IDIOMA wins
@@ -1314,45 +1573,65 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                        holds its fact). Among every resolving token,
                        prefer — in winner-rank order — the first
                        relation co-occurring with the subject.
-                       Relations are vocabulary; co-occurrence with the
-                       asked entity is evidence. No co-occurrence
-                       anywhere keeps the winner (honest attempt). */
+                        Relations are vocabulary; co-occurrence with the
+                       asked entity is evidence (direct or inherited:
+                       Piolín touches CAPAZ_DE through PINGÜINO). No
+                       co-occurrence anywhere keeps the winner (honest
+                       attempt). */
                     SYMBOL_ID subj_id = SymbolFind(graph->symbols, subj);
                     if (subj_id != SYMBOL_INVALID)
                     {
                         SYMBOL_ID best_rid =
                             SymbolFind(graph->symbols, best_rel);
-                        RELATION *probe[1];
                         if (best_rid != SYMBOL_INVALID &&
-                            GraphQuerySubjectRelation(graph, subj_id,
-                                                      best_rid,
-                                                      probe, 1) == 0)
+                            !TouchesInherited(graph, subj_id, best_rid))
                         {
-                            /* Every cached relation sharing the
-                               descriptor as key is a candidate
-                               (IDIOMA names both IDIOMA and
-                               IDIOMA_OFICIAL); rank them exactly as
-                               resolution does (affix, then predicate
-                               frequency) and take the first touching
-                               the subject. */
-                            char dstem[64] = {0};
-                            StemWord(tokens.tokens[i], dstem,
-                                     sizeof dstem);
+                            /* Evidence-ordered redirect: every resolving
+                               token contributes its relation plus the
+                               key-sharing family (IDIOMA names IDIOMA
+                               and IDIOMA_OFICIAL; "tiene" names TIENE
+                               for a "Dios" question). Ranked by affix,
+                               exact token-name match, established use;
+                               the first touching the subject wins. A
+                               resolving descriptor that yields no
+                               triple is useless; evidence decides.
+                               Runs ONLY when the winner co-occurs with
+                               nothing, so every current pass is
+                               untouched by construction. */
                             uint32_t c_idx[64];
                             size_t c_affix[64];
                             int c_exact[64];
                             uint64_t c_freq[64];
                             uint32_t ncand = 0;
                             uint32_t nrel = RelCacheFill(graph);
+                            for (uint32_t t = 0;
+                                 t < tokens.count && ncand < 64; t++)
+                            {
+                                if (strcmp(tokens.tokens[t], "NO") == 0)
+                                    continue;
+                                char trel[64] = {0};
+                                int ttrusted = 0;
+                                if (!ResolveRelationPass(graph,
+                                                         tokens.tokens[t],
+                                                         trel, sizeof(trel),
+                                                         &ttrusted))
+                                    continue;
+                                char dstem[64] = {0};
+                                StemWord(tokens.tokens[t], dstem,
+                                         sizeof dstem);
                             for (uint32_t k = 0;
                                  k < nrel && ncand < 64; k++)
                             {
+                                /* Reserved: NO and bare glue never answer. */
+                                if (strcmp(rel_cache[k].name, "NO") == 0 ||
+                                    IsGlueToken(rel_cache[k].name))
+                                    continue;
                                 int names = 0;
                                 for (uint32_t j = 0;
                                      j < rel_cache[k].nkeys; j++)
                                 {
                                     if (strcmp(rel_cache[k].keys[j],
-                                               tokens.tokens[i]) == 0 ||
+                                               tokens.tokens[t]) == 0 ||
                                         strcmp(rel_cache[k].keys[j],
                                                dstem) == 0)
                                     {
@@ -1365,17 +1644,29 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                 if (strcmp(rel_cache[k].name,
                                            best_rel) == 0)
                                     continue;
+                                {
+                                    int dup = 0;
+                                    for (uint32_t d = 0; d < ncand; d++)
+                                        if (c_idx[d] == k)
+                                        {
+                                            dup = 1;
+                                            break;
+                                        }
+                                    if (dup)
+                                        continue;
+                                }
                                 c_idx[ncand] = k;
                                 c_affix[ncand] =
-                                    LcpLen(tokens.tokens[i],
+                                    LcpLen(tokens.tokens[t],
                                            rel_cache[k].name);
                                 c_exact[ncand] =
-                                    (strcmp(tokens.tokens[i],
+                                    (strcmp(tokens.tokens[t],
                                             rel_cache[k].name) == 0);
                                 c_freq[ncand] =
                                     TokenRarity(graph,
                                                 rel_cache[k].name);
                                 ncand++;
+                                }
                             }
                             /* Resolution order: affix, exact-name,
                                then predicate frequency. First
@@ -1411,9 +1702,7 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                 SYMBOL_ID crid = SymbolFind(graph->symbols,
                                     rel_cache[c_idx[c]].name);
                                 if (crid != SYMBOL_INVALID &&
-                                    GraphQuerySubjectRelation(graph, subj_id,
-                                                              crid, probe,
-                                                              1) > 0)
+                                    TouchesInherited(graph, subj_id, crid))
                                 {
                                     strcpy(best_rel,
                                            rel_cache[c_idx[c]].name);
@@ -1560,24 +1849,166 @@ int ParserAnswerQuestion(
 
         if (rel_id != SYMBOL_INVALID)
         {
+            /* Counting form: the numeral, not the list. Exact total
+               of POSITIVE claims (denials are not counted).
+               Zero is honest when nothing positive is held. */
+            if (q->is_count)
+            {
+                uint32_t total = RelationCountBySubjectRelationPolar(
+                    graph->relations, subj_id, rel_id,
+                    POLARITY_POSITIVE);
+                snprintf(out_answer, max_len, "%u", total);
+                out_answer[max_len - 1] = '\0';
+                return 1;
+            }
+            /* Negative verification (S,R,O): the resolved relation
+               first, then fallback-ordered co-occurring relations
+               (the descriptor "idioma" ambiguously covers IDIOMA and
+               IDIOMA_OFICIAL: evidence decides, winner first).
+               Exact direction first, then swapped: leading-NO forms
+               ("¿No es Oslo la capital de Noruega?") put the holder
+               last. The swap can only confirm against a stored swapped
+               claim; documented risk, vanishingly rare in practice.
+               Both polarities on one relation surface as a counted
+               dispute (P4 evidence). */
+            if (q->is_negative && q->object[0] != '\0')
+            {
+                SYMBOL_ID obj_id =
+                    StemFindSymbol(graph->symbols, q->object);
+                if (obj_id != SYMBOL_INVALID)
+                {
+                    SYMBOL_ID vrel[65];
+                    uint32_t nvrel = 0;
+                    vrel[nvrel++] = rel_id;
+                    /* Relation family: every entry sharing a cache key
+                       with the winner (IDIOMA names both IDIOMA and
+                       IDIOMA_OFICIAL, either direction). Evidence
+                       decides within the family, winner first. */
+                    {
+                        char fkeys[16][64];
+                        uint32_t nfkeys = 0;
+                        uint32_t nrel = RelCacheFill(graph);
+                        for (uint32_t k = 0; k < nrel; k++)
+                        {
+                            if (strcmp(rel_cache[k].name,
+                                       q->relation) != 0)
+                                continue;
+                            for (uint32_t j = 0;
+                                 j < rel_cache[k].nkeys &&
+                                 nfkeys < 16; j++)
+                            {
+                                strcpy(fkeys[nfkeys],
+                                       rel_cache[k].keys[j]);
+                                nfkeys++;
+                            }
+                        }
+                        for (uint32_t k = 0;
+                             k < nrel && nvrel < 65; k++)
+                        {
+                            if (strcmp(rel_cache[k].name, "NO") == 0 ||
+                                IsGlueToken(rel_cache[k].name) ||
+                                strcmp(rel_cache[k].name,
+                                       q->relation) == 0)
+                                continue;
+                            int shares = 0;
+                            for (uint32_t j = 0;
+                                 j < rel_cache[k].nkeys && !shares; j++)
+                                for (uint32_t f = 0;
+                                     f < nfkeys; f++)
+                                    if (strcmp(rel_cache[k].keys[j],
+                                               fkeys[f]) == 0)
+                                    {
+                                        shares = 1;
+                                        break;
+                                    }
+                            if (!shares)
+                                continue;
+                            SYMBOL_ID crid = SymbolFind(graph->symbols,
+                                rel_cache[k].name);
+                            if (crid == SYMBOL_INVALID)
+                                continue;
+                            RELATION *probe[1];
+                            if (GraphQuerySubjectRelation(graph, subj_id,
+                                                          crid, probe,
+                                                          1) > 0 ||
+                                GraphQuerySubjectRelation(graph, obj_id,
+                                                          crid, probe,
+                                                          1) > 0)
+                                vrel[nvrel++] = crid;
+                        }
+                    }
+                    for (uint32_t v = 0; v < nvrel; v++)
+                    {
+                        RELATION *neg = RelationFindPolar(graph->relations,
+                            subj_id, vrel[v], obj_id, POLARITY_NEGATIVE);
+                        RELATION *pos = RelationFindPolar(graph->relations,
+                            subj_id, vrel[v], obj_id, POLARITY_POSITIVE);
+                        if (neg == NULL && pos == NULL)
+                        {
+                            neg = RelationFindPolar(graph->relations,
+                                obj_id, vrel[v], subj_id,
+                                POLARITY_NEGATIVE);
+                            pos = RelationFindPolar(graph->relations,
+                                obj_id, vrel[v], subj_id,
+                                POLARITY_POSITIVE);
+                        }
+                        if (neg != NULL && pos == NULL)
+                        {
+                            snprintf(out_answer, max_len, "%s",
+                                     LangString(I18N_NO, 0));
+                            out_answer[max_len - 1] = '\0';
+                            return 1;
+                        }
+                        if (pos != NULL && neg == NULL)
+                        {
+                            snprintf(out_answer, max_len, "%s",
+                                     LangString(I18N_YES, 0));
+                            out_answer[max_len - 1] = '\0';
+                            return 1;
+                        }
+                        if (pos != NULL && neg != NULL)
+                        {
+                            snprintf(out_answer, max_len,
+                                     "%s (%llu) / %s (%llu)",
+                                     LangString(I18N_YES, 0),
+                                     (unsigned long long)pos->count,
+                                     LangString(I18N_NO, 0),
+                                     (unsigned long long)neg->count);
+                            out_answer[max_len - 1] = '\0';
+                            return 1;
+                        }
+                    }
+                }
+                return 0;
+            }
             RELATION *results[32];
             uint32_t n = GraphQuerySubjectRelation(
                 graph, subj_id, rel_id, results, 32);
 
-            if (n > 0)
+            /* Negatives never list as facts: a denied claim answering
+               a slot question would be a lie. All-negative resolves
+               to honest unknown. */
+            RELATION *posit[32];
+            uint32_t npos = 0;
+            for (uint32_t f = 0; f < n && npos < 32; f++)
+                if (results[f]->polarity != POLARITY_NEGATIVE)
+                    posit[npos++] = results[f];
+
+            if (npos > 0)
             {
                 /* Order answers by semantic-area coherence. */
-                ParserRankByArea(graph, subj_id, results, n);
+                ParserRankByArea(graph, subj_id, posit, npos);
 
-                /* Build answer from ALL objects (recall over
+                /* Build answer from ALL positive objects (recall over
                    truncation: the loop is buffer-guarded, so long
                    lists degrade to fits-in-buffer, never overflow).
                    A capped answer hides known facts (Leonardo holds
-                   11 occupations, not 5). */
+                   11 occupations, not 5). Objects carrying a negative
+                   triple too surface the dispute with both counts. */
                 uint32_t pos = 0;
-                for (uint32_t i = 0; i < n; i++)
+                for (uint32_t i = 0; i < npos; i++)
                 {
-                    const SYMBOL *obj = SymbolGet(graph->symbols, results[i]->object);
+                    const SYMBOL *obj = SymbolGet(graph->symbols, posit[i]->object);
                     if (obj)
                     {
                         if (i > 0 && pos + 2 < max_len)
@@ -1591,10 +2022,136 @@ int ParserAnswerQuestion(
                             memcpy(out_answer + pos, obj->name, name_len);
                             pos += name_len;
                         }
+                        RELATION *contra = RelationFindPolar(
+                            graph->relations, subj_id, rel_id,
+                            posit[i]->object, POLARITY_NEGATIVE);
+                        if (contra != NULL)
+                        {
+                            char mark[64];
+                            snprintf(mark, sizeof(mark),
+                                     " [DISPUTED +%llu/-%llu]",
+                                     (unsigned long long)posit[i]->count,
+                                     (unsigned long long)contra->count);
+                            uint32_t mlen = (uint32_t)strlen(mark);
+                            if (pos + mlen < max_len)
+                            {
+                                memcpy(out_answer + pos, mark, mlen);
+                                pos += mlen;
+                            }
+                        }
                     }
                 }
                 out_answer[pos] = '\0';
                 return 1;
+            }
+
+            /* Default reasoning (M6, non-monotonic): no direct claim.
+               Walk ES upward; per object, the NEAREST level mentioning
+               it decides (positive lists it, negative excludes it).
+               Specificity, not quantifiers: no "all birds fly" is
+               stored or needed; nearer overrides farther, denials
+               included. Read-only (defeasible conclusions never
+               materialize), depth-capped, cycle-guarded by the visited
+               set. No mentions anywhere keeps honest unknown. */
+            {
+                SYMBOL_ID es_id = SymbolFind(graph->symbols, "ES");
+                if (es_id != SYMBOL_INVALID)
+                {
+                    SYMBOL_ID level[8];
+                    uint32_t nlevel = 0;
+                    level[nlevel++] = subj_id;
+                    uint32_t head = 0;
+                    while (head < nlevel && nlevel < 8)
+                    {
+                        RELATION *up[32];
+                        uint32_t nu = GraphQuerySubjectRelation(
+                            graph, level[head], es_id, up, 32);
+                        for (uint32_t u = 0; u < nu; u++)
+                        {
+                            SYMBOL_ID parent = up[u]->object;
+                            int seen = 0;
+                            for (uint32_t v = 0; v < nlevel; v++)
+                                if (level[v] == parent)
+                                {
+                                    seen = 1;
+                                    break;
+                                }
+                            if (!seen && nlevel < 8)
+                                level[nlevel++] = parent;
+                        }
+                        head++;
+                    }
+                    SYMBOL_ID winners[32];
+                    uint32_t nwin = 0;
+                    SYMBOL_ID decided[64];
+                    uint32_t ndec = 0;
+                    int denied_only = 0;
+                    /* Level 0 included: direct positives already
+                       returned above, so level 0 can only contribute
+                       denials here — and a nearer denial must block a
+                       farther affirmation of the same object. */
+                    for (uint32_t l = 0; l < nlevel; l++)
+                    {
+                        RELATION *cand[32];
+                        uint32_t nc = GraphQuerySubjectRelation(
+                            graph, level[l], rel_id, cand, 32);
+                        for (uint32_t c = 0; c < nc; c++)
+                        {
+                            SYMBOL_ID o = cand[c]->object;
+                            int known = 0;
+                            for (uint32_t w = 0; w < ndec; w++)
+                                if (decided[w] == o)
+                                {
+                                    known = 1;
+                                    break;
+                                }
+                            if (known)
+                                continue;
+                            if (ndec < 64)
+                                decided[ndec++] = o;
+                            if (cand[c]->polarity == POLARITY_NEGATIVE)
+                            {
+                                denied_only = 1;
+                                continue;
+                            }
+                            if (nwin < 32)
+                                winners[nwin++] = o;
+                        }
+                    }
+                    if (nwin > 0)
+                    {
+                        uint32_t pos = 0;
+                        for (uint32_t i = 0; i < nwin; i++)
+                        {
+                            const SYMBOL *obj = SymbolGet(graph->symbols,
+                                                          winners[i]);
+                            if (obj == NULL)
+                                continue;
+                            if (i > 0 && pos + 2 < max_len)
+                            {
+                                out_answer[pos++] = ',';
+                                out_answer[pos++] = ' ';
+                            }
+                            uint32_t name_len =
+                                (uint32_t)strlen(obj->name);
+                            if (pos + name_len < max_len)
+                            {
+                                memcpy(out_answer + pos, obj->name,
+                                       name_len);
+                                pos += name_len;
+                            }
+                        }
+                        out_answer[pos] = '\0';
+                        return 1;
+                    }
+                    if (denied_only)
+                    {
+                        snprintf(out_answer, max_len, "%s",
+                                 LangString(I18N_NO, 0));
+                        out_answer[max_len - 1] = '\0';
+                        return 1;
+                    }
+                }
             }
         }
     }

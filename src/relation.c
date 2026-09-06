@@ -344,6 +344,44 @@ uint32_t RelationFindBySubjectRelation(const RELATION_TABLE *table,
     return found;
 }
 
+uint32_t RelationCountBySubjectRelation(const RELATION_TABLE *table,
+                                        SYMBOL_ID subject,
+                                        SYMBOL_ID relation)
+{
+    if (!table || subject == SYMBOL_INVALID || relation == SYMBOL_INVALID)
+        return 0;
+
+    /* Full scan, no index shortcuts: exactness over speed (tables are
+       small; a capped count would fabricate the answer). */
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < table->count; i++)
+    {
+        if (table->items[i].subject == subject &&
+            table->items[i].relation == relation)
+            found++;
+    }
+    return found;
+}
+
+uint32_t RelationCountBySubjectRelationPolar(const RELATION_TABLE *table,
+                                             SYMBOL_ID subject,
+                                             SYMBOL_ID relation,
+                                             RELATION_POLARITY polarity)
+{
+    if (!table || subject == SYMBOL_INVALID || relation == SYMBOL_INVALID)
+        return 0;
+
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < table->count; i++)
+    {
+        if (table->items[i].subject == subject &&
+            table->items[i].relation == relation &&
+            table->items[i].polarity == polarity)
+            found++;
+    }
+    return found;
+}
+
 uint32_t RelationFindByObject(const RELATION_TABLE *table, SYMBOL_ID object,
                               RELATION **results, uint32_t max_results)
 {

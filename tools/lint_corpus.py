@@ -48,6 +48,8 @@ FILES = [
     "data/samples/math_knowledge.tsv",
     "data/samples/iconclass_trees.tsv",
     "data/samples/jung_symbols.tsv",
+    "data/samples/grammar_seed.tsv",
+    "data/samples/animal_seed.tsv",
 ]
 
 STOP_SUBJ = {

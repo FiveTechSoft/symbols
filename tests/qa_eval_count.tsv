@@ -1,0 +1,26 @@
+# QA count set (M2 roadmap): pregunta<TAB>numero_esperado.
+# Preguntas ¿Cuántos/cuántas X tiene Y? agregan triples y verbalizan el
+# numeral (no la lista). Curadas + verificadas por ejecución contra el
+# corpus (22/22 hoy). Runner: test_eval_qa (umbral 90%). No muta el modelo.
+¿Cuántos idiomas oficiales tiene Bolivia?	4
+¿Cuántas ocupaciones tiene Leonardo_da_vinci?	11
+¿De cuántas organizaciones es miembro Belice?	4
+¿De cuántas organizaciones es miembro Corea_del_sur?	4
+¿De cuántas organizaciones es miembro Irak?	3
+¿Cuántos idiomas oficiales tiene Noruega?	2
+¿Cuántos idiomas oficiales tiene Nueva_zelanda?	2
+¿Cuántos idiomas oficiales tiene Bélgica?	2
+¿Cuántos idiomas oficiales tiene Suiza?	3
+¿Cuántos idiomas oficiales tiene Sudáfrica?	4
+¿Cuántas ocupaciones tiene Miguel_ángel?	5
+¿Cuántas ocupaciones tiene Salvador_dalí?	5
+¿De cuántas organizaciones es miembro Japón?	8
+¿De cuántas organizaciones es miembro Haití?	7
+¿De cuántas organizaciones es miembro Jamaica?	7
+¿De cuántas organizaciones es miembro India?	7
+¿De cuántas organizaciones es miembro Australia?	11
+¿De cuántas organizaciones es miembro Egipto?	10
+¿De cuántas organizaciones es miembro Trinidad_y_tobago?	8
+¿De cuántas organizaciones es miembro Suiza?	7
+¿De cuántas organizaciones es miembro Surinam?	10
+¿De cuántas organizaciones es miembro Turquía?	12

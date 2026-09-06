@@ -120,6 +120,15 @@ int ModelSave(const MODEL *model, const char *filepath)
             fclose(f);
             return 0;
         }
+        {
+            /* V4: polarity rides along (older readers stop above). */
+            uint32_t pol = (uint32_t)r->polarity;
+            if (fwrite(&pol, sizeof(uint32_t), 1, f) != 1)
+            {
+                fclose(f);
+                return 0;
+            }
+        }
     }
 
     /* 4. Embeddings block (32D) */
@@ -253,28 +262,37 @@ MODEL *ModelLoad(const char *filepath)
         free(name);
     }
 
-    /* Load relations (V3 adds provenance; V1/V2 => unknown) */
+    /* Load relations (V3 adds provenance; V1/V2 => unknown;
+       V4 adds polarity; older => positive) */
     for (uint32_t i = 0; i < rel_count; i++)
     {
         SYMBOL_ID subj, rel, obj, src = SYMBOL_INVALID;
         uint64_t count;
         float weight;
+        uint32_t pol = (uint32_t)POLARITY_POSITIVE;
 
         if (fread(&subj,   sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&rel,   sizeof(SYMBOL_ID), 1, f) != 1 ||
             fread(&obj,    sizeof(SYMBOL_ID), 1, f) != 1 ||
-            fread(&count,  sizeof(uint64_t), 1, f) != 1 ||
+            fread(&count,     sizeof(uint64_t), 1, f) != 1 ||
             fread(&weight, sizeof(float), 1, f) != 1 ||
-            (version >= 3 && fread(&src, sizeof(SYMBOL_ID), 1, f) != 1))
+            (version >= 3 && fread(&src, sizeof(SYMBOL_ID), 1, f) != 1) ||
+            (version >= 4 && fread(&pol, sizeof(uint32_t), 1, f) != 1))
         {
             ModelDestroy(model);
             fclose(f);
             return NULL;
         }
 
-        if (GraphAddRelation(model->graph, subj, rel, obj))
+        /* Exact restore: direct polar add + field copy. Re-running
+           conflict policies here would corrupt stored weights
+           (halving twice); policies run at ingest, never at load. */
+        if (RelationAddPolar(model->graph->relations, subj, rel, obj,
+                             (RELATION_POLARITY)pol))
         {
-            RELATION *r = GraphFindRelation(model->graph, subj, rel, obj);
+            RELATION *r = RelationFindPolar(model->graph->relations,
+                                            subj, rel, obj,
+                                            (RELATION_POLARITY)pol);
             if (r != NULL)
             {
                 r->count = count;

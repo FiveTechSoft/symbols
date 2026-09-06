@@ -1,0 +1,25 @@
+# QA default-reasoning set (M6 roadmap): pregunta<TAB>respuesta.
+# Razonamiento no-monotono por especificidad taxonomica: se camina ES
+# hacia arriba y el nivel mas cercano con evidencia decide (las
+# negaciones excluyen; todo denegado responde No.). Sin cuantificadores:
+# ningun "todas las aves vuelan" guardado ni necesitado.
+# Curadas + verificadas por ejecución (18/18 hoy). Umbral 90%.
+# No muta el modelo.
+el capaz_de de Piolin es	VOLAR
+el capaz_de de Tux es	NADAR
+el capaz_de de Gorrion es	VOLAR
+el capaz_de de Murcielago es	VOLAR
+el capaz_de de Pinguino es	NADAR
+el capaz_de de Avestruz es	No.
+el capaz_de de Ballena es	NADAR
+el capaz_de de Perro es	LADRAR
+el capaz_de de Canario es	VOLAR
+el capaz_de de Aguila es	VOLAR
+el capaz_de de Leon es	RUGIR
+el capaz_de de Tiburon es	NADAR
+el capaz_de de Serpiente es	ARRASTRARSE
+el capaz_de de Caballo es	GALOPAR
+el capaz_de de Gato es	MAULLAR
+el capaz_de de Ornitorrinco es	NADAR
+el capaz_de de Ave es	VOLAR
+el capaz_de de Pez es	NADAR

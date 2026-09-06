@@ -20,7 +20,9 @@ static const int V_COUNT[I18N_COUNT] = {
     1,  /* I18N_REPHRASE       */
     3,  /* I18N_SOCIAL         */
     3,  /* I18N_LEARNED        */
-    1   /* I18N_EXTRACT        */
+    1,  /* I18N_EXTRACT        */
+    1,  /* I18N_YES            */
+    1   /* I18N_NO             */
 };
 
 static const char *const E_POSITIVE[6] = {
@@ -190,6 +192,14 @@ static const char *const F_EXTRACT[1] = {
     "Je n'extrais pas de relation claire. Essayez 'symbole relation objet'."
 };
 
+static const char *const E_YES[1] = { "Yes." };
+static const char *const S_YES[1] = { "Si." };
+static const char *const F_YES[1] = { "Oui." };
+
+static const char *const E_NO[1] = { "No." };
+static const char *const S_NO[1] = { "No." };
+static const char *const F_NO[1] = { "Non." };
+
 static const char *const LANG_NAMES[LANG_COUNT] = {
     "English", "Espanol", "Francais"
 };
@@ -353,6 +363,20 @@ const char *LangTemplate(const I18N_KEY key, const LANG_ID id, int variant)
         case LANG_EN: return E_LEARNED[variant];
         case LANG_ES: return S_LEARNED[variant];
         default:      return F_LEARNED[variant];
+        }
+    case I18N_YES:
+        switch (lang)
+        {
+        case LANG_EN: return E_YES[0];
+        case LANG_ES: return S_YES[0];
+        default:      return F_YES[0];
+        }
+    case I18N_NO:
+        switch (lang)
+        {
+        case LANG_EN: return E_NO[0];
+        case LANG_ES: return S_NO[0];
+        default:      return F_NO[0];
         }
     default:
         switch (lang)

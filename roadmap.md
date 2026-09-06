@@ -17,8 +17,10 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 27/27, eval 87/87, hygiene 87/87, lint 4114/0/0.
-- Model: 5,700 symbols / 3,373 relations (math + Iconclass included,
+- Suite 30/30 (incluye `test_eval_count` 22/22, `test_eval_negation`
+  20/20 y `test_eval_default` 18/18), eval 87/87, hygiene 87/87,
+  lint 4155/0/0.
+- Model: 5,783 symbols / 3,430 relations (math + Iconclass included,
   post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
 - Dynamic vocabulary: question tokens resolve against used relations
   (exact, stemmed, affix-ranked, embedding-ranked); learned words
@@ -51,10 +53,81 @@ symbols.
 - [x] P1 — Bucle de crecimiento medido: extractores → lint → regen →
   eval (`tools/progress.py` + `tools/progress.csv`, columns
   model_relations/model_symbols).
-- [ ] P2 — Profundidad de QA: multi-hop, conteo, comparación, negación;
-  eval por categorías. Multi-hop y numérico quedan fuera del core por
-  diseño: se implementan como sidecars tipados colgados de símbolos,
-  igual que `source`.
+- [ ] P2 — Profundidad de QA: multi-hop, conteo, comparación, negación.
+  Doctrina: sin tipos nuevos en el core; agregación en el camino de QA
+  y datos tipados colgados de símbolos, igual que `source`. Cada hito
+  trae su set (`tests/qa_eval_<cap>.tsv`, ~20 filas curadas + verificadas
+  por ejecución), umbral 90, sin regresión (87/87, 38/40, suite) e
+  inmunidad Quijote. Baselines medidos 2026-09-06 (dorado actual):
+- [x] M2 — Conteo (primero: fino y sobre triples existentes). Preguntas
+  `¿Cuántos/cuántas X tiene Y?` agregan los objetos recuperados y
+  verbalizan el numeral (`RelationCountBySubjectRelation` exacto, nunca
+  muestra truncada; `is_count` en `QUESTION`). Hoy: `tests/qa_eval_count.tsv`
+  22/22 en suite (`test_eval_count`). Sin datos nuevos.
+  - [x] M1 — Negación: ingesta `X no es Y` → triple NEGATIVO
+    (polaridad V4 persistida; ALLOW_BOTH auditable); preguntas
+    `¿X no es Y?` verifican (S,R,O) con swap documentado y responden
+    Sí/No/i18n + disputas contadas; los negativos nunca listan como
+    hechos. `tests/qa_eval_negation.tsv` 20/20. Glue cerrado como
+    hechos gramaticales; `NO` reservado en resolución.
+  - [ ] M4 — Multisalto capado a 2 (composición, no tipos): resolver la
+    interior, sustituir por la entidad, resolver la exterior
+    (`la capital del país con moneda X` → país → capital). Baseline: 0/1.
+    Set: `tests/qa_eval_multihop.tsv`.
+  - [ ] M3a — Corpus numérico (prerrequisito): el extractor hoy tira los
+    números; medidas con unidad como sidecar tipado (valor+unidad
+    colgado del símbolo, nunca objeto-relación).
+  - [ ] M3b — Comparación (`más/menos`, `mayor/menor`, `antes/después`)
+    sobre el sidecar M3a. Baseline: 0/1. Set: `tests/qa_eval_compare.tsv`.
+  Orden: M2 → M1 → M4 → M3a → M3b (valor/coste).
+  - [x] M5 — Defaults no-monótonos por especificidad (adelantado: el
+    sustrato estaba listo). Sin cuantificadores: se camina ES hacia
+    arriba y el nivel más cercano con evidencia decide por objeto
+    (positivo lista, negativo excluye; todo denegado responde No.).
+    Read-only (nada derrotable se materializa). Pingüino nada pero no
+    vuela; Piolín el canario sí vuela. `tests/qa_eval_default.tsv`
+    18/18.
+
+## Reasoning distance (measured, not claimed)
+
+Reasoning here = composition over stored facts where every step cites
+triples (unlike LLM chain-of-thought, unverified text). Single-hop
+lookup is retrieval, not reasoning. The Reasoning Index is a VECTOR
+(no single-number gaming); each row names set, baseline, gate:
+
+- R1 lookup: `qa_eval` 87/87 (+hard 38/40). Retrieval baseline.
+- R2 counting: `qa_eval_count` 22/22 (M2 ✓, aggregation over sets).
+- R3 negation: `qa_eval_negation` 20/20 (M1 ✓: polar ingest +
+  (S,R,O) verification + dispute format; V4 persists polarity).
+- R4 2-hop chaining: 0/1 → M4 (substitute-then-ask over ground facts).
+- R5 comparison: 0/1 → M3 (no numeric data today).
+- R6 analogy: unit-green (`test_analogical`), map-silent 0/4
+  (ROMA/PARIS vs ROMA/EURO all score 0.00 on the golden). Needs a
+  firing investigation (threshold vs embedding coverage) before any
+  ranking set.
+- R7 contradiction: storage + policies unit-tested
+  (`test_contradictions`), never ingested, never surfaced (M1).
+- R8 default inheritance: `qa_eval_default` 18/18 (M5 ✓: ES-walk with
+  per-object specificity, denials exclude, all-denied answers No.).
+
+Zebra probe (`houses_puzzle.pl`, SWISH, 15 rules): reified givens in
+a fresh graph answer stored lookups 3/3 and honest-unknown on
+everything else (L0 ✓, inference 0); the machine-checked oracle
+(all 15 rules asserted in Python, playing Prolog's role outside the
+engine) answers 8/8. The gap decomposes exactly: (1) no variables —
+ground-only triples cannot hold unknown bindings; (2) no backtracking
+search — nothing explores assignments (M4 chains ground facts only,
+a weaker thing); (3) no reverse QA — `GraphQueryObject` exists but
+QA never uses it, so "who owns X" is unaskable even answered.
+Side note: the SWISH code admits 2 full solutions (green/white swap);
+both agree on water/zebra — machine-checking earns its keep.
+
+Protocol for reasoning probes: scratch TSVs + fresh graphs + freshly
+linked harnesses, NEVER the golden (a read-only CLI session once grew
+it +3/+2 via YO self-seeding + autosave). Since the stale-lib
+incident (2026-09-06: `libsymbolic.a` predated the headers and a
+harness read `valid=222`), every rebuild is timestamp-checked
+(obj > src, lib > obj) before measuring.
 - [x] P3 — NLG acotada y honesta ("no lo sé" como feature) + i18n:
   - [x] Pasar UI y respuestas de QA a **EN por defecto** (`c1df0c6`:
     prefijo "AI >", UI de main_cli y todos los conectores de
