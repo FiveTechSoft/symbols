@@ -98,6 +98,41 @@ int main(void)
     CHECK(ParserAnswerQuestion(graph, &q, ans, sizeof(ans)) == 1);
     CHECK(strstr(ans, "ANIMAL") != NULL);
 
+    /* 6) Punctuation-less "quien eres" is a question, not small talk:
+       the classifier must not swallow it as a 2-token SOCIAL ack. */
+    {
+        char out[512];
+        LangSet(LANG_ES);
+        CHECK(DialogGenerateResponse(graph, ctx, "quien eres",
+                                     out, sizeof(out)) == 1);
+        CHECK(strstr(out, "Soy ") != NULL);
+        CHECK(strstr(out, "MODELO_SIMBOLICO") != NULL);
+    }
+
+    /* 7) Greetings stay social: an ack, never an identity claim. */
+    {
+        char out[512];
+        LangSet(LANG_EN);
+        CHECK(DialogGenerateResponse(graph, ctx, "hola",
+                                     out, sizeof(out)) == 1);
+        CHECK(strstr(out, "Soy ") == NULL);
+        CHECK(strstr(out, "I am ") == NULL);
+    }
+
+    /* 8) 1-letter symbols must not win the substring fallback:
+       "¿eres un robot?" must answer unknown, never "E eS CONSTANTE". */
+    {
+        char out[512];
+        LangSet(LANG_EN);
+        SYMBOL_ID e = GraphAddSymbol(graph, "E");
+        CHECK(GraphAddRelation(graph, e, es,
+                               GraphAddSymbol(graph,
+                                              "CONSTANTE_MATEMATICA")) == 1);
+        CHECK(DialogGenerateResponse(graph, ctx, "¿eres un robot?",
+                                     out, sizeof(out)) == 1);
+        CHECK(strstr(out, "CONSTANTE_MATEMATICA") == NULL);
+    }
+
     LangSet(LANG_EN);
     ContextDestroy(ctx);
     GraphDestroy(graph);
