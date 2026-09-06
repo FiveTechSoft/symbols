@@ -22,6 +22,11 @@ typedef struct
     int  is_question;
     int  is_count;         /* CUÁNTO-form: answer with the numeral */
     int  is_negative;      /* NO-form: verify (S,R,O), answer Sí/No */
+    int  hole;             /* M8 conjunctive: subject is the hole; the
+                              answer intersects conj_rel/conj_obj pairs */
+    uint32_t nconj;
+    char conj_rel[3][64];
+    char conj_obj[3][128];
     int  valid;
 } QUESTION;
 

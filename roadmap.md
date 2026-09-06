@@ -17,9 +17,9 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 32/32 (incluye `test_eval_count` 22/22, `test_eval_negation`
-  20/20, `test_eval_default` 18/18, `test_eval_reverse` 8/8 y
-  `test_neuro_prolog` 36/36), eval 87/87, hygiene 87/87,
+- Suite 33/33 (incluye `test_eval_count` 22/22, `test_eval_negation`
+  20/20, `test_eval_default` 18/18, `test_eval_reverse` 8/8,
+  `test_eval_conjunctive` 10/10 y `test_neuro_prolog` 36/36), eval 87/87, hygiene 87/87,
   lint 4155/0/0.
 - Model: 5,783 symbols / 3,430 relations (math + Iconclass included,
   post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
@@ -94,6 +94,11 @@ symbols.
     Sin búsqueda: un hueco, escaneo indexado, disputa igual que slots.
     `tests/qa_eval_reverse.tsv` 8/8. Multihueco y backtracking quedan
     fuera (solver-sidecar futuro).
+  - [x] M8 — Conjunciones AND por intersección (la coma de Prolog,
+    adelantado: son operaciones de conjuntos, no búsqueda). Cada mitad
+    resuelve (relación, entidad) con evidencia o veta la lectura;
+    la respuesta intersecta sujetos (o cuenta). `tests/qa_eval_conjunctive.tsv`
+    10/10, incluido conteo conjunto.
 
 ## Reasoning distance (measured, not claimed)
 
@@ -119,6 +124,8 @@ lookup is retrieval, not reasoning. The Reasoning Index is a VECTOR
 - R9 single-hole variables: `qa_eval_reverse` 8/8 (M7 ✓: evidence
   roles, indexed scan, no search). Multi-hole joins need the solver
   sidecar (queued).
+- R10 conjunction: `qa_eval_conjunctive` 10/10 (M8 ✓: per-half
+  evidence resolution + subject intersection, incl. joint count).
 
 Zebra probe (`houses_puzzle.pl`, SWISH, 15 rules): reified givens in
 a fresh graph answer stored lookups 3/3 and honest-unknown on

@@ -922,6 +922,148 @@ int SurfaceRender(const char *pred, const char *subj, const char *obj,
     return (out[0] != '\0');
 }
 
+/* One half of a conjunction ("... moneda el euro"): resolves its
+   descriptor (trust, then rarity) and its trailing entity. Both or
+   nothing: a half that does not resolve vetoes the conjunctive
+   reading and the question falls back to the normal path. Positive
+   only (NO inside fails the half); the hole is always the subject.
+   Among resolving descriptors, the first whose relation touches the
+   trailing entity (either slot) wins: rarity alone crowns junk
+   ("países"->PAIS, "como"->COMO_CRISTO over "moneda"), evidence
+   does not. */
+static int ResolveHalf(const GRAPH *graph, char toks[][64],
+                       uint32_t ntok, char *out_rel, size_t rel_size,
+                       char *out_obj, size_t obj_size)
+{
+    PARSED_SENTENCE half;
+    memset(&half, 0, sizeof(half));
+    for (uint32_t i = 0; i < ntok && i < PARSER_MAX_TOKENS; i++)
+    {
+        strcpy(half.tokens[i], toks[i]);
+        half.count++;
+    }
+    int order[32];
+    uint32_t norder = 0;
+    int best_untrusted[32];
+    uint64_t best_freq[32];
+    for (uint32_t i = 0; i < ntok && norder < 32; i++)
+    {
+        if (strcmp(toks[i], "NO") == 0)
+            return 0;
+        char rel[64] = {0};
+        int trusted = 0;
+        if (!ResolveRelationPass(graph, toks[i], rel, sizeof(rel),
+                                 &trusted))
+            continue;
+        order[norder] = (int)i;
+        best_untrusted[norder] = trusted ? 0 : 1;
+        best_freq[norder] = TokenRarity(graph, toks[i]);
+        norder++;
+    }
+    /* Trust, then rarity (stable, deterministic). */
+    for (uint32_t a = 0; a < norder; a++)
+        for (uint32_t b = a + 1; b < norder; b++)
+            if (best_untrusted[b] < best_untrusted[a] ||
+                (best_untrusted[b] == best_untrusted[a] &&
+                 best_freq[b] < best_freq[a]))
+            {
+                int t = order[a];
+                order[a] = order[b];
+                order[b] = t;
+                int u = best_untrusted[a];
+                best_untrusted[a] = best_untrusted[b];
+                best_untrusted[b] = u;
+                uint64_t f = best_freq[a];
+                best_freq[a] = best_freq[b];
+                best_freq[b] = f;
+            }
+    for (uint32_t o = 0; o < norder; o++)
+    {
+        uint32_t i = (uint32_t)order[o];
+        char rel[64] = {0};
+        int trusted = 0;
+        if (!ResolveRelationPass(graph, toks[i], rel, sizeof(rel),
+                                 &trusted))
+            continue;
+        char obj[128] = {0};
+        if (ResolveEntity(graph, &half, i + 1, obj, sizeof(obj)) < 0 ||
+            obj[0] == '\0')
+            continue;
+        SYMBOL_ID rid = SymbolFind(graph->symbols, rel);
+        SYMBOL_ID oid = SymbolFind(graph->symbols, obj);
+        if (rid == SYMBOL_INVALID || oid == SYMBOL_INVALID)
+            continue;
+        if (!TouchesEither(graph, oid, rid))
+            continue;
+        strncpy(out_rel, rel, rel_size - 1);
+        out_rel[rel_size - 1] = '\0';
+        strncpy(out_obj, obj, obj_size - 1);
+        out_obj[obj_size - 1] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+static uint32_t IntersectSubjects(const GRAPH *graph,
+                                  const SYMBOL_ID *rels,
+                                  const SYMBOL_ID *objs,
+                                  uint32_t npairs, SYMBOL_ID *out,
+                                  uint32_t maxout)
+{
+    SYMBOL_ID acc[64];
+    uint32_t nacc = 0;
+    for (uint32_t p = 0; p < npairs; p++)
+    {
+        RELATION *rev[64];
+        uint32_t nr = RelationFindByObject(graph->relations, objs[p],
+                                           rev, 64);
+        SYMBOL_ID cur[64];
+        uint32_t ncur = 0;
+        for (uint32_t r = 0; r < nr && ncur < 64; r++)
+        {
+            if (rev[r]->relation != rels[p] ||
+                rev[r]->polarity == POLARITY_NEGATIVE)
+                continue;
+            int dup = 0;
+            for (uint32_t d = 0; d < ncur; d++)
+                if (cur[d] == rev[r]->subject)
+                {
+                    dup = 1;
+                    break;
+                }
+            if (!dup)
+                cur[ncur++] = rev[r]->subject;
+        }
+        if (p == 0)
+        {
+            for (uint32_t i = 0; i < ncur && nacc < 64; i++)
+                acc[nacc++] = cur[i];
+        }
+        else
+        {
+            uint32_t w = 0;
+            for (uint32_t i = 0; i < nacc; i++)
+            {
+                for (uint32_t j = 0; j < ncur; j++)
+                    if (acc[i] == cur[j])
+                    {
+                        acc[w++] = acc[i];
+                        break;
+                    }
+            }
+            nacc = w;
+        }
+        if (nacc == 0)
+            return 0;
+    }
+    {
+        uint32_t n = (nacc < maxout) ? nacc : maxout;
+        for (uint32_t i = 0; i < n; i++)
+            out[i] = acc[i];
+        return n;
+    }
+}
+
 /* ============================================================
    Question Detection & Answering
    ============================================================ */
@@ -1501,6 +1643,69 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         }
     }
 
+    /* Conjunctive form, M8 (Prolog comma): top-level Y splits the
+       question into halves, each resolving (relation, trailing
+       entity); the subject is the shared hole. All halves must
+       resolve or the reading is abandoned for the normal path
+       (strictly additive: no current pass contains a standalone Y,
+       verified by grep over every set). Cap 3 pairs + subject hole. */
+    {
+        uint32_t bounds[8];
+        uint32_t nbound = 0;
+        for (uint32_t i = 0; i < tokens.count && nbound < 8; i++)
+            if (strcmp(tokens.tokens[i], "Y") == 0)
+            {
+                bounds[nbound++] = i;
+            }
+        if (nbound > 0 && nbound < 4)
+        {
+            char hrel[4][64];
+            char hobj[4][128];
+            uint32_t nhalf = 0;
+            uint32_t ha = 0;
+            int ok = 1;
+            for (uint32_t b = 0; b <= nbound && ok; b++)
+            {
+                uint32_t hb = (b < nbound) ? bounds[b] : tokens.count;
+                if (hb <= ha + 1)
+                {
+                    ok = 0;
+                    break;
+                }
+                char htoks[32][64];
+                uint32_t nht = 0;
+                for (uint32_t k = ha; k < hb && nht < 32; k++)
+                {
+                    strcpy(htoks[nht], tokens.tokens[k]);
+                    nht++;
+                }
+                if (nhalf >= 4 ||
+                    !ResolveHalf(graph, htoks, nht, hrel[nhalf],
+                                 sizeof(hrel[0]), hobj[nhalf],
+                                 sizeof(hobj[0])))
+                    ok = 0;
+                else
+                    nhalf++;
+                ha = hb + 1;
+            }
+            if (ok && nhalf >= 2)
+            {
+                q.hole = 1;
+                q.nconj = (nhalf - 1 < 3) ? nhalf - 1 : 3;
+                for (uint32_t c = 0; c < q.nconj; c++)
+                {
+                    strcpy(q.conj_rel[c], hrel[c + 1]);
+                    strcpy(q.conj_obj[c], hobj[c + 1]);
+                }
+                strcpy(q.relation, hrel[0]);
+                strcpy(q.object, hobj[0]);
+                q.valid = 1;
+                q.is_question = 1;
+                return q;
+            }
+        }
+    }
+
     /* Fact shape: descriptor token pointing to a graph relation plus an
        entity. The entity usually trails the descriptor ("la CAPITAL de
        FRANCIA es") but may precede it ("Paris es"): both directions are
@@ -1888,6 +2093,73 @@ int ParserAnswerQuestion(
         return 0;
 
     out_answer[0] = '\0';
+
+    /* Conjunctive-hole form (M8): no subject to resolve; intersect
+       the (relation, object) pairs and list (or count) the shared
+       subjects. Empty intersection is honest unknown. */
+    if (q->valid && q->hole && !q->is_negative)
+    {
+        SYMBOL_ID hrel[4];
+        SYMBOL_ID hobj[4];
+        uint32_t npairs = 0;
+        SYMBOL_ID r0 = SymbolFind(graph->symbols, q->relation);
+        SYMBOL_ID o0 = SymbolFind(graph->symbols, q->object);
+        if (r0 != SYMBOL_INVALID && o0 != SYMBOL_INVALID)
+        {
+            hrel[npairs] = r0;
+            hobj[npairs] = o0;
+            npairs++;
+            for (uint32_t c = 0; c < q->nconj && npairs < 4; c++)
+            {
+                SYMBOL_ID rc = SymbolFind(graph->symbols,
+                                          q->conj_rel[c]);
+                SYMBOL_ID oc = SymbolFind(graph->symbols,
+                                          q->conj_obj[c]);
+                if (rc == SYMBOL_INVALID || oc == SYMBOL_INVALID)
+                    return 0;
+                hrel[npairs] = rc;
+                hobj[npairs] = oc;
+                npairs++;
+            }
+        }
+        if (npairs > 0)
+        {
+            SYMBOL_ID hit[32];
+            uint32_t n = IntersectSubjects(graph, hrel, hobj, npairs,
+                                           hit, 32);
+            if (q->is_count)
+            {
+                snprintf(out_answer, max_len, "%u", n);
+                out_answer[max_len - 1] = '\0';
+                return 1;
+            }
+            if (n > 0)
+            {
+                uint32_t pos = 0;
+                for (uint32_t i = 0; i < n; i++)
+                {
+                    const SYMBOL *s = SymbolGet(graph->symbols,
+                                                hit[i]);
+                    if (s == NULL)
+                        continue;
+                    if (i > 0 && pos + 2 < max_len)
+                    {
+                        out_answer[pos++] = ',';
+                        out_answer[pos++] = ' ';
+                    }
+                    uint32_t name_len = (uint32_t)strlen(s->name);
+                    if (pos + name_len < max_len)
+                    {
+                        memcpy(out_answer + pos, s->name, name_len);
+                        pos += name_len;
+                    }
+                }
+                out_answer[pos] = '\0';
+                return 1;
+            }
+        }
+        return 0;
+    }
 
     /* Find subject symbol (exact first, then morphological fallback) */
     SYMBOL_ID subj_id = StemFindSymbol(graph->symbols, q->subject);

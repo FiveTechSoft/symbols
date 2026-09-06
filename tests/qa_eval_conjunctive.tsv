@@ -1,0 +1,16 @@
+# QA conjunctive set (M8 roadmap): pregunta<TAB>respuesta_esperada.
+# Conjuncion AND de restricciones (la coma de Prolog): cada mitad
+# resuelve (relacion, entidad) con evidencia y la respuesta intersecta
+# sujetos. Sin busqueda: interseccion de conjuntos indexados.
+# Curadas + verificadas por ejecución (10/10 hoy). Umbral 90%.
+# No muta el modelo.
+¿Qué países tienen como moneda el euro y como idioma el español?	ESPAÑA
+¿Qué país tiene como capital Madrid y como moneda el euro?	ESPAÑA
+¿Qué país tiene como capital París y como moneda el euro?	FRANCIA
+¿Qué país tiene como capital Roma y como moneda el euro?	ITALIA
+¿Qué país tiene como capital Lisboa y como moneda el euro?	PORTUGAL
+¿Qué país tiene como capital Berlín y como moneda el euro?	ALEMANIA
+¿Qué país es miembro de la ONU y tiene como idioma oficial el alemán?	SUIZA
+¿Quién es miembro de la OTAN y tiene como moneda el dólar?	ESTADOS_UNIDOS
+¿Cuántos países tienen como moneda el euro y como idioma el español?	1
+¿Qué países tienen como idioma oficial el alemán y como moneda el euro?	ALEMANIA
