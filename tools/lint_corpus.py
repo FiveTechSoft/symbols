@@ -7,11 +7,16 @@ y estas categorias:
 
   mojibake   doble-codificacion UTF-8 (patron estrecho). Intenta
              reparar via latin-1 -> utf-8; si no, DROP.
-  wikimarkup [[...]], {{, }}            -> quita segmento/corta (FIX)
+   wikimarkup [[...]] balanceado       -> quita segmento (FIX);
+              markup sin balancear ({{, }}, [[, ]], <, >) = fragmento
+              destrozado ({{NOWRAP, INGLÉS_}}) -> DROP (markup_fragment,
+              nunca se lava a hecho limpio)
   asterisk   '*' residual de markdown   -> quita + colapsa _ (FIX)
   paren      parentetico final _(1921)  -> quita (FIX con perdida
              documentada); parentesis desbalanceados -> DROP
-  anaphora   sujeto anaforico (SU/TU/THE/SHE/SONS OF...) -> DROP
+   anaphora   sujeto anaforico (SU/TU/THE/SHE/SONS OF...) -> DROP
+   null       marcador de ausencia (NINGUNO/NO/N-A como valor
+              completo: "sin valor" no es un hecho) -> DROP
   spaced_pred predicado con espacios    -> DROP (irrecuperable)
   phrase_obj  objeto >4 tokens o >48 chars con espacio -> DROP
   empty      campo vacio                -> DROP
@@ -49,6 +54,14 @@ STOP_SUBJ = {
 }
 STOP_PREFIX = ("SU ", "SUS ", "TU ", "TUS ", "MI ", "MIS ", "THE ",
                "AN ", "SONS OF", "DAUGHTERS OF", "KINGS OF")
+
+# Whole-value absence markers (same set as the infobox extractor):
+# "no value" is not a fact, never a symbol. "-" excluded on purpose:
+# MENOS SIMBOLO - is a real fact (the minus sign), not an absence.
+NULL_VALUES = frozenset([
+    "NINGUNO", "NINGUNA", "NINGUN", "NINGÚN",
+    "NO", "N/A",
+])
 
 MOJI_RE = re.compile(r"Ã[©±²³­¯º-¼]|Â[¿¡]|â€")
 WIKILINK_RE = re.compile(r"\[\[.*?\]\]")
@@ -96,13 +109,18 @@ def repair_mojibake(field: str):
 def clean_field(field: str):
     """Devuelve (campo_limpio, accion) con accion en
     {'ok','fixed','drop'} y motivo aparte."""
-    # 1. wikimarkup: quita segmentos [[...]] y llaves sueltas.
-    # Las colas sin cerrar ([[ARCHIVO:... sin ]] de cierre) son
-    # referencias a fichero, nunca contenido: se cortan.
+    # 1. wikimarkup: segmentos [[...]] balanceados fuera; colas sin
+    # cerrar ([[ARCHIVO:... sin ]]) cortadas. Si queda markup sin
+    # balancear ({{, }}, [[, ]], <, >), el campo es un fragmento
+    # destrozado ({{NOWRAP, INGLÉS_}}): DROP con markup_fragment.
+    # Lavar esos caracteres (INGLÉS_}} -> INGLÉS) fabricaria un hecho
+    # limpio a partir de basura: prohibido.
     new = WIKILINK_RE.sub("", field)
     new = re.sub(r"\[\[.*$", "", new)
-    new = new.replace("{{", "").replace("}}", "")
+    new = re.sub(r"\{\{[^{}]*\}\}", "", new)
     new = re.sub(r"\{\{.*$", "", new)
+    if re.search(r"[{}\[\]<>]", new):
+        return new, "drop", "markup_fragment"
     # comillas angulares de lemas/citas: puro markup
     new = new.replace("«", "").replace("»", "")
     # 2. asteriscos markdown + colapso de guiones
@@ -139,6 +157,8 @@ def check_triple(s: str, p: str, o: str, src: str = ""):
     su = s.strip().upper()
     if su in STOP_SUBJ or su.startswith(STOP_PREFIX):
         return "drop", s, p, o, src2, "anaphora"
+    if su in NULL_VALUES or o.strip().upper() in NULL_VALUES:
+        return "drop", s, p, o, src2, "null_marker"
     if " " in p.strip():
         return "drop", s, p, o, src2, "spaced_pred"
     ou = o.strip().upper()
@@ -168,6 +188,12 @@ def check_triple(s: str, p: str, o: str, src: str = ""):
     ou = o.strip().upper()
     if len(ou.split()) > 4 or (len(ou) > 48 and " " in ou):
         return "drop", s, p, o, src2, "phrase_obj"
+
+    # Re-chequeo post-limpieza: valores que DEVIENEN nulos al limpiar
+    # (Ninguno<ref>...</ref> -> NINGUNO) caen aqui, no se rescatan.
+    if (s.strip().upper() in NULL_VALUES or
+            o.strip().upper() in NULL_VALUES):
+        return "drop", s, p, o, src2, "null_marker"
 
     # Sujetos/objetos con espacio: frase larga -> drop (simetrico a
     # phrase_obj); resto -> guion bajo (convencion del proyecto:

@@ -4,9 +4,14 @@ Wikipedia articles contain {{Infobox ...}} templates with key=value pairs
 that are already semantic triples ready to ingest.
 """
 import re
+import html
 import requests
 import time
 from collections import Counter
+
+# Contactable UA: Wikimedia blocks generic/bot-like agents (403).
+WIKI_UA = ('SymbolicLLM-research/1.0 '
+           '(https://github.com/FiveTechSoft/symbols; corpus research)')
 
 # Map common infobox keys to our predicate vocabulary
 KEY_PREDICATE_MAP = {
@@ -30,6 +35,7 @@ KEY_PREDICATE_MAP = {
     "idioma": "IDIOMA",
     "idiomas": "IDIOMA",
     "idioma_oficial": "IDIOMA_OFICIAL",
+    "idiomas_oficiales": "IDIOMA_OFICIAL",
     "moneda": "MONEDA",
     "huso_horario": "HUSO_HORARIO",
     "dominio": "DOMINIO",
@@ -142,17 +148,76 @@ INFOBOX_PATTERNS = [
 ]
 
 
+def split_top_level(text):
+    """Split an infobox body into field chunks.
+
+    Fields start at line-leading '|' (MediaWiki convention); chunks
+    swallowed by multiline {{templates}} are re-joined until braces
+    balance, so inner pipes ({{nowrap|X}}, citations, file links)
+    never become separators. A globally depth-tracked split would
+    drift on the first unbalanced fragment and lose every later
+    field; balance is re-anchored per field instead. Shattering a
+    value is what produced the poison ({{NOWRAP, INGLÉS_}},
+    [[ARCHIVO:...). Depth 1 (not 0) is the flush level: the text
+    spans one outer {{...}} whose closing }} was stripped by the
+    caller, so every complete field returns pending-opens to
+    exactly 1. Stray closers may flush early (the tail becomes a
+    keyless chunk the pair loop skips); stray openers merge to end
+    (the cleaner drops the blob): degradation stays local, never
+    shifts later fields. """
+    def bal(s):
+        return s.count('{{') + s.count('[[') - s.count('}}') - s.count(']]')
+
+    parts, buf, depth = [], [], 0
+    for ch in re.split(r'\n\s*\|', text):
+        buf.append(ch)
+        depth += bal(ch)
+        if depth <= 1:
+            parts.append('\n|'.join(buf))
+            buf = []
+    if buf:
+        parts.append('\n|'.join(buf))
+    return parts
+
+
 def clean_infobox_value(val):
-    """Clean a wikitext value: remove templates, links, HTML."""
-    # Remove {{template}} references
-    val = re.sub(r'\{\{[^}]*\}\}', '', val)
-    # Remove [[link|display]] → display, or [[link]] → link
-    val = re.sub(r'\[\[(?:[^|\]]*\|)?([^\]]+)\]\]', r'\1', val)
+    """Clean a wikitext value: remove templates, links, HTML.
+
+    Template/link removal runs innermost-first to fixpoint, so nested
+    templates ({{cita web|...{{...}}...}}) vanish whole instead of
+    leaving their name as text (KMCITA_WEB). HTML entities (&nbsp;)
+    are markup, never content. Anything still carrying unbalanced
+    markup residue ([[{, ]], <, >) is a shattered fragment: return ''
+    so the pair is dropped, never laundered into a clean-looking lie.
+    """
+    # File-namespace links ([[Archivo:...|20px|...]]) are images,
+    # never content: drop whole (lint already treats their tails
+    # as file references, never facts).
+    val = re.sub(r'\[\[(?:Archivo|File|Image|Imagen):[^\]]*\]\]', '',
+                 val, flags=re.IGNORECASE)
+    # Unwrap whole-value wrappers bearing a real link:
+    # {{nowrap|[[Corona noruega]]...}} → the content after the
+    # template name (the fact). Citations/markers ({{cita web|...}},
+    # {{esd}}) carry no link and fall through to deletion below.
+    val = re.sub(r'^\s*\{\{[^|{}]*\|([^{}]*\[\[[^\]]+\]\][^{}]*)\}\}\s*$',
+                 r'\1', val)
+    # Remove {{template}} innermost-first to fixpoint (nesting-safe)
+    prev = None
+    while prev != val:
+        prev = val
+        val = re.sub(r'\{\{[^{}]*\}\}', '', val)
+    # Remove [[link|a|b|display]] → display (LAST segment), or
+    # [[link]] → link (fixpoint)
+    prev = None
+    while prev != val:
+        prev = val
+        val = re.sub(r'\[\[(?:[^\]]*\|)?([^\]|]+)\]\]', r'\1', val)
     # Remove <ref>...</ref>
     val = re.sub(r'<ref[^>]*>.*?</ref>', '', val, flags=re.DOTALL)
     val = re.sub(r'<ref[^>]*/?>', '', val)
-    # Remove HTML tags
+    # Remove HTML tags, then entities (&nbsp; &amp; ...)
     val = re.sub(r'<[^>]+>', '', val)
+    val = html.unescape(val).replace(' ', ' ')
     # Remove wiki formatting
     val = re.sub(r"'{2,}", '', val)
     val = re.sub(r'{{(?:negrita|nihongo|lang)[^}]*}}', '', val)
@@ -160,6 +225,14 @@ def clean_infobox_value(val):
     val = re.sub(r'\s+', ' ', val).strip()
     # Remove trailing commas, dots
     val = val.rstrip('.,;:')
+    # Fragment backstop: unbalanced markup residue or splitter
+    # residue (|) never cleans, and no legit value starts with
+    # punctuation (suffix tails like "-a"): return '' so the pair
+    # is dropped, never laundered into a clean-looking lie.
+    if re.search(r'[{}\[\]<>|]', val):
+        return ''
+    if val and not re.match(r'(?u)[^\W_]', val):
+        return ''
     return val
 
 
@@ -206,9 +279,8 @@ def parse_infobox(text):
 
     infobox_text = text[infobox_start:i]
 
-    # Parse key = value pairs
-    # Split by | but not inside {{ }}
-    lines = re.split(r'\|(?!\{)', infobox_text)
+    # Parse key = value pairs (splitter is brace-aware, see above)
+    lines = split_top_level(infobox_text)
 
     for line in lines:
         line = line.strip()
@@ -254,6 +326,17 @@ def triples_from_infobox(article_title, pairs):
                 # Skip values that are just numbers or dates
                 if re.match(r'^[\d.,/\-]+$', v):
                     continue
+                # Absence markers are not facts
+                if v.strip().upper() in NULL_VALUES:
+                    continue
+                # Suffix tails ("-a" from "Noruego, -a") and splitter
+                # residue never become symbols (same fragment rule as
+                # the cleaner: content starts alphanumeric, carries no
+                # markup).
+                if not re.match(r'(?u)[^\W_]', v):
+                    continue
+                if re.search(r'[{}\[\]<>|]', v):
+                    continue
                 obj = v.upper().replace(' ', '_')
                 triples.append((subject, pred, obj))
 
@@ -267,7 +350,7 @@ def fetch_infoboxes_wikipedia(titles, lang='es', limit=500):
     """
     api_url = f"https://{lang}.wikipedia.org/w/api.php"
     session = requests.Session()
-    session.headers.update({'User-Agent': 'SymbolicLLM/1.0 (research)'})
+    session.headers.update({'User-Agent': WIKI_UA})
 
     all_triples = []
     stats = Counter()
@@ -316,6 +399,15 @@ def fetch_infoboxes_wikipedia(titles, lang='es', limit=500):
         time.sleep(0.5)
 
     return all_triples, stats
+
+
+# Whole-value absence markers: "no value" is not a fact
+# (JAPÓN IDIOMA_OFICIAL NINGUNO). Never become symbols.
+# "-" excluded on purpose: MENOS SIMBOLO - is real (minus sign).
+NULL_VALUES = frozenset([
+    'NINGUNO', 'NINGUNA', 'NINGUN', 'NINGÚN',
+    'NO', 'N/A',
+])
 
 
 # Common Wikipedia categories to scrape infoboxes from

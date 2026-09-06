@@ -17,8 +17,8 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 25/25, eval 87/87, hygiene 87/87, lint 3923/0/0.
-- Model: 5,576 symbols / 3,192 relations (math + Iconclass included).
+- Suite 26/26, eval 87/87, hygiene 87/87, lint 4368/0/0.
+- Model: 6,165 symbols / 3,627 relations (math + Iconclass included).
 - Dynamic vocabulary: question tokens resolve against used relations
   (exact, stemmed, affix-ranked, embedding-ranked); learned words
   work immediately.
@@ -70,9 +70,10 @@ symbols.
 - [x] P5 — Set held-out con verdad humana: `tests/qa_eval_hard.tsv` creado
   (40 hechos verificados a mano, sin solapes con `qa_eval.tsv`, solo para
   medir). `tools/progress.py` portado a Linux (detecta `build/` y binarios
-  sin `.exe`). Aspiracional sin umbral: hoy 35/40 = 87,5%; los 5 gaps
-  documentados (Noruega oslo/krona, idioma PL/SV/HU) son el objetivo de
-  P1/P4. El progreso = ver `hard_pass` subir sin tocar este set.
+  sin `.exe`). Aspiracional sin umbral: hoy 38/40 = 95%; los 2 restos son
+  artefactos del set, no del motor (KORONA vs CORONA_NORUEGA de es:WP;
+  HUNGRARO es typo por HÚNGARO). El progreso = ver `hard_pass` subir
+  sin tocar este set.
 
 ## Language & i18n
 
@@ -152,3 +153,11 @@ symbols.
   are the target: NO capital/currency, PL/SV/HU language).
   `tools/progress.py` now port-detects `build/` (Linux) vs
   `build-gcc/*.exe` (Windows).
+- 2026-09-05: corpus honesto + retrieval — re-extracción es:WP con split
+  brace-aware y limpieza fixpoint (`extract_infoboxes.py`); el linter
+  dropea fragmentos (`markup_fragment`) y ausencias (`null_marker`) en
+  vez de lavarlos; descriptores con co-ocurrencia de sujeto, prioridad
+  exacta en desempates, recall completo en respuestas, folding de
+  tildes en la medida. Eval curado a verdad de corpus (87 filas).
+  Hard 35/40 -> 38/40 (techo honesto: KORONA/HUNGRARO son artefactos
+  del set). Modelo dorado regenerado determinista (6165/3627).

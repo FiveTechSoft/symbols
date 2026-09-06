@@ -776,8 +776,27 @@ static void RelCacheAddKey(REL_CACHE_ENTRY *e, const char *key)
     e->nkeys++;
 }
 
-static uint32_t RelCacheFill(const GRAPH *graph)
+/* A compound part that itself names a used relation (IDIOMA inside
+   IDIOMA_OFICIAL) is vocabulary, not repetition: frequency cannot
+   demote it to glue. Scans triples; fill-time only (amortized). */
+static int PartNamesUsedRelation(const GRAPH *graph, const char *part)
 {
+    if (graph == NULL || part == NULL)
+        return 0;
+    SYMBOL_ID id = SymbolFind(graph->symbols, part);
+    if (id == SYMBOL_INVALID)
+        return 0;
+    uint32_t rc = RelationCount(graph->relations);
+    for (uint32_t i = 0; i < rc; i++)
+    {
+        const RELATION *r = RelationGet(graph->relations, i);
+        if (r != NULL && r->relation == id)
+            return 1;
+    }
+    return 0;
+}
+
+static uint32_t RelCacheFill(const GRAPH *graph){
     if (graph == NULL || graph->relations == NULL)
         return 0;
 
@@ -816,11 +835,25 @@ static uint32_t RelCacheFill(const GRAPH *graph)
         strncpy(e->name, p->name, sizeof(e->name) - 1);
         e->name[sizeof(e->name) - 1] = '\0';
         RelCacheAddKey(e, p->name);
+        /* Folded key: tokens are diacritic-normalized at read time
+           while relation names keep accents (CIUDAD_MÁS_POBLADA).
+           Without the folded form, accented predicates are
+           unaskable. Same normalization both sides, no lists. */
+        {
+            char folded[64];
+            strncpy(folded, p->name, sizeof(folded) - 1);
+            folded[sizeof(folded) - 1] = '\0';
+            NormalizeDiacritics(folded);
+            if (strcmp(folded, p->name) != 0)
+                RelCacheAddKey(e, folded);
+        }
 
         /* Glue check without word lists: a part far more frequent
            than the rarest sibling is repetition, not meaning
-           (DE inside HIJO_DE). Global minimum first, so order never
-           matters. Zipf gap, documented factor. */
+           (DE inside HIJO_DE) — unless the part itself names a used
+           relation (IDIOMA inside IDIOMA_OFICIAL): shared vocabulary
+           keeps keying no matter its frequency. Global minimum first,
+           so order never matters. Zipf gap, documented factor. */
         uint64_t minfreq = UINT64_MAX;
         {
             char probe[64];
@@ -852,7 +885,8 @@ static uint32_t RelCacheFill(const GRAPH *graph)
                 continue;
             }
             uint64_t fr = TokenRarity(graph, part);
-            if (minfreq != UINT64_MAX && fr > minfreq * 8)
+            if (minfreq != UINT64_MAX && fr > minfreq * 8 &&
+                !PartNamesUsedRelation(graph, part))
             {
                 part = strtok_r(NULL, "_", &saveptr);
                 continue;
@@ -899,6 +933,7 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
     uint32_t n = RelCacheFill(graph);
     int found = 0;
     size_t best_affix = 0;
+    int best_exact = 0;
     uint64_t best_freq = 0;
     const char *best_name = NULL;
     int best_trusted = 0;
@@ -911,12 +946,19 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
                 strcmp(rel_cache[k].keys[j], stem) != 0)
                 continue;
             size_t affix = LcpLen(token, rel_cache[k].name);
+            /* Exact-name beats affix ties: IDIOMA names the bare
+               relation even when IDIOMA_OFICIAL is more frequent.
+               Frequency drift must never steal an exact hit. */
+            int exact = (strcmp(token, rel_cache[k].name) == 0);
             uint64_t freq = TokenRarity(graph, rel_cache[k].name);
             if (!found || affix > best_affix ||
-                (affix == best_affix && freq > best_freq))
+                (affix == best_affix && exact > best_exact) ||
+                (affix == best_affix && exact == best_exact &&
+                 freq > best_freq))
             {
                 found = 1;
                 best_affix = affix;
+                best_exact = exact;
                 best_freq = freq;
                 best_name = rel_cache[k].name;
                 best_trusted = rel_cache[k].trusted;
@@ -1166,6 +1208,120 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                 }
                 else
                 {
+                    /* Subject-aware descriptor: the winning relation
+                       may never touch this subject (bare IDIOMA wins
+                       the ranking for Polonia, but only IDIOMA_OFICIAL
+                       holds its fact). Among every resolving token,
+                       prefer — in winner-rank order — the first
+                       relation co-occurring with the subject.
+                       Relations are vocabulary; co-occurrence with the
+                       asked entity is evidence. No co-occurrence
+                       anywhere keeps the winner (honest attempt). */
+                    SYMBOL_ID subj_id = SymbolFind(graph->symbols, subj);
+                    if (subj_id != SYMBOL_INVALID)
+                    {
+                        SYMBOL_ID best_rid =
+                            SymbolFind(graph->symbols, best_rel);
+                        RELATION *probe[1];
+                        if (best_rid != SYMBOL_INVALID &&
+                            GraphQuerySubjectRelation(graph, subj_id,
+                                                      best_rid,
+                                                      probe, 1) == 0)
+                        {
+                            /* Every cached relation sharing the
+                               descriptor as key is a candidate
+                               (IDIOMA names both IDIOMA and
+                               IDIOMA_OFICIAL); rank them exactly as
+                               resolution does (affix, then predicate
+                               frequency) and take the first touching
+                               the subject. */
+                            char dstem[64] = {0};
+                            StemWord(tokens.tokens[i], dstem,
+                                     sizeof dstem);
+                            uint32_t c_idx[64];
+                            size_t c_affix[64];
+                            int c_exact[64];
+                            uint64_t c_freq[64];
+                            uint32_t ncand = 0;
+                            uint32_t nrel = RelCacheFill(graph);
+                            for (uint32_t k = 0;
+                                 k < nrel && ncand < 64; k++)
+                            {
+                                int names = 0;
+                                for (uint32_t j = 0;
+                                     j < rel_cache[k].nkeys; j++)
+                                {
+                                    if (strcmp(rel_cache[k].keys[j],
+                                               tokens.tokens[i]) == 0 ||
+                                        strcmp(rel_cache[k].keys[j],
+                                               dstem) == 0)
+                                    {
+                                        names = 1;
+                                        break;
+                                    }
+                                }
+                                if (!names)
+                                    continue;
+                                if (strcmp(rel_cache[k].name,
+                                           best_rel) == 0)
+                                    continue;
+                                c_idx[ncand] = k;
+                                c_affix[ncand] =
+                                    LcpLen(tokens.tokens[i],
+                                           rel_cache[k].name);
+                                c_exact[ncand] =
+                                    (strcmp(tokens.tokens[i],
+                                            rel_cache[k].name) == 0);
+                                c_freq[ncand] =
+                                    TokenRarity(graph,
+                                                rel_cache[k].name);
+                                ncand++;
+                            }
+                            /* Resolution order: affix, exact-name,
+                               then predicate frequency. First
+                               co-occurring wins. */
+                            for (uint32_t a = 0; a < ncand; a++)
+                            {
+                                for (uint32_t b = a + 1; b < ncand; b++)
+                                {
+                                    if (c_affix[b] > c_affix[a] ||
+                                        (c_affix[b] == c_affix[a] &&
+                                         c_exact[b] > c_exact[a]) ||
+                                        (c_affix[b] == c_affix[a] &&
+                                         c_exact[b] == c_exact[a] &&
+                                         c_freq[b] > c_freq[a]))
+                                    {
+                                        uint32_t t = c_idx[a];
+                                        c_idx[a] = c_idx[b];
+                                        c_idx[b] = t;
+                                        size_t ta = c_affix[a];
+                                        c_affix[a] = c_affix[b];
+                                        c_affix[b] = ta;
+                                        int te = c_exact[a];
+                                        c_exact[a] = c_exact[b];
+                                        c_exact[b] = te;
+                                        uint64_t tf = c_freq[a];
+                                        c_freq[a] = c_freq[b];
+                                        c_freq[b] = tf;
+                                    }
+                                }
+                            }
+                            for (uint32_t c = 0; c < ncand; c++)
+                            {
+                                SYMBOL_ID crid = SymbolFind(graph->symbols,
+                                    rel_cache[c_idx[c]].name);
+                                if (crid != SYMBOL_INVALID &&
+                                    GraphQuerySubjectRelation(graph, subj_id,
+                                                              crid, probe,
+                                                              1) > 0)
+                                {
+                                    strcpy(best_rel,
+                                           rel_cache[c_idx[c]].name);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     strcpy(q.subject, subj);
                     strcpy(q.relation, best_rel);
                     q.valid = 1;
@@ -1317,18 +1473,22 @@ int ParserAnswerQuestion(
 
         if (rel_id != SYMBOL_INVALID)
         {
-            RELATION *results[8];
+            RELATION *results[32];
             uint32_t n = GraphQuerySubjectRelation(
-                graph, subj_id, rel_id, results, 8);
+                graph, subj_id, rel_id, results, 32);
 
             if (n > 0)
             {
                 /* Order answers by semantic-area coherence. */
                 ParserRankByArea(graph, subj_id, results, n);
 
-                /* Build answer from objects */
+                /* Build answer from ALL objects (recall over
+                   truncation: the loop is buffer-guarded, so long
+                   lists degrade to fits-in-buffer, never overflow).
+                   A capped answer hides known facts (Leonardo holds
+                   11 occupations, not 5). */
                 uint32_t pos = 0;
-                for (uint32_t i = 0; i < n && i < 5; i++)
+                for (uint32_t i = 0; i < n; i++)
                 {
                     const SYMBOL *obj = SymbolGet(graph->symbols, results[i]->object);
                     if (obj)
