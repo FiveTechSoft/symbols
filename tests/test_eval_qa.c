@@ -20,6 +20,41 @@ static void TrimNL(char *s)
         s[--n] = '\0';
 }
 
+/* Fold Spanish diacritics (UTF-8) to ASCII base, both sides of the
+   comparison: the map stores HÚNGARO, humans write HUNGRARO — same
+   word. Ñ is a letter, not an accent: preserved. Measurement-only;
+   the sets are never touched. */
+static void FoldAccents(const char *src, char *dst, size_t dst_size)
+{
+    static const struct { const char *from; char to; } tab[] = {
+        {"\xC3\xA1", 'A'}, {"\xC3\xA9", 'E'}, {"\xC3\xAD", 'I'},
+        {"\xC3\xB3", 'O'}, {"\xC3\xBA", 'U'}, {"\xC3\xBC", 'U'},
+        {"\xC3\x81", 'A'}, {"\xC3\x89", 'E'}, {"\xC3\x8D", 'I'},
+        {"\xC3\x93", 'O'}, {"\xC3\x9A", 'U'}, {"\xC3\x9C", 'U'},
+        /* Mirrors NormalizeDiacritics (engine folds Ñ→N everywhere,
+           subjects included): measurement must judge likewise. */
+        {"\xC3\x91", 'N'}, {"\xC3\xB1", 'N'},
+    };
+    size_t o = 0;
+    while (*src && o + 1 < dst_size)
+    {
+        int hit = 0;
+        for (size_t t = 0; t < sizeof(tab) / sizeof(tab[0]); t++)
+        {
+            if (strncmp(src, tab[t].from, 2) == 0)
+            {
+                dst[o++] = tab[t].to;
+                src += 2;
+                hit = 1;
+                break;
+            }
+        }
+        if (!hit)
+            dst[o++] = *src++;
+    }
+    dst[o] = '\0';
+}
+
 int main(int argc, char **argv)
 {
     const char *tsv_path = (argc > 1) ? argv[1] : "tests/qa_eval.tsv";
@@ -53,7 +88,10 @@ int main(int argc, char **argv)
         char answer[256] = {0};
         int found = (q.valid && q.is_question) ?
             ParserAnswerQuestion(graph, &q, answer, sizeof(answer)) : 0;
-        int ok = (found && strstr(answer, expected) != NULL);
+        char fanswer[256] = {0}, fexpected[256] = {0};
+        FoldAccents(found ? answer : "", fanswer, sizeof(fanswer));
+        FoldAccents(expected, fexpected, sizeof(fexpected));
+        int ok = (found && strstr(fanswer, fexpected) != NULL);
         if (ok)
             pass++;
         else
