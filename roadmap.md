@@ -17,9 +17,10 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 29/29 (incluye `test_eval_count` 22/22 y `test_eval_negation`
-  20/20), eval 87/87, hygiene 87/87, lint 4126/0/0.
-- Model: 5,725 symbols / 3,399 relations (math + Iconclass included,
+- Suite 30/30 (incluye `test_eval_count` 22/22, `test_eval_negation`
+  20/20 y `test_eval_default` 18/18), eval 87/87, hygiene 87/87,
+  lint 4155/0/0.
+- Model: 5,783 symbols / 3,430 relations (math + Iconclass included,
   post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
 - Dynamic vocabulary: question tokens resolve against used relations
   (exact, stemmed, affix-ranked, embedding-ranked); learned words
@@ -79,6 +80,13 @@ symbols.
   - [ ] M3b — Comparación (`más/menos`, `mayor/menor`, `antes/después`)
     sobre el sidecar M3a. Baseline: 0/1. Set: `tests/qa_eval_compare.tsv`.
   Orden: M2 → M1 → M4 → M3a → M3b (valor/coste).
+  - [x] M5 — Defaults no-monótonos por especificidad (adelantado: el
+    sustrato estaba listo). Sin cuantificadores: se camina ES hacia
+    arriba y el nivel más cercano con evidencia decide por objeto
+    (positivo lista, negativo excluye; todo denegado responde No.).
+    Read-only (nada derrotable se materializa). Pingüino nada pero no
+    vuela; Piolín el canario sí vuela. `tests/qa_eval_default.tsv`
+    18/18.
 
 ## Reasoning distance (measured, not claimed)
 
@@ -99,6 +107,8 @@ lookup is retrieval, not reasoning. The Reasoning Index is a VECTOR
   ranking set.
 - R7 contradiction: storage + policies unit-tested
   (`test_contradictions`), never ingested, never surfaced (M1).
+- R8 default inheritance: `qa_eval_default` 18/18 (M5 ✓: ES-walk with
+  per-object specificity, denials exclude, all-denied answers No.).
 
 Zebra probe (`houses_puzzle.pl`, SWISH, 15 rules): reified givens in
 a fresh graph answer stored lookups 3/3 and honest-unknown on

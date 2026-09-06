@@ -89,6 +89,12 @@ int main(void)
     printf("   Glue:      %llu triples, %u symbols\n",
            ir12.relations_inserted, SymbolCount(graph->symbols));
 
+    /* 8e2. Ingest animal seed (taxonomy + direct capabilities) */
+    printf("8e2. Ingesting animal_seed.tsv (animals)...\n");
+    INGEST_STATS ir12b = IngestTSV(graph, "data/samples/animal_seed.tsv");
+    printf("   Animals:   %llu triples, %u symbols\n",
+           ir12b.relations_inserted, SymbolCount(graph->symbols));
+
     /* 8f. Ingest negation seeds (true denials -> polar triples) */
     printf("8f. Ingesting negation_seed.txt (denials)...\n");
     {

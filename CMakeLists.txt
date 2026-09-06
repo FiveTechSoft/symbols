@@ -87,6 +87,7 @@ target_link_libraries(test_eval_qa symbolic)
 add_test(NAME test_eval_qa COMMAND test_eval_qa tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME test_eval_count COMMAND test_eval_qa tests/qa_eval_count.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME test_eval_negation COMMAND test_eval_qa tests/qa_eval_negation.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_default COMMAND test_eval_qa tests/qa_eval_default.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
 target_link_libraries(test_qa_hygiene symbolic)

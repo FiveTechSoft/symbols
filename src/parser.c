@@ -298,6 +298,52 @@ static uint32_t FindSplits(const GRAPH *graph, const PARSED_SENTENCE *tokens,
     return n;
 }
 
+/* Does the relation touch the subject directly or through ES
+   ancestry? Redirect evidence must see inherited claims (Piolín holds
+   no direct CAPAZ_DE triple, but PINGÜINO denies for it): direct-only
+   checks strand inheritable questions at the winner. BFS over ES,
+   depth-capped, visited; any polarity touches. */
+static int TouchesInherited(const GRAPH *graph, SYMBOL_ID subj,
+                            SYMBOL_ID rel)
+{
+    if (graph == NULL || subj == SYMBOL_INVALID || rel == SYMBOL_INVALID)
+        return 0;
+    SYMBOL_ID es = SymbolFind(graph->symbols, "ES");
+    SYMBOL_ID seen[16];
+    uint32_t nseen = 0;
+    SYMBOL_ID queue[16];
+    uint32_t qh = 0, qt = 0;
+    seen[nseen++] = subj;
+    queue[qt++] = subj;
+    RELATION *probe[1];
+    while (qh < qt)
+    {
+        SYMBOL_ID cur = queue[qh++];
+        if (GraphQuerySubjectRelation(graph, cur, rel, probe, 1) > 0)
+            return 1;
+        if (es == SYMBOL_INVALID)
+            continue;
+        RELATION *up[16];
+        uint32_t nu = GraphQuerySubjectRelation(graph, cur, es, up, 16);
+        for (uint32_t u = 0; u < nu && qt < 16; u++)
+        {
+            int known = 0;
+            for (uint32_t v = 0; v < nseen; v++)
+                if (seen[v] == up[u]->object)
+                {
+                    known = 1;
+                    break;
+                }
+            if (known)
+                continue;
+            if (nseen < 16)
+                seen[nseen++] = up[u]->object;
+            queue[qt++] = up[u]->object;
+        }
+    }
+    return 0;
+}
+
 /* Session token census: raw occurrence counts per token hash. Glue
    never stands alone as a symbol, so graph frequencies miss it; the
    census sees every token as read, letting splitters find coordinators
@@ -1527,19 +1573,18 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                        holds its fact). Among every resolving token,
                        prefer — in winner-rank order — the first
                        relation co-occurring with the subject.
-                       Relations are vocabulary; co-occurrence with the
-                       asked entity is evidence. No co-occurrence
-                       anywhere keeps the winner (honest attempt). */
+                        Relations are vocabulary; co-occurrence with the
+                       asked entity is evidence (direct or inherited:
+                       Piolín touches CAPAZ_DE through PINGÜINO). No
+                       co-occurrence anywhere keeps the winner (honest
+                       attempt). */
                     SYMBOL_ID subj_id = SymbolFind(graph->symbols, subj);
                     if (subj_id != SYMBOL_INVALID)
                     {
                         SYMBOL_ID best_rid =
                             SymbolFind(graph->symbols, best_rel);
-                        RELATION *probe[1];
                         if (best_rid != SYMBOL_INVALID &&
-                            GraphQuerySubjectRelation(graph, subj_id,
-                                                      best_rid,
-                                                      probe, 1) == 0)
+                            !TouchesInherited(graph, subj_id, best_rid))
                         {
                             /* Evidence-ordered redirect: every resolving
                                token contributes its relation plus the
@@ -1657,9 +1702,7 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                 SYMBOL_ID crid = SymbolFind(graph->symbols,
                                     rel_cache[c_idx[c]].name);
                                 if (crid != SYMBOL_INVALID &&
-                                    GraphQuerySubjectRelation(graph, subj_id,
-                                                              crid, probe,
-                                                              1) > 0)
+                                    TouchesInherited(graph, subj_id, crid))
                                 {
                                     strcpy(best_rel,
                                            rel_cache[c_idx[c]].name);
@@ -2000,6 +2043,115 @@ int ParserAnswerQuestion(
                 }
                 out_answer[pos] = '\0';
                 return 1;
+            }
+
+            /* Default reasoning (M6, non-monotonic): no direct claim.
+               Walk ES upward; per object, the NEAREST level mentioning
+               it decides (positive lists it, negative excludes it).
+               Specificity, not quantifiers: no "all birds fly" is
+               stored or needed; nearer overrides farther, denials
+               included. Read-only (defeasible conclusions never
+               materialize), depth-capped, cycle-guarded by the visited
+               set. No mentions anywhere keeps honest unknown. */
+            {
+                SYMBOL_ID es_id = SymbolFind(graph->symbols, "ES");
+                if (es_id != SYMBOL_INVALID)
+                {
+                    SYMBOL_ID level[8];
+                    uint32_t nlevel = 0;
+                    level[nlevel++] = subj_id;
+                    uint32_t head = 0;
+                    while (head < nlevel && nlevel < 8)
+                    {
+                        RELATION *up[32];
+                        uint32_t nu = GraphQuerySubjectRelation(
+                            graph, level[head], es_id, up, 32);
+                        for (uint32_t u = 0; u < nu; u++)
+                        {
+                            SYMBOL_ID parent = up[u]->object;
+                            int seen = 0;
+                            for (uint32_t v = 0; v < nlevel; v++)
+                                if (level[v] == parent)
+                                {
+                                    seen = 1;
+                                    break;
+                                }
+                            if (!seen && nlevel < 8)
+                                level[nlevel++] = parent;
+                        }
+                        head++;
+                    }
+                    SYMBOL_ID winners[32];
+                    uint32_t nwin = 0;
+                    SYMBOL_ID decided[64];
+                    uint32_t ndec = 0;
+                    int denied_only = 0;
+                    /* Level 0 included: direct positives already
+                       returned above, so level 0 can only contribute
+                       denials here — and a nearer denial must block a
+                       farther affirmation of the same object. */
+                    for (uint32_t l = 0; l < nlevel; l++)
+                    {
+                        RELATION *cand[32];
+                        uint32_t nc = GraphQuerySubjectRelation(
+                            graph, level[l], rel_id, cand, 32);
+                        for (uint32_t c = 0; c < nc; c++)
+                        {
+                            SYMBOL_ID o = cand[c]->object;
+                            int known = 0;
+                            for (uint32_t w = 0; w < ndec; w++)
+                                if (decided[w] == o)
+                                {
+                                    known = 1;
+                                    break;
+                                }
+                            if (known)
+                                continue;
+                            if (ndec < 64)
+                                decided[ndec++] = o;
+                            if (cand[c]->polarity == POLARITY_NEGATIVE)
+                            {
+                                denied_only = 1;
+                                continue;
+                            }
+                            if (nwin < 32)
+                                winners[nwin++] = o;
+                        }
+                    }
+                    if (nwin > 0)
+                    {
+                        uint32_t pos = 0;
+                        for (uint32_t i = 0; i < nwin; i++)
+                        {
+                            const SYMBOL *obj = SymbolGet(graph->symbols,
+                                                          winners[i]);
+                            if (obj == NULL)
+                                continue;
+                            if (i > 0 && pos + 2 < max_len)
+                            {
+                                out_answer[pos++] = ',';
+                                out_answer[pos++] = ' ';
+                            }
+                            uint32_t name_len =
+                                (uint32_t)strlen(obj->name);
+                            if (pos + name_len < max_len)
+                            {
+                                memcpy(out_answer + pos, obj->name,
+                                       name_len);
+                                pos += name_len;
+                            }
+                        }
+                        out_answer[pos] = '\0';
+                        return 1;
+                    }
+                    if (denied_only)
+                    {
+                        snprintf(out_answer, max_len, "%s",
+                                 LangString(I18N_NO, 0));
+                        out_answer[max_len - 1] = '\0';
+                        return 1;
+                    }
+                }
             }
         }
     }
