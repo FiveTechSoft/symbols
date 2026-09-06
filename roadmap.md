@@ -76,9 +76,24 @@ symbols.
     fuera": QUE/DONDE/CUANDO/COMO comparten sintaxis con
     declarativas, piden el signo de interrogación. Suite 27
     (`tests/test_self_reference.c`).
-- [ ] P4 — Razonamiento con confianza: exponer pesos y contradicciones
-  en las respuestas (infraestructura ya existe: `RELATION.weight`,
-  `GraphCheckContradiction`, `CONFLICT_POLICY`).
+- [x] P4a — Núcleo neuro-Prolog sobre el grafo (`src/neuro_prolog.c`,
+  `include/neuro_prolog.h`, `tests/test_neuro_prolog.c`): `NPProve` une la
+  consulta (sujeto/predicado/objeto, 16 variables) contra los hechos con
+  checkpoints de frame (copia de 80 B), cierre de identidad por BFS
+  (Leibniz: A ES B, B R C ⇒ A R C y simétrico), decaimiento 0.9^n por
+  salto, umbral `min_conf`, tope `max_depth` (defecto 8) y circuito de
+  soluciones con dedup + confianza máxima. Puente fuzzy γ entre el
+  predicado pedido y el guardado (hoy coseno 32D; API agnóstica para el
+  swap a Hamming 256-bit), solo si la fase exacta/inferida queda vacía.
+  Sin tautologías X ES X. **Medición: 36/36 checks** — hecho directo,
+  enumeración, P libre, 1–2 saltos, ambos extremos, min_conf,
+  max_depth, ciclo sin loop, fallos honestos = 0, pinguino/NAF documentado
+  como fuera de alcance, fuzzy on/off/gate y ~0.1 µs/consulta. Suite
+  28/28 (antes 27), lint 4114/0/0.
+- [ ] P4b — Horn + corte sobre P4a: reglas head/body declaradas, corte
+  Prolog (`!`), NAF (pingüino no vuela aunque sus aves sí),
+  cuantificadores y exposición de `RELATION.weight`,
+  `GraphCheckContradiction` y `CONFLICT_POLICY` en las respuestas NL.
 - [x] P5 — Set held-out con verdad humana: `tests/qa_eval_hard.tsv` creado
   (40 hechos verificados a mano, sin solapes con `qa_eval.tsv`, solo para
   medir). `tools/progress.py` portado a Linux (detecta `build/` y binarios
@@ -172,4 +187,14 @@ symbols.
   exacta en desempates, recall completo en respuestas, folding de
   tildes en la medida. Eval curado a verdad de corpus (87 filas).
   Hard 35/40 -> 38/40 (techo honesto: KORONA/HUNGRARO son artefactos
-  del set). Modelo dorado regenerado determinista (6165/3627).
+   del set). Modelo dorado regenerado determinista (6165/3627).
+- 2026-09-06: P4a medido — `src/neuro_prolog.c` +
+  `include/neuro_prolog.h`: `NPProve` (unificación de 3 términos + 16
+  variables con frame de 80 B checkpoint/rollback; cierre de identidad
+  BFS, decaimiento 0.9^n, circuito de soluciones con dedup, umbral
+  min_conf y tope max_depth; sin tautologías X ES X). Puente fuzzy γ solo
+  si no hay hecho exacto/inferido y existe tabla de embeddings
+  (coseno hoy, Hamming 256-bit mañana). Benchmark
+  `tests/test_neuro_prolog.c`: 36/36 (~0.1 µs/consulta, cadena 2 saltos).
+  Documentado como fuera de alcance hasta P4b: NAF, reglas head/body,
+  cut (!), cuantificadores. Suite 28/28.
