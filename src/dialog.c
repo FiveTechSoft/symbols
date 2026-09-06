@@ -41,6 +41,15 @@ DIALOG_INTENT DialogClassify(const char *input)
         return intent;
     }
 
+    /* Question-only closed forms without punctuation still read as a
+       question: "quien eres" (2 tokens) is a self-question, not small
+       talk. Same rule as the ingester, through one shared function. */
+    if (ParserIsQuestion(input))
+    {
+        intent.act = SPEECH_ACT_QUERY;
+        return intent;
+    }
+
     /* Short input with nothing to store is social. Longer input is a
        statement: the tree pass will identify its symbols and relations. */
     if (tokens.count <= 2)
@@ -103,20 +112,22 @@ int DialogGenerateResponse(
                 }
                 first[k] = '\0';
                 char sent[512] = {0};
-                if (first[0] != '\0' &&
-                    SurfaceRender(pq.relation, pq.subject, first,
-                                  sent, sizeof(sent)))
+                if (strcmp(pq.subject, "YO") == 0 &&
+                    (strcmp(pq.relation, "ES") == 0 ||
+                     strcmp(pq.relation, "ESTAR") == 0))
                 {
-                    snprintf(out_response, max_len, "%s", sent);
-                }
-                else if (strcmp(pq.subject, "YO") == 0 &&
-                         (strcmp(pq.relation, "ES") == 0 ||
-                          strcmp(pq.relation, "ESTAR") == 0))
-                {
-                    /* Self copula without a learned mold: identity
-                       statement ("Soy MODELO_SIMBOLICO, ..."). */
+                    /* Identity always takes the localized copula
+                       ("Soy X"), never a learned mold ("YO ES X"):
+                       any ingested "es"-sentence records a mold for
+                       the base copula that would otherwise shadow it. */
                     snprintf(out_response, max_len, "%s%s",
                              LangString(I18N_AM, 0), answer);
+                }
+                else if (first[0] != '\0' &&
+                         SurfaceRender(pq.relation, pq.subject, first,
+                                       sent, sizeof(sent)))
+                {
+                    snprintf(out_response, max_len, "%s", sent);
                 }
                 else
                 {
@@ -153,6 +164,9 @@ int DialogGenerateResponse(
             const SYMBOL *sym = SymbolGet(graph->symbols, (SYMBOL_ID)i);
             if (sym == NULL || sym->name == NULL) continue;
             if (sym->name[0] == '\0') continue;
+            /* 1-letter symbols are too easy to hit by substring match
+               ("E" inside "ERES") and fabricate nonsense answers. */
+            if (strlen(sym->name) < 2) continue;
             if (strstr(upper, sym->name))
             {
                 strncpy(matches[match_count], sym->name, 63);

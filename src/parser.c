@@ -337,6 +337,15 @@ static int SentenceIsInterrogative(const char *sentence,
     return 0;
 }
 
+int ParserIsQuestion(const char *sentence)
+{
+    if (sentence == NULL)
+        return 0;
+    PARSED_SENTENCE tokens;
+    ParserTokenize(sentence, &tokens);
+    return SentenceIsInterrogative(sentence, &tokens);
+}
+
 int ParserIngestSentence(GRAPH *graph, const char *sentence)
 {
     if (graph == NULL || sentence == NULL)

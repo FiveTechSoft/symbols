@@ -27,6 +27,12 @@ typedef struct
    actually holds, so learned words work immediately. */
 QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input);
 
+/* True when the line reads as a question, punctuation or not: '?' or a
+   question-only closed-class token (QUIEN/CUAL/ERES/SOIS/WHO...).
+   Single source of truth shared by the ingester and the dialog
+   classifier, so "quien eres" without '?' is never small talk. */
+int ParserIsQuestion(const char *sentence);
+
 /* Tokenize and normalize input (prose, code, formulas alike) */
 int ParserTokenize(const char *input, PARSED_SENTENCE *out);
 
