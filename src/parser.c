@@ -1051,8 +1051,11 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
     /* NO is reserved (polarity marker): it never resolves, and no
        relation named NO answers (junk-vocabulary from the fragment
        era: a negation marker must not root clauses or qualify
-       splits). The copula strip still sees it as edge glue. */
-    if (strcmp(token, "NO") == 0)
+       splits). Articles and bare glue as relation names are reserved
+       likewise (EL/LA/DE/... never predicate: bulk junk like
+       (X, EL, Y) must not win descriptor contests). The copula strip
+       still sees them as edge glue. */
+    if (strcmp(token, "NO") == 0 || IsGlueToken(token))
         return 0;
 
     uint32_t n = RelCacheFill(graph);
@@ -1203,6 +1206,13 @@ static int ResolveRelationEmbed(const GRAPH *graph,
             continue;
         for (uint32_t k = 0; k < np; k++)
         {
+            /* Reserved/glue relations never answer, not even by
+               vectors (bulk junk like EL wins on co-occurrence
+               similarity alone). */
+            const SYMBOL *pr = SymbolGet(graph->symbols, rids[k]);
+            if (pr == NULL || pr->name == NULL || pr->name[0] == '\0' ||
+                strcmp(pr->name, "NO") == 0 || IsGlueToken(pr->name))
+                continue;
             const float *pv = EmbeddingGetVector(graph->embeddings, rids[k]);
             if (pv == NULL)
                 continue;
@@ -1564,11 +1574,12 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                 char dstem[64] = {0};
                                 StemWord(tokens.tokens[t], dstem,
                                          sizeof dstem);
-                                for (uint32_t k = 0;
-                                     k < nrel && ncand < 64; k++)
-                                {
-                                /* Reserved: NO never answers. */
-                                if (strcmp(rel_cache[k].name, "NO") == 0)
+                            for (uint32_t k = 0;
+                                 k < nrel && ncand < 64; k++)
+                            {
+                                /* Reserved: NO and bare glue never answer. */
+                                if (strcmp(rel_cache[k].name, "NO") == 0 ||
+                                    IsGlueToken(rel_cache[k].name))
                                     continue;
                                 int names = 0;
                                 for (uint32_t j = 0;
@@ -1852,6 +1863,7 @@ int ParserAnswerQuestion(
                              k < nrel && nvrel < 65; k++)
                         {
                             if (strcmp(rel_cache[k].name, "NO") == 0 ||
+                                IsGlueToken(rel_cache[k].name) ||
                                 strcmp(rel_cache[k].name,
                                        q->relation) == 0)
                                 continue;
