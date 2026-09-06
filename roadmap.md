@@ -17,8 +17,9 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 31/31 (incluye `test_eval_count` 22/22, `test_eval_negation`
-  20/20, `test_eval_default` 18/18 y `test_eval_reverse` 8/8), eval 87/87, hygiene 87/87,
+- Suite 32/32 (incluye `test_eval_count` 22/22, `test_eval_negation`
+  20/20, `test_eval_default` 18/18, `test_eval_reverse` 8/8 y
+  `test_neuro_prolog` 36/36), eval 87/87, hygiene 87/87,
   lint 4155/0/0.
 - Model: 5,783 symbols / 3,430 relations (math + Iconclass included,
   post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
@@ -171,7 +172,11 @@ harness read `valid=222`), every rebuild is timestamp-checked
   enumeración, P libre, 1–2 saltos, ambos extremos, min_conf,
   max_depth, ciclo sin loop, fallos honestos = 0, pinguino/NAF documentado
   como fuera de alcance, fuzzy on/off/gate y ~0.1 µs/consulta. Suite
-  28/28 (antes 27), lint 4114/0/0.
+  32/32, lint 4155/0/0. Frontera medida con M5: P4a solo ve
+  triples positivos (polarity-blind por diseño) y responde VOLAR para
+  Piolín por herencia; M5 ve la denegación específica (PINGÜINO) y
+  responde No. Acuerdan en cadenas puramente positivas; divergen ante
+  denegación — esa es exactamente la línea P4b (NAF).
 - [ ] P4b — Horn + corte sobre P4a: reglas head/body declaradas, corte
   Prolog (`!`), NAF (pingüino no vuela aunque sus aves sí),
   cuantificadores y exposición de `RELATION.weight`,
