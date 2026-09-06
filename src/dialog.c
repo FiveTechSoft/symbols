@@ -106,9 +106,22 @@ int DialogGenerateResponse(
                 if (first[0] != '\0' &&
                     SurfaceRender(pq.relation, pq.subject, first,
                                   sent, sizeof(sent)))
+                {
                     snprintf(out_response, max_len, "%s", sent);
+                }
+                else if (strcmp(pq.subject, "YO") == 0 &&
+                         (strcmp(pq.relation, "ES") == 0 ||
+                          strcmp(pq.relation, "ESTAR") == 0))
+                {
+                    /* Self copula without a learned mold: identity
+                       statement ("Soy MODELO_SIMBOLICO, ..."). */
+                    snprintf(out_response, max_len, "%s%s",
+                             LangString(I18N_AM, 0), answer);
+                }
                 else
+                {
                     snprintf(out_response, max_len, "%s", answer);
+                }
                 return 1;
             }
         }

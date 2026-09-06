@@ -17,8 +17,9 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 26/26, eval 87/87, hygiene 87/87, lint 4368/0/0.
-- Model: 6,165 symbols / 3,627 relations (math + Iconclass included).
+- Suite 27/27, eval 87/87, hygiene 87/87, lint 4114/0/0.
+- Model: 5,700 symbols / 3,373 relations (math + Iconclass included,
+  post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
 - Dynamic vocabulary: question tokens resolve against used relations
   (exact, stemmed, affix-ranked, embedding-ranked); learned words
   work immediately.
@@ -64,6 +65,17 @@ symbols.
   - [x] Entrada agnóstica de idioma: sin detección de idioma; la
     resolución es por similitud semántica contra el mapa vivo
     (exacto → stemmeado → embedding → atención; ya existía en el parser).
+  - [x] Auto-referencia honesta: copulas conjugadas (soy/eres/somos…
+    → ES; estoy/… → ESTAR, solo si la base es relación usada, tabla
+    cerrada no semántica); interrogante "QUIEN" sin entidad →
+    autoconcepto (YO) si existe en el grafo; el REPL siembra
+    YO--ES-->MODELO_SIMBOLICO/LLM_DE_CONVERSACION (idempotente) y NLG
+    emite "Soy /I am /Je suis …". Las preguntas nunca se ingieren
+    ('?' o tokens cerrados solo-de-pregunta), sin punctuation ni con
+    ella: no hay triples fabricados (QUIEN--SOY-->YO). "Quedando
+    fuera": QUE/DONDE/CUANDO/COMO comparten sintaxis con
+    declarativas, piden el signo de interrogación. Suite 27
+    (`tests/test_self_reference.c`).
 - [ ] P4 — Razonamiento con confianza: exponer pesos y contradicciones
   en las respuestas (infraestructura ya existe: `RELATION.weight`,
   `GraphCheckContradiction`, `CONFLICT_POLICY`).

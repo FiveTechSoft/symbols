@@ -28,6 +28,7 @@ typedef enum
     I18N_AND,            /* " and " list connector */
     I18N_COMPOUND_HEAD,  /* "From my data about " */
     I18N_IS,             /* "is " */
+    I18N_AM,             /* "I am " self-copula identity prefix */
     I18N_OF,             /* " of " */
     I18N_TAXO,           /* " (which is a %s)" taxonomy suffix */
     I18N_UNKNOWN,        /* "No record of %s %s yet." (2 slots, used as format) */

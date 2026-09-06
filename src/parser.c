@@ -305,6 +305,38 @@ static uint64_t TokenRarity(const GRAPH *graph, const char *token)
     return (s != NULL) ? s->frequency : 0;
 }
 
+/* Does this line read as a question, punctuation or not? A '?'
+   settles it. Without punctuation only interrogative-only
+   closed-class tokens can prove it: the pronouns QUIEN/CUAL/CUALES
+   and second-person copulas ERES/SOIS (first-person SOY stays OUT:
+   "yo soy medico" is a fact worth storing, and its copula already
+   resolves through the lemma table). QUE/DONDE/CUANDO/COMO and their
+   English cousins share syntax with declarative relatives, so they
+   require the mark. Questions query; they never store: ingesting
+   them would fabricate triples out of question words
+   (QUIEN--SOY-->YO). */
+static int SentenceIsInterrogative(const char *sentence,
+                                   const PARSED_SENTENCE *tokens)
+{
+    if (strchr(sentence, '?') != NULL)
+        return 1;
+
+    static const char *const QUESTION_ONLY[] = {
+        "QUIEN", "CUAL", "CUALES", "ERES", "SOIS",
+        "WHO", "WHOM", "WHOSE", NULL
+    };
+
+    for (uint32_t i = 0; i < tokens->count; i++)
+    {
+        for (uint32_t m = 0; QUESTION_ONLY[m] != NULL; m++)
+        {
+            if (strcmp(tokens->tokens[i], QUESTION_ONLY[m]) == 0)
+                return 1;
+        }
+    }
+    return 0;
+}
+
 int ParserIngestSentence(GRAPH *graph, const char *sentence)
 {
     if (graph == NULL || sentence == NULL)
@@ -320,6 +352,9 @@ int ParserIngestSentence(GRAPH *graph, const char *sentence)
        becomes visible (coordinators never stand alone as symbols). */
     for (uint32_t ci = 0; ci < tokens.count; ci++)
         CensusAdd(tokens.tokens[ci]);
+
+    if (SentenceIsInterrogative(sentence, &tokens))
+        return 0;
 
     /* Segments first: split at local frequency maxima (glue betrayed
        by repetition), then parse each segment recursively on its own.
@@ -967,13 +1002,54 @@ static int ResolveRelationPass(const GRAPH *graph, const char *token,
         }
     }
 
-    if (!found || best_name == NULL)
-        return 0;
-    strncpy(out, best_name, out_size - 1);
-    out[out_size - 1] = '\0';
-    if (out_trusted != NULL)
-        *out_trusted = best_trusted;
-    return 1;
+    if (found && best_name != NULL)
+    {
+        strncpy(out, best_name, out_size - 1);
+        out[out_size - 1] = '\0';
+        if (out_trusted != NULL)
+            *out_trusted = best_trusted;
+        return 1;
+    }
+
+    /* Conjugated copulas never stem into one another by suffix rules
+       (ERES does not reduce to ES). A closed, unambiguous set of
+       personal forms points at the base copula, and only when that
+       base is a relation this graph actually uses; SON and ERA stay
+       out (homographs: the sound, the threshing floor). */
+    {
+        static const struct
+        {
+            const char *form;
+            const char *base;
+        } COPULA_LEMMA[] = {
+            {"SOY", "ES"}, {"ERES", "ES"}, {"SOMOS", "ES"},
+            {"SOIS", "ES"}, {"ERAS", "ES"}, {"ERAMOS", "ES"},
+            {"ERAIS", "ES"}, {"ERAN", "ES"},
+            {"ESTOY", "ESTAR"}, {"ESTAMOS", "ESTAR"},
+            {"ESTAIS", "ESTAR"}, {"ESTAN", "ESTAR"},
+            {"ESTABA", "ESTAR"},
+            {NULL, NULL}
+        };
+
+        for (uint32_t c = 0; COPULA_LEMMA[c].form != NULL; c++)
+        {
+            if (strcmp(token, COPULA_LEMMA[c].form) != 0)
+                continue;
+            for (uint32_t k = 0; k < n; k++)
+            {
+                if (strcmp(rel_cache[k].name, COPULA_LEMMA[c].base) != 0)
+                    continue;
+                strncpy(out, rel_cache[k].name, out_size - 1);
+                out[out_size - 1] = '\0';
+                if (out_trusted != NULL)
+                    *out_trusted = rel_cache[k].trusted;
+                return 1;
+            }
+            return 0;
+        }
+    }
+
+    return 0;
 }
 
 /* Embedding description: the (token, relation) pair with the highest
@@ -1118,6 +1194,40 @@ static int ResolveEntity(const GRAPH *graph, const PARSED_SENTENCE *tokens,
     return (int)best_at;
 }
 
+/* Question subject anchored on a clause root: the entity trail after
+   the root first ("... CAPITAL DE FRANCIA"), then the span before it
+   ("FRANCIA ES ..."). A bare interrogative leftover (QUIEN) with no
+   content entity is a self-question whenever the graph has a self
+   symbol: "¿quien eres?" asks about YO, never about the word QUIEN.
+   Returns 0 when nothing resolves. */
+static int ResolveQuestionSubject(const GRAPH *graph,
+                                  const PARSED_SENTENCE *tokens,
+                                  uint32_t root_pos,
+                                  char *subj, size_t subj_size)
+{
+    int spos = ResolveEntity(graph, tokens, root_pos + 1, subj, subj_size);
+    if (spos < 0)
+    {
+        PARSED_SENTENCE pre;
+        memset(&pre, 0, sizeof(pre));
+        for (uint32_t k = 0; k < root_pos &&
+                            pre.count < PARSER_MAX_TOKENS; k++)
+        {
+            strcpy(pre.tokens[pre.count], tokens->tokens[k]);
+            pre.count++;
+        }
+        spos = ResolveEntity(graph, &pre, 0, subj, subj_size);
+    }
+    if (spos < 0 || strlen(subj) == 0)
+        return 0;
+
+    if (strcmp(subj, "QUIEN") == 0 &&
+        SymbolFind(graph->symbols, "YO") != SYMBOL_INVALID)
+        strcpy(subj, "YO");
+
+    return 1;
+}
+
 QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
 {
     QUESTION q;
@@ -1184,29 +1294,10 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         if (best_pos >= 0)
         {
             uint32_t i = (uint32_t)best_pos;
+            char subj[128] = {0};
+            if (ResolveQuestionSubject(graph, &tokens, i,
+                                       subj, sizeof(subj)))
             {
-                char subj[128] = {0};
-                int spos = ResolveEntity(graph, &tokens, i + 1,
-                                         subj, sizeof(subj));
-                if (spos < 0)
-                {
-                    PARSED_SENTENCE pre;
-                    memset(&pre, 0, sizeof(pre));
-                    for (uint32_t k = 0; k < i &&
-                                        pre.count < PARSER_MAX_TOKENS; k++)
-                    {
-                        strcpy(pre.tokens[pre.count], tokens.tokens[k]);
-                        pre.count++;
-                    }
-                    spos = ResolveEntity(graph, &pre, 0,
-                                         subj, sizeof(subj));
-                }
-                if (spos < 0 || strlen(subj) == 0)
-                {
-                    /* Winner has no entity: fall through to the
-                       embedding pass rather than trying worse winners. */
-                }
-                else
                 {
                     /* Subject-aware descriptor: the winning relation
                        may never touch this subject (bare IDIOMA wins
@@ -1345,22 +1436,9 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                                       &epos) && epos >= 0)
             {
                 char subj[128] = {0};
-                int spos = ResolveEntity(graph, &tokens, (uint32_t)epos + 1,
-                                         subj, sizeof(subj));
-                if (spos < 0)
-                {
-                    PARSED_SENTENCE pre;
-                    memset(&pre, 0, sizeof(pre));
-                    for (uint32_t k = 0; k < (uint32_t)epos &&
-                                        pre.count < PARSER_MAX_TOKENS; k++)
-                    {
-                        strcpy(pre.tokens[pre.count], tokens.tokens[k]);
-                        pre.count++;
-                    }
-                    spos = ResolveEntity(graph, &pre, 0,
-                                         subj, sizeof(subj));
-                }
-                if (spos >= 0 && strlen(subj) > 0)
+                if (ResolveQuestionSubject(graph, &tokens,
+                                           (uint32_t)epos, subj,
+                                           sizeof(subj)))
                 {
                     strcpy(q.subject, subj);
                     strcpy(q.relation, rel);

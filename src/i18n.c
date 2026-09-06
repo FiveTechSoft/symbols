@@ -12,6 +12,7 @@ static const int V_COUNT[I18N_COUNT] = {
     1,  /* I18N_AND            */
     1,  /* I18N_COMPOUND_HEAD  */
     1,  /* I18N_IS             */
+    1,  /* I18N_AM             */
     1,  /* I18N_OF             */
     1,  /* I18N_TAXO           */
     3,  /* I18N_UNKNOWN        */
@@ -97,6 +98,10 @@ static const char *const F_COMPOUND_HEAD[1] = { "Selon mes donnees sur " };
 static const char *const E_IS[1] = { "is " };
 static const char *const S_IS[1] = { "es " };
 static const char *const F_IS[1] = { "est " };
+
+static const char *const E_AM[1] = { "I am " };
+static const char *const S_AM[1] = { "Soy " };
+static const char *const F_AM[1] = { "Je suis " };
 
 static const char *const E_OF[1] = { " of " };
 static const char *const S_OF[1] = { " de " };
@@ -292,6 +297,13 @@ const char *LangTemplate(const I18N_KEY key, const LANG_ID id, int variant)
         case LANG_EN: return E_IS[0];
         case LANG_ES: return S_IS[0];
         default:      return F_IS[0];
+        }
+    case I18N_AM:
+        switch (lang)
+        {
+        case LANG_EN: return E_AM[0];
+        case LANG_ES: return S_AM[0];
+        default:      return F_AM[0];
         }
     case I18N_OF:
         switch (lang)
