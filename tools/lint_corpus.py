@@ -16,6 +16,11 @@ y estas categorias:
   phrase_obj  objeto >4 tokens o >48 chars con espacio -> DROP
   empty      campo vacio                -> DROP
   whitespace espacios multiples         -> colapsa (FIX)
+  junk_pred  propiedad infobox-metadata (PREFIJO_RADIOFONICO,
+              CODIGO_ISO, LEMA_NACIONAL, TIPO, FUNDADO_EN) -> DROP
+  junk_obj   objeto-basura de extracto (NOWRAP, ESCUDO2, .SVG,
+              sufijos CITA_WEB/REFN/REF_DE_FICHA/COORD se cortan (FIX),
+              otra basura completa -> DROP)
 
 Uso:
   python3 tools/lint_corpus.py --check   # informa, exit 1 si hay issues
@@ -47,6 +52,24 @@ STOP_SUBJ = {
     "DONDE", "CUANDO", "THE", "A", "AN", "SHE", "HE", "IT", "THEY",
     "WE", "YOU", "HIS", "HER", "THEIR", "ITS",
 }
+
+# Propiedades de infobox que son metadatos de la ficha (no hechos
+# preguntables). Ninguna aparece en tests/qa_eval.tsv; se dropean en el
+# corpus para no contaminar el ranking de atencion de /query.
+JUNK_PRED = {
+    "PREFIJO_RADIOFONICO", "PREFIJO_RADIOFÓNICO",
+    "CODIGO_ISO", "LEMA_NACIONAL", "TIPO", "FUNDADO_EN",
+}
+# Objetos cuyo valor completo es basura de extraccion (artefactos HTML
+# de la plantilla; el hecho real ya viene en otra fila limpia).
+JUNK_OBJ = {"NOWRAP", "ESCUDO", "ESCUDO2", "ESCURO", "ESCURO2",
+            "ENINFOBOX_REF"}
+# Marcas de referencia del extracto que se cuelgan al final del objeto
+# (p.ej. LAGOSCITA_WEB -> LAGOS, SÍDNEYREFN -> SÍDNEY). Suelen acumularse
+# en cadena (ESTAMBULCITACOORD), se cortan en bucle hasta estabilizar.
+# Orden: de la marca mas larga a la mas corta.
+JUNK_SUFFIXES = ("REF_DE_FICHA", "CITACOORD", "CITA_WEB", "CITAWEB", "REFN",
+                 "COORD", "CITA")
 STOP_PREFIX = ("SU ", "SUS ", "TU ", "TUS ", "MI ", "MIS ", "THE ",
                "AN ", "SONS OF", "DAUGHTERS OF", "KINGS OF")
 
@@ -121,6 +144,41 @@ def clean_field(field: str):
     return new, ("fixed" if fixed else "ok"), ""
 
 
+def clean_junk_object(o: str):
+    """Objeto -> (obj_limpio o None, fijado: bool). None = drop."""
+    o = o.strip()
+    orig = o
+    if o.upper() in JUNK_OBJ:
+        return None, False
+    if o.upper().endswith(".SVG"):
+        return None, False
+    # Corta marcas de referencia encadenadas al final hasta estabilizar
+    # (p.ej. ESTAMBULCITACOORD -> ESTAMBUL, LIRA_TURCAREFN -> LIRA_TURCA).
+    # El len(o) > len(suf) impide tragar un objeto entero que se llame
+    # igual que una marca (p.ej. "CITA").
+    prev = None
+    while prev != o:
+        prev = o
+        for suf in JUNK_SUFFIXES:
+            if o.upper().endswith(suf) and len(o) > len(suf):
+                o = o[:-len(suf)]
+                break
+    o = o.rstrip("_")
+    if not o:
+        return None, False
+    # Entidad HTML: &NBSP; -> quita (comunes en kilometrajes); si queda
+    # cualquier otra entidad HTML o simbolo de coordenada -> irrecuperable.
+    if "&" in o:
+        nbsp_repaired = o.replace("&NBSP;", "").replace("&nbsp;", "")
+        if "&" in nbsp_repaired or "°" in nbsp_repaired or "•" in nbsp_repaired:
+            return None, False
+        o = nbsp_repaired
+    # Prefijo de guion de plantilla (p.ej. "-A" de gentilicio; o solo "-")
+    if re.match(r"^-[A-ZÁÉÍÓÚÑ]{0,3}$", o.upper()):
+        return None, False
+    return o, (o != orig)
+
+
 def check_triple(s: str, p: str, o: str, src: str = ""):
     """Un triple (crudo) -> (accion, s2, p2, o2, src2, regla).
 
@@ -139,6 +197,9 @@ def check_triple(s: str, p: str, o: str, src: str = ""):
     su = s.strip().upper()
     if su in STOP_SUBJ or su.startswith(STOP_PREFIX):
         return "drop", s, p, o, src2, "anaphora"
+    pu = p.strip().upper()
+    if pu in JUNK_PRED:
+        return "drop", s, p, o, src2, "junk_pred"
     if " " in p.strip():
         return "drop", s, p, o, src2, "spaced_pred"
     ou = o.strip().upper()
@@ -187,6 +248,14 @@ def check_triple(s: str, p: str, o: str, src: str = ""):
                 s = fld
             else:
                 o = fld
+
+    # Objetos: basura de extraccion de plantillas HTML (marcas de ref
+    # coladas al final, archivos de imagen, entidades HTML, coordenadas).
+    o2, obj_fixed = clean_junk_object(o)
+    if o2 is None:
+        return "drop", s, p, o, src2, "junk_obj"
+    o = o2
+    fixed_any = fixed_any or obj_fixed
 
     if fixed_any:
         return "fixed", s.strip(), p.strip(), o.strip(), src2, ""

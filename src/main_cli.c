@@ -124,6 +124,26 @@ int main(void)
         }
     }
 
+    /* Self-knowledge seed: the identity triples this REPL answers with
+       when asked who it is. Idempotent: existing triples are left
+       untouched, so restarts never double-count. */
+    {
+        static const char *const self_facts[][2] = {
+            {"YO", "MODELO_SIMBOLICO"},
+            {"YO", "LLM_DE_CONVERSACION"},
+        };
+        for (size_t i = 0; i < sizeof(self_facts) / sizeof(self_facts[0]); i++)
+        {
+            SYMBOL_ID s = GraphAddSymbol(graph, self_facts[i][0]);
+            SYMBOL_ID p = GraphAddSymbol(graph, "ES");
+            SYMBOL_ID o = GraphAddSymbol(graph, self_facts[i][1]);
+            if (s != SYMBOL_INVALID && p != SYMBOL_INVALID &&
+                o != SYMBOL_INVALID &&
+                GraphFindRelation(graph, s, p, o) == NULL)
+                GraphAddRelation(graph, s, p, o);
+        }
+    }
+
     printf("========================================================\n");
     printf("     SYMBOLIC LLM\n");
     printf("  Natural conversation without backpropagation or GPUs.\n");
@@ -657,8 +677,12 @@ int main(void)
             char s[64] = {0}, p[64] = {0}, o[64] = {0};
             if (sscanf(input + 6, "%63s %63s %63s", s, p, o) == 3)
             {
-                SYMBOL_ID sid = (strcmp(s, "*") == 0) ?
-                    SYMBOL_INVALID : StemFindSymbol(graph->symbols, s);
+                int star_subj = (strcmp(s, "*") == 0);
+                /* An unknown named subject must yield zero results, not
+                   the whole map (the old wildcard fallback masqueraded
+                   misses as matches). */
+                SYMBOL_ID sid = star_subj ? SYMBOL_INVALID :
+                    StemFindSymbol(graph->symbols, s);
                 /* Canonicalize P/O filters through the stemmer so
                    inflected forms match stored names */
                 const char *pname = p;
@@ -685,9 +709,13 @@ int main(void)
                     }
                 }
                 RELATION *rels[64];
-                uint32_t n = (sid != SYMBOL_INVALID) ?
-                    GraphQuerySubject(graph, sid, rels, 64) :
-                    RelationCount(graph->relations);
+                uint32_t n;
+                if (star_subj)
+                    n = RelationCount(graph->relations);
+                else if (sid == SYMBOL_INVALID)
+                    n = 0;
+                else
+                    n = GraphQuerySubject(graph, sid, rels, 64);
                 uint32_t shown = 0;
                 for (uint32_t i = 0; i < n && shown < 32; i++)
                 {
