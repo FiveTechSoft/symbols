@@ -1,0 +1,14 @@
+# QA reverse set (M7 roadmap): pregunta<TAB>respuesta_esperada.
+# Variables de un hueco: resuelven relacion + entidad ligada y listan
+# el otro extremo ((S,R)->vacio + (R,S-como-O)->lleno = swap por
+# evidencia). Sin busqueda: un hueco, escaneo indexado.
+# Curadas + verificadas por ejecución (8/8 hoy). Umbral 90%.
+# No muta el modelo.
+¿Qué países tienen como moneda el euro?	ESPAÑA
+¿Qué ciudad es capital de Italia?	ROMA
+¿Qué ciudad es capital de Francia?	PARÍS
+¿Qué ciudad es capital de España?	MADRID
+¿Qué ciudad es capital de Alemania?	BERLÍN
+¿Quién es miembro de la ONU?	ARABIA_SAUDITA
+¿Qué países tienen como idioma el español?	ESPAÑA
+¿Qué países tienen como idioma el inglés?	INGLATERRA

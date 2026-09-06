@@ -17,8 +17,8 @@ symbols.
 
 ## Measured state (verified 2026-09-05)
 
-- Suite 30/30 (incluye `test_eval_count` 22/22, `test_eval_negation`
-  20/20 y `test_eval_default` 18/18), eval 87/87, hygiene 87/87,
+- Suite 31/31 (incluye `test_eval_count` 22/22, `test_eval_negation`
+  20/20, `test_eval_default` 18/18 y `test_eval_reverse` 8/8), eval 87/87, hygiene 87/87,
   lint 4155/0/0.
 - Model: 5,783 symbols / 3,430 relations (math + Iconclass included,
   post P3 corpus junk-cleanup: junk_pred/junk_obj fuera del corpus).
@@ -87,6 +87,12 @@ symbols.
     Read-only (nada derrotable se materializa). Pingüino nada pero no
     vuela; Piolín el canario sí vuela. `tests/qa_eval_default.tsv`
     18/18.
+  - [x] M7 — Variables en query de un hueco (reverse QA, adelantado por
+    el zebra: gap #3). Roles por evidencia: slot vacío + reverso
+    no vacío ⇒ swap ((S,R)→∅ y (R,S-como-O)→lleno responde sujetos).
+    Sin búsqueda: un hueco, escaneo indexado, disputa igual que slots.
+    `tests/qa_eval_reverse.tsv` 8/8. Multihueco y backtracking quedan
+    fuera (solver-sidecar futuro).
 
 ## Reasoning distance (measured, not claimed)
 
@@ -109,6 +115,9 @@ lookup is retrieval, not reasoning. The Reasoning Index is a VECTOR
   (`test_contradictions`), never ingested, never surfaced (M1).
 - R8 default inheritance: `qa_eval_default` 18/18 (M5 ✓: ES-walk with
   per-object specificity, denials exclude, all-denied answers No.).
+- R9 single-hole variables: `qa_eval_reverse` 8/8 (M7 ✓: evidence
+  roles, indexed scan, no search). Multi-hole joins need the solver
+  sidecar (queued).
 
 Zebra probe (`houses_puzzle.pl`, SWISH, 15 rules): reified givens in
 a fresh graph answer stored lookups 3/3 and honest-unknown on

@@ -344,6 +344,28 @@ static int TouchesInherited(const GRAPH *graph, SYMBOL_ID subj,
     return 0;
 }
 
+/* Does the relation touch the entity in either slot, directly?
+   (Ancestry lives in TouchesInherited; this is the one-hop check.) */
+static int TouchesEither(const GRAPH *graph, SYMBOL_ID entity,
+                         SYMBOL_ID rel)
+{
+    RELATION *probe[1];
+    if (graph == NULL || entity == SYMBOL_INVALID ||
+        rel == SYMBOL_INVALID)
+        return 0;
+    if (GraphQuerySubjectRelation(graph, entity, rel, probe, 1) > 0)
+        return 1;
+    {
+        RELATION *rev[64];
+        uint32_t nr = RelationFindByObject(graph->relations, entity,
+                                           rev, 64);
+        for (uint32_t i = 0; i < nr; i++)
+            if (rev[i]->relation == rel)
+                return 1;
+    }
+    return 0;
+}
+
 /* Session token census: raw occurrence counts per token hash. Glue
    never stands alone as a symbol, so graph frequencies miss it; the
    census sees every token as read, letting splitters find coordinators
@@ -1583,8 +1605,20 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                     {
                         SYMBOL_ID best_rid =
                             SymbolFind(graph->symbols, best_rel);
+                        SYMBOL_ID obj_id = SYMBOL_INVALID;
+                        if (q.object[0] != '\0')
+                            obj_id = SymbolFind(graph->symbols, q.object);
+                        /* Keep on either-side evidence (subject holds
+                           the triple forward, or the object is held:
+                           "el capital de Italia" vs "capital de Italia
+                           es Roma" describe the same fact from opposite
+                           ends). TouchesInherited covers the subject
+                           side with ancestry; the object side is direct
+                           (ancestry there belongs to M4 chaining). */
                         if (best_rid != SYMBOL_INVALID &&
-                            !TouchesInherited(graph, subj_id, best_rid))
+                            !TouchesInherited(graph, subj_id, best_rid) &&
+                            (obj_id == SYMBOL_INVALID ||
+                             !TouchesEither(graph, obj_id, best_rid)))
                         {
                             /* Evidence-ordered redirect: every resolving
                                token contributes its relation plus the
@@ -1701,8 +1735,25 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                             {
                                 SYMBOL_ID crid = SymbolFind(graph->symbols,
                                     rel_cache[c_idx[c]].name);
-                                if (crid != SYMBOL_INVALID &&
-                                    TouchesInherited(graph, subj_id, crid))
+                                if (crid == SYMBOL_INVALID)
+                                    continue;
+                                /* Either end may hold the evidence (the
+                                   asked entity can stand left or right
+                                   of the triple), directly or by
+                                   ancestry on the subject side. */
+                                if (TouchesInherited(graph, subj_id, crid) ||
+                                    TouchesEither(graph, subj_id, crid))
+                                {
+                                    strcpy(best_rel,
+                                           rel_cache[c_idx[c]].name);
+                                    break;
+                                }
+                                SYMBOL_ID obj_id = SYMBOL_INVALID;
+                                if (q.object[0] != '\0')
+                                    obj_id = SymbolFind(graph->symbols,
+                                                        q.object);
+                                if (obj_id != SYMBOL_INVALID &&
+                                    TouchesEither(graph, obj_id, crid))
                                 {
                                     strcpy(best_rel,
                                            rel_cache[c_idx[c]].name);
@@ -2053,6 +2104,7 @@ int ParserAnswerQuestion(
                included. Read-only (defeasible conclusions never
                materialize), depth-capped, cycle-guarded by the visited
                set. No mentions anywhere keeps honest unknown. */
+            int walk_denied = 0;
             {
                 SYMBOL_ID es_id = SymbolFind(graph->symbols, "ES");
                 if (es_id != SYMBOL_INVALID)
@@ -2144,14 +2196,83 @@ int ParserAnswerQuestion(
                         out_answer[pos] = '\0';
                         return 1;
                     }
+                    /* No winners: denials alone do NOT answer yet. A
+                       reverse reading may still list (the denial was
+                       about this holder, the question may ask the
+                       other end). Defer to below. */
                     if (denied_only)
-                    {
-                        snprintf(out_answer, max_len, "%s",
-                                 LangString(I18N_NO, 0));
-                        out_answer[max_len - 1] = '\0';
-                        return 1;
-                    }
+                        walk_denied = 1;
                 }
+            }
+
+            /* Reverse QA, M7 (single-hole variables): nothing carries
+               the subject forward, but triples carry it as object
+               (WHO owns X = who stands left of X). The descriptor and
+               the bound entity already resolved; the hole is the
+               subject. Lists subjects, positives only, dispute-marked
+               exactly like slot answers. Reaching here means direct,
+               count, verification and walk found nothing: answering
+               the reverse is still evidence, never guessing. */
+            {
+                RELATION *rev[64];
+                uint32_t nr = RelationFindByObject(graph->relations,
+                                                   subj_id, rev, 64);
+                uint32_t pos = 0;
+                uint32_t listed = 0;
+                for (uint32_t r = 0; r < nr && listed < 32; r++)
+                {
+                    if (rev[r]->relation != rel_id ||
+                        rev[r]->polarity == POLARITY_NEGATIVE)
+                        continue;
+                    const SYMBOL *s = SymbolGet(graph->symbols,
+                                                rev[r]->subject);
+                    if (s == NULL)
+                        continue;
+                    if (listed > 0 && pos + 2 < max_len)
+                    {
+                        out_answer[pos++] = ',';
+                        out_answer[pos++] = ' ';
+                    }
+                    uint32_t name_len = (uint32_t)strlen(s->name);
+                    if (pos + name_len < max_len)
+                    {
+                        memcpy(out_answer + pos, s->name, name_len);
+                        pos += name_len;
+                    }
+                    RELATION *contra = RelationFindPolar(
+                        graph->relations, rev[r]->subject, rel_id,
+                        subj_id, POLARITY_NEGATIVE);
+                    if (contra != NULL)
+                    {
+                        char mark[64];
+                        snprintf(mark, sizeof(mark),
+                                 " [DISPUTED +%llu/-%llu]",
+                                 (unsigned long long)rev[r]->count,
+                                 (unsigned long long)contra->count);
+                        uint32_t mlen = (uint32_t)strlen(mark);
+                        if (pos + mlen < max_len)
+                        {
+                            memcpy(out_answer + pos, mark, mlen);
+                            pos += mlen;
+                        }
+                    }
+                    listed++;
+                }
+                if (listed > 0)
+                {
+                    out_answer[pos] = '\0';
+                    return 1;
+                }
+            }
+            /* Deferred denial: the walk found only denials and the
+               reverse found nothing listable. Answering No. here
+               (rather than unknown) is evidence, not guessing. */
+            if (walk_denied)
+            {
+                snprintf(out_answer, max_len, "%s",
+                         LangString(I18N_NO, 0));
+                out_answer[max_len - 1] = '\0';
+                return 1;
             }
         }
     }
