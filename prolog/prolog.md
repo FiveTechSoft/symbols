@@ -9148,3 +9148,42 @@ Verificación en clon: 30–42 completos + `preflight_project` PASS.
 
 ---
 
+# EXP43 — Open multi-abstraction corpus (sin fusión)
+
+## Lo que demuestra
+
+519 frases (seed 7), tres estructuras compartiendo personas:
+
+```text
+extracción P=R=1.00, hallucination=0
+reaches :- [visits,in] F1=0.89 · based :- [works_at,located,in] F1=0.78
+13/13 reach · 8/8 based · 15/15 retrieval · 2/2 unknown
+6/6 distractores (falsedad verificada en generador) → 48/48
+```
+
+Sin fusión: exactamente dos paths latentes, uno por skill; la tarea
+selecciona estructura (`reach` vs `based`) con proof propia aunque
+compartan persona (EXP41 en lenguaje natural). Transferencia tra en
+ambas skills.
+
+Hallazgo de motor (documentado, no tocado):
+`discover_composition/2` deja solo la última regla (retractall
+global); el runner conserva hallazgos en `found_rule/3` local.
+
+## Commit
+
+```text
+experiment43.pl + make_corpus_natural2.py + corpus_natural2/ (nuevos)
+natural_parse.pl (patrones works_at/located/based, aditivo)
+README.md (EXP43)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–43 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

@@ -1,0 +1,519 @@
+The weather is pleasant today.
+Pablo reaches Portugal.
+Tara reaches Italy.
+Marta is based in Italy.
+Tara reached Norway last year.
+Quinn reached Spain last year.
+Diego reaches Ireland.
+Children play outside.
+Pablo visited Dublin.
+Pablo later returned to Dublin.
+Pablo visits Dublin last year.
+Pablo later returned to Lisboa.
+Pablo visits Lisboa last year.
+Pablo arrived in Lisboa frequently.
+Pablo visits Madrid last year.
+Pablo arrived in Madrid frequently.
+Last week, pablo visited Madrid.
+Pablo owns a lantern.
+Last week, pablo owns a lantern.
+The lantern belongs to pablo.
+He has a paddle.
+Last week, pablo owns a paddle.
+Pablo has a paddle.
+The paddle belongs to pablo.
+Yesterday pablo works at Helvetia.
+Pablo works at Helvetia.
+Diego visited Quito.
+Diego later returned to Quito.
+Diego visits Quito every summer.
+Diego later returned to Dublin.
+Diego visits Dublin last year.
+Diego arrived in Dublin frequently.
+Diego visits Lisboa last year.
+Diego arrived in Lisboa frequently.
+Last week, diego visited Lisboa.
+Diego owns a camera.
+Last week, diego owns a camera.
+The camera belongs to diego.
+He has a kettle.
+Last week, diego owns a kettle.
+Diego has a kettle.
+The kettle belongs to diego.
+Yesterday diego works at Danubio.
+Diego works at Danubio.
+Rosa reached Norway last year.
+The wind blows strongly.
+Marta visited Roma.
+Marta later returned to Roma.
+Marta visits Roma frequently.
+Marta later returned to Lima.
+Marta visits Lima frequently.
+Marta arrived in Lima every summer.
+Marta visits Bern frequently.
+Marta arrived in Bern every summer.
+Last week, marta visited Bern.
+Marta owns a violin.
+Last week, marta owns a violin.
+The violin belongs to marta.
+She has a globe.
+Last week, marta owns a globe.
+Marta has a globe.
+The globe belongs to marta.
+Yesterday marta works at Electra.
+Marta works at Electra.
+Fabio reached Portugal last year.
+Irene reaches Grecia.
+Alba reached Peru last year.
+Fabio visited Dublin.
+Fabio later returned to Dublin.
+Fabio visits Dublin last year.
+Fabio later returned to Lisboa.
+Fabio visits Lisboa last year.
+Fabio arrived in Lisboa frequently.
+Fabio visits Madrid last year.
+Fabio arrived in Madrid frequently.
+Last week, fabio visited Madrid.
+Fabio owns a lantern.
+Last week, fabio owns a lantern.
+The lantern belongs to fabio.
+He has a paddle.
+Last week, fabio owns a paddle.
+Fabio has a paddle.
+The paddle belongs to fabio.
+Yesterday fabio works at Futura.
+Fabio works at Futura.
+Quinn visited Dublin.
+Quinn later returned to Dublin.
+Quinn visits Dublin last year.
+Quinn later returned to Lisboa.
+Quinn visits Lisboa last year.
+Quinn arrived in Lisboa frequently.
+Quinn visits Madrid last year.
+Quinn arrived in Madrid frequently.
+Last week, quinn visited Madrid.
+Quinn owns a globe.
+Last week, quinn owns a globe.
+The globe belongs to quinn.
+He has a book.
+Last week, quinn owns a book.
+Quinn has a book.
+The book belongs to quinn.
+Yesterday quinn works at Danubio.
+Quinn works at Danubio.
+Olga reaches Peru.
+Nils was based in Ireland last year.
+Jorge visited Madrid.
+Jorge later returned to Madrid.
+Jorge visits Madrid last year.
+Jorge later returned to Paris.
+Jorge visits Paris every summer.
+Jorge arrived in Paris last year.
+Jorge visits Quito every summer.
+Jorge arrived in Quito last year.
+Last week, jorge visited Quito.
+Jorge owns a paddle.
+Last week, jorge owns a paddle.
+The paddle belongs to jorge.
+He has a camera.
+Last week, jorge owns a camera.
+Jorge has a camera.
+The camera belongs to jorge.
+Yesterday jorge works at Borealis.
+Jorge works at Borealis.
+The garden blooms beautifully.
+Hugo reaches Portugal.
+Pablo was based in France last year.
+Nils reached Portugal last year.
+Marta reaches Switzerland.
+Jorge reached Ecuador last year.
+Rosa visited Bern.
+Rosa later returned to Bern.
+Rosa visits Bern last year.
+She visited Atenea.
+Rosa later returned to Atenea.
+Rosa visits Atenea every summer.
+Rosa arrived in Atenea frequently.
+Rosa visits Oslo last year.
+Rosa arrived in Oslo every summer.
+Today rosa visited Oslo.
+Rosa owns a kettle.
+Today rosa owns a kettle.
+The kettle belongs to rosa.
+Today rosa owns a tablet.
+Rosa has a tablet.
+The tablet belongs to rosa.
+Last week, rosa works at Electra.
+Rosa works at Electra.
+Alba reaches Italy.
+Elena reached Grecia last year.
+Rosa was based in Italy last year.
+The train arrives late.
+Sven reaches Spain.
+Sven is based in Ireland.
+Stars appear gradually.
+Nobody answered the phone.
+Vera reached Italy last year.
+Madrid is in Spain.
+Madrid lies in Spain.
+Oslo is in Norway.
+Oslo lies in Norway.
+Paris is in France.
+Paris lies in France.
+Roma is in Italy.
+Roma lies in Italy.
+Quito is in Ecuador.
+Quito lies in Ecuador.
+Lima is in Peru.
+Lima lies in Peru.
+Dublin is in Ireland.
+Dublin lies in Ireland.
+Bern is in Switzerland.
+Bern lies in Switzerland.
+Lisboa is in Portugal.
+Lisboa lies in Portugal.
+Atenea is in Grecia.
+Atenea lies in Grecia.
+Bruno was based in Ecuador last year.
+Elena visited Lima.
+Elena later returned to Lima.
+Elena visits Lima frequently.
+Elena later returned to Bern.
+Elena visits Bern frequently.
+Elena arrived in Bern every summer.
+Elena visits Atenea last year.
+Elena arrived in Atenea frequently.
+Last week, elena visited Atenea.
+Elena owns a compass.
+Last week, elena owns a compass.
+The compass belongs to elena.
+She has a mirror.
+Last week, elena owns a mirror.
+Elena has a mirror.
+The mirror belongs to elena.
+Yesterday elena works at Electra.
+Elena works at Electra.
+The moon shines brightly.
+Music fills the streets.
+Olga reached Switzerland last year.
+Thunder rumbles far away.
+Ugo visited Madrid.
+Ugo later returned to Madrid.
+Ugo visits Madrid frequently.
+Ugo later returned to Paris.
+Ugo visits Paris last year.
+Ugo arrived in Paris last year.
+Ugo visits Quito last year.
+Ugo arrived in Quito last year.
+Yesterday ugo visited Quito.
+Ugo owns a book.
+Yesterday ugo owns a book.
+The book belongs to ugo.
+He has a compass.
+Yesterday ugo owns a compass.
+Ugo has a compass.
+The compass belongs to ugo.
+Today ugo works at Helvetia.
+Ugo works at Helvetia.
+Carla reached Peru last year.
+Hugo reached France last year.
+Sven visited Lisboa.
+Sven later returned to Lisboa.
+Sven visits Lisboa every summer.
+He visited Madrid.
+Sven later returned to Madrid.
+Sven visits Madrid every summer.
+Sven arrived in Madrid frequently.
+Sven visits Paris frequently.
+Sven arrived in Paris last year.
+Today sven visited Paris.
+Sven owns a mirror.
+Today sven owns a mirror.
+The mirror belongs to sven.
+Today sven owns a violin.
+Sven has a violin.
+The violin belongs to sven.
+Last week, sven works at Futura.
+Sven works at Futura.
+Pablo reached Spain last year.
+Bruno reached Ireland last year.
+Irene is based in Norway.
+Marta reaches Italy.
+Coffee tastes better today.
+Marta reached Peru last year.
+Hugo visited Lisboa.
+Hugo later returned to Lisboa.
+Hugo visits Lisboa every summer.
+He visited Madrid.
+Hugo later returned to Madrid.
+Hugo visits Madrid every summer.
+Hugo arrived in Madrid frequently.
+Hugo visits Paris frequently.
+Hugo arrived in Paris last year.
+Today hugo visited Paris.
+Hugo owns a kettle.
+Today hugo owns a kettle.
+The kettle belongs to hugo.
+Today hugo owns a tablet.
+Hugo has a tablet.
+The tablet belongs to hugo.
+Last week, hugo works at Helvetia.
+Hugo works at Helvetia.
+Leo was based in Spain last year.
+Rosa reaches Grecia.
+Tara reaches Grecia.
+Quinn is based in Spain.
+Kira visited Oslo.
+Kira later returned to Oslo.
+Kira visits Oslo last year.
+She visited Roma.
+Kira later returned to Roma.
+Kira visits Roma last year.
+Kira arrived in Roma every summer.
+Kira visits Lima last year.
+Kira arrived in Lima every summer.
+Today kira visited Lima.
+Kira owns a book.
+Today kira owns a book.
+The book belongs to kira.
+Today kira owns a compass.
+Kira has a compass.
+The compass belongs to kira.
+Last week, kira works at Civica.
+Kira works at Civica.
+Fabio reaches Ireland.
+Jorge reaches France.
+The river flows calmly.
+Olga reaches Grecia.
+Nils visited Quito.
+Nils later returned to Quito.
+Nils visits Quito frequently.
+He visited Dublin.
+Nils later returned to Dublin.
+Nils visits Dublin every summer.
+Nils arrived in Dublin frequently.
+Nils visits Lisboa every summer.
+Nils arrived in Lisboa frequently.
+Today nils visited Lisboa.
+Nils owns a camera.
+Today nils owns a camera.
+The camera belongs to nils.
+Today nils owns a kettle.
+Nils has a kettle.
+The kettle belongs to nils.
+Last week, nils works at Futura.
+Nils works at Futura.
+Jorge was based in Ecuador last year.
+Pablo reached Ireland last year.
+Birds sing every morning.
+Tea cools on the table.
+Alba is based in Norway.
+Greta reaches Grecia.
+Greta reached Norway last year.
+Waves crash against the rocks.
+Elena reaches Peru.
+Kira reaches Norway.
+Irene reached Norway last year.
+Snow covers the mountains.
+Ugo reached Ecuador last year.
+Leo reached France last year.
+Greta visited Bern.
+Greta later returned to Bern.
+Greta visits Bern frequently.
+Greta later returned to Atenea.
+Greta visits Atenea last year.
+Greta arrived in Atenea frequently.
+Greta visits Oslo frequently.
+Greta arrived in Oslo every summer.
+Last week, greta visited Oslo.
+Greta owns a globe.
+Last week, greta owns a globe.
+The globe belongs to greta.
+She has a book.
+Last week, greta owns a book.
+Greta has a book.
+The book belongs to greta.
+Yesterday greta works at Granito.
+Greta works at Granito.
+Kira reaches Peru.
+Irene visited Atenea.
+Irene later returned to Atenea.
+Irene visits Atenea last year.
+Irene later returned to Oslo.
+Irene visits Oslo frequently.
+Irene arrived in Oslo every summer.
+Irene visits Roma frequently.
+Irene arrived in Roma every summer.
+Last week, irene visited Roma.
+Irene owns a mirror.
+Last week, irene owns a mirror.
+The mirror belongs to irene.
+She has a violin.
+Last week, irene owns a violin.
+Irene has a violin.
+The violin belongs to irene.
+Yesterday irene works at Acme.
+Irene works at Acme.
+Bruno reaches France.
+It rains frequently.
+Nils reaches Ireland.
+Quinn reaches Portugal.
+Ugo reached Spain last year.
+Alba visited Oslo.
+Alba later returned to Oslo.
+Alba visits Oslo last year.
+She visited Roma.
+Alba later returned to Roma.
+Alba visits Roma last year.
+Alba arrived in Roma every summer.
+Alba visits Lima last year.
+Alba arrived in Lima every summer.
+Today alba visited Lima.
+Alba owns a book.
+Today alba owns a book.
+The book belongs to alba.
+Today alba owns a compass.
+Alba has a compass.
+The compass belongs to alba.
+Last week, alba works at Acme.
+Alba works at Acme.
+Acme is located in Oslo.
+Acme was located in Oslo.
+Borealis is located in Quito.
+Borealis was located in Quito.
+Civica is located in Bern.
+Civica was located in Bern.
+Danubio is located in Madrid.
+Danubio was located in Madrid.
+Electra is located in Roma.
+Electra was located in Roma.
+Futura is located in Dublin.
+Futura was located in Dublin.
+Granito is located in Atenea.
+Granito was located in Atenea.
+Helvetia is located in Paris.
+Helvetia was located in Paris.
+Olga is based in Grecia.
+Sven reached France last year.
+The city never sleeps.
+Ugo reaches France.
+Leo visited Paris.
+Leo later returned to Paris.
+Leo visits Paris last year.
+Leo later returned to Quito.
+Leo visits Quito last year.
+Leo arrived in Quito last year.
+Leo visits Dublin frequently.
+Leo arrived in Dublin frequently.
+Yesterday leo visited Dublin.
+Leo owns a tablet.
+Yesterday leo owns a tablet.
+The tablet belongs to leo.
+He has a lantern.
+Yesterday leo owns a lantern.
+Leo has a lantern.
+The lantern belongs to leo.
+Today leo works at Danubio.
+Leo works at Danubio.
+Kira reached Italy last year.
+Bruno visited Paris.
+Bruno later returned to Paris.
+Bruno visits Paris every summer.
+Bruno later returned to Quito.
+Bruno visits Quito every summer.
+Bruno arrived in Quito last year.
+Bruno visits Dublin last year.
+Bruno arrived in Dublin frequently.
+Last week, bruno visited Dublin.
+Bruno owns a tablet.
+Last week, bruno owns a tablet.
+The tablet belongs to bruno.
+He has a lantern.
+Last week, bruno owns a lantern.
+Bruno has a lantern.
+The lantern belongs to bruno.
+Yesterday bruno works at Borealis.
+Bruno works at Borealis.
+Diego reached Portugal last year.
+Traffic moves slowly today.
+Carla visited Roma.
+Carla later returned to Roma.
+Carla visits Roma frequently.
+Carla later returned to Lima.
+Carla visits Lima frequently.
+Carla arrived in Lima every summer.
+Carla visits Bern frequently.
+Carla arrived in Bern every summer.
+Last week, carla visited Bern.
+Carla owns a violin.
+Last week, carla owns a violin.
+The violin belongs to carla.
+She has a globe.
+Last week, carla owns a globe.
+Carla has a globe.
+The globe belongs to carla.
+Yesterday carla works at Civica.
+Carla works at Civica.
+Kira is based in Switzerland.
+Olga visited Lima.
+Olga later returned to Lima.
+Olga visits Lima last year.
+She visited Bern.
+Olga later returned to Bern.
+Olga visits Bern last year.
+Olga arrived in Bern every summer.
+Olga visits Atenea every summer.
+Olga arrived in Atenea frequently.
+Today olga visited Atenea.
+Olga owns a compass.
+Today olga owns a compass.
+The compass belongs to olga.
+Today olga owns a mirror.
+Olga has a mirror.
+The mirror belongs to olga.
+Last week, olga works at Granito.
+Olga works at Granito.
+Vera was based in Norway last year.
+Vera visited Oslo.
+Vera later returned to Oslo.
+Vera visits Oslo last year.
+She visited Roma.
+Vera later returned to Roma.
+Vera visits Roma last year.
+Vera arrived in Roma every summer.
+Vera visits Lima last year.
+Vera arrived in Lima every summer.
+Today vera visited Lima.
+Vera owns a tablet.
+Today vera owns a tablet.
+The tablet belongs to vera.
+Today vera owns a lantern.
+Vera has a lantern.
+The lantern belongs to vera.
+Last week, vera works at Acme.
+Vera works at Acme.
+Carla reaches Italy.
+Vera reaches Norway.
+Leo reaches Ecuador.
+Tara visited Atenea.
+Tara later returned to Atenea.
+Tara visits Atenea every summer.
+She visited Oslo.
+Tara later returned to Oslo.
+Tara visits Oslo last year.
+Tara arrived in Oslo every summer.
+Tara visits Roma last year.
+Tara arrived in Roma every summer.
+Today tara visited Roma.
+Tara owns a paddle.
+Today tara owns a paddle.
+The paddle belongs to tara.
+Today tara owns a camera.
+Tara has a camera.
+The camera belongs to tara.
+Last week, tara works at Granito.
+Tara works at Granito.
+Leo reached Ireland last year.
+Vera reaches Peru.
+Nils reached Ecuador last year.
+Time passes quickly.

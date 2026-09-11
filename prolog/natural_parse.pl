@@ -99,6 +99,21 @@ parse_pat([P0, reached, K0], (P, reaches, K)) :-
     resolve_subj(P0, P), resolve_obj(K0, K).
 parse_pat([P0, reach, K0], (P, reaches, K)) :-
     resolve_subj(P0, P), resolve_obj(K0, K).
+% [P works|worked at G] (corpus v0.2; distinto de works_in)
+parse_pat([P0, works, at, G0], (P, works_at, G)) :-
+    resolve_subj(P0, P), resolve_obj(G0, G).
+parse_pat([P0, worked, at, G0], (P, works_at, G)) :-
+    resolve_subj(P0, P), resolve_obj(G0, G).
+% [G is|was located in C]
+parse_pat([G0, is, located, in, C0], (G, located, C)) :-
+    resolve_subj(G0, G), resolve_obj(C0, C).
+parse_pat([G0, was, located, in, C0], (G, located, C)) :-
+    resolve_subj(G0, G), resolve_obj(C0, C).
+% [P is|was based in K] (conclusion observada del 2o objetivo latente)
+parse_pat([P0, is, based, in, K0], (P, based, K)) :-
+    resolve_subj(P0, P), resolve_obj(K0, K).
+parse_pat([P0, was, based, in, K0], (P, based, K)) :-
+    resolve_subj(P0, P), resolve_obj(K0, K).
 % [O belongs to P]
 parse_pat([O0, belongs, to, P0], (O, belongs_to, P)) :-
     resolve_obj(O0, O), resolve_subj(P0, P).
