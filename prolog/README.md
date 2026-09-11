@@ -43,6 +43,7 @@ swipl -s experiment23.pl -g experiment23 -t halt
 swipl -s experiment24.pl -g experiment24 -t halt
 swipl -s experiment25.pl -g experiment25 -t halt
 swipl -s experiment26.pl -g experiment26 -t halt
+swipl -s experiment27.pl -g experiment27 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -78,6 +79,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 24 | Composición jerárquica: reglas como unidades (340 vs 16 evals, mismas predicciones) | 3/3; skill library `r3`, `r6` |
 | 25 | Composición profunda 3 niveles (340 vs 20 evals, mismas predicciones) | 3/3; skills `r3`, `r7` |
 | 26 | Skills persistentes sin hechos; transferencia a entidades nuevas | 10/10; `r9` se ejecuta sin `constrained` ni inducción |
+| 27 | Clases emergentes sin declarar + herencia de skills (0 tipos) | 12/12; `obj6/obj8` heredan `reaches`, `obj7` no |
 
 ## Arquitectura emergente
 
