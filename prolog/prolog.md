@@ -9315,3 +9315,38 @@ Verificación en clon: 30–46 completos + `preflight_project` PASS.
 
 ---
 
+# EXP47 — Transfer during conversation (EXP44 + EXP46)
+
+## Lo que demuestra
+
+Ontología B contada en diálogo (`keeps/tours` + `resides_in`,
+superficies nuevas): mapa de 3 pares inducido mid-diálogo
+(`belongs_to↔held_by, owns↔keeps, visits↔tours`, nada dado);
+`stored(tablet,paris)` y `stored(tablet,rome)` predichos DE
+INMEDIATO con prueba de transferencia; Londres → UNKNOWN con
+razón; `resides_in` posterior no interfiere; corpus intacto.
+`passed 15/15` + preflight PASS.
+
+Dos lecciones: `say_proof` ahora genérico (las pruebas anidadas
+rompían el verbalizador cerrado) y la estructura-pregunta se
+descubre alrededor de la consulta (`struct_sse_m`), no de un
+`struct_def` fijado — la transferencia sigue a lo contado.
+
+## Commit
+
+```text
+experiment47.pl (nuevo; ningún módulo tocado)
+conversation.pl (say_proof genérico, aditivo; EXP45 sigue 16/16)
+natural_parse.pl (+resides_in, aditivo)
+README.md (EXP47)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–47 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

@@ -163,6 +163,10 @@ parse_pat([D0, needs, I0], (D, needs, I)) :-
     resolve_subj(D0, D), resolve_obj(I0, I).
 parse_pat([D0, needed, I0], (D, needs, I)) :-
     resolve_subj(D0, D), resolve_obj(I0, I).
+% [P resides in C] (EXP47: superficie B, SIN normalizar a lives_in;
+% el mapa lo induce el motor por roles estructurales)
+parse_pat([P0, resides, in, C0], (P, resides_in, C)) :-
+    resolve_subj(P0, P), resolve_obj(C0, C).
 % [O belongs to P]
 parse_pat([O0, belongs, to, P0], (O, belongs_to, P)) :-
     resolve_obj(O0, O), resolve_subj(P0, P).

@@ -78,6 +78,7 @@ swipl -s experiment44.pl -g experiment44 -t halt
 python3 make_corpus_natural3.py   # regenera corpus_natural3/* (seed 11)
 swipl -s conversation.pl -g conversation_demo -t halt
 swipl -s experiment46.pl -g dialogue46 -t halt
+swipl -s experiment47.pl -g dialogue47 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -134,6 +135,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP44 | Cruce de superficies (mapa A↔B por roles, nada dado) | 39/39; 10+10 joins, mapa de 5 pares, proofs trans-ontología |
 | EXP45 | Chat simbólico (pregunta→prueba→respuesta verbalizada) | 16/16; sí/no/quién/dónde/why, UNKNOWN con razón |
 | EXP46 | Memoria conversacional (`tell` alimenta abstracciones) | 14/14; multi-turno, `reach` sobre lo contado, UNKNOWN |
+| EXP47 | Transferencia en diálogo (ontología nueva contada, mapa, uso) | 15/15; `stored` inmediato, UNKNOWN Londres, sin interferencia |
 
 ## Arquitectura emergente
 
@@ -306,6 +308,10 @@ skills compuestas con prueba composicional, sin volver a hechos).
 - `experiment46.pl` — EXP46: `tell/1` multi-turno sobre el corpus;
   lo contado alimenta reglas descubiertas (`reach` sobre visitas
   nuevas); ciclo experiencia→memoria→respuesta→experiencia.
+- `experiment47.pl` — EXP47: ontología B contada en diálogo
+  (`keeps/tours` + `resides_in`); mapa inducido mid-diálogo;
+  `stored` predicho de inmediato (París y Roma), Londres UNKNOWN;
+  `say_proof` genérico para pruebas anidadas.
 - `preflight.pl` — incluye regla de asserts anidados (EXP45:
   `found_rule/2` en rama `->` vs `dynamic /3`); sin falsos
   positivos en `remember_relation/3+4`.

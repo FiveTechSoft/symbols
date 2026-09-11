@@ -251,6 +251,25 @@ say_proof([Single]) :- !,
     writeln('Confidence: 1.00').
 say_proof([]) :-
     writeln('Confidence: 1.00').
+% fallback generico (EXP47): pruebas anidadas/compuestas se recorren
+% paso a paso; los pasos conocidos se verbalizan, el resto se muestra.
+say_proof(Proof) :-
+    is_list(Proof), !,
+    forall(member(St, Proof), say_step(St)),
+    writeln('Confidence: 1.00').
+
+say_step(rule(R, Path)) :- !,
+    format('Rule: ~w :- ~w.~n', [R, Path]).
+say_step(map(Pairs)) :- !,
+    format('Transfer: ~w.~n', [Pairs]).
+say_step(reuse(C, S)) :- !,
+    format('Reuse concept ~w at ~w.~n', [C, S]).
+say_step(member(S, C)) :- !,
+    format('Member ~w of ~w.~n', [S, C]).
+say_step((S, R, O)) :- !,
+    format('~w ~w ~w.~n', [S, R, O]).
+say_step(Other) :-
+    format('~w.~n', [Other]).
 
 say_fact((S, R, O)) :- !,
     format('~w ~w ~w.~n', [S, R, O]).
