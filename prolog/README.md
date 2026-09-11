@@ -63,6 +63,7 @@ swipl -s experiment31.pl -g experiment31 -t halt
 swipl -s experiment32.pl -g experiment32 -t halt
 swipl -s experiment33.pl -g experiment33 -t halt
 swipl -s experiment34.pl -g experiment34 -t halt
+swipl -s experiment35.pl -g experiment35 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -107,6 +108,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP32 | Embeddings simbólicos (firmas WL sin etiquetas, 3 vocabularios) | 8/8; clases absorbentes + similitud explicada |
 | EXP33 | POO emergente: clase→comportamiento heredado (identidad≠pertenencia) | 10/10; `zorin/velara` heredan, `wex` UNKNOWN |
 | EXP34 | Separación estructura/comportamiento (mismo dato, veredictos opuestos) | 9/9; sin `reaches`: identidad exacta de 5 |
+| EXP35 | SSE por tarea (un objeto, 3 firmas auditadas, 0 fuga) | 12/12; firmas distintas + respuestas correctas |
 
 ## Arquitectura emergente
 
