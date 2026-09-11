@@ -18,6 +18,8 @@ parse_question(Sentence, q_yn(X, lives_in, Y)) :-
     tokenize_en(Sentence, [does, X, live, in, Y]), !.
 parse_question(Sentence, q_yn(X, visits, Y)) :-
     tokenize_en(Sentence, [does, X, visit, Y]), !.
+parse_question(Sentence, q_yn(X, reaches, Y)) :-
+    tokenize_en(Sentence, [does, X, reach, Y]), !.
 parse_question(Sentence, q_why(X, reaches, Y)) :-
     tokenize_en(Sentence, [why, does, X, reach, Y]), !.
 
