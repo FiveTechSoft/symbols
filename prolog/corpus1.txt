@@ -1,0 +1,150 @@
+lina visits roma.
+roma is in italy.
+lina reaches italy.
+lina eats bread.
+mario visited paris.
+paris lies in france.
+mario has reached france.
+mario ate cheese.
+yesterday sofia visited madrid.
+madrid was in spain.
+sofia reaches spain.
+sofia eats rice.
+today anna visits oslo.
+oslo is in norway.
+anna ate apple.
+paul visits quito.
+quito lies in ecuador.
+paul reaches ecuador.
+paul eats fish.
+elena visited lima.
+lima was in peru.
+elena has reached peru.
+elena ate meat.
+yesterday ruth visited dublin.
+dublin is in ireland.
+ruth reaches ireland.
+ruth eats soup.
+today ivan visits bern.
+bern lies in switzerland.
+ivan ate salad.
+zorin visits velara.
+velara was in italy.
+zorin reaches italy.
+zorin eats bread.
+kadir visited quis.
+quis is in france.
+kadir has reached france.
+kadir ate cheese.
+yesterday wex visited tormo.
+tormo lies in spain.
+wex reaches spain.
+wex eats rice.
+today nuru visits sarina.
+sarina was in norway.
+nuru ate apple.
+tavio visits belgrado.
+belgrado is in ecuador.
+tavio reaches ecuador.
+tavio eats fish.
+sella visited caspia.
+caspia lies in peru.
+sella has reached peru.
+sella ate meat.
+yesterday brizio visited dornas.
+dornas was in ireland.
+brizio reaches ireland.
+brizio eats soup.
+today kama visits elmira.
+elmira is in switzerland.
+kama ate salad.
+dulio visits faro.
+faro lies in italy.
+dulio reaches italy.
+dulio eats bread.
+femia visited gandia.
+gandia was in france.
+femia has reached france.
+femia ate cheese.
+yesterday giras visited halvar.
+halvar is in spain.
+giras reaches spain.
+giras eats rice.
+today helmo visits ibiza.
+ibiza lies in norway.
+helmo ate apple.
+irsa visits jaca.
+jaca was in ecuador.
+irsa reaches ecuador.
+irsa eats fish.
+jovito visited karlov.
+karlov is in peru.
+jovito has reached peru.
+jovito ate meat.
+yesterday klen visited leiria.
+leiria lies in ireland.
+klen reaches ireland.
+klen eats soup.
+today luria visits mostar.
+mostar was in switzerland.
+luria ate salad.
+mavro visits narva.
+narva is in italy.
+mavro reaches italy.
+mavro eats bread.
+nesli visited ourense.
+ourense lies in france.
+nesli has reached france.
+nesli ate cheese.
+yesterday otman visited palamos.
+palamos was in spain.
+otman reaches spain.
+otman eats rice.
+today pavia visits quero.
+quero is in norway.
+pavia ate apple.
+quilo visits ribera.
+ribera lies in ecuador.
+quilo reaches ecuador.
+quilo eats fish.
+ravia visited soria.
+soria was in peru.
+ravia has reached peru.
+ravia ate meat.
+yesterday selmo visited teruel.
+teruel is in ireland.
+selmo reaches ireland.
+selmo eats soup.
+today taria visits ubeda.
+ubeda lies in switzerland.
+taria ate salad.
+ulixes visits vilalba.
+vilalba was in italy.
+ulixes reaches italy.
+ulixes eats bread.
+varna visited xativa.
+xativa is in france.
+varna has reached france.
+varna ate cheese.
+yesterday woldo visited yecla.
+yecla lies in spain.
+woldo reaches spain.
+woldo eats rice.
+today xenia visits zambrana.
+zambrana was in norway.
+xenia ate apple.
+yarimo visits alaro.
+alaro is in ecuador.
+yarimo reaches ecuador.
+yarimo eats fish.
+zelda visited benissa.
+benissa lies in peru.
+zelda has reached peru.
+zelda ate meat.
+yesterday barto visited calella.
+calella was in ireland.
+barto reaches ireland.
+barto eats soup.
+today corin visits denia.
+denia is in switzerland.
+corin ate salad.

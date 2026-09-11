@@ -1,0 +1,10 @@
+heldout(anna, norway).
+heldout(ivan, switzerland).
+heldout(nuru, norway).
+heldout(kama, switzerland).
+heldout(helmo, norway).
+heldout(luria, switzerland).
+heldout(pavia, norway).
+heldout(taria, switzerland).
+heldout(xenia, norway).
+heldout(corin, switzerland).

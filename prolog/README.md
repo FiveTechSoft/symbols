@@ -46,6 +46,15 @@ swipl -s experiment26.pl -g experiment26 -t halt
 swipl -s experiment27.pl -g experiment27 -t halt
 ```
 
+Ritual pre-vuelo (estático, sin ejecutar) y corpus:
+
+```sh
+swipl -s preflight.pl -g "preflight('experiment19.pl')" -t halt
+swipl -s preflight.pl -g "preflight_project('.')" -t halt
+swipl -s run_corpus1.pl -g main -t halt
+python3 make_corpus1.py   # regenera corpus1.txt + heldout1.pl (semilla fija)
+```
+
 Cada experimento arranca con memoria vacía, carga solo sus módulos
 explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive.
 
@@ -80,6 +89,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 25 | Composición profunda 3 niveles (340 vs 20 evals, mismas predicciones) | 3/3; skills `r3`, `r7` |
 | 26 | Skills persistentes sin hechos; transferencia a entidades nuevas | 10/10; `r9` se ejecuta sin `constrained` ni inducción |
 | 27 | Clases emergentes sin declarar + herencia de skills (0 tipos) | 12/12; `obj6/obj8` heredan `reaches`, `obj7` no |
+| 28 | Corpus v0.1: ingesta separada + ciclo + Corpus 1 (150 frases EN) | 21/21; 150/150 hechos, held-out 10/10 razonado |
 
 ## Arquitectura emergente
 
@@ -128,6 +138,13 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   (podas sólidas: un patrón con soporte>0 nunca se poda).
 - `hierarchical.pl` — biblioteca de skills: reglas como unidades de
   búsqueda sin expandir sus internos.
+- `corpus.pl` — sistema v0.1: `learn_sentence/file/corpus`,
+  `learn_cycle(Targets)`, `ask/why`, `save/load_knowledge`,
+  `knowledge_stats` (ingesta separada del aprendizaje).
+- `preflight.pl` — ritual estático: sintaxis, aridad, dinámicas,
+  indefinidas, consults; más `preflight_project/1` (unión del proyecto).
+- `run_corpus1.pl` + `corpus1.txt` + `heldout1.pl` + `make_corpus1.py` —
+  Corpus 1 piloto (150 frases, 10 held-out; `longterm_c1.pl` generado).
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
@@ -146,6 +163,19 @@ abierto de verdad (palabras nuevas fuera del lexicón no parsean);
 longitudes de camino acotadas (cota 3–4 por coste combinatorio);
 funcionalidad y completitud descritas por escenario (mundo parcialmente
 observado puede subdeterminar veredictos).
+
+## Corpus 1 (piloto, 150 frases EN)
+
+```text
+BEFORE:      0 hechos, 0 símbolos
+ingesta:     150/150 hechos (cobertura total, 0 rechazadas)
+AFTER:       150 hechos, 96 símbolos, 64 unknowns, 4 conceptos, 5 reglas
+held-out:    10/10 razonado (nunca en corpus) + 10 distractores TN
+```
+
+Escala honesta: la rejilla de composición crece cuadráticamente con las
+entidades; el piloto valida el bucle end-to-end (el Corpus 2 usará la
+maquinaria guiada de EXP23 para escalar).
 
 ## Regla de módulos (pagada con sangre)
 
