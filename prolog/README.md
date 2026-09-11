@@ -123,6 +123,36 @@ Capas de conocimiento: `L0` hechos, `L1` reglas, `L2` meta-reglas,
 Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
 `STRUCTURAL EQUIVALENCE`, `RELATIONAL KNOWLEDGE`.
 
+Checkpoint pre-EXP36 (secuencia conceptual cerrada EXP30–35):
+
+```text
+TEXT
+ ↓
+SYMBOLS
+ ↓
+GRAPH
+ ↓
+ROLES
+ ↓
+OBJECTS
+ ↓
+SSE
+ ↓
+CLASSES
+ ↓
+SKILLS
+ ↓
+TASK-CONDITIONED SSE
+ ↓
+INFERENCE
+ ↓
+PROOF
+```
+
+`SSE(object)` distingue de `SSE(object | task)`: la segunda se
+construye excluyendo explícitamente la variable objetivo
+(principio de exclusión evidencial, EXP34–35).
+
 ## Principios verificados (con refs)
 
 - **Rehusar es válido**: `ambiguous` (EXP7), `REFUSED r7` (EXP10),
@@ -138,6 +168,11 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   reconstrucción exacta de 10 tripletas).
 - **Reglas autónomas**: disparan en memoria cruda sin sus conceptos de
   origen (EXP8 `nora`, EXP10 `xilo`).
+- **Exclusión evidencial**: la representación empleada para inferir una
+  propiedad debe construirse sin utilizar evidencia de esa misma
+  propiedad (`sse_excluding/3` lo garantiza por construcción, no por
+  disciplina: EXP34 separa estructura/comportamiento, EXP35 una firma
+  distinta por tarea con cero fuga).
 
 ## Mapa de ficheros
 
@@ -177,6 +212,14 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
 - `experiment30.pl` + `make_corpusA.py` + `corpusA/` + `secret/` +
   `heldoutA.pl` + `distractorA.pl` — primer corpus natural con parser
   posicional y test secreto temporal (retrieve/reason/unknown).
+- `experiment33.pl` — POO emergente: clases por SSE, skill `reaches`
+  adherida a CLASS_A y heredada por objetos nuevos (`wex` → UNKNOWN).
+- `experiment34.pl` — separación estructura/comportamiento: misma
+  evidencia, dos regímenes de firma (con/sin `reaches`); el SSE
+  representa lo sabido ANTES de la inferencia a predecir.
+- `experiment35.pl` — SSE por tarea (`sse_excluding/3`): un objeto, una
+  firma distinta por objetivo, cero átomos, sin fuga; `reaches` sale
+  por regla con prueba, no por la firma.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
