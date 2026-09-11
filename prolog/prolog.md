@@ -9350,3 +9350,41 @@ Verificación en clon: 30–47 completos + `preflight_project` PASS.
 
 ---
 
+# EXP48 — Bidirectional dialogue (el modelo pregunta)
+
+## Lo que demuestra
+
+Tras `Pierre tours Paris`, el modelo detecta supply parcial y
+SONDEA (hipótesis en vocabulario A, nunca visto en B):
+
+```text
+Model: What does pierre own?
+User: He keeps a tablet. → Learned (encaje estructural).
+Model: Does tablet belong to pierre?
+User: The tablet is held by Pierre. → Learned.
+mapa: belongs_to↔held_by, owns↔keeps, visits↔tours (nada dado)
+stored(tablet,paris) con prueba de transferencia.
+Londres → UNKNOWN con razón. Corpus intacto. passed 14/14.
+```
+
+Iniciativa + hipótesis + aceptación estructural + alineamiento =
+construcción activa de conocimiento en diálogo. Lección: la sonda
+del backlink debe ser local al par (el objeto tiene aristas en el
+corpus global).
+
+## Commit
+
+```text
+experiment48.pl (nuevo; ningún módulo tocado)
+README.md (EXP48)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–48 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
