@@ -9187,3 +9187,46 @@ Verificación en clon: 30–43 completos + `preflight_project` PASS.
 
 ---
 
+# EXP44-A — Cross-surface role mapping (EXP39 en corpus)
+
+## Lo que demuestra
+
+495 frases (seed 11), dos familias disjuntas; B sin conclusiones:
+
+```text
+extracción P=R=1.00, hallucination=0
+reaches/serves nativos F1=1.00 (familias separadas por entidades)
+10+10 joins B por firma, cero vocabulario compartido
+mapa de 5 pares inducido por roles, nada dado:
+  belongs_to↔held_by, visits↔tours, owns↔keeps,
+  cooks↔prepares, needs↔requires
+stored/offers predichos con prueba trans-ontología
+  (nativa + mapa + cadena B) → passed 39/39
+```
+
+Separación preservada: el parser produce superficies
+(`keeps`, `tours`, ...) y el MOTOR descubre equivalencias por
+roles. Nombres ≠ función estructural ≠ skill operacional.
+
+Lección metodológica: `expected/5` vs `expected/6` se saltaba en
+silencio bajo `forall` (2 unknowns sin ejecutar); guardia que
+cuenta queries ejecutadas + aridad uniforme. Preflight cazó además
+`struct_sig/2` vs `/3` antes del commit.
+
+## Commit
+
+```text
+experiment44.pl + make_corpus_natural3.py + corpus_natural3/ (nuevos)
+natural_parse.pl (+cooks/needs, +familia B, aditivo; EXP42 sigue 36/36)
+README.md (EXP44)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–44 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

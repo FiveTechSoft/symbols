@@ -114,6 +114,55 @@ parse_pat([P0, is, based, in, K0], (P, based, K)) :-
     resolve_subj(P0, P), resolve_obj(K0, K).
 parse_pat([P0, was, based, in, K0], (P, based, K)) :-
     resolve_subj(P0, P), resolve_obj(K0, K).
+% --- familia B, corpus v0.3 (EXP44-A): superficie disjunta, SIN
+% normalizar contra la familia A. El mapa lo induce el motor por roles.
+% [P keeps|kept O]
+parse_pat([P0, keeps, O0], (P, keeps, O)) :-
+    resolve_subj(P0, P), resolve_obj(O0, O).
+parse_pat([P0, kept, O0], (P, keeps, O)) :-
+    resolve_subj(P0, P), resolve_obj(O0, O).
+% [O is|was held by P]
+parse_pat([O0, is, held, by, P0], (O, held_by, P)) :-
+    resolve_obj(O0, O), resolve_subj(P0, P).
+parse_pat([O0, was, held, by, P0], (O, held_by, P)) :-
+    resolve_obj(O0, O), resolve_subj(P0, P).
+% [P tours|toured C] + [P came back to C]
+parse_pat([P0, tours, C0], (P, tours, C)) :-
+    resolve_subj(P0, P), resolve_obj(C0, C).
+parse_pat([P0, toured, C0], (P, tours, C)) :-
+    resolve_subj(P0, P), resolve_obj(C0, C).
+parse_pat([P0, came, back, to, C0], (P, tours, C)) :-
+    resolve_subj(P0, P), resolve_obj(C0, C).
+% [O is|was stored in C] (conclusion B, jamas observada: solo queries)
+parse_pat([O0, is, stored, in, C0], (O, stored, C)) :-
+    resolve_obj(O0, O), resolve_subj(C0, C).
+parse_pat([O0, was, stored, in, C0], (O, stored, C)) :-
+    resolve_obj(O0, O), resolve_subj(C0, C).
+% [P prepares|prepared D]
+parse_pat([P0, prepares, D0], (P, prepares, D)) :-
+    resolve_subj(P0, P), resolve_obj(D0, D).
+parse_pat([P0, prepared, D0], (P, prepares, D)) :-
+    resolve_subj(P0, P), resolve_obj(D0, D).
+% [D requires|required I]
+parse_pat([D0, requires, I0], (D, requires, I)) :-
+    resolve_subj(D0, D), resolve_obj(I0, I).
+parse_pat([D0, required, I0], (D, requires, I)) :-
+    resolve_subj(D0, D), resolve_obj(I0, I).
+% [P serves|offers I] (conclusiones observadas en A / ocultas en B)
+parse_pat([P0, serves, I0], (P, serves, I)) :-
+    resolve_subj(P0, P), resolve_obj(I0, I).
+parse_pat([P0, offers, I0], (P, offers, I)) :-
+    resolve_subj(P0, P), resolve_obj(I0, I).
+% [P cooks|cooked D]
+parse_pat([P0, cooks, D0], (P, cooks, D)) :-
+    resolve_subj(P0, P), resolve_obj(D0, D).
+parse_pat([P0, cooked, D0], (P, cooks, D)) :-
+    resolve_subj(P0, P), resolve_obj(D0, D).
+% [D needs|needed I]
+parse_pat([D0, needs, I0], (D, needs, I)) :-
+    resolve_subj(D0, D), resolve_obj(I0, I).
+parse_pat([D0, needed, I0], (D, needs, I)) :-
+    resolve_subj(D0, D), resolve_obj(I0, I).
 % [O belongs to P]
 parse_pat([O0, belongs, to, P0], (O, belongs_to, P)) :-
     resolve_obj(O0, O), resolve_subj(P0, P).
