@@ -67,6 +67,7 @@ swipl -s experiment35.pl -g experiment35 -t halt
 swipl -s experiment36.pl -g experiment36 -t halt
 swipl -s experiment37.pl -g experiment37 -t halt
 swipl -s experiment38.pl -g experiment38 -t halt
+swipl -s experiment39.pl -g experiment39 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -115,6 +116,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP36 | SSE de estructuras (transferencia estructural + regla `findall`) | 12/12; estructura→concepto→skill en vocabulario nuevo |
 | EXP37 | Composición de conceptos (skills compuestas sin volver a hechos) | 16/16; `cater` vía cA+cB, prueba composicional |
 | EXP38 | Composición jerárquica (compuesto L3 como ladrillo de L4) | 19/19; `attends` con prueba anidada, sin reinducir |
+| EXP39 | Transferencia horizontal (abstracción sin origen) | 13/13; wipe A, B con relaciones nuevas, mapa por roles |
 
 ## Arquitectura emergente
 
@@ -257,6 +259,11 @@ skills compuestas con prueba composicional, sin volver a hechos).
   (`cater`) entra opaco al nivel 4 con cD (invitación,
   `contrib :- [brings, needs]`); `attends(Q,L)` con prueba anidada
   de profundidad 2; cadena temporal en 4 eslabones.
+- `experiment39.pl` — transferencia horizontal: concepto cA persistido
+  (firma + skill + roles), wipe total de A (`facts=0`), dominio B con
+  objetos y relaciones nuevos; mapa A↔B por perfiles de rol;
+  `stored` predicho con prueba de reutilización; cero relaciones-A
+  en consulta (auditado).
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —

@@ -9000,3 +9000,40 @@ Verificación en clon: 30–38 completos + `preflight_project` PASS.
 
 ---
 
+# EXP39 — Horizontal abstraction transfer (sin origen)
+
+## Lo que demuestra
+
+```text
+A: owns/belongs_to/visits → stocked (F1=1.0)
+     ↓ persistencia (firma + skill + roles, cero átomos)
+WIPE: hechos A = 0 (verificado), abstracción intacta
+     ↓
+B: keeps/held_by/tours (todo nuevo) → reconocido como cA
+     ↓ mapa por roles: belongs_to↔held_by, visits↔tours
+stored(tablet,sevilla) con prueba de reutilización
+```
+
+`wex→UNKNOWN`; cross rechazado; auditoría de cero relaciones-A en
+consulta. `passed 13/13` + preflight PASS.
+
+Primera evidencia de memoria semántica reutilizable: la abstracción
+deja de depender del contexto que la originó, porque ese contexto ya
+no existe.
+
+## Commit
+
+```text
+experiment39.pl (nuevo; ningún módulo tocado)
+README.md (EXP39)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–39 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
