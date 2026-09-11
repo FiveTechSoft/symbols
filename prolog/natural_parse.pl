@@ -167,6 +167,10 @@ parse_pat([D0, needed, I0], (D, needs, I)) :-
 % el mapa lo induce el motor por roles estructurales)
 parse_pat([P0, resides, in, C0], (P, resides_in, C)) :-
     resolve_subj(P0, P), resolve_obj(C0, C).
+% [C allures O] (EXP49: superficie con roles INVERTIDOS respecto a
+% visits: la ciudad es sujeto. El motor debe RECHAZAR el mapa.)
+parse_pat([C0, allures, O0], (C, allures, O)) :-
+    resolve_subj(C0, C), resolve_obj(O0, O).
 % [O belongs to P]
 parse_pat([O0, belongs, to, P0], (O, belongs_to, P)) :-
     resolve_obj(O0, O), resolve_subj(P0, P).

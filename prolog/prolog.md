@@ -9388,3 +9388,41 @@ Verificación en clon: 30–48 completos + `preflight_project` PASS.
 
 ---
 
+# EXP49 — Hypothesis and counterevidence (aceptar/rechazar)
+
+## Lo que demuestra
+
+Ciclo completo observar→hipótesis→sondear→evidencia→aceptar/rechazar:
+
+```text
+Mira tours Paris → hipótesis tours~=visits (0.5)
+sondeo: cadena tours+in existe → ACEPTADA (1.0), mapa la registra
+caters(mira,france) con prueba; Why? con proof.
+Paris allures Mira → hipótesis allures~=visits (0.5)
+contraevidencia: sujeto conocido-ciudad → RECHAZADA (0.0) con razón
+mapa la rehúsa; caters por allures → UNKNOWN; Why? → noproof.
+passed 15/15.
+```
+
+El sistema no necesita acertar siempre: distingue respaldo
+suficiente de rechazo. Lección: `~=` no existe en `format/2`
+(escapar `~~=`); el sondeo debe preceder a la aceptación
+(la predicción exige hipótesis aceptada).
+
+## Commit
+
+```text
+experiment49.pl (nuevo; ningún módulo tocado)
+natural_parse.pl (+allures, aditivo)
+README.md (EXP49)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–49 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
