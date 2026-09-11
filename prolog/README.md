@@ -70,6 +70,8 @@ swipl -s experiment38.pl -g experiment38 -t halt
 swipl -s experiment39.pl -g experiment39 -t halt
 swipl -s experiment40.pl -g experiment40 -t halt
 swipl -s experiment41.pl -g experiment41 -t halt
+swipl -s experiment42.pl -g experiment42 -t halt
+python3 make_corpus_natural.py   # regenera corpus_natural/* (seed 42)
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -121,6 +123,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP39 | Transferencia horizontal (abstracción sin origen) | 13/13; wipe A, B con relaciones nuevas, mapa por roles |
 | EXP40 | Conocimiento abstracto inmutable (doble wipe + E sin tocar C) | 20/20; 3 vocabularios, firmas locales, snapshots idénticos |
 | EXP41 | Roles múltiples (un objeto, varios conceptos, skills por rol) | 15/15; proofs independientes, parciales → UNKNOWN |
+| EXP42 | Primer corpus natural (656 frases, cero lexicón de entidades) | 36/36; extracción 1.00, `reaches` F1=0.89, transferencia 8/8 |
 
 ## Arquitectura emergente
 
@@ -276,6 +279,10 @@ skills compuestas con prueba composicional, sin volver a hechos).
   cB (viaje) con la skill de cada rol y prueba independiente
   (identidad ≠ rol ≠ comportamiento); A-only/B-only y parciales →
   UNKNOWN.
+- `experiment42.pl` + `natural_parse.pl` + `make_corpus_natural.py` +
+  `corpus_natural/` — primer corpus abierto (656 frases, gold,
+  held-out previo, queries, distractores); parser sin entidades,
+  motor intacto.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —

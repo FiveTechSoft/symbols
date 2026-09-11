@@ -9111,3 +9111,40 @@ Verificación en clon: 30–41 completos + `preflight_project` PASS.
 
 ---
 
+# EXP42 — First natural corpus (datos no diseñados)
+
+## Lo que demuestra
+
+656 frases (seed 42) con variación, pronombres, ruido y
+contradicciones; motor intacto; parser nuevo sin listas de entidades:
+
+```text
+extracción P=R=1.00, hallucination=0 (498+16 hechos + 30 ruidos)
+reaches :- [visits,in] descubierto con F1=0.8947 (honesto, no 1.0)
+16/16 reasoned (core 12 + transferencia 4) · 12/12 retrieved
+2/2 unknown · 4/4 distractores → passed 36/36
+```
+
+Claves: held-out = conclusiones (premisas intactas, como EXP30);
+`reaches` denso para descubrimiento (precedente EXP28); pronombres
+por recencia de rol en bloques; `returned/arrived`→`visits`
+declarado; transferencia = entidades nuevas (cruce de nombres de
+relación: EXP39 simbólico, pendiente de cablear al parser).
+
+## Commit
+
+```text
+experiment42.pl + natural_parse.pl + make_corpus_natural.py (nuevos)
+corpus_natural/ (corpus, gold, heldout, expected, distractores, README)
+README.md (EXP42)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–42 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

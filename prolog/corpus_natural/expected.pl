@@ -1,0 +1,30 @@
+expected(1, core, reach, ana, italy, reasoned).
+expected(2, tra, reach, bruno, ireland, reasoned).
+expected(3, core, reach, carmen, italy, reasoned).
+expected(4, core, reach, diego, france, reasoned).
+expected(5, core, reach, elena, italy, reasoned).
+expected(6, tra, reach, ines, peru, reasoned).
+expected(7, core, reach, jorge, ireland, reasoned).
+expected(8, core, reach, lucia, spain, reasoned).
+expected(9, core, reach, luis, france, reasoned).
+expected(10, core, reach, marcos, ireland, reasoned).
+expected(11, core, reach, maria, spain, reasoned).
+expected(12, core, reach, pablo, ireland, reasoned).
+expected(13, core, reach, pedro, france, reasoned).
+expected(14, core, reach, sara, spain, reasoned).
+expected(15, tra, reach, sofia, italy, reasoned).
+expected(16, tra, reach, yago, ecuador, reasoned).
+expected(17, core, visits, maria, barcelona, retrieved).
+expected(18, core, visits, pedro, oslo, retrieved).
+expected(19, core, visits, ana, bergen, retrieved).
+expected(20, core, visits, luis, paris, retrieved).
+expected(21, core, visits, carmen, lyon, retrieved).
+expected(22, core, visits, jorge, roma, retrieved).
+expected(23, core, visits, elena, milan, retrieved).
+expected(24, core, visits, pablo, quito, retrieved).
+expected(25, tra, visits, sofia, lima, retrieved).
+expected(26, tra, visits, yago, dublin, retrieved).
+expected(27, tra, visits, ines, bern, retrieved).
+expected(28, tra, visits, bruno, madrid, retrieved).
+expected(29, core, unknown_person, zorin, -).
+expected(30, core, unknown_person, velara, -).

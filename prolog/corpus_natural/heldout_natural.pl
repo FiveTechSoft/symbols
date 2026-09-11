@@ -1,0 +1,16 @@
+heldout(ana, italy, reaches).
+heldout(bruno, ireland, reaches).
+heldout(carmen, italy, reaches).
+heldout(diego, france, reaches).
+heldout(elena, italy, reaches).
+heldout(ines, peru, reaches).
+heldout(jorge, ireland, reaches).
+heldout(lucia, spain, reaches).
+heldout(luis, france, reaches).
+heldout(marcos, ireland, reaches).
+heldout(maria, spain, reaches).
+heldout(pablo, ireland, reaches).
+heldout(pedro, france, reaches).
+heldout(sara, spain, reaches).
+heldout(sofia, italy, reaches).
+heldout(yago, ecuador, reaches).
