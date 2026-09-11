@@ -8899,3 +8899,55 @@ Verificación en clon: 30–36 completos + `preflight_project` PASS.
 
 ---
 
+# EXP37 — Composite structural concepts (checkpoint de composición)
+
+## Lo que demuestra
+
+```text
+cA ── stocked        (suministro {P owns O, O belongs_to P, P visits L})
+cB ── cuisine        (cocina {P cooks D, D needs I})
+cA + cB ── cater     (compuesta, compartiendo P)
+```
+
+`cater(zorin,sevilla)` (nunca observado) con proof composicional:
+
+```text
+composite(cA,cB,zorin)
+    ├── struct_match(sa3,cA) + rule(stocked,...)
+    └── member(sb3,cB)
+```
+
+La unidad de razonamiento pasa a hechos → reglas → conceptos →
+**conceptos compuestos**: el sistema responde sin recuperar ningún
+hecho original (`alpha owns book`, ...). Parciales (`wex` solo cA,
+`yago` solo cB) → UNKNOWN; cross rechazado; cero átomos.
+`passed 16/16` + preflight PASS.
+
+## Dos principios nuevos
+
+1. **Exclusión temporal:** la evidencia de una conclusión solo entra
+   después de descubierta la estructura que debe explicarla
+   (`observe_composite_train` tras inducir sub-skills; `cater`
+   presente antes empataría `[belongs_to,cater]` F1=1.0 y rompería
+   el margen).
+2. **Exclusión global por objetivo:** `SSE(X | T)` = representación
+   de `X` menos toda evidencia de `T`, en todas las estructuras
+   (miembros `P` compartidos exigen uniformidad:
+   `excluded_all([stocked, cuisine, cater])`).
+
+## Commit
+
+```text
+experiment37.pl (nuevo; ningún módulo tocado)
+README.md (EXP37 + 2 principios)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–37 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

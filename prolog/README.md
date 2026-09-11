@@ -65,6 +65,7 @@ swipl -s experiment33.pl -g experiment33 -t halt
 swipl -s experiment34.pl -g experiment34 -t halt
 swipl -s experiment35.pl -g experiment35 -t halt
 swipl -s experiment36.pl -g experiment36 -t halt
+swipl -s experiment37.pl -g experiment37 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -111,6 +112,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP34 | Separación estructura/comportamiento (mismo dato, veredictos opuestos) | 9/9; sin `reaches`: identidad exacta de 5 |
 | EXP35 | SSE por tarea (un objeto, 3 firmas auditadas, 0 fuga) | 12/12; firmas distintas + respuestas correctas |
 | EXP36 | SSE de estructuras (transferencia estructural + regla `findall`) | 12/12; estructura→concepto→skill en vocabulario nuevo |
+| EXP37 | Composición de conceptos (skills compuestas sin volver a hechos) | 16/16; `cater` vía cA+cB, prueba composicional |
 
 ## Arquitectura emergente
 
@@ -153,7 +155,10 @@ PROOF
 
 `SSE(object)` distingue de `SSE(object | task)`: la segunda se
 construye excluyendo explícitamente la variable objetivo
-(principio de exclusión evidencial, EXP34–35).
+(principio de exclusión evidencial, EXP34–35). EXP36–37 elevan la
+unidad a estructuras (`SSE(structure | task)` → conceptos
+estructurales) y a su composición (conceptos como ladrillos,
+skills compuestas con prueba composicional, sin volver a hechos).
 
 ## Principios verificados (con refs)
 
@@ -175,6 +180,14 @@ construye excluyendo explícitamente la variable objetivo
   propiedad (`sse_excluding/3` lo garantiza por construcción, no por
   disciplina: EXP34 separa estructura/comportamiento, EXP35 una firma
   distinta por tarea con cero fuga).
+- **Exclusión temporal** (EXP37): la evidencia de una conclusión solo
+  puede entrar después de descubierta la estructura que debe
+  explicarla (`cater` observado tras inducir sub-skills; presente
+  antes, empataría el descubrimiento y rompería el margen).
+- **Exclusión global por objetivo** (EXP37): `SSE(X | T)` =
+  representación estructural de `X` menos toda evidencia de `T`, en
+  todas las estructuras que la usan (no solo en su clase); los
+  miembros compartidos (`P` en cA+cB) la exigen uniforme.
 
 ## Mapa de ficheros
 
@@ -230,6 +243,10 @@ construye excluyendo explícitamente la variable objetivo
   [belongs_to, visits]` adherida al concepto de estructura y heredada
   en vocabulario nuevo (`s3`), distractores por arista ausente/extra,
   UNKNOWN sin estructura.
+- `experiment37.pl` — composición de conceptos: cA (suministro) + cB
+  (cocina) compartiendo `P`; `cater(P,L)` sobre conceptos + sub-skills
+  (`stocked`, `cuisine`), sin volver a hechos crudos; `wex`/`yago`
+  parciales → UNKNOWN; exclusión uniforme y temporal.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
