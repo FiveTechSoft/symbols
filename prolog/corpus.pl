@@ -13,6 +13,7 @@
 :- consult('multivariable.pl').
 :- consult('reuse.pl').
 :- consult('continuous.pl').
+:- consult('guided_search.pl').
 :- consult('question_parser.pl').
 
 :- use_module(library(lists)).
@@ -120,6 +121,51 @@ add_concept_relation(SC, R, OC, Sc) :-
 discover_rules_dedup :-
     forall(concept_relation(SC, R, OC, Sc),
            assert_learned_rule_dedup(rule(SC, R, OC), SC, R, OC, Sc)).
+
+% discover_all: conceptos+relaciones+reglas (idempotente, sin targets).
+discover_all :-
+    discover_concepts,
+    discover_concept_relations,
+    discover_rules_dedup.
+
+% learn_cycle_guided(+Targets, -Rows): guided per target + metricas.
+% Rows = [row(Target, Path, F1, Generated, Evaluated, Ms)].
+learn_cycle_guided(Targets, Rows) :-
+    discover_concepts,
+    discover_concept_relations,
+    discover_rules_dedup,
+    retry_unresolved,
+    findall(Row, ( member(T, Targets),
+                   guided_target(T, Row)
+                 ),
+            Rows).
+
+guided_target(T, row(T, Path, F1, Gen, Ev, Ms)) :-
+    run_discovery(guided, T, 3, Stats),
+    Stats = stats(Path, F1, _Sup, Gen, Ev, _Pr, Ms),
+    retractall(composed_rule(T, _, _)),
+    assertz(composed_rule(T, Path, F1)),
+    induce_constrained(T, Path).
+
+% Exhaustive candidate COUNT (aritmetico, sin puntuar): cota superior
+% honesta de lo que costaria no guiar.
+exhaustive_count(Target, MaxLen, Count) :-
+    findall(R, ( memory_relation(_, R, _, _, _), R \== Target ), Rs0),
+    sort(Rs0, Vocab),
+    length(Vocab, V),
+    count_patterns(V, MaxLen, Count).
+
+count_patterns(V, MaxLen, Count) :-
+    findall(C, ( between(1, MaxLen, L),
+                 C is V ^ L
+               ),
+            Cs),
+    sum_ints(Cs, Count).
+
+sum_ints([], 0).
+sum_ints([H|T], S) :-
+    sum_ints(T, S0),
+    S is S0 + H.
 
 % ---------- PREGUNTAS ----------
 ask(Q, A) :-

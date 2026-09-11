@@ -30,11 +30,25 @@ travels_verb(travelled). travels_verb(traveled). travels_verb(travelling).
 arrives_verb(arrive). arrives_verb(arrives).
 arrives_verb(arrived). arrives_verb(arriving).
 
+% --- extension EXP28: reads/borrows/owns/likes (tokens nuevos, aditiva) ---
+reads_verb(read). reads_verb(reads).
+borrows_verb(borrow). borrows_verb(borrows). borrows_verb(borrowed).
+owns_verb(own). owns_verb(owns). owns_verb(owned).
+likes_verb(like). likes_verb(likes). likes_verb(liked).
+
 % deteccion verbal local: extiende sin tocar english_graph
 my_detect_verb(Tokens, travels) :-
     member(T, Tokens), travels_verb(T), !.
 my_detect_verb(Tokens, arrives) :-
     member(T, Tokens), arrives_verb(T), !.
+my_detect_verb(Tokens, reads) :-
+    member(T, Tokens), reads_verb(T), !.
+my_detect_verb(Tokens, borrows) :-
+    member(T, Tokens), borrows_verb(T), !.
+my_detect_verb(Tokens, owns) :-
+    member(T, Tokens), owns_verb(T), !.
+my_detect_verb(Tokens, likes) :-
+    member(T, Tokens), likes_verb(T), !.
 my_detect_verb(Tokens, eats) :-
     member(T, Tokens), eats_verb(T), !.
 my_detect_verb(Tokens, lives_in) :-
@@ -60,6 +74,14 @@ verb_form_word(T) :-
     travels_verb(T), !.
 verb_form_word(T) :-
     arrives_verb(T), !.
+verb_form_word(T) :-
+    reads_verb(T), !.
+verb_form_word(T) :-
+    borrows_verb(T), !.
+verb_form_word(T) :-
+    owns_verb(T), !.
+verb_form_word(T) :-
+    likes_verb(T), !.
 verb_form_word(in).
 
 % known entity of any type
@@ -189,6 +211,30 @@ parse_mapped(Tokens, Maps, (S, arrives, O), usage) :-
     pre_fillers(Tokens, I, subj_visits, [S]),
     post_fillers(Tokens, I, obj_in, [O]),
     assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, reads, O), usage) :-
+    my_detect_verb(Tokens, reads),
+    verb_pos(Tokens, reads, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_any, [O]),
+    assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, borrows, O), usage) :-
+    my_detect_verb(Tokens, borrows),
+    verb_pos(Tokens, borrows, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_any, [O]),
+    assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, owns, O), usage) :-
+    my_detect_verb(Tokens, owns),
+    verb_pos(Tokens, owns, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_any, [O]),
+    assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, likes, O), usage) :-
+    my_detect_verb(Tokens, likes),
+    verb_pos(Tokens, likes, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_any, [O]),
+    assert_mentions(Maps).
 
 verb_pos(Tokens, visits, I) :-
     nth0(I, Tokens, W), visits_verb(W), !.
@@ -200,6 +246,14 @@ verb_pos(Tokens, travels, I) :-
     nth0(I, Tokens, W), travels_verb(W), !.
 verb_pos(Tokens, arrives, I) :-
     nth0(I, Tokens, W), arrives_verb(W), !.
+verb_pos(Tokens, reads, I) :-
+    nth0(I, Tokens, W), reads_verb(W), !.
+verb_pos(Tokens, borrows, I) :-
+    nth0(I, Tokens, W), borrows_verb(W), !.
+verb_pos(Tokens, owns, I) :-
+    nth0(I, Tokens, W), owns_verb(W), !.
+verb_pos(Tokens, likes, I) :-
+    nth0(I, Tokens, W), likes_verb(W), !.
 verb_pos(Tokens, lives_in, I) :-
     nth0(I, Tokens, in),
     nth0(J, Tokens, A), J < I, member(A, [live, lives, lived]), !.
@@ -231,6 +285,11 @@ role_filler(obj_eats, T) :- food(T), !.
 role_filler(obj_eats, T) :-
     content_word(T), \+ person(T), \+ city(T),
     \+ country(T), \+ typename(T).
+role_filler(obj_any, T) :- city(T), !.
+role_filler(obj_any, T) :- country(T), !.
+role_filler(obj_any, T) :- food(T), !.
+role_filler(obj_any, T) :-
+    content_word(T), \+ person(T), \+ typename(T).
 
 % all unknown words of accepted triples (recall audit)
 unknown_words(Triples, Unknowns) :-

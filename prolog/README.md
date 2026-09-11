@@ -53,6 +53,8 @@ swipl -s preflight.pl -g "preflight('experiment19.pl')" -t halt
 swipl -s preflight.pl -g "preflight_project('.')" -t halt
 swipl -s run_corpus1.pl -g main -t halt
 python3 make_corpus1.py   # regenera corpus1.txt + heldout1.pl (semilla fija)
+swipl -s experiment28.pl -g experiment28 -t halt
+python3 make_corpus2.py   # regenera corpus2/*.txt + heldout2.pl (semilla fija)
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -90,6 +92,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 26 | Skills persistentes sin hechos; transferencia a entidades nuevas | 10/10; `r9` se ejecuta sin `constrained` ni inducción |
 | 27 | Clases emergentes sin declarar + herencia de skills (0 tipos) | 12/12; `obj6/obj8` heredan `reaches`, `obj7` no |
 | 28 | Corpus v0.1: ingesta separada + ciclo + Corpus 1 (150 frases EN) | 21/21; 150/150 hechos, held-out 10/10 razonado |
+| 29 | Guided corpus learning por bloques + control negativo de ruido | 33/33; guided << exhaustive por bloque |
 
 ## Arquitectura emergente
 
@@ -145,6 +148,9 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   indefinidas, consults; más `preflight_project/1` (unión del proyecto).
 - `run_corpus1.pl` + `corpus1.txt` + `heldout1.pl` + `make_corpus1.py` —
   Corpus 1 piloto (150 frases, 10 held-out; `longterm_c1.pl` generado).
+- `experiment28.pl` + `make_corpus2.py` + `corpus2/*.txt` + `heldout2.pl`
+  + `distractor2.pl` — Corpus 2 por bloques con tabla marginal
+  (evaluaciones/fact) y control negativo en el bloque de ruido.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
@@ -176,6 +182,17 @@ held-out:    10/10 razonado (nunca en corpus) + 10 distractores TN
 Escala honesta: la rejilla de composición crece cuadráticamente con las
 entidades; el piloto valida el bucle end-to-end (el Corpus 2 usará la
 maquinaria guiada de EXP23 para escalar).
+
+## Corpus 2 por bloques (EXP28, 345 frases EN en 4 bloques)
+
+```text
+b1: guided 39 gen / 11 eval  (exhaustive 39: igualdad verificada)
+b2: guided 155 gen / 15 eval (exhaustive contaría 258)
+b3: guided 84 gen / 7 eval   (exhaustive contaría 399)
+b4: ruido owns/likes: 0 reglas nuevas (control negativo)
+held-out 15/15 razonado + 15 distractores TN (verificados falsos)
+total: 33 evals / 345 hechos = 0.096 evals/fact
+```
 
 ## Regla de módulos (pagada con sangre)
 

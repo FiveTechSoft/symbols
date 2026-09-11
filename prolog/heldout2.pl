@@ -1,0 +1,15 @@
+heldout(anna, norway, reaches).
+heldout(bririn, norway, reaches).
+heldout(klerin, norway, reaches).
+heldout(otrin, switzerland, reaches).
+heldout(selrin, norway, reaches).
+heldout(quivio, norway, arrives).
+heldout(yavio, norway, arrives).
+heldout(brisel, norway, arrives).
+heldout(gisel, switzerland, arrives).
+heldout(klesel, norway, arrives).
+heldout(quidor, quilix, borrows).
+heldout(yador, quilix, borrows).
+heldout(brikan, quilix, borrows).
+heldout(gikan, ullix, borrows).
+heldout(klekan, quilix, borrows).
