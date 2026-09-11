@@ -1,0 +1,78 @@
+ana works in bern.
+bern produces wine.
+ana provides wine.
+leo works in lisboa.
+lisboa produces cheese.
+leo provides cheese.
+mia works in atenea.
+atenea produces steel.
+mia provides steel.
+juan works in napoles.
+napoles produces glass.
+juan provides glass.
+pedro works in turin.
+turin produces paper.
+pedro provides paper.
+lucia works in oporto.
+oporto produces silk.
+marco works in niza.
+niza produces coffee.
+marco provides coffee.
+elena works in gante.
+gante produces honey.
+elena provides honey.
+david works in brujas.
+brujas produces wine.
+david provides wine.
+sara works in sevilla.
+sevilla produces cheese.
+sara provides cheese.
+jorge works in granada.
+granada produces steel.
+jorge provides steel.
+laura works in cordoba.
+cordoba produces glass.
+laura provides glass.
+diego works in bilbao.
+bilbao produces paper.
+diego provides paper.
+ines works in valencia.
+valencia produces silk.
+ines provides silk.
+raul works in zaragoza.
+zaragoza produces coffee.
+raul provides coffee.
+nadia works in malaga.
+malaga produces honey.
+nadia provides honey.
+ivan works in santander.
+santander produces wine.
+ivan provides wine.
+vera works in madrid.
+madrid produces cheese.
+hugo works in paris.
+paris produces steel.
+hugo provides steel.
+clara works in roma.
+roma produces glass.
+clara provides glass.
+pablo works in oslo.
+oslo produces paper.
+pablo provides paper.
+carmen works in quito.
+quito produces silk.
+carmen provides silk.
+luis works in lima.
+lima produces coffee.
+luis provides coffee.
+alba works in dublin.
+dublin produces honey.
+alba provides honey.
+david owns bike.
+nadia owns house.
+luis owns boat.
+lucia owns garden.
+juan likes house.
+raul likes book.
+leo likes garden.
+diego likes bike.

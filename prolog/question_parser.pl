@@ -3,6 +3,9 @@
 % Tipos: where (directa), who (inversa), does (si/no), why (explicacion).
 % Respuestas: answer(Xs, retrieved|reasoned, Proof) | yes | no | unknown.
 % Listas completas (nunca singleton-forzado); sin hecho ni regla -> unknown.
+% question_parser depende del tokenizador (antes lo aportaba el llamante
+% por accidente; ahora es dependencia explicita, sin cambio de conducta).
+:- consult('english_graph.pl').
 :- use_module(library(lists)).
 
 % --- parse de preguntas (tokens via open_vocab) ---
@@ -22,6 +25,26 @@ parse_question(Sentence, q_where_uses(X)) :-
     tokenize_en(Sentence, [where, does, X, use]), !.
 parse_question(Sentence, q_where_harvests(X)) :-
     tokenize_en(Sentence, [where, does, X, harvest]), !.
+% generic where over multiword relations (Corpus A and beyond).
+% Surface: "Where does Ana come from?" -> q_where(comes_from, ana).
+parse_question(Sentence, q_where(Rel, X)) :-
+    tokenize_en(Sentence, Tokens),
+    append([where, does, X], VTokens, Tokens),
+    VTokens \== [],
+    atomic_list_concat(VTokens, '_', Rel),
+    question_relation(Rel), !.
+
+% relations licensed for generic where-questions (surface -> canonical).
+question_relation(come_from).
+question_relation(provides).
+question_relation(uses).
+rel_canonical(come_from, comes_from).
+rel_canonical(provides, provides).
+rel_canonical(uses, uses).
+parse_question(Sentence, q_where_comes_from(X)) :-
+    tokenize_en(Sentence, [where, does, X, come, from]), !.
+parse_question(Sentence, q_where_provides2(X)) :-
+    tokenize_en(Sentence, [where, does, X, provide2]), !.
 parse_question(Sentence, q_who_visits(Y)) :-
     tokenize_en(Sentence, [who, visits, Y]), !.
 parse_question(Sentence, q_who_lives(Y)) :-
@@ -54,6 +77,10 @@ answer_query(q_where_uses(X), A) :-
     solve_slot(uses, X, sub, A).
 answer_query(q_where_harvests(X), A) :-
     solve_slot(harvests, X, sub, A).
+answer_query(q_where(Rel0, X), A) :-
+    question_relation(Rel0),
+    rel_canonical(Rel0, Rel),
+    solve_slot(Rel, X, sub, A).
 answer_query(q_who_visits(Y), A) :-
     solve_slot(visits, Y, obj, A).
 answer_query(q_who_lives(Y), A) :-
@@ -153,6 +180,13 @@ verbalize(answer([X], _, _), q_where_uses(S), Out) :-
     format(string(Out), "~w uses ~w.", [S, X]).
 verbalize(answer([X], _, _), q_where_harvests(S), Out) :-
     format(string(Out), "~w harvests ~w.", [S, X]).
+surface_verb(comes_from, 'comes from').
+surface_verb(come_from, 'come from').
+surface_verb(provides, 'provides').
+surface_verb(uses, 'uses').
+verbalize(answer([Y], _, _), q_where(Rel, X), Out) :-
+    surface_verb(Rel, V),
+    format(string(Out), '~w ~w ~w.', [X, V, Y]).
 verbalize(answer([X], _, _), q_who_visits(O), Out) :-
     format(string(Out), "~w visits ~w.", [X, O]).
 verbalize(answer([X], _, _), q_who_lives(O), Out) :-

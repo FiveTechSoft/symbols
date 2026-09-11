@@ -57,6 +57,8 @@ swipl -s experiment28.pl -g experiment28 -t halt
 python3 make_corpus2.py   # regenera corpus2/*.txt + heldout2.pl
 swipl -s experiment29.pl -g experiment29 -t halt
 python3 make_corpus3.py   # regenera corpus3/* + heldout3/distractor3
+swipl -s experiment30.pl -g experiment30 -t halt
+python3 make_corpusA.py   # regenera corpusA/* + secreto + heldoutA/distractorA
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -96,6 +98,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 28 | Corpus v0.1: ingesta separada + ciclo + Corpus 1 (150 frases EN) | 21/21; 150/150 hechos, held-out 10/10 razonado |
 | EXP28 | Guided corpus learning por bloques + control negativo de ruido | 33/33; guided << exhaustive por bloque |
 | EXP29 | Corpus 3: transferencia real (vocabulario y relaciones inéditos) | 40/40; 10 ocultos con proof atribuida a meta, 20 TN verificados |
+| EXP30 | Primer corpus natural (cero lexicón) + secreto temporal | 20/20; retrieve/reason/unknown, prueba por acierto |
 
 ## Arquitectura emergente
 
@@ -157,6 +160,10 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
 - `experiment29.pl` + `make_corpus3.py` + `corpus3/` — Corpus 3:
   transferencia a vocabulario y relaciones inéditos, test oculto con
   proof atribuida (meta vs inducida) y distractores verificados.
+- `positional.pl` — simbolizador sin lexicón (SVO estructural puro).
+- `experiment30.pl` + `make_corpusA.py` + `corpusA/` + `secret/` +
+  `heldoutA.pl` + `distractorA.pl` — primer corpus natural con parser
+  posicional y test secreto temporal (retrieve/reason/unknown).
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —

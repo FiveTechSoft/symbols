@@ -183,21 +183,42 @@ ho_call(_, _, []).
 % comprobar cada fichero contra la union es la semantica correcta aqui.
 preflight_project(Dir) :-
     retractall(pf_finding(_, _)),
-    directory_files(Dir, Files0),
-    include(pl_file, Files0, Pls0),
-    sort(Pls0, Pls),
-    findall(Full, ( member(F, Pls),
-                    atomic_list_concat([Dir, '/', F], Full)
-                  ),
-            Fulls),
+    pl_files_recursive(Dir, Pls),
+    sort(Pls, Fulls),
     collect_union(Fulls, UH, UD),
     forall(member(Full, Fulls),
            check_against_union(Full, UH, UD)),
     report_preflight(Dir).
 
+% recursive .pl discovery (skips .git); paths relative to CWD for reports
+pl_files_recursive(Dir, Pls) :-
+    directory_files(Dir, Entries0),
+    exclude(dot_entry, Entries0, Entries),
+    findall(Q, ( member(E, Entries),
+                 atomic_list_concat([Dir, '/', E], P),
+                 dir_pl_file(P, Q)
+               ),
+            Pls).
+
+% dir_pl_file(+Path, -PlFile): el propio fichero o los de dentro.
+dir_pl_file(P, P) :-
+    pl_file(P), !.
+dir_pl_file(P, Q) :-
+    exists_directory(P),
+    \+ subdir_skip(P),
+    pl_files_recursive(P, Sub),
+    member(Q, Sub).
+
+dot_entry('.').
+dot_entry('..').
+
+subdir_skip(P) :-
+    sub_atom(P, _, _, _, '/.git').
+
 pl_file(F) :-
     atom_string(A, F),
-    sub_atom(A, _, 3, 0, '.pl').
+    sub_atom(A, _, 3, 0, '.pl'),
+    exists_file(F).
 
 collect_union([], [], []).
 collect_union([F|Fs], UH, UD) :-
