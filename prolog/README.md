@@ -41,6 +41,7 @@ swipl -s experiment21.pl -g experiment21 -t halt
 swipl -s experiment22.pl -g experiment22 -t halt
 swipl -s experiment23.pl -g experiment23 -t halt
 swipl -s experiment24.pl -g experiment24 -t halt
+swipl -s experiment25.pl -g experiment25 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -74,6 +75,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 22 | Ciclo cerrado: olvidar experiencia, conservar regla, 2ª familia sin interferencia | 11/11; `reaches` intacta tras aprender `arrives` |
 | 23 | Búsqueda guiada vs exhaustiva (mismo F1, 16.6× menos patrones) | 5/5; ganador y F1 idénticos |
 | 24 | Composición jerárquica: reglas como unidades (340 vs 16 evals, mismas predicciones) | 3/3; skill library `r3`, `r6` |
+| 25 | Composición profunda 3 niveles (340 vs 20 evals, mismas predicciones) | 3/3; skills `r3`, `r7` |
 
 ## Arquitectura emergente
 
