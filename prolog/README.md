@@ -36,6 +36,7 @@ swipl -s experiment16.pl -g experiment16 -t halt
 swipl -s experiment17.pl -g experiment17 -t halt
 swipl -s experiment18.pl -g experiment18 -t halt
 swipl -s experiment19.pl -g experiment19 -t halt
+swipl -s experiment20.pl -g experiment20 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -64,6 +65,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 17 | Identidad SAME/DIFFERENT/UNKNOWN/CONTRADICTION; funcionalidad descubierta | 16/16 |
 | 18 | Correferencia como abducción de identidad (género+funcionalidad, nunca azar) | 17/17, memoria exacta post-reconstrucción |
 | 19 | Preguntas sobre memoria: retrieval vs reasoning + prueba (`Why`) | 10/10; Q3 inferida (no almacenada) con cadena de justificación |
+| 20 | Conflicto, tiempo y revisión (provenance; pasado interpola, futuro UNKNOWN) | 18/18; `INVENTION` de tipos: 0 |
 
 ## Arquitectura emergente
 
@@ -106,6 +108,8 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   pronombres.
 - `question_parser.pl` — preguntas (directa/inversa/sí-no/por-qué) con
   prueba: `retrieved` (hecho) vs `reasoned` (regla + cadena).
+- `conflict.pl` — creencias con estado (provenance: fuente, tiempo,
+  `active|contested|superseded`) y revisión temporal.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
   incrementalidad, segundo orden, persistencia (`longterm.pl`,
   `longterm14.pl` son salidas de ejemplo regenerables).

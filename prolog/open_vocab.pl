@@ -100,6 +100,23 @@ symbolize_open(Sentence, T, Kind) :-
     map_pronouns_pure(T0, Tokens, Maps),
     parse_mapped(Tokens, Maps, T, Kind).
 
+% symbolize_timed: como symbolize_open pero extrae el primer año (Time)
+% y lo quita de los tokens (los adjuntos temporales no son argumentos).
+% Time = year | none.
+symbolize_timed(Sentence, T, Kind, Time) :-
+    tokenize_en(Sentence, T0),
+    map_pronouns_pure(T0, T1, Maps),
+    include(year_token, T1, Years),
+    exclude(year_token, T1, Tokens),
+    ( Years = [Y|_] -> atom_number(Y, Time) ; Time = none ),
+    parse_mapped(Tokens, Maps, T, Kind).
+
+year_token(T) :-
+    atom(T),
+    atom_length(T, 4),
+    atom_number(T, N),
+    N >= 1000, N =< 2100.
+
 % is_a pattern: "X is a <type>"
 parse_mapped([X, is, a, T], Maps, (X, is_a, T), typed) :-
     typename(T),
