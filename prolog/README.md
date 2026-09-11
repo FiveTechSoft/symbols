@@ -60,6 +60,7 @@ python3 make_corpus3.py   # regenera corpus3/* + heldout3/distractor3
 swipl -s experiment30.pl -g experiment30 -t halt
 python3 make_corpusA.py   # regenera corpusA/* + secreto + heldoutA/distractorA
 swipl -s experiment31.pl -g experiment31 -t halt
+swipl -s experiment32.pl -g experiment32 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -101,6 +102,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP29 | Corpus 3: transferencia real (vocabulario y relaciones inéditos) | 40/40; 10 ocultos con proof atribuida a meta, 20 TN verificados |
 | EXP30 | Primer corpus natural (cero lexicón) + secreto temporal | 20/20; retrieve/reason/unknown, prueba por acierto |
 | EXP31 | Alineación de marcos (roles descubiertos, eventos reificados) | 12/12; 12→6 nodos, mapa 3/3, queries cruzadas |
+| EXP32 | Embeddings simbólicos (firmas WL sin etiquetas, 3 vocabularios) | 8/8; clases absorbentes + similitud explicada |
 
 ## Arquitectura emergente
 
