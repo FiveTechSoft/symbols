@@ -31,7 +31,7 @@ reset_experiment :-
 object_signature(E, sig(O, I, ON, IN)) :-
     findall(X, memory_relation(E, _, X, _, _), Outs),
     length(Outs, O),
-    findall(X, memory_relation(_, _, E, _, _), Ins),
+    findall(X, memory_relation(X, _, E, _, _), Ins),
     findall(X, ( memory_relation(X, _, E, _, _) ), Ins2),
     length(Ins, I),
     findall((A, B), ( member(N, Outs),
@@ -48,7 +48,7 @@ object_signature(E, sig(O, I, ON, IN)) :-
 deg(E, O, I) :-
     findall(X, memory_relation(E, _, X, _, _), L1),
     length(L1, O),
-    findall(X, memory_relation(_, _, E, _, _), L2),
+    findall(X, memory_relation(X, _, E, _, _), L2),
     length(L2, I).
 
 % la firma no contiene atomos (auditoria: solo estructura)

@@ -64,6 +64,7 @@ swipl -s experiment32.pl -g experiment32 -t halt
 swipl -s experiment33.pl -g experiment33 -t halt
 swipl -s experiment34.pl -g experiment34 -t halt
 swipl -s experiment35.pl -g experiment35 -t halt
+swipl -s experiment36.pl -g experiment36 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -109,6 +110,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP33 | POO emergente: clase→comportamiento heredado (identidad≠pertenencia) | 10/10; `zorin/velara` heredan, `wex` UNKNOWN |
 | EXP34 | Separación estructura/comportamiento (mismo dato, veredictos opuestos) | 9/9; sin `reaches`: identidad exacta de 5 |
 | EXP35 | SSE por tarea (un objeto, 3 firmas auditadas, 0 fuga) | 12/12; firmas distintas + respuestas correctas |
+| EXP36 | SSE de estructuras (transferencia estructural + regla `findall`) | 12/12; estructura→concepto→skill en vocabulario nuevo |
 
 ## Arquitectura emergente
 
@@ -196,7 +198,10 @@ construye excluyendo explícitamente la variable objetivo
   `learn_cycle(Targets)`, `ask/why`, `save/load_knowledge`,
   `knowledge_stats` (ingesta separada del aprendizaje).
 - `preflight.pl` — ritual estático: sintaxis, aridad, dinámicas,
-  indefinidas, consults; más `preflight_project/1` (unión del proyecto).
+  indefinidas, consults; más `preflight_project/1` (unión del proyecto)
+  y regla `findall_template` (EXP36: toda variable nombrada de la
+  plantilla `findall/bagof/setof` debe aparecer en el objetivo;
+  solo cuerpos de reglas, las anónimas `_` están exentas).
 - `run_corpus1.pl` + `corpus1/` + `make_corpus1.py` —
   Corpus 1 piloto (150 frases, 10 held-out; `longterm_c1.pl` generado).
 - `experiment28.pl` + `make_corpus2.py` + `corpus2/` + `heldout2.pl`
@@ -220,6 +225,11 @@ construye excluyendo explícitamente la variable objetivo
 - `experiment35.pl` — SSE por tarea (`sse_excluding/3`): un objeto, una
   firma distinta por objetivo, cero átomos, sin fuga; `reaches` sale
   por regla con prueba, no por la firma.
+- `experiment36.pl` — SSE estructural: estructuras `{P owns O,
+  O belongs_to P, P visits L}` como unidad; `stocked :-
+  [belongs_to, visits]` adherida al concepto de estructura y heredada
+  en vocabulario nuevo (`s3`), distractores por arista ausente/extra,
+  UNKNOWN sin estructura.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —

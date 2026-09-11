@@ -79,7 +79,7 @@ sse_excluding(E, Exclude, sig(O, I, ON, IN)) :-
                ),
             Outs),
     length(Outs, O),
-    findall(X, ( memory_relation(_, R, E, _, _),
+    findall(X, ( memory_relation(X, R, E, _, _),
                  \+ member(R, Exclude)
                ),
             Ins),
@@ -101,7 +101,7 @@ deg_excluding(E, Exclude, O, I) :-
                ),
             L1),
     length(L1, O),
-    findall(X, ( memory_relation(_, R, E, _, _),
+    findall(X, ( memory_relation(X, R, E, _, _),
                  \+ member(R, Exclude)
                ),
             L2),

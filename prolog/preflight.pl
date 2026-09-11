@@ -1,6 +1,8 @@
 % preflight.pl
 % Ritual automatizado antes de publicar: sintaxis, aridad, dinamicas,
-% llamadas indefinidas y consults existentes. Estatico (no ejecuta nada).
+% llamadas indefinidas, consults existentes y plantillas findall/bagof/setof
+% desconectadas (toda variable nombrada de la plantilla debe aparecer en el
+% objetivo; EXP36). Estatico (no ejecuta nada).
 % Uso: preflight('experiment19.pl'). Veredicto pass/fail con informe.
 % Limites honestos: allowlist pragmatica de builtins/libs; HO aproximado.
 :- use_module(library(lists)).
@@ -23,7 +25,8 @@ preflight_inner(File) :-
            pf_fail(consult, File, M)),
     check_undefined(File, HeadsAll, DynAll, Calls),
     check_arity(File, HeadsAll, Calls),
-    check_dynamics(File, DynAll, Calls).
+    check_dynamics(File, DynAll, Calls),
+    check_findall_templates(File).
 
 % ---------- lectura ----------
 read_all_terms(File, Terms) :-
@@ -241,7 +244,57 @@ check_against_union(Full, UH, UD) :-
            ; kernel_pred(N/A) -> true
            ; resolvable_builtin(N/A) -> true
            ; pf_fail(undefined, Full, N/A)
-           )).
+           )),
+    check_findall_templates(Full).
+
+% ---------- plantillas findall/bagof/setof desconectadas (EXP36) ----------
+% Toda variable NOMBRADA de la plantilla debe aparecer en el objetivo.
+% findall(X, (memory_relation(_,R,E,_,_),...), Ins) con X ausente devuelve
+% [_] por solucion: longitudes "correctas", contenido falso (EXP36: grados
+% (6,6)/(15,15) contando toda la memoria). Las anonimas (_) estan exentas
+% (idioma de conteo: findall(_, G, L), length(L, N)); SWI las omite en
+% variable_names, asi que la exencion es automatica.
+check_findall_templates(File) :-
+    catch(read_named_terms(File, Terms), E,
+          ( pf_fail(syntax, File, E), fail )),
+    forall(( member(T-Names, Terms),
+             clause_check_body(T, B),
+             sub_term(Sub, B),
+             collector_sub(Sub, Temp, Goal),
+             term_variables(Temp, TVs),
+             member(V, TVs),
+             \+ goal_var_in(Goal, V),
+             member(Nm=VV, Names), VV == V,
+             term_to_atom(Temp, TA),
+             atomic_list_concat([Nm, ' not in goal of ', TA], Detail)
+           ),
+           pf_fail(findall_template, File, Detail)).
+
+% Solo cuerpos de reglas (y initialization): los findall literales en
+% cabezas (p. ej. walk_body(findall(_,G,_),...) o el propio
+% collector_sub(findall(Temp,Goal,_),...)) son patrones, no colectas.
+clause_check_body((H :- B), B) :- callable(H), !.
+clause_check_body((:- initialization(G)), G) :- !.
+clause_check_body(_, none).
+
+read_named_terms(File, Terms) :-
+    open(File, read, S, [encoding(utf8)]),
+    read_named_loop(S, Terms),
+    close(S).
+
+read_named_loop(S, [T-Names|Ts]) :-
+    read_term(S, T, [variable_names(Names)]),
+    T \== end_of_file, !,
+    read_named_loop(S, Ts).
+read_named_loop(_, []).
+
+collector_sub(findall(Temp, Goal, _), Temp, Goal).
+collector_sub(bagof(Temp, Goal, _), Temp, Goal).
+collector_sub(setof(Temp, Goal, _), Temp, Goal).
+
+goal_var_in(Goal, V) :-
+    term_variables(Goal, GVs),
+    member(VV, GVs), VV == V, !.
 
 % --- asserts: objetivos de modificacion (registrados, no llamadas) ---
 assert_targets_in_terms(Terms, Targets) :-

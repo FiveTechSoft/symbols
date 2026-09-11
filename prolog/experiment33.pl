@@ -78,7 +78,7 @@ build_world :-
 object_signature(E, sig(O, I, ON, IN)) :-
     findall(X, memory_relation(E, _, X, _, _), Outs),
     length(Outs, O),
-    findall(X, memory_relation(_, _, E, _, _), Ins),
+    findall(X, memory_relation(X, _, E, _, _), Ins),
     length(Ins, I),
     findall((A, B), ( member(N, Outs), deg(N, A, B) ), ON0),
     sort(ON0, ON),
@@ -88,7 +88,7 @@ object_signature(E, sig(O, I, ON, IN)) :-
 deg(E, O, I) :-
     findall(X, memory_relation(E, _, X, _, _), L1),
     length(L1, O),
-    findall(X, memory_relation(_, _, E, _, _), L2),
+    findall(X, memory_relation(X, _, E, _, _), L2),
     length(L2, I).
 
 derive_struct_classes :-
