@@ -9037,3 +9037,38 @@ Verificación en clon: 30–39 completos + `preflight_project` PASS.
 
 ---
 
+# EXP40 — Immutable abstract knowledge (doble wipe)
+
+## Lo que demuestra
+
+```text
+A → C → WIPE A → B reconoce C → WIPE B →
+D (3er vocabulario) reconoce C → C + cF → E
+```
+
+C inmutable: snapshots `post_a == post_wipe_b == post_e` (igualdad
+estructural, no solo predictiva). E=`banquet(odin,kilimanjaro)`
+nunca observado, con prueba sobre conceptos; parcial → UNKNOWN;
+cross rechazado; cero relaciones A/B en consulta.
+`passed 20/20` + preflight PASS.
+
+Método: **firmas locales a la estructura** (solo aristas internas;
+`P` multi-estructura ya no contamina). La unidad de generalización
+queda formalmente en la estructura.
+
+## Commit
+
+```text
+experiment40.pl (nuevo; ningún módulo tocado)
+README.md (EXP40)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–40 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
