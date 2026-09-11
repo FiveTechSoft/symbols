@@ -9072,3 +9072,42 @@ Verificación en clon: 30–40 completos + `preflight_project` PASS.
 
 ---
 
+# EXP41 — Multiple roles (identidad ≠ rol ≠ comportamiento)
+
+## Lo que demuestra
+
+```text
+                 zorin
+                /     \
+          concepto cA  concepto cB
+          (suministro)   (viaje)
+               │             │
+          stocked       travels
+```
+
+`zorin` (A+B nuevo) recibe ambas skills, cada una con prueba que no
+menciona al otro rol (`proof_independent/3`: cA-prueba sin `travels`
+y viceversa). Sin mega-clase `zorin`: son dos pertenencias a
+estructuras, no una firma conjunta. A-only (`beta`) → `travels`
+UNKNOWN; B-only (`carl`) → `stocked` UNKNOWN; parcial → UNKNOWN;
+cross rechazado. `passed 15/15` + preflight PASS.
+
+Herramientas reutilizadas sin cambios: firmas locales (EXP40) para
+que `P` multi-estructura no contamine, y exclusión uniforme (EXP37).
+
+## Commit
+
+```text
+experiment41.pl (nuevo; ningún módulo tocado)
+README.md (EXP41)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–41 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
