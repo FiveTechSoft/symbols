@@ -22,8 +22,19 @@ eats_verb(eat). eats_verb(eats). eats_verb(ate). eats_verb(eating).
 
 % auxiliares de span excluidos de slots (is/was/lies ya lo estan en origen)
 aux_skip(live). aux_skip(lives). aux_skip(lived).
+aux_skip(through).
+
+% --- extension EXP22: travels/arrives (tokens nuevos, aditiva) ---
+travels_verb(travel). travels_verb(travels).
+travels_verb(travelled). travels_verb(traveled). travels_verb(travelling).
+arrives_verb(arrive). arrives_verb(arrives).
+arrives_verb(arrived). arrives_verb(arriving).
 
 % deteccion verbal local: extiende sin tocar english_graph
+my_detect_verb(Tokens, travels) :-
+    member(T, Tokens), travels_verb(T), !.
+my_detect_verb(Tokens, arrives) :-
+    member(T, Tokens), arrives_verb(T), !.
 my_detect_verb(Tokens, eats) :-
     member(T, Tokens), eats_verb(T), !.
 my_detect_verb(Tokens, lives_in) :-
@@ -45,6 +56,10 @@ verb_form_word(T) :-
     reaches_verb(T), !.
 verb_form_word(T) :-
     eats_verb(T), !.
+verb_form_word(T) :-
+    travels_verb(T), !.
+verb_form_word(T) :-
+    arrives_verb(T), !.
 verb_form_word(in).
 
 % known entity of any type
@@ -162,6 +177,18 @@ parse_mapped(Tokens, Maps, (S, lives_in, O), usage) :-
     pre_fillers(Tokens, I, subj_visits, [S]),
     post_fillers(Tokens, I, obj_visits, [O]),
     assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, travels, O), usage) :-
+    my_detect_verb(Tokens, travels),
+    verb_pos(Tokens, travels, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_visits, [O]),
+    assert_mentions(Maps).
+parse_mapped(Tokens, Maps, (S, arrives, O), usage) :-
+    my_detect_verb(Tokens, arrives),
+    verb_pos(Tokens, arrives, I),
+    pre_fillers(Tokens, I, subj_visits, [S]),
+    post_fillers(Tokens, I, obj_in, [O]),
+    assert_mentions(Maps).
 
 verb_pos(Tokens, visits, I) :-
     nth0(I, Tokens, W), visits_verb(W), !.
@@ -169,6 +196,10 @@ verb_pos(Tokens, reaches, I) :-
     nth0(I, Tokens, W), reaches_verb(W), !.
 verb_pos(Tokens, eats, I) :-
     nth0(I, Tokens, W), eats_verb(W), !.
+verb_pos(Tokens, travels, I) :-
+    nth0(I, Tokens, W), travels_verb(W), !.
+verb_pos(Tokens, arrives, I) :-
+    nth0(I, Tokens, W), arrives_verb(W), !.
 verb_pos(Tokens, lives_in, I) :-
     nth0(I, Tokens, in),
     nth0(J, Tokens, A), J < I, member(A, [live, lives, lived]), !.

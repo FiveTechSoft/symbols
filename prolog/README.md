@@ -38,6 +38,7 @@ swipl -s experiment18.pl -g experiment18 -t halt
 swipl -s experiment19.pl -g experiment19 -t halt
 swipl -s experiment20.pl -g experiment20 -t halt
 swipl -s experiment21.pl -g experiment21 -t halt
+swipl -s experiment22.pl -g experiment22 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -68,6 +69,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 19 | Preguntas sobre memoria: retrieval vs reasoning + prueba (`Why`) | 10/10; Q3 inferida (no almacenada) con cadena de justificación |
 | 20 | Conflicto, tiempo y revisión (provenance; pasado interpola, futuro UNKNOWN) | 18/18; `INVENTION` de tipos: 0 |
 | 21 | Regla transferida con memoria factual borrada (solo el programa sobrevive) | 11/11; `sofia→italy` sin ningún hecho `reaches` |
+| 22 | Ciclo cerrado: olvidar experiencia, conservar regla, 2ª familia sin interferencia | 11/11; `reaches` intacta tras aprender `arrives` |
 
 ## Arquitectura emergente
 
