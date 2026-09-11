@@ -8951,3 +8951,52 @@ Verificación en clon: 30–37 completos + `preflight_project` PASS.
 
 ---
 
+# EXP38 — Hierarchical composition (compuesto como ladrillo)
+
+## Lo que demuestra
+
+```text
+Nivel 0   hechos
+Nivel 1   estructuras (cA suministro, cB cocina, cD invitación)
+Nivel 2   conceptos + sub-skills (stocked, cuisine, contrib)
+Nivel 3   concepto compuesto (cA+cB → cater)
+Nivel 4   composición de compuesto (cater + cD → attends)
+```
+
+`attends(nell,sevilla)` (5 conclusiones ocultas, vocabulario nuevo)
+con prueba anidada de profundidad 2: el compuesto L3 entra **opaco**
+(`predict_attends` solo invoca `predict_cater` + `predict_in` cD;
+jamás hechos crudos ni reinducción). Parciales → UNKNOWN; cross
+rechazado; cero átomos. `passed 19/19` + preflight PASS.
+
+## Método: cadena temporal en 4 eslabones
+
+El descubrimiento necesita hechos del objetivo (`concept_relation`),
+pero la conclusión compuesta debe estar ausente (empates):
+
+```text
+base + facts L2 → descubrir L2 → observar cater →
+descubrir contrib → observar attends
+```
+
+`cater` durante L2 empataría `stocked` (`[belongs_to,cater]`
+F1=1.0); `attends` muere en `L` (sumidero) pero se observa en la
+cima por principio. Cada conclusión entra un eslabón después de lo
+que la explica.
+
+## Commit
+
+```text
+experiment38.pl (nuevo; ningún módulo tocado)
+README.md (EXP38 + eslabones temporales)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–38 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

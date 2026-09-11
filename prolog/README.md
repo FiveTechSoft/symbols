@@ -66,6 +66,7 @@ swipl -s experiment34.pl -g experiment34 -t halt
 swipl -s experiment35.pl -g experiment35 -t halt
 swipl -s experiment36.pl -g experiment36 -t halt
 swipl -s experiment37.pl -g experiment37 -t halt
+swipl -s experiment38.pl -g experiment38 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -113,6 +114,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP35 | SSE por tarea (un objeto, 3 firmas auditadas, 0 fuga) | 12/12; firmas distintas + respuestas correctas |
 | EXP36 | SSE de estructuras (transferencia estructural + regla `findall`) | 12/12; estructura→concepto→skill en vocabulario nuevo |
 | EXP37 | Composición de conceptos (skills compuestas sin volver a hechos) | 16/16; `cater` vía cA+cB, prueba composicional |
+| EXP38 | Composición jerárquica (compuesto L3 como ladrillo de L4) | 19/19; `attends` con prueba anidada, sin reinducir |
 
 ## Arquitectura emergente
 
@@ -184,6 +186,10 @@ skills compuestas con prueba composicional, sin volver a hechos).
   puede entrar después de descubierta la estructura que debe
   explicarla (`cater` observado tras inducir sub-skills; presente
   antes, empataría el descubrimiento y rompería el margen).
+  EXP38 la precisa a eslabones: base+L2 → descubrir L2 → observar
+  `cater` → descubrir `contrib` → observar `attends` (el
+  descubrimiento necesita hechos del objetivo; la conclusión
+  compuesta debe estar ausente).
 - **Exclusión global por objetivo** (EXP37): `SSE(X | T)` =
   representación estructural de `X` menos toda evidencia de `T`, en
   todas las estructuras que la usan (no solo en su clase); los
@@ -247,6 +253,10 @@ skills compuestas con prueba composicional, sin volver a hechos).
   (cocina) compartiendo `P`; `cater(P,L)` sobre conceptos + sub-skills
   (`stocked`, `cuisine`), sin volver a hechos crudos; `wex`/`yago`
   parciales → UNKNOWN; exclusión uniforme y temporal.
+- `experiment38.pl` — composición jerárquica: el compuesto L3
+  (`cater`) entra opaco al nivel 4 con cD (invitación,
+  `contrib :- [brings, needs]`); `attends(Q,L)` con prueba anidada
+  de profundidad 2; cadena temporal en 4 eslabones.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
