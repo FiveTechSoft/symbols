@@ -61,6 +61,7 @@ swipl -s experiment30.pl -g experiment30 -t halt
 python3 make_corpusA.py   # regenera corpusA/* + secreto + heldoutA/distractorA
 swipl -s experiment31.pl -g experiment31 -t halt
 swipl -s experiment32.pl -g experiment32 -t halt
+swipl -s experiment33.pl -g experiment33 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -103,6 +104,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP30 | Primer corpus natural (cero lexicón) + secreto temporal | 20/20; retrieve/reason/unknown, prueba por acierto |
 | EXP31 | Alineación de marcos (roles descubiertos, eventos reificados) | 12/12; 12→6 nodos, mapa 3/3, queries cruzadas |
 | EXP32 | Embeddings simbólicos (firmas WL sin etiquetas, 3 vocabularios) | 8/8; clases absorbentes + similitud explicada |
+| EXP33 | POO emergente: clase→comportamiento heredado (identidad≠pertenencia) | 10/10; `zorin/velara` heredan, `wex` UNKNOWN |
 
 ## Arquitectura emergente
 
