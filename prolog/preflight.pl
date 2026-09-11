@@ -296,12 +296,16 @@ goal_var_in(Goal, V) :-
     term_variables(Goal, GVs),
     member(VV, GVs), VV == V, !.
 
-% --- asserts: objetivos de modificacion (registrados, no llamadas) ---
+% --- asserts: objetivos de modificacion A CUALQUIER PROFUNDIDAD ---
+% (EXP45: assertz(found_rule/2) escondido en una rama -> ; con dynamic
+% found_rule/3 pasaba limpio porque solo se miraban conjunciones top).
+% Se reutiliza clause_check_body/2 (solo cuerpos) + sub_term/2.
 assert_targets_in_terms(Terms, Targets) :-
     findall(N/A, ( member(T, Terms),
-                   clause_conjuncts(T, Conj),
-                   member(B, Conj),
-                   assert_goal(B, Inner),
+                   clause_check_body(T, B),
+                   B \== none,
+                   sub_term(Sub, B),
+                   assert_goal(Sub, Inner),
                    callable(Inner),
                    functor(Inner, N, A)
                  ),

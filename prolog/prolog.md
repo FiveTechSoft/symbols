@@ -9269,3 +9269,49 @@ Verificación en clon: 30–45 completos + `preflight_project` PASS.
 
 ---
 
+# EXP46 — Conversational memory (ciclo de vida)
+
+## Lo que demuestra
+
+`tell/1` multi-turno sobre el corpus EXP43, sin redescubrir:
+
+```text
+John lives in Madrid. → Learned.
+Where does John live? → Madrid.
+John visits Paris. → Learned.
+Does John reach France? → Yes. + proof (visits/in + regla)
+Why? → Because: ...
+John visits Roma. → Learned.
+Where does John reach? → France, Italy (acumula).
+Does John reach London? → No. / Does zorin visit madrid? → UNKNOWN.
+John sings loudly. → I didn't understand that.
+```
+
+14/14. Lo contado alimenta las abstracciones descubiertas del
+corpus; la memoria persiste entre turnos. Ciclo experiencia →
+memoria → respuesta → experiencia nueva (aprendizaje continuo,
+no modelo entrenado una vez).
+
+Preflight: asserts anidados a cualquier profundidad
+(`found_rule/2` en rama `->` ya lo habría cazado); verificado sin
+falsos positivos en `remember_relation/3+4` — por eso NO se
+prohíben definiciones multi-aridad legítimas, solo el desajuste
+definición/uso.
+
+## Commit
+
+```text
+experiment46.pl (nuevo; ningún módulo tocado)
+preflight.pl (asserts anidados)
+README.md (EXP46)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–46 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

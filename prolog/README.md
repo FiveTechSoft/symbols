@@ -77,6 +77,7 @@ python3 make_corpus_natural2.py   # regenera corpus_natural2/* (seed 7)
 swipl -s experiment44.pl -g experiment44 -t halt
 python3 make_corpus_natural3.py   # regenera corpus_natural3/* (seed 11)
 swipl -s conversation.pl -g conversation_demo -t halt
+swipl -s experiment46.pl -g dialogue46 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -132,6 +133,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP43 | Corpus abierto multi-abstracción (519 frases, 2 skills sin fusión) | 48/48; `reaches`+`based`, selección por tarea, transferencia |
 | EXP44 | Cruce de superficies (mapa A↔B por roles, nada dado) | 39/39; 10+10 joins, mapa de 5 pares, proofs trans-ontología |
 | EXP45 | Chat simbólico (pregunta→prueba→respuesta verbalizada) | 16/16; sí/no/quién/dónde/why, UNKNOWN con razón |
+| EXP46 | Memoria conversacional (`tell` alimenta abstracciones) | 14/14; multi-turno, `reach` sobre lo contado, UNKNOWN |
 
 ## Arquitectura emergente
 
@@ -301,6 +303,12 @@ skills compuestas con prueba composicional, sin volver a hechos).
 - `conversation.pl` — EXP45: `ask/2` + `say/1` + `why`; 12 formas
   sobre el mundo EXP43; respuestas generadas desde el proof
   (sí/no/listas/UNKNOWN con razón); demo dialogada 16/16.
+- `experiment46.pl` — EXP46: `tell/1` multi-turno sobre el corpus;
+  lo contado alimenta reglas descubiertas (`reach` sobre visitas
+  nuevas); ciclo experiencia→memoria→respuesta→experiencia.
+- `preflight.pl` — incluye regla de asserts anidados (EXP45:
+  `found_rule/2` en rama `->` vs `dynamic /3`); sin falsos
+  positivos en `remember_relation/3+4`.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
