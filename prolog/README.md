@@ -40,6 +40,7 @@ swipl -s experiment20.pl -g experiment20 -t halt
 swipl -s experiment21.pl -g experiment21 -t halt
 swipl -s experiment22.pl -g experiment22 -t halt
 swipl -s experiment23.pl -g experiment23 -t halt
+swipl -s experiment24.pl -g experiment24 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -72,6 +73,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 21 | Regla transferida con memoria factual borrada (solo el programa sobrevive) | 11/11; `sofia→italy` sin ningún hecho `reaches` |
 | 22 | Ciclo cerrado: olvidar experiencia, conservar regla, 2ª familia sin interferencia | 11/11; `reaches` intacta tras aprender `arrives` |
 | 23 | Búsqueda guiada vs exhaustiva (mismo F1, 16.6× menos patrones) | 5/5; ganador y F1 idénticos |
+| 24 | Composición jerárquica: reglas como unidades (340 vs 16 evals, mismas predicciones) | 3/3; skill library `r3`, `r6` |
 
 ## Arquitectura emergente
 
@@ -118,6 +120,8 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   `active|contested|superseded`) y revisión temporal.
 - `guided_search.pl` — vocabulario incidente + filtro de extremos
   (podas sólidas: un patrón con soporte>0 nunca se poda).
+- `hierarchical.pl` — biblioteca de skills: reglas como unidades de
+  búsqueda sin expandir sus internos.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
