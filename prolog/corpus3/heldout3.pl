@@ -1,0 +1,10 @@
+heldout(selan, zelan, harvests).
+heldout(brilan, barlan, harvests).
+heldout(kalan, xelan, harvests).
+heldout(dulan, yalan, harvests).
+heldout(felan, zelan, harvests).
+heldout(gilan, barlan, harvests).
+heldout(hellan, xelan, harvests).
+heldout(irlan, yalan, harvests).
+heldout(jolan, zelan, harvests).
+heldout(klelan, barlan, harvests).

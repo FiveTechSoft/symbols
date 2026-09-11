@@ -1,0 +1,986 @@
+zarin works corsel.
+corsel supplies talix.
+zarin provides talix.
+turin worked dorsel.
+dorsel supplied ullix.
+turin provided ullix.
+yesterday serin worked filsel.
+filsel supplies valix.
+serin provides valix.
+bririn works gorsel.
+gorsel supplied wolix.
+bririn provided wolix.
+karin worked halsel.
+halsel supplies xelix.
+karin provides xelix.
+yesterday durin worked ivsel.
+ivsel supplied yalix.
+durin provided yalix.
+ferin works jelsel.
+jelsel supplies zelix.
+ferin provides zelix.
+girin worked korsel.
+korsel supplied barlix.
+girin provided barlix.
+yesterday helrin worked zador.
+zador supplies talix.
+helrin provides talix.
+irrin works tudor.
+tudor supplied ullix.
+irrin provided ullix.
+jorin worked sedor.
+sedor supplies valix.
+jorin provides valix.
+yesterday klerin worked bridor.
+bridor supplied wolix.
+klerin provided wolix.
+lurin works kador.
+kador supplies xelix.
+lurin provides xelix.
+marin worked dudor.
+dudor supplied yalix.
+marin provided yalix.
+yesterday nerin worked fedor.
+fedor supplies zelix.
+nerin provides zelix.
+otrin works gidor.
+gidor supplied barlix.
+otrin provided barlix.
+parin worked heldor.
+heldor supplies talix.
+parin provides talix.
+yesterday quirin worked irdor.
+irdor supplied ullix.
+quirin provided ullix.
+rarin works jodor.
+jodor supplies valix.
+rarin provides valix.
+selrin worked kledor.
+kledor supplied wolix.
+selrin provided wolix.
+yesterday tarin worked ludor.
+ludor supplies xelix.
+tarin provides xelix.
+ulrin works mador.
+mador supplied yalix.
+ulrin provided yalix.
+varin worked nedor.
+nedor supplies zelix.
+varin provides zelix.
+yesterday worin worked otdor.
+otdor supplied barlix.
+worin provided barlix.
+xerin works pador.
+pador supplies talix.
+xerin provides talix.
+yarin worked quidor.
+quidor supplied ullix.
+yarin provided ullix.
+yesterday zerin worked rador.
+rador supplies valix.
+zerin provides valix.
+barrin works seldor.
+seldor supplied wolix.
+barrin provided wolix.
+corrin worked tador.
+tador supplies xelix.
+corrin provides xelix.
+yesterday dorrin worked uldor.
+uldor supplied yalix.
+dorrin provided yalix.
+filrin works vador.
+vador supplies zelix.
+filrin provides zelix.
+gorrin worked wodor.
+wodor supplied barlix.
+gorrin provided barlix.
+yesterday halrin worked xedor.
+xedor supplies talix.
+halrin provides talix.
+ivrin works yador.
+yador supplied ullix.
+ivrin provided ullix.
+jelrin worked zedor.
+zedor supplies valix.
+jelrin provides valix.
+yesterday korrin worked bardor.
+bardor supplied wolix.
+korrin provided wolix.
+zavio works cordor.
+cordor supplies xelix.
+zavio provides xelix.
+tuvio worked dordor.
+dordor supplied yalix.
+tuvio provided yalix.
+yesterday sevio worked fildor.
+fildor supplies zelix.
+sevio provides zelix.
+brivio works gordor.
+gordor supplied barlix.
+brivio provided barlix.
+kavio worked haldor.
+haldor supplies talix.
+kavio provides talix.
+yesterday duvio worked ivdor.
+ivdor supplied ullix.
+duvio provided ullix.
+fevio works jeldor.
+jeldor supplies valix.
+fevio provides valix.
+givio worked kordor.
+kordor supplied wolix.
+givio provided wolix.
+yesterday helvio worked zakan.
+zakan supplies xelix.
+helvio provides xelix.
+irvio works tukan.
+tukan supplied yalix.
+irvio provided yalix.
+jovio worked sekan.
+sekan supplies zelix.
+jovio provides zelix.
+yesterday klevio worked brikan.
+brikan supplied barlix.
+klevio provided barlix.
+luvio works kakan.
+kakan supplies talix.
+luvio provides talix.
+mavio worked dukan.
+dukan supplied ullix.
+mavio provided ullix.
+yesterday nevio worked fekan.
+fekan supplies valix.
+nevio provides valix.
+otvio works gikan.
+gikan supplied wolix.
+otvio provided wolix.
+pavio worked helkan.
+helkan supplies xelix.
+pavio provides xelix.
+yesterday quivio worked irkan.
+irkan supplied yalix.
+quivio provided yalix.
+ravio works jokan.
+jokan supplies zelix.
+ravio provides zelix.
+selvio worked klekan.
+klekan supplied barlix.
+selvio provided barlix.
+yesterday tavio worked lukan.
+lukan supplies talix.
+tavio provides talix.
+ulvio works makan.
+makan supplied ullix.
+ulvio provided ullix.
+vavio worked nekan.
+nekan supplies valix.
+vavio provides valix.
+yesterday wovio worked otkan.
+otkan supplied wolix.
+wovio provided wolix.
+xevio works pakan.
+pakan supplies xelix.
+xevio provides xelix.
+yavio worked quikan.
+quikan supplied yalix.
+yavio provided yalix.
+yesterday zevio worked rakan.
+rakan supplies zelix.
+zevio provides zelix.
+barvio works selkan.
+selkan supplied barlix.
+barvio provided barlix.
+corvio worked takan.
+takan supplies talix.
+corvio provides talix.
+yesterday dorvio worked ulkan.
+ulkan supplied ullix.
+dorvio provided ullix.
+filvio works vakan.
+vakan supplies valix.
+filvio provides valix.
+gorvio worked wokan.
+wokan supplied wolix.
+gorvio provided wolix.
+yesterday halvio worked xekan.
+xekan supplies xelix.
+halvio provides xelix.
+ivvio works yakan.
+yakan supplied yalix.
+ivvio provided yalix.
+jelvio worked zekan.
+zekan supplies zelix.
+jelvio provides zelix.
+yesterday korvio worked barkan.
+barkan supplied barlix.
+korvio provided barlix.
+zasel works corkan.
+corkan supplies talix.
+zasel provides talix.
+tusel worked dorkan.
+dorkan supplied ullix.
+tusel provided ullix.
+yesterday sesel worked filkan.
+filkan supplies valix.
+sesel provides valix.
+brisel works gorkan.
+gorkan supplied wolix.
+brisel provided wolix.
+kasel worked halkan.
+halkan supplies xelix.
+kasel provides xelix.
+yesterday dusel worked ivkan.
+ivkan supplied yalix.
+dusel provided yalix.
+fesel works jelkan.
+jelkan supplies zelix.
+fesel provides zelix.
+gisel worked korkan.
+korkan supplied barlix.
+gisel provided barlix.
+yesterday helsel worked zalix.
+zalix supplies talix.
+helsel provides talix.
+irsel works tulix.
+tulix supplied ullix.
+irsel provided ullix.
+josel worked selix.
+selix supplies valix.
+josel provides valix.
+yesterday klesel worked brilix.
+brilix supplied wolix.
+klesel provided wolix.
+lusel works kalix.
+kalix supplies xelix.
+lusel provides xelix.
+masel worked dulix.
+dulix supplied yalix.
+masel provided yalix.
+yesterday nesel worked felix.
+felix supplies zelix.
+nesel provides zelix.
+otsel works gilix.
+gilix supplied barlix.
+otsel provided barlix.
+pasel worked hellix.
+hellix supplies talix.
+pasel provides talix.
+yesterday quisel worked irlix.
+irlix supplied ullix.
+quisel provided ullix.
+rasel works jolix.
+jolix supplies valix.
+rasel provides valix.
+selsel worked klelix.
+klelix supplied wolix.
+selsel provided wolix.
+yesterday tasel worked lulix.
+lulix supplies xelix.
+tasel provides xelix.
+ulsel works malix.
+malix supplied yalix.
+ulsel provided yalix.
+vasel worked nelix.
+nelix supplies zelix.
+vasel provides zelix.
+yesterday wosel worked otlix.
+otlix supplied barlix.
+wosel provided barlix.
+xesel works palix.
+palix supplies talix.
+xesel provides talix.
+yasel worked quilix.
+quilix supplied ullix.
+yasel provided ullix.
+yesterday zesel worked ralix.
+ralix supplies valix.
+zesel provides valix.
+barsel works sellix.
+sellix supplied wolix.
+barsel provided wolix.
+corlix buys tavil.
+tavil is in luzel.
+corlix imports luzel.
+dorlix bought ulvil.
+ulvil lies in mazel.
+dorlix imported mazel.
+yesterday fillix bought vavil.
+vavil was in nezel.
+fillix imports nezel.
+gorlix buys wovil.
+wovil is in otzel.
+gorlix imported otzel.
+hallix bought xevil.
+xevil lies in pazel.
+hallix imports pazel.
+yesterday ivlix bought yavil.
+yavil was in quizel.
+ivlix imported quizel.
+jellix buys zevil.
+zevil is in razel.
+jellix imports razel.
+korlix bought barvil.
+barvil lies in selzel.
+korlix imported selzel.
+yesterday zamor bought corvil.
+corvil was in luzel.
+zamor imports luzel.
+tumor buys dorvil.
+dorvil is in mazel.
+tumor imported mazel.
+semor bought filvil.
+filvil lies in nezel.
+semor imports nezel.
+yesterday brimor bought gorvil.
+gorvil was in otzel.
+brimor imported otzel.
+kamor buys halvil.
+halvil is in pazel.
+kamor imports pazel.
+dumor bought ivvil.
+ivvil lies in quizel.
+dumor imported quizel.
+yesterday femor bought jelvil.
+jelvil was in razel.
+femor imports razel.
+gimor buys korvil.
+korvil is in selzel.
+gimor imported selzel.
+helmor bought zaxor.
+zaxor lies in luzel.
+helmor imports luzel.
+yesterday irmor bought tuxor.
+tuxor was in mazel.
+irmor imported mazel.
+jomor buys sexor.
+sexor is in nezel.
+jomor imports nezel.
+klemor bought brixor.
+brixor lies in otzel.
+klemor imported otzel.
+yesterday lumor bought kaxor.
+kaxor was in pazel.
+lumor imports pazel.
+mamor buys duxor.
+duxor is in quizel.
+mamor imported quizel.
+nemor bought fexor.
+fexor lies in razel.
+nemor imports razel.
+yesterday otmor bought gixor.
+gixor was in selzel.
+otmor imported selzel.
+pamor buys helxor.
+helxor is in luzel.
+pamor imports luzel.
+quimor bought irxor.
+irxor lies in mazel.
+quimor imported mazel.
+yesterday ramor bought joxor.
+joxor was in nezel.
+ramor imports nezel.
+selmor buys klexor.
+klexor is in otzel.
+selmor imported otzel.
+tamor bought luxor.
+luxor lies in pazel.
+tamor imports pazel.
+yesterday ulmor bought maxor.
+maxor was in quizel.
+ulmor imported quizel.
+vamor buys nexor.
+nexor is in razel.
+vamor imports razel.
+womor bought otxor.
+otxor lies in selzel.
+womor imported selzel.
+yesterday xemor bought paxor.
+paxor was in luzel.
+xemor imports luzel.
+yamor buys quixor.
+quixor is in mazel.
+yamor imported mazel.
+zemor bought raxor.
+raxor lies in nezel.
+zemor imports nezel.
+yesterday barmor bought selxor.
+selxor was in otzel.
+barmor imported otzel.
+cormor buys taxor.
+taxor is in pazel.
+cormor imports pazel.
+dormor bought ulxor.
+ulxor lies in quizel.
+dormor imported quizel.
+yesterday filmor bought vaxor.
+vaxor was in razel.
+filmor imports razel.
+gormor buys woxor.
+woxor is in selzel.
+gormor imported selzel.
+halmor bought xexor.
+xexor lies in luzel.
+halmor imports luzel.
+yesterday ivmor bought yaxor.
+yaxor was in mazel.
+ivmor imported mazel.
+jelmor buys zexor.
+zexor is in nezel.
+jelmor imports nezel.
+kormor bought barxor.
+barxor lies in otzel.
+kormor imported otzel.
+yesterday zatan bought corxor.
+corxor was in pazel.
+zatan imports pazel.
+tutan buys dorxor.
+dorxor is in quizel.
+tutan imported quizel.
+setan bought filxor.
+filxor lies in razel.
+setan imports razel.
+yesterday britan bought gorxor.
+gorxor was in selzel.
+britan imported selzel.
+katan buys halxor.
+halxor is in luzel.
+katan imports luzel.
+dutan bought ivxor.
+ivxor lies in mazel.
+dutan imported mazel.
+yesterday fetan bought jelxor.
+jelxor was in nezel.
+fetan imports nezel.
+gitan buys korxor.
+korxor is in otzel.
+gitan imported otzel.
+heltan bought zayan.
+zayan lies in pazel.
+heltan imports pazel.
+yesterday irtan bought tuyan.
+tuyan was in quizel.
+irtan imported quizel.
+jotan buys seyan.
+seyan is in razel.
+jotan imports razel.
+kletan bought briyan.
+briyan lies in selzel.
+kletan imported selzel.
+yesterday lutan bought kayan.
+kayan was in luzel.
+lutan imports luzel.
+matan buys duyan.
+duyan is in mazel.
+matan imported mazel.
+netan bought feyan.
+feyan lies in nezel.
+netan imports nezel.
+yesterday ottan bought giyan.
+giyan was in otzel.
+ottan imported otzel.
+patan buys helyan.
+helyan is in pazel.
+patan imports pazel.
+quitan bought iryan.
+iryan lies in quizel.
+quitan imported quizel.
+yesterday ratan bought joyan.
+joyan was in razel.
+ratan imports razel.
+seltan buys kleyan.
+kleyan is in selzel.
+seltan imported selzel.
+tatan bought luyan.
+luyan lies in luzel.
+tatan imports luzel.
+yesterday ultan bought mayan.
+mayan was in mazel.
+ultan imported mazel.
+vatan buys neyan.
+neyan is in nezel.
+vatan imports nezel.
+wotan bought otyan.
+otyan lies in otzel.
+wotan imported otzel.
+yesterday xetan bought payan.
+payan was in pazel.
+xetan imports pazel.
+yatan buys quiyan.
+quiyan is in quizel.
+yatan imported quizel.
+zetan bought rayan.
+rayan lies in razel.
+zetan imports razel.
+yesterday bartan bought selyan.
+selyan was in selzel.
+bartan imported selzel.
+cortan buys tayan.
+tayan is in luzel.
+cortan imports luzel.
+dortan bought ulyan.
+ulyan lies in mazel.
+dortan imported mazel.
+yesterday filtan bought vayan.
+vayan was in nezel.
+filtan imports nezel.
+gortan buys woyan.
+woyan is in otzel.
+gortan imported otzel.
+haltan bought xeyan.
+xeyan lies in pazel.
+haltan imports pazel.
+yesterday ivtan bought yayan.
+yayan was in quizel.
+ivtan imported quizel.
+jeltan buys zeyan.
+zeyan is in razel.
+jeltan imports razel.
+kortan bought baryan.
+baryan lies in selzel.
+kortan imported selzel.
+yesterday zavil bought coryan.
+coryan was in luzel.
+zavil imports luzel.
+tuvil buys doryan.
+doryan is in mazel.
+tuvil imported mazel.
+sevil bought filyan.
+filyan lies in nezel.
+sevil imports nezel.
+yesterday brivil bought goryan.
+goryan was in otzel.
+brivil imported otzel.
+kavil buys halyan.
+halyan is in pazel.
+kavil imports pazel.
+duvil bought ivyan.
+ivyan lies in quizel.
+duvil imported quizel.
+yesterday fevil bought jelyan.
+jelyan was in razel.
+fevil imports razel.
+givil buys koryan.
+koryan is in selzel.
+givil imported selzel.
+helvil bought zazel.
+zazel lies in luzel.
+helvil imports luzel.
+yesterday irvil bought tuzel.
+tuzel was in mazel.
+irvil imported mazel.
+jovil buys sezel.
+sezel is in nezel.
+jovil imports nezel.
+klevil bought brizel.
+brizel lies in otzel.
+klevil imported otzel.
+yesterday luvil bought kazel.
+kazel was in pazel.
+luvil imports pazel.
+mavil buys duzel.
+duzel is in quizel.
+mavil imported quizel.
+nevil bought fezel.
+fezel lies in razel.
+nevil imports razel.
+yesterday otvil bought gizel.
+gizel was in selzel.
+otvil imported selzel.
+pavil buys helzel.
+helzel is in luzel.
+pavil imports luzel.
+quivil bought irzel.
+irzel lies in mazel.
+quivil imported mazel.
+yesterday ravil bought jozel.
+jozel was in nezel.
+ravil imports nezel.
+selvil buys klezel.
+klezel is in otzel.
+selvil imported otzel.
+tazel cooks lufor.
+lufor needs kajos.
+tazel uses kajos.
+ulzel cooked mafor.
+mafor needed dujos.
+ulzel used dujos.
+today vazel cooks nefor.
+nefor needs fejos.
+vazel uses fejos.
+wozel cooks otfor.
+otfor needed gijos.
+wozel used gijos.
+xezel cooked pafor.
+pafor needs heljos.
+xezel uses heljos.
+today yazel cooks quifor.
+quifor needed irjos.
+yazel used irjos.
+zezel cooks rafor.
+rafor needs jojos.
+zezel uses jojos.
+barzel cooked selfor.
+selfor needed klejos.
+barzel used klejos.
+today corzel cooks tafor.
+tafor needs kajos.
+corzel uses kajos.
+dorzel cooks ulfor.
+ulfor needed dujos.
+dorzel used dujos.
+filzel cooked vafor.
+vafor needs fejos.
+filzel uses fejos.
+today gorzel cooks wofor.
+wofor needed gijos.
+gorzel used gijos.
+halzel cooks xefor.
+xefor needs heljos.
+halzel uses heljos.
+ivzel cooked yafor.
+yafor needed irjos.
+ivzel used irjos.
+today jelzel cooks zefor.
+zefor needs jojos.
+jelzel uses jojos.
+korzel cooks barfor.
+barfor needed klejos.
+korzel used klejos.
+zamar cooked corfor.
+corfor needs kajos.
+zamar uses kajos.
+today tumar cooks dorfor.
+dorfor needed dujos.
+tumar used dujos.
+semar cooks filfor.
+filfor needs fejos.
+semar uses fejos.
+brimar cooked gorfor.
+gorfor needed gijos.
+brimar used gijos.
+today kamar cooks halfor.
+halfor needs heljos.
+kamar uses heljos.
+dumar cooks ivfor.
+ivfor needed irjos.
+dumar used irjos.
+femar cooked jelfor.
+jelfor needs jojos.
+femar uses jojos.
+today gimar cooks korfor.
+korfor needed klejos.
+gimar used klejos.
+helmar cooks zagus.
+zagus needs kajos.
+helmar uses kajos.
+irmar cooked tugus.
+tugus needed dujos.
+irmar used dujos.
+today jomar cooks segus.
+segus needs fejos.
+jomar uses fejos.
+klemar cooks brigus.
+brigus needed gijos.
+klemar used gijos.
+lumar cooked kagus.
+kagus needs heljos.
+lumar uses heljos.
+today mamar cooks dugus.
+dugus needed irjos.
+mamar used irjos.
+nemar cooks fegus.
+fegus needs jojos.
+nemar uses jojos.
+otmar cooked gigus.
+gigus needed klejos.
+otmar used klejos.
+today pamar cooks helgus.
+helgus needs kajos.
+pamar uses kajos.
+quimar cooks irgus.
+irgus needed dujos.
+quimar used dujos.
+ramar cooked jogus.
+jogus needs fejos.
+ramar uses fejos.
+today selmar cooks klegus.
+klegus needed gijos.
+selmar used gijos.
+tamar cooks lugus.
+lugus needs heljos.
+tamar uses heljos.
+ulmar cooked magus.
+magus needed irjos.
+ulmar used irjos.
+today vamar cooks negus.
+negus needs jojos.
+vamar uses jojos.
+womar cooks otgus.
+otgus needed klejos.
+womar used klejos.
+xemar cooked pagus.
+pagus needs kajos.
+xemar uses kajos.
+today yamar cooks quigus.
+quigus needed dujos.
+yamar used dujos.
+zemar cooks ragus.
+ragus needs fejos.
+zemar uses fejos.
+barmar cooked selgus.
+selgus needed gijos.
+barmar used gijos.
+today cormar cooks tagus.
+tagus needs heljos.
+cormar uses heljos.
+dormar cooks ulgus.
+ulgus needed irjos.
+dormar used irjos.
+filmar cooked vagus.
+vagus needs jojos.
+filmar uses jojos.
+today gormar cooks wogus.
+wogus needed klejos.
+gormar used klejos.
+halmar cooks xegus.
+xegus needs kajos.
+halmar uses kajos.
+ivmar cooked yagus.
+yagus needed dujos.
+ivmar used dujos.
+today jelmar cooks zegus.
+zegus needs fejos.
+jelmar uses fejos.
+kormar cooks bargus.
+bargus needed gijos.
+kormar used gijos.
+zanis cooked corgus.
+corgus needs heljos.
+zanis uses heljos.
+today tunis cooks dorgus.
+dorgus needed irjos.
+tunis used irjos.
+senis cooks filgus.
+filgus needs jojos.
+senis uses jojos.
+brinis cooked gorgus.
+gorgus needed klejos.
+brinis used klejos.
+today kanis cooks halgus.
+halgus needs kajos.
+kanis uses kajos.
+dunis cooks ivgus.
+ivgus needed dujos.
+dunis used dujos.
+fenis cooked jelgus.
+jelgus needs fejos.
+fenis uses fejos.
+today ginis cooks korgus.
+korgus needed gijos.
+ginis used gijos.
+helnis cooks zahan.
+zahan needs heljos.
+helnis uses heljos.
+irnis cooked tuhan.
+tuhan needed irjos.
+irnis used irjos.
+today jonis cooks sehan.
+sehan needs jojos.
+jonis uses jojos.
+klenis cooks brihan.
+brihan needed klejos.
+klenis used klejos.
+lunis cooked kahan.
+kahan needs kajos.
+lunis uses kajos.
+today manis cooks duhan.
+duhan needed dujos.
+manis used dujos.
+nenis cooks fehan.
+fehan needs fejos.
+nenis uses fejos.
+otnis cooked gihan.
+gihan needed gijos.
+otnis used gijos.
+today panis cooks helhan.
+helhan needs heljos.
+panis uses heljos.
+quinis cooks irhan.
+irhan needed irjos.
+quinis used irjos.
+ranis cooked johan.
+johan needs jojos.
+ranis uses jojos.
+today selnis cooks klehan.
+klehan needed klejos.
+selnis used klejos.
+tanis cooks luhan.
+luhan needs kajos.
+tanis uses kajos.
+ulnis cooked mahan.
+mahan needed dujos.
+ulnis used dujos.
+today vanis cooks nehan.
+nehan needs fejos.
+vanis uses fejos.
+wonis cooks othan.
+othan needed gijos.
+wonis used gijos.
+xenis cooked pahan.
+pahan needs heljos.
+xenis uses heljos.
+today yanis cooks quihan.
+quihan needed irjos.
+yanis used irjos.
+zenis cooks rahan.
+rahan needs jojos.
+zenis uses jojos.
+barnis cooked selhan.
+selhan needed klejos.
+barnis used klejos.
+today cornis cooks tahan.
+tahan needs kajos.
+cornis uses kajos.
+dornis cooks ulhan.
+ulhan needed dujos.
+dornis used dujos.
+filnis cooked vahan.
+vahan needs fejos.
+filnis uses fejos.
+today gornis cooks wohan.
+wohan needed gijos.
+gornis used gijos.
+halnis cooks xehan.
+xehan needs heljos.
+halnis uses heljos.
+ivnis cooked yahan.
+yahan needed irjos.
+ivnis used irjos.
+today jelnis cooks zehan.
+zehan needs jojos.
+jelnis uses jojos.
+kornis cooks barhan.
+barhan needed klejos.
+kornis used klejos.
+zafor cooked corhan.
+corhan needs kajos.
+zafor uses kajos.
+today tufor cooks dorhan.
+dorhan needed dujos.
+tufor used dujos.
+sefor cooks filhan.
+filhan needs fejos.
+sefor uses fejos.
+brifor cooked gorhan.
+gorhan needed gijos.
+brifor used gijos.
+today kafor cooks halhan.
+halhan needs heljos.
+kafor uses heljos.
+dufor cooks ivhan.
+ivhan needed irjos.
+dufor used irjos.
+fefor cooked jelhan.
+jelhan needs jojos.
+fefor uses jojos.
+today gifor cooks korhan.
+korhan needed klejos.
+gifor used klejos.
+helfor cooks zajos.
+zajos needs kajos.
+helfor uses kajos.
+irfor cooked tujos.
+tujos needed dujos.
+irfor used dujos.
+today jofor cooks sejos.
+sejos needs fejos.
+jofor uses fejos.
+klefor cooks brijos.
+brijos needed gijos.
+klefor used gijos.
+lujos praises vajos.
+vajos honors vajos.
+vajos exalts haljos.
+lujos admires haljos.
+majos praises wojos.
+wojos honors wojos.
+wojos exalts ivjos.
+majos admires ivjos.
+nejos praises xejos.
+xejos honors xejos.
+xejos exalts jeljos.
+nejos admires jeljos.
+otjos praises yajos.
+yajos honors yajos.
+yajos exalts korjos.
+otjos admires korjos.
+pajos praises zejos.
+zejos honors zejos.
+zejos exalts zakil.
+pajos admires zakil.
+quijos praises barjos.
+barjos honors barjos.
+barjos exalts tukil.
+quijos admires tukil.
+rajos praises corjos.
+corjos honors corjos.
+corjos exalts sekil.
+rajos admires sekil.
+seljos praises dorjos.
+dorjos honors dorjos.
+dorjos exalts brikil.
+seljos admires brikil.
+tajos praises filjos.
+filjos honors filjos.
+filjos exalts kakil.
+tajos admires kakil.
+uljos praises gorjos.
+gorjos honors gorjos.
+gorjos exalts dukil.
+uljos admires dukil.
+fekil praises pakil.
+pakil exalts zekil.
+gikil praises quikil.
+quikil exalts barkil.
+helkil praises rakil.
+rakil exalts corkil.
+irkil praises selkil.
+selkil exalts dorkil.
+jokil praises takil.
+takil exalts filkil.
+klekil praises ulkil.
+ulkil exalts gorkil.
+lukil praises vakil.
+vakil exalts halkil.
+makil praises wokil.
+wokil exalts ivkil.
+nekil praises xekil.
+xekil exalts jelkil.
+otkil praises yakil.
+yakil exalts korkil.
+zalan plants lulan.
+lulan yields xelan.
+zalan harvests xelan.
+tulan planted malan.
+malan yielded yalan.
+tulan harvested yalan.
+selan plants nelan.
+nelan yields zelan.
+brilan planted otlan.
+otlan yielded barlan.
+kalan plants palan.
+palan yields xelan.
+dulan planted quilan.
+quilan yielded yalan.
+felan plants ralan.
+ralan yields zelan.
+gilan planted sellan.
+sellan yielded barlan.
+hellan plants talan.
+talan yields xelan.
+irlan planted ullan.
+ullan yielded yalan.
+jolan plants valan.
+valan yields zelan.
+klelan planted wolan.
+wolan yielded barlan.

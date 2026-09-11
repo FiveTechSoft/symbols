@@ -52,9 +52,11 @@ Ritual pre-vuelo (estático, sin ejecutar) y corpus:
 swipl -s preflight.pl -g "preflight('experiment19.pl')" -t halt
 swipl -s preflight.pl -g "preflight_project('.')" -t halt
 swipl -s run_corpus1.pl -g main -t halt
-python3 make_corpus1.py   # regenera corpus1.txt + heldout1.pl (semilla fija)
+python3 make_corpus1.py   # regenera corpus1/corpus1.txt + heldout1.pl
 swipl -s experiment28.pl -g experiment28 -t halt
-python3 make_corpus2.py   # regenera corpus2/*.txt + heldout2.pl (semilla fija)
+python3 make_corpus2.py   # regenera corpus2/*.txt + heldout2.pl
+swipl -s experiment29.pl -g experiment29 -t halt
+python3 make_corpus3.py   # regenera corpus3/* + heldout3/distractor3
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -92,7 +94,8 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | 26 | Skills persistentes sin hechos; transferencia a entidades nuevas | 10/10; `r9` se ejecuta sin `constrained` ni inducción |
 | 27 | Clases emergentes sin declarar + herencia de skills (0 tipos) | 12/12; `obj6/obj8` heredan `reaches`, `obj7` no |
 | 28 | Corpus v0.1: ingesta separada + ciclo + Corpus 1 (150 frases EN) | 21/21; 150/150 hechos, held-out 10/10 razonado |
-| 29 | Guided corpus learning por bloques + control negativo de ruido | 33/33; guided << exhaustive por bloque |
+| EXP28 | Guided corpus learning por bloques + control negativo de ruido | 33/33; guided << exhaustive por bloque |
+| EXP29 | Corpus 3: transferencia real (vocabulario y relaciones inéditos) | 40/40; 10 ocultos con proof atribuida a meta, 20 TN verificados |
 
 ## Arquitectura emergente
 
@@ -146,11 +149,14 @@ Identidad separada en 4 niveles: `ENTITY IDENTITY`, `CONCEPT MEMBERSHIP`,
   `knowledge_stats` (ingesta separada del aprendizaje).
 - `preflight.pl` — ritual estático: sintaxis, aridad, dinámicas,
   indefinidas, consults; más `preflight_project/1` (unión del proyecto).
-- `run_corpus1.pl` + `corpus1.txt` + `heldout1.pl` + `make_corpus1.py` —
+- `run_corpus1.pl` + `corpus1/` + `make_corpus1.py` —
   Corpus 1 piloto (150 frases, 10 held-out; `longterm_c1.pl` generado).
-- `experiment28.pl` + `make_corpus2.py` + `corpus2/*.txt` + `heldout2.pl`
+- `experiment28.pl` + `make_corpus2.py` + `corpus2/` + `heldout2.pl`
   + `distractor2.pl` — Corpus 2 por bloques con tabla marginal
   (evaluaciones/fact) y control negativo en el bloque de ruido.
+- `experiment29.pl` + `make_corpus3.py` + `corpus3/` — Corpus 3:
+  transferencia a vocabulario y relaciones inéditos, test oculto con
+  proof atribuida (meta vs inducida) y distractores verificados.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —

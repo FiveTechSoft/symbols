@@ -61,9 +61,9 @@ def main():
         else:
             sentences.append(REACHES_T[i % len(REACHES_T)].format(p=p, k=k))
         sentences.append(EATS_T[i % len(EATS_T)].format(p=p, f=f))
-    with open("corpus1.txt", "w", encoding="utf-8") as fh:
+    with open("corpus1/corpus1.txt", "w", encoding="utf-8") as fh:
         fh.write("\n".join(sentences) + "\n")
-    with open("heldout1.pl", "w", encoding="utf-8") as fh:
+    with open("corpus1/heldout1.pl", "w", encoding="utf-8") as fh:
         for p, k in heldout:
             fh.write(f"heldout({p}, {k}).\n")
     print(f"sentences={len(sentences)} heldout={len(heldout)} "

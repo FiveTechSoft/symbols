@@ -14,6 +14,14 @@ parse_question(Sentence, q_where_arrives(X)) :-
     tokenize_en(Sentence, [where, does, X, arrive]), !.
 parse_question(Sentence, q_where_borrows(X)) :-
     tokenize_en(Sentence, [where, does, X, borrow]), !.
+parse_question(Sentence, q_where_provides(X)) :-
+    tokenize_en(Sentence, [where, does, X, provide]), !.
+parse_question(Sentence, q_where_imports(X)) :-
+    tokenize_en(Sentence, [where, does, X, import]), !.
+parse_question(Sentence, q_where_uses(X)) :-
+    tokenize_en(Sentence, [where, does, X, use]), !.
+parse_question(Sentence, q_where_harvests(X)) :-
+    tokenize_en(Sentence, [where, does, X, harvest]), !.
 parse_question(Sentence, q_who_visits(Y)) :-
     tokenize_en(Sentence, [who, visits, Y]), !.
 parse_question(Sentence, q_who_lives(Y)) :-
@@ -38,6 +46,14 @@ answer_query(q_where_arrives(X), A) :-
     solve_slot(arrives, X, sub, A).
 answer_query(q_where_borrows(X), A) :-
     solve_slot(borrows, X, sub, A).
+answer_query(q_where_provides(X), A) :-
+    solve_slot(provides, X, sub, A).
+answer_query(q_where_imports(X), A) :-
+    solve_slot(imports, X, sub, A).
+answer_query(q_where_uses(X), A) :-
+    solve_slot(uses, X, sub, A).
+answer_query(q_where_harvests(X), A) :-
+    solve_slot(harvests, X, sub, A).
 answer_query(q_who_visits(Y), A) :-
     solve_slot(visits, Y, obj, A).
 answer_query(q_who_lives(Y), A) :-
@@ -129,6 +145,14 @@ verbalize(answer([X], _, _), q_where_arrives(S), Out) :-
     format(string(Out), "~w arrives in ~w.", [S, X]).
 verbalize(answer([X], _, _), q_where_borrows(S), Out) :-
     format(string(Out), "~w borrows ~w.", [S, X]).
+verbalize(answer([X], _, _), q_where_provides(S), Out) :-
+    format(string(Out), "~w provides ~w.", [S, X]).
+verbalize(answer([X], _, _), q_where_imports(S), Out) :-
+    format(string(Out), "~w imports ~w.", [S, X]).
+verbalize(answer([X], _, _), q_where_uses(S), Out) :-
+    format(string(Out), "~w uses ~w.", [S, X]).
+verbalize(answer([X], _, _), q_where_harvests(S), Out) :-
+    format(string(Out), "~w harvests ~w.", [S, X]).
 verbalize(answer([X], _, _), q_who_visits(O), Out) :-
     format(string(Out), "~w visits ~w.", [X, O]).
 verbalize(answer([X], _, _), q_who_lives(O), Out) :-

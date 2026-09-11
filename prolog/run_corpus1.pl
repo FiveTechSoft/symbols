@@ -2,7 +2,7 @@
 % Driver Corpus 1: ingesta -> ciclo -> metricas antes/despues -> held-out.
 % Uso desde prolog/: swipl -s run_corpus1.pl -g main -t halt
 :- consult('corpus.pl').
-:- consult('heldout1.pl').
+:- consult('corpus1/heldout1.pl').
 
 :- use_module(library(lists)).
 
@@ -11,7 +11,7 @@
 main :-
     knowledge_stats(Before),
     show_stats('BEFORE', Before),
-    learn_corpus('.'),
+    learn_corpus('corpus1'),
     memory_size(NFacts),
     check(NFacts =:= 150, 'ingested 150 facts (template coverage total)'),
     knowledge_stats(AfterIngest),
