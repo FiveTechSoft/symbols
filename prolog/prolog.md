@@ -9230,3 +9230,42 @@ Verificación en clon: 30–44 completos + `preflight_project` PASS.
 
 ---
 
+# EXP45 — First symbolic chat (etapa 1)
+
+## Lo que demuestra
+
+`ask/2` + `say/1` + `why` sobre el mundo EXP43 (12 formas):
+
+```text
+Does alba reach norway? → Yes. + proof (visits/in + regla)
+Why? → Because: ... Rule: ... Confidence: 1.00
+Does alba reach ireland? → No.
+Does zorin visit madrid? → I don't know.
+Why? → UNKNOWN. Reason: No valid proof exists.
+```
+
+16/16 con contenidos verificados (`t_has`: alba en Oslo,
+norway en respuestas, carla en italy). La respuesta se genera
+desde el proof, nunca por continuación estadística.
+
+Lección: `found_rule/2` vs `/3` fallaba en silencio tras
+`dynamic` (preflight pendiente de regla de aridad); el mundo
+asumido (sofia/yago/ines) no existía en v2 — verificar pools
+contra el corpus, no contra la memoria.
+
+## Commit
+
+```text
+conversation.pl (nuevo; ningún módulo tocado)
+README.md (EXP45)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–45 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+

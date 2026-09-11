@@ -76,6 +76,7 @@ swipl -s experiment43.pl -g experiment43 -t halt
 python3 make_corpus_natural2.py   # regenera corpus_natural2/* (seed 7)
 swipl -s experiment44.pl -g experiment44 -t halt
 python3 make_corpus_natural3.py   # regenera corpus_natural3/* (seed 11)
+swipl -s conversation.pl -g conversation_demo -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -130,6 +131,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP42 | Primer corpus natural (656 frases, cero lexicón de entidades) | 36/36; extracción 1.00, `reaches` F1=0.89, transferencia 8/8 |
 | EXP43 | Corpus abierto multi-abstracción (519 frases, 2 skills sin fusión) | 48/48; `reaches`+`based`, selección por tarea, transferencia |
 | EXP44 | Cruce de superficies (mapa A↔B por roles, nada dado) | 39/39; 10+10 joins, mapa de 5 pares, proofs trans-ontología |
+| EXP45 | Chat simbólico (pregunta→prueba→respuesta verbalizada) | 16/16; sí/no/quién/dónde/why, UNKNOWN con razón |
 
 ## Arquitectura emergente
 
@@ -296,6 +298,9 @@ skills compuestas con prueba composicional, sin volver a hechos).
   — EXP44-A (495 frases): familia B sin conclusiones; mapa
   A↔B inducido por roles (5 pares), `stored`/`offers` predichos
   con prueba trans-ontología; guardia anti-saltos silenciosos.
+- `conversation.pl` — EXP45: `ask/2` + `say/1` + `why`; 12 formas
+  sobre el mundo EXP43; respuestas generadas desde el proof
+  (sí/no/listas/UNKNOWN con razón); demo dialogada 16/16.
 - `question_parser.pl` — preguntas con prueba; `longterm21.pl` es la regla
   `reaches` exportada que EXP21 recarga tras borrar los hechos.
 - `continuous.pl`, `meta_pattern.pl`, `rule_instantiation.pl` —
