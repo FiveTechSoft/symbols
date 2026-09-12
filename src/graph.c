@@ -24,6 +24,7 @@ GRAPH *GraphCreate(
     graph->symbols = SymbolTableCreate(symbol_capacity);
     graph->relations = RelationTableCreate(relation_capacity);
     graph->embeddings = NULL;
+    graph->numerics = NULL;
 
     if (graph->symbols == NULL || graph->relations == NULL)
     {
@@ -53,6 +54,14 @@ void GraphSetEmbeddingTable(GRAPH *graph, EMBEDDING_TABLE *embeddings)
     if (graph == NULL)
         return;
     graph->embeddings = embeddings;
+}
+
+
+void GraphSetNumericTable(GRAPH *graph, NUMERIC_TABLE *numerics)
+{
+    if (graph == NULL)
+        return;
+    graph->numerics = numerics;
 }
 
 

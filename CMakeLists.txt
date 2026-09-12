@@ -17,6 +17,7 @@ add_library(symbolic STATIC
     src/generator.c
     src/ingest.c
     src/nlg.c
+    src/numeric.c
     src/prune.c
     src/shard.c
     src/stats.c
@@ -75,6 +76,7 @@ sllm_test(test_i18n           tests/test_i18n.c)
 sllm_test(test_self_reference tests/test_self_reference.c)
 sllm_test(test_neuro_prolog  tests/test_neuro_prolog.c)
 sllm_test(test_provenance     tests/test_provenance.c)
+sllm_test(test_numeric        tests/test_numeric.c)
 sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)
 sllm_test(test_qa_debug        test_qa_debug.c)

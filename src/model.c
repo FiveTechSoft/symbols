@@ -12,16 +12,20 @@ MODEL *ModelCreate(uint32_t symbol_capacity, uint32_t relation_capacity)
 
     model->graph = GraphCreate(symbol_capacity, relation_capacity);
     model->embeddings = EmbeddingTableCreate(symbol_capacity);
+    model->numerics = NumericCreate(symbol_capacity);
 
-    if (model->graph == NULL || model->embeddings == NULL)
+    if (model->graph == NULL || model->embeddings == NULL ||
+        model->numerics == NULL)
     {
         GraphDestroy(model->graph);
         EmbeddingTableDestroy(model->embeddings);
+        NumericDestroy(model->numerics);
         free(model);
         return NULL;
     }
 
     GraphSetEmbeddingTable(model->graph, model->embeddings);
+    GraphSetNumericTable(model->graph, model->numerics);
     model->config = LearningConfigDefault();
     return model;
 }
@@ -32,6 +36,7 @@ void ModelDestroy(MODEL *model)
         return;
 
     EmbeddingTableDestroy(model->embeddings);
+    NumericDestroy(model->numerics);
     GraphDestroy(model->graph);
     free(model);
 }
@@ -142,6 +147,37 @@ int ModelSave(const MODEL *model, const char *filepath)
 
             if (fwrite(&e->id, sizeof(SYMBOL_ID), 1, f) != 1 ||
                 fwrite(e->vector, sizeof(float), EMBEDDING_DIM, f) != EMBEDDING_DIM)
+            {
+                fclose(f);
+                return 0;
+            }
+        }
+    }
+
+    /* 5. Numeric sidecar block (V5): typed measures hanging off
+       symbols. Count + [id, value, unit]. Absent (count 0) when the
+       model holds no measures; V4 and older readers stop before it. */
+    {
+        uint32_t num_count = 0;
+        uint32_t i;
+        if (model->numerics != NULL)
+            num_count = model->numerics->count;
+        if (fwrite(&num_count, sizeof(uint32_t), 1, f) != 1)
+        {
+            fclose(f);
+            return 0;
+        }
+        for (i = 0; i < num_count; i++)
+        {
+            char unitbuf[NUMERIC_UNIT_MAX];
+            memset(unitbuf, 0, sizeof(unitbuf));
+            strncpy(unitbuf, model->numerics->items[i].unit,
+                    NUMERIC_UNIT_MAX - 1);
+            if (fwrite(&model->numerics->items[i].id, sizeof(SYMBOL_ID),
+                       1, f) != 1 ||
+                fwrite(&model->numerics->items[i].value, sizeof(double),
+                       1, f) != 1 ||
+                fwrite(unitbuf, 1, NUMERIC_UNIT_MAX, f) != NUMERIC_UNIT_MAX)
             {
                 fclose(f);
                 return 0;
@@ -321,6 +357,36 @@ MODEL *ModelLoad(const char *filepath)
             }
 
             EmbeddingSetVector(model->embeddings, emb_id, vector);
+        }
+    }
+
+    /* Load numerics sidecar (V5 only; older files simply carry none) */
+    if (version >= 5 && model->numerics != NULL)
+    {
+        uint32_t num_count = 0;
+        uint32_t i;
+        if (fread(&num_count, sizeof(uint32_t), 1, f) != 1)
+        {
+            ModelDestroy(model);
+            fclose(f);
+            return NULL;
+        }
+        for (i = 0; i < num_count; i++)
+        {
+            SYMBOL_ID nid;
+            double nval;
+            char nunit[NUMERIC_UNIT_MAX];
+            if (fread(&nid, sizeof(SYMBOL_ID), 1, f) != 1 ||
+                fread(&nval, sizeof(double), 1, f) != 1 ||
+                fread(nunit, 1, NUMERIC_UNIT_MAX, f) != NUMERIC_UNIT_MAX)
+            {
+                ModelDestroy(model);
+                fclose(f);
+                return NULL;
+            }
+            nunit[NUMERIC_UNIT_MAX - 1] = '\0';
+            if (nid != SYMBOL_INVALID && nid <= sym_count)
+                NumericSet(model->numerics, nid, nval, nunit);
         }
     }
 

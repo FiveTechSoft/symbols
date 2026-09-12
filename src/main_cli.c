@@ -95,14 +95,16 @@ int main(void)
     GRAPH *graph = GraphCreate(128, 256);
     CONTEXT *ctx = ContextCreate();
     EMBEDDING_TABLE *embeds = EmbeddingTableCreate(128);
+    NUMERIC_TABLE *nums = NumericCreate(128);
 
-    if (!graph || !ctx || !embeds)
+    if (!graph || !ctx || !embeds || !nums)
     {
         fprintf(stderr, "Critical error: could not initialize structures.\n");
         return EXIT_FAILURE;
     }
 
     GraphSetEmbeddingTable(graph, embeds);
+    GraphSetNumericTable(graph, nums);
 
     /* Auto-load default model if it exists */
     {
@@ -115,9 +117,12 @@ int main(void)
             {
                 GraphDestroy(graph);
                 EmbeddingTableDestroy(embeds);
+                NumericDestroy(nums);
                 graph = loaded->graph;
                 embeds = loaded->embeddings;
+                nums = loaded->numerics;
                 GraphSetEmbeddingTable(graph, embeds);
+                GraphSetNumericTable(graph, nums);
                 ContextReset(ctx);
                 printf("AI > Model loaded from 'wiki_model.bin'.\n\n");
             }
@@ -171,6 +176,7 @@ int main(void)
             MODEL temp;
             temp.graph = graph;
             temp.embeddings = embeds;
+            temp.numerics = nums;
             temp.config = LearningConfigDefault();
             if (ModelSave(&temp, "wiki_model.bin"))
                 printf("\nAI > Goodbye! All learned knowledge is saved.\n");
@@ -195,20 +201,25 @@ int main(void)
         {
             GRAPH *new_graph = GraphCreate(128, 256);
             EMBEDDING_TABLE *new_embeds = EmbeddingTableCreate(128);
+            NUMERIC_TABLE *new_nums = NumericCreate(128);
 
-            if (!new_graph || !new_embeds)
+            if (!new_graph || !new_embeds || !new_nums)
             {
                 printf("AI > Error: out of memory, keeping previous graph.\n\n");
                 GraphDestroy(new_graph);
                 EmbeddingTableDestroy(new_embeds);
+                NumericDestroy(new_nums);
                 continue;
             }
 
             GraphDestroy(graph);
             EmbeddingTableDestroy(embeds);
+            NumericDestroy(nums);
             graph = new_graph;
             embeds = new_embeds;
+            nums = new_nums;
             GraphSetEmbeddingTable(graph, embeds);
+            GraphSetNumericTable(graph, nums);
             ContextReset(ctx);
             printf("AI > Memory cleared. Starting fresh.\n\n");
             continue;
@@ -536,6 +547,7 @@ int main(void)
             MODEL temp;
             temp.graph = graph;
             temp.embeddings = embeds;
+            temp.numerics = nums;
             temp.config = LearningConfigDefault();
 
             if (ModelSave(&temp, path))
@@ -552,11 +564,14 @@ int main(void)
             if (loaded != NULL)
             {
                 EmbeddingTableDestroy(embeds);
+                NumericDestroy(nums);
                 GraphDestroy(graph);
 
                 graph = loaded->graph;
                 embeds = loaded->embeddings;
+                nums = loaded->numerics;
                 GraphSetEmbeddingTable(graph, embeds);
+                GraphSetNumericTable(graph, nums);
                 ContextReset(ctx);
                 free(loaded);
 

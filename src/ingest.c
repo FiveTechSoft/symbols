@@ -94,6 +94,18 @@ int IngestTripleSource(GRAPH *graph,
         }
     }
 
+    /* M3a numeric sidecar: an object naming a measure keeps its plain
+       symbol (triples untouched) and additionally carries the typed
+       (value, unit) on the symbol itself. Table present (ModelCreate
+       wires it; bare graphs simply skip, mirroring embeddings). */
+    if (graph->numerics != NULL)
+    {
+        double nval = 0.0;
+        char nunit[NUMERIC_UNIT_MAX] = {0};
+        if (NumericParseMeasure(o_upper, &nval, nunit, sizeof(nunit)))
+            NumericSet(graph->numerics, o_id, nval, nunit);
+    }
+
     /* Update embeddings on every co-occurrence (not just new relations) */
     if (graph->embeddings != NULL)
     {

@@ -5,6 +5,7 @@
 #include "symbol.h"
 #include "relation.h"
 #include "embedding.h"
+#include "numeric.h"
 
 #define SIMILARITY_THRESHOLD_DEFAULT 0.70f
 
@@ -30,6 +31,7 @@ typedef struct
     SYMBOL_TABLE    *symbols;
     RELATION_TABLE  *relations;
     EMBEDDING_TABLE *embeddings;
+    NUMERIC_TABLE   *numerics;
 } GRAPH;
 
 GRAPH *GraphCreate(uint32_t symbol_capacity,
@@ -38,6 +40,8 @@ GRAPH *GraphCreate(uint32_t symbol_capacity,
 void GraphDestroy(GRAPH *graph);
 
 void GraphSetEmbeddingTable(GRAPH *graph, EMBEDDING_TABLE *embeddings);
+
+void GraphSetNumericTable(GRAPH *graph, NUMERIC_TABLE *numerics);
 
 SYMBOL_ID GraphAddSymbol(GRAPH *graph, const char *name);
 

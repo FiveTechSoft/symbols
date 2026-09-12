@@ -323,9 +323,12 @@ def triples_from_infobox(article_title, pairs):
 
         for v in values:
             if len(v) > 1 and len(v) < 100:
-                # Skip values that are just numbers or dates
+                # M3a numeric sidecar: pure numbers flow as measure objects
+                # (the C ingest attaches typed value+unit sidecars); only
+                # slash forms (dates, ratios) stay out of scope.
                 if re.match(r'^[\d.,/\-]+$', v):
-                    continue
+                    if '/' in v:
+                        continue
                 # Absence markers are not facts
                 if v.strip().upper() in NULL_VALUES:
                     continue

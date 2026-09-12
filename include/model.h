@@ -7,12 +7,13 @@
 #include "embedding.h"
 #define MODEL_MAGIC   0x53594D42
 
-#define MODEL_VERSION 4 /* V4: per-relation polarity; V1-V3 readable */
+#define MODEL_VERSION 5 /* V5: numeric sidecar block; V1-V4 readable */
 
 typedef struct
 {
     GRAPH           *graph;
     EMBEDDING_TABLE *embeddings;
+    NUMERIC_TABLE   *numerics;
     LEARNING_CONFIG  config;
 } MODEL;
 

@@ -1,0 +1,25 @@
+# QA numeric set (M3a roadmap): value lookup over measure sidecars.
+# Pregunta<TAB>respuesta_esperada (substring; all-digit, no folding needed).
+# Curadas + verificadas por ejecucion sobre el fixture (test_numeric
+# ingests tests/qa_numeric_fixture.tsv in-memory; golden untouched).
+# Runner: test_numeric via ctest (umbral 90%).
+la superficie de ESPANA es	505.990
+la superficie de PORTUGAL es	92.090
+la superficie de FRANCIA es	643.801
+la altitud de MADRID es	667
+la altitud de MULHACEN es	3.479
+la altitud de ANETO es	3.404
+la altitud de TOLEDO es	529
+la altitud de EVEREST es	8.848
+la longitud del EBRO es	930
+la longitud del TAJO es	1.007
+la poblacion de ESPANA es	48
+la poblacion de FRANCIA es	68
+la poblacion de ALEMANIA es	83
+la poblacion de ITALIA es	59
+la poblacion de PORTUGAL es	10
+la poblacion de MADRID es	3
+la constitucion de ESPANA es	1978
+la revolucion de FRANCIA es	1789
+la reunificacion de ALEMANIA es	1990
+la unificacion de ITALIA es	1861

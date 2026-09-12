@@ -99,10 +99,21 @@ walkable.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it),
-  M3a/M3b (numeric sidecar, then comparison),
+  M3b (comparison más/menos, mayor/menor, antes/después over the M3a
+  sidecar),
   P4b (Horn + cut + NAF over P4a), R6 analogy ranking set (needs PARIS
   data + incoming-role similarity + frequency-gated cosine first, see
   below). Each ships with its eval set + threshold (90),
+- [x] M3a — numeric sidecar (done 2026-09-12): measures as typed
+  (value, unit) hanging off object symbols (`numeric.h/c`, never new
+  core relation types); Spanish-format heuristic documented in code
+  (thousands dots, decimal comma, '/' rejects dates); persisted as V5
+  block (V1-V4 load untouched, golden intact); extractor keeps pure
+  numbers (slash-forms still out). Gate: 13 parse cases + 20-row
+  fixture (`qa_numeric_fixture.tsv`) with sidecar asserts + 20-row QA
+  set (`qa_eval_numeric.tsv`, same Detect/Answer path) 20/20 + V5
+  round-trip on scratch bin; suite 35/35, eval 87/87. Golden regen
+  with numeric data is queued explicitly (not this turn).
   no-merge on regression (87/87, suite, Quijote immunity).
 - [x] M4 — 2-hop chaining (done 2026-09-12): substitute-then-ask over
   positive ground facts in the QA path (QUESTION gains is_multihop +
