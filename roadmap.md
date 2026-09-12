@@ -305,6 +305,7 @@ when measured (never assumed); red stays red until re-measured.
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
 | LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
+| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop | green 09-12 | 18+9+13+12+9+8 |
 | M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
 | M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
 | M3b compare | `qa_eval_compare.tsv` | green 09-12 | 20/20 |
@@ -321,16 +322,18 @@ when measured (never assumed); red stays red until re-measured.
 | R7 contradiction | surfaced (stored only today) | pending | — |
 | golden-regen | numeric data in golden | pending | — |
 
-**Index: 15/21 = 71% (2026-09-12).**
+**Index: 16/22 = 73% (2026-09-12).**
 
-Destination estimate: ~40% (judgment, not a gate). The index counts
-milestones equally; difficulty does not: the 6 pending contain the two
-hardest problems (real-text ingest, golden regen), and the destination
-itself (books, manuals) measures 2–22%, not 71%. What is built —
-loops, persistence, QA depth on curated data, gates — is the solid
-~40% of a product; most of the rest is one wall (un-simplified text)
-plus hardening. Standing commitment: keep measuring everything,
-report misses as data, never move a goalpost silently.
+Destination estimate: ~45% (judgment, not a gate; was ~40%: the
+conversation objective advanced — anaphora through ES-loop all gated —
+while the real-text wall stands). The index counts milestones equally;
+difficulty does not: the pending contain the two hardest problems
+(real-text ingest, golden regen), and the destination itself (books,
+manuals) measures 2–22%, not 73%. What is built — loops, dialogue,
+persistence, QA depth on curated data, gates — is the solid part of a
+product; most of the rest is one wall (un-simplified text) plus
+hardening. Standing commitment: keep measuring everything, report
+misses as data, never move a goalpost silently.
 
 Regression floor (any red = stop, regardless of the index):
 suite 36/36 (`ctest --test-dir build-gcc`), eval 87/87, hard ≥38/40,
