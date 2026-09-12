@@ -72,6 +72,17 @@ recorded, verdict: borrow vs build). Past violators stay documented
 (P4a/P4b reimplement tabling/NAF by hand: kept, working, frozen —
 future inference work goes SWI-side).
 
+Capability split (surveyed + probed 2026-09-12, no smoke):
+learn-facts-from-text (parser borrowable via link_grammar, loop ours);
+induce-rules (aleph/liftcover/phil exist: borrow-check before
+extending discover); learn-weights (cplint/ProbLog: borrow);
+stemming/similarity (snowball/porter/isub installed: borrow);
+reason (tabling/NAF/s(CASP): borrow); store+provenance (rdf_db
+partial: tiers/policies ours); streaming embeddings (ours);
+scale/embed (ours on footprint); teach→prove loop+gates (ours).
+The moat is the integrated learning product + measurement, never a
+single capability.
+
 Novelty position (2026-09-12, binding): the value is the measured
 artifact, not formalism novelty. Horn + cut + NAF, Jaccard, Zipf,
 SLD, embeddings-cosine all predate us and mostly run better elsewhere
@@ -122,7 +133,10 @@ walkable.
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
-  prerequisite: P2 measured 2% without it),
+  prerequisite: P2 measured 2% without it; lead 2026-09-12: probe the
+  link_grammar pack before inventing our own simplifier),
+  borrow-check aleph vs discover (rule induction exists as SWI pack;
+  justify ours by streaming + eval-gated niche or adopt),
   RSI level 2 — self-tuning rank weights (offline sweep, then bandit;
   optimize HELD-OUT only, never training sets — Goodhart guard),
   evaluate building on SWI-Prolog (tabling/CLP/Janus) vs reimplementing
@@ -308,3 +322,7 @@ its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
 - 2026-09-12: destination sharpened to what SWI-Prolog cannot do
   (LEARN: text/dialogue→triples); non-overlap table + borrow-first
   rule binding (P4a/P4b kept and frozen as past violators).
+- 2026-09-12: capability split recorded (9 rows: borrow inference,
+  weights, stemming, ILP-pending-check; build learning loop, fuzzy
+  layer, sidecars, scale, gates); link_grammar lead for canonization;
+  aleph-vs-discover borrow-check queued.
