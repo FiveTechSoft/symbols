@@ -48,6 +48,26 @@ bb_load(File) :-
     memory_size(NF),
     format('Loaded ~w facts from ~w.~n', [NF, File]).
 
+% save [nombre]: vuelca la memoria viva (base + lo ensenado en sesion) al
+% mismo formato memfact/provfact que bb_load/1 lee. Sin nombre -> session.
+% Solo nombres simples (sin rutas): el save nunca sale de esta carpeta.
+chat_save_cmd([save, Name|_]) :-
+    atom(Name), Name \== save, Name \== '..',
+    \+ sub_atom(Name, _, _, _, '/'),
+    \+ sub_atom(Name, _, _, _, '\\'),
+    chat_save(Name), !.
+
+chat_save(Alias) :-
+    atom_concat(Alias, '.knowledge.pl', Out),
+    open(Out, write, S),
+    forall(memory_relation(A, R, O, W, U),
+           format(S, 'memfact(~q,~q,~q,~q,~q).~n', [A, R, O, W, U])),
+    forall(prov(A, R, O, info(Ref, T, St)),
+           format(S, 'provfact(~q,~q,~q,~q,~q,~q).~n', [A, R, O, Ref, T, St])),
+    close(S),
+    memory_size(NF),
+    format('Saved ~w facts -> ~w~n', [NF, Out]).
+
 chat_loop :-
     write('> '),
     flush_output,
@@ -72,6 +92,8 @@ chat_line_guarded(L) :-
     ; Toks == [bye] -> writeln('Bye.')
     ; Toks == [help] -> chat_help
     ; Toks == [why] -> chat_why_bare
+    ; Toks == [save] -> chat_save(session)
+    ; chat_save_cmd(Toks) -> true
     ; chat_greet(Toks) -> true
     ; chat_about(Toks) -> true
     ; Toks == [who, are, you] -> chat_identity(en)
@@ -270,7 +292,7 @@ chat_help :-
     writeln('who <verb> <obj>? | what did <s> <verb>? | did <s> <verb> <obj>?'),
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
     writeln('Teach me facts without "?": Alice visits Paris. (I learn them)'),
-    writeln('why? (about last answer) | quit').
+    writeln('save [name] (keep session memory) | why? (about last answer) | quit').
 
 chat_why_bare :-
     ( last_fact(S, V, O) ->
