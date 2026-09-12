@@ -9462,3 +9462,40 @@ Verificación en clon: 30–50 completos + `preflight_project` PASS.
 
 ---
 
+# EXP51 — Scaling benchmark (el coste sigue al vocabulario)
+
+## Lo que demuestra
+
+Niveles acumulativos 0/10/50/200/500 ontologías, mismo motor:
+
+```text
+nivel hechos conceptos skills abs   disc  q20
+l0    261    6        3      1ms   68ms  0ms
+l1    291    9        3      3ms   184ms 0ms
+l2    411    9        3      4ms   200ms 0ms
+l3    861    9        3      12ms  173ms 0ms
+l4    1761   9        3      28ms  243ms 0ms
+TOTAL passed 23/23 (transfer + unknown + sanity por nivel)
+```
+
+Hechos ×6.7, conceptos y skills SATURAN (6→9, 3→3: sin explosión
+de reglas); descubrimiento 68→243ms (sublineal: acotado por
+vocabulario, no por hechos); consulta 0ms/60 preguntas.
+Transferencia, UNKNOWN y cordura en todos los niveles.
+
+## Commit
+
+```text
+experiment51.pl (nuevo; ningún módulo tocado)
+README.md (EXP51)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–51 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
