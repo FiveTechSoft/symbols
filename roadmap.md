@@ -17,7 +17,9 @@ C engine (reported 2026-09-05/06, not re-run since):
   defaults (18/18), single-hole reverse QA (8/8), conjunction (10/10),
   held-out hard set 38/40 (2 misses are set artifacts, documented).
 - Not working: 2-hop chaining 0/1 (M4), comparison 0/1 (no numeric
-  data, M3a/M3b), analogy map-silent 0/4 (needs investigation),
+  data, M3a/M3b), analogy structurally silent on city leaves (R6
+  investigated 2026-09-12: ROMA has 0 outgoing, PARIS absent; hubs
+  fire at 1.00),
   contradiction never surfaced, multi-hole joins need the solver sidecar.
 - README benchmark numbers (13.8M queries/s, 1M relations) are
   microbenchmarks, not production measurements. Read them as such.
@@ -97,9 +99,20 @@ walkable.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it), M4 (2-hop,
-  substitute-then-ask), M3a/M3b (numeric sidecar, then comparison), P4b (Horn + cut + NAF over P4a), R6 analogy firing
-  investigation. Each ships with its eval set + threshold (90),
+  substitute-then-ask), M3a/M3b (numeric sidecar, then comparison),
+  P4b (Horn + cut + NAF over P4a), R6 analogy ranking set (needs PARIS
+  data + incoming-role similarity + frequency-gated cosine first, see
+  below). Each ships with its eval set + threshold (90),
   no-merge on regression (87/87, suite, Quijote immunity).
+- [x] R6 analogy firing investigation (done 2026-09-12, binary audit
+  of golden: parse tail_ok): country hubs fire (ITALIA/FRANCIA sim=1.00
+  + transfers). City leaves are silent BY CONSTRUCTION, not by
+  threshold: ROMA has 0 outgoing relations (leaf, freq 4) so
+  Jaccard-over-outgoing is always 0.00; PARIS is absent from the map
+  entirely (vocabulary gap); low-freq embeddings are noise (ROMA top
+  cosine 47% = floor, vectors exist but carry no signal).
+  (`test_analogical` stays unit-green; `/synonyms A B` pair form is
+  unimplemented — lists synonyms of A.)
 
 ## 4. Explicitly parked
 
