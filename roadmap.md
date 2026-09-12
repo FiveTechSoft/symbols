@@ -99,6 +99,8 @@ walkable.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it),
+  RSI level 2 — self-tuning rank weights (offline sweep, then bandit;
+  optimize HELD-OUT only, never training sets — Goodhart guard),
   R6 analogy ranking set (needs PARIS data + incoming-role similarity +
   frequency-gated cosine first). Each ships with its eval set +
   threshold (90), no-merge on regression (87/87, suite, Quijote
@@ -158,6 +160,10 @@ walkable.
 - Bulk whole-book ingest (until a regeneration passes the 50-gate).
 - Parity claims in the README (bench numbers stay, labeled as bench).
 - Multi-hole joins / solver sidecar (queued behind P4).
+- RSI level 3 — code/architecture self-modification (science fiction
+  with current means: no safe variation generator, 87-row sets too
+  small to select on, no self-model). Unparks only with all three
+  present; training-set optimization stays forbidden (Goodhart).
 
 ## 5. The corpus gate (binding)
 
