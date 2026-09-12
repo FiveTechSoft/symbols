@@ -222,6 +222,15 @@ when measured (never assumed); red stays red until re-measured.
 
 **Index: 15/21 = 71% (2026-09-12).**
 
+Destination estimate: ~40% (judgment, not a gate). The index counts
+milestones equally; difficulty does not: the 6 pending contain the two
+hardest problems (real-text ingest, golden regen), and the destination
+itself (books, manuals) measures 2–22%, not 71%. What is built —
+loops, persistence, QA depth on curated data, gates — is the solid
+~40% of a product; most of the rest is one wall (un-simplified text)
+plus hardening. Standing commitment: keep measuring everything,
+report misses as data, never move a goalpost silently.
+
 Regression floor (any red = stop, regardless of the index):
 suite 36/36 (`ctest --test-dir build-gcc`), eval 87/87, hard ≥38/40,
 hygiene PASS, `git status --short wiki_model.bin` empty.
