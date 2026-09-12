@@ -9499,3 +9499,46 @@ Verificación en clon: 30–51 completos + `preflight_project` PASS.
 
 ---
 
+# EXP52 — Vocabulary vs facts grid (romper EXP51)
+
+## Lo que demuestra
+
+Malla 3×3 (vocab {6,15,30} × distractores {70,970,9970}), 9/9
+celdas completas sin timeouts, F1=1.00 en todas:
+
+```text
+V  D     hechos vocab disc     compr
+6  70    130    6     66ms      3.9
+6  9970  6538   6     23ms   1307.6
+15 9970  8968   15   355ms   1793.6
+30 70    130    27   1893ms      2.4
+30 9970  9548   30   4481ms   1909.6
+TOTAL passed 27/27 (transfer + unknown + TN por celda)
+```
+
+El coste sigue al VOCABULARIO (66→1893ms por gen 258→20439),
+no a los hechos (plano dentro de cada fila). Compresión
+hechos/(conceptos+reglas) hasta ×1909. Dos honestidades: los
+hechos colapsan por dedup (entidades fijas) y los conceptos
+colapsan por saturación (indistinguibilidad, eco EXP16);
+`heapused` no resolvió RAM (limitación registrada).
+
+Lección: `reset_cell` borraba `check_results` (3/3 en vez de
+27/27); el resumen debe sobrevivir a las celdas.
+
+## Commit
+
+```text
+experiment52.pl (nuevo; ningún módulo tocado)
+README.md (EXP52)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–52 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
