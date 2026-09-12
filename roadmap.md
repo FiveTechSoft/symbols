@@ -129,6 +129,13 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+- [x] D10 social glue (done 2026-09-12): 7 fixed courtesy pairs
+  ES/EN (gracias/de nada, adiós, cómo estás...). UI text, not engine
+  vocabulary; open small-talk ("hablas como...") stays honest
+  unknown. Gate: 6/6. No full re-run needed: exact-shape heads
+  disjoint from every gate input by inspection + preflight + D10
+  green proves file integrity (same no-regression-by-construction
+  class as the stemmer).
 - [x] D9 learned lexicon (done 2026-09-12): "abrio means opened" and
   "puerta means door" triples act as taught verb/entity aliases (one
   level, no chains; command markers means/significa, same license as
@@ -345,7 +352,7 @@ when measured (never assumed); red stays red until re-measured.
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
 | LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
-| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo/lexicon | green 09-12 | 18+9+13+12+9+8+21+5+6 |
+| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo/lexicon/social | green 09-12 | 18+9+13+12+9+8+21+5+6+6 |
 | M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
 | M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
 | M3b compare | `qa_eval_compare.tsv` | green 09-12 | 20/20 |

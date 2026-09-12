@@ -223,6 +223,7 @@ chat_line_tokens(L, Toks, Changed) :-
     ; Toks == [bye] -> writeln('Bye.')
     ; Toks == [help] -> chat_help
     ; Toks == [why] -> chat_why_bare
+    ; chat_social(Toks) -> true
     ; Toks == [more] -> dialog_more
     ; Toks == [mas] -> dialog_more
     ; Toks == [the, rest] -> dialog_more
@@ -260,6 +261,24 @@ chat_line_tokens(L, Toks, Changed) :-
 dialog_meta_es(Toks) :-
     member(W, Toks),
     member(W, [sabes, trata, protagonistas]), !,
+    chat_known(es).
+
+% Libro: de que libro hablamos (conteo + cabezas). Dispara con el
+% medio (libro/book) + sintaxis cerrada; jamas con contenido.
+dialog_book_cmd(Toks) :-
+    member(B, Toks),
+    member(B, [libro, book]),
+    forall(member(W, Toks),
+           member(W, [que, cual, es, el, libro, what, which, is, the,
+                      book, de, trata, habla, hablamos])), !,
+    dialog_book(Toks).
+
+dialog_book(Toks) :-
+    memory_size(NF),
+    ( ( member(W, Toks), member(W, [que, cual, libro]) ) ->
+        format('Hablamos de un libro con ~w hechos. ', [NF])
+    ; format('This book holds ~w facts. ', [NF])
+    ),
     chat_known(es).
 
 % D5 entidad suelta con '?': resumen (about). Sin '?' va a learn
@@ -522,6 +541,17 @@ chat_help :-
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
+
+% D10 pegamento social minimo (texto UI, no vocabulario del motor:
+% pares fijos de cortesia; lo abierto como "hablas como..." sigue
+% unknown honesto).
+chat_social([gracias]) :- !, writeln('De nada. Preguntame lo que quieras.').
+chat_social([thanks]) :- !, writeln('You are welcome. Ask me anything.').
+chat_social([thank, you]) :- !, writeln('You are welcome. Ask me anything.').
+chat_social([adios]) :- !, writeln('Adios, hasta pronto.').
+chat_social([goodbye]) :- !, writeln('Goodbye, see you soon.').
+chat_social([como, estas]) :- !, writeln('Bien. Y ahora, pregunta lo que quieras.').
+chat_social([how, are, you]) :- !, writeln('I am well. Now ask me anything.').
 
 chat_why_bare :-
     ( last_fact(S, V, O) ->
