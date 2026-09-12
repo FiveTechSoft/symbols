@@ -212,7 +212,14 @@ walkable.
   by construction) in chat.pl + ask.pl.
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it; lead 2026-09-12: probe the
-  link_grammar pack before inventing our own simplifier),
+  link_grammar pack before inventing our own simplifier — BLOCKED, no
+  Windows binary (needs make + native lib); canon-v1 measured same day
+  on Genesis-100 (split ;: + strip leading discourse markers): subjects
+  fixed (and×30 → god/lord/adam) but relations stay clausal
+  (said_let_there_be); gate still FAIL (~2 strict, ~20 generous).
+  Wall decomposed: 1/3 markers done, 2/3 verb-complex extraction
+  pending (real parsing or the pack on Linux); junk KBs deleted,
+  never committed),
   borrow-check aleph vs discover DONE 2026-09-12 (aleph pack v5,
   same comes_from task, 0.0s): identical rule, pos 2/neg 0, acc 1.
   Verdict KEEP OURS: aleph needs hand modes + curated pos/neg split
