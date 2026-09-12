@@ -75,13 +75,22 @@ norm_name(Toks, Name) :-
 
 % Puente morfologico bidireccional: la pregunta y la memoria usan formas
 % de superficie distintas del mismo verbo (infraestructura de lengua).
-% Coinciden si son iguales o comparten stem.
+% Coinciden si son iguales o comparten stem (con desdoblado simetrico:
+% ver chat.pl, misma garantia de no-regresion).
 bb_rel_forms(V, Rs) :-
-    bb_stem(V, St),
+    bb_stem(V, St0),
+    bb_ddouble(St0, St),
     findall(R, (memory_relation(_, R, _, _, _),
-                ( R == V ; (bb_stem(R, St), R \== V) )), R0),
+                ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
+                            RSt == St, R \== V) )), R0),
     sort(R0, Rs),
     Rs \== [].
+
+bb_ddouble(W, D) :-
+    sub_atom(W, _, 1, 0, C),
+    sub_atom(W, _, 1, 1, C), !,
+    sub_atom(W, 0, _, 1, D).
+bb_ddouble(W, W).
 
 bb_stem(W, St) :-
     ( sub_atom(W, _, 3, 0, 'ied') ->

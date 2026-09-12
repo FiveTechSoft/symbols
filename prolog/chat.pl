@@ -8,6 +8,7 @@
 :- consult('question_parser.pl').
 :- consult('english_graph.pl').
 :- consult('positional.pl').
+:- consult('dialog_ref.pl').
 
 % Interfaz de datos: la aporta el .knowledge.pl que bb_load/1 consulta en
 % runtime (memfact/5 hechos, provfact/6 provenance). Declarada, no definida.
@@ -47,6 +48,7 @@ bb_load(File) :-
     retractall(prov_log(_, _)),
     retractall(last_fact(_, _, _)),
     retractall(told_rel(_)),
+    dialog_reset,
     consult(File),
     forall(memfact(S, R, O, W, U), assertz(memory_relation(S, R, O, W, U))),
     forall(provfact(S, R, O, Ref, T, St), assertz(prov(S, R, O, info(Ref, T, St)))),
@@ -117,7 +119,8 @@ chat_line(L) :-
 
 chat_line_guarded(L) :-
     gen_tokenize(L, Lower, _),
-    exclude(gen_qmark, Lower, Toks),
+    exclude(gen_qmark, Lower, Toks0),
+    dialog_substitute(Toks0, Toks, Changed),
     ( Toks == [] -> true
     ; Toks == [quit] -> writeln('Bye.')
     ; Toks == [exit] -> writeln('Bye.')
@@ -140,7 +143,7 @@ chat_line_guarded(L) :-
         chat_known(es)
     ; chat_is_spanish(Toks) -> chat_spanish_help
     ; is_question(L) -> chat_ask(Toks)
-    ; chat_learn(L, Toks)
+    ; chat_learn(L, Toks, Changed)
     ).
 
 % Pregunta = termina en '?'. Todo lo demas es candidato a ensenar, nunca
@@ -156,15 +159,31 @@ is_question(L) :-
 %    solo si termina en '.' (acto declarativo = sintaxis, no lexico).
 % Guardia: si encaja en forma de pregunta, se responde y NO se aprende.
 % Sin triple ni forma: chat_ask (UNKNOWN honesto).
-chat_learn(L, Toks) :-
+% chat_learn: pronouns never get stored. Unresolvable pronoun ->
+% honest refusal; resolved ones were substituted upstream, so the
+% learned sentence is rebuilt from names (Changed==yes) instead of
+% the raw line. Plain lines learn verbatim (zero behavior change).
+chat_learn(L, Toks, Changed) :-
+    ( dialog_has_pronoun(Toks) ->
+        writeln('I don''t know who that is. Use names and I will learn it.')
+    ; ( Changed == yes ->
+          atomic_list_concat(Toks, ' ', B),
+          atom_string(B, S0),
+          string_concat(S0, ".", LS)
+      ; ( string(L) -> LS = L ; atom_string(L, LS) )
+      ),
+      chat_learn_sent(LS, Toks)
+    ).
+
+chat_learn_sent(LS, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
-    ; learn_sentence(L, stored(A, V, O, Src)) ->
+    ; learn_sentence(LS, stored(A, V, O, Src)) ->
         format('Learned [~w]: ~w --~w--> ~w.~n', [Src, A, V, O]),
         chat_note_told(V),
         chat_set_last(A, V, O)
-    ; learn_sentence(L, stored_identity(X, Y, _)) ->
+    ; learn_sentence(LS, stored_identity(X, Y, _)) ->
         format('Learned: ~w is ~w.~n', [X, Y])
-    ; chat_learn_positional(L)
+    ; chat_learn_positional(LS)
     ; chat_ask(Toks)
     ).
 
@@ -331,6 +350,8 @@ chat_help :-
     writeln('who <verb> <obj>? | what did <s> <verb>? | did <s> <verb> <obj>?'),
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
     writeln('Teach me facts ending with a period: Zorin reaches Oslo.'),
+    writeln('he/she/it follow the conversation (one clear antecedent);'),
+    writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
 
@@ -346,7 +367,8 @@ chat_why_bare :-
     ).
 
 chat_ask(Toks) :-
-    ( chat_form(Toks, Kind, Ans) -> chat_say(Kind, Ans)
+    ( dialog_has_pronoun(Toks) -> writeln("I don't know.")
+    ; chat_form(Toks, Kind, Ans) -> chat_say(Kind, Ans)
     ; chat_ask_qp(Toks)
     ).
 
@@ -481,13 +503,27 @@ qnorm(Toks, Name) :-
     Ws \== [],
     atomic_list_concat(Ws, '_', Name).
 
-% Puente morfologico bidireccional (igual que ask.pl).
+% Puente morfologico bidireccional (igual que ask.pl), con desdoblado
+% simetrico de consonante final (trimmed->trimm->trim): f aplicada en
+% ambos lados conserva todos los matches previos por construccion
+% (si a==b entonces f(a)==f(b)) y anade la clase stopped/dropped.
 bb_rel_forms(V, Rs) :-
-    bb_stem(V, St),
+    bb_stem(V, St0),
+    bb_ddouble(St0, St),
     findall(R, (memory_relation(_, R, _, _, _),
-                ( R == V ; (bb_stem(R, St), R \== V) )), R0),
+                ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
+                            RSt == St, R \== V) )), R0),
     sort(R0, Rs),
     Rs \== [].
+
+% bb_ddouble: una de dos letras finales iguales fuera (ingles: la
+% consonante se dobla ante -ed/-ing; call/full/well nunca se tocan
+% porque el desdoblado es simetrico en la comparacion).
+bb_ddouble(W, D) :-
+    sub_atom(W, _, 1, 0, C),
+    sub_atom(W, _, 1, 1, C), !,
+    sub_atom(W, 0, _, 1, D).
+bb_ddouble(W, W).
 
 bb_stem(W, St) :-
     ( sub_atom(W, _, 3, 0, 'ied') ->
@@ -540,7 +576,9 @@ chat_remember(Xs, Facts) :-
 
 chat_set_last(S, V, O) :-
     retractall(last_fact(_, _, _)),
-    assertz(last_fact(S, V, O)).
+    assertz(last_fact(S, V, O)),
+    dialog_note([S], subj),
+    dialog_note([O], obj).
 
 chat_sources([]).
 chat_sources([(S, R, O)|T]) :-

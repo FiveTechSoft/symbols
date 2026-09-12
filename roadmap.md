@@ -129,11 +129,22 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
-  D1 anaphora in dialogue ("Where did HE go?", EXP18 exists: wire it),
   D2 ellipsis ("And Madrid?", reuse last question skeleton),
   D3 continuity (entity stack + ask when ambiguous),
   D4 initiative (probe missing roles, EXP48 pattern). Each with
   scripted multi-turn dialogue sets; same gate discipline as P1/P3.
+- [x] D1 anaphora in dialogue (done 2026-09-12): `dialog_ref.pl` —
+  entity stack (subject/object tiers, recency) + closed EN pronoun
+  set; single survivor substitutes, 0/2+ stay UNKNOWN (never random),
+  unresolvable-pronoun questions answer unknown (did-catchall fixed),
+  pronoun assertions refused (never stored) or learned substituted.
+  EXP18 principles reused (verdict shapes), machinery adapted: no
+  gender facts exist, veto needs pronoun facts the chat never stores,
+  reconstruct would mutate curated maps. Gate: 3 scripted dialogues,
+  18/18 (single chains, veto-by-ambiguity unknowns, substituted
+  learning); P1 17/17, P3 8/8, LOOP50 20/20 unchanged. Drive-by fix:
+  symmetric doubled-consonant destemming (trimmed→trim, no-regression
+  by construction) in chat.pl + ask.pl.
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it; lead 2026-09-12: probe the
   link_grammar pack before inventing our own simplifier),
