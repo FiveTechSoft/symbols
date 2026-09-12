@@ -53,6 +53,10 @@ bb_content(W) :-
 % Esqueleto de la ultima pregunta con forma (D2): la elipsis lo continua.
 :- dynamic dialog_lastq/1.
 
+% Ultima lista respondida + cuanto se mostro (D7 more).
+:- dynamic dialog_lastlist/1.
+:- dynamic dialog_lastoff/1.
+
 % Aclaracion pendiente (D3): pregunta original + pronombre + candidatos.
 % Una linea que responda con un candidato prosigue; cualquier otra cosa
 % la abandona y se procesa normal.
@@ -80,6 +84,8 @@ bb_load(File) :-
     retractall(last_fact(_, _, _)),
     retractall(told_rel(_)),
     retractall(dialog_lastq(_)),
+    retractall(dialog_lastlist(_)),
+    retractall(dialog_lastoff(_)),
     retractall(dialog_pending(_, _, _)),
     retractall(dialog_pending_teach(_, _)),
     dialog_reset,
@@ -217,6 +223,9 @@ chat_line_tokens(L, Toks, Changed) :-
     ; Toks == [bye] -> writeln('Bye.')
     ; Toks == [help] -> chat_help
     ; Toks == [why] -> chat_why_bare
+    ; Toks == [more] -> dialog_more
+    ; Toks == [mas] -> dialog_more
+    ; Toks == [the, rest] -> dialog_more
     ; Toks == [save] -> chat_save(session)
     ; chat_save_cmd(Toks) -> true
     ; Toks == [discover] -> chat_discover_all
@@ -509,6 +518,7 @@ chat_help :-
     writeln('"And Madrid?" continues the last question (evidence or unknown).'),
     writeln('unfinished teaching ("Ana opened.") gets asked back once.'),
     writeln('En español: ensena "Ana abrio puerta." y pregunta "Quien abrio puerta?".'),
+    writeln('more (see the rest of long lists) | how many (count).'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
@@ -714,6 +724,17 @@ chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     findall(O, member(O-_, OF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, OF), Facts).
+% D7 how-many (M2 en dialogo): cuenta objetos distintos de (S, V).
+% El resto nominal ("books") lo filtra qnorm; el sujeto manda.
+chat_form([how, many|Mid], say, count(N)) :-
+    append(Pre, [V], Mid),
+    Pre \== [],
+    qnorm(Pre, S),
+    bb_rel_forms(V, Rs),
+    findall(O, (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), Os0),
+    sort(Os0, Os),
+    Os \== [],
+    length(Os, N).
 chat_form([did|Mid], say, YesNo) :-
     ( did_split(Mid, S, V, O),
       bb_rel_forms(V, Rs),
@@ -813,8 +834,39 @@ chat_say(say, answer(Xs, Facts)) :-
     ( Rest == 0 -> format('~w.~n', [L])
     ; format('~w... (and ~w more)~n', [L, Rest])
     ),
+    length(Show, Shown),
+    retractall(dialog_lastlist(_)),
+    assertz(dialog_lastlist(Xs)),
+    retractall(dialog_lastoff(_)),
+    assertz(dialog_lastoff(Shown)),
     chat_remember(Xs, Facts),
     chat_sources(Facts).
+
+% D7 more: continua la ultima lista plana (las razonadas muestran sus
+% 3 pruebas y ahi terminan: "Nothing more.").
+dialog_more :-
+    dialog_lastlist(Xs),
+    dialog_lastoff(K),
+    length(Xs, N),
+    K < N, !,
+    Want is min(K + 5, N) - K,
+    length(Prefix, K),
+    append(Prefix, Rest, Xs),
+    length(Show, Want),
+    append(Show, _, Rest),
+    K2 is K + Want,
+    atomic_list_concat(Show, ', ', L),
+    ( K2 < N -> R is N - K2, format('~w... (and ~w more)~n', [L, R])
+    ; format('~w.~n', [L])
+    ),
+    retractall(dialog_lastoff(_)),
+    assertz(dialog_lastoff(K2)).
+dialog_more :-
+    writeln('Nothing more.').
+
+% D7 how-many: cuenta objetos distintos de (S, V) (M2 en dialogo).
+chat_say(say, count(N)) :-
+    format('~w.~n', [N]).
 chat_say(say, yes((S, V, O))) :-
     writeln('Yes.'),
     chat_set_last(S, V, O),

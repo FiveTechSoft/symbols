@@ -129,6 +129,14 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+- [x] D7 more + how-many (done 2026-09-12): capped lists continue on
+  "more/más/the rest" (stored full list + offset; reasoned lists stay
+  put); "how many X did S V?" counts distinct objects (M2 in
+  dialogue; nominal rest filtered by qnorm). Correction-with-denial
+  queued explicitly (needs polarity: core change, no silent hack).
+  Gate: 2 dialogues 21/21; full regressions green. Honest footnote:
+  first run flagged 3 mismatches, all three were wrong expectations
+  (forgotten fixture rows), engine right — gates cut both ways.
 - [x] D6 Spanish teach→ask loop (done 2026-09-12, from the failing
   transcript): accent folding in the chat tokenizer shim (closed
   diacritics, eñe kept; chat-local, engine untouched), determiners
