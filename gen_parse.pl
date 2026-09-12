@@ -113,6 +113,24 @@ gen_norm_char('‘', '\'') :- !.
 gen_norm_char('“', ' ') :- !.
 gen_norm_char('”', ' ') :- !.
 gen_norm_char('"', ' ') :- !.
+gen_norm_char('á', 'a') :- !.
+gen_norm_char('é', 'e') :- !.
+gen_norm_char('í', 'i') :- !.
+gen_norm_char('ó', 'o') :- !.
+gen_norm_char('ú', 'u') :- !.
+gen_norm_char('ü', 'u') :- !.
+gen_norm_char('ñ', 'n') :- !.
+gen_norm_char('ç', 'c') :- !.
+gen_norm_char('à', 'a') :- !.
+gen_norm_char('è', 'e') :- !.
+gen_norm_char('ì', 'i') :- !.
+gen_norm_char('ò', 'o') :- !.
+gen_norm_char('ù', 'u') :- !.
+gen_norm_char('â', 'a') :- !.
+gen_norm_char('ê', 'e') :- !.
+gen_norm_char('î', 'i') :- !.
+gen_norm_char('ô', 'o') :- !.
+gen_norm_char('û', 'u') :- !.
 gen_norm_char('(', ' ') :- !.
 gen_norm_char(')', ' ') :- !.
 gen_norm_char('[', ' ') :- !.

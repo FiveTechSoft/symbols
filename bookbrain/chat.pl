@@ -52,8 +52,82 @@ chat_line_guarded(L) :-
     ; Toks == [bye] -> writeln('Bye.')
     ; Toks == [help] -> chat_help
     ; Toks == [why] -> chat_why_bare
+    ; Toks == [who, are, you] -> chat_identity(en)
+    ; Toks == [what, are, you] -> chat_identity(en)
+    ; Toks == [quien, eres] -> chat_identity(es)
+    ; Toks == [quienes, somos] -> chat_identity(es)
+    ; ( Toks == [who, do, you, know] ; Toks == [whom, do, you, know] ) ->
+        chat_known(en)
+    ; ( Toks == [quien, conoces] ; Toks == [a, quien, conoces] ) ->
+        chat_known(es)
+    ; chat_is_spanish(Toks) -> chat_spanish_help
     ; chat_ask(Toks)
     ).
+
+% Deteccion de español (el corpus es ingles; se responde en español).
+chat_is_spanish(Toks) :-
+    member(W, Toks),
+    member(W, [quien, quienes, que, cual, cuales, donde, cuando,
+               porque, como, eres, es, son, estoy, estas,
+               conoces, dime, explicame, cual, donde]).
+chat_is_spanish(Toks) :-
+    member(W, Toks),
+    member(W, [alicia, maravillas, libro, sabes, tienes, puedes]).
+
+chat_spanish_help :-
+    writeln('De momento solo entiendo preguntas en ingles, porque el libro esta en ingles.'),
+    writeln('Prueba por ejemplo:'),
+    writeln('  Who opened door?'),
+    writeln('  What did footman open?'),
+    writeln('  Why did Alice open door?'),
+    writeln('  Who do you know?').
+
+chat_identity(Lang) :-
+    memory_size(NF),
+    ( Lang == es ->
+        format('Soy BookBrain: un asistente simbolico con ~w hechos en memoria.~n', [NF]),
+        writeln('Respondo con pruebas y fuentes; si no se, digo que no se.')
+    ; format('I am BookBrain: a symbolic assistant with ~w facts in memory.~n', [NF]),
+      writeln('I answer with proofs and sources; when I lack evidence, I say so.')
+    ).
+
+% doc_ent no persiste en .knowledge; top sujetos por hechos (sin eventos
+% ni menciones sin resolver).
+chat_known(Lang) :-
+    findall(S, (memory_relation(S, _, _, _, _),
+                \+ sub_atom(S, _, _, _, '_ch'),
+                \+ sub_atom(S, _, 3, 0, 'he_'),
+                \+ sub_atom(S, _, 5, 0, 'she_'),
+                S \== narrator), Ss0),
+    msort(Ss0, Ss),
+    clump_counts(Ss, CC),
+    keysort_counts(CC, Desc),
+    take_names(Desc, 10, Top),
+    atomic_list_concat(Top, ', ', L),
+    ( Lang == es ->
+        format('Conozco a: ~w.~n', [L])
+    ; format('I know: ~w.~n', [L])
+    ).
+
+clump_counts([], []).
+clump_counts([H|T], [C-H|R]) :-
+    run_len(H, T, C, Rest),
+    clump_counts(Rest, R).
+
+run_len(H, [], 1, []).
+run_len(H, [H|T], C, R) :- !, run_len(H, T, C0, R), C is C0 + 1.
+run_len(_, L, 1, L).
+
+keysort_counts(CC, Desc) :-
+    findall(C-S, member(C-S, CC), P),
+    keysort(P, A),
+    reverse(A, Desc).
+
+take_names(_, 0, []) :- !.
+take_names([], _, []) :- !.
+take_names([_-S|T], K, [S|R]) :-
+    K1 is K - 1,
+    take_names(T, K1, R).
 
 gen_qmark('?').
 
