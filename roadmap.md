@@ -348,6 +348,15 @@ Chat-first validation (binding 2026-09-12): every advance, whatever
 its layer, is validated by testing the chat for improved conversation
 (dialogue gates + a live session); an advance that does not improve
 (or regresses) the conversation does not land.
+Hardcoded vocabulary (binding 2026-09-12, part of the objective):
+open-class hardcoded words = 0 (gen_closed 80 and Spanish content
+lists 30 removed 2026-09-12; meaning comes from the live map via
+bb_content or from curated data). What grows with each dialogue act
+is closed-class syntax only (interrogatives, pronouns, articles,
+commands: ~85 today across chat.pl/ask.pl/dialog_ref.pl, each citing
+its license in comments). Audit: every literal word list lives behind
+a named predicate; new words cite the syntax license or come from the
+map. Counts re-measured per milestone, never assumed down.
 
 ## 9. Decisions log
 
