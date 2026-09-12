@@ -193,8 +193,13 @@ walkable.
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it; lead 2026-09-12: probe the
   link_grammar pack before inventing our own simplifier),
-  borrow-check aleph vs discover (rule induction exists as SWI pack;
-  justify ours by streaming + eval-gated niche or adopt),
+  borrow-check aleph vs discover DONE 2026-09-12 (aleph pack v5,
+  same comes_from task, 0.0s): identical rule, pos 2/neg 0, acc 1.
+  Verdict KEEP OURS: aleph needs hand modes + curated pos/neg split
+  (anti-doctrine: zero-config, learned-words-work-immediately); ours
+  runs from raw sentences with auto F1 + answer-attributed proofs.
+  Borrow later: aleph's search for recursive rules (ours caps at
+  composition length, no recursion). Toy scale both sides, stated.
   RSI level 2 — self-tuning rank weights (offline sweep, then bandit;
   optimize HELD-OUT only, never training sets — Goodhart guard),
   evaluate building on SWI-Prolog (tabling/CLP/Janus) vs reimplementing
