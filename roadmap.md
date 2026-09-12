@@ -55,6 +55,13 @@ teachable assistant for closed domains (a book, a manual, a knowledge
 base) that learns when told, cites sources, reinforces on repetition,
 and says "I don't know" instead of inventing. No LLM does all four.
 
+Novelty position (2026-09-12, binding): the value is the measured
+artifact, not formalism novelty. Horn + cut + NAF, Jaccard, Zipf,
+SLD, embeddings-cosine all predate us and mostly run better elsewhere
+(Prolog with tabling, ProbLog, standard IR). We reimplement a subset
+in C for embeddability and measure it honestly on real data. The
+README must never claim otherwise.
+
 The 5-minute demo that decides everything: teach it a fact, ask about
 it, demand the proof. If that loop holds on real text, the project
 lives. If not, nothing else matters.
@@ -101,6 +108,19 @@ walkable.
   prerequisite: P2 measured 2% without it),
   RSI level 2 — self-tuning rank weights (offline sweep, then bandit;
   optimize HELD-OUT only, never training sets — Goodhart guard),
+  evaluate building on SWI-Prolog (tabling/CLP/Janus) vs reimplementing
+  the reasoning core (open question 2026-09-12: the lab already runs in
+  SWI; formalism novelty is disclaimed in section 2).
+  VERDICT 2026-09-12 (surveyed + probed, SWI 10.1.14): borrow the
+  reasoning, keep the memory. Tabling terminates cyclic closure,
+  built-in NAF, and s(CASP) adds justifications + both negations —
+  our P4a/P4b reimplements all three by hand. What SWI does NOT give:
+  text→triples learning, 32D fuzzy layer, provenance/weights sidecars,
+  streaming ingest at scale, 32 MB embeddable C core. Direction: C =
+  memory/ingest/retrieve, SWI = inference via a bridge (TBD); future
+  reasoning work (quantifiers, solver sidecar, R6 incoming-similarity)
+  goes SWI-side unless measured otherwise. ProbLog noted for the
+  probabilistic layer (our 0.9^n decay is unprincipled).
   R6 analogy ranking set (needs PARIS data + incoming-role similarity +
   frequency-gated cosine first). Each ships with its eval set +
   threshold (90), no-merge on regression (87/87, suite, Quijote
@@ -262,3 +282,9 @@ its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
 - 2026-09-12: roadmap rewritten as honest edition; destination fixed
   as "the machine that knows what it knows", LLM parity demoted to
   north star.
+- 2026-09-12: novelty disclaimed (value = measured artifact, not
+  formalism); README de-smoked (microbenchmarks labeled, no parity or
+  zero-hallucination claims); SWI-Prolog surveyed + probed (tabling
+  terminates, NAF built-in, s(CASP) documented) → direction: C is
+  memory, SWI is inference; incremental probes only, no product built
+  on unexamined ground.

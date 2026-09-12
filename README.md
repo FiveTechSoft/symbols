@@ -2,11 +2,11 @@
 
 A lightweight symbolic language model written in **pure C11**. No matrices, no backpropagation, no PyTorch. Symbols, relations, 32D embeddings, and local probabilistic learning.
 
-This model represents a paradigm shift from the dominant trend in artificial intelligence. While **current LLMs (Large Language Models)** based on the Transformer architecture rely on brute force — massive dense matrix multiplications, global backpropagation, billions of opaque parameters, and enormous energy consumption — this system proposes a **lightweight, deterministic, neuro-symbolic probabilistic approach implemented in pure C**.
+A research artifact, not a paradigm claim: a tiny, auditable, teachable engine for closed domains that learns when told, cites sources, and says it doesn't know instead of inventing. Its formalism (Horn rules, Jaccard, embeddings-cosine) predates it and mostly runs better elsewhere — see `roadmap.md` for the honest state, gates, and measurements. What it offers is the measured combination: embeddable C, inspectable triples, cited proofs, no confabulation by design.
 
 ---
 
-## What Makes This Model Unique?
+## What This Model Does Differently?
 
 ### 1. Explicit Knowledge Representation Instead of Diffuse Weights
 
@@ -38,13 +38,18 @@ Capable of inferring unseen knowledge (e.g., Siamese → Cat → Mammal → Lung
 
 ## Comparison: This Model vs. Current LLMs (Transformers)
 
+Engineering trade-offs, not parity claims. Speed/memory rows are
+microbenchmarks (hash lookups, bulk loads); real-text precision is
+measured separately in `roadmap.md` (e.g. book ingest ~2–22%, retrieval
+sets 87/87). Read numbers as what they are.
+
 | Dimension | Current LLMs (LLaMA, GPT, Claude) | This Symbolic Model in C |
 | --- | --- | --- |
 | **Memory Usage** | 8 GB to hundreds of GB of GPU VRAM. | **32 MB RAM** for 1 million complete relations. |
 | **Hardware Required** | Dedicated accelerators (NVIDIA GPUs / TPUs). | **Any standard CPU** (Windows, Linux, embedded). |
-| **Inference Speed** | 20 to 150 tokens/second (ms latency). | **> 13 million queries/second** (~70 ns per query). The entire dense mathematical machinery of deep learning has been replaced by discrete data structures and graph theory. |
+| **Inference Speed** | 20 to 150 tokens/second (ms latency). | **> 13 million hash lookups/second** (~70 ns per exact query, microbenchmark — not end-to-end QA latency). |
 | **Continuous Learning** | Impossible at runtime (catastrophic forgetting; requires retraining or LoRA). | **Instant O(1) streaming insertion** without forgetting anything. |
-| **Hallucinations** | Frequent and hard to detect (stochastic black box). | **Zero hallucination**: if no path exists in the graph, it deterministically responds that it doesn't know. |
+| **Hallucinations** | Frequent and hard to detect (stochastic black box). | **No confabulation by design**: with no supporting path it answers unknown. Precision on real text is a separate measured number, not 100%. |
 | **Explainability** | Opaque (attention weights don't indicate logical causality). | **100% auditable**: exact logical trace of every deduction. |
 | **Cold Start** | Seconds or minutes loading tensors into memory. | **< 20 milliseconds** to load 50,000 concepts from disk. |
 | **Model Size** | Checkpoints from 4 GB to 140 GB. | **Under 1 MB** for tens of thousands of facts. |
