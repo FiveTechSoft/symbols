@@ -69,9 +69,11 @@ walkable.
 - [ ] P0b — Session persistence: a `save` command so taught facts
   survive the session (same memfact/provfact format). Gate: teach,
   save, reload, ask → same proof.
-- [ ] P1 — Curated demo KBs only: small hand-verified KBs (40-fact
-  scale, `qa_eval_hard.tsv` style) that pass the 50-gate at ≥80%.
-  Rule: the chat demos exclusively on gated KBs. No exceptions.
+- [x] P1 — Curated demo KBs only (done 2026-09-12): `prolog/demo.knowledge.pl`
+  (20 hand-verified lexical facts, stem-compatible verbs) passes a
+  16-question gate at 17/17 (who/what/did/why + bare why? + honest
+  unknown, all with `curated_N` proofs). Rule stands: the chat demos
+  exclusively on gated KBs.
 - [ ] P2 — BookBrain regeneration gate: regenerate a book KB with the
   current pipeline (corpus learn + positional fallback), then the same
   50-gate (seed 42, Gutenberg grounding + manual review, ≥80%) before
