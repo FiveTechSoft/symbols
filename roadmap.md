@@ -129,6 +129,15 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+- [x] D8 typo tolerance (done 2026-09-12): unknown entities fall back
+  to the closest live symbol (Levenshtein =< 2, len >= 3, same
+  initial, unique best or nothing: never random), with an "(assuming
+  X)" note; the answer still requires a real triple (fuzzy proposes,
+  evidence disposes). Zero hardcoded words (audited diff); verbs stay
+  exact (documented limit). Gate: 5/5 (typo answered, verb-typo and
+  far-typo honest unknown, exact-first intact); all gates green.
+  Bug found by probe: row-DP off-by-one pre-bound new[0] while the
+  formula recomputed it (verified against kitten/sitting=3).
 - [x] D7 more + how-many (done 2026-09-12): capped lists continue on
   "more/más/the rest" (stored full list + offset; reasoned lists stay
   put); "how many X did S V?" counts distinct objects (M2 in
@@ -318,7 +327,7 @@ when measured (never assumed); red stays red until re-measured.
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
 | LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
-| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop | green 09-12 | 18+9+13+12+9+8 |
+| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo | green 09-12 | 18+9+13+12+9+8+21+5 |
 | M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
 | M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
 | M3b compare | `qa_eval_compare.tsv` | green 09-12 | 20/20 |

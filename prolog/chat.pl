@@ -779,11 +779,62 @@ chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
     sort(Xs0, Xs),
     findall((E, time, Tm), member(_-(E, time, Tm), LF), Facts).
 
-% qnorm: quita glue, une con _. Solo sobrevive lo que el mapa conoce.
-qnorm(Toks, Name) :-
+% qnorm_exact: quita glue, une con _. Solo sobrevive lo que el mapa conoce.
+qnorm_exact(Toks, Name) :-
     findall(W, (member(W, Toks), bb_content(W)), Ws),
     Ws \== [],
     atomic_list_concat(Ws, '_', Name).
+% qnorm (nombre publico): exacto primero (cero cambio de conducta), cada
+% token a su simbolo mas cercano (Levenshtein =< 2, len >= 3, unico
+% mejor o nada: nunca azar) y el join debe existir. La respuesta final
+% exige tripla real: lo difuso propone, la evidencia dispone.
+qnorm(Toks, Name) :-
+    qnorm_exact(Toks, Name), !.
+qnorm(Toks, Name) :-
+    findall(W2, (member(W, Toks), fuzzy_keep(W, W2)), Ws),
+    Ws \== [],
+    atomic_list_concat(Ws, '_', Name),
+    bb_content(Name),
+    format('(assuming ~w)~n', [Name]).
+
+fuzzy_keep(W, W) :- bb_content(W), !.
+fuzzy_keep(W, C) :- fuzzy_one(W, C).
+fuzzy_one(W, C) :-
+    atom_chars(W, [F|Cs]),
+    length([F|Cs], L),
+    L >= 3,
+    findall(D-S, (memory_symbol(S),
+                  atom_chars(S, [F|_]),
+                  atom_length(S, LS),
+                  abs(LS - L) =< 2,
+                  symbol_dist(W, S, D),
+                  D =< 2), DS),
+    keysort(DS, [D0-C|_]),
+    \+ ( member(D1-C1, DS), C1 \== C, D1 =:= D0 ).
+
+memory_symbol(S) :- memory_relation(S, _, _, _, _).
+memory_symbol(S) :- memory_relation(_, _, S, _, _).
+
+% Levenshtein por filas (DP lineal en el producto).
+symbol_dist(A, B, D) :-
+    atom_chars(A, CA),
+    atom_chars(B, CB),
+    length(CB, N),
+    numlist(0, N, R0),
+    lev_loop(CA, CB, R0, D).
+
+lev_loop([], _, Row, D) :- last(Row, D), !.
+lev_loop([A|As], B, Prev, D) :-
+    Prev = [P0|_],
+    C0 is P0 + 1,
+    lev_cells(A, B, Prev, C0, Tail),
+    lev_loop(As, B, [C0|Tail], D).
+
+lev_cells(_, [], _, _, []).
+lev_cells(A, [B|Bs], [Dg, Up|Rest], Left, [C|Cs]) :-
+    ( A == B -> Cost = 0 ; Cost = 1 ),
+    C is min(Up + 1, min(Left + 1, Dg + Cost)),
+    lev_cells(A, Bs, [Up|Rest], C, Cs).
 
 % Puente morfologico bidireccional (igual que ask.pl), con desdoblado
 % simetrico de consonante final (trimmed->trimm->trim): f aplicada en
