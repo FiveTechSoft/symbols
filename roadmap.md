@@ -45,16 +45,13 @@ Chat / BookBrain (new, untracked, verified 2026-09-12):
 - Preflight: chat.pl, ask.pl, bookbrain.pl PASS. Project gate still
   red only on `gaps.pl` (separate WIP).
 
-## 2. Destination (achievable, demoable)
+## 2. Destination
 
-Not LLM parity — that stays a north star, never an operational goal.
-The reachable, valuable thing this project can uniquely offer:
-
-**The machine that learns what it knows**: a tiny, local, auditable,
-teachable assistant for closed domains (a book, a manual, a knowledge
-base) that learns its knowledge from text and dialogue, cites sources,
-reinforces on repetition, and says "I don't know" instead of inventing.
-SWI-Prolog cannot learn — that verb is the whole destination.
+A chat engine that learns from interaction and behaves as much like
+an LLM as measurably possible: coherent multi-turn conversation,
+knowledge it can cite, honest unknowns. How close it gets is decided
+by dialogue gates, never by claims. Small, local and auditable are
+constraints, not selling points.
 
 Non-overlap with SWI-Prolog (surveyed + probed 2026-09-12, binding):
 SWI covers inference — Horn, cut, NAF, tabling termination,
@@ -132,6 +129,11 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+  D1 anaphora in dialogue ("Where did HE go?", EXP18 exists: wire it),
+  D2 ellipsis ("And Madrid?", reuse last question skeleton),
+  D3 continuity (entity stack + ask when ambiguous),
+  D4 initiative (probe missing roles, EXP48 pattern). Each with
+  scripted multi-turn dialogue sets; same gate discipline as P1/P3.
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it; lead 2026-09-12: probe the
   link_grammar pack before inventing our own simplifier),
@@ -209,7 +211,7 @@ walkable.
   cosine "attention" is deterministic ranking, not QKV).
 - Any external LLM support, hybrid or otherwise (rejected 2026-09-05).
 - Bulk whole-book ingest (until a regeneration passes the 50-gate).
-- Parity claims in the README (bench numbers stay, labeled as bench).
+- Unmeasured parity claims (numbers stay only with gates attached).
 - Multi-hole joins / solver sidecar (queued behind P4).
 - RSI level 3 — code/architecture self-modification (science fiction
   with current means: no safe variation generator, 87-row sets too
@@ -310,9 +312,10 @@ its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
 - 2026-09-12: `alice.knowledge.pl` quarantined (50-gate: 11/50 = 22%;
   role misassignment, phantom ch13 refs, narrator entity). Chat demos
   only on gated KBs from now on.
-- 2026-09-12: roadmap rewritten as honest edition; destination fixed
-  as "the machine that knows what it knows", LLM parity demoted to
-  north star.
+- 2026-09-12: roadmap rewritten as honest edition (superseded same
+  day: destination now flat — chat engine learning from interaction,
+  LLM-like behavior as measured operational goal; D-family queued
+  first in P4).
 - 2026-09-12: novelty disclaimed (value = measured artifact, not
   formalism); README de-smoked (microbenchmarks labeled, no parity or
   zero-hallucination claims); SWI-Prolog surveyed + probed (tabling
