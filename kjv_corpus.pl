@@ -6,26 +6,52 @@
 %   kjv_load_limit(Max): ingiere hasta Max versiculos (0 = todo el archivo).
 %   Contadores: books, verses, sents, stored, rejects. Verificacion: al
 %   final verses debe ser 31102 (conteo KJV auditado por dos metodos).
+% EXP56: via deferred.pl (consultado abajo) los inserts pueden ir en
+% diferido (dx_deferred_on) o en modo collect (kjv_collecting: extrae y
+% aparca en kjv_staged/4 sin tocar memoria).
 :- use_module(library(lists)).
+:- consult('deferred.pl').
 
 :- dynamic kjv_book/2.    % kjv_book(BI, Title)
 :- dynamic kjv_count/2.   % kjv_count(Key, N) globales: books, verses, sents, stored, rejects
 :- dynamic kjv_bcount/2.  % kjv_bcount(Key, N) del libro en curso: bverses, bsents, bstored, brejects
 :- dynamic kjv_bstart/1.  % kjv_bstart(Ms) instante en que empezo el libro en curso
+% EXP55: modo de simbolizacion conmutable. single = una tripleta (EXP54,
+% por defecto y protegido); event = frames multi-verbo + roles (ev_parse).
+:- dynamic kjv_mode/1.
+
+set_kjv_mode(M) :-
+    retractall(kjv_mode(_)),
+    assertz(kjv_mode(M)).
+
+kjv_cur_mode(M) :- kjv_mode(M), !.
+kjv_cur_mode(single).
+
+:- dynamic kjv_collecting/0.
+:- dynamic kjv_staged/4.   % kjv_staged(S, R, O, Ref) extraido, sin ingerir
+
+kjv_collect_on :-
+    retractall(kjv_collecting),
+    retractall(kjv_staged(_, _, _, _)),
+    assertz(kjv_collecting).
+kjv_collect_off :-
+    retractall(kjv_collecting).
 
 kjv_reset :-
     retractall(kjv_book(_, _)),
     retractall(kjv_count(_, _)),
     retractall(kjv_bcount(_, _)),
     retractall(kjv_bstart(_)),
-    forall(member(K, [books, verses, sents, stored, rejects]),
+    forall(member(K, [books, verses, sents, stored, rejects,
+                      frames, skipped_frames, dropped_verbs]),
            assertz(kjv_count(K, 0))),
     kjv_book_locals_reset,
     reset_pronouns.
 
 kjv_book_locals_reset :-
     retractall(kjv_bcount(_, _)),
-    forall(member(K, [bverses, bsents, bstored, brejects]),
+    forall(member(K, [bverses, bsents, bstored, brejects,
+                      bframes, bskipped_frames, bdropped_verbs]),
            assertz(kjv_bcount(K, 0))),
     statistics(runtime, [Now, _]),
     assertz(kjv_bstart(Now)).
@@ -159,13 +185,38 @@ kjv_ingest_verse(BI, C, V, Toks) :-
 kjv_ingest_sent(Sn, Ref) :-
     kjv_inc(sents),
     kjv_binc(bsents),
-    ( symbolize_kjv(Sn, (S, R, O)) ->
-        remember_tracked(S, R, O, Ref, none),
-        kjv_inc(stored),
-        kjv_binc(bstored)
-    ; kjv_inc(rejects),
-      kjv_binc(brejects)
+    kjv_cur_mode(Mode),
+    ( Mode == event ->
+        ev_symbolize(Sn, Ref, Triples, NF, NSk, ND),
+        kjv_addn(frames, bframes, NF),
+        kjv_addn(skipped_frames, bskipped_frames, NSk),
+        kjv_addn(dropped_verbs, bdropped_verbs, ND)
+    ; ( symbolize_kjv(Sn, (S, R, O)) ->
+            Triples = [(S, R, O)]
+      ; Triples = []
+      )
+    ),
+    ( Triples == [] ->
+        kjv_inc(rejects),
+        kjv_binc(brejects)
+    ; forall(member((S, R, O), Triples),
+             kjv_put(S, R, O, Ref))
     ).
+
+% kjv_put: aparca (collect) o inserta (dx_track = eager/diferido).
+kjv_put(S, R, O, Ref) :-
+    ( kjv_collecting ->
+        assertz(kjv_staged(S, R, O, Ref))
+    ; dx_track(S, R, O, Ref, none)
+    ),
+    kjv_inc(stored),
+    kjv_binc(bstored).
+
+% Suma N a un contador global y su espejo de libro.
+kjv_addn(_, _, 0) :- !.
+kjv_addn(G, B, N) :-
+    retract(kjv_count(G, X)), X1 is X + N, assertz(kjv_count(G, X1)),
+    retract(kjv_bcount(B, Y)), Y1 is Y + N, assertz(kjv_bcount(B, Y1)).
 
 kjv_empty_str("").
 
@@ -187,12 +238,15 @@ kjv_report_book(BI) :-
     kjv_bcount(bsents, NS),
     kjv_bcount(bstored, NSt),
     kjv_bcount(brejects, NR),
+    kjv_bcount(bframes, NF),
+    kjv_bcount(bskipped_frames, NSk),
+    kjv_bcount(bdropped_verbs, ND),
     kjv_bstart(T0),
     statistics(runtime, [Now, _]),
     Ms is Now - T0,
     ( NS > 0 -> Y is 100 * NSt / NS ; Y = 0 ),
-    format('BOOK ~w | verses=~w sents=~w stored=~w rejects=~w yield=~1f% ms=~w | ~w~n',
-           [BI, NV, NS, NSt, NR, Y, Ms, Title]).
+    format('BOOK ~w | verses=~w sents=~w stored=~w rejects=~w yield=~1f% frames=~w skipfr=~w dropv=~w ms=~w | ~w~n',
+           [BI, NV, NS, NSt, NR, Y, NF, NSk, ND, Ms, Title]).
 
 kjv_list_books :-
     forall(kjv_book(BI, T), format('book ~w: ~w~n', [BI, T])).

@@ -19,6 +19,21 @@
 :- dynamic dx_cn/2.     % dx_cn(R, N groups with ccnt==1)
 :- dynamic dx_mc/2.     % dx_mc(R, N groups with ccnt>=2)
 :- dynamic dx_n/1.
+:- dynamic dx_deferred/0.  % si activo, dx_track desvia a dx_remember
+
+% Dispatcher para lectores: por defecto (apagado) es remember_tracked
+% identico; con dx_deferred_on va a insercion diferida.
+dx_deferred_on :-
+    retractall(dx_deferred),
+    assertz(dx_deferred).
+dx_deferred_off :-
+    retractall(dx_deferred).
+
+dx_track(S, R, O, Src, Time) :-
+    dx_deferred, !,
+    dx_remember(S, R, O, Src, Time).
+dx_track(S, R, O, Src, Time) :-
+    remember_tracked(S, R, O, Src, Time).
 
 dx_reset :-
     retractall(dx_seq(_, _)),
