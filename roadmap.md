@@ -99,11 +99,19 @@ walkable.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it),
-  M3b (comparison más/menos, mayor/menor, antes/después over the M3a
-  sidecar),
   P4b (Horn + cut + NAF over P4a), R6 analogy ranking set (needs PARIS
   data + incoming-role similarity + frequency-gated cosine first, see
   below). Each ships with its eval set + threshold (90),
+  no-merge on regression (87/87, suite, Quijote immunity).
+- [x] M3b — comparison (done 2026-09-12): superlative argmax/argmin
+  over valued holders plus binary winner, all on shared units (ties,
+  missing values and unit mismatch are honest unknown; years order
+  temporally via min/max, menos = antes). QUESTION gains is_compare +
+  cmp_op/cmp_binary/cmp_other, M8 precedent; binary shape tried before
+  superlative; Y/NO/count vetoed. Gate: 20-row set
+  (`qa_eval_compare.tsv`, 5 INDEPENDENCIA years added to the fixture)
+  20/20 via test_numeric (same Detect/Answer path; golden V4 has no
+  sidecars, so it runs there after regen); suite 35/35, eval 87/87.
 - [x] M3a — numeric sidecar (done 2026-09-12): measures as typed
   (value, unit) hanging off object symbols (`numeric.h/c`, never new
   core relation types); Spanish-format heuristic documented in code
@@ -114,7 +122,6 @@ walkable.
   set (`qa_eval_numeric.tsv`, same Detect/Answer path) 20/20 + V5
   round-trip on scratch bin; suite 35/35, eval 87/87. Golden regen
   with numeric data is queued explicitly (not this turn).
-  no-merge on regression (87/87, suite, Quijote immunity).
 - [x] M4 — 2-hop chaining (done 2026-09-12): substitute-then-ask over
   positive ground facts in the QA path (QUESTION gains is_multihop +
   inner_rel/inner_obj, M8 precedent; outer candidates ranked by

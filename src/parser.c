@@ -1068,6 +1068,87 @@ static uint32_t IntersectSubjects(const GRAPH *graph,
    Question Detection & Answering
    ============================================================ */
 
+/* M3b helpers: valued holders scan the dense relation array (the
+   sanctioned sequential-access path); sidecar lookup stays tiny.
+   Positive ground only: denials never compare. */
+static uint32_t ValuedHolders(const GRAPH *graph, SYMBOL_ID rel,
+                              SYMBOL_ID *subs, double *vals,
+                              char units[][NUMERIC_UNIT_MAX],
+                              uint32_t max)
+{
+    uint32_t n = 0, i, nrel;
+    if (graph == NULL || graph->relations == NULL || rel == SYMBOL_INVALID)
+        return 0;
+    nrel = graph->relations->count;
+    for (i = 0; i < nrel && n < max; i++)
+    {
+        RELATION *r = &graph->relations->items[i];
+        double v;
+        char u[NUMERIC_UNIT_MAX];
+        uint32_t d;
+        int dup = 0;
+        if (r->relation != rel || r->polarity == POLARITY_NEGATIVE)
+            continue;
+        if (graph->numerics == NULL ||
+            !NumericGet(graph->numerics, r->object, &v, u, sizeof(u)))
+            continue;
+        for (d = 0; d < n; d++)
+            if (subs[d] == r->subject)
+            {
+                dup = 1;
+                break;
+            }
+        if (dup)
+            continue;
+        subs[n] = r->subject;
+        vals[n] = v;
+        strncpy(units[n], u, NUMERIC_UNIT_MAX - 1);
+        units[n][NUMERIC_UNIT_MAX - 1] = '\0';
+        n++;
+    }
+    return n;
+}
+
+/* Best valued object of (subj, rel); per-side unit must be unanimous. */
+static int BestOfSide(const GRAPH *graph, SYMBOL_ID subj, SYMBOL_ID rel,
+                      double *best, char *unit, size_t usize)
+{
+    RELATION *hits[64];
+    uint32_t nh, h;
+    int have = 0;
+    if (graph == NULL || subj == SYMBOL_INVALID || rel == SYMBOL_INVALID)
+        return 0;
+    nh = GraphQuerySubjectRelation(graph, subj, rel, hits, 64);
+    for (h = 0; h < nh; h++)
+    {
+        double v;
+        char u[NUMERIC_UNIT_MAX];
+        if (hits[h]->polarity == POLARITY_NEGATIVE)
+            continue;
+        if (graph->numerics == NULL ||
+            !NumericGet(graph->numerics, hits[h]->object, &v, u, sizeof(u)))
+            continue;
+        if (!have)
+        {
+            *best = v;
+            have = 1;
+            if (unit != NULL && usize > 0)
+            {
+                strncpy(unit, u, usize - 1);
+                unit[usize - 1] = '\0';
+            }
+        }
+        else
+        {
+            if (unit != NULL && usize > 0 && strcmp(unit, u) != 0)
+                return 0;
+            if (v > *best)
+                *best = v;
+        }
+    }
+    return have;
+}
+
 /* Relation vocabulary cache: distinct used relations with precomputed
    match keys (full name plus stemmed compound parts). Rebuilt whenever
    the relation count changes, so growth invalidates it. The cache is
@@ -1818,6 +1899,172 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         }
     }
 
+    /* Compare form, M3b (aggregation over numeric sidecars, never new
+       types): MAS/MENOS plus a resolving relation. Binary first ("S
+       TIENE MAS R QUE O": winner by sidecar value on a shared unit;
+       ties and unit mismatch abandon the reading), then superlative
+       ("el X con MAS R es": argmax/argmin over every valued holder;
+       units must agree). Evidence before committing or fall through
+       (strictly additive: no current set row carries MAS/MENOS).
+       M8 owns Y, M1 owns NO, M2 owns counting: vetoed. */
+    {
+        int veto = q.is_count;
+        uint32_t m = 0;
+        int found_m = 0, op = 0;
+        uint32_t i;
+        for (i = 0; i < tokens.count && !veto; i++)
+        {
+            if (strcmp(tokens.tokens[i], "Y") == 0 ||
+                strcmp(tokens.tokens[i], "NO") == 0)
+                veto = 1;
+            else if (!found_m && (strcmp(tokens.tokens[i], "MAS") == 0 ||
+                                  strcmp(tokens.tokens[i], "MENOS") == 0))
+            {
+                found_m = 1;
+                m = i;
+                op = (strcmp(tokens.tokens[i], "MAS") == 0) ? 1 : -1;
+            }
+        }
+        if (!veto && found_m)
+        {
+            int order[32];
+            uint32_t norder = 0;
+            int ord_untrusted[32];
+            uint64_t ord_freq[32];
+            uint32_t a, b, o, qi;
+            int binary_only = 0;
+            for (qi = m + 1; qi < tokens.count; qi++)
+                if (strcmp(tokens.tokens[qi], "QUE") == 0)
+                {
+                    binary_only = 1;
+                    break;
+                }
+            for (i = m + 1; i < tokens.count && norder < 32; i++)
+            {
+                char rel[64] = {0};
+                int trusted = 0;
+                if (!ResolveRelationPass(graph, tokens.tokens[i],
+                                         rel, sizeof(rel), &trusted))
+                    continue;
+                order[norder] = (int)i;
+                ord_untrusted[norder] = trusted ? 0 : 1;
+                ord_freq[norder] = TokenRarity(graph, tokens.tokens[i]);
+                norder++;
+            }
+            for (a = 0; a < norder; a++)
+                for (b = a + 1; b < norder; b++)
+                    if (ord_untrusted[b] < ord_untrusted[a] ||
+                        (ord_untrusted[b] == ord_untrusted[a] &&
+                         ord_freq[b] < ord_freq[a]))
+                    {
+                        int t = order[a];
+                        order[a] = order[b];
+                        order[b] = t;
+                        int u = ord_untrusted[a];
+                        ord_untrusted[a] = ord_untrusted[b];
+                        ord_untrusted[b] = u;
+                        uint64_t f = ord_freq[a];
+                        ord_freq[a] = ord_freq[b];
+                        ord_freq[b] = f;
+                    }
+            for (o = 0; o < norder; o++)
+            {
+                char r1[64] = {0};
+                int trusted = 0;
+                SYMBOL_ID r1id;
+                uint32_t qi;
+                int has_que = 0;
+                if (!ResolveRelationPass(graph,
+                                         tokens.tokens[(uint32_t)order[o]],
+                                         r1, sizeof(r1), &trusted))
+                    continue;
+                r1id = SymbolFind(graph->symbols, r1);
+                if (r1id == SYMBOL_INVALID)
+                    continue;
+                /* Binary shape: entities on both sides of QUE. */
+                if (binary_only)
+                {
+                    PARSED_SENTENCE pre, post;
+                    char xs[128] = {0}, ys[128] = {0};
+                    SYMBOL_ID xid, yid;
+                    double bx = 0.0, by = 0.0;
+                    char ux[NUMERIC_UNIT_MAX] = {0};
+                    char uy[NUMERIC_UNIT_MAX] = {0};
+                    int hx, hy;
+                    uint32_t k, qj;
+                    memset(&pre, 0, sizeof(pre));
+                    for (k = 0; k < m && pre.count < PARSER_MAX_TOKENS; k++)
+                    {
+                        strcpy(pre.tokens[pre.count], tokens.tokens[k]);
+                        pre.count++;
+                    }
+                    memset(&post, 0, sizeof(post));
+                    for (qj = m + 1; qj < tokens.count; qj++)
+                        if (strcmp(tokens.tokens[qj], "QUE") == 0)
+                            break;
+                    for (k = qj + 1; k < tokens.count &&
+                                     post.count < PARSER_MAX_TOKENS; k++)
+                    {
+                        strcpy(post.tokens[post.count], tokens.tokens[k]);
+                        post.count++;
+                    }
+                    if (ResolveEntity(graph, &pre, 0, xs, sizeof(xs)) < 0 ||
+                        ResolveEntity(graph, &post, 0, ys, sizeof(ys)) < 0)
+                        continue;
+                    xid = SymbolFind(graph->symbols, xs);
+                    yid = SymbolFind(graph->symbols, ys);
+                    if (xid == SYMBOL_INVALID || yid == SYMBOL_INVALID)
+                        continue;
+                    /* Binary shape resolved: values decide here, never
+                       the superlative below (a tie is honest unknown). */
+                    hx = BestOfSide(graph, xid, r1id, &bx, ux, sizeof(ux));
+                    hy = BestOfSide(graph, yid, r1id, &by, uy, sizeof(uy));
+                    if (hx && hy && strcmp(ux, uy) == 0 && bx != by)
+                    {
+                        /* MAS/max, MENOS/min. */
+                        int xwins = (op > 0) ? (bx > by) : (bx < by);
+                        strcpy(q.relation, r1);
+                        strcpy(q.subject, xwins ? xs : ys);
+                        strcpy(q.cmp_other, xwins ? ys : xs);
+                        q.is_compare = 1;
+                        q.cmp_op = op;
+                        q.cmp_binary = 1;
+                        q.valid = 1;
+                        q.is_question = 1;
+                        return q;
+                    }
+                    continue;
+                }
+                /* Superlative shape: holders with sidecars, one unit. */
+                {
+                    SYMBOL_ID subs[64];
+                    double vals[64];
+                    char units[64][NUMERIC_UNIT_MAX];
+                    uint32_t n, d;
+                    int one_unit = 1;
+                    n = ValuedHolders(graph, r1id, subs, vals, units, 64);
+                    if (n < 2)
+                        continue;
+                    for (d = 1; d < n; d++)
+                        if (strcmp(units[d], units[0]) != 0)
+                        {
+                            one_unit = 0;
+                            break;
+                        }
+                    if (!one_unit)
+                        continue;
+                    strcpy(q.relation, r1);
+                    q.is_compare = 1;
+                    q.cmp_op = op;
+                    q.cmp_binary = 0;
+                    q.valid = 1;
+                    q.is_question = 1;
+                    return q;
+                }
+            }
+        }
+    }
+
     /* Fact shape: descriptor token pointing to a graph relation plus an
        entity. The entity usually trails the descriptor ("la CAPITAL de
        FRANCIA es") but may precede it ("Paris es"): both directions are
@@ -2333,6 +2580,114 @@ int ParserAnswerQuestion(
             }
             out_answer[pos] = '\0';
             return 1;
+        }
+    }
+
+    /* Compare form (M3b): superlative argmax/argmin over valued
+       holders with one shared unit, or binary winner by sidecar value.
+       Ties, missing values and unit mismatch are honest unknown. */
+    if (q->valid && q->is_compare && !q->is_negative)
+    {
+        SYMBOL_ID r1 = SymbolFind(graph->symbols, q->relation);
+        if (r1 == SYMBOL_INVALID)
+            return 0;
+        if (!q->cmp_binary)
+        {
+            SYMBOL_ID subs[64];
+            double vals[64];
+            char units[64][NUMERIC_UNIT_MAX];
+            uint32_t n, d, w;
+            double extreme = 0.0;
+            int have = 0;
+            SYMBOL_ID tied[32];
+            uint32_t ntied = 0;
+            uint32_t pos = 0;
+            n = ValuedHolders(graph, r1, subs, vals, units, 64);
+            if (n < 2)
+                return 0;
+            for (d = 1; d < n; d++)
+                if (strcmp(units[d], units[0]) != 0)
+                    return 0;
+            for (d = 0; d < n; d++)
+            {
+                int better = !have ||
+                    ((q->cmp_op > 0) ? (vals[d] > extreme)
+                                     : (vals[d] < extreme));
+                if (better)
+                {
+                    extreme = vals[d];
+                    ntied = 0;
+                    have = 1;
+                }
+                if (have && vals[d] == extreme && ntied < 32)
+                    tied[ntied++] = subs[d];
+            }
+            if (ntied == 0)
+                return 0;
+            for (w = 0; w < ntied; w++)
+            {
+                const SYMBOL *s = SymbolGet(graph->symbols, tied[w]);
+                char cell[192];
+                if (s == NULL)
+                    continue;
+                if (units[0][0] != '\0')
+                    snprintf(cell, sizeof(cell), "%s (%g %s)", s->name,
+                             extreme, units[0]);
+                else
+                    snprintf(cell, sizeof(cell), "%s (%g)", s->name,
+                             extreme);
+                cell[sizeof(cell) - 1] = '\0';
+                if (w > 0 && pos + 2 < max_len)
+                {
+                    out_answer[pos++] = ',';
+                    out_answer[pos++] = ' ';
+                }
+                {
+                    uint32_t cl = (uint32_t)strlen(cell);
+                    if (pos + cl < max_len)
+                    {
+                        memcpy(out_answer + pos, cell, cl);
+                        pos += cl;
+                    }
+                }
+            }
+            out_answer[pos] = '\0';
+            return 1;
+        }
+        {
+            SYMBOL_ID xid = StemFindSymbol(graph->symbols, q->subject);
+            SYMBOL_ID yid = StemFindSymbol(graph->symbols, q->cmp_other);
+            double bx = 0.0, by = 0.0;
+            char ux[NUMERIC_UNIT_MAX] = {0};
+            char uy[NUMERIC_UNIT_MAX] = {0};
+            int hx, hy, xwins;
+            const SYMBOL *s;
+            char cell[192];
+            hx = BestOfSide(graph, xid, r1, &bx, ux, sizeof(ux));
+            hy = BestOfSide(graph, yid, r1, &by, uy, sizeof(uy));
+            if (!hx || !hy || strcmp(ux, uy) != 0 || bx == by)
+                return 0;
+            xwins = (q->cmp_op > 0) ? (bx > by) : (bx < by);
+            s = SymbolGet(graph->symbols, xwins ? xid : yid);
+            if (s == NULL)
+                return 0;
+            if (ux[0] != '\0')
+                snprintf(cell, sizeof(cell), "%s (%g %s)", s->name,
+                         xwins ? bx : by, ux);
+            else
+                snprintf(cell, sizeof(cell), "%s (%g)", s->name,
+                         xwins ? bx : by);
+            cell[sizeof(cell) - 1] = '\0';
+            {
+                uint32_t cl = (uint32_t)strlen(cell);
+                if (cl + 1 < max_len)
+                {
+                    memcpy(out_answer, cell, cl);
+                    out_answer[cl] = '\0';
+                    return 1;
+                }
+            }
+            return 0;
         }
     }
 

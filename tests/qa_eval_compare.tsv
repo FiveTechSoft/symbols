@@ -1,0 +1,32 @@
+# QA compare set (M3b roadmap): superlative argmax/argmin and binary
+# winner over numeric sidecars. Units must agree or the answer is
+# honest unknown. Years order temporally via min/max (menos = antes).
+# Pregunta<TAB>respuesta_esperada (substring). Curadas + verificadas por
+# ejecucion contra el fixture (test_numeric ingests
+# tests/qa_numeric_fixture.tsv in-memory; golden untouched).
+# Runner: test_numeric (in-memory fixture tests/qa_numeric_fixture.tsv,
+# same Detect/Answer path as test_eval_qa; umbral 90%). El dorado V4 no
+# trae sidecars: este set corre via test_eval_qa cuando se regenere el
+# dorado con datos numericos. No muta el modelo.
+# Nota doctrinal: sin filtro de tipos (MADRID ciudad gana "menos
+# POBLACION" entre tenedores; la evidencia decide, no la clase).
+el pais con mas POBLACION es	ALEMANIA
+el pais con menos POBLACION es	MADRID
+el pais con mas SUPERFICIE es	FRANCIA
+el pais con menos SUPERFICIE es	PORTUGAL
+el lugar con mas ALTITUD es	EVEREST
+el lugar con menos ALTITUD es	TOLEDO
+el rio con mas LONGITUD es	TAJO
+el rio con menos LONGITUD es	EBRO
+el pais con mas INDEPENDENCIA es	PERU
+el pais con menos INDEPENDENCIA es	MEXICO
+ESPANA tiene mas POBLACION que FRANCIA	FRANCIA
+ALEMANIA tiene mas POBLACION que ITALIA	ALEMANIA
+PORTUGAL tiene menos POBLACION que ESPANA	PORTUGAL
+MADRID tiene mas ALTITUD que TOLEDO	MADRID
+EBRO tiene menos LONGITUD que TAJO	EBRO
+MEXICO tiene menos INDEPENDENCIA que PERU	MEXICO
+FRANCIA tiene mas SUPERFICIE que ESPANA	FRANCIA
+ITALIA tiene menos POBLACION que ALEMANIA	ITALIA
+ANETO tiene mas ALTITUD que TOLEDO	ANETO
+VENEZUELA tiene mas INDEPENDENCIA que MEXICO	VENEZUELA

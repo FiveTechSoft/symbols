@@ -44,6 +44,48 @@ static void TrimNL(char *s)
         s[--n] = '\0';
 }
 
+/* Run one QA set through the production Detect/Answer path. */
+static void RunEvalSet(MODEL *m, const char *path, const char *label)
+{
+    FILE *f = fopen(path, "r");
+    char line[1024];
+    uint32_t total = 0, pass = 0;
+    printf("   %s (%s):\n", label, path);
+    Check(f != NULL, "open eval set");
+    if (f == NULL)
+        return;
+    while (fgets(line, sizeof(line), f))
+    {
+        char *tab;
+        QUESTION q;
+        char answer[256] = {0};
+        int found;
+        TrimNL(line);
+        if (line[0] == '\0' || line[0] == '#')
+            continue;
+        tab = strchr(line, '\t');
+        if (!tab || tab[1] == '\0')
+            continue;
+        *tab = '\0';
+        total++;
+        q = ParserDetectQuestion(m->graph, line);
+        found = (q.valid && q.is_question) ?
+            ParserAnswerQuestion(m->graph, &q, answer,
+                                 sizeof(answer)) : 0;
+        if (found && strstr(answer, tab + 1) != NULL)
+            pass++;
+        else
+            printf("  MISS #%u: '%s' -> '%s' (esperaba '%s')\n",
+                   total, line, found ? answer : "<sin respuesta>",
+                   tab + 1);
+    }
+    fclose(f);
+    printf("   %s: %u/%u\n", label, pass, total);
+    Check(total == 20, "20 eval rows");
+    Check(total > 0 && (100 * pass / total) >= NUMERIC_QA_THRESHOLD,
+          "eval threshold 90");
+}
+
 int main(void)
 {
     /* 1. Parse unit cases (documented Spanish-format heuristic). */
@@ -118,8 +160,8 @@ int main(void)
         }
         printf("   rows=%u relations=%u\n", nrows,
                RelationCount(m->graph->relations));
-        Check(nrows == 20, "20 fixture rows");
-        Check(RelationCount(m->graph->relations) == 20, "20 relations");
+        Check(nrows == 25, "25 fixture rows");
+        Check(RelationCount(m->graph->relations) == 25, "25 relations");
     }
 
     /* 3. Sidecar spot checks on stored symbols. */
@@ -159,47 +201,10 @@ int main(void)
         }
     }
 
-    /* 4. QA value lookup over the set (same path as test_eval_qa). */
-    printf("4. QA lookup (tests/qa_eval_numeric.tsv):\n");
-    {
-        FILE *f = fopen("tests/qa_eval_numeric.tsv", "r");
-        char line[1024];
-        uint32_t total = 0, pass = 0;
-        Check(f != NULL, "open eval set");
-        if (f != NULL)
-        {
-            while (fgets(line, sizeof(line), f))
-            {
-                char *tab;
-                QUESTION q;
-                char answer[256] = {0};
-                int found;
-                TrimNL(line);
-                if (line[0] == '\0' || line[0] == '#')
-                    continue;
-                tab = strchr(line, '\t');
-                if (!tab || tab[1] == '\0')
-                    continue;
-                *tab = '\0';
-                total++;
-                q = ParserDetectQuestion(m->graph, line);
-                found = (q.valid && q.is_question) ?
-                    ParserAnswerQuestion(m->graph, &q, answer,
-                                         sizeof(answer)) : 0;
-                if (found && strstr(answer, tab + 1) != NULL)
-                    pass++;
-                else
-                    printf("  MISS #%u: '%s' -> '%s' (esperaba '%s')\n",
-                           total, line, found ? answer : "<sin respuesta>",
-                           tab + 1);
-            }
-            fclose(f);
-        }
-        printf("   NUMERIC eval: %u/%u\n", pass, total);
-        Check(total == 20, "20 eval rows");
-        Check(total > 0 && (100 * pass / total) >= NUMERIC_QA_THRESHOLD,
-              "numeric threshold 90");
-    }
+    /* 4. QA sets through the production path (lookup + compare). */
+    printf("4. QA sets:\n");
+    RunEvalSet(m, "tests/qa_eval_numeric.tsv", "value lookup");
+    RunEvalSet(m, "tests/qa_eval_compare.tsv", "comparison");
 
     /* 5. V5 persist round-trip on a scratch bin (ignored by git). */
     printf("5. V5 round-trip (numeric_test.bin):\n");

@@ -33,6 +33,13 @@ typedef struct
                                hops over positive ground triples */
     char inner_rel[64];
     char inner_obj[128];
+    int  is_compare;       /* M3b comparison over numeric sidecars: cmp_op
+                               +1 MAS/max, -1 MENOS/min; superlative argues
+                               over every holder, binary (cmp_binary) over
+                               subject vs cmp_other; units must agree */
+    int  cmp_op;
+    int  cmp_binary;
+    char cmp_other[128];
     int  valid;
 } QUESTION;
 
