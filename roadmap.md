@@ -330,6 +330,10 @@ thresholds fixed (90 eval/unit suites, 80 corpus gate, 100 taught or
 curated answers); counts by double method; every gate re-runnable by
 its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
 `tools/loop50_gate.py`, `swipl` harnesses).
+Chat-first validation (binding 2026-09-12): every advance, whatever
+its layer, is validated by testing the chat for improved conversation
+(dialogue gates + a live session); an advance that does not improve
+(or regresses) the conversation does not land.
 
 ## 9. Decisions log
 
