@@ -184,7 +184,49 @@ formalism) is adopted if it passes the gates (eval without regression,
 preflight clean, 50-gate for corpus), never on hype. If a gate itself
 proves wrong, change the gate in the open with the failure cited.
 
-## 8. Decisions log
+## 8. Measures and progress index (binding, 2026-09-12)
+
+One number to know where we stand, with every input re-measurable.
+Index = gated-green milestones / total milestones. A FAIL counts only
+when measured (never assumed); red stays red until re-measured.
+
+| ID | Gate | State | Numbers |
+|----|------|-------|---------|
+| P0 loop-1 | teach→ask→proof, 1 fact | green 09-12 | 1/1 |
+| P0b save | same proof after reload | green 09-12 | 1/1 |
+| P1 curated KB | 16 questions, all proved | green 09-12 | 17/17 |
+| P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
+| P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
+| LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
+| M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
+| M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
+| M3b compare | `qa_eval_compare.tsv` | green 09-12 | 20/20 |
+| P4b-core | `test_neuro_prolog_rules` | green 09-12 | 28/28 |
+| P4b-rest | quantifiers, NL surfacing, persist | pending | — |
+| R6-inv | firing investigation delivered | green 09-12 | diagnosis |
+| R6-rank | ranking set (blocked: data) | pending | — |
+| canonization | short-SVO simplifier + gate | pending | — |
+| M5 defaults | `qa_eval_default.tsv` | green (prior) | 18/18 |
+| M7 reverse | `qa_eval_reverse.tsv` | green (prior) | 8/8 |
+| M8 conjunction | `qa_eval_conjunctive.tsv` | green (prior) | 10/10 |
+| M1 negation | `qa_eval_negation.tsv` | green (prior) | 20/20 |
+| M2 count | `qa_eval_count.tsv` | green (prior) | 22/22 |
+| R7 contradiction | surfaced (stored only today) | pending | — |
+| golden-regen | numeric data in golden | pending | — |
+
+**Index: 15/21 = 71% (2026-09-12).**
+
+Regression floor (any red = stop, regardless of the index):
+suite 36/36 (`ctest --test-dir build-gcc`), eval 87/87, hard ≥38/40,
+hygiene PASS, `git status --short wiki_model.bin` empty.
+
+Evidence rules: baseline pre-change recorded (M4 1/20, R6 0.00s);
+thresholds fixed (90 eval/unit suites, 80 corpus gate, 100 taught or
+curated answers); counts by double method; every gate re-runnable by
+its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
+`tools/loop50_gate.py`, `swipl` harnesses).
+
+## 9. Decisions log
 
 - 2026-09-05: external LLM / hybrid TinyLlama proposal rejected.
 - 2026-09-05: per-relation composed embeddings + cosine "attention";
