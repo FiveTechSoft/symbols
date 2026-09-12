@@ -74,18 +74,25 @@ walkable.
   16-question gate at 17/17 (who/what/did/why + bare why? + honest
   unknown, all with `curated_N` proofs). Rule stands: the chat demos
   exclusively on gated KBs.
-- [ ] P2 — BookBrain regeneration gate: regenerate a book KB with the
-  current pipeline (corpus learn + positional fallback), then the same
-  50-gate (seed 42, Gutenberg grounding + manual review, ≥80%) before
-  any demo use. Today's pipeline emits a different schema than
-  `alice.knowledge.pl`; that is fine, the gate decides, not the schema.
+- [ ] P2 — BookBrain regeneration gate (FAILED 2026-09-12, see below):
+  pipeline extended with the positional fallback (same doctrine as
+  chat_learn), then run on 2,647 Gutenberg-Alice sentences: 637 stored
+  (24%; 2 via open_vocab, 635 positional), manual 50-gate (seed 42):
+  1/50 = 2% vs 80% threshold. Failure mode: dialogue fragments as
+  subjects (`"she --can't_explain_it..."`), whole clauses as relations
+  (`--and_hurried_off_to_the_garden-->`), quote-glued atoms. This
+  confirms positional.pl's documented limit (rigid-SVO short input
+  only); the missing piece is input canonization (sentence
+  simplification), which does not exist. Queued in P4. The regen KB
+  was deleted, not committed. Gate stands; no demo use.
 - [ ] P3 — Dialogue feeds discovery: run `learn_cycle` periodically
   over told facts (EXP46 sketch → product). Storing is not enough: the chat must
   induce, not just store. Gate: taught regularities answerable with
   rule-attributed proofs; no regression on P1 KBs.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
-  M4 (2-hop, substitute-then-ask), M3a/M3b (numeric sidecar, then
-  comparison), P4b (Horn + cut + NAF over P4a), R6 analogy firing
+  input canonization for book ingest (short-SVO sentence simplification;
+  prerequisite: P2 measured 2% without it), M4 (2-hop,
+  substitute-then-ask), M3a/M3b (numeric sidecar, then comparison), P4b (Horn + cut + NAF over P4a), R6 analogy firing
   investigation. Each ships with its eval set + threshold (90),
   no-merge on regression (87/87, suite, Quijote immunity).
 
