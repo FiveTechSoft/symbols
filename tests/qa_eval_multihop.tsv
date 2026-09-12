@@ -1,0 +1,25 @@
+# QA multihop set (M4 roadmap): composicion capada a 2 sobre hechos base.
+# Forma: "la R1 del pais con R2 O2 es" -> interior (R2=O2) -> entidad ->
+# exterior (R1). Pregunta<TAB>respuesta_esperada (substring, con folding).
+# Curadas + verificadas por ejecucion contra el corpus. Runner:
+# test_eval_qa (umbral 90%). No muta el modelo.
+la moneda del pais con capital ATENAS es	EURO
+la moneda del pais con capital BERLIN es	EURO
+el idioma del pais con capital BRASILIA es	PORTUGUES
+el gentilicio del pais con capital ATENAS es	GRIEGO
+la capital del pais con moneda EURO es	MADRID
+la capital del pais con moneda PESO es	BUENOS_AIRES
+la moneda del pais con capital MADRID es	EURO
+el idioma del pais con capital BERLIN es	ALEMAN
+la moneda del pais con capital ROMA es	EURO
+el gentilicio del pais con capital LISBOA es	PORTUGUES
+la moneda del pais con capital ABUYA es	NAIRA
+el gentilicio del pais con capital ABUYA es	NIGERIANO
+la moneda del pais con capital ANKARA es	LIRA_TURCA
+el idioma del pais con capital ANKARA es	TURCO
+la moneda del pais con capital ASUNCION es	GUARANI
+el gentilicio del pais con capital ASUNCION es	PARAGUAYO
+el gentilicio del pais con capital BRUSELAS es	BELGA
+el gentilicio del pais con capital BELMOPAN es	BELICENO
+la moneda del pais con capital BOGOTA es	PESO
+el gobierno del pais con capital ATENAS es	REPUBLICA_PARLAMENTARIA

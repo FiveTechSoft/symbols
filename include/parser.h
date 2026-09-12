@@ -23,10 +23,16 @@ typedef struct
     int  is_count;         /* CUÁNTO-form: answer with the numeral */
     int  is_negative;      /* NO-form: verify (S,R,O), answer Sí/No */
     int  hole;             /* M8 conjunctive: subject is the hole; the
-                              answer intersects conj_rel/conj_obj pairs */
+                               answer intersects conj_rel/conj_obj pairs */
     uint32_t nconj;
     char conj_rel[3][64];
     char conj_obj[3][128];
+    int  is_multihop;      /* M4 composition: outer relation answered over
+                               inner-resolved subjects (inner_rel/inner_obj
+                               locate them by reverse lookup); capped at 2
+                               hops over positive ground triples */
+    char inner_rel[64];
+    char inner_obj[128];
     int  valid;
 } QUESTION;
 

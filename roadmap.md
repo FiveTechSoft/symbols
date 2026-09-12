@@ -98,12 +98,18 @@ walkable.
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
-  prerequisite: P2 measured 2% without it), M4 (2-hop,
-  substitute-then-ask), M3a/M3b (numeric sidecar, then comparison),
+  prerequisite: P2 measured 2% without it),
+  M3a/M3b (numeric sidecar, then comparison),
   P4b (Horn + cut + NAF over P4a), R6 analogy ranking set (needs PARIS
   data + incoming-role similarity + frequency-gated cosine first, see
   below). Each ships with its eval set + threshold (90),
   no-merge on regression (87/87, suite, Quijote immunity).
+- [x] M4 — 2-hop chaining (done 2026-09-12): substitute-then-ask over
+  positive ground facts in the QA path (QUESTION gains is_multihop +
+  inner_rel/inner_obj, M8 precedent; outer candidates ranked by
+  trust/rarity with end-to-end evidence before committing; Y/NO/count
+  vetoed to their owners). `tests/qa_eval_multihop.tsv` 20/20 (baseline
+  1/20 pre-change); suite 34/34, eval 87/87, hard 38/40, hygiene PASS.
 - [x] R6 analogy firing investigation (done 2026-09-12, binary audit
   of golden: parse tail_ok): country hubs fire (ITALIA/FRANCIA sim=1.00
   + transfers). City leaves are silent BY CONSTRUCTION, not by

@@ -1706,6 +1706,118 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
         }
     }
 
+    /* Multihop form, M4 (composition, not types): capped at 2 hops
+       over positive ground triples. Split tokens into outer [0..k) and
+       inner [k..n): the inner span must resolve (relation, entity) with
+       evidence (ResolveHalf), the outer span must name a used relation,
+       and the full chain must yield answers (inner subjects by reverse
+       lookup holding outer objects). Inner answers substitute the hole;
+       the outer question is then asked about them. All three must hold
+       or the reading is abandoned for the normal path (strictly
+       additive). M8 owns Y, M1 owns NO, M2 owns counting: any of those
+       vetoes this reading. Aggregation lives on the QA path; the core
+       gains no new types. */
+    {
+        int veto = q.is_count;
+        for (uint32_t i = 0; i < tokens.count && !veto; i++)
+            if (strcmp(tokens.tokens[i], "Y") == 0 ||
+                strcmp(tokens.tokens[i], "NO") == 0)
+                veto = 1;
+        if (!veto)
+        {
+            for (uint32_t k = 1; k < tokens.count; k++)
+            {
+                char itoks[32][64];
+                uint32_t nit = 0;
+                for (uint32_t j = k; j < tokens.count && nit < 32; j++)
+                {
+                    strcpy(itoks[nit], tokens.tokens[j]);
+                    nit++;
+                }
+                char r2[64] = {0};
+                char o2[128] = {0};
+                if (!ResolveHalf(graph, itoks, nit, r2, sizeof(r2),
+                                 o2, sizeof(o2)))
+                    continue;
+                /* Outer relation candidates: resolving tokens ranked
+                   by trust, then rarity (rarest content first, so the
+                   copula ES always loses to MONEDA/CAPITAL). */
+                int order[32];
+                uint32_t norder = 0;
+                int ord_untrusted[32];
+                uint64_t ord_freq[32];
+                for (uint32_t i = 0; i < k && norder < 32; i++)
+                {
+                    char rel[64] = {0};
+                    int trusted = 0;
+                    if (!ResolveRelationPass(graph, tokens.tokens[i],
+                                             rel, sizeof(rel), &trusted))
+                        continue;
+                    order[norder] = (int)i;
+                    ord_untrusted[norder] = trusted ? 0 : 1;
+                    ord_freq[norder] = TokenRarity(graph,
+                                                   tokens.tokens[i]);
+                    norder++;
+                }
+                for (uint32_t a = 0; a < norder; a++)
+                    for (uint32_t b = a + 1; b < norder; b++)
+                        if (ord_untrusted[b] < ord_untrusted[a] ||
+                            (ord_untrusted[b] == ord_untrusted[a] &&
+                             ord_freq[b] < ord_freq[a]))
+                        {
+                            int t = order[a];
+                            order[a] = order[b];
+                            order[b] = t;
+                            int u = ord_untrusted[a];
+                            ord_untrusted[a] = ord_untrusted[b];
+                            ord_untrusted[b] = u;
+                            uint64_t f = ord_freq[a];
+                            ord_freq[a] = ord_freq[b];
+                            ord_freq[b] = f;
+                        }
+                SYMBOL_ID r2id = SymbolFind(graph->symbols, r2);
+                SYMBOL_ID o2id = SymbolFind(graph->symbols, o2);
+                if (r2id == SYMBOL_INVALID || o2id == SYMBOL_INVALID)
+                    continue;
+                SYMBOL_ID subs[64];
+                uint32_t nsubs = IntersectSubjects(graph, &r2id, &o2id,
+                                                   1, subs, 64);
+                if (nsubs == 0)
+                    continue;
+                for (uint32_t o = 0; o < norder; o++)
+                {
+                    char r1[64] = {0};
+                    int trusted = 0;
+                    if (!ResolveRelationPass(graph,
+                                             tokens.tokens[(uint32_t)order[o]],
+                                             r1, sizeof(r1), &trusted))
+                        continue;
+                    SYMBOL_ID r1id = SymbolFind(graph->symbols, r1);
+                    if (r1id == SYMBOL_INVALID)
+                        continue;
+                    RELATION *tmp[8];
+                    int hit = 0;
+                    for (uint32_t s = 0; s < nsubs; s++)
+                        if (GraphQuerySubjectRelation(graph, subs[s],
+                                                       r1id, tmp, 8) > 0)
+                        {
+                            hit = 1;
+                            break;
+                        }
+                    if (!hit)
+                        continue;
+                    strcpy(q.relation, r1);
+                    strcpy(q.inner_rel, r2);
+                    strcpy(q.inner_obj, o2);
+                    q.is_multihop = 1;
+                    q.valid = 1;
+                    q.is_question = 1;
+                    return q;
+                }
+            }
+        }
+    }
+
     /* Fact shape: descriptor token pointing to a graph relation plus an
        entity. The entity usually trails the descriptor ("la CAPITAL de
        FRANCIA es") but may precede it ("Paris es"): both directions are
@@ -2159,6 +2271,69 @@ int ParserAnswerQuestion(
             }
         }
         return 0;
+    }
+
+    /* Multihop form (M4): inner subjects by reverse lookup (positive
+       ground only; denials never chain) feed the outer relation; list
+       the distinct outer objects. Empty anywhere is honest unknown. */
+    if (q->valid && q->is_multihop && !q->is_negative)
+    {
+        SYMBOL_ID r2 = SymbolFind(graph->symbols, q->inner_rel);
+        SYMBOL_ID o2 = SymbolFind(graph->symbols, q->inner_obj);
+        SYMBOL_ID r1 = SymbolFind(graph->symbols, q->relation);
+        if (r2 == SYMBOL_INVALID || o2 == SYMBOL_INVALID ||
+            r1 == SYMBOL_INVALID)
+            return 0;
+        SYMBOL_ID subs[64];
+        uint32_t nsubs = IntersectSubjects(graph, &r2, &o2, 1, subs, 64);
+        if (nsubs == 0)
+            return 0;
+        SYMBOL_ID got[32];
+        uint32_t ngot = 0;
+        for (uint32_t i = 0; i < nsubs; i++)
+        {
+            RELATION *hits[64];
+            uint32_t nh = GraphQuerySubjectRelation(graph, subs[i], r1,
+                                                     hits, 64);
+            for (uint32_t h = 0; h < nh && ngot < 32; h++)
+            {
+                if (hits[h]->polarity == POLARITY_NEGATIVE)
+                    continue;
+                int dup = 0;
+                for (uint32_t d = 0; d < ngot; d++)
+                    if (got[d] == hits[h]->object)
+                    {
+                        dup = 1;
+                        break;
+                    }
+                if (!dup)
+                    got[ngot++] = hits[h]->object;
+            }
+        }
+        if (ngot == 0)
+            return 0;
+        {
+            uint32_t pos = 0;
+            for (uint32_t i = 0; i < ngot; i++)
+            {
+                const SYMBOL *s = SymbolGet(graph->symbols, got[i]);
+                if (s == NULL)
+                    continue;
+                if (i > 0 && pos + 2 < max_len)
+                {
+                    out_answer[pos++] = ',';
+                    out_answer[pos++] = ' ';
+                }
+                uint32_t name_len = (uint32_t)strlen(s->name);
+                if (pos + name_len < max_len)
+                {
+                    memcpy(out_answer + pos, s->name, name_len);
+                    pos += name_len;
+                }
+            }
+            out_answer[pos] = '\0';
+            return 1;
+        }
     }
 
     /* Find subject symbol (exact first, then morphological fallback) */
