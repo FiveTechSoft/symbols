@@ -352,6 +352,7 @@ when measured (never assumed); red stays red until re-measured.
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
 | LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
+| alice_clean | 45 hand-verified Alicia facts + 18 checks | green 09-12 | 18/18 |
 | D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo/lexicon/social | green 09-12 | 18+9+13+12+9+8+21+5+6+6 |
 | M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
 | M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
@@ -369,11 +370,10 @@ when measured (never assumed); red stays red until re-measured.
 | R7 contradiction | surfaced (stored only today) | pending | — |
 | golden-regen | numeric data in golden | pending | — |
 
-**Index: 16/22 = 73% (2026-09-12).**
+**Index: 17/23 = 74% (2026-09-12).**
 
-Destination estimate: ~45% (judgment, not a gate; was ~40%: the
-conversation objective advanced — anaphora through ES-loop all gated —
-while the real-text wall stands). The index counts milestones equally;
+Destination estimate: ~50% (judgment, not a gate; was ~45%: first
+non-embarrassing book chat via curated Alicia). The index counts milestones equally;
 difficulty does not: the pending contain the two hardest problems
 (real-text ingest, golden regen), and the destination itself (books,
 manuals) measures 2–22%, not 73%. What is built — loops, dialogue,
