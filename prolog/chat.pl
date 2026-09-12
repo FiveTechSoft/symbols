@@ -16,10 +16,27 @@
 :- dynamic provfact/6.
 
 % Shim del dialecto bookbrain (gen_parse.pl no existe en este arbol):
-% delega en el tokenizador del motor. Infraestructura, no lexico.
+% delega en el tokenizador del motor + pliega tildes a ASCII
+% (diacriticos cerrados, como FoldAccents del harness C: la eñe se
+% conserva como letra). Infraestructura, no lexico.
 gen_tokenize(S, Toks, _) :-
     ( string(S) -> S2 = S ; atom_string(S, S2) ),
-    tokenize_en(S2, Toks).
+    tokenize_en(S2, T0),
+    maplist(fold_accents, T0, Toks).
+
+fold_accents(A, F) :-
+    atom_chars(A, Cs),
+    maplist(fold_char, Cs, Fs),
+    atom_chars(F, Fs).
+
+fold_char(C, F) :-
+    member(C-F,
+           ['á'-a, 'à'-a, 'ä'-a, 'â'-a, 'Á'-a, 'À'-a, 'Ä'-a, 'Â'-a,
+            'é'-e, 'è'-e, 'ë'-e, 'ê'-e, 'É'-e, 'È'-e, 'Ë'-e, 'Ê'-e,
+            'í'-i, 'ì'-i, 'ï'-i, 'î'-i, 'Í'-i, 'Ì'-i, 'Ï'-i, 'Î'-i,
+            'ó'-o, 'ò'-o, 'ö'-o, 'ô'-o, 'Ó'-o, 'Ò'-o, 'Ö'-o, 'Ô'-o,
+            'ú'-u, 'ù'-u, 'ü'-u, 'û'-u, 'Ú'-u, 'Ù'-u, 'Ü'-u, 'Û'-u]), !.
+fold_char(C, C).
 % Sin listas cerradas hardcodeadas: palabra de contenido = la que el mapa
 % vivo conoce como simbolo (sujeto, relacion u objeto). El resto es glue
 % y se ignora. Doctrina roadmap: nada open-class hardcodeado.
@@ -313,15 +330,29 @@ chat_learn_sent(LS, Toks) :-
 chat_learn_positional(L) :-
     ( string(L) -> S = L ; atom_string(L, S) ),
     sub_string(S, _, _, 0, "."),
-    gen_tokenize(S, Toks, _),
-    Toks = [F|_],
+    gen_tokenize(S, T0, _),
+    T0 = [F | _],
     \+ qlead(F),
-    symbolize_text(S, (A, V, O)),
+    positional_triple(T0, A, V, O),
     next_sentence_id(Src),
     remember_tracked(A, V, O, Src, none),
     format('Learned [~w]: ~w --~w--> ~w (by structure).~n', [Src, A, V, O]),
     chat_note_told(V),
     chat_set_last(A, V, O).
+
+% SVO estructural con determinantes fuera SOLO del tramo intermedio:
+% primero = sujeto y ultimo = objeto siempre se conservan ("LA" como
+% objeto en MIEMBRO_DE LA es contenido). Sin tramo -> falla honesto.
+positional_triple(Toks, A, V, O) :-
+    append([A | Mid], [O], Toks),
+    Mid \== [],
+    exclude(is_determiner, Mid, Mid2),
+    Mid2 \== [],
+    atomic_list_concat(Mid2, '_', V).
+
+% Determinantes cerrados EN/ES fuera del SVO estructural (sintaxis;
+% las preposiciones se conservan: portan significado).
+is_determiner(W) :- member(W, [the, a, an, el, la, los, las, un, una]).
 
 chat_note_told(V) :-
     ( told_rel(V) -> true ; assertz(told_rel(V)) ).
@@ -382,7 +413,7 @@ clump_counts([H|T], [C-H|R]) :-
     run_len(H, T, C, Rest),
     clump_counts(Rest, R).
 
-run_len(H, [], 1, []).
+run_len(_, [], 1, []).
 run_len(H, [H|T], C, R) :- !, run_len(H, T, C0, R), C is C0 + 1.
 run_len(_, L, 1, L).
 
@@ -477,6 +508,7 @@ chat_help :-
     writeln('with several antecedents I ask who you mean (answer a name).'),
     writeln('"And Madrid?" continues the last question (evidence or unknown).'),
     writeln('unfinished teaching ("Ana opened.") gets asked back once.'),
+    writeln('En español: ensena "Ana abrio puerta." y pregunta "Quien abrio puerta?".'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
@@ -498,8 +530,54 @@ chat_ask(Toks) :-
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
+    ; es_form(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say_es(Kind, Ans)
     ; chat_ask_qp(Toks)
     ).
+
+% D6 formas ES (espejo estructural de chat_form; interrogativos cerrados
+% como '?' y qlead). Sin lexico verbal ES: V debe existir en memoria.
+% quien [quien,V|Resto]: sujetos con (S,V,O). que [que,V|Resto]:
+% objetos de (S,V) con S del resto. did [V,S,O] (orden VSO).
+es_form([quien, V|Rest], say, answer(Xs, Facts)) :-
+    qnorm(Rest, O),
+    bb_rel_forms(V, Rs),
+    findall(S-(S, Vr, O), (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), SF),
+    SF \== [],
+    findall(S, member(S-_, SF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, SF), Facts).
+es_form([que, V|Rest], say, answer(Xs, Facts)) :-
+    qnorm(Rest, S),
+    bb_rel_forms(V, Rs),
+    findall(O-(S, Vr, O), (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), OF),
+    OF \== [],
+    findall(O, member(O-_, OF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, OF), Facts).
+es_form([V, S, O], say, YesNo) :-
+    V \== quien, V \== que,
+    bb_content(S), bb_content(O),
+    bb_rel_forms(V, Rs),
+    member(Vr, Rs),
+    ( memory_relation(S, Vr, O, _, _) -> YesNo = yes((S, Vr, O))
+    ; YesNo = no
+    ).
+
+% Salida ES: listas y pruebas identicas (lengua-neutral); Si/No/No-lo-se
+% localizados.
+chat_say_es(say, answer(Xs, Facts)) :-
+    chat_say(say, answer(Xs, Facts)).
+chat_say_es(say, yes((S, V, O))) :-
+    writeln('Sí.'),
+    chat_set_last(S, V, O),
+    chat_sources([(S, V, O)]).
+chat_say_es(say, no) :-
+    writeln('No.').
+chat_say_es(_, unknown) :-
+    writeln('No lo sé.').
 
 % D2 elipsis: "And Madrid?" continua el esqueleto anterior con X en el
 % slot (who/did/why/where/when: ultimo; what: sujeto). Solo formas con

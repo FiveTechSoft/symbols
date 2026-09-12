@@ -129,13 +129,24 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+- [x] D6 Spanish teach→ask loop (done 2026-09-12, from the failing
+  transcript): accent folding in the chat tokenizer shim (closed
+  diacritics, eñe kept; chat-local, engine untouched), determiners
+  stripped only from the relation mid-span (first/last tokens always
+  kept: MIEMBRO_DE LA survives), ES who/what/did forms mirroring EN
+  with Sí/No/No-lo-sé output. Spanish content verbs stay out (no
+  lexicon exists). Gate: 8-turn ES dialogue 8/8 + fold probes (é/ó by
+  char code); all gates green (D1 18, D2 9, D3 13, D4 12, D5 9, P1 17,
+  P3 8, LOOP50 20/20). Drive-by: pre-existing singleton H silenced;
+  chat.bat forces UTF-8 console (accents were mojibake at the pipe
+  AND at double-click).
 - [x] D5 Spanish meta-dialogue (done 2026-09-12, from a real failing
   transcript): sabes/trata/protagonistas markers answer with what is
   known; bare entity + '?' gives the about summary; Spanish fact verbs
   ("quien abrio...") stay honest unknown (needs a verb lexicon that
   does not exist: queued explicitly, not faked). Gate: 8-turn Spanish
-  dialogue 9/9; all gates green (D1 18, D2 9, D3 13, D4 12, P1 17,
-  P3 8, LOOP50 20/20).
+  dialogue 9/9; all gates green (D1 18, D2 9, D3 13, D4 12, D6 8,
+  P1 17, P3 8, LOOP50 20/20).
 - [x] D4 initiative (done 2026-09-12, EXP48 pattern): 2-token
   assertions [Subject, known-verb] trigger a missing-slot probe
   ("What did Ana open?"); a one-word reply learns direct with

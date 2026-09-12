@@ -15,10 +15,24 @@
 :- dynamic memfact/5.
 :- dynamic provfact/6.
 
-% Shim del dialecto bookbrain (ver chat.pl): delega en tokenize_en/2.
+% Shim del dialecto bookbrain (ver chat.pl): delega en tokenize_en/2
+% + pliega tildes (misma tabla, misma licencia).
 gen_tokenize(S, Toks, _) :-
     ( string(S) -> S2 = S ; atom_string(S, S2) ),
-    tokenize_en(S2, Toks).
+    tokenize_en(S2, T0),
+    maplist(fold_accents, T0, Toks).
+fold_accents(A, F) :-
+    atom_chars(A, Cs),
+    maplist(fold_char, Cs, Fs),
+    atom_chars(F, Fs).
+fold_char(C, F) :-
+    member(C-F,
+           ['á'-a, 'à'-a, 'ä'-a, 'â'-a, 'Á'-a, 'À'-a, 'Ä'-a, 'Â'-a,
+            'é'-e, 'è'-e, 'ë'-e, 'ê'-e, 'É'-e, 'È'-e, 'Ë'-e, 'Ê'-e,
+            'í'-i, 'ì'-i, 'ï'-i, 'î'-i, 'Í'-i, 'Ì'-i, 'Ï'-i, 'Î'-i,
+            'ó'-o, 'ò'-o, 'ö'-o, 'ô'-o, 'Ó'-o, 'Ò'-o, 'Ö'-o, 'Ô'-o,
+            'ú'-u, 'ù'-u, 'ü'-u, 'û'-u, 'Ú'-u, 'Ù'-u, 'Ü'-u, 'Û'-u]), !.
+fold_char(C, C).
 % Sin listas cerradas hardcodeadas: contenido = simbolo del mapa vivo.
 bb_content(W) :-
     ( memory_relation(W, _, _, _, _)
