@@ -85,10 +85,15 @@ walkable.
   only); the missing piece is input canonization (sentence
   simplification), which does not exist. Queued in P4. The regen KB
   was deleted, not committed. Gate stands; no demo use.
-- [ ] P3 — Dialogue feeds discovery: run `learn_cycle` periodically
-  over told facts (EXP46 sketch → product). Storing is not enough: the chat must
-  induce, not just store. Gate: taught regularities answerable with
-  rule-attributed proofs; no regression on P1 KBs.
+- [x] P3 — Dialogue feeds discovery (done 2026-09-12): `told_rel/1`
+  tracks session-taught relations; explicit `discover [rel]` runs
+  `learn_cycle_guided` (explicit, not automatic: cost follows vocabulary,
+  EXP51/52). Chat QA falls back to question_parser when memory alone
+  fails (facts first, induced rules second, unknown last). Gate: 2
+  taught examples of `comes_from :- [lives_in, belongs_to]`, held-out
+  unknown pre-discovery, rule kept (F1=0.80 as reported), held-out
+  `peru. (reasoned)` with rule proof + ground steps post-discovery
+  (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it), M4 (2-hop,
