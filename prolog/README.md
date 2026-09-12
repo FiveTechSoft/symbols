@@ -81,6 +81,7 @@ swipl -s experiment46.pl -g dialogue46 -t halt
 swipl -s experiment47.pl -g dialogue47 -t halt
 swipl -s experiment48.pl -g dialogue48 -t halt
 swipl -s experiment49.pl -g dialogue49 -t halt
+swipl -s experiment50.pl -g benchmark50 -t halt
 ```
 
 Cada experimento arranca con memoria vacía, carga solo sus módulos
@@ -140,6 +141,7 @@ explícitos y demuestra qué conocimiento entra, qué se induce y qué sobrevive
 | EXP47 | Transferencia en diálogo (ontología nueva contada, mapa, uso) | 15/15; `stored` inmediato, UNKNOWN Londres, sin interferencia |
 | EXP48 | Diálogo bidireccional (el modelo sondea roles ausentes) | 14/14; hipótesis en A, acepta B, mapa, uso, UNKNOWN |
 | EXP49 | Hipótesis y contraevidencia (acepta/rechaza con razón) | 15/15; `tours` aceptado, `allures` rechazado por inversión |
+| EXP50 | Benchmark acumulativo (una memoria, 5 episodios, coste) | 32/32; aprende/transfiere/rechaza, carga 146ms, nada se olvida |
 
 ## Arquitectura emergente
 
@@ -322,6 +324,9 @@ skills compuestas con prueba composicional, sin volver a hechos).
 - `experiment49.pl` — EXP49: hipótesis con confianza por soporte
   (`tours` aceptado por cadena, `allures` rechazado por inversión
   de roles con razón); el mapa solo registra lo aceptado.
+- `experiment50.pl` — EXP50: 5 episodios sin reinicio (baseline,
+  2 ontologías, reversal, no-olvido); tabla hechos/checks/ms por
+  episodio; memoria monótona verificada.
 - `preflight.pl` — incluye regla de asserts anidados (EXP45:
   `found_rule/2` en rama `->` vs `dynamic /3`); sin falsos
   positivos en `remember_relation/3+4`.

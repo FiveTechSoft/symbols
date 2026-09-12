@@ -9426,3 +9426,39 @@ Verificación en clon: 30–49 completos + `preflight_project` PASS.
 
 ---
 
+# EXP50 — Cumulative benchmark (una memoria, sin reinicio)
+
+## Lo que demuestra
+
+5 episodios conversacionales sobre memoria monótona (261→268 hechos):
+
+```text
+e0 baseline corpus ............ 4 checks, 0ms
+e1 ontologia supply-A ......... 7 checks, 1ms (mapa + stored + why)
+e2 ontologia supply-B ......... 6 checks, 1ms (mapa estable, mismo)
+e3 reversal ................... 5 checks, 0ms (rechazo + UNKNOWN)
+e4 no-olvido .................. 5 checks, 0ms (todo sigue en verde)
+carga inicial 519 frases ...... 146ms
+TOTAL ......................... passed 32/32
+```
+
+Aprende, transfiere dos veces, rechaza una, y nada se olvida. La
+nueva regla preflight (asserts anidados) cazó `rel_map50/2` vs
+`/3` antes del commit: dogfooding inmediato.
+
+## Commit
+
+```text
+experiment50.pl (nuevo; ningún módulo tocado)
+README.md (EXP50)
+prolog.md (esta sección)
+```
+
+Verificación en clon: 30–50 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
