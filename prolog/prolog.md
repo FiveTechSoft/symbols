@@ -9542,3 +9542,83 @@ Verificación en clon: 30–52 completos + `preflight_project` PASS.
 
 ---
 
+# EXP53 — Many skills + nota matemática (medidas y principios)
+
+## Lo que demuestra
+
+3/10/30/100 skills disjuntas (vocabulario propio por skill),
+descubrimiento GUIADO, wipe (hechos=0, skills intactas) y
+transferencia K/K en dominio fresco:
+
+```text
+K   hechos vocab disc     gen  eval  q        nq
+3   45     9     2.7ms    42   15    0.02ms   3
+10  150    30    8.9ms    140  50    0.04ms   10
+30  450    90    78.8ms   420  150   0.08ms   30
+100 1500   300   822.5ms  1400 500   0.29ms   100
+TOTAL passed 20/20 (descubrir + wipe + transferir + TN)
+```
+
+Generados/evaluados exactamente lineales en K (14/5 por skill:
+el guiado fija el coste por skill). Descubrimiento total
+levemente superlineal (×10K→×100ms): cada llamada re-escanea
+toda la memoria para el vocabulario (candidato a scoping futuro,
+sin tocar el motor ahora). Consulta despreciable (lookup por
+objetivo + cadena 2-hop).
+
+## Nota matemática: qué medimos y en qué se basa
+
+Medidas (definiciones operativas, no teoremas):
+
+```text
+|F| hechos (memory_relation) · |V| vocabulario (rels distintas)
+|C| conceptos (clases de equivalencia por firma, umbral 0.80)
+|S| skills (composed + constrained + found rules)
+P(V) = V+V²+V³ patrones exhaustivos (longitud ≤3, exacto)
+G/E guiados (incident_vocab + filtro de extremos, medidos)
+compr = |F|/(|C|+|S|) · T_disc(V), T_abs, T_q en ms (walltime)
+```
+
+Observado (EXP51–53):
+
+```text
+T_disc ~ P(V) con V incidente (guiado) o total (exhaustivo)
+|C|,|S| saturan con |F| (EXP51: 1761 hechos → 9 conceptos, 3 skills)
+T_q ~ O(1) por skill (índice por objetivo + cadena acotada)
+```
+
+Principios (cada uno con evidencia citada, no postulados):
+
+```text
+1. Composicionalidad: reglas = caminos en el DAG de relaciones;
+   descubrir = buscar sobre V^L (combinatorio en vocabulario,
+   no en hechos). Evidencia: EXP52 (plano por filas).
+2. Cociente por indistinguibilidad: conceptos = clases bajo firma
+   estructural (estilo WL); la saturación colapsa el cociente.
+   Evidencia: EXP52 (53→4 conceptos), EXP16.
+3. Higiene evidencial: el predictor es independiente del objetivo
+   por construcción (exclusión global/temporal). Evidencia:
+   EXP34/35/37 (fuga = 0 auditada).
+4. Invariancia bajo renombramiento: skills invariantes ante
+   isomorfismos de vocabulario (roles, no nombres). Evidencia:
+   EXP39/44 (mapas inducidos, cero dado).
+5. Monotonía sin olvido: el conocimiento sobrevive a episodios.
+   Evidencia: EXP50 (32/32 acumulativo).
+```
+
+## Commit
+
+```text
+experiment53.pl (nuevo; ningún módulo tocado)
+README.md (EXP53)
+prolog.md (esta sección + nota matemática)
+```
+
+Verificación en clon: 30–53 completos + `preflight_project` PASS.
+
+---
+
+## Assistant (Build · Muse Spark 1.3 Free)
+
+---
+
