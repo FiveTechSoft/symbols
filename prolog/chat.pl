@@ -32,6 +32,10 @@ bb_content(W) :-
 
 :- dynamic last_fact/3.
 
+% Relaciones ensenadas en sesion: candidatas a descubrir (P3). Se siembran
+% en chat_learn y las consume el comando discover. Interfaz propia.
+:- dynamic told_rel/1.
+
 chat(File) :-
     bb_load(File),
     writeln('BookBrain chat. Ask me anything (quit to exit).'),
@@ -42,6 +46,7 @@ bb_load(File) :-
     retractall(prov(_, _, _, _)),
     retractall(prov_log(_, _)),
     retractall(last_fact(_, _, _)),
+    retractall(told_rel(_)),
     consult(File),
     forall(memfact(S, R, O, W, U), assertz(memory_relation(S, R, O, W, U))),
     forall(provfact(S, R, O, Ref, T, St), assertz(prov(S, R, O, info(Ref, T, St)))),
@@ -67,6 +72,33 @@ chat_save(Alias) :-
     close(S),
     memory_size(NF),
     format('Saved ~w facts -> ~w~n', [NF, Out]).
+
+% discover [rel]: induce reglas sobre lo ensenado en sesion (P3) via
+% learn_cycle_guided (conceptos + guided + constrained). Sin args: todas
+% las relaciones contadas en told_rel/1. Explicito, no automatico: el
+% coste sigue al vocabulario (EXP51/52) y un discover sorpresa en un mapa
+% grande pararia el dialogo. Las preguntas usan las reglas despues, con
+% prueba atribuida (solve_slot/proof_for: hechos primero, reglas despues).
+chat_discover_cmd([discover, R]) :-
+    atom(R), R \== discover,
+    chat_discover_targets([R]), !.
+
+chat_discover_all :-
+    findall(R, told_rel(R), Rs0),
+    sort(Rs0, Rs),
+    ( Rs == [] ->
+        writeln('Nothing taught yet: teach me facts ending with a period first.')
+    ; chat_discover_targets(Rs)
+    ).
+
+chat_discover_targets(Rs) :-
+    learn_cycle_guided(Rs, Rows),
+    forall(member(row(T, Path, F1, Gen, Ev, Ms), Rows),
+           ( constrained_rule(T, _, _) ->
+               format('rule: ~w :- ~w (F1=~2f, gen=~w, eval=~w, ~wms)~n',
+                      [T, Path, F1, Gen, Ev, Ms])
+           ; format('no rule kept for ~w (best ~w, F1=~2f)~n', [T, Path, F1])
+           )).
 
 chat_loop :-
     write('> '),
@@ -94,6 +126,8 @@ chat_line_guarded(L) :-
     ; Toks == [why] -> chat_why_bare
     ; Toks == [save] -> chat_save(session)
     ; chat_save_cmd(Toks) -> true
+    ; Toks == [discover] -> chat_discover_all
+    ; chat_discover_cmd(Toks) -> true
     ; chat_greet(Toks) -> true
     ; chat_about(Toks) -> true
     ; Toks == [who, are, you] -> chat_identity(en)
@@ -126,6 +160,7 @@ chat_learn(L, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
     ; learn_sentence(L, stored(A, V, O, Src)) ->
         format('Learned [~w]: ~w --~w--> ~w.~n', [Src, A, V, O]),
+        chat_note_told(V),
         chat_set_last(A, V, O)
     ; learn_sentence(L, stored_identity(X, Y, _)) ->
         format('Learned: ~w is ~w.~n', [X, Y])
@@ -143,7 +178,11 @@ chat_learn_positional(L) :-
     next_sentence_id(Src),
     remember_tracked(A, V, O, Src, none),
     format('Learned [~w]: ~w --~w--> ~w (by structure).~n', [Src, A, V, O]),
+    chat_note_told(V),
     chat_set_last(A, V, O).
+
+chat_note_told(V) :-
+    ( told_rel(V) -> true ; assertz(told_rel(V)) ).
 
 % Guardia anti-preguntas: la via estructural jamas ingiere forma
 % interrogativa ("Who reaches Oslo." no es un hecho). Lista cerrada de
@@ -291,7 +330,8 @@ gen_qmark('?').
 chat_help :-
     writeln('who <verb> <obj>? | what did <s> <verb>? | did <s> <verb> <obj>?'),
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
-    writeln('Teach me facts without "?": Alice visits Paris. (I learn them)'),
+    writeln('Teach me facts ending with a period: Zorin reaches Oslo.'),
+    writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
 
 chat_why_bare :-
@@ -306,8 +346,63 @@ chat_why_bare :-
     ).
 
 chat_ask(Toks) :-
-    ( chat_form(Toks, Kind, Ans) -> true ; Kind = say, Ans = unknown ),
-    chat_say(Kind, Ans).
+    ( chat_form(Toks, Kind, Ans) -> chat_say(Kind, Ans)
+    ; chat_ask_qp(Toks)
+    ).
+
+% Fallback con reglas: si la memoria directa no basta, question_parser
+% (solve_slot: hechos, luego constrained rules inducidas, luego unknown).
+% Solo se llega aqui cuando chat_form falla: lo ya respondido no cambia.
+chat_ask_qp(Toks) :-
+    atomic_list_concat(Toks, ' ', S),
+    ( parse_question(S, QP), answer_query(QP, Ans) ->
+        chat_say_qp(Ans)
+    ; writeln("I don't know.")
+    ).
+
+chat_say_qp(answer(Xs, retrieved, Facts)) :-
+    chat_say(say, answer(Xs, Facts)).
+chat_say_qp(answer(Xs, reasoned, Proofs)) :-
+    cap_list(Xs, 5, Show, Rest),
+    atomic_list_concat(Show, ', ', L),
+    ( Rest == 0 -> format('~w. (reasoned)~n', [L])
+    ; format('~w... (and ~w more, reasoned)~n', [L, Rest])
+    ),
+    show_rule_proofs(Proofs, 3),
+    remember_proof(Proofs).
+chat_say_qp(yes) :- writeln('Yes.').
+chat_say_qp(no) :- writeln('No.').
+chat_say_qp(explanation(S, V, O, Proof)) :-
+    chat_say(say, explanation(S, V, O, Proof)).
+chat_say_qp(unknown) :- writeln("I don't know.").
+
+cap_list(Xs, K, Show, Rest) :-
+    length(Xs, N),
+    ( N =< K -> Show = Xs, Rest = 0
+    ; length(Show, K), append(Show, _, Xs), Rest is N - K
+    ).
+
+show_rule_proofs(_, 0) :- !.
+show_rule_proofs([], _) :- !.
+show_rule_proofs([[rule(R, Path, _)|Steps]|T], K) :-
+    format('  via rule ~w :- ~w~n', [R, Path]),
+    show_steps(Steps),
+    K1 is K - 1,
+    show_rule_proofs(T, K1).
+show_rule_proofs([_|T], K) :-
+    show_rule_proofs(T, K).
+
+show_steps([]).
+show_steps([(A, R, B)|T]) :-
+    ( prov(A, R, B, info(Ref, _, _)) ->
+        format('    [~w] ~w --~w--> ~w~n', [Ref, A, R, B])
+    ; format('    [noref] ~w --~w--> ~w~n', [A, R, B])
+    ),
+    show_steps(T).
+
+remember_proof([[rule(_, _, _),(S, V, O)|_]|_]) :- !,
+    chat_set_last(S, V, O).
+remember_proof(_).
 
 % ---- formas ----
 % Sujeto multi-palabra: V = primer token con formas en memoria.
