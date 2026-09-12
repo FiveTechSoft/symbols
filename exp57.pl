@@ -9,6 +9,15 @@
 :- use_module(library(lists)).
 
 exp57 :-
+    exp57_core(0, full).
+
+% Curva de escala: mismos pipeline en prefijos por versiculos.
+exp57_curve :-
+    forall(member(V, [6000, 12000, 18000, 24000]),
+           exp57_core(V, V)),
+    exp57_core(0, full).
+
+exp57_core(MaxV, Tag) :-
     clear_memory,
     retractall(prov(_, _, _, _)),
     retractall(prov_log(_, _)),
@@ -19,24 +28,24 @@ exp57 :-
     set_kjv_mode(single),
     kjv_collect_on,
     timed(read_lines, TR),
-    format('E57-READ ms=~w~n', [TR]),
-    timed(kjv_load_limit(0), TC),
+    format('E57-READ ~w ms=~w~n', [Tag, TR]),
+    timed(kjv_load_limit(MaxV), TC),
     kjv_count(verses, NV),
     kjv_count(sents, NS),
     kjv_count(stored, NSt),
     findall(1, kjv_staged(_, _, _, _), StL),
     length(StL, NStaged),
-    format('E57-COLLECT verses=~w sents=~w stored=~w staged=~w ms=~w~n',
-           [NV, NS, NSt, NStaged, TC]),
+    format('E57-COLLECT ~w verses=~w sents=~w stored=~w staged=~w ms=~w~n',
+           [Tag, NV, NS, NSt, NStaged, TC]),
     kjv_collect_off,
     timed(insert_staged, TI),
     memory_size(NF0),
-    format('E57-INSERT memfacts=~w ms=~w~n', [NF0, TI]),
+    format('E57-INSERT ~w memfacts=~w ms=~w~n', [Tag, NF0, TI]),
     retractall(kjv_staged(_, _, _, _)),
     timed(dx_build_indexes, TX),
-    format('E57-INDEX ms=~w~n', [TX]),
+    format('E57-INDEX ~w ms=~w~n', [Tag, TX]),
     timed(dx_replay, TRp),
-    format('E57-REPLAY ms=~w~n', [TRp]),
+    format('E57-REPLAY ~w ms=~w~n', [Tag, TRp]),
     Tot is TR + TC + TI + TX + TRp,
     memory_size(NF),
     e57_symbols(NSym),
@@ -45,9 +54,9 @@ exp57 :-
     findall(1, prov(_, _, _, _), PL),
     length(PL, NP),
     e57_ram(RAM),
-    format('E57-TOTAL ms=~w facts=~w staged=~w symbols=~w conflicts=~w provenances=~w ram=~w~n',
-           [Tot, NF, NStaged, NSym, NC, NP, RAM]),
-    e57_equiv.
+    format('E57-TOTAL ~w ms=~w facts=~w staged=~w symbols=~w conflicts=~w provenances=~w ram=~w~n',
+           [Tag, Tot, NF, NStaged, NSym, NC, NP, RAM]),
+    ( Tag == full -> e57_equiv ; true ).
 
 timed(Goal, Ms) :-
     get_time(T0),

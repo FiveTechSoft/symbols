@@ -1,7 +1,8 @@
-"""show_e57.py — lineas E57* del log."""
+"""show_e57.py — lineas E57* del log (argv[1] opcional)."""
 import sys
 
-raw = open('exp57.log', 'rb').read()
+log = sys.argv[1] if len(sys.argv) > 1 else 'exp57.log'
+raw = open(log, 'rb').read()
 t = None
 for enc in ('utf-16', 'utf-8'):
     try:
