@@ -41,6 +41,12 @@ bb_content(W) :-
 % la abandona y se procesa normal.
 :- dynamic dialog_pending/3.
 
+% Ensenanza pendiente (D4 iniciativa): (Sujeto, Verbo) con objeto
+% ausente. La siguiente linea de una palabra lo completa y se aprende
+% directo (remember_tracked con provenance sentence_N); otra cosa la
+% abandona. Single-shot como D3.
+:- dynamic dialog_pending_teach/2.
+
 % Relaciones ensenadas en sesion: candidatas a descubrir (P3). Se siembran
 % en chat_learn y las consume el comando discover. Interfaz propia.
 :- dynamic told_rel/1.
@@ -58,6 +64,7 @@ bb_load(File) :-
     retractall(told_rel(_)),
     retractall(dialog_lastq(_)),
     retractall(dialog_pending(_, _, _)),
+    retractall(dialog_pending_teach(_, _)),
     dialog_reset,
     dialog_reset,
     consult(File),
@@ -131,17 +138,62 @@ chat_line(L) :-
 chat_line_guarded(L) :-
     gen_tokenize(L, Lower, _),
     exclude(gen_qmark, Lower, Toks0),
-    % D3: la respuesta a una aclaracion prosigue la pregunta original;
-    % cualquier otra linea la abandona.
+    chat_line_dispatch(L, Toks0).
+
+chat_line_dispatch(L, Toks0) :-
+    % D3: la respuesta a una aclaracion prosigue la pregunta original.
+    % D4: la respuesta a un sondeo completa la ensenanza.
+    % Cualquier otra linea abandona pendientes (single-shot).
     ( dialog_pending(Q0, P0, Cs0),
       dialog_match_reply(Toks0, Cs0, C0) ->
         retractall(dialog_pending(_, _, _)),
+        retractall(dialog_pending_teach(_, _)),
         maplist(dl_repl(P0, C0), Q0, ToksP),
         dialog_substitute(ToksP, Toks, _),
-        Changed = yes
+        chat_line_tokens(L, Toks, yes)
+    ; dialog_pending_teach(S, V),
+      dialog_teach_reply(Toks0, O) ->
+        retractall(dialog_pending(_, _, _)),
+        retractall(dialog_pending_teach(_, _)),
+        chat_learn_direct(S, V, O)
     ; retractall(dialog_pending(_, _, _)),
-      dialog_substitute(Toks0, Toks, Changed)
-    ),
+      retractall(dialog_pending_teach(_, _)),
+      dialog_substitute(Toks0, Toks, Changed),
+      chat_line_tokens(L, Toks, Changed)
+    ).
+
+% Respuesta de una palabra (articulos fuera) que no sea comando,
+% pronombre ni palabra cerrada: autoridad del usuario, vale novel.
+dialog_teach_reply(Toks, O) :-
+    exclude(is_article, Toks, [O]),
+    atom(O),
+    \+ member(O, [quit, exit, bye, help, why]),
+    \+ dialog_pronoun(O),
+    \+ member(O, [what, who, when, where, why, how, which, whom,
+                  and, or, not, no, yes, do, does, did, is, are]).
+
+is_article(W) :- member(W, [the, a, an]).
+
+% Aprendizaje directo del slot ausente, con provenance sentence_N.
+chat_learn_direct(S, V, O) :-
+    next_sentence_id(Src),
+    remember_tracked(S, V, O, Src, none),
+    format('Learned [~w]: ~w --~w--> ~w.~n', [Src, S, V, O]),
+    chat_note_told(V),
+    chat_set_last(S, V, O).
+
+% D4 iniciativa (patron EXP48): asercion de 2 tokens [Sujeto, Verbo]
+% con S conocido y V con familia en memoria = slot objeto ausente. El
+% modelo pregunta ("What did S V?") y la siguiente linea de una palabra
+% completa el hecho. Sin el par, camino normal (UNKNOWN honesto).
+dialog_probe_missing([S, V]) :-
+    qnorm([S], S),
+    bb_rel_forms(V, _),
+    bb_stem(V, VB),
+    format('What did ~w ~w?~n', [S, VB]),
+    assertz(dialog_pending_teach(S, V)).
+
+chat_line_tokens(L, Toks, Changed) :-
     ( Toks == [] -> true
     ; Toks == [quit] -> writeln('Bye.')
     ; Toks == [exit] -> writeln('Bye.')
@@ -230,6 +282,7 @@ chat_learn(L, Toks, Changed) :-
 
 chat_learn_sent(LS, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
+    ; dialog_probe_missing(Toks) -> true
     ; learn_sentence(LS, stored(A, V, O, Src)) ->
         format('Learned [~w]: ~w --~w--> ~w.~n', [Src, A, V, O]),
         chat_note_told(V),
@@ -406,6 +459,7 @@ chat_help :-
     writeln('he/she/it follow the conversation (one clear antecedent);'),
     writeln('with several antecedents I ask who you mean (answer a name).'),
     writeln('"And Madrid?" continues the last question (evidence or unknown).'),
+    writeln('unfinished teaching ("Ana opened.") gets asked back once.'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').

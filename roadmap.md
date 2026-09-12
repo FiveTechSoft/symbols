@@ -129,8 +129,14 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
-  D4 initiative (probe missing roles, EXP48 pattern). Each with
-  scripted multi-turn dialogue sets; same gate discipline as P1/P3.
+- [x] D4 initiative (done 2026-09-12, EXP48 pattern): 2-token
+  assertions [Subject, known-verb] trigger a missing-slot probe
+  ("What did Ana open?"); a one-word reply learns direct with
+  sentence_N provenance, anything else abandons cleanly (dispatch
+  refactor: pending-D3 / pending-teach / normal as terminal
+  alternatives). User is authority on novel objects; closed words
+  vetoed as replies. Gate: 2 dialogues 12/12 (probe, learn, abandon,
+  resume); D1/D2/D3/P1/P3/LOOP50 green (18+9+13+17+8+20).
 - [x] D3 continuity (done 2026-09-12): ambiguous pronouns ask ("Do
   you mean Leo or Ana?", tier-ordered, max 5); a name reply continues
   the stored question, anything else abandons it cleanly. Candidates
