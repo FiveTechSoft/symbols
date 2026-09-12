@@ -216,7 +216,9 @@ chat_line_tokens(L, Toks, Changed) :-
         chat_known(es)
     ; chat_is_spanish(Toks) -> chat_spanish_help
     ; is_question(L) ->
-        ( dialog_ambiguity(Toks, P, Cs) ->
+        ( dialog_meta_es(Toks) -> true
+        ; dialog_single_about(Toks) -> true
+        ; dialog_ambiguity(Toks, P, Cs) ->
             dialog_clarify(P, Cs),
             assertz(dialog_pending(Toks, P, Cs))
         ; dialog_ellipsis(Toks) -> true
@@ -224,6 +226,21 @@ chat_line_tokens(L, Toks, Changed) :-
         )
     ; chat_learn(L, Toks, Changed)
     ).
+
+% D5 actos meta en espanol (sintaxis de dialogo, como help/quit: que
+% sabes / de que trata / protagonistas -> lo conocido). Verbos de
+% contenido en espanol ("quien abrio...") quedan FUERA a proposito:
+% exigen lexico verbal que no existe; responden unknown honesto.
+dialog_meta_es(Toks) :-
+    member(W, Toks),
+    member(W, [sabes, trata, protagonistas]), !,
+    chat_known(es).
+
+% D5 entidad suelta con '?': resumen (about). Sin '?' va a learn
+% (D3-abandon intacto: "Madrid" sin '?' sigue unknown).
+dialog_single_about([X]) :-
+    qnorm([X], X), !,
+    about_entity(X, en).
 
 % D3: respuesta = entidad candidata (qnorm) -> prosigue; si no, nada.
 dialog_match_reply(Toks, Cs, C) :-
