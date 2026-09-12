@@ -26,6 +26,7 @@ add_library(symbolic STATIC
     src/export.c
     src/stem.c
     src/i18n.c
+    src/neuro_rules.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -75,6 +76,7 @@ sllm_test(test_stem           tests/test_stem.c)
 sllm_test(test_i18n           tests/test_i18n.c)
 sllm_test(test_self_reference tests/test_self_reference.c)
 sllm_test(test_neuro_prolog  tests/test_neuro_prolog.c)
+sllm_test(test_neuro_prolog_rules tests/test_neuro_prolog_rules.c)
 sllm_test(test_provenance     tests/test_provenance.c)
 sllm_test(test_numeric        tests/test_numeric.c)
 sllm_test(test_attention       test_attention.c)

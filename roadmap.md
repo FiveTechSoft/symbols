@@ -99,10 +99,22 @@ walkable.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
   input canonization for book ingest (short-SVO sentence simplification;
   prerequisite: P2 measured 2% without it),
-  P4b (Horn + cut + NAF over P4a), R6 analogy ranking set (needs PARIS
-  data + incoming-role similarity + frequency-gated cosine first, see
-  below). Each ships with its eval set + threshold (90),
-  no-merge on regression (87/87, suite, Quijote immunity).
+  R6 analogy ranking set (needs PARIS data + incoming-role similarity +
+  frequency-gated cosine first). Each ships with its eval set +
+  threshold (90), no-merge on regression (87/87, suite, Quijote
+  immunity).
+- [x] P4b — Horn rules + cut + NAF (done 2026-09-12, engine core):
+  `neuro_rules.h/c` over untouched P4a: declared head/body rules with
+  frame-checkpoint SLD and renamed-apart variables, shallow cut
+  (first-solution commit, documented), NAF (unprovable, never binds),
+  denial veto transitive at every level (the penguin line: explicit
+  denials poison all derivations through them; fact-level contradiction
+  stays with conflict policies). Confidence decays per rule step.
+  Gate: `test_neuro_prolog_rules` 28/28 (facts, inheritance, cut 1 vs
+  union 2, NAF both ways, veto direct + transitive, chains, depth cap,
+  cycles terminate, malformed rejected); suite 36/36, eval 87/87.
+   Queued explicitly: quantifiers, NL surfacing of weight/conflict
+   policy, persist of declared rules.
 - [x] M3b — comparison (done 2026-09-12): superlative argmax/argmin
   over valued holders plus binary winner, all on shared units (ties,
   missing values and unit mismatch are honest unknown; years order
