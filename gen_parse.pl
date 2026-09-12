@@ -95,8 +95,18 @@ gen_role(for, recipient). gen_role(about, topic). gen_role(by, agent_by).
 
 % ===== tokenizador con caso preservado (sin pcre) =====
 % gen_tokenize(+Sentence, -Lower, -Raw): dos vistas alineadas por indice.
+% Pre-pasada por palabras (antes de quitar tildes), solo con efecto en
+% español (el ingles no tiene estos tokens):
+%   él/mí/tú/sí/sé -> ELPRON/MIPRON/TUPRON/SIPRON/SEVERB (ortografia).
+%   vocal final TONICA (habló/llegué/oí) -> sufijo V (morfologia: los
+%   sustantivos casi nunca terminan asi; excepciones en lista cerrada).
 gen_tokenize(Sentence, Lower, Raw) :-
-    string_chars(Sentence, Chars),
+    split_string(Sentence, " ", " ", W0),
+    maplist(gen_word_fix, W0, W1),
+    atomic_list_concat(W1, ' ', Spaced),
+    atom_string(Spaced, SpacedAtom),
+    atom_string(SpacedStr, SpacedAtom),
+    string_chars(SpacedStr, Chars),
     maplist(gen_norm_char, Chars, Normed),
     string_chars(NormStr, Normed),
     split_string(NormStr, " ", " ", Chunks0),
@@ -106,6 +116,59 @@ gen_tokenize(Sentence, Lower, Raw) :-
     maplist(atom_string, Raw, R1),
     maplist(gen_down, R1, L1),
     Lower = L1.
+
+% Pre-pasada por palabra: pronombres acentuados y vocal tonica final.
+% gen_word_fix(+Word, -Fixed). Todo minusculiza despues; aqui se decide
+% con la forma original.
+gen_word_fix(W, 'ELPRON') :- low_eq(W, 'él'), !.
+gen_word_fix(W, 'MIPRON') :- low_eq(W, 'mí'), !.
+gen_word_fix(W, 'TUPRON') :- low_eq(W, 'tú'), !.
+gen_word_fix(W, 'SIPRON') :- low_eq(W, 'sí'), !.
+gen_word_fix(W, 'SEVERB') :- low_eq(W, 'sé'), !.
+gen_word_fix(W, Out) :-
+    atom_string(A, W),
+    strip_edge_punct(A, Core),
+    ( stressed_final(Core, Stem) ->
+        ( noun_stressed_exception(Stem) -> Out = W
+        ; atom_concat(Stem, 'V', VAtom), atom_string(VAtom, Out)
+        )
+    ; Out = W
+    ).
+
+% Quita puntuacion adherida al final (conserva la tilde interior).
+strip_edge_punct(A, Core) :-
+    atom_chars(A, Cs),
+    drop_trail(Cs, D1),
+    reverse(D1, D2rev),
+    drop_trail(D2rev, D3rev),
+    reverse(D3rev, D3),
+    atom_chars(Core, D3).
+
+drop_trail([C|Cs], Out) :-
+    member(C, ['.', ',', ';', ':', '?', '!', '"', '«', '»', '¿', '¡', '(', ')', '[', ']']), !,
+    drop_trail(Cs, Out).
+drop_trail(L, L).
+
+low_eq(W, Target) :-
+    string_lower(W, L),
+    atom_string(T, Target),
+    string_lower(T, L).
+
+% Vocal tonica final (tras quitar puntuacion adherida sencilla).
+stressed_final(A, Stem) :-
+    atom_chars(A, Cs),
+    append(Body, [Last], Cs),
+    member(Last, ['á', 'é', 'í', 'ó', 'ú']),
+    Body \== [],
+    last(Body, Prev),
+    \+ member(Prev, [' ', '.', ',', ';', ':', '?', '!']),
+    atom_chars(Stem, Body).
+
+% Excepciones: sustantivos/adverbios con final tonica (lista cerrada).
+noun_stressed_exception(Stem) :-
+    member(Stem, ['beb', 'mam', 'pap', 'sof', 'domin', 'all', 'ac',
+                  'allí', 'aquí', 'ahí', 'café', 'chale', 'alla', 'aca',
+                  'alli', 'aqui', 'ahi', 'quiza', 'quizá', 'alla']).
 
 % Normaliza comillas/apostrofos/guiones a ' o espacio (una pasada, chars).
 gen_norm_char('’', '\'') :- !.
