@@ -569,10 +569,11 @@ es_form([que, V|Rest], say, answer(Xs, Facts)) :-
     findall(F, member(_-F, OF), Facts).
 es_form([V, S, O], say, YesNo) :-
     V \== quien, V \== que,
-    bb_content(S), bb_content(O),
+    qnorm_atom(S, S2),
+    qnorm_atom(O, O2),
     bb_rel_forms(V, Rs),
     member(Vr, Rs),
-    ( memory_relation(S, Vr, O, _, _) -> YesNo = yes((S, Vr, O))
+    ( memory_relation(S2, Vr, O2, _, _) -> YesNo = yes((S2, Vr, O2))
     ; YesNo = no
     ).
 
@@ -779,23 +780,31 @@ chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
     sort(Xs0, Xs),
     findall((E, time, Tm), member(_-(E, time, Tm), LF), Facts).
 
-% qnorm_exact: quita glue, une con _. Solo sobrevive lo que el mapa conoce.
-qnorm_exact(Toks, Name) :-
-    findall(W, (member(W, Toks), bb_content(W)), Ws),
-    Ws \== [],
-    atomic_list_concat(Ws, '_', Name).
-% qnorm (nombre publico): exacto primero (cero cambio de conducta), cada
-% token a su simbolo mas cercano (Levenshtein =< 2, len >= 3, unico
-% mejor o nada: nunca azar) y el join debe existir. La respuesta final
-% exige tripla real: lo difuso propone, la evidencia dispone.
+% qnorm (nombre publico): por token, alias ensenado gana; si no,
+% contenido propio; si nada resuelve, fallback difuso (Levenshtein
+% =< 2, len >= 3, unico mejor o nada: nunca azar) y el join debe
+% existir. La respuesta final exige tripla real: lo difuso propone,
+% la evidencia dispone.
 qnorm(Toks, Name) :-
-    qnorm_exact(Toks, Name), !.
+    findall(W2, (member(W, Toks), qnorm_atom(W, W2)), Ws),
+    Ws \== [],
+    atomic_list_concat(Ws, '_', Name),
+    bb_content(Name).
 qnorm(Toks, Name) :-
     findall(W2, (member(W, Toks), fuzzy_keep(W, W2)), Ws),
     Ws \== [],
     atomic_list_concat(Ws, '_', Name),
     bb_content(Name),
     format('(assuming ~w)~n', [Name]).
+
+% Alias ensenados ("puerta means door"): el mapeo gana al propio
+% token (el mapeo ES el conocimiento; el hecho means sigue consultable
+% directo). Sin triplas means, identico al exacto por construccion.
+qnorm_atom(W, C) :-
+    means_triple(W, C),
+    bb_content(C), !.
+qnorm_atom(W, W) :-
+    bb_content(W), !.
 
 fuzzy_keep(W, W) :- bb_content(W), !.
 fuzzy_keep(W, C) :- fuzzy_one(W, C).
@@ -840,14 +849,29 @@ lev_cells(A, [B|Bs], [Dg, Up|Rest], Left, [C|Cs]) :-
 % simetrico de consonante final (trimmed->trimm->trim): f aplicada en
 % ambos lados conserva todos los matches previos por construccion
 % (si a==b entonces f(a)==f(b)) y anade la clase stopped/dropped.
+% D9 lexico aprendido: triplas (A,means|significa,C) ensenadas declaran
+% alias de verbo ("abrio means opened"); se resuelven un nivel, sin
+% cadenas. Sin triplas means, identico a antes por construccion.
 bb_rel_forms(V, Rs) :-
+    bb_rel_forms_direct(V, Rs0),
+    findall(R, (means_triple(V, C),
+                bb_rel_forms_direct(C, RC), member(R, RC)), Rs1),
+    append(Rs0, Rs1, Rall),
+    sort(Rall, Rs),
+    Rs \== [].
+
+means_triple(V, C) :-
+    memory_relation(V, means, C, _, _).
+means_triple(V, C) :-
+    memory_relation(V, significa, C, _, _).
+
+bb_rel_forms_direct(V, Rs) :-
     bb_stem(V, St0),
     bb_ddouble(St0, St),
     findall(R, (memory_relation(_, R, _, _, _),
                 ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
                             RSt == St, R \== V) )), R0),
-    sort(R0, Rs),
-    Rs \== [].
+    sort(R0, Rs).
 
 % bb_ddouble: una de dos letras finales iguales fuera (ingles: la
 % consonante se dobla ante -ed/-ing; call/full/well nunca se tocan

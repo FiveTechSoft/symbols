@@ -90,15 +90,28 @@ norm_name(Toks, Name) :-
 % Puente morfologico bidireccional: la pregunta y la memoria usan formas
 % de superficie distintas del mismo verbo (infraestructura de lengua).
 % Coinciden si son iguales o comparten stem (con desdoblado simetrico:
-% ver chat.pl, misma garantia de no-regresion).
+% ver chat.pl, misma garantia de no-regresion). D9: alias ensenados
+% (A,means|significa,C), un nivel, como en chat.pl.
 bb_rel_forms(V, Rs) :-
+    bb_rel_forms_direct(V, Rs0),
+    findall(R, (means_triple(V, C),
+                bb_rel_forms_direct(C, RC), member(R, RC)), Rs1),
+    append(Rs0, Rs1, Rall),
+    sort(Rall, Rs),
+    Rs \== [].
+
+means_triple(V, C) :-
+    memory_relation(V, means, C, _, _).
+means_triple(V, C) :-
+    memory_relation(V, significa, C, _, _).
+
+bb_rel_forms_direct(V, Rs) :-
     bb_stem(V, St0),
     bb_ddouble(St0, St),
     findall(R, (memory_relation(_, R, _, _, _),
                 ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
                             RSt == St, R \== V) )), R0),
-    sort(R0, Rs),
-    Rs \== [].
+    sort(R0, Rs).
 
 bb_ddouble(W, D) :-
     sub_atom(W, _, 1, 0, C),

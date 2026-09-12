@@ -129,6 +129,17 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
+- [x] D9 learned lexicon (done 2026-09-12): "abrio means opened" and
+  "puerta means door" triples act as taught verb/entity aliases (one
+  level, no chains; command markers means/significa, same license as
+  tell/talk). Cross-lingual QA without any dictionary: the alias wins
+  over the raw token (mapping IS the knowledge; means-facts stay
+  directly queryable). Without means-triples identical by
+  construction. Gate: 6/6 (unknown pre-teach, learned, who/what/did
+  in Spanish over an English map); full regressions green. Bugs found
+  en route: entity aliases needed too (verbs alone insufficient);
+  two orphan code fragments from edits broke the load (preflight
+  caught one, runtime the other: verify every edit).
 - [x] D8 typo tolerance (done 2026-09-12): unknown entities fall back
   to the closest live symbol (Levenshtein =< 2, len >= 3, same
   initial, unique best or nothing: never random), with an "(assuming
@@ -327,7 +338,7 @@ when measured (never assumed); red stays red until re-measured.
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
 | LOOP50 | `tools/loop50_gate.py`, 50 real facts | green 09-12 | 20/20 |
-| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo | green 09-12 | 18+9+13+12+9+8+21+5 |
+| D dialogue | anaphora/ellipsis/clarify/initiative/ES-meta/ES-loop/more/count/typo/lexicon | green 09-12 | 18+9+13+12+9+8+21+5+6 |
 | M4 2-hop | `qa_eval_multihop.tsv` | green 09-12 | 20/20 (was 1/20) |
 | M3a sidecar | parse + fixture + QA + V5 | green 09-12 | 13+20+20 |
 | M3b compare | `qa_eval_compare.tsv` | green 09-12 | 20/20 |
