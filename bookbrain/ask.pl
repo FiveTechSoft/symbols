@@ -57,22 +57,32 @@ norm_name(Toks, Name) :-
     Ws \== [],
     atomic_list_concat(Ws, '_', Name).
 
-% Expansion morfologica del verbo de la pregunta a formas de superficie
-% presentes en memoria (infraestructura de lengua, no dominio).
-bb_verb_forms(V, Forms) :-
-    findall(F, bb_vform(V, F), F0),
-    sort([V|F0], Forms).
-
-bb_vform(V, F) :- atom_concat(V, ed, F).
-bb_vform(V, F) :- sub_atom(V, _, 1, 0, e), atom_concat(V, d, F).
-bb_vform(V, F) :- atom_concat(V, s, F).
-bb_vform(V, F) :- atom_concat(V, ing, F).
-
+% Puente morfologico bidireccional: la pregunta y la memoria usan formas
+% de superficie distintas del mismo verbo (infraestructura de lengua).
+% Coinciden si son iguales o comparten stem.
 bb_rel_forms(V, Rs) :-
-    bb_verb_forms(V, Forms),
-    findall(R, (member(R, Forms), memory_relation(_, R, _, _, _)), R0),
+    bb_stem(V, St),
+    findall(R, (memory_relation(_, R, _, _, _),
+                ( R == V ; (bb_stem(R, St), R \== V) )), R0),
     sort(R0, Rs),
     Rs \== [].
+
+bb_stem(W, St) :-
+    ( sub_atom(W, _, 3, 0, 'ied') ->
+        sub_atom(W, 0, _, 3, Pre), atom_concat(Pre, 'y', St)
+    ; sub_atom(W, _, 3, 0, 'ies') ->
+        sub_atom(W, 0, _, 3, Pre2), atom_concat(Pre2, 'y', St)
+    ; sub_atom(W, _, 2, 0, 'ed') ->
+        sub_atom(W, 0, _, 2, St)
+    ; sub_atom(W, _, 3, 0, 'ing') ->
+        sub_atom(W, 0, _, 3, St)
+    ; sub_atom(W, _, 2, 0, 'es') ->
+        sub_atom(W, 0, _, 2, St)
+    ; ( sub_atom(W, _, 1, 0, 's') ->
+          sub_atom(W, 0, _, 1, St0), St = St0
+      ; St = W
+      )
+    ).
 
 ask_form([who, V|Rest], answer(Xs, retrieved, Facts)) :-
     norm_name(Rest, O),

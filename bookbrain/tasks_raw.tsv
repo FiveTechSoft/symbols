@@ -1,0 +1,100 @@
+C01	COMP	Who beginns get?	alice	exact	auto-text-order
+C02	COMP	What did alice look?	sides	exact	auto-text-order
+C03	COMP	Who learnts things?	alice	exact	auto-text-order
+C04	COMP	What did came legg?	table	exact	auto-text-order
+C05	COMP	Who opens door?	alice	exact	auto-text-order
+C06	COMP	What did alice long?	get	exact	auto-text-order
+C07	COMP	Who beguns think?	alice	exact	auto-text-order
+C08	COMP	What did beautifully print?	alice	exact	auto-text-order
+C09	COMP	Who venturs taste?	alice	exact	auto-text-order
+C10	COMP	What did alice forgotten?	key	exact	auto-text-order
+C11	COMP	Who gots way?	alice	exact	auto-text-order
+C12	COMP	What did soon finish?	cake	exact	auto-text-order
+C13	COMP	Who wells say?	alice	exact	auto-text-order
+C14	COMP	What did rabbit start?	violently	exact	auto-text-order
+C15	COMP	Who slipps like?	mouse	exact	auto-text-order
+C16	COMP	What did pool gett?	birds	exact	auto-text-order
+C17	COMP	Who draggls feathers?	birds	exact	auto-text-order
+C18	COMP	What did last turn?	sulky	exact	auto-text-order
+C19	COMP	Who refuses tell?	lory_positively	exact	auto-text-order
+C20	COMP	What did soon submitt?	english	exact	auto-text-order
+Q01	QA	Did alice beginn get?	yes	exact	auto-text-order
+Q02	QA	Why did alice look sides?	alice-looked-sides	proof	auto-text-order
+Q03	QA	Who learnts things?	alice	exact	auto-text-order
+Q04	QA	Did came legg table?	yes	exact	auto-text-order
+Q05	QA	Why did alice open door?	alice-opened-door	proof	auto-text-order
+Q06	QA	Who longs get?	alice	exact	auto-text-order
+Q07	QA	Did alice begun think?	yes	exact	auto-text-order
+Q08	QA	Why did beautifully print alice?	beautifully-printed-alice	proof	auto-text-order
+Q09	QA	Who venturs taste?	alice	exact	auto-text-order
+Q10	QA	Did alice forgotten key?	yes	exact	auto-text-order
+Q11	QA	Who wrote alice?	unknown	unknown	manual-absence:author-absent
+Q12	QA	Who killed alice?	unknown	unknown	manual-absence:no-kill
+Q13	QA	What did queen eat?	unknown	unknown	manual-absence:no-eat
+Q14	QA	Did hatter sing song?	unknown	unknown	manual-absence:no-record
+Q15	QA	Who visited london?	unknown	unknown	manual-absence:no-london
+Q16	QA	What did gryphon drink?	unknown	unknown	manual-absence:no-drink
+Q17	QA	Did alice meet shakespeare?	unknown	unknown	manual-absence:no-entity
+Q18	QA	Who taught turtle?	unknown	unknown	manual-absence:no-teach
+Q19	QA	What did king build?	unknown	unknown	manual-absence:no-build
+Q20	QA	Why did dodo fly?	unknown	unknown	manual-absence:no-fly
+R01	REAS	Why did alice beginn get?	alice-beginning-get	proof	auto-text-order
+R02	REAS	Why did alice look sides?	alice-looked-sides	proof	auto-text-order
+R03	REAS	Why did alice learnt things?	alice-learnt-things	proof	auto-text-order
+R04	REAS	Why did came legg table?	came-legged-table	proof	auto-text-order
+R05	REAS	Why did alice open door?	alice-opened-door	proof	auto-text-order
+R06	REAS	Why did alice long get?	alice-longed-get	proof	auto-text-order
+R07	REAS	Why did alice begun think?	alice-begun-think	proof	auto-text-order
+R08	REAS	Why did beautifully print alice?	beautifully-printed-alice	proof	auto-text-order
+R09	REAS	Why did alice ventur taste?	alice-ventured-taste	proof	auto-text-order
+R10	REAS	Why did alice forgotten key?	alice-forgotten-key	proof	auto-text-order
+R11	REAS	Why did beautifully print alice?	get-via-alice	proof2	auto-chain-order
+R12	REAS	Why did pool gett birds?	feathers-via-birds	proof2	auto-chain-order
+R13	REAS	Why did rabbit notic alice?	get-via-alice	proof2	auto-chain-order
+R14	REAS	Why did felt irritat caterpillar?	state-via-caterpillar	proof2	auto-chain-order
+R15	REAS	Why did just miss alice?	get-via-alice	proof2	auto-chain-order
+R16	REAS	Why did cat only grinn alice?	get-via-alice	proof2	auto-chain-order
+R17	REAS	Why did dormouse sitt alice?	get-via-alice	proof2	auto-chain-order
+R18	REAS	Why did dormouse follow alice?	sides-via-alice	proof2	auto-chain-order
+R19	REAS	Why did march hare mov dormouse?	alice-via-dormouse	proof2	auto-chain-order
+R20	REAS	Why did cat look king?	angrily-via-king	proof2	auto-chain-order
+M01	MEM	Who seems think?	cat|footman	exact	auto-multich
+M02	MEM	Who looks anxiously?	alice|king	exact	auto-multich
+M03	MEM	Who adds explanation?	alice|hatter	exact	auto-multich
+M04	MEM	Who looks alice?	everybody|mock_turtle	exact	auto-multich
+M05	MEM	What did alice beginn?	get	exact	auto-multich
+M06	MEM	What did alice look?	sides	exact	auto-multich
+M07	MEM	What did alice learnt?	things	exact	auto-multich
+M08	MEM	What did alice open?	door	exact	auto-multich
+M09	MEM	What did alice long?	get	exact	auto-multich
+M10	MEM	What did alice begun?	think	exact	auto-multich
+M11	MEM	What did alice ventur?	taste	exact	auto-multich
+M12	MEM	What did alice forgotten?	key	exact	auto-multich
+M13	MEM	What did alice got?	way	exact	auto-multich
+M14	MEM	What did soon finish?	cake	exact	auto-multich
+M15	MEM	What did alice well?	say	exact	auto-multich
+M16	MEM	What did rabbit start?	violently	exact	auto-multich
+M17	MEM	What did mouse slipp?	like	exact	auto-multich
+M18	MEM	What did pool gett?	birds	exact	auto-multich
+M19	MEM	What did birds draggl?	feathers	exact	auto-multich
+M20	MEM	What did last turn?	sulky	exact	auto-multich
+G01	GEN	Answer in one word: who beginns get?	alice	exact	auto-text-order
+G02	GEN	Answer in one word: who looks sides?	alice	exact	auto-text-order
+G03	GEN	Answer in one word: who learnts things?	alice	exact	auto-text-order
+G04	GEN	Answer in one word: who leggs table?	came	exact	auto-text-order
+G05	GEN	Answer in one word: who opens door?	alice	exact	auto-text-order
+G06	GEN	Answer in one word: who longs get?	alice	exact	auto-text-order
+G07	GEN	Answer in one word: who beguns think?	alice	exact	auto-text-order
+G08	GEN	Answer in one word: who prints alice?	beautifully	exact	auto-text-order
+G09	GEN	Say yes or no: did alice beginn get?	yes	exact	auto-text-order
+G10	GEN	Say yes or no: did alice look sides?	yes	exact	auto-text-order
+G11	GEN	Say yes or no: did alice learnt things?	yes	exact	auto-text-order
+G12	GEN	Say yes or no: did came legg table?	yes	exact	auto-text-order
+G13	GEN	Say yes or no: did alice open door?	yes	exact	auto-text-order
+G14	GEN	Say yes or no: did alice long get?	yes	exact	auto-text-order
+G15	GEN	Admit it if unknown: who wrote alice?	unknown	unknown	manual-absence
+G16	GEN	List all who opened door.	alice	exact	manual:footman-coref-error-excluded
+G17	GEN	Answer in one word: what did footman open?	door	exact	manual:triple-exists-but-agent-wrong
+G18	GEN	Say yes or no: did alice open door?	yes	exact	manual-verified
+G19	GEN	Admit it if unknown: why did dodo fly?	unknown	unknown	manual-absence
+G20	GEN	List all: what did alice open?	door	exact	manual:footman-excluded
