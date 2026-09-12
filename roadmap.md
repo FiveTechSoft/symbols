@@ -50,10 +50,27 @@ Chat / BookBrain (new, untracked, verified 2026-09-12):
 Not LLM parity — that stays a north star, never an operational goal.
 The reachable, valuable thing this project can uniquely offer:
 
-**The machine that knows what it knows**: a tiny, local, auditable,
+**The machine that learns what it knows**: a tiny, local, auditable,
 teachable assistant for closed domains (a book, a manual, a knowledge
-base) that learns when told, cites sources, reinforces on repetition,
-and says "I don't know" instead of inventing. No LLM does all four.
+base) that learns its knowledge from text and dialogue, cites sources,
+reinforces on repetition, and says "I don't know" instead of inventing.
+SWI-Prolog cannot learn — that verb is the whole destination.
+
+Non-overlap with SWI-Prolog (surveyed + probed 2026-09-12, binding):
+SWI covers inference — Horn, cut, NAF, tabling termination,
+s(CASP) justifications + both negations, CLP, ProbLog-style weights.
+We borrow there and stop reimplementing. SWI does NOT cover our build
+zone: text/dialogue→triples learning (open vocab, positional,
+concept/skill discovery), 32D fuzzy retrieval layer, provenance and
+trust-tier sidecars, streaming ingest at 32 MB scale, the teach→prove
+loop with eval gates. If a future item falls on SWI's side, it is
+borrowed, not built — otherwise we walk in circles for nothing.
+
+Borrow-first rule (binding): no new reasoning capability enters P4
+without a written borrow-check (pack surveyed, probe or reason
+recorded, verdict: borrow vs build). Past violators stay documented
+(P4a/P4b reimplement tabling/NAF by hand: kept, working, frozen —
+future inference work goes SWI-side).
 
 Novelty position (2026-09-12, binding): the value is the measured
 artifact, not formalism novelty. Horn + cut + NAF, Jaccard, Zipf,
@@ -288,3 +305,6 @@ its documented command (ctest, `test_eval_qa`, `tools/progress.py`,
   terminates, NAF built-in, s(CASP) documented) → direction: C is
   memory, SWI is inference; incremental probes only, no product built
   on unexamined ground.
+- 2026-09-12: destination sharpened to what SWI-Prolog cannot do
+  (LEARN: text/dialogue→triples); non-overlap table + borrow-first
+  rule binding (P4a/P4b kept and frozen as past violators).
