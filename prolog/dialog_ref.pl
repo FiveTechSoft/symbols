@@ -38,6 +38,12 @@ dialog_pronoun(W) :-
     member(W, [he, him, his, she, her, hers, it, its,
                they, them, their]).
 
+% Tier por caso morfologico (sintaxis, como la lista): sujeto para
+% he/she/they, objeto para him/her/them, ambos para el resto.
+dialog_tier(P, subj) :- member(P, [he, she, they]), !.
+dialog_tier(P, obj) :- member(P, [him, her, them]), !.
+dialog_tier(_, both).
+
 dialog_has_pronoun(Toks) :-
     member(W, Toks),
     dialog_pronoun(W), !.
@@ -54,14 +60,55 @@ sub_one(W, C-yes) :-
     dialog_resolve(W, C), !.
 sub_one(W, W-no).
 
-% tiers: mismo rol primero (sujeto pronominal ~ sujetos recientes),
-% luego el otro; recencia dentro de cada tier; 1 superviviente o nada.
+% tiers: el caso del pronombre elige tier (sujeto u objeto); resto
+% (his/hers/its/their/it) prueba sujetos y luego objetos. 1
+% superviviente o nada (UNKNOWN honesto, nunca azar).
+dialog_resolve(P, C) :-
+    dialog_tier(P, subj), !,
+    dialog_stack(subj, Ss),
+    tier_single(P, Ss, C).
+dialog_resolve(P, C) :-
+    dialog_tier(P, obj), !,
+    dialog_stack(obj, Os),
+    tier_single(P, Os, C).
 dialog_resolve(P, C) :-
     dialog_stack(subj, Ss),
     dialog_stack(obj, Os),
     ( tier_single(P, Ss, C) -> true
     ; tier_single(P, Os, C)
     ).
+
+% dialog_candidates(+P, -Cs): lista ordenada para aclarar (D3), en el
+% tier de su caso. Sin veto: la pregunta, no la afirmacion, decide.
+dialog_candidates(P, Cs) :-
+    dialog_tier(P, subj), !,
+    dialog_stack(subj, Ss),
+    tier_list(Ss, Cs).
+dialog_candidates(P, Cs) :-
+    dialog_tier(P, obj), !,
+    dialog_stack(obj, Os),
+    tier_list(Os, Cs).
+dialog_candidates(_P, Cs) :-
+    dialog_stack(subj, Ss),
+    dialog_stack(obj, Os),
+    append(Ss, Os, All),
+    foldl(note_ord, All, [], Ordered),
+    findall(C, (member(C, Ordered), \+ dialog_pronoun(C)), Cs).
+
+tier_list(Es, Cs) :-
+    foldl(note_ord, Es, [], Ordered),
+    findall(C, (member(C, Ordered), \+ dialog_pronoun(C)), Cs).
+
+note_ord(E, Old, New) :-
+    ( member(E, Old) -> New = Old ; append(Old, [E], New) ).
+
+% dialog_ambiguity(+Toks, -P, -Cs): primer pronombre con 2+ candidatos.
+dialog_ambiguity(Toks, P, Cs) :-
+    member(P, Toks),
+    dialog_pronoun(P),
+    dialog_candidates(P, Cs),
+    length(Cs, N),
+    N >= 2, !.
 
 tier_single(P, Es, C) :-
     findall(C, ( member(C, Es), \+ dialog_pronoun(C) ), Cs0),

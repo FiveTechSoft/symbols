@@ -36,6 +36,11 @@ bb_content(W) :-
 % Esqueleto de la ultima pregunta con forma (D2): la elipsis lo continua.
 :- dynamic dialog_lastq/1.
 
+% Aclaracion pendiente (D3): pregunta original + pronombre + candidatos.
+% Una linea que responda con un candidato prosigue; cualquier otra cosa
+% la abandona y se procesa normal.
+:- dynamic dialog_pending/3.
+
 % Relaciones ensenadas en sesion: candidatas a descubrir (P3). Se siembran
 % en chat_learn y las consume el comando discover. Interfaz propia.
 :- dynamic told_rel/1.
@@ -52,6 +57,7 @@ bb_load(File) :-
     retractall(last_fact(_, _, _)),
     retractall(told_rel(_)),
     retractall(dialog_lastq(_)),
+    retractall(dialog_pending(_, _, _)),
     dialog_reset,
     dialog_reset,
     consult(File),
@@ -125,7 +131,17 @@ chat_line(L) :-
 chat_line_guarded(L) :-
     gen_tokenize(L, Lower, _),
     exclude(gen_qmark, Lower, Toks0),
-    dialog_substitute(Toks0, Toks, Changed),
+    % D3: la respuesta a una aclaracion prosigue la pregunta original;
+    % cualquier otra linea la abandona.
+    ( dialog_pending(Q0, P0, Cs0),
+      dialog_match_reply(Toks0, Cs0, C0) ->
+        retractall(dialog_pending(_, _, _)),
+        maplist(dl_repl(P0, C0), Q0, ToksP),
+        dialog_substitute(ToksP, Toks, _),
+        Changed = yes
+    ; retractall(dialog_pending(_, _, _)),
+      dialog_substitute(Toks0, Toks, Changed)
+    ),
     ( Toks == [] -> true
     ; Toks == [quit] -> writeln('Bye.')
     ; Toks == [exit] -> writeln('Bye.')
@@ -147,9 +163,41 @@ chat_line_guarded(L) :-
     ; ( Toks == [quien, conoces] ; Toks == [a, quien, conoces] ) ->
         chat_known(es)
     ; chat_is_spanish(Toks) -> chat_spanish_help
-    ; is_question(L) -> ( dialog_ellipsis(Toks) -> true ; chat_ask(Toks) )
+    ; is_question(L) ->
+        ( dialog_ambiguity(Toks, P, Cs) ->
+            dialog_clarify(P, Cs),
+            assertz(dialog_pending(Toks, P, Cs))
+        ; dialog_ellipsis(Toks) -> true
+        ; chat_ask(Toks)
+        )
     ; chat_learn(L, Toks, Changed)
     ).
+
+% D3: respuesta = entidad candidata (qnorm) -> prosigue; si no, nada.
+dialog_match_reply(Toks, Cs, C) :-
+    qnorm(Toks, C),
+    member(C, Cs).
+
+dl_repl(P, C, W, O) :- ( W == P -> O = C ; O = W ).
+
+% Pregunta de aclaracion: hasta 5 candidatos en orden de recencia.
+dialog_clarify(_P, Cs) :-
+    take_first(Cs, 5, Show),
+    join_or(Show, L),
+    format('Do you mean ~w?~n', [L]).
+
+take_first(_, 0, []) :- !.
+take_first([], _, []) :- !.
+take_first([H|T], K, [H|R]) :-
+    K1 is K - 1,
+    take_first(T, K1, R).
+
+join_or([A, B], L) :- !, atomic_list_concat([A, ' or ', B], L).
+join_or([A, B|T], L) :-
+    atomic_list_concat([A, ', '], H),
+    join_or([B|T], R),
+    atom_concat(H, R, L).
+join_or([A], A).
 
 % Pregunta = termina en '?'. Todo lo demas es candidato a ensenar, nunca
 % a responder: las preguntas jamas se ingieren (doctrina roadmap).
@@ -356,6 +404,7 @@ chat_help :-
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
     writeln('Teach me facts ending with a period: Zorin reaches Oslo.'),
     writeln('he/she/it follow the conversation (one clear antecedent);'),
+    writeln('with several antecedents I ask who you mean (answer a name).'),
     writeln('"And Madrid?" continues the last question (evidence or unknown).'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),

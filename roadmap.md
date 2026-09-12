@@ -129,9 +129,15 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
-  D3 continuity (entity stack + ask when ambiguous),
   D4 initiative (probe missing roles, EXP48 pattern). Each with
   scripted multi-turn dialogue sets; same gate discipline as P1/P3.
+- [x] D3 continuity (done 2026-09-12): ambiguous pronouns ask ("Do
+  you mean Leo or Ana?", tier-ordered, max 5); a name reply continues
+  the stored question, anything else abandons it cleanly. Candidates
+  by pronoun case (he/she/they→subjects, him/her/them→objects, rest
+  both; closed-class syntax, same license as the pronoun list).
+  Gate: 2 dialogues 13/13 (answer, abandon, re-ask); D1 evolved
+  (2+ now clarifies instead of silent unknown), D2/P1/P3/LOOP50 green.
 - [x] D2 ellipsis (done 2026-09-12): "And Madrid?" continues the last
   question skeleton (LastQ per-form slot swap; who + person without
   object falls back to did-verify). Marker shapes disjoint from full
