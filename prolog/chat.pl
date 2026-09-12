@@ -33,6 +33,9 @@ bb_content(W) :-
 
 :- dynamic last_fact/3.
 
+% Esqueleto de la ultima pregunta con forma (D2): la elipsis lo continua.
+:- dynamic dialog_lastq/1.
+
 % Relaciones ensenadas en sesion: candidatas a descubrir (P3). Se siembran
 % en chat_learn y las consume el comando discover. Interfaz propia.
 :- dynamic told_rel/1.
@@ -48,6 +51,8 @@ bb_load(File) :-
     retractall(prov_log(_, _)),
     retractall(last_fact(_, _, _)),
     retractall(told_rel(_)),
+    retractall(dialog_lastq(_)),
+    dialog_reset,
     dialog_reset,
     consult(File),
     forall(memfact(S, R, O, W, U), assertz(memory_relation(S, R, O, W, U))),
@@ -142,7 +147,7 @@ chat_line_guarded(L) :-
     ; ( Toks == [quien, conoces] ; Toks == [a, quien, conoces] ) ->
         chat_known(es)
     ; chat_is_spanish(Toks) -> chat_spanish_help
-    ; is_question(L) -> chat_ask(Toks)
+    ; is_question(L) -> ( dialog_ellipsis(Toks) -> true ; chat_ask(Toks) )
     ; chat_learn(L, Toks, Changed)
     ).
 
@@ -351,6 +356,7 @@ chat_help :-
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
     writeln('Teach me facts ending with a period: Zorin reaches Oslo.'),
     writeln('he/she/it follow the conversation (one clear antecedent);'),
+    writeln('"And Madrid?" continues the last question (evidence or unknown).'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
     writeln('save [name] (keep session memory) | why? (about last answer) | quit').
@@ -368,9 +374,66 @@ chat_why_bare :-
 
 chat_ask(Toks) :-
     ( dialog_has_pronoun(Toks) -> writeln("I don't know.")
-    ; chat_form(Toks, Kind, Ans) -> chat_say(Kind, Ans)
+    ; chat_form(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
     ; chat_ask_qp(Toks)
     ).
+
+% D2 elipsis: "And Madrid?" continua el esqueleto anterior con X en el
+% slot (who/did/why/where/when: ultimo; what: sujeto). Solo formas con
+% marcador (and | what/how about) y X entidad unica: disjunto de las
+% formas completas por construccion. Sonda con evidencia (probe) o se
+% deja al camino normal (UNKNOWN honesto). Caso especial: who + X
+% persona sin objeto -> verificar candidato (Did X V O?).
+% Tras responder, chat_ask actualiza LastQ: encadena ("And Oslo?").
+dialog_ellipsis([and, X]) :- !, dialog_ell_entity(X).
+dialog_ellipsis([what, about, X]) :- !, dialog_ell_entity(X).
+dialog_ellipsis([how, about, X]) :- !, dialog_ell_entity(X).
+dialog_ellipsis(_) :- fail.
+
+dialog_ell_entity(X) :-
+    qnorm([X], X),
+    dialog_lastq(LQ),
+    dialog_ell_build(LQ, X, NewT),
+    ( dialog_probe(NewT) -> chat_ask(NewT)
+    ; dialog_ell_verify(LQ, X)
+    ).
+
+% Verificar-candidato: who [who,V,O] + X persona -> Did X V O?
+dialog_ell_verify([who, V, O], X) :-
+    dialog_in_subj(X),
+    dialog_probe([did, X, V, O]), !,
+    chat_ask([did, X, V, O]).
+
+dialog_ell_build([who, V, _O], X, [who, V, X]).
+dialog_ell_build([what, did, _S, V], X, [what, did, X, V]).
+dialog_ell_build([did, S, V, _O], X, [did, S, V, X]).
+dialog_ell_build([why, did | Mid], X, [why, did | Mid2]) :-
+    append(Pre, [_], Mid),
+    append(Pre, [X], Mid2).
+dialog_ell_build([where, did | Mid], X, [where, did | Mid2]) :-
+    append(Pre, [_], Mid),
+    append(Pre, [X], Mid2).
+dialog_ell_build([when, did | Mid], X, [when, did | Mid2]) :-
+    append(Pre, [_], Mid),
+    append(Pre, [X], Mid2).
+
+% Sonda: la forma resuelve con respuestas (yes/no son compuestos con
+% la tripla; no, solo de did, es respuesta cerrada genuina porque las
+% entidades vienen resueltas del esqueleto o de qnorm).
+dialog_probe(T) :-
+    ( chat_form(T, _, answer(Xs, _)) -> Xs \== []
+    ; chat_form(T, _, yes(_)) -> true
+    ; chat_form(T, _, no) -> true
+    ; chat_form(T, _, explanation(_, _, _, _)) -> true
+    ).
+
+% X en tier de sujetos (persona candidata a verificar).
+dialog_in_subj(X) :-
+    dialog_stack(subj, Ss),
+    member(X, Ss).
 
 % Fallback con reglas: si la memoria directa no basta, question_parser
 % (solve_slot: hechos, luego constrained rules inducidas, luego unknown).

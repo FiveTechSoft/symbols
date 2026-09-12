@@ -129,10 +129,17 @@ walkable.
   `peru. (reasoned)` with rule proof + ground steps post-discovery
   (8/8); P1 still 17/17.
 - [ ] P4 — Research queue, no date promises, ordered by value/cost:
-  D2 ellipsis ("And Madrid?", reuse last question skeleton),
   D3 continuity (entity stack + ask when ambiguous),
   D4 initiative (probe missing roles, EXP48 pattern). Each with
   scripted multi-turn dialogue sets; same gate discipline as P1/P3.
+- [x] D2 ellipsis (done 2026-09-12): "And Madrid?" continues the last
+  question skeleton (LastQ per-form slot swap; who + person without
+  object falls back to did-verify). Marker shapes disjoint from full
+  forms; probe requires evidence (yes(_)/no/explanation, never bare
+  atoms); LastQ refreshes so it chains. Gate: 9-turn dialogue 9/9;
+  P1/D1/P3/LOOP50 unchanged. Bug found by gate: probe matched atom
+  `yes` against compound `yes((S,V,O))` (silent fail); `no` accepted
+  as genuine closed answer (entities pre-resolved).
 - [x] D1 anaphora in dialogue (done 2026-09-12): `dialog_ref.pl` —
   entity stack (subject/object tiers, recency) + closed EN pronoun
   set; single survivor substitutes, 0/2+ stay UNKNOWN (never random),
