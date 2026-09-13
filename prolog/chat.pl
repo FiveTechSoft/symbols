@@ -572,7 +572,10 @@ is_question(L) :-
 % learned sentence is rebuilt from names (Changed==yes) instead of
 % the raw line. Plain lines learn verbatim (zero behavior change).
 chat_learn(L, Toks, Changed) :-
-    ( dialog_has_pronoun(Toks) ->
+    ( member(Neg, [not, never, no]),
+      member(Neg, Toks) ->
+        writeln('I don''t learn negated facts. Tell me what IS true.')
+    ; dialog_has_pronoun(Toks) ->
         writeln('I don''t know who that is. Use names and I will learn it.')
     ; ( Changed == yes ->
           atomic_list_concat(Toks, ' ', B),
