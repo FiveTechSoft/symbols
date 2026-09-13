@@ -300,6 +300,7 @@ chat_line_tokens(L, Toks, Changed) :-
     ( Toks == [] -> true
     ; Toks = [T], chat_quit_token(T) -> writeln('Bye.')
     ; Toks == [help] -> chat_help
+    ; Toks == [ayuda] -> chat_help
     ; Toks == [why] -> chat_why_bare
     ; chat_social(Toks) -> true
     ; Toks == [more] -> dialog_more
@@ -1358,7 +1359,6 @@ tell_me_bare([cuentame|Rest]) :-
 % no conoce el ancla, falla honesto.
 graph_ask(Toks, say, Ans) :-
     nl_tokens(Toks, Packed),
-    % why es interrogativo cerrado: no degradar a Yes/No de graph_fill.
     \+ member(why, Packed),
     pins_of(Packed, Rels, Ents),
     graph_fill(Packed, Rels, Ents, Ans).
@@ -1652,12 +1652,12 @@ dialog_ell_entity(X, about) :-
 dialog_ell_entity(X, about) :-
     dialog_ell_entity(X, continue).
 dialog_ell_entity(X, continue) :-
-    qnorm([X], X),
+    ( qnorm([X], XN) -> X2 = XN ; X2 = X ),
     dialog_lastq(LQ),
-    ( dialog_ell_build(LQ, X, NewT), dialog_probe(NewT) -> chat_ask(NewT)
-    ; dialog_ell_verify(LQ, X)
-    ; lastq_rel(LQ, V), graph_ask([V, X], _, _) -> chat_ask([V, X])
-    ; dialog_ell_build(LQ, X, NewT) -> chat_ask(NewT)
+    ( dialog_ell_build(LQ, X2, NewT), dialog_probe(NewT) -> chat_ask(NewT)
+    ; dialog_ell_verify(LQ, X2)
+    ; lastq_rel(LQ, V), graph_ask([V, X2], _, _) -> chat_ask([V, X2])
+    ; dialog_ell_build(LQ, X2, NewT) -> chat_ask(NewT)
     ), !.
 
 lastq_rel(LQ, V) :-
