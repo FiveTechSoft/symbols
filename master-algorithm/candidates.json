@@ -1,0 +1,129 @@
+{
+  "compiled": "2026-09-13",
+  "source_report": "/workspace/master-algorithm/00-unification-map.md",
+  "ranking_criterion": "Closeness to covering all five Domingos tribes with one training procedure",
+  "ranked_candidates": [
+    {
+      "rank": 1,
+      "name": "GFlowNets",
+      "key_papers": [
+        {"title": "Flow Network based Generative Models for Non-Iterative Diverse Candidate Generation", "year": 2021, "arxiv": "2106.04399", "url": "https://arxiv.org/abs/2106.04399"},
+        {"title": "GFlowNet Foundations", "year": 2021, "arxiv": "2111.09266", "url": "https://arxiv.org/abs/2111.09266"},
+        {"title": "Trajectory balance: Improved credit assignment in GFlowNets", "year": 2022, "arxiv": "2201.13259", "url": "https://arxiv.org/abs/2201.13259"},
+        {"title": "Unifying Generative Models with GFlowNets and Beyond", "year": 2022, "arxiv": "2209.02606", "url": "https://arxiv.org/abs/2209.02606"}
+      ],
+      "tribes": ["Connectionists", "Bayesians", "Evolutionaries (diversity)", "Symbolists (partial)"],
+      "verdict": "real_master_algorithm_candidate",
+      "verdict_line": "Closest explicit theoretical unifier of generative+inferential tribes; still short of all five."
+    },
+    {
+      "rank": 2,
+      "name": "Foundation models / Algorithm Distillation / ICL meta-learning (incl. TAIL)",
+      "key_papers": [
+        {"title": "In-context Reinforcement Learning with Algorithm Distillation", "year": 2022, "arxiv": "2210.14215", "url": "https://arxiv.org/abs/2210.14215"},
+        {"title": "Transformers Meet In-Context Learning: A Universal Approximation Theory", "year": 2025, "arxiv": "2506.05200", "url": "https://arxiv.org/abs/2506.05200"},
+        {"title": "Universal Algorithm-Implicit Learning", "year": 2026, "arxiv": "2602.14761", "url": "https://arxiv.org/abs/2602.14761"}
+      ],
+      "tribes": ["Connectionists", "Analogizers (emergent ICL)", "meta-emulation of others"],
+      "verdict": "real_master_algorithm_candidate",
+      "verdict_line": "Bitter-Lesson scalable unifier (one loss, many algorithms in context); tribe coverage soft/meta."
+    },
+    {
+      "rank": 3,
+      "name": "DreamCoder",
+      "key_papers": [
+        {"title": "DreamCoder: Growing generalizable, interpretable knowledge with wake-sleep Bayesian program learning", "year": 2020, "arxiv": "2006.08381", "url": "https://arxiv.org/abs/2006.08381"},
+        {"title": "DreamCoder: Bootstrapping Inductive Program Synthesis with Wake-Sleep Library Learning", "year": 2021, "doi": "10.1145/3453483.3454080", "url": "https://doi.org/10.1145/3453483.3454080"}
+      ],
+      "tribes": ["Symbolists", "Bayesians", "Connectionists"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "Cleanest 3-tribe (Symb+Bayes+Conn) wake-sleep procedure; elite hybrid, not full Master Algorithm."
+    },
+    {
+      "rank": 4,
+      "name": "JEPA / energy-based world models",
+      "key_papers": [
+        {"title": "A Path Towards Autonomous Machine Intelligence", "year": 2022, "url": "https://openreview.net/forum?id=BZ5a1r-kVsf"},
+        {"title": "Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture", "year": 2023, "arxiv": "2301.08243", "url": "https://arxiv.org/abs/2301.08243"},
+        {"title": "Introduction to Latent Variable Energy-Based Models: A Path Towards Autonomous Machine Intelligence", "year": 2023, "arxiv": "2306.02572", "url": "https://arxiv.org/abs/2306.02572"},
+        {"title": "Revisiting Feature Prediction for Learning Visual Representations from Video", "year": 2024, "arxiv": "2404.08471", "url": "https://arxiv.org/abs/2404.08471"}
+      ],
+      "tribes": ["Connectionists", "Bayesians (energy / partial)"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "Ambitious AMI agenda; empirically Conn(+energy) hybrid with planning aspirations."
+    },
+    {
+      "rank": 5,
+      "name": "DeepProbLog / neuro-symbolic probabilistic programming",
+      "key_papers": [
+        {"title": "DeepProbLog: Neural Probabilistic Logic Programming", "year": 2018, "arxiv": "1805.10872", "url": "https://arxiv.org/abs/1805.10872"},
+        {"title": "From Statistical Relational to Neuro-Symbolic Artificial Intelligence", "year": 2020, "arxiv": "2003.08316", "url": "https://arxiv.org/abs/2003.08316"},
+        {"title": "Logic Tensor Networks", "year": 2020, "arxiv": "2012.13635", "url": "https://arxiv.org/abs/2012.13635"}
+      ],
+      "tribes": ["Symbolists", "Bayesians", "Connectionists"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "Strong 3-tribe hybrid with end-to-end gradients through logic; scale limits."
+    },
+    {
+      "rank": 6,
+      "name": "AlphaGeometry-style neuro-symbolic products",
+      "key_papers": [
+        {"title": "Solving olympiad geometry without human demonstrations", "year": 2024, "doi": "10.1038/s41586-023-06747-5", "url": "https://doi.org/10.1038/s41586-023-06747-5"}
+      ],
+      "tribes": ["Symbolists", "Connectionists"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "SOTA hybrid product (LM + symbolic engine), not one Master training algorithm."
+    },
+    {
+      "rank": 7,
+      "name": "Bayesian deep learning / VI + nets",
+      "key_papers": [
+        {"title": "A Survey on Bayesian Deep Learning", "year": 2016, "arxiv": "1604.01662", "url": "https://arxiv.org/abs/1604.01662", "doi": "10.1145/3409383"},
+        {"title": "Bayesian Computation in Deep Learning", "year": 2025, "arxiv": "2502.18300", "url": "https://arxiv.org/abs/2502.18300"}
+      ],
+      "tribes": ["Bayesians", "Connectionists"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "Mature 2-tribe substrate; not a five-tribe Master Algorithm."
+    },
+    {
+      "rank": 8,
+      "name": "Evolutionary-gradient QD hybrids / Evolution through Large Models",
+      "key_papers": [
+        {"title": "Scaling MAP-Elites to Deep Neuroevolution", "year": 2020, "arxiv": "2003.01825", "url": "https://arxiv.org/abs/2003.01825"},
+        {"title": "Policy Gradient Assisted MAP-Elites", "year": 2021, "doi": "10.1145/3449639.3459304", "url": "https://doi.org/10.1145/3449639.3459304"},
+        {"title": "Diversity Policy Gradient for Sample Efficient Quality-Diversity Optimization", "year": 2020, "arxiv": "2006.08505", "url": "https://arxiv.org/abs/2006.08505"},
+        {"title": "Evolution through Large Models", "year": 2022, "arxiv": "2206.08896", "url": "https://arxiv.org/abs/2206.08896"}
+      ],
+      "tribes": ["Evolutionaries", "Connectionists"],
+      "verdict": "strong_hybrid",
+      "verdict_line": "Strong Evo+Conn hybrids (ELM relevant to code LMs); not five-tribe."
+    }
+  ],
+  "notable_narrow_unifiers": [
+    {
+      "name": "Flow Matching",
+      "arxiv": "2210.02747",
+      "url": "https://arxiv.org/abs/2210.02747",
+      "note": "Unifies deep generative paths (CNF/diffusion); not Domingos five-tribe unification."
+    }
+  ],
+  "critiques": [
+    {"name": "Davis review of Domingos", "url": "https://cs.nyu.edu/~davise/papers/OldReviews/MasterAlgorithm.pdf"},
+    {"name": "The Bitter Lesson (Sutton 2019)", "url": "http://www.incompleteideas.net/IncIdeas/BitterLesson.html"},
+    {"name": "No Free Lunch Theorems (Wolpert & Macready 1997)", "doi": "10.1109/4235.585893", "url": "https://doi.org/10.1109/4235.585893"}
+  ],
+  "falsifiable_hypotheses": [
+    "H1: Tiny GFlowNet (TB loss, ≤5M) matches/exceeds MH unique high-reward modes at fixed sample budget on multimodal discrete task.",
+    "H2: ≤50M causal transformer distilled on RL learning histories shows in-context return rise on held-out tasks without weight updates.",
+    "H3: Grammar/logic-constrained decoding on TinyLlama-1B improves exact arithmetic/rule tasks by ≥10 absolute points vs unconstrained.",
+    "H4: Mini DreamCoder on list DSL rediscovers map/fold-like abstraction within fixed wake-sleep budget on one GPU.",
+    "H5: JEPA-style latent prediction beats pixel reconstruction on MiniGrid/video toy for horizon≥8 latent rollout error under matched compute."
+  ],
+  "tinyllama_priority_hooks": [
+    "Algorithm Distillation / ICL meta-learning into 1B context",
+    "Neuro-symbolic / constrained decoding for exact reasoning",
+    "GFlowNet fine-tuning for diverse synthetic chains",
+    "Bayesian/ensemble PEFT for uncertainty",
+    "ELM-style evolution of prompts or LoRA adapters"
+  ]
+}

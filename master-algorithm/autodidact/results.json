@@ -1,0 +1,1271 @@
+{
+  "question": "c\u00f3mo hacer un sistema que aprenda por s\u00ed solo",
+  "claim_under_test": "scheduler + critic + growing language > more data (fixed language)",
+  "seed": 42,
+  "autodidact": {
+    "N": 30,
+    "K": 12,
+    "curiosity_rule": "UCB1 over unlocked AND non-saturated families: UCB_i = avg_reward_i + 1.4*sqrt(ln(T+1)/n_i); never-tried get +\u221e; saturated excluded from the pool. Reward = novelty(# new true + 0.5*new_types + 0.25*dead-end correct rejects) - cost. After a visit: expand param (order / Catalan r / max m) on success or failure if room remains; else mark saturated. When ALL unlocked families are saturated, unlock next from locked human catalog.",
+    "honesty": "The locked-family catalog is human-designed; unlocking is still choosing from a pre-authored menu, not inventing new mathematics. Curiosity (UCB) is a simple bandit rule and can waste steps on dead-end families \u2014 that is intentional.",
+    "step_log": [
+      {
+        "step": 1,
+        "family_chosen": "linear_recurrences",
+        "why": "UCB1 among 3 active (unlocked\u2227\u00acsaturated) families; picked 'linear_recurrences' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 2,
+        "dead_end": false,
+        "reward": -0.07,
+        "reward_detail": {
+          "new_true": 0,
+          "new_reject": 1,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 0,
+          "cost": 0.07,
+          "novelty": 0.0,
+          "score": -0.07
+        },
+        "new_truths": 0,
+        "growth_action": "no new truths \u2192 expand param 1\u21922",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "linear_recurrence_order_1",
+            "true": false,
+            "outcome": "new_reject",
+            "relation_type": "linear_recurrence",
+            "formula": "no exact small-int recurrence order 1 in [-5,5]",
+            "counterexample": "no fit"
+          }
+        ],
+        "archive_n_confirmed": 0,
+        "archive_confirmed_types": []
+      },
+      {
+        "step": 2,
+        "family_chosen": "ratio_limits",
+        "why": "UCB1 among 3 active (unlocked\u2227\u00acsaturated) families; picked 'ratio_limits' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 0,
+        "dead_end": false,
+        "reward": 2.05,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 3,
+          "dead_end_correct": 3,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.2,
+          "novelty": 2.25,
+          "score": 2.05
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths but param at max \u2192 mark saturated",
+        "family_saturated_after": true,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "ratio_limit_phi",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "ratio_limit",
+            "formula": "F(n+1)/F(n) \u2192 \u03c6=(1+\u221a5)/2",
+            "counterexample": null
+          },
+          {
+            "name": "NEG_ratios_to_e",
+            "true": false,
+            "outcome": "new_reject",
+            "relation_type": "ratio_limit_neg",
+            "formula": "F(n+1)/F(n) \u2192 e",
+            "counterexample": "|ratio-e|=1.100e+00 (e=2.718282, \u03c6=1.618034)"
+          },
+          {
+            "name": "NEG_ratios_to_pi",
+            "true": false,
+            "outcome": "new_reject",
+            "relation_type": "ratio_limit_neg",
+            "formula": "F(n+1)/F(n) \u2192 \u03c0",
+            "counterexample": "|ratio-\u03c0|=1.524e+00"
+          },
+          {
+            "name": "NEG_ratios_to_2",
+            "true": false,
+            "outcome": "new_reject",
+            "relation_type": "ratio_limit_neg",
+            "formula": "F(n+1)/F(n) \u2192 2",
+            "counterexample": "|ratio-2|=3.820e-01"
+          }
+        ],
+        "archive_n_confirmed": 1,
+        "archive_confirmed_types": [
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 3,
+        "family_chosen": "dead_end_always_prime",
+        "why": "UCB1 among 2 active (unlocked\u2227\u00acsaturated) families; picked 'dead_end_always_prime' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 0,
+        "dead_end": true,
+        "reward": 0.2,
+        "reward_detail": {
+          "new_true": 0,
+          "new_reject": 1,
+          "dead_end_correct": 1,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 0,
+          "cost": 0.05,
+          "novelty": 0.25,
+          "score": 0.2
+        },
+        "new_truths": 0,
+        "growth_action": "dead-end family \u2192 mark saturated (curiosity wasted a step; recover next)",
+        "family_saturated_after": true,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "NEG_F_n_always_prime",
+            "true": false,
+            "outcome": "new_reject",
+            "relation_type": "dead_end:dead_end_always_prime",
+            "formula": "F(n) is prime for all n",
+            "counterexample": "F(0)=0 not prime"
+          }
+        ],
+        "archive_n_confirmed": 1,
+        "archive_confirmed_types": [
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 4,
+        "family_chosen": "linear_recurrences",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'linear_recurrences' because avg=-0.070+1.4*sqrt(ln(3+1)/1)=1.648 \u2192 UCB=1.578; sat=False; param=2. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 3,
+        "dead_end": false,
+        "reward": 2.31,
+        "reward_detail": {
+          "new_true": 2,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.19,
+          "novelty": 2.5,
+          "score": 2.31
+        },
+        "new_truths": 2,
+        "growth_action": "found new truths \u2192 expand param 2\u21923 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "classic_fibonacci_recurrence",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n)=F(n-1)+F(n-2)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_1",
+            "true": false,
+            "outcome": "duplicate_reject",
+            "relation_type": "linear_recurrence",
+            "formula": "no exact small-int recurrence order 1 in [-5,5]",
+            "counterexample": "no fit"
+          },
+          {
+            "name": "linear_recurrence_order_2",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2)",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 3,
+        "archive_confirmed_types": [
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 5,
+        "family_chosen": "linear_recurrences",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'linear_recurrences' because avg=1.120+1.4*sqrt(ln(4+1)/2)=1.256 \u2192 UCB=2.376; sat=False; param=3. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 4,
+        "dead_end": false,
+        "reward": 1.24,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.26,
+          "novelty": 1.5,
+          "score": 1.24
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths \u2192 expand param 3\u21924 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "classic_fibonacci_recurrence",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n)=F(n-1)+F(n-2)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_1",
+            "true": false,
+            "outcome": "duplicate_reject",
+            "relation_type": "linear_recurrence",
+            "formula": "no exact small-int recurrence order 1 in [-5,5]",
+            "counterexample": "no fit"
+          },
+          {
+            "name": "linear_recurrence_order_2",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_3",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2) + (0)*F(n-3)",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 4,
+        "archive_confirmed_types": [
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 6,
+        "family_chosen": "linear_recurrences",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'linear_recurrences' because avg=1.160+1.4*sqrt(ln(5+1)/3)=1.082 \u2192 UCB=2.242; sat=False; param=4. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 4,
+        "dead_end": false,
+        "reward": 1.17,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.33,
+          "novelty": 1.5,
+          "score": 1.17
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths but param at max \u2192 mark saturated",
+        "family_saturated_after": true,
+        "unlocked_families": [
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "classic_fibonacci_recurrence",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n)=F(n-1)+F(n-2)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_1",
+            "true": false,
+            "outcome": "duplicate_reject",
+            "relation_type": "linear_recurrence",
+            "formula": "no exact small-int recurrence order 1 in [-5,5]",
+            "counterexample": "no fit"
+          },
+          {
+            "name": "linear_recurrence_order_2",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_3",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2) + (0)*F(n-3)",
+            "counterexample": null
+          },
+          {
+            "name": "linear_recurrence_order_4",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "linear_recurrence",
+            "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2) + (0)*F(n-3) + (0)*F(n-4)",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 5,
+        "archive_confirmed_types": [
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 7,
+        "family_chosen": "bilinear_identities",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'bilinear_identities' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 2,
+        "dead_end": false,
+        "reward": 2.88,
+        "reward_detail": {
+          "new_true": 2,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 2,
+          "cost": 0.12,
+          "novelty": 3.0,
+          "score": 2.88
+        },
+        "new_truths": 2,
+        "growth_action": "found new truths \u2192 expand param 1\u21922 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "cassini_identity",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "cassini_identity",
+            "formula": "F(n+1)F(n-1)-F(n)^2 = (-1)^n",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r1",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+1)F(n-1) = (-1)^{n-1} F(1)^2",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 7,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 8,
+        "family_chosen": "bilinear_identities",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'bilinear_identities' because avg=2.880+1.4*sqrt(ln(7+1)/1)=2.019 \u2192 UCB=4.899; sat=False; param=2. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 3,
+        "dead_end": false,
+        "reward": 1.31,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.19,
+          "novelty": 1.5,
+          "score": 1.31
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths \u2192 expand param 2\u21923 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "cassini_identity",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "cassini_identity",
+            "formula": "F(n+1)F(n-1)-F(n)^2 = (-1)^n",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r1",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+1)F(n-1) = (-1)^{n-1} F(1)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r2",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+2)F(n-2) = (-1)^{n-2} F(2)^2",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 8,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 9,
+        "family_chosen": "bilinear_identities",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'bilinear_identities' because avg=2.095+1.4*sqrt(ln(8+1)/2)=1.467 \u2192 UCB=3.562; sat=False; param=3. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 4,
+        "dead_end": false,
+        "reward": 1.24,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.26,
+          "novelty": 1.5,
+          "score": 1.24
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths \u2192 expand param 3\u21924 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "cassini_identity",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "cassini_identity",
+            "formula": "F(n+1)F(n-1)-F(n)^2 = (-1)^n",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r1",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+1)F(n-1) = (-1)^{n-1} F(1)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r2",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+2)F(n-2) = (-1)^{n-2} F(2)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r3",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+3)F(n-3) = (-1)^{n-3} F(3)^2",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 9,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 10,
+        "family_chosen": "bilinear_identities",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'bilinear_identities' because avg=1.810+1.4*sqrt(ln(9+1)/3)=1.227 \u2192 UCB=3.037; sat=False; param=4. Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 4,
+        "dead_end": false,
+        "reward": 1.17,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.33,
+          "novelty": 1.5,
+          "score": 1.17
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths but param at max \u2192 mark saturated",
+        "family_saturated_after": true,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "cassini_identity",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "cassini_identity",
+            "formula": "F(n+1)F(n-1)-F(n)^2 = (-1)^n",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r1",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+1)F(n-1) = (-1)^{n-1} F(1)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r2",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+2)F(n-2) = (-1)^{n-2} F(2)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r3",
+            "true": true,
+            "outcome": "duplicate_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+3)F(n-3) = (-1)^{n-3} F(3)^2",
+            "counterexample": null
+          },
+          {
+            "name": "catalan_identity_r4",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "catalan_identity",
+            "formula": "F(n)^2 - F(n+4)F(n-4) = (-1)^{n-4} F(4)^2",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 10,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 11,
+        "family_chosen": "gcd_identities",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'gcd_identities' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 0,
+        "dead_end": false,
+        "reward": 1.45,
+        "reward_detail": {
+          "new_true": 1,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.05,
+          "novelty": 1.5,
+          "score": 1.45
+        },
+        "new_truths": 1,
+        "growth_action": "found new truths but param at max \u2192 mark saturated",
+        "family_saturated_after": true,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "gcd_identities",
+          "linear_recurrences",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "gcd_identity",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "gcd_identity",
+            "formula": "gcd(F(a),F(b))=F(gcd(a,b))",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 11,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "ratio_limit"
+        ]
+      },
+      {
+        "step": 12,
+        "family_chosen": "modular_periods",
+        "why": "UCB1 among 1 active (unlocked\u2227\u00acsaturated) families; picked 'modular_periods' because never-tried \u2192 UCB=+\u221e (forced explore). Rule: argmax_i [avg_reward_i + 1.4*sqrt(ln(T+1)/n_i)]; never-tried=+\u221e; saturated excluded.",
+        "family_param": 10,
+        "dead_end": false,
+        "reward": 5.15,
+        "reward_detail": {
+          "new_true": 5,
+          "new_reject": 0,
+          "dead_end_correct": 0,
+          "dead_end_wrong": 0,
+          "new_types_in_visit": 1,
+          "cost": 0.35,
+          "novelty": 5.5,
+          "score": 5.15
+        },
+        "new_truths": 5,
+        "growth_action": "found new truths \u2192 expand param 5\u219210 (grow language inside family)",
+        "family_saturated_after": false,
+        "unlocked_families": [
+          "bilinear_identities",
+          "dead_end_always_prime",
+          "gcd_identities",
+          "linear_recurrences",
+          "modular_periods",
+          "ratio_limits"
+        ],
+        "accept_reject": [
+          {
+            "name": "pisano_period_m2",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "pisano_period",
+            "formula": "\u03c0(2)=3",
+            "counterexample": null
+          },
+          {
+            "name": "pisano_period_m3",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "pisano_period",
+            "formula": "\u03c0(3)=8",
+            "counterexample": null
+          },
+          {
+            "name": "pisano_period_m4",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "pisano_period",
+            "formula": "\u03c0(4)=6",
+            "counterexample": null
+          },
+          {
+            "name": "pisano_period_m5",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "pisano_period",
+            "formula": "\u03c0(5)=20",
+            "counterexample": null
+          },
+          {
+            "name": "pisano_periods_summary",
+            "true": true,
+            "outcome": "new_true",
+            "relation_type": "pisano_period",
+            "formula": "found 4/4 moduli m=2..5; map={2: 3, 3: 8, 4: 6, 5: 20}",
+            "counterexample": null
+          }
+        ],
+        "archive_n_confirmed": 16,
+        "archive_confirmed_types": [
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit"
+        ]
+      }
+    ],
+    "unlock_events": [
+      {
+        "step": 6,
+        "unlocked": "bilinear_identities",
+        "reason": "post-step: all unlocked families saturated \u2192 unlock next"
+      },
+      {
+        "step": 10,
+        "unlocked": "gcd_identities",
+        "reason": "post-step: all unlocked families saturated \u2192 unlock next"
+      },
+      {
+        "step": 11,
+        "unlocked": "modular_periods",
+        "reason": "post-step: all unlocked families saturated \u2192 unlock next"
+      }
+    ],
+    "archive": {
+      "confirmed": {
+        "ratio_limit_phi": {
+          "name": "ratio_limit_phi",
+          "family": "ratio_limits",
+          "formula": "F(n+1)/F(n) \u2192 \u03c6=(1+\u221a5)/2",
+          "true": true,
+          "support": "last ratio=1.618033988748204, |err|=1.691e-12, n_ratios=28",
+          "counterexample": null,
+          "step": 2,
+          "relation_type": "ratio_limit"
+        },
+        "classic_fibonacci_recurrence": {
+          "name": "classic_fibonacci_recurrence",
+          "family": "linear_recurrences",
+          "formula": "F(n)=F(n-1)+F(n-2)",
+          "true": true,
+          "support": "exact for n=2..30 (29 checks)",
+          "counterexample": null,
+          "step": 4,
+          "relation_type": "linear_recurrence"
+        },
+        "linear_recurrence_order_2": {
+          "name": "linear_recurrence_order_2",
+          "family": "linear_recurrences",
+          "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2)",
+          "true": true,
+          "support": "holds for all n=2..30 (29 checks); 1 fits in [-5,5], chose min L1",
+          "counterexample": null,
+          "step": 4,
+          "relation_type": "linear_recurrence"
+        },
+        "linear_recurrence_order_3": {
+          "name": "linear_recurrence_order_3",
+          "family": "linear_recurrences",
+          "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2) + (0)*F(n-3)",
+          "true": true,
+          "support": "holds for all n=3..30 (28 checks); 9 fits in [-5,5], chose min L1",
+          "counterexample": null,
+          "step": 5,
+          "relation_type": "linear_recurrence"
+        },
+        "linear_recurrence_order_4": {
+          "name": "linear_recurrence_order_4",
+          "family": "linear_recurrences",
+          "formula": "F(n) = (1)*F(n-1) + (1)*F(n-2) + (0)*F(n-3) + (0)*F(n-4)",
+          "true": true,
+          "support": "holds for all n=4..30 (27 checks); min L1 among fits",
+          "counterexample": null,
+          "step": 6,
+          "relation_type": "linear_recurrence"
+        },
+        "cassini_identity": {
+          "name": "cassini_identity",
+          "family": "bilinear_identities",
+          "formula": "F(n+1)F(n-1)-F(n)^2 = (-1)^n",
+          "true": true,
+          "support": "holds for n=1..29 checked (29 eqs)",
+          "counterexample": null,
+          "step": 7,
+          "relation_type": "cassini_identity"
+        },
+        "catalan_identity_r1": {
+          "name": "catalan_identity_r1",
+          "family": "bilinear_identities",
+          "formula": "F(n)^2 - F(n+1)F(n-1) = (-1)^{n-1} F(1)^2",
+          "true": true,
+          "support": "29 checks for n=1..29",
+          "counterexample": null,
+          "step": 7,
+          "relation_type": "catalan_identity"
+        },
+        "catalan_identity_r2": {
+          "name": "catalan_identity_r2",
+          "family": "bilinear_identities",
+          "formula": "F(n)^2 - F(n+2)F(n-2) = (-1)^{n-2} F(2)^2",
+          "true": true,
+          "support": "27 checks for n=2..28",
+          "counterexample": null,
+          "step": 8,
+          "relation_type": "catalan_identity"
+        },
+        "catalan_identity_r3": {
+          "name": "catalan_identity_r3",
+          "family": "bilinear_identities",
+          "formula": "F(n)^2 - F(n+3)F(n-3) = (-1)^{n-3} F(3)^2",
+          "true": true,
+          "support": "25 checks for n=3..27",
+          "counterexample": null,
+          "step": 9,
+          "relation_type": "catalan_identity"
+        },
+        "catalan_identity_r4": {
+          "name": "catalan_identity_r4",
+          "family": "bilinear_identities",
+          "formula": "F(n)^2 - F(n+4)F(n-4) = (-1)^{n-4} F(4)^2",
+          "true": true,
+          "support": "23 checks for n=4..26",
+          "counterexample": null,
+          "step": 10,
+          "relation_type": "catalan_identity"
+        },
+        "gcd_identity": {
+          "name": "gcd_identity",
+          "family": "gcd_identities",
+          "formula": "gcd(F(a),F(b))=F(gcd(a,b))",
+          "true": true,
+          "support": "496 pairs verified (a,b<=N)",
+          "counterexample": null,
+          "step": 11,
+          "relation_type": "gcd_identity"
+        },
+        "pisano_period_m2": {
+          "name": "pisano_period_m2",
+          "family": "modular_periods",
+          "formula": "\u03c0(2)=3",
+          "true": true,
+          "support": "verified on prefix N=30",
+          "counterexample": null,
+          "step": 12,
+          "relation_type": "pisano_period"
+        },
+        "pisano_period_m3": {
+          "name": "pisano_period_m3",
+          "family": "modular_periods",
+          "formula": "\u03c0(3)=8",
+          "true": true,
+          "support": "verified on prefix N=30",
+          "counterexample": null,
+          "step": 12,
+          "relation_type": "pisano_period"
+        },
+        "pisano_period_m4": {
+          "name": "pisano_period_m4",
+          "family": "modular_periods",
+          "formula": "\u03c0(4)=6",
+          "true": true,
+          "support": "verified on prefix N=30",
+          "counterexample": null,
+          "step": 12,
+          "relation_type": "pisano_period"
+        },
+        "pisano_period_m5": {
+          "name": "pisano_period_m5",
+          "family": "modular_periods",
+          "formula": "\u03c0(5)=20",
+          "true": true,
+          "support": "verified on prefix N=30",
+          "counterexample": null,
+          "step": 12,
+          "relation_type": "pisano_period"
+        },
+        "pisano_periods_summary": {
+          "name": "pisano_periods_summary",
+          "family": "modular_periods",
+          "formula": "found 4/4 moduli m=2..5; map={2: 3, 3: 8, 4: 6, 5: 20}",
+          "true": true,
+          "support": "N=30",
+          "counterexample": null,
+          "step": 12,
+          "relation_type": "pisano_period"
+        }
+      },
+      "rejected": {
+        "linear_recurrence_order_1": {
+          "name": "linear_recurrence_order_1",
+          "family": "linear_recurrences",
+          "formula": "no exact small-int recurrence order 1 in [-5,5]",
+          "true": false,
+          "support": "searched at N=30",
+          "counterexample": "no fit",
+          "step": 1,
+          "relation_type": "linear_recurrence"
+        },
+        "NEG_ratios_to_e": {
+          "name": "NEG_ratios_to_e",
+          "family": "ratio_limits",
+          "formula": "F(n+1)/F(n) \u2192 e",
+          "true": false,
+          "support": "last ratio=1.6180339887482036, |err vs e|=1.100e+00",
+          "counterexample": "|ratio-e|=1.100e+00 (e=2.718282, \u03c6=1.618034)",
+          "step": 2,
+          "relation_type": "ratio_limit_neg"
+        },
+        "NEG_ratios_to_pi": {
+          "name": "NEG_ratios_to_pi",
+          "family": "ratio_limits",
+          "formula": "F(n+1)/F(n) \u2192 \u03c0",
+          "true": false,
+          "support": "last ratio=1.6180339887482036, |err vs \u03c0|=1.524e+00",
+          "counterexample": "|ratio-\u03c0|=1.524e+00",
+          "step": 2,
+          "relation_type": "ratio_limit_neg"
+        },
+        "NEG_ratios_to_2": {
+          "name": "NEG_ratios_to_2",
+          "family": "ratio_limits",
+          "formula": "F(n+1)/F(n) \u2192 2",
+          "true": false,
+          "support": "last ratio=1.6180339887482036, |err vs 2|=3.820e-01",
+          "counterexample": "|ratio-2|=3.820e-01",
+          "step": 2,
+          "relation_type": "ratio_limit_neg"
+        },
+        "NEG_F_n_always_prime": {
+          "name": "NEG_F_n_always_prime",
+          "family": "dead_end_always_prime",
+          "formula": "F(n) is prime for all n",
+          "true": false,
+          "support": "checked n=0..30",
+          "counterexample": "F(0)=0 not prime",
+          "step": 3,
+          "relation_type": "dead_end:dead_end_always_prime"
+        }
+      },
+      "n_confirmed": 16,
+      "n_rejected": 5,
+      "confirmed_relation_types": [
+        "cassini_identity",
+        "catalan_identity",
+        "gcd_identity",
+        "linear_recurrence",
+        "pisano_period",
+        "ratio_limit"
+      ]
+    },
+    "final_family_stats": {
+      "linear_recurrences": {
+        "unlocked": true,
+        "saturated": true,
+        "n_visits": 4,
+        "avg_reward": 1.1625,
+        "param": 4,
+        "dead_end": false
+      },
+      "ratio_limits": {
+        "unlocked": true,
+        "saturated": true,
+        "n_visits": 1,
+        "avg_reward": 2.05,
+        "param": 0,
+        "dead_end": false
+      },
+      "dead_end_always_prime": {
+        "unlocked": true,
+        "saturated": true,
+        "n_visits": 1,
+        "avg_reward": 0.2,
+        "param": 0,
+        "dead_end": true
+      },
+      "bilinear_identities": {
+        "unlocked": true,
+        "saturated": true,
+        "n_visits": 4,
+        "avg_reward": 1.65,
+        "param": 4,
+        "dead_end": false
+      },
+      "gcd_identities": {
+        "unlocked": true,
+        "saturated": true,
+        "n_visits": 1,
+        "avg_reward": 1.45,
+        "param": 0,
+        "dead_end": false
+      },
+      "modular_periods": {
+        "unlocked": true,
+        "saturated": false,
+        "n_visits": 1,
+        "avg_reward": 5.15,
+        "param": 10,
+        "dead_end": false
+      },
+      "zeckendorf": {
+        "unlocked": false,
+        "saturated": false,
+        "n_visits": 0,
+        "avg_reward": 0.0,
+        "param": 0,
+        "dead_end": false
+      },
+      "closed_forms": {
+        "unlocked": false,
+        "saturated": false,
+        "n_visits": 0,
+        "avg_reward": 0.0,
+        "param": 0,
+        "dead_end": false
+      },
+      "dead_end_geometric_2": {
+        "unlocked": false,
+        "saturated": false,
+        "n_visits": 0,
+        "avg_reward": 0.0,
+        "param": 0,
+        "dead_end": true
+      }
+    },
+    "relation_types_found": [
+      "cassini_identity",
+      "catalan_identity",
+      "gcd_identity",
+      "linear_recurrence",
+      "pisano_period",
+      "ratio_limit"
+    ],
+    "n_relation_types": 6
+  },
+  "baseline": {
+    "description": "Baseline: fixed hypothesis language (full miner H1\u2013H8), only increase N from 20\u219240\u219280. No family scheduler, no unlock.",
+    "rows": [
+      {
+        "N": 20,
+        "n_internal_true_core": 10,
+        "internal_true_names": [
+          "classic_fibonacci_recurrence",
+          "linear_recurrence_order_2",
+          "linear_recurrence_order_3",
+          "ratio_limit_phi",
+          "cassini_identity",
+          "catalan_identity_r2",
+          "gcd_identity",
+          "pisano_periods_m2_to_20",
+          "zeckendorf",
+          "binet_formula"
+        ],
+        "pisano_moduli_found": 7,
+        "relation_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_relation_types": 8,
+        "new_types_vs_previous": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "cumulative_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_cumulative_types": 8
+      },
+      {
+        "N": 40,
+        "n_internal_true_core": 10,
+        "internal_true_names": [
+          "classic_fibonacci_recurrence",
+          "linear_recurrence_order_2",
+          "linear_recurrence_order_3",
+          "ratio_limit_phi",
+          "cassini_identity",
+          "catalan_identity_r2",
+          "gcd_identity",
+          "pisano_periods_m2_to_20",
+          "zeckendorf",
+          "binet_formula"
+        ],
+        "pisano_moduli_found": 15,
+        "relation_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_relation_types": 8,
+        "new_types_vs_previous": [],
+        "cumulative_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_cumulative_types": 8
+      },
+      {
+        "N": 80,
+        "n_internal_true_core": 10,
+        "internal_true_names": [
+          "classic_fibonacci_recurrence",
+          "linear_recurrence_order_2",
+          "linear_recurrence_order_3",
+          "ratio_limit_phi",
+          "cassini_identity",
+          "catalan_identity_r2",
+          "gcd_identity",
+          "pisano_periods_m2_to_20",
+          "zeckendorf",
+          "binet_formula"
+        ],
+        "pisano_moduli_found": 19,
+        "relation_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_relation_types": 8,
+        "new_types_vs_previous": [],
+        "cumulative_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_cumulative_types": 8
+      }
+    ],
+    "type_growth": [
+      {
+        "N": 20,
+        "new_types": [
+          "binet_formula",
+          "cassini_identity",
+          "catalan_identity",
+          "gcd_identity",
+          "linear_recurrence",
+          "pisano_period",
+          "ratio_limit",
+          "zeckendorf"
+        ],
+        "n_cumulative_types": 8,
+        "core_true_plateau": 10,
+        "pisano_moduli": 7
+      },
+      {
+        "N": 40,
+        "new_types": [],
+        "n_cumulative_types": 8,
+        "core_true_plateau": 10,
+        "pisano_moduli": 15
+      },
+      {
+        "N": 80,
+        "new_types": [],
+        "n_cumulative_types": 8,
+        "core_true_plateau": 10,
+        "pisano_moduli": 19
+      }
+    ],
+    "final_relation_types": [
+      "binet_formula",
+      "cassini_identity",
+      "catalan_identity",
+      "gcd_identity",
+      "linear_recurrence",
+      "pisano_period",
+      "ratio_limit",
+      "zeckendorf"
+    ],
+    "n_relation_types_final": 8,
+    "new_types_after_N20": []
+  },
+  "comparison": {
+    "autodidact_N": 30,
+    "autodidact_K": 12,
+    "autodidact_relation_types": [
+      "cassini_identity",
+      "catalan_identity",
+      "gcd_identity",
+      "linear_recurrence",
+      "pisano_period",
+      "ratio_limit"
+    ],
+    "autodidact_n_types": 6,
+    "autodidact_types_from_language_growth": [
+      "cassini_identity",
+      "catalan_identity",
+      "gcd_identity",
+      "pisano_period"
+    ],
+    "baseline_types_at_N20": [
+      "binet_formula",
+      "cassini_identity",
+      "catalan_identity",
+      "gcd_identity",
+      "linear_recurrence",
+      "pisano_period",
+      "ratio_limit",
+      "zeckendorf"
+    ],
+    "baseline_n_types_at_N20": 8,
+    "baseline_new_types_from_more_N": [],
+    "baseline_final_n_types": 8,
+    "chose_next_question_beat_more_N": true,
+    "summary": "Autodidact at fixed N=30 over K=12 steps found 6 productive relation types (4 via unlocking/expanding language beyond the initial set). Baseline with more N (20\u219240\u219280) added 0 new relation types after N=20 (core plateau; only Pisano coverage grows). Verdict: choosing the next question BEAT reading more terms."
+  },
+  "total_runtime_sec": 0.1335
+}

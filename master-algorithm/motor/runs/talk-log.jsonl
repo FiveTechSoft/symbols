@@ -1,0 +1,18 @@
+{"q": "quién eres", "a": "Soy el motor Master Algorithm. Hablo solo de lo que demostré. Ahora mismo: 41 cláusulas verified/1 en theory.pl. Si no está ahí, no lo sé.", "tag": "identity"}
+{"q": "qué sabes de Fibonacci", "a": "Fibonacci: F(n) = 1·F(n-1) + 1·F(n-2). Cláusula rec(fib,[1, 1]). Hay un rec de orden mayor con ceros de relleno; no es otra ley.", "tag": "rec-fib"}
+{"q": "se transfiere a Lucas?", "a": "Sí. Fibonacci y Lucas comparten la ley [1,1]: F(n) = 1·F(n-1) + 1·F(n-2) y lo mismo para Lucas. Eso está en rec(fib,[1,1]) y rec(lucas,[1,1]). verified transfer_fib_to_lucas_1_1.", "tag": "transfer-lucas"}
+{"q": "y a Pell?", "a": "De Pell demostré pell(n) = 2·pell(n-1) + 1·pell(n-2). Preguntame por transferencia, Cassini o Pisano si querés el resto.", "tag": "rec-pell"}
+{"q": "explicame cassini", "a": "Cassini está verificado: F(n+1)F(n-1)-F(n)^2 = (-1)^n. Cláusula cassini_fib en theory.pl.", "tag": "cassini"}
+{"q": "fibonacci es el doble siempre?", "a": "De Fibonacci demostré F(n) = 1·F(n-1) + 1·F(n-2). Preguntame por transferencia, Cassini o Pisano si querés el resto.", "tag": "rec-fib"}
+{"q": "filotaxis", "a": "UNKNOWN. Eso no está en theory.pl. No lo invento.", "tag": "unknown"}
+{"q": "qué es el alma", "a": "UNKNOWN. Eso no está en theory.pl. No lo invento.", "tag": "unknown"}
+{"q": "creciste", "a": "Llevo 45 ticks. 41 hechos verificados, 15 tipos. Transferencia media 0.5. Reúso de lemas 0.0. El crítico rechazó 32 conjeturas.", "tag": "growth"}
+{"q": "quién eres, de qué tribu", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda se guarda como UNKNOWN, y la curiosidad elige el próximo tick. Memoria viva: 41 verified/1. No improvisé el resto del mundo.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "se transfiere Fibonacci a Lucas?", "a": "Fibonacci: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Si hay un rec más largo, es la misma ley con ceros.\n[símbolo]", "tag": "rec-fib"}
+{"q": "y a Pell?", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "filotaxis", "a": "UNKNOWN. No hay cláusula. Mi tribu no rellena el hueco con una historia.\n[duda · crítico]", "tag": "unknown"}
+{"q": "cassini", "a": "Demostrado: F(n+1)F(n-1)-F(n)^2 = (-1)^n. Eso es símbolo puro, no una red que lo aproximó.\n[símbolo]", "tag": "cassini"}
+{"q": "se transfiere Fibonacci a Lucas?", "a": "Fibonacci: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Si hay un rec más largo, es la misma ley con ceros.\n[símbolo]", "tag": "rec-fib"}
+{"q": "y a Pell?", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "se transfiere Fibonacci a Lucas?", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1,1]) y rec(lucas,[1,1]). verified transfer_fib_to_lucas_1_1.\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "y a Pell?", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}

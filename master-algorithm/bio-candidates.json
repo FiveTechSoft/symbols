@@ -1,0 +1,156 @@
+{
+  "compiled": "2026-09-13",
+  "query": "the engine with biological essence that grows and develops",
+  "ranking_criterion": "biological essence + grows/develops (not mere training) + implementable kernel stealable for Anto motor (hypothesize→verify→archive→next)",
+  "note": "All URLs HTTP-checked 2026-09-13 unless noted. No invented papers. Spanish 'motor biológico' named system: none found.",
+  "top6": [
+    {
+      "rank": 1,
+      "name": "Neural Developmental Programs (NDPs)",
+      "grows": ["topology", "connectivity", "node embeddings"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "high_for_evo_developmental_kernel",
+      "key_papers": [
+        {"title": "Towards Self-Assembling Artificial Neural Networks through Neural Developmental Programs", "year": 2023, "arxiv": "2307.08197", "url": "https://arxiv.org/abs/2307.08197", "doi": "10.1162/isal_a_00697", "http": 200}
+      ],
+      "code": "https://github.com/enajx/NDP",
+      "laptop_experiment": "Run enajx/NDP on XOR/CartPole; measure node/edge count over developmental steps vs fixed MLP baseline."
+    },
+    {
+      "rank": 2,
+      "name": "NEAT + CPPN/HyperNEAT + Novelty Search / MAP-Elites (QD neuroevolution)",
+      "grows": ["topology", "weights", "behavior archive", "species"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "fills_evolutionary_tribe_hole;_archive_matches_Anto_loop",
+      "key_papers": [
+        {"title": "Evolving Neural Networks through Augmenting Topologies", "year": 2002, "doi": "10.1162/106365602320169811", "url": "https://doi.org/10.1162/106365602320169811", "http": 200},
+        {"title": "Compositional Pattern Producing Networks: A Novel Abstraction of Development", "year": 2007, "doi": "10.1007/s10710-007-9028-8", "url": "https://doi.org/10.1007/s10710-007-9028-8", "http": 200},
+        {"title": "A Hypercube-Based Encoding for Evolving Large-Scale Neural Networks", "year": 2009, "doi": "10.1162/artl.2009.15.2.15202", "url": "https://doi.org/10.1162/artl.2009.15.2.15202", "http": 200},
+        {"title": "Abandoning Objectives: Evolution Through the Search for Novelty Alone", "year": 2011, "doi": "10.1162/EVCO_a_00025", "url": "https://doi.org/10.1162/EVCO_a_00025", "http": 200},
+        {"title": "Illuminating search spaces by mapping elites", "year": 2015, "arxiv": "1504.04909", "url": "https://arxiv.org/abs/1504.04909", "http": 200}
+      ],
+      "code": "https://github.com/CodeReclaimers/neat-python",
+      "laptop_experiment": "neat-python XOR: assert complexification (more nodes/edges over gens) and compare novelty-archive diversity vs fitness-only."
+    },
+    {
+      "rank": 3,
+      "name": "Growing Neural Cellular Automata (NCA)",
+      "grows": ["body_pattern", "regeneration_dynamics"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "morphogenetic_substrate_not_full_Master_Algorithm",
+      "key_papers": [
+        {"title": "Growing Neural Cellular Automata", "year": 2020, "url": "https://distill.pub/2020/growing-ca/", "http": 200}
+      ],
+      "code": "https://distill.pub/2020/growing-ca/",
+      "laptop_experiment": "Train grow-from-seed emoji/pattern; damage mid-pattern; measure regeneration MSE without retrain."
+    },
+    {
+      "rank": 4,
+      "name": "DreamCoder / Bayesian Program Learning (Tenenbaum developmental mind)",
+      "grows": ["theory_library", "abstractions", "recognition_model"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "strong_Symb+Bayes+Conn_hybrid;_mirrors_theory.pl_growth",
+      "key_papers": [
+        {"title": "How to Grow a Mind: Statistics, Structure, and Abstraction", "year": 2011, "doi": "10.1126/science.1192788", "url": "https://doi.org/10.1126/science.1192788", "http_note": "DOI resolver 403 from this box; paper widely cited Science 2011"},
+        {"title": "DreamCoder: Growing generalizable, interpretable knowledge with wake-sleep Bayesian program learning", "year": 2020, "arxiv": "2006.08381", "url": "https://arxiv.org/abs/2006.08381", "http": 200}
+      ],
+      "laptop_experiment": "List-function or arithmetic DSL: library size must increase across wake-sleep cycles while compression of solved tasks rises."
+    },
+    {
+      "rank": 5,
+      "name": "Enhanced POET + OMNI (open-ended coevolution)",
+      "grows": ["environments", "policies", "curriculum", "interestingness_filter"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "open_ended_engine_for_next_question;_not_five_tribe_unifier",
+      "key_papers": [
+        {"title": "Paired Open-Ended Trailblazer (POET)", "year": 2019, "arxiv": "1901.01753", "url": "https://arxiv.org/abs/1901.01753", "http": 200},
+        {"title": "Enhanced POET: Open-Ended Reinforcement Learning through Unbounded Invention of Learning Challenges and their Solutions", "year": 2020, "arxiv": "2003.08536", "url": "https://arxiv.org/abs/2003.08536", "http": 200},
+        {"title": "OMNI: Open-endedness via Models of human Notions of Interestingness", "year": 2024, "arxiv": "2306.01711", "url": "https://arxiv.org/abs/2306.01711", "venue": "ICLR 2024", "http": 200}
+      ],
+      "code_omni": "https://github.com/jennyzzt/omni",
+      "laptop_experiment": "Toy POET on 1D obstacle courses or OMNI-style interestingness filter over a finite task pool; measure environment novelty growth and transfer success."
+    },
+    {
+      "rank": 6,
+      "name": "Active Inference structure learning (Free Energy Principle / pymdp)",
+      "grows": ["generative_model_structure", "hidden_states", "policies"],
+      "development_neq_training": true,
+      "master_algorithm_closeness": "Bayes+agency_kernel;_structure_learning_still_nascent",
+      "key_papers": [
+        {"title": "pymdp: A Python library for active inference in discrete state spaces", "year": 2022, "arxiv": "2201.03904", "url": "https://arxiv.org/abs/2201.03904", "doi": "10.21105/joss.04098", "http": 200}
+      ],
+      "code": "https://github.com/infer-actively/pymdp",
+      "laptop_experiment": "Discrete T-maze / slot concept-learning: when novel observation appears, model must expand hidden-state slots (Bayesian model expansion) then optionally reduce."
+    }
+  ],
+  "honorable_mentions": [
+    {
+      "name": "Michael Levin TAME / xenobots / anthrobots",
+      "why_not_top6_kernel": "Experimentally grounded bioelectric collective intelligence; not a laptop-stealable learning kernel.",
+      "papers": [
+        {"title": "Technological Approach to Mind Everywhere (TAME)", "year": 2022, "doi": "10.3389/fnsys.2022.768201", "url": "https://doi.org/10.3389/fnsys.2022.768201", "http": 200},
+        {"title": "A scalable pipeline for designing reconfigurable organisms (xenobots)", "year": 2020, "doi": "10.1073/pnas.1910837117", "url": "https://doi.org/10.1073/pnas.1910837117", "http": 200},
+        {"title": "Motile Living Biobots Self-Construct from Adult Human Somatic Progenitor Seed Cells (anthrobots)", "year": 2023, "doi": "10.1002/advs.202303575", "url": "https://doi.org/10.1002/advs.202303575", "http": 200}
+      ]
+    },
+    {
+      "name": "Avida / Tierra / Flow-Lenia / von Neumann constructors",
+      "why_not_top6_kernel": "True evolving ALife substrates; grow populations/bodies more than a Master Algorithm training procedure.",
+      "papers": [
+        {"title": "Avida: A Software Platform for Research in Computational Evolutionary Biology", "year": 2004, "doi": "10.1162/106454604773563612", "url": "https://doi.org/10.1162/106454604773563612", "http": 200},
+        {"title": "Lenia — Biology of Artificial Life", "year": 2018, "arxiv": "1812.05433", "url": "https://arxiv.org/abs/1812.05433", "http": 200},
+        {"title": "Flow-Lenia: Emergent evolutionary dynamics in mass conservative continuous cellular automata", "year": 2025, "arxiv": "2506.08569", "url": "https://arxiv.org/abs/2506.08569", "http": 200},
+        {"title": "Self-Reproduction and Evolution in Cellular Automata: 25 Years after Evoloops", "year": 2024, "arxiv": "2402.03961", "url": "https://arxiv.org/abs/2402.03961", "http": 200}
+      ]
+    },
+    {
+      "name": "Thousand Brains / Monty (Hawkins)",
+      "why_not_top6_kernel": "Strong cortical algorithm; grows object models via sensorimotor columns; younger stack, less 'embryogenic' than NDP/NEAT/NCA.",
+      "papers": [
+        {"title": "The Thousand Brains Project: A New Paradigm for Sensorimotor Intelligence", "year": 2024, "arxiv": "2412.18354", "url": "https://arxiv.org/abs/2412.18354", "http": 200}
+      ],
+      "code": "https://github.com/thousandbrainsproject/tbp.monty"
+    },
+    {
+      "name": "Liquid Time-Constant Networks (Hasani)",
+      "why_not_top6_kernel": "C. elegans-inspired continuous-time dynamics; adaptive time-constants ≠ developmental growth of topology/body/theory.",
+      "papers": [
+        {"title": "Liquid Time-Constant Networks", "year": 2021, "arxiv": "2006.04439", "url": "https://arxiv.org/abs/2006.04439", "venue": "AAAI", "http": 200}
+      ]
+    },
+    {
+      "name": "Autopoiesis / Kauffman Origins of Order / AIS CLONALG",
+      "why_not_top6_kernel": "Foundational theories or niche optimizers; weak as a single growing Master-Algorithm kernel for Anto."
+    },
+    {
+      "name": "ASAL — Automating the Search for Artificial Life with Foundation Models",
+      "papers": [
+        {"title": "Automating the Search for Artificial Life with Foundation Models", "year": 2024, "arxiv": "2412.17799", "url": "https://arxiv.org/abs/2412.17799", "http": 200}
+      ]
+    }
+  ],
+  "falsifiable_laptop_tests": [
+    {
+      "id": "T1_neat_complexification",
+      "claim": "NEAT develops (topology grows) rather than only trains weights.",
+      "protocol": "neat-python XOR, 50 gens; plot #nodes+#connections vs fitness; novelty archive behavioral entropy vs fitness-only control.",
+      "pass_if": "Mean complexity increases while fitness rises; novelty run retains higher behavioral diversity at equal fitness."
+    },
+    {
+      "id": "T2_nca_regeneration",
+      "claim": "Growing NCA encodes morphogenetic development + repair, not a static trained image.",
+      "protocol": "Distill Growing NCA grow-from-seed; after convergence, zero out a region; continue rollout without weight update.",
+      "pass_if": "Damaged region regenerates toward target below MSE threshold; fixed CNN decode baseline does not."
+    },
+    {
+      "id": "T3_ndp_or_pymdp_structure_growth",
+      "claim": "A developmental/structure-learning kernel grows the learner's form when tasks/observations demand it.",
+      "protocol": "A) enajx/NDP CartPole: count edges after developmental rollout. B) pymdp slot/concept task: count hidden states before/after novel stimulus.",
+      "pass_if": "Structure metric (edges or hidden states) increases only when task complexity/novelty requires it, then performance improves."
+    }
+  ],
+  "spanish_iberoamerican": {
+    "motor_biologico_named_system": null,
+    "note": "Searched 'motor biológico' + aprendizaje/algoritmo maestro/neuroevolución; only Domingos translations and generic neuroevolution/liquid-net coverage. No unique named Iberoamerican biological Master-Algorithm engine found."
+  }
+}

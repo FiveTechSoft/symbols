@@ -1,0 +1,166 @@
+{
+  "seed": 0,
+  "unifier": {
+    "name": "UnifierMLP",
+    "class": "sklearn MLPClassifier/MLPRegressor (32,16)",
+    "rationale": "Connectionist substrate as Domingos-style unification candidate: force one MLP algorithm class onto all five tribe tasks via encodings/surrogates/amortization \u2014 honest about where it loses."
+  },
+  "tasks": {
+    "symbolist": {
+      "description": "Recover XOR(bit0,bit1) among 6 binary features",
+      "specialized": {
+        "learner": "DecisionTree",
+        "holdout_accuracy": 1.0,
+        "rule_recovered": true,
+        "primary": 1.0
+      },
+      "unifier": {
+        "learner": "UnifierMLP",
+        "holdout_accuracy": 1.0,
+        "rule_recovered": true,
+        "primary": 1.0
+      },
+      "winner": "tie",
+      "metric": "holdout_accuracy (+ rule_recovered)"
+    },
+    "connectionist": {
+      "description": "Two moons nonlinear binary classification",
+      "specialized": {
+        "learner": "MLP(16,16)",
+        "holdout_accuracy": 0.97,
+        "linear_baseline_accuracy": 0.82,
+        "primary": 0.97
+      },
+      "unifier": {
+        "learner": "UnifierMLP",
+        "holdout_accuracy": 0.98,
+        "primary": 0.98
+      },
+      "winner": "unifier",
+      "metric": "holdout_accuracy"
+    },
+    "evolutionary": {
+      "description": "Minimize 2D Rastrigin, eval_budget=200",
+      "specialized": {
+        "learner": "(1+lambda)-ES",
+        "best_fitness": 1.390669005387707,
+        "evals": 200,
+        "primary": 1.390669005387707,
+        "primary_sense": "minimize"
+      },
+      "unifier": {
+        "learner": "UnifierMLP",
+        "best_fitness": 1.9949789434735408,
+        "evals": 200,
+        "primary": 1.9949789434735408,
+        "primary_sense": "minimize",
+        "note": "MLPRegressor surrogate + propose-eval loop"
+      },
+      "winner": "specialized",
+      "metric": "best_fitness (rastrigin, lower better)"
+    },
+    "bayesian": {
+      "description": "Infer coin bias theta=0.72 from 12 flips; Beta(1,1) prior",
+      "meta": {
+        "heads": 7,
+        "n_obs": 12,
+        "true_theta": 0.72,
+        "true_posterior_mean": 0.5714285714285714
+      },
+      "specialized": {
+        "learner": "ConjugateBetaBinomial",
+        "posterior_mean": 0.5714285714285714,
+        "ci90": [
+          0.35479928101961294,
+          0.7760446057886807
+        ],
+        "covers_true_theta": true,
+        "kl_to_true_posterior": 0.0,
+        "mae_vs_true_theta": 0.14857142857142858,
+        "primary": 0.0,
+        "primary_sense": "minimize"
+      },
+      "unifier": {
+        "learner": "UnifierMLP",
+        "posterior_mean": 0.5658156692583883,
+        "ci90": [
+          0.4158156692583883,
+          0.7158156692583884
+        ],
+        "covers_true_theta": false,
+        "kl_to_true_posterior": 0.0009696876509517338,
+        "mae_vs_true_theta": 0.15418433074161164,
+        "primary": 0.0009696876509517338,
+        "primary_sense": "minimize",
+        "note": "amortized MLP ensemble; Beta-matched for KL"
+      },
+      "winner": "specialized",
+      "metric": "KL(true_posterior || estimate) lower better; also CI coverage"
+    },
+    "analogizer": {
+      "description": "3-class 2D Gaussians, 5-shot support, 1-NN vs MLP",
+      "specialized": {
+        "learner": "1-NN",
+        "holdout_accuracy": 0.9888888888888889,
+        "n_shots": 5,
+        "primary": 0.9888888888888889
+      },
+      "unifier": {
+        "learner": "UnifierMLP",
+        "holdout_accuracy": 1.0,
+        "n_shots": 5,
+        "primary": 1.0
+      },
+      "winner": "unifier",
+      "metric": "query accuracy"
+    }
+  },
+  "elapsed_seconds": 0.77,
+  "summary_table": [
+    {
+      "tribe": "symbolist",
+      "specialized_learner": "DecisionTree",
+      "specialized_primary": 1.0,
+      "unifier_primary": 1.0,
+      "winner": "tie",
+      "metric": "holdout_accuracy (+ rule_recovered)"
+    },
+    {
+      "tribe": "connectionist",
+      "specialized_learner": "MLP(16,16)",
+      "specialized_primary": 0.97,
+      "unifier_primary": 0.98,
+      "winner": "unifier",
+      "metric": "holdout_accuracy"
+    },
+    {
+      "tribe": "evolutionary",
+      "specialized_learner": "(1+lambda)-ES",
+      "specialized_primary": 1.390669005387707,
+      "unifier_primary": 1.9949789434735408,
+      "winner": "specialized",
+      "metric": "best_fitness (rastrigin, lower better)"
+    },
+    {
+      "tribe": "bayesian",
+      "specialized_learner": "ConjugateBetaBinomial",
+      "specialized_primary": 0.0,
+      "unifier_primary": 0.0009696876509517338,
+      "winner": "specialized",
+      "metric": "KL(true_posterior || estimate) lower better; also CI coverage"
+    },
+    {
+      "tribe": "analogizer",
+      "specialized_learner": "1-NN",
+      "specialized_primary": 0.9888888888888889,
+      "unifier_primary": 1.0,
+      "winner": "unifier",
+      "metric": "query accuracy"
+    }
+  ],
+  "scoreboard": {
+    "specialized_wins": 2,
+    "unifier_wins": 2,
+    "ties": 1
+  }
+}

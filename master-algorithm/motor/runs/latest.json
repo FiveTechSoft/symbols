@@ -1,0 +1,789 @@
+{
+  "ticks_this_run": 5,
+  "total_steps": 55,
+  "backend": "swipl",
+  "swipl": true,
+  "n_verified_facts": 43,
+  "n_rejected": 32,
+  "n_lemmas": 10,
+  "n_distinct_types": 15,
+  "distinct_types": [
+    "bilinear_fib",
+    "bit_fn",
+    "boolean_from_examples",
+    "euclid_conjectures",
+    "lemma:EqAng",
+    "lemma:EqSeg",
+    "lemma:HalfSeg",
+    "lemma:Parallel",
+    "lemma_reuse",
+    "linear_recurrence",
+    "linear_recurrences",
+    "modular_period",
+    "modular_periods",
+    "ratio_limits",
+    "transfer_recurrence"
+  ],
+  "curves": [
+    {
+      "n_verified_facts": 2,
+      "n_distinct_types": 2,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.0,
+      "n_rejected": 0,
+      "n_lemmas": 1,
+      "tick": 1
+    },
+    {
+      "n_verified_facts": 3,
+      "n_distinct_types": 4,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.5714,
+      "n_rejected": 4,
+      "n_lemmas": 1,
+      "tick": 2
+    },
+    {
+      "n_verified_facts": 3,
+      "n_distinct_types": 4,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.7,
+      "n_rejected": 7,
+      "n_lemmas": 1,
+      "tick": 3
+    },
+    {
+      "n_verified_facts": 4,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.6364,
+      "n_rejected": 7,
+      "n_lemmas": 1,
+      "tick": 4
+    },
+    {
+      "n_verified_facts": 4,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.7143,
+      "n_rejected": 10,
+      "n_lemmas": 1,
+      "tick": 5
+    },
+    {
+      "n_verified_facts": 4,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.7143,
+      "n_rejected": 10,
+      "n_lemmas": 1,
+      "tick": 6
+    },
+    {
+      "n_verified_facts": 4,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.7333,
+      "n_rejected": 11,
+      "n_lemmas": 1,
+      "tick": 7
+    },
+    {
+      "n_verified_facts": 5,
+      "n_distinct_types": 6,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.7059,
+      "n_rejected": 12,
+      "n_lemmas": 1,
+      "tick": 8
+    },
+    {
+      "n_verified_facts": 5,
+      "n_distinct_types": 6,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.7222,
+      "n_rejected": 13,
+      "n_lemmas": 1,
+      "tick": 9
+    },
+    {
+      "n_verified_facts": 7,
+      "n_distinct_types": 7,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.65,
+      "n_rejected": 13,
+      "n_lemmas": 2,
+      "tick": 10
+    },
+    {
+      "n_verified_facts": 8,
+      "n_distinct_types": 7,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.619,
+      "n_rejected": 13,
+      "n_lemmas": 2,
+      "tick": 11
+    },
+    {
+      "n_verified_facts": 9,
+      "n_distinct_types": 7,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.6538,
+      "n_rejected": 17,
+      "n_lemmas": 2,
+      "tick": 12
+    },
+    {
+      "n_verified_facts": 11,
+      "n_distinct_types": 8,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.6071,
+      "n_rejected": 17,
+      "n_lemmas": 3,
+      "tick": 13
+    },
+    {
+      "n_verified_facts": 12,
+      "n_distinct_types": 8,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.5862,
+      "n_rejected": 17,
+      "n_lemmas": 3,
+      "tick": 14
+    },
+    {
+      "n_verified_facts": 13,
+      "n_distinct_types": 8,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.6176,
+      "n_rejected": 21,
+      "n_lemmas": 3,
+      "tick": 15
+    },
+    {
+      "n_verified_facts": 15,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.5833,
+      "n_rejected": 21,
+      "n_lemmas": 4,
+      "tick": 16
+    },
+    {
+      "n_verified_facts": 17,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.75,
+      "reject_rate": 0.5526,
+      "n_rejected": 21,
+      "n_lemmas": 5,
+      "tick": 17
+    },
+    {
+      "n_verified_facts": 19,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.75,
+      "reject_rate": 0.525,
+      "n_rejected": 21,
+      "n_lemmas": 6,
+      "tick": 18
+    },
+    {
+      "n_verified_facts": 20,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.8,
+      "reject_rate": 0.5122,
+      "n_rejected": 21,
+      "n_lemmas": 6,
+      "tick": 19
+    },
+    {
+      "n_verified_facts": 22,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.8,
+      "reject_rate": 0.4884,
+      "n_rejected": 21,
+      "n_lemmas": 7,
+      "tick": 20
+    },
+    {
+      "n_verified_facts": 23,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4773,
+      "n_rejected": 21,
+      "n_lemmas": 7,
+      "tick": 21
+    },
+    {
+      "n_verified_facts": 23,
+      "n_distinct_types": 9,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4773,
+      "n_rejected": 21,
+      "n_lemmas": 7,
+      "tick": 22
+    },
+    {
+      "n_verified_facts": 26,
+      "n_distinct_types": 11,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4468,
+      "n_rejected": 21,
+      "n_lemmas": 7,
+      "tick": 23
+    },
+    {
+      "n_verified_facts": 29,
+      "n_distinct_types": 11,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.42,
+      "n_rejected": 21,
+      "n_lemmas": 7,
+      "tick": 24
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 12,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4677,
+      "n_rejected": 29,
+      "n_lemmas": 7,
+      "tick": 25
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 12,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4677,
+      "n_rejected": 29,
+      "n_lemmas": 7,
+      "tick": 26
+    },
+    {
+      "n_verified_facts": 35,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4531,
+      "n_rejected": 29,
+      "n_lemmas": 7,
+      "tick": 27
+    },
+    {
+      "n_verified_facts": 39,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4348,
+      "n_rejected": 30,
+      "n_lemmas": 7,
+      "tick": 28
+    },
+    {
+      "n_verified_facts": 39,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4507,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 29
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 30
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 31
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 32
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 33
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 34
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 35
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 36
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 37
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 38
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 39
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.8333,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 40
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 41
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 42
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 43
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4444,
+      "n_rejected": 32,
+      "n_lemmas": 7,
+      "tick": 44
+    },
+    {
+      "n_verified_facts": 41,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4384,
+      "n_rejected": 32,
+      "n_lemmas": 8,
+      "tick": 45
+    },
+    {
+      "n_verified_facts": 42,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4324,
+      "n_rejected": 32,
+      "n_lemmas": 9,
+      "tick": 46
+    },
+    {
+      "n_verified_facts": 42,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4324,
+      "n_rejected": 32,
+      "n_lemmas": 9,
+      "tick": 47
+    },
+    {
+      "n_verified_facts": 42,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4324,
+      "n_rejected": 32,
+      "n_lemmas": 9,
+      "tick": 48
+    },
+    {
+      "n_verified_facts": 42,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4324,
+      "n_rejected": 32,
+      "n_lemmas": 9,
+      "tick": 49
+    },
+    {
+      "n_verified_facts": 42,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4324,
+      "n_rejected": 32,
+      "n_lemmas": 9,
+      "tick": 50
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4267,
+      "n_rejected": 32,
+      "n_lemmas": 10,
+      "tick": 51
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.4267,
+      "n_rejected": 32,
+      "n_lemmas": 10,
+      "tick": 52
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.4267,
+      "n_rejected": 32,
+      "n_lemmas": 10,
+      "tick": 53
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.4267,
+      "n_rejected": 32,
+      "n_lemmas": 10,
+      "tick": 54
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.4267,
+      "n_rejected": 32,
+      "n_lemmas": 10,
+      "tick": 55
+    }
+  ],
+  "baselines": {
+    "A_more_data_frozen_language": {
+      "points": [
+        {
+          "N": 20,
+          "n_true": 4,
+          "n_types": 4,
+          "types": [
+            "cassini",
+            "catalan",
+            "linear_recurrence",
+            "ratio_limit"
+          ]
+        },
+        {
+          "N": 40,
+          "n_true": 4,
+          "n_types": 4,
+          "types": [
+            "cassini",
+            "catalan",
+            "linear_recurrence",
+            "ratio_limit"
+          ]
+        }
+      ],
+      "type_growth_20_to_40": 0,
+      "verdict": "extra N adds no new relation types in frozen language"
+    },
+    "B_no_archive_no_transfer": {
+      "description": "no archive: frozen wrong prior [2,0] on Lucas",
+      "accuracy": 0.0,
+      "hits": 0,
+      "total": 23
+    }
+  },
+  "transfer_eval": {
+    "lucas": {
+      "transfer_from": "fib",
+      "transfer_coeffs": [
+        1,
+        1,
+        0
+      ],
+      "transfer_accuracy": 1.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        1,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": true,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "pell": {
+      "transfer_from": "fib",
+      "transfer_coeffs": [
+        1,
+        1,
+        0
+      ],
+      "transfer_accuracy": 0.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        2,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": false,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "summary": {
+      "lucas_transfer_beats_baseline": true,
+      "pell_transfer_beats_baseline": false,
+      "absorbed_intelligence": true,
+      "negative_transfer_pell_expected": true
+    }
+  },
+  "step_log_tail": [
+    {
+      "tick": 51,
+      "world": "geometry",
+      "family": "euclid_conjectures",
+      "why": "UCB1 over 11 arms (world,family); picked geometry::euclid_conjectures because avg=1.179+1.4*sqrt(ln(50+1)/7)=1.049\u21922.228. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.15,
+        "score": -0.15
+      },
+      "growth": "param at max \u2192 saturate",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 52,
+      "world": "geometry",
+      "family": "lemma_reuse",
+      "why": "UCB1 over 11 arms (world,family); picked geometry::lemma_reuse because avg=1.179+1.4*sqrt(ln(51+1)/7)=1.052\u21922.230. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.15,
+        "score": -0.15
+      },
+      "growth": "param at max \u2192 saturate",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 53,
+      "world": "logic",
+      "family": "dead_end_const_true",
+      "why": "UCB1 over 11 arms (world,family); picked logic::dead_end_const_true because avg=0.600+1.4*sqrt(ln(52+1)/3)=1.611\u21922.211. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 3,
+        "cost": 0.15,
+        "score": 0.6
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 54,
+      "world": "geometry",
+      "family": "dead_end_false_eq",
+      "why": "UCB1 over 11 arms (world,family); picked geometry::dead_end_false_eq because avg=0.200+1.4*sqrt(ln(53+1)/2)=1.977\u21922.177. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.05,
+        "score": 0.2
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 55,
+      "world": "sequences",
+      "family": "dead_end_always_prime",
+      "why": "UCB1 over 11 arms (world,family); picked sequences::dead_end_always_prime because avg=0.200+1.4*sqrt(ln(54+1)/2)=1.982\u21922.182. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.05,
+        "score": 0.2
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    }
+  ],
+  "elapsed_s": 0.074,
+  "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
+  "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
+  "transfer_accuracy": 0.5,
+  "lemma_reuse_rate": 0.5,
+  "reject_rate": 0.4267
+}
