@@ -1696,3 +1696,18 @@
 {"q": "identidad F(n+1)F(n-1)-F(n)^2", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
 {"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
 {"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fibonacci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "fib(n)=2*fib(n-1)", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "periodo de pisano", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "true_mod fib 5", "a": "Periodos: π_fib(5)=20. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "pell(n) = (2)*pell(n-1) + (1)*pell(n-2)", "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]", "tag": "rec-pell"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "period_fib_m6", "a": "Rechazado. rejected('period_fib_m6'): insufficient prefix.\n[crítico]", "tag": "reject-named"}
+{"q": "fibonacci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}

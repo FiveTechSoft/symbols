@@ -649,12 +649,25 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     if hits:
         strong = [h for h in hits if h["score"] >= 2.0] or hits
         # Predicate-specialized kinds beat bare rec when explicitly bound
+        # Exact clause-name hits (rejected period_fib_m6, verified period_fib_m2, …)
+        # beat a true_mod dump when the question tokenizes that name.
+        q_toks = set(deduce.tokenize(s))
+        named_hit = next(
+            (
+                h for h in hits
+                if h["kind"] in ("rejected", "verified")
+                and h["score"] >= 5
+                and (
+                    h["name"].lower() in q_toks
+                    or any(t == h["name"].lower() for t in q_toks)
+                )
+            ),
+            None,
+        )
+        if named_hit:
+            return _render_hit(named_hit, kb, st, more=more)
         per = [h for h in hits if h["kind"] == "period"]
-        if per and (
-            "true_mod" in bound
-            or any(a.startswith("period") for a in bound)
-            or per[0]["score"] >= 7.5
-        ):
+        if per and ("true_mod" in bound or per[0]["score"] >= 7.5):
             return _render_hit(per[0], kb, st, more=more)
         if any(h["kind"] == "companion" for h in strong) and "companion" in bound:
             return _render_hit(next(h for h in strong if h["kind"] == "companion"), kb, st, more=more)

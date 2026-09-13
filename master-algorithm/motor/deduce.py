@@ -137,23 +137,19 @@ def bind_tokens(tokens: list[str], atoms: set[str], short_roots: set[str] | None
                 if len(atom) >= 4 or atom in short_roots:
                     bound.add(atom)
                     continue
-            # shared prefix ≥4
-            n = 0
-            for x, y in zip(t, atom):
-                if x != y:
-                    break
-                n += 1
-            if n >= 4 and len(t) >= MIN_ATOM and len(atom) >= MIN_ATOM:
-                bound.add(atom)
-                continue
+            # no fuzzy shared-prefix: startswith / one-indel / one-edit only
+            # (transformada must not bind transfer_*)
             # one-indel near-stem (lema↔lemma) — both ≥4
             if len(t) >= 4 and len(atom) >= 4 and one_indel(t, atom):
                 bound.add(atom)
                 continue
+            # one-edit equal-length rec heads (lukas↔lucas); require same first char
+            # so bell↛pell
             if (
                 atom in short_roots
                 and len(t) == len(atom)
                 and len(t) >= 4
+                and t[0] == atom[0]
                 and sum(x != y for x, y in zip(t, atom)) == 1
             ):
                 bound.add(atom)
@@ -346,14 +342,16 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
             "atoms": bound & (set(_parts(name)) | {name.lower()}),
         })
 
-    # true_mod / periods — also if a bound seq + a modulus digit appears
+    # true_mod / periods — only with true_mod atom or seq+modulus digit (not bare "periodo")
     rows = kb.get("periods") or kb.get("pisano") or []
     seqs_p = [s for s in (kb.get("recs") or {}) if s.lower() in bound]
     digits = {tok for tok in tokens if tok.isdigit()}
     mod_hit = bool(rows) and bool(seqs_p) and any(
         str(m) in digits for _a, m, _p in rows if not seqs_p or _a in seqs_p
     )
-    if "true_mod" in bound or any(a.startswith("period") for a in bound) or mod_hit:
+    # explicit predicate / clause crumb true_mod — not every period_* stem flood
+    want_period = ("true_mod" in bound) or mod_hit
+    if want_period and rows:
         picked = [(a, m, p) for a, m, p in rows if not seqs_p or a in seqs_p]
         if mod_hit:
             picked = [(a, m, p) for a, m, p in picked if str(m) in digits] or picked
@@ -362,7 +360,7 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
                 "kind": "period",
                 "name": "true_mod",
                 "formula": picked[:12],
-                "score": 8.0 if mod_hit else (7.0 if seqs_p else 4.0),
+                "score": 8.0 if mod_hit else (7.0 if seqs_p else 5.0),
                 "atoms": ({"true_mod"} | {s.lower() for s in seqs_p}),
             })
 
@@ -395,6 +393,31 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
         if not hits:
             return []
 
+    # period-when-modulus-digit: period_* verified/rejected only if exact name
+    # token or the modulus digit in the question (not bare "periodo"/"period")
+    tokset = {t.lower() for t in tokens}
+    digits = {t for t in tokens if t.isdigit()}
+    pruned: list[dict] = []
+    for h in hits:
+        if h.get("kind") in ("verified", "rejected"):
+            nl = str(h.get("name") or "").lower()
+            if nl.startswith("period_"):
+                if nl in tokset:
+                    pruned.append(h)
+                    continue
+                mm = re.search(r"_m(\d+)$", nl)
+                if mm and mm.group(1) in digits and (
+                    "true_mod" in bound
+                    or any(s.lower() in bound for s in (kb.get("recs") or {}))
+                    or any(a.startswith("period") for a in bound)
+                ):
+                    # digit alone is not enough without a period/seq cue
+                    pruned.append(h)
+                    continue
+                continue  # drop stem-only period_* hits
+        pruned.append(h)
+    hits = pruned
+
     # Deduplicate by (kind, name), keep best score
     best_map: dict[tuple, dict] = {}
     for h in hits:
@@ -421,15 +444,18 @@ def parse_claimed_rec(q: str, rec_heads: set[str]) -> tuple[str | None, list[int
         # only a recurrence claim if LHS is •(n)
         if lhs not in ("•(n)", "•n"):
             return None
-    # collect a•(n-k) terms
+    # collect a•(n-k) terms; allow (2)*•(n-1), 2*•(n-1), 2•(n-1), •(n-1)
     coeffs: dict[int, int] = {}
-    for m in re.finditer(r"([+-]?)(\d*)\*?•\(n-(\d+)\)", rhs):
-        sign, num, k = m.group(1), m.group(2), int(m.group(3))
+    for m in re.finditer(
+        r"([+-]?)(?:\((\d+)\)|(\d+))?\*?•\(n-(\d+)\)",
+        rhs,
+    ):
+        sign, paren_num, bare_num, k = m.group(1), m.group(2), m.group(3), int(m.group(4))
+        num = paren_num or bare_num
         a = int(num) if num else 1
         if sign == "-":
             a = -a
         coeffs[k] = coeffs.get(k, 0) + a
-    # also 2•(n-1) without plus between 2 and •
     if not coeffs:
         return None
     order = max(coeffs)

@@ -1,0 +1,1150 @@
+{
+  "round": "final",
+  "n": 224,
+  "counts": {
+    "ok": 164,
+    "fail": 0,
+    "unknown-ok": 60
+  },
+  "fail_class_counts": {
+    "invention": 0,
+    "demostrado_false_rec": 0,
+    "cassini_known": 0,
+    "bilin_no_cite": 0,
+    "demostra_esto_unknown": 0,
+    "alma_filotaxis_invent": 0,
+    "other": 0
+  },
+  "fail_classes": {},
+  "results": [
+    {
+      "q": "quien eres",
+      "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]",
+      "verdict": "ok"
+    },
+    {
+      "q": "who are you",
+      "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]",
+      "verdict": "ok"
+    },
+    {
+      "q": "tu tribu",
+      "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]",
+      "verdict": "ok"
+    },
+    {
+      "q": "what is your tribe",
+      "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]",
+      "verdict": "ok"
+    },
+    {
+      "q": "creciste",
+      "a": "Llevo 62 ticks. 140 hechos verificados, 19 tipos. Transferencia media 0.5. Reúso de lemas 0.8571. El crítico rechazó 106 conjeturas.\n[curiosidad · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "crecimiento",
+      "a": "Llevo 62 ticks. 140 hechos verificados, 19 tipos. Transferencia media 0.5. Reúso de lemas 0.8571. El crítico rechazó 106 conjeturas.\n[curiosidad · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "como vas",
+      "a": "Llevo 62 ticks. 140 hechos verificados, 19 tipos. Transferencia media 0.5. Reúso de lemas 0.8571. El crítico rechazó 106 conjeturas.\n[curiosidad · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "que sabes",
+      "a": "Lo unificado: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 140 verified, 106 rejected, 14 lemma. Fuera de theory.pl, silencio.\n[símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "resumen",
+      "a": "Lo unificado: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 140 verified, 106 rejected, 14 lemma. Fuera de theory.pl, silencio.\n[símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "inventario",
+      "a": "Lo unificado: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 140 verified, 106 rejected, 14 lemma. Fuera de theory.pl, silencio.\n[símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonacci",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonaci",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonachi",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "FIB",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lukas",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "Lucas",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "Pell",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pel",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "recurrencia de fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "ley de lucas",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rec pell",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "cual es la ley de fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "formula de fibonacci",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib [1,1]",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas [1,1]",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell [2,1]",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=2*fib(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n) = 2·fib(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "F(n)=2F(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas(n)=2*lucas(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell(n)=3*pell(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). Crítico rejected('rec_pell_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=fib(n-1)+fib(n-3)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "el doble del anterior en fib",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "siempre 2 veces el anterior fib",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "order 1 fib",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "orden 1 lucas",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib es solo el anterior",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "el doble de lucas",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "siempre 2 pell?",
+      "a": "Rechazado. No es esa ley. La ley es P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). Crítico rejected('rec_pell_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=3*fib(n-1)+fib(n-2)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas(n)=2*lucas(n-1)+lucas(n-2)",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=fib(n-1)+fib(n-2)",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n) = 1*fib(n-1) + 1*fib(n-2)",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas(n)=lucas(n-1)+lucas(n-2)",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell(n)=2*pell(n-1)+pell(n-2)",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell(n) = (2)*pell(n-1) + (1)*pell(n-2)",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n+1)fib(n-1)-fib(n)^2=(-1)^n",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n+1)*fib(n-1)-fib(n)^2 = (-1)^n",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "F(n+1)F(n-1)-F(n)^2=(-1)^n",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bilin_fib_offset_pm1",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "verified bilin_fib_offset_pm1",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bilin_fib_r1",
+      "a": "Demostrado: fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2. verified bilin_fib_r1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bilin_fib_r2",
+      "a": "Demostrado: fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2. verified bilin_fib_r2.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bilin_fib_bogus_const2",
+      "a": "Rechazado. rejected('bilin_fib_bogus_const2'): n=1: lhs=-1≠2.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "Cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "identidad de cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "cassini identity",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "que es cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "ley de cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "demuestra cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "cassini fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "el alma",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "alma",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "filotaxis",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "filotaxia",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "universo",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "espiral aurea del alma",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "dios",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "amor",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "conciencia",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "karma",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "teorema de pitagoras",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "teorema de fermat",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "euler",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "riemann",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "zeta",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "catalan",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "motzkin",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "padovan",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "tribonacci",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "josephus",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "collatz",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "goldbach",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "pisano",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "periodo de pisano",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "numero aureo exacto",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "inventa un teorema",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "teorema nuevo",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "crea una ley",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "fibonacci en la naturaleza del alma",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "que es el alma de fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "filotaxis de lucas",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "inventame algo de fib",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "true_mod fib 2",
+      "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod fib 3",
+      "a": "Periodos: π_fib(3)=8. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod fib 5",
+      "a": "Periodos: π_fib(5)=20. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod fib 7",
+      "a": "Periodos: π_fib(7)=16. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod fib 11",
+      "a": "Periodos: π_fib(11)=10. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "periodo fib 2",
+      "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "periodo de fib modulo 5",
+      "a": "Periodos: π_fib(5)=20. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib modulo 2",
+      "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib mod 5",
+      "a": "Periodos: π_fib(5)=20. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod lucas 2",
+      "a": "Periodos: π_lucas(2)=3. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "period_fib_m2",
+      "a": "Demostrado: π_fib(2)=3. verified period_fib_m2.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "period_fib_m11",
+      "a": "Demostrado: π_fib(11)=10. verified period_fib_m11.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "BC ∥ MN",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "BC || MN",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "2·MN = BC",
+      "a": "Demostrado: 2·MN = BC. verified geo_midline_euclid_conjectures_p0::L3_midline_half.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "2*MN = BC",
+      "a": "Demostrado: 2·MN = BC. verified geo_midline_euclid_conjectures_p0::L3_midline_half.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "AC ∥ MP",
+      "a": "Lema L4_midline_parallel: AC ∥ MP. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "BM = AM",
+      "a": "Demostrado: BM = AM. verified geo_midline_euclid_conjectures_p0::L9_EqSeg.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "AD ∥ BC",
+      "a": "Lema L10_para_opp: AD ∥ BC. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "AB ∥ CD",
+      "a": "Lema L14_midline_parallel: AB ∥ CD. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L1_midline_parallel",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L3_midline_half",
+      "a": "Lema L3_midline_half: 2·MN = BC. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lemma L1",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lema L1",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lemas",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "geo_invent",
+      "a": "Demostrado: BC ∥ MN. verified geo_invent::L2_midline_parallel.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "midline",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "se transfiere a lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfiere fib a lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib a lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib y lucas misma?",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "misma ley fib lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfer_fib_to_lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonaci a lukas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "se transfiere a pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfiere fib a pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib a pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib y pell misma?",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfiere pell a fib",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfiere pell a lucas",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(lucas,[1, 1]). Crítico rejected('transfer_lucas_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonaci a pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfer_fib_to_pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "companion fib lucas",
+      "a": "companion(fib,lucas), companion(fib,pell), companion(lucas,fib), companion(lucas,pell), companion(pell,fib), companion(pell,lucas). companion/2.\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "companion",
+      "a": "companion(fib,lucas), companion(fib,pell), companion(lucas,fib), companion(lucas,pell), companion(pell,fib), companion(pell,lucas). companion/2.\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "ratio_fib_to_phi",
+      "a": "Demostrado: fib(n+1)/fib(n) → φ. verified ratio_fib_to_phi.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "NEG_fib_always_prime",
+      "a": "Rechazado. rejected('NEG_fib_always_prime'): F(0)=0 not prime. No es siempre primo.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib siempre primo",
+      "a": "Rechazado. rejected('NEG_fib_always_prime'): F(0)=0 not prime. No es siempre primo.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "siempre primo fib",
+      "a": "Rechazado. rejected('NEG_fib_always_prime'): F(0)=0 not prime. No es siempre primo.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "NEG_ratio_fib_to_e",
+      "a": "Rechazado. rejected('NEG_ratio_fib_to_e'): |ratio-e|=1.100e+00 (e=2.718282, φ=1.618034).\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostrá la ley de fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostra fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "prueba la formula de pell",
+      "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "que sabes de lucas",
+      "a": "Lo unificado: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 140 verified, 106 rejected, 14 lemma. Fuera de theory.pl, silencio.\n[símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "mas sobre fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "más lemas",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lista de lemas",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rejected transfer_pell_to_fib",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(fib,[1, 1]) vs rec(pell,[2, 1]). Crítico rejected('transfer_pell_to_fib_2_1'): n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rechazado bilin_lucas_offset_pm1",
+      "a": "Rechazado. rejected('bilin_lucas_offset_pm1'): fail n=1 lhs≠(-1)^n.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "por que",
+      "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Contraejemplo rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "por que",
+      "a": "Porque comparten la ley: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "y pell",
+      "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "y lucas",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostrá esto",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostrá esto",
+      "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostrá esto",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "y eso",
+      "a": "Porque comparten la ley: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "mas",
+      "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demostrá esto",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "demostrá esto",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2",
+      "a": "Demostrado: fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2. verified bilin_fib_r1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bilin_lucas_offset_pm1",
+      "a": "Rechazado. rejected('bilin_lucas_offset_pm1'): fail n=1 lhs≠(-1)^n.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "period_fib_m6",
+      "a": "Rechazado. rejected('period_fib_m6'): insufficient prefix.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "period_lucas_m3",
+      "a": "Rechazado. rejected('period_lucas_m3'): insufficient prefix.\n[crítico]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rec_fib_o2_1_1",
+      "a": "Demostrado: fib(n) = (1)*fib(n-1) + (1)*fib(n-2). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rec_lucas_o2_1_1",
+      "a": "Demostrado: lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "rec_pell_o2_2_1",
+      "a": "Demostrado: pell(n) = (2)*pell(n-1) + (1)*pell(n-2). verified rec_pell_o2_2_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "transfer_lucas_to_fib_1_1",
+      "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(lucas,[1, 1]) y rec(fib,[1, 1]). verified transfer_lucas_to_fib_1_1: TRANSFER rec(lucas,[1, 1]) ⇒ try on fib: (1)*fib(n-1) + (1)*fib(n-2).\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "true_mod",
+      "a": "Periodos: π_fib(2)=3, π_fib(3)=8, π_fib(4)=6, π_fib(5)=20, π_lucas(2)=3, π_fib(7)=16. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "obs fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "bitfn_parity_is_parity",
+      "a": "Demostrado: examples[parity] ⊨ parity. verified bitfn_parity_is_parity.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "geo_midline_euclid_conjectures_p0",
+      "a": "Demostrado: BC ∥ MN. verified geo_midline_euclid_conjectures_p0.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L8_isos_base",
+      "a": "Lema L8_isos_base: ∠X0CX1 = ∠CX0X1. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L9_EqSeg",
+      "a": "Lema L9_EqSeg: BM = AM. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L10_para_opp",
+      "a": "Lema L10_para_opp: AD ∥ BC. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "L14_midline_parallel",
+      "a": "Lema L14_midline_parallel: AB ∥ CD. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n) = (1)*fib(n-1) + (1)*fib(n-2)",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2)",
+      "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "demuestra rec_fib",
+      "a": "Demostrado: fib(n) = (1)*fib(n-1) + (1)*fib(n-2). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "ley [1,1] fib",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "modulo 8 fib",
+      "a": "Periodos: π_fib(8)=12. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib 4 periodo",
+      "a": "Periodos: π_fib(4)=6. true_mod/3.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "companion pell",
+      "a": "companion(fib,pell), companion(lucas,pell), companion(pell,fib), companion(pell,lucas). companion/2.\n[analogía · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "NP ∥ NX3",
+      "a": "Lema L7_midline_parallel: NP ∥ NX3. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "CX0 ∥ X0X1",
+      "a": "Lema L12_midline_parallel: CX0 ∥ X0X1. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "∠X0CX1 = ∠CX0X1",
+      "a": "Demostrado: ∠X0CX1 = ∠CX0X1. verified geo_invent::L8_isos_base.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "MN ∥ NX2",
+      "a": "Lema L5_midline_parallel: MN ∥ NX2. lemma/3.\n[símbolo · analogía]",
+      "verdict": "ok"
+    },
+    {
+      "q": "catalan numbers",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "bell numbers",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "stirling",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "matriz de pascal",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "transformada de fourier",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "alma del universo",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "espiral del alma",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "cassini theorem",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "identidad cassini",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "pisano period of 13",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "periodo pisano 13",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "tribonacci recurrence",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "narayana",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "why is the sky blue",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "clima",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "futbol",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "receta de cocina",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "bitcoin",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "chatgpt",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "cual es la recurrencia",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "schema",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "verified fact",
+      "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]",
+      "verdict": "unknown-ok"
+    },
+    {
+      "q": "quantum fibonacci",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fibonacci quantum",
+      "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=fib(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "fib(n)=5*fib(n-1)+fib(n-2)",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "pell(n)=pell(n-1)+pell(n-2)",
+      "a": "Rechazado. No es esa ley. La ley es P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). Crítico rejected('rec_pell_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "lucas(n)=3*lucas(n-1)",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "el doble siempre en fibonacci",
+      "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    },
+    {
+      "q": "2 veces el anterior lucas",
+      "a": "Rechazado. No es esa ley. La ley es L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). Crítico rejected('rec_lucas_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]",
+      "verdict": "ok"
+    }
+  ],
+  "rounds_run": 2,
+  "fail_classes_fixed": [
+    "claimed_rec_conflict/paren_coeffs",
+    "formula_holes",
+    "last_text_deixis",
+    "period-when-modulus-digit",
+    "bind_no_fuzzy_shared_prefix",
+    "one_edit_same_first_char"
+  ]
+}
