@@ -637,20 +637,38 @@ chat_learn_conj(Toks) :-
     append(Left, [And|Right], Toks),
     member(And, [and, y]),
     Left \== [], Right \== [],
+    \+ (member(X, [and, y]), member(X, Left)),
+    \+ (member(X, [and, y]), member(X, Right)),
     positional_triple(Left, A, V, O),
     conj_right(A, V, Right, A2, V2, O2),
     (A, V, O) \== (A2, V2, O2),
     chat_store(A, V, O),
     chat_store(A2, V2, O2).
+% Recursive conjunction: "a v1 o1 and a2 v2 o2 and a3 v3 o3"
+chat_learn_conj(Toks) :-
+    append(Left, [And|Right], Toks),
+    member(And, [and, y]),
+    Left \== [], Right \== [],
+    \+ (member(X, [and, y]), member(X, Left)),
+    positional_triple(Left, A, V, O),
+    chat_store(A, V, O),
+    chat_learn_conj(Right).
+% Base case: last SVO in chain (no more "and").
+chat_learn_conj(Toks) :-
+    \+ member(and, Toks), \+ member(y, Toks),
+    positional_triple(Toks, A, V, O),
+    chat_store(A, V, O).
 
 % Primero el objeto solo (and the queen): comparte el verbo. Si se
 % antepone el sujeto a un determinante, el 3-token lo tomaria por rel.
 % Full SVO on right with new subject: two independent facts.
+% Guard: reject if right side contains "and" (let recursive clause handle it).
 conj_right(A, _V, Right, A2, V2, O2) :-
     Right = [First|Rest],
     First \== A,
     \+ is_determiner(First),
     Rest \== [],
+    \+ member(and, Right), \+ member(y, Right),
     positional_triple(Right, A2, V2, O2),
     \+ is_determiner(V2).
 % Object only: shares subject from left.
@@ -659,6 +677,7 @@ conj_right(A, V, Right, A, V, O2) :-
     O2 \== A,
     O2 \== V.
 conj_right(A, _V, Right, A, V2, O2) :-
+    \+ member(and, Right), \+ member(y, Right),
     positional_triple([A|Right], A, V2, O2),
     \+ is_determiner(V2).
 
@@ -671,16 +690,24 @@ chat_store(A, V, O) :-
     remember_tracked(A, R, O, Src, none),
     chat_after_learn(Src, A, R, O).
 
+% canon_ok: allow canonicalization only if distance<=1, stems match,
+% or irregular_form relates the two (prevents meet→eat at distance 2).
+canon_ok(_, _, D) :- D =< 1, !.
+canon_ok(V, Rx, _) :-
+    bb_stem(V, SV), bb_stem(Rx, SR), SV == SR, !.
+canon_ok(V, Rx, _) :- irregular_form(V, Rx), !.
+canon_ok(V, Rx, _) :- irregular_form(Rx, V), !.
+
 % Verbo novel a distancia <=2 del unico predicado vivo del par (o
 % del sujeto si el objeto es nuevo): se reusa, no se duplica.
 canon_rel(S, V, O, R) :-
     findall(Rx, (memory_relation(S, Rx, O, _, _),
-                 symbol_dist(V, Rx, D), D =< 2), R0),
+                 symbol_dist(V, Rx, D), canon_ok(V, Rx, D)), R0),
     sort(R0, [R]), !.
 canon_rel(S, V, _O, R) :-
     \+ live_symbol(V),
     findall(Rx, (memory_relation(S, Rx, _, _, _),
-                 symbol_dist(V, Rx, D), D =< 2), R0),
+                 symbol_dist(V, Rx, D), canon_ok(V, Rx, D)), R0),
     sort(R0, [R]), !.
 canon_rel(_S, V, _O, V).
 
@@ -2199,14 +2226,31 @@ chat_say(say, answer(Xs, Facts)) :-
 % C3: la frase ES la tripla. phrase/2 genera y parsea. Los terminales
 % salen del mapa vivo (simbolo partido por '_'), nunca de una lista.
 surface_sent((S, V, O), Line) :-
-    ( phrase(svo(S, V, O), Toks) ->
+    display_verb(S, V, V2),
+    ( phrase(svo(S, V2, O), Toks) ->
         atomic_list_concat(Toks, ' ', Body),
         atom_concat(Body, '.', Line)
     ; surface_atom(S, Ss),
-      surface_atom(V, Vs),
+      surface_atom(V2, Vs),
       surface_atom(O, Os),
       format(atom(Line), '~w ~w ~w.', [Ss, Vs, Os])
     ).
+
+% 3rd person singular inflection for display. Base-form verbs (stem==self)
+% get 's'; already-inflected forms and unknown subjects are left as-is.
+display_verb(S, V, V2) :-
+    should_inflect(S, V), !,
+    atom_concat(V, 's', V2).
+display_verb(_, V, V).
+
+should_inflect(S, V) :-
+    atom(S), atom(V),
+    live_symbol(S),
+    bb_stem(V, V),
+    \+ irregular_form(V, _),
+    atom_chars(V, Chars),
+    last(Chars, Last),
+    \+ member(Last, [a, e, i, o, u]).
 
 surface_atom(A, Out) :-
     atomic_list_concat(Parts, '_', A),

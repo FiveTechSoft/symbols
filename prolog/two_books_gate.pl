@@ -34,7 +34,7 @@ run_two :-
     expect("who found key?", "alice found key"),
     expect("quien ama valerie?", "michel ama valerie"),
     expect("que libro?", "plataforma"),
-    expect("who ate cake?", "alice eat cake"),
+    expect("who ate cake?", "alice eats cake"),
     expect("loves means ama", "Learned"),
     expect("does valerie love michel?", "Yes"),
     expect("who is houellebecq?", "plataforma"),
