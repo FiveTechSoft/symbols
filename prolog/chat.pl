@@ -313,6 +313,11 @@ chat_line_tokens(L, Toks, Changed) :-
     ; chat_discover_cmd(Toks) -> true
     ; chat_greet(Toks) -> true
     ; chat_about(Toks) -> true
+    ; book_other(Toks, B) -> about_entity(B, es)
+    ; tell_me_bare(Toks) ->
+        ( member(cuentame, Toks) -> chat_list_books(es)
+        ; chat_list_books(en)
+        )
     ; Toks == [who, are, you] -> chat_identity(en)
     ; Toks == [what, are, you] -> chat_identity(en)
     ; Toks == [quien, eres] -> chat_identity(es)
@@ -364,7 +369,9 @@ book_pin(Toks, B) :-
     % Si hay rel viva que toca el titulo (author, appears_in), no
     % volcar el about: lo responde graph_ask.
     findall(R, (member(W, Packed), pin_rel(W, R), rel_touches([B], R)), RR),
-    RR == [].
+    RR == [],
+    packed_names(Packed, Ents),
+    exclude(==(B), Ents, []).
 
 packed_has(Packed, B) :-
     member(W, Packed),
@@ -387,6 +394,8 @@ other_word(W) :-
 % en la pila (ultimo titulo mencionado).
 book_anaphora(Toks, B) :-
     live_books(Bs), Bs \== [],
+    member(D, Toks),
+    is_determiner(D),
     nl_tokens(Toks, Packed),
     \+ include(packed_has(Packed), Bs, [_|_]),
     \+ (member(W, Packed), other_word(W)),
@@ -395,6 +404,16 @@ book_anaphora(Toks, B) :-
     ; Ents = [T], book_type(T)
     ),
     last_book(Bs, B).
+
+% "el otro libro": el titulo que no es el de recencia.
+book_other(Toks, B) :-
+    live_books(Bs),
+    member(W, Toks),
+    other_word(W),
+    nl_tokens(Toks, Packed),
+    \+ include(packed_has(Packed), Bs, [_|_]),
+    last_book(Bs, Last),
+    findall(X, (member(X, Bs), X \== Last), [B]).
 
 last_book(Bs, B) :-
     dialog_stack(subj, Ss),
@@ -1035,11 +1054,24 @@ chat_ask(Toks) :-
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
+    ; ask_or(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
+    ; pol_neg(Toks, Clean),
+      once(chat_form(Clean, _, A0)),
+      pol_flip(A0, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(say, Ans)
     ; chat_form(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
     ; book_pin(Toks, B) ->
+        ask_lang(Toks, Lang),
+        about_entity(B, Lang)
+    ; book_other(Toks, B) ->
         ask_lang(Toks, Lang),
         about_entity(B, Lang)
     ; book_anaphora(Toks, B) ->
@@ -1143,6 +1175,41 @@ conj_right_q(_, Right, Right).
 conj_merge(yes(F1), yes(F2), say, yes_both(F1, F2)).
 conj_merge(no, _, say, no).
 conj_merge(_, no, say, no).
+
+% "did alice or michel find key": or/o cerrado.
+ask_or(Toks, Kind, Ans) :-
+    append([Did, A], [Or, B|Rest], Toks),
+    member(Did, [did, does, do]),
+    member(Or, [or, o]),
+    qnorm([A], E1), qnorm([B], E2),
+    map_entity(E1), map_entity(E2),
+    Rest \== [],
+    once(chat_form([Did, A|Rest], _, A1)),
+    once(chat_form([Did, B|Rest], _, A2)),
+    or_merge(A1, A2, Kind, Ans).
+
+or_merge(yes(F), no, say, yes(F)).
+or_merge(no, yes(F), say, yes(F)).
+or_merge(yes(F1), yes(F2), say, yes_both(F1, F2)).
+or_merge(no, no, say, no).
+
+% never/not invierte el si/no (polaridad cerrada, no lexico).
+pol_neg(Toks, Clean) :-
+    member(Neg, [never, not]),
+    select(Neg, Toks, Clean),
+    Clean \== [].
+
+pol_flip(yes(_), no).
+pol_flip(no, yes_bare).
+
+tell_me_bare([tell, me|Rest]) :-
+    Rest \== [],
+    \+ member(about, Rest),
+    \+ graph_pins([tell, me|Rest], _, _).
+tell_me_bare([cuentame|Rest]) :-
+    Rest \== [],
+    \+ member(de, Rest),
+    \+ graph_pins([cuentame|Rest], _, _).
 % entidad anclan la consulta; el resto (interrogativos, determinantes,
 % palabras nuevas) es el hueco. Sin listas de contenido: si el grafo
 % no conoce el ancla, falla honesto.
@@ -1253,6 +1320,8 @@ pack_is_about(Packed, E) :-
 about_glue(W) :- qlead(W).
 about_glue(W) :- is_determiner(W).
 about_glue(W) :- atom_length(W, L), L =< 2.
+about_glue(else).
+about_glue(mas).
 
 % "que paso con X" / "what happened to X": un verbo novel (L>=3) y el
 % resto glue (qlead/det/prep L=<3). "to" cae por longitud; el evento
@@ -1302,6 +1371,17 @@ graph_fill(_, Rels, [A, B], yes((S, R, O))) :-
     ( memory_relation(A, R, B, _, _) -> S = A, O = B
     ; memory_relation(B, R, A, _, _) -> S = B, O = A
     ).
+% "is michel in plataforma": appears_in es la rel de elenco (ensenada).
+graph_fill(_, [], [A, B], yes((A, appears_in, B))) :-
+    memory_relation(A, appears_in, B, _, _).
+graph_fill(_, [], [A, B], yes((B, appears_in, A))) :-
+    memory_relation(B, appears_in, A, _, _).
+graph_fill(_, [], [A, B], no) :-
+    ( memory_relation(A, is, book, _, _)
+    ; memory_relation(B, is, book, _, _)
+    ),
+    \+ memory_relation(A, appears_in, B, _, _),
+    \+ memory_relation(B, appears_in, A, _, _).
 graph_fill(Toks, [], [A, B], yes((S, R, O))) :-
     findall(Rx, (memory_relation(A, Rx, B, _, _)
                ; memory_relation(B, Rx, A, _, _)), R0),
@@ -1560,6 +1640,12 @@ chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     findall(F, member(_-F, OF), Facts).
 % D7 how-many (M2 en dialogo): cuenta objetos distintos de (S, V).
 % El resto nominal ("books") lo filtra qnorm; el sujeto manda.
+chat_form([how, many|Mid], say, count(N)) :-
+    live_books(Bs), Bs \== [],
+    nl_tokens(Mid, [W]),
+    book_type(T),
+    inflect_same(W, T),
+    length(Bs, N).
 chat_form([how, many|Mid], say, count(N)) :-
     append(Pre, [V], Mid),
     Pre \== [],
@@ -1879,6 +1965,8 @@ chat_say(say, yes_both((S1, V1, O1), (S2, V2, O2))) :-
     chat_sources([(S1, V1, O1), (S2, V2, O2)]).
 chat_say(say, no) :-
     writeln('No.').
+chat_say(say, yes_bare) :-
+    writeln('Yes.').
 chat_say(say, explanation(S, Vr, O, Proof)) :-
     surface_sent((S, Vr, O), Line),
     writeln(Line),

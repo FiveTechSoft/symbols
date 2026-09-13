@@ -71,6 +71,22 @@ run_two :-
     ; format('FAIL conj missing 2nd: ~w~n', [OutAnd]), fail
     ),
     expect("what about the baby that turned pig?", "turned"),
+    expect("is michel in plataforma?", "appears"),
+    capture("is alice in plataforma?", OutIn),
+    ( sub_string(OutIn, _, _, _, "No") -> true
+    ; format('FAIL alice-in-plat: ~w~n', [OutIn]), fail
+    ),
+    expect("how many books?", "2"),
+    capture("did alice never eat cake?", OutNev),
+    ( sub_string(OutNev, _, _, _, "No") -> true
+    ; format('FAIL never: ~w~n', [OutNev]), fail
+    ),
+    expect("did alice or michel find the key?", "alice"),
+    capture("de que trata plataforma?", _),
+    capture("hablame del otro libro", OutOtr),
+    ( sub_string(OutOtr, _, _, _, "alice_in_wonderland") -> true
+    ; format('FAIL otro libro: ~w~n', [OutOtr]), fail
+    ),
     delete_file('two_books_tmp.knowledge.pl').
 
 capture(Line, Out) :-
