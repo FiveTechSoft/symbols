@@ -57,6 +57,20 @@ run_two :-
     ; format('FAIL compare: ~w~n', [OutCmp]), fail
     ),
     \+ sub_string(OutCmp, _, _, _, "I don't know"),
+    expect("wrote means author", "Learned"),
+    capture("who wrote plataforma?", OutW),
+    ( sub_string(OutW, _, _, _, "houellebecq") -> true
+    ; format('FAIL wrote: ~w~n', [OutW]), fail
+    ),
+    \+ sub_string(OutW, _, _, _, "appears in"),
+    capture("did michel ama valerie and valerie ama michel?", OutAnd),
+    ( sub_string(OutAnd, _, _, _, "Yes") -> true
+    ; format('FAIL conj-and: ~w~n', [OutAnd]), fail
+    ),
+    ( sub_string(OutAnd, _, _, _, "valerie ama michel") -> true
+    ; format('FAIL conj missing 2nd: ~w~n', [OutAnd]), fail
+    ),
+    expect("what about the baby that turned pig?", "turned"),
     delete_file('two_books_tmp.knowledge.pl').
 
 capture(Line, Out) :-

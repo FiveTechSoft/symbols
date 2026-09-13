@@ -360,7 +360,11 @@ dialog_meta_es([de, que|Rest]) :-
 book_pin(Toks, B) :-
     nl_tokens(Toks, Packed), !,
     live_books(Bs),
-    findall(X, (member(X, Bs), packed_has(Packed, X)), [B]).
+    findall(X, (member(X, Bs), packed_has(Packed, X)), [B]),
+    % Si hay rel viva que toca el titulo (author, appears_in), no
+    % volcar el about: lo responde graph_ask.
+    findall(R, (member(W, Packed), pin_rel(W, R), rel_touches([B], R)), RR),
+    RR == [].
 
 packed_has(Packed, B) :-
     member(W, Packed),
@@ -1027,6 +1031,10 @@ chat_ask(Toks) :-
         ( rel_join(Left, Right) -> chat_ask(Left)
         ; chat_unknown
         )
+    ; ask_conj(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
     ; chat_form(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -1115,7 +1123,26 @@ rel_holds(Right, E) :-
       )
     ), !.
 
-% Pregunta contra el mapa vivo: los tokens que ya son relacion o
+% "did SVO and SVO": and/y cerrados. Las dos mitades contra el mapa.
+ask_conj(Toks, Kind, Ans) :-
+    append(Left, [And|Right], Toks),
+    member(And, [and, y]),
+    Left = [Did|_],
+    member(Did, [did, does, do]),
+    Right \== [],
+    \+ (member(W, Right), qlead(W)),
+    conj_right_q(Did, Right, RQ),
+    once(chat_form(Left, _, A1)),
+    once(chat_form(RQ, _, A2)),
+    conj_merge(A1, A2, Kind, Ans).
+
+conj_right_q(Did, Right, [Did|Right]) :-
+    Right \= [Did|_], !.
+conj_right_q(_, Right, Right).
+
+conj_merge(yes(F1), yes(F2), say, yes_both(F1, F2)).
+conj_merge(no, _, say, no).
+conj_merge(_, no, say, no).
 % entidad anclan la consulta; el resto (interrogativos, determinantes,
 % palabras nuevas) es el hueco. Sin listas de contenido: si el grafo
 % no conoce el ancla, falla honesto.
@@ -1844,6 +1871,12 @@ chat_say(say, yes((S, V, O))) :-
     writeln(Line),
     chat_set_last(S, V, O),
     chat_sources([(S, V, O)]).
+chat_say(say, yes_both((S1, V1, O1), (S2, V2, O2))) :-
+    writeln('Yes.'),
+    surface_sent((S1, V1, O1), L1), writeln(L1),
+    surface_sent((S2, V2, O2), L2), writeln(L2),
+    chat_set_last(S2, V2, O2),
+    chat_sources([(S1, V1, O1), (S2, V2, O2)]).
 chat_say(say, no) :-
     writeln('No.').
 chat_say(say, explanation(S, Vr, O, Proof)) :-

@@ -224,7 +224,8 @@ run_cases :-
     ( sub_string(OutNeed, _, _, _, "object") -> true
     ; format('FAIL D4 why: ~w~n', [OutNeed]), fail
     ),
-    expect_all("door", ["Learned"]).
+    expect_all("door", ["Learned"]),
+    expect("did nilo met rio and nilo met sam?", "Yes").
 
 dcg_roundtrip(T) :-
     ( surface_sent(T, Line),
