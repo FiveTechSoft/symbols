@@ -1,23 +1,27 @@
 """
-Sequences world: Fibonacci + Lucas + Pell.
+Sequences world: Fibonacci + Lucas + Pell — generative schema language.
 
-Learning a recurrence on one sequence asserts `rec(Seq, Coeffs)` into the
-Prolog archive; transfer_prior tries that clause on companion sequences
-(absorb intelligence = cross-sequence Horn reuse, not the internet).
-
-Reuses fibonacci/miner.py helpers where possible.
+Hypotheses come from operators in schema_lang (linrec scan, modperiod schema,
+bilinear schema), not a frozen menu of named theorems. Transfer remains the
+intelligence metric: Fib law → Lucas (succeed), Fib law → Pell (fail honestly).
 """
 
 from __future__ import annotations
 
 import sys
-from itertools import product
 from pathlib import Path
 from typing import Any, Optional
 
 from .base import Conjecture, FamilySpec, VerifiedFact, WorldBase
+from .schema_lang import (
+    HypothesisLanguage,
+    SchemaClass,
+    generate_bilinear_candidates,
+    generate_linrec_candidates,
+    generate_modperiod_candidates,
+    verify_bilinear,
+)
 
-# Reuse Fibonacci miner
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "fibonacci"))
 import miner as M  # noqa: E402
@@ -51,6 +55,9 @@ SEQ_BUILDERS = {
 
 
 def _search_recurrence(vals: list[int], order: int, coeff_range=range(-3, 4)) -> Optional[list[int]]:
+    """Kept for metrics.transfer_eval scratch search."""
+    from itertools import product
+
     N = len(vals) - 1
     if N < order + 2:
         return None
@@ -72,121 +79,143 @@ def _search_recurrence(vals: list[int], order: int, coeff_range=range(-3, 4)) ->
     return fits[0][1]
 
 
+# Map schema class id → FamilySpec-compatible arm id (UCB still schedules arms)
+_SCHEMA_TO_FAMILY = {
+    "linrec_scan": "linear_recurrences",
+    "transfer_horn": "transfer_recurrence",
+    "ratio_scan": "ratio_limits",
+    "dead_prime": "dead_end_always_prime",
+    "modperiod_schema": "modular_periods",
+    "bilinear_schema": "bilinear_schema",  # NEW — not in old families() list
+}
+
+
 class SequencesWorld(WorldBase):
     name = "sequences"
 
-    def __init__(self, N: int = 24) -> None:
+    def __init__(self, N: int = 24, language: Optional[HypothesisLanguage] = None) -> None:
         self.N = N
         self.data = {k: b(N) for k, b in SEQ_BUILDERS.items()}
-        self._critic = None  # set by kernel
+        self._critic = None
         self._archive = None
+        self.language = language or HypothesisLanguage.seed()
 
     def bind(self, archive, critic) -> None:
         self._archive = archive
         self._critic = critic
-        # seed observations into theory (idempotent)
         for seq, vals in self.data.items():
             for n, v in enumerate(vals):
                 archive.assert_obs(seq, n, v)
+        # Restore language skin from archive meta if present
+        skin = archive.meta.get("hypothesis_skin")
+        if skin and "schemas" in skin:
+            try:
+                self.language = HypothesisLanguage(
+                    schemas={
+                        k: SchemaClass.from_dict(v) for k, v in skin["schemas"].items()
+                    },
+                    generation=int(skin.get("generation", 0)),
+                    molt_history=list(skin.get("molt_history", [])),
+                    seen_coeff_fingerprints=list(skin.get("seen_coeff_fingerprints", [])),
+                )
+            except Exception:
+                pass
+
+    def persist_skin(self) -> None:
+        if self._archive is not None:
+            self._archive.meta["hypothesis_skin"] = self.language.snapshot()
+            # Also write schema/2 style facts into meta (not verified theorems)
+            self._archive.meta["schema_classes"] = [
+                {"id": s.id, "unlocked": s.unlocked, "origin": s.origin}
+                for s in self.language.schemas.values()
+            ]
+            self._archive.save_meta()
 
     def families(self) -> dict[str, FamilySpec]:
-        return {
-            "linear_recurrences": FamilySpec(
-                id="linear_recurrences",
-                description="Exact small-int linear recurrences on fib/lucas/pell; param=max order",
-                dead_end=False,
-                param=1,
-                param_max=3,
-                unlocked=True,
-                unlock_order=0,
-            ),
-            "transfer_recurrence": FamilySpec(
-                id="transfer_recurrence",
-                description="Try archived rec/2 clauses from companions (Horn transfer)",
-                dead_end=False,
-                param=0,
-                param_max=0,
-                unlocked=True,
-                unlock_order=1,
-            ),
-            "ratio_limits": FamilySpec(
-                id="ratio_limits",
-                description="Consecutive ratios → φ on fib (and analogs)",
-                dead_end=False,
-                param=0,
-                param_max=0,
-                unlocked=True,
-                unlock_order=2,
-            ),
-            "dead_end_always_prime": FamilySpec(
-                id="dead_end_always_prime",
-                description="DEAD END: claim sequence terms always prime",
-                dead_end=True,
-                param=0,
-                param_max=0,
-                unlocked=True,
-                unlock_order=3,
-            ),
-            "modular_periods": FamilySpec(
-                id="modular_periods",
-                description="Pisano-style periods; param=max modulus",
-                dead_end=False,
-                param=3,
-                param_max=10,
-                unlocked=False,
-                unlock_order=4,
-            ),
-            "bilinear_fib": FamilySpec(
-                id="bilinear_fib",
-                description="Cassini on Fibonacci only",
-                dead_end=False,
-                param=0,
-                param_max=0,
-                unlocked=False,
-                unlock_order=5,
-            ),
-        }
+        """UCB arms derived from the live hypothesis language (skin)."""
+        out: dict[str, FamilySpec] = {}
+        lang = self.language
+        for sid, sch in lang.schemas.items():
+            if sid.startswith("geo_"):
+                continue  # geometry owns geo_invent
+            # Mutant linrec variants also become arms
+            if sid.startswith("linrec_scan"):
+                fam_id = "linear_recurrences" if sid == "linrec_scan" else sid
+            else:
+                fam_id = _SCHEMA_TO_FAMILY.get(sid, sid)
+            out[fam_id] = FamilySpec(
+                id=fam_id,
+                description=sch.description,
+                dead_end=sch.dead_end,
+                param=sch.order if "linrec" in sid else (
+                    sch.m_max if "modperiod" in sid else (
+                        sch.r_max if "bilinear" in sid else 0
+                    )
+                ),
+                param_max=sch.order_max if "linrec" in sid else (
+                    sch.m_cap if "modperiod" in sid else (
+                        sch.r_cap if "bilinear" in sid else 0
+                    )
+                ),
+                unlocked=sch.unlocked,
+                unlock_order=list(lang.schemas.keys()).index(sid),
+                saturated=sch.saturated,
+                n_visits=sch.n_visits,
+                total_reward=sch.total_reward,
+            )
+        return out
+
+    def _schema_for_family(self, fam_id: str) -> Optional[SchemaClass]:
+        # reverse map
+        for sid, mapped in _SCHEMA_TO_FAMILY.items():
+            if mapped == fam_id and sid in self.language.schemas:
+                return self.language.schemas[sid]
+        if fam_id in self.language.schemas:
+            return self.language.schemas[fam_id]
+        if fam_id.startswith("linrec_scan") and fam_id in self.language.schemas:
+            return self.language.schemas[fam_id]
+        return None
 
     def observe(self) -> dict[str, Any]:
         return {
             "N": self.N,
             "sequences": {k: v[:8] + (["..."] if len(v) > 8 else []) for k, v in self.data.items()},
             "n_recs_archived": len(self._archive.list_recs()) if self._archive else 0,
+            "n_schema_classes": self.language.n_schema_classes(),
+            "unlocked_schemas": self.language.unlocked_ids(),
+            "language_generation": self.language.generation,
         }
 
     def hypothesize(self, family: FamilySpec, archive_confirmed: dict, step: int) -> list[Conjecture]:
         out: list[Conjecture] = []
         fid = family.id
+        sch = self._schema_for_family(fid)
 
-        if fid == "linear_recurrences":
+        if fid == "linear_recurrences" or (sch and sch.id.startswith("linrec_scan")):
+            if sch is None:
+                sch = self.language.schemas.get("linrec_scan")
+            if sch is None:
+                return out
+            prefer_novel = sch.novelty_bonus > 0 or self.language.preferred_novel_coeffs()
             for seq, vals in self.data.items():
-                for order in range(1, family.param + 1):
-                    coeffs = _search_recurrence(vals, order)
-                    if coeffs is None:
-                        out.append(
-                            Conjecture(
-                                name=f"rec_{seq}_order_{order}_none",
-                                family=fid,
-                                world=self.name,
-                                formula=f"no small-int recurrence order {order} on {seq}",
-                                payload={"seq": seq, "coeffs": None, "order": order, "kind": "rec"},
-                                relation_type="linear_recurrence",
-                            )
+                cands = generate_linrec_candidates(
+                    vals,
+                    sch,
+                    seq,
+                    prefer_novel=prefer_novel,
+                    seen=self.language.seen_coeff_fingerprints,
+                )
+                for c in cands:
+                    out.append(
+                        Conjecture(
+                            name=c["name"],
+                            family=fid,
+                            world=self.name,
+                            formula=c["formula"],
+                            payload=c,
+                            relation_type=c["relation_type"],
                         )
-                    else:
-                        formula = f"{seq}(n) = " + " + ".join(
-                            f"({c})*{seq}(n-{i+1})" for i, c in enumerate(coeffs)
-                        )
-                        out.append(
-                            Conjecture(
-                                name=f"rec_{seq}_o{order}_{'_'.join(map(str, coeffs))}",
-                                family=fid,
-                                world=self.name,
-                                formula=formula,
-                                payload={"seq": seq, "coeffs": coeffs, "order": order, "kind": "rec"},
-                                relation_type="linear_recurrence",
-                            )
-                        )
+                    )
 
         elif fid == "transfer_recurrence":
             if not self._critic:
@@ -204,24 +233,21 @@ class SequencesWorld(WorldBase):
                             family=fid,
                             world=self.name,
                             formula=formula,
-                            payload={"seq": seq, "coeffs": coeffs, "kind": "rec", "src": src},
+                            payload={"seq": seq, "coeffs": coeffs, "kind": "rec", "src": src, "schema": "transfer_horn"},
                             relation_type="transfer_recurrence",
                             from_transfer=True,
                             transfer_source=src,
                         )
                     )
-            # Empty list if no priors yet — kernel scores 0; arm stays unsaturated.
 
         elif fid == "ratio_limits":
-            # fib → φ; also false claims → e
-            F = self.data["fib"]
             out.append(
                 Conjecture(
                     name="ratio_fib_to_phi",
                     family=fid,
                     world=self.name,
                     formula="fib(n+1)/fib(n) → φ",
-                    payload={"kind": "ratio_phi"},
+                    payload={"kind": "ratio_phi", "schema": "ratio_scan"},
                     relation_type="ratio_limit",
                 )
             )
@@ -231,7 +257,7 @@ class SequencesWorld(WorldBase):
                     family=fid,
                     world=self.name,
                     formula="fib(n+1)/fib(n) → e",
-                    payload={"kind": "ratio_e"},
+                    payload={"kind": "ratio_e", "schema": "ratio_scan"},
                     relation_type="ratio_limit_neg",
                 )
             )
@@ -243,40 +269,51 @@ class SequencesWorld(WorldBase):
                     family=fid,
                     world=self.name,
                     formula="fib(n) always prime",
-                    payload={"kind": "always_prime", "seq": "fib"},
+                    payload={"kind": "always_prime", "seq": "fib", "schema": "dead_prime"},
                     relation_type="dead_end:prime",
                 )
             )
 
-        elif fid == "modular_periods":
-            seq = "fib"
-            vals = self.data[seq]
-            max_m = family.param
-            for m in range(2, max_m + 1):
-                # discover period via miner helper if available
-                period = M.pisano_period(vals, m, self.N)
-                out.append(
-                    Conjecture(
-                        name=f"pisano_{seq}_m{m}",
-                        family=fid,
-                        world=self.name,
-                        formula=f"π_{seq}({m})={period}" if period else f"π_{seq}({m})=unknown",
-                        payload={"kind": "period", "seq": seq, "m": m, "period": period},
-                        relation_type="modular_period",
+        elif fid == "modular_periods" or (sch and sch.id == "modperiod_schema"):
+            if sch is None:
+                sch = self.language.schemas.get("modperiod_schema")
+            if sch is None or not sch.unlocked:
+                return out
+            for seq in ("fib", "lucas"):
+                cands = generate_modperiod_candidates(
+                    self.data[seq], sch, seq, self.N, M.pisano_period
+                )
+                for c in cands:
+                    out.append(
+                        Conjecture(
+                            name=c["name"],
+                            family=fid,
+                            world=self.name,
+                            formula=c["formula"],
+                            payload=c,
+                            relation_type=c["relation_type"],
+                        )
                     )
-                )
 
-        elif fid == "bilinear_fib":
-            out.append(
-                Conjecture(
-                    name="cassini_fib",
-                    family=fid,
-                    world=self.name,
-                    formula="F(n+1)F(n-1)-F(n)^2 = (-1)^n",
-                    payload={"kind": "cassini"},
-                    relation_type="cassini_identity",
-                )
-            )
+        elif fid == "bilinear_schema" or (sch and sch.id == "bilinear_schema"):
+            if sch is None:
+                sch = self.language.schemas.get("bilinear_schema")
+            if sch is None or not sch.unlocked:
+                return out
+            # Search schema params on fib (and lucas for transfer-flavored check)
+            for seq in ("fib", "lucas"):
+                cands = generate_bilinear_candidates(self.data[seq], sch, seq, self.N)
+                for c in cands:
+                    out.append(
+                        Conjecture(
+                            name=c["name"],
+                            family=fid,
+                            world=self.name,
+                            formula=c["formula"],
+                            payload=c,
+                            relation_type=c["relation_type"],
+                        )
+                    )
 
         return out
 
@@ -318,6 +355,8 @@ class SequencesWorld(WorldBase):
             ok, cex = self._critic.check_recurrence(seq, coeffs, obs)
             if ok and self._archive:
                 self._archive.assert_rec(seq, coeffs)
+                self.language.note_coeffs(coeffs)
+                self.persist_skin()
             return VerifiedFact(
                 name=conjecture.name,
                 family=conjecture.family,
@@ -332,7 +371,7 @@ class SequencesWorld(WorldBase):
             )
 
         if kind == "ratio_phi":
-            rel = M.check_ratios_to_phi(self.data["fib"], self.N)
+            rel = M.check_ratio_to_phi(self.data["fib"], self.N)
             return VerifiedFact(
                 name=conjecture.name,
                 family=conjecture.family,
@@ -398,17 +437,22 @@ class SequencesWorld(WorldBase):
                 relation_type=conjecture.relation_type,
             )
 
-        if kind == "cassini":
-            rels = M.check_cassini(self.data["fib"], self.N)
-            rel = next(r for r in rels if r.name == "cassini_identity")
+        if kind == "bilinear":
+            seq = p["seq"]
+            ok, support, cex = verify_bilinear(self.data[seq], p, self.N)
+            # Critic gate: only archive if true AND not a bogus/neg form
+            if ok and self._archive and p.get("form") != "bogus_const":
+                self._archive.assert_verified(
+                    self.name, conjecture.family, conjecture.name, conjecture.formula
+                )
             return VerifiedFact(
                 name=conjecture.name,
                 family=conjecture.family,
                 world=self.name,
                 formula=conjecture.formula,
-                true=rel.true,
-                support=rel.support,
-                counterexample=rel.counterexample,
+                true=ok,
+                support=support,
+                counterexample=cex,
                 relation_type=conjecture.relation_type,
             )
 
@@ -423,24 +467,68 @@ class SequencesWorld(WorldBase):
             relation_type=conjecture.relation_type,
         )
 
-
     def expand_family(self, family: FamilySpec, new_truths: int) -> str:
-        # Keep transfer arm alive until some rec/2 exists to absorb.
+        sch = self._schema_for_family(family.id)
         if family.id == "transfer_recurrence":
             if self._archive and not self._archive.list_recs():
                 return "waiting for rec/2 priors — do not saturate"
             if new_truths > 0:
                 family.saturated = False
                 return "transfer absorbed — keep arm for other companions"
-            # After successful era, allow soft saturate only if all companions have matching rec
             recs = {s for s, _ in self._archive.list_recs()} if self._archive else set()
             if {"fib", "lucas", "pell"} <= recs:
                 family.saturated = True
+                if sch:
+                    sch.saturated = True
                 return "all sequences have rec — saturate transfer"
             return "priors remain for other targets — stay active"
+
+        # Sync param growth into schema language
+        if sch and not sch.dead_end:
+            if family.param < family.param_max:
+                old = family.param
+                bump = 2 if "modular" in family.id else 1
+                family.param = min(family.param_max, family.param + bump)
+                if "linrec" in sch.id or family.id == "linear_recurrences":
+                    sch.order = family.param
+                elif "modperiod" in sch.id or family.id == "modular_periods":
+                    sch.m_max = family.param
+                elif "bilinear" in sch.id:
+                    sch.r_max = family.param
+                sch.n_visits = family.n_visits
+                sch.total_reward = family.total_reward
+                if new_truths == 0:
+                    sch.ticks_no_new_type += 1
+                else:
+                    sch.ticks_no_new_type = 0
+                self.persist_skin()
+                return f"expand schema param {old}→{family.param}"
+            family.saturated = True
+            sch.saturated = True
+            sch.n_visits = family.n_visits
+            sch.total_reward = family.total_reward
+            self.persist_skin()
+            return "param at max → saturate schema"
         return super().expand_family(family, new_truths)
 
     def transfer_prior(self, archive_confirmed: dict) -> list[Conjecture]:
-        # Handled as its own family; also exposed for metrics
-        fam = self.families()["transfer_recurrence"]
+        fam = self.families().get("transfer_recurrence")
+        if not fam:
+            return []
         return self.hypothesize(fam, archive_confirmed, step=-1)
+
+    def sync_arms_from_language(self, arms: dict) -> None:
+        """After molt: ensure kernel arms reflect newly unlocked schemas."""
+        from ..kernel import arm_key
+
+        for fam_id, fam in self.families().items():
+            key = arm_key(self.name, fam_id)
+            if key not in arms:
+                arms[key] = fam
+            else:
+                # Unlock / unsaturate if language says so
+                arms[key].unlocked = fam.unlocked
+                if not fam.saturated:
+                    arms[key].saturated = False
+                arms[key].param = fam.param
+                arms[key].param_max = fam.param_max

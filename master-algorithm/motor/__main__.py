@@ -1,4 +1,4 @@
-"""CLI: python -m motor tick|status|theory|live|vive|talk"""
+"""CLI: python -m motor tick|status|theory|live|vive|talk|molt"""
 
 from __future__ import annotations
 
@@ -32,11 +32,19 @@ def main(argv: list[str] | None = None) -> int:
     p_vive.add_argument("--rounds", type=int, default=2)
     p_vive.add_argument("--tick-steps", type=int, default=5, dest="tick_steps")
 
+    p_molt = sub.add_parser("molt", help="Self-modify talk.py skins until exam worthy")
+    p_molt.add_argument("--max", type=int, default=8, help="Max molt rounds")
+
     p_talk = sub.add_parser("talk", help="Natural-language mouth over theory.pl")
     p_talk.add_argument("-q", dest="question", help="One-shot question")
     p_talk.add_argument("--growth", action="store_true", help="Ask creciste")
 
     args = parser.parse_args(argv)
+
+    if args.cmd == "molt":
+        from motor.molt_talk import run_molt, _worthy
+        payload = run_molt(max_molts=args.max)
+        return 0 if _worthy(payload["final_score"]) else 1
 
     if args.cmd == "talk":
         from motor.talk import main as talk_main

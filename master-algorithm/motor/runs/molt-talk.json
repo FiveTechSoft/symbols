@@ -1,0 +1,78 @@
+{
+  "finished": true,
+  "reason": "worthy_after_molt",
+  "molts": 1,
+  "history": [
+    {
+      "round": 0,
+      "kept": true,
+      "score": {
+        "n": 243,
+        "known_hit": 159,
+        "known_total": 159,
+        "known_rate": 1.0,
+        "unknown_correct": 46,
+        "unknown_total": 46,
+        "reject_ok": 38,
+        "reject_total": 38,
+        "inventions": 0,
+        "followup_ok": 7,
+        "followup_total": 7,
+        "failures_n": 2,
+        "followup_stress_ok": false,
+        "followup_stress_failed": [
+          "pell_porque",
+          "pell_why"
+        ]
+      },
+      "failures": [],
+      "stress_failed": [
+        "pell_porque",
+        "pell_why"
+      ],
+      "what_changed": "baseline (no rewrite)"
+    },
+    {
+      "round": 1,
+      "kept": true,
+      "score": {
+        "n": 243,
+        "known_hit": 159,
+        "known_total": 159,
+        "known_rate": 1.0,
+        "unknown_correct": 46,
+        "unknown_total": 46,
+        "reject_ok": 38,
+        "reject_total": 38,
+        "inventions": 0,
+        "followup_ok": 7,
+        "followup_total": 7,
+        "failures_n": 0,
+        "followup_stress_ok": true,
+        "followup_stress_failed": []
+      },
+      "failures": [],
+      "stress_failed": [],
+      "what_changed": "heal_DISABLED_scar; ensure_pell_gate; fix_pell_porque; marker_1",
+      "recipes": [
+        "fix_pell_porque"
+      ]
+    }
+  ],
+  "final_score": {
+    "n": 243,
+    "known_hit": 159,
+    "known_total": 159,
+    "known_rate": 1.0,
+    "unknown_correct": 46,
+    "unknown_total": 46,
+    "reject_ok": 38,
+    "reject_total": 38,
+    "inventions": 0,
+    "followup_ok": 7,
+    "followup_total": 7,
+    "failures_n": 0,
+    "followup_stress_ok": true,
+    "followup_stress_failed": []
+  }
+}

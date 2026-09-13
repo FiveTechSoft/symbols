@@ -23,24 +23,48 @@ RUNS_DIR = MOTOR_DIR / "runs"
 UCB_C = 1.4
 
 
+def _resolve_archive_dir(archive_dir: Path | str | None) -> Path:
+    """Resolve archive directory. Default: motor/archive. Relative paths from project root."""
+    if archive_dir is None:
+        return MOTOR_DIR / "archive"
+    p = Path(archive_dir)
+    if p.is_absolute():
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    # Prefer project root (parent of motor/)
+    root = MOTOR_DIR.parent
+    cand = (root / p).resolve()
+    cand.mkdir(parents=True, exist_ok=True)
+    return cand
+
+
 def arm_key(world: str, family: str) -> str:
     return f"{world}::{family}"
 
 
 class MotorKernel:
-    def __init__(self, reset: bool = False) -> None:
+    def __init__(self, reset: bool = False, archive_dir: Path | str | None = None) -> None:
         RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        self.archive_dir = _resolve_archive_dir(archive_dir)
+        theory = self.archive_dir / "theory.pl"
+        meta = self.archive_dir / "meta.json"
         if reset:
-            theory = MOTOR_DIR / "archive" / "theory.pl"
-            meta = MOTOR_DIR / "archive" / "meta.json"
             if theory.exists():
                 theory.unlink()
             if meta.exists():
                 meta.unlink()
+            skin = self.archive_dir / "skin.json"
+            if skin.exists():
+                skin.unlink()
 
-        self.archive = PrologArchive()
+        self.archive = PrologArchive(theory_path=theory, meta_path=meta)
         self.critic = PrologCritic(self.archive)
         self.worlds = build_worlds()
+        # Share hypothesis language skin across sequence/geometry worlds
+        seq = self.worlds.get("sequences")
+        geo = self.worlds.get("geometry")
+        if seq is not None and geo is not None and hasattr(seq, "language"):
+            geo.language = seq.language
         for w in self.worlds.values():
             if hasattr(w, "bind"):
                 w.bind(self.archive, self.critic)

@@ -1,4 +1,3 @@
-# MOLT_ROUND=1
 """Natural-language mouth over theory.pl. Never invents. Spanish first.
 
 Doctrine (BookBrain discipline, theory.pl ontology):
@@ -435,7 +434,7 @@ def _answer_why(kb: dict, last_topic: str | None, last_tag: str | None, st: dict
     """Cite rejected/verified reason for last topic — tag-aware, no mix."""
     topic = last_topic or ""
     tag = last_tag or ""
-    if "transfer-pell" in (tag or "") or st.get("transfer_dst") == "pell" or (topic == "transfer" and "pell" in (tag or "")):
+    if "transfer-pell-DISABLED" in (tag or "") or st.get("transfer_dst") == "pell-DISABLED" or (topic == "transfer" and "pell-DISABLED" in (tag or "")):
         rhits = (
             _rejected_named(kb, "transfer_fib_to_pell")
             or _rejected_named(kb, "transfer_lucas_to_pell")
