@@ -1057,6 +1057,7 @@ chat_social([thank, you]) :- !, writeln('You are welcome. Ask me anything.').
 chat_social([adios]) :- !, writeln('Adios, hasta pronto.').
 chat_social([goodbye]) :- !, writeln('Goodbye, see you soon.').
 chat_social([como, estas]) :- !, writeln('Bien. Y ahora, pregunta lo que quieras.').
+chat_social([que, tal]) :- !, writeln('Todo bien. Preguntame lo que quieras.').
 chat_social([how, are, you]) :- !, writeln('I am well. Now ask me anything.').
 
 chat_why_bare :-
