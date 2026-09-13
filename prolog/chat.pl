@@ -51,6 +51,8 @@ bb_content(W) :-
 
 :- use_module(library(lists)).
 
+chat_quit_token(T) :- member(T, [quit, exit, bye]).
+
 :- dynamic last_fact/3.
 
 % Esqueleto de la ultima pregunta con forma (D2): la elipsis lo continua.
@@ -101,7 +103,6 @@ bb_load(File) :-
     retractall(dialog_pending(_, _, _)),
     retractall(dialog_pending_teach(_, _)),
     retractall(dialog_last_input(_)),
-    dialog_reset,
     dialog_reset,
     retractall(gapfact(_, _, _, _, _)),
     retractall(gapseq(_)),
@@ -213,7 +214,7 @@ chat_loop :-
     ( L == end_of_file -> chat_autosave, writeln('Bye.')
     ; gen_tokenize(L, Lower, _),
       exclude(gen_qmark, Lower, T0),
-      ( T0 == [quit] ; T0 == [exit] ; T0 == [bye] ) ->
+      T0 = [T], chat_quit_token(T) ->
           chat_autosave, writeln('Bye.')
     ; chat_line(L),
       chat_loop
@@ -297,9 +298,7 @@ dialog_why_need(S, V) :-
 
 chat_line_tokens(L, Toks, Changed) :-
     ( Toks == [] -> true
-    ; Toks == [quit] -> writeln('Bye.')
-    ; Toks == [exit] -> writeln('Bye.')
-    ; Toks == [bye] -> writeln('Bye.')
+    ; Toks = [T], chat_quit_token(T) -> writeln('Bye.')
     ; Toks == [help] -> chat_help
     ; Toks == [why] -> chat_why_bare
     ; chat_social(Toks) -> true
@@ -403,6 +402,7 @@ book_anaphora(Toks, B) :-
     ( Ents == []
     ; Ents = [T], book_type(T)
     ),
+    \+ has_unknown_content(Packed),
     last_book(Bs, B).
 
 % "el otro libro": el titulo que no es el de recencia.
@@ -904,7 +904,7 @@ chat_greet([buenas, noches]) :- !, writeln('Hola. Preguntame lo que quieras sobr
 % Hablame de X / tell me about X / who is X / quien es X.
 % Resumen de entidad: primeros hechos (no-eventos) + total.
 chat_about(Toks) :-
-    about_target(Toks, Lang, Name),
+    about_target(Toks, Lang, Name), !,
     about_entity(Name, Lang).
 
 about_target([y|Rest], Lang, Name) :- Rest \== [], about_target(Rest, Lang, Name).
@@ -1009,19 +1009,30 @@ show_src([(_, O, Ref)|T], K) :-
 gen_qmark('?').
 
 chat_help :-
-    writeln('who <verb> <obj>? | what did <s> <verb>? | did <s> <verb> <obj>?'),
-    writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
-    writeln('Teach me facts (SVO, period optional): Zorin reaches Oslo.'),
-    writeln('Ask with those same words: "reaches Oslo?" — the map fills the hole.'),
-    writeln('he/she/it follow the conversation (one clear antecedent);'),
-    writeln('with several antecedents I ask who you mean (answer a name).'),
-    writeln('"And Madrid?" continues the last question (evidence or unknown).'),
-    writeln('unfinished teaching ("Ana opened.") gets asked back once.'),
-    writeln('Ensenar es SVO: "Ana abrio puerta". Preguntar: "Quien abrio puerta?".'),
-    writeln('more (see the rest of long lists) | how many (count).'),
-    writeln('ambiguous pronouns get an honest unknown, never a guess.'),
-    writeln('discover [relation] (find rules in what you taught me)'),
-    writeln('save [name] (dump processed memory) | load [name] (add a .knowledge.pl)'),
+    writeln('Questions (English):'),
+    writeln('  who <verb> <obj>?          -- Who did it?'),
+    writeln('  what did <s> <verb>?       -- What did they do?'),
+    writeln('  did <s> <verb> <obj>?      -- Yes/no check'),
+    writeln('  why did <s> <verb> <obj>?  -- Explanation + proof'),
+    writeln('  where did <s> <verb>?      -- Location'),
+    writeln('  when did <s> <verb>?       -- Time'),
+    writeln('  how many <verb> <obj>?     -- Count'),
+    writeln('Questions (Spanish):'),
+    writeln('  quien <verbo> <?objeto>?   -- Quien lo hizo?'),
+    writeln('  que <verbo> <?sujeto>?     -- Que hicieron?'),
+    writeln('Teach me facts (SVO, period optional):'),
+    writeln('  Zorin reaches Oslo.        -- Direct assertion'),
+    writeln('  Ana abrio puerta.           -- Spanish SVO'),
+    writeln('Pronouns: he/she/it follow conversation (one clear antecedent).'),
+    writeln('  With several antecedents I ask who you mean (answer a name).'),
+    writeln('Ellipsis: "And Madrid?" continues the last question.'),
+    writeln('Incomplete teaching ("Ana opened.") gets asked back once.'),
+    writeln('Commands: more | discover [relation] | save [name] | load [name]'),
+    writeln('  more (see the rest of long lists)'),
+    writeln('  discover (find rules in what you taught me)'),
+    writeln('  save [name] (dump processed memory to file)'),
+    writeln('  load [name] (add a .knowledge.pl file)'),
+    writeln('Social: gracias/thanks | adios/goodbye | how are you'),
     writeln('why? (about last answer) | quit').
 
 % D10 pegamento social minimo (texto UI, no vocabulario del motor:
@@ -1047,40 +1058,34 @@ chat_why_bare :-
     ; writeln('Nothing to explain yet. Ask something first.')
     ).
 
+% Helper: remembers last question and outputs answer
+chat_remember_and_say(Toks, Kind, Ans) :-
+    retractall(dialog_lastq(_)),
+    assertz(dialog_lastq(Toks)),
+    chat_say(Kind, Ans).
+
 chat_ask(Toks) :-
     ( dialog_has_pronoun(Toks) -> chat_unknown
     ; rel_split(Toks, Left, Right), last_ent(Left, _) ->
         ( rel_join(Left, Right) -> chat_ask(Left)
         ; chat_unknown
         )
-    ; ask_conj(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
-    ; ask_or(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
-    ; ask_or_vp(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
-    ; ask_except(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
+    ; ask_conj(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_or(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_or_vp(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_except(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_only(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_both(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_neither(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_else(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
+    ; ask_same(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
     ; pol_neg(Toks, Clean),
       ( once(chat_form(Clean, _, A0))
       ; once(graph_ask(Clean, _, A0))
       ),
       pol_flip(A0, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(say, Ans)
-    ; chat_form(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
+        chat_remember_and_say(Toks, say, Ans)
+    ; chat_form(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
     ; book_pin(Toks, B) ->
         ask_lang(Toks, Lang),
         about_entity(B, Lang)
@@ -1093,10 +1098,7 @@ chat_ask(Toks) :-
     ; book_compare(Toks) ->
         ask_lang(Toks, Lang),
         chat_compare_books(Lang)
-    ; graph_ask(Toks, Kind, Ans) ->
-        retractall(dialog_lastq(_)),
-        assertz(dialog_lastq(Toks)),
-        chat_say(Kind, Ans)
+    ; graph_ask(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
     ; es_form(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -1107,12 +1109,13 @@ chat_ask(Toks) :-
       \+ graph_pins(Toks, _, _) ->
         chat_why_bare
     ; length(Toks, 2),
-      Toks \= [que|_],
+      member(Wq, Toks), qlead(Wq),
       last_fact(_, _, _),
       \+ graph_pins(Toks, _, _) ->
         chat_why_bare
     ; dialog_last_input(Q), is_question(Q),
       \+ graph_pins(Toks, _, _),
+      \+ has_unknown_content(Toks),
       live_books([_|_]) ->
         ask_lang(Toks, Lang),
         chat_list_books(Lang)
@@ -1126,6 +1129,17 @@ ask_lang(Toks, es) :-
 ask_lang(Toks, es) :-
     member(de, Toks), !.
 ask_lang(_, en).
+
+% True if Toks contains a content word (≥3 chars, not qlead/determiner)
+% that is unknown to the knowledge base. Used to prevent listing books
+% for questions with unrecognized verbs/entities.
+has_unknown_content(Toks) :-
+    member(W, Toks),
+    atom_length(W, L), L >= 3,
+    \+ qlead(W),
+    \+ is_determiner(W),
+    \+ bb_content(W),
+    \+ pin_rel(W, _).
 
 % Relativa (Bratko DCG, sin lexico): "that"/"which"/"que" en medio
 % filtran el ente que precede. El join es un hecho vivo, o unknown.
@@ -1246,6 +1260,82 @@ ask_except(Toks, say, Ans) :-
 fact_mentions(Xs, (S, _, O)) :-
     ( member(S, Xs) ; member(O, Xs) ).
 
+is_book_ent(B) :-
+    memory_relation(B, is, book, _, _).
+
+% "did only alice find the key": unico sujeto de ese V-O.
+ask_only(Toks, say, Ans) :-
+    append(Left, [only, STok|Right], Toks),
+    Left \== [],
+    qnorm([STok], S),
+    map_entity(S),
+    append(Left, [STok|Right], Core),
+    once(chat_form(Core, _, A0)),
+    ( A0 = yes((S, V, O)),
+      findall(X, memory_relation(X, V, O, _, _), Xs0),
+      sort(Xs0, [S]) -> Ans = yes((S, V, O))
+    ; Ans = no
+    ).
+
+% "did alice meet both the hatter and the queen".
+ask_both(Toks, Kind, Ans) :-
+    append(Pre, [both|Rest], Toks),
+    append(O1t, [And|O2t], Rest),
+    member(And, [and, y]),
+    O1t \== [], O2t \== [],
+    Pre \== [],
+    append(Pre, O1t, C1),
+    append(Pre, O2t, C2),
+    once(chat_form(C1, _, A1)),
+    once(chat_form(C2, _, A2)),
+    conj_merge(A1, A2, Kind, Ans).
+
+% "did neither alice nor michel eat the key".
+ask_neither(Toks, say, Ans) :-
+    append(Left, [neither, A, nor, B|Right], Toks),
+    member(Did, Left),
+    member(Did, [did, does, do]),
+    once(chat_form([Did, A|Right], _, A1)),
+    once(chat_form([Did, B|Right], _, A2)),
+    ( A1 = no, A2 = no -> Ans = yes_bare
+    ; Ans = no
+    ).
+
+% "who else met the hatter": excluye el ultimo sujeto de la pila.
+ask_else(Toks, say, Ans) :-
+    select(else, Toks, Core),
+    Core \== [],
+    once(( chat_form(Core, say, answer(Xs0, F0))
+         ; graph_ask(Core, say, answer(Xs0, F0))
+         )),
+    ( dialog_stack(subj, [Last|_]) ->
+        exclude(==(Last), Xs0, Xs)
+    ; Xs = Xs0
+    ),
+    ( Xs == [] -> Ans = nobody
+    ; include(fact_mentions(Xs), F0, Facts),
+      Facts \== [],
+      Ans = answer(Xs, Facts)
+    ).
+
+% "same author" de dos titulos: rel compartida distinta de `is`.
+ask_same(Toks, say, Ans) :-
+    member(same, Toks),
+    nl_tokens(Toks, Packed),
+    live_books(Bs),
+    include(packed_has(Packed), Bs, [B1, B2]),
+    findall(R, (memory_relation(B1, R, _, _, _),
+                memory_relation(B2, R, _, _, _),
+                R \== is), Rs0),
+    sort(Rs0, Rs),
+    ( member(W, Packed), pin_rel(W, R), memberchk(R, Rs) -> true
+    ; Rs = [R]
+    ),
+    memory_relation(B1, R, O1, _, _),
+    memory_relation(B2, R, O2, _, _),
+    ( O1 == O2 -> Ans = yes_bare ; Ans = no
+    ).
+
 % never/not invierte el si/no (polaridad cerrada, no lexico).
 pol_neg(Toks, Clean) :-
     member(Neg, [never, not]),
@@ -1298,13 +1388,14 @@ rel_touches(Ents, R) :-
 pin_rel(W, R) :-
     bb_rel_forms(W, Rs),
     member(R, Rs).
-% set → set_in, appears → appears_in: prefijo vivo + '_' en el grafo.
+% set → set_in, appear → appears_in: stem del prefijo + '_' vivo.
 pin_rel(W, R) :-
     \+ map_entity(W),
     atom_length(W, L), L >= 3,
     memory_relation(_, R, _, _, _),
-    atom_concat(W, Rest, R),
-    sub_atom(Rest, 0, 1, _, '_').
+    atom_concat(Prefix, Rest, R),
+    sub_atom(Rest, 0, 1, _, '_'),
+    inflect_same(W, Prefix).
 pin_rel(W, R) :-
     \+ bb_rel_forms(W, _),
     \+ map_entity(W),
@@ -1436,6 +1527,15 @@ graph_fill(_, [], [A, B], yes((A, appears_in, B))) :-
     memory_relation(A, appears_in, B, _, _).
 graph_fill(_, [], [A, B], yes((B, appears_in, A))) :-
     memory_relation(B, appears_in, A, _, _).
+graph_fill(_, [], Ents, Ans) :-
+    length(Ents, 3),
+    include(is_book_ent, Ents, [Book]),
+    subtract(Ents, [Book], [A, B]),
+    ( memory_relation(A, appears_in, Book, _, _),
+      memory_relation(B, appears_in, Book, _, _) ->
+        Ans = yes_both((A, appears_in, Book), (B, appears_in, Book))
+    ; Ans = no
+    ).
 graph_fill(_, [], [A, B], no) :-
     ( memory_relation(A, is, book, _, _)
     ; memory_relation(B, is, book, _, _)
@@ -1492,6 +1592,11 @@ es_form([que, V|Rest], say, answer(Xs, Facts)) :-
     findall(O, member(O-_, OF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, OF), Facts).
+% quien V E? pero nadie V a E: "No" honesto (evita fallback a outgoing).
+es_form([quien, V|Rest], say, no) :-
+    qnorm(Rest, O),
+    O \== [],
+    \+ (bb_rel_forms(V, Rs), member(Vr, Rs), memory_relation(_, Vr, O, _, _)).
 es_form([V, S, O], say, YesNo) :-
     V \== quien, V \== que,
     qnorm_atom(S, S2),
@@ -1688,6 +1793,11 @@ chat_form([who, V|Rest], say, answer(Xs, Facts)) :-
     findall(S, member(S-_, SF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, SF), Facts).
+% who V E? but no one V's E: honest "no" (prevents graph fallback to outgoing).
+chat_form([who, V|Rest], say, no) :-
+    qnorm(Rest, O),
+    O \== [],
+    \+ (bb_rel_forms(V, Rs), member(Vr, Rs), memory_relation(_, Vr, O, _, _)).
 chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     append(Pre, [V], Mid),
     Pre \== [],
@@ -1700,6 +1810,14 @@ chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     findall(F, member(_-F, OF), Facts).
 % D7 how-many (M2 en dialogo): cuenta objetos distintos de (S, V).
 % El resto nominal ("books") lo filtra qnorm; el sujeto manda.
+chat_form([how, many|Mid], say, count(N)) :-
+    nl_tokens(Mid, Packed),
+    pins_of(Packed, Rels, Ents),
+    Rels \== [], Ents = [E],
+    findall(S, (member(R, Rels), memory_relation(S, R, E, _, _)), Ss0),
+    sort(Ss0, Ss),
+    Ss \== [],
+    length(Ss, N).
 chat_form([how, many|Mid], say, count(N)) :-
     live_books(Bs), Bs \== [],
     nl_tokens(Mid, [W]),
@@ -1831,7 +1949,9 @@ bb_rel_forms(V, Rs) :-
     bb_rel_forms_direct(V, Rs0),
     findall(R, (means_triple(V, C),
                 bb_rel_forms_direct(C, RC), member(R, RC)), Rs1),
-    append(Rs0, Rs1, Rall),
+    findall(R, (irregular_form(V, Base),
+                bb_rel_forms_direct(Base, RB), member(R, RB)), Rs2),
+    append([Rs0, Rs1, Rs2], Rall),
     sort(Rall, Rs),
     Rs \== [].
 
@@ -1846,6 +1966,40 @@ means_triple(V, C) :-
     ( Rel == means ; Rel == significa ),
     A \== V,
     inflect_same(V, A).
+
+% Irregular verb forms: past/participle → base form. Closed list.
+% Allows "ate"→"eat", "went"→"go", etc. in bb_rel_forms resolution.
+irregular_form(ate, eat).
+irregular_form(went, go).
+irregular_form(saw, see).
+irregular_form(found, find).
+irregular_form(got, get).
+irregular_form(made, make).
+irregular_form(said, say).
+irregular_form(took, take).
+irregular_form(gave, give).
+irregular_form(knew, know).
+irregular_form(thought, think).
+irregular_form(came, come).
+irregular_form(ran, run).
+irregular_form(led, lead).
+irregular_form(felt, feel).
+irregular_form(brought, bring).
+irregular_form(began, begin).
+irregular_form(kept, keep).
+irregular_form(held, hold).
+irregular_form(wrote, write).
+irregular_form(stood, stand).
+irregular_form(heard, hear).
+irregular_form(paid, pay).
+irregular_form(met, meet).
+irregular_form(ate, eat).
+irregular_form(drunk, drink).
+irregular_form(drank, drink).
+irregular_form(entered, enter).
+irregular_form(followed, follow).
+irregular_form(defied, defy).
+irregular_form(peeped, peep).
 
 inflect_same(A, B) :-
     bb_stem(A, S0), bb_ddouble(S0, X),

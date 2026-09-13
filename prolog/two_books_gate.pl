@@ -105,6 +105,31 @@ run_two :-
     ( sub_string(OutList, _, _, _, "michel") -> true
     ; format('FAIL list chars: ~w~n', [OutList]), fail
     ),
+    expect("did only alice find the key?", "Yes"),
+    capture("did alice meet both the hatter and the queen?", OutBoth),
+    ( sub_string(OutBoth, _, _, _, "Yes") -> true
+    ; format('FAIL both: ~w~n', [OutBoth]), fail
+    ),
+    capture("did neither alice nor michel eat the key?", OutNei),
+    ( sub_string(OutNei, _, _, _, "Yes") -> true
+    ; format('FAIL neither: ~w~n', [OutNei]), fail
+    ),
+    capture("is alice and valerie in plataforma?", OutAB),
+    ( sub_string(OutAB, _, _, _, "No") -> true
+    ; format('FAIL alice+valerie in: ~w~n', [OutAB]), fail
+    ),
+    expect("how many people appear in plataforma?", "4"),
+    capture("does alice_in_wonderland have the same author as plataforma?", OutSame),
+    ( sub_string(OutSame, _, _, _, "No") -> true
+    ; format('FAIL same author: ~w~n', [OutSame]), fail
+    ),
+    capture("who found key?", _),
+    capture("who else met the hatter?", OutElse),
+    ( sub_string(OutElse, _, _, _, "No one else") -> true
+    ; format('FAIL else: ~w~n', [OutElse]), fail
+    ),
+    capture("forget that", OutFg),
+    \+ sub_string(OutFg, _, _, _, "Because"),
     delete_file('two_books_tmp.knowledge.pl').
 
 capture(Line, Out) :-
