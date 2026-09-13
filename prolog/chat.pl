@@ -1938,12 +1938,13 @@ fuzzy_one(W, C) :-
     atom_chars(W, [F|Cs]),
     length([F|Cs], L),
     L >= 3,
+    MaxD is L // 3,
     findall(D-S, (memory_symbol(S),
                   atom_chars(S, [F|_]),
                   atom_length(S, LS),
                   abs(LS - L) =< 2,
                   symbol_dist(W, S, D),
-                  D =< 2), DS),
+                  D =< MaxD), DS),
     keysort(DS, [D0-C|_]),
     \+ ( member(D1-C1, DS), C1 \== C, D1 =:= D0 ).
 
@@ -2067,7 +2068,15 @@ bb_stem(W, St) :-
     ; sub_atom(W, _, 3, 0, 'ies') ->
         sub_atom(W, 0, _, 3, Pre2), atom_concat(Pre2, 'y', St)
     ; sub_atom(W, _, 2, 0, 'ed') ->
-        sub_atom(W, 0, _, 2, St)
+        sub_atom(W, 0, _, 2, Pre3),
+        ( atom_length(Pre3, PL), PL >= 2,
+          sub_atom(Pre3, _, 1, 0, C1),
+          sub_atom(Pre3, _, 1, 1, C2),
+          C1 == C2,
+          sub_atom(Pre3, 0, _, 1, Undoubled) ->
+            St = Undoubled
+        ; St = Pre3
+        )
     ; sub_atom(W, _, 3, 0, 'ing') ->
         sub_atom(W, 0, _, 3, St)
     ; sub_atom(W, _, 2, 0, 'es') ->
