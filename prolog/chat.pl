@@ -1629,6 +1629,19 @@ es_form([que, V|Rest], say, answer(Xs, Facts)) :-
     findall(O, member(O-_, OF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, OF), Facts).
+% que V S? pero V no es verbo conocido: sugerir ensenar traduccion.
+es_form([que, V|Rest], say, unknown) :-
+    qnorm(Rest, S),
+    S \== [],
+    \+ es_did_form(V),
+    \+ bb_rel_forms(V, _),
+    format('No reconozco "~w". Ensename: "eat significa ~w" o "<verb> means ~w".~n', [V, V, V]).
+% quien V E? pero V no es verbo conocido: sugerir ensenar traduccion.
+es_form([quien, V|Rest], say, unknown) :-
+    qnorm(Rest, O),
+    O \== [],
+    \+ bb_rel_forms(V, _),
+    format('No reconozco "~w". Puedes ensenarme: "eat significa ~w" o "<verbo> means ~w".~n', [V, V, V]).
 % quien V E? pero nadie V a E: "No" honesto (evita fallback a outgoing).
 es_form([quien, V|Rest], say, no) :-
     qnorm(Rest, O),
