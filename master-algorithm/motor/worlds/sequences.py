@@ -172,8 +172,9 @@ class SequencesWorld(WorldBase):
                 return self.language.schemas[sid]
         if fam_id in self.language.schemas:
             return self.language.schemas[fam_id]
-        if fam_id.startswith("linrec_scan") and fam_id in self.language.schemas:
-            return self.language.schemas[fam_id]
+        for prefix in ("linrec_scan", "bilinear_schema", "modperiod_schema"):
+            if fam_id.startswith(prefix) and fam_id in self.language.schemas:
+                return self.language.schemas[fam_id]
         return None
 
     def observe(self) -> dict[str, Any]:
@@ -274,9 +275,9 @@ class SequencesWorld(WorldBase):
                 )
             )
 
-        elif fid == "modular_periods" or (sch and sch.id == "modperiod_schema"):
+        elif fid == "modular_periods" or fid.startswith("modperiod_schema") or (sch and "modperiod" in sch.id):
             if sch is None:
-                sch = self.language.schemas.get("modperiod_schema")
+                sch = self.language.schemas.get(fid) or self.language.schemas.get("modperiod_schema")
             if sch is None or not sch.unlocked:
                 return out
             for seq in ("fib", "lucas"):
@@ -295,9 +296,9 @@ class SequencesWorld(WorldBase):
                         )
                     )
 
-        elif fid == "bilinear_schema" or (sch and sch.id == "bilinear_schema"):
+        elif fid == "bilinear_schema" or fid.startswith("bilinear_schema") or (sch and "bilinear" in sch.id):
             if sch is None:
-                sch = self.language.schemas.get("bilinear_schema")
+                sch = self.language.schemas.get(fid) or self.language.schemas.get("bilinear_schema")
             if sch is None or not sch.unlocked:
                 return out
             # Search schema params on fib (and lucas for transfer-flavored check)
@@ -371,7 +372,7 @@ class SequencesWorld(WorldBase):
             )
 
         if kind == "ratio_phi":
-            rel = M.check_ratio_to_phi(self.data["fib"], self.N)
+            rel = M.check_ratios_to_phi(self.data["fib"], self.N)
             return VerifiedFact(
                 name=conjecture.name,
                 family=conjecture.family,

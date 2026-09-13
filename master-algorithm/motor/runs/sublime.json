@@ -1,0 +1,99 @@
+{
+  "n_schema_classes": 10,
+  "n_verified": 140,
+  "n_rejected": 106,
+  "transfer_accuracy": 0.5,
+  "lucas_transfer": 1.0,
+  "pell_transfer": 0.0,
+  "reject_rate": 0.4309,
+  "n_types": 19,
+  "lemma_reuse_rate": 0.8571,
+  "language_generation": 6,
+  "unlocked_schemas": [
+    "bilinear_schema",
+    "bilinear_schema_r4_g4",
+    "bilinear_schema_r4_g5",
+    "bilinear_schema_r4_g6",
+    "dead_prime",
+    "geo_invent",
+    "linrec_scan",
+    "modperiod_schema",
+    "ratio_scan",
+    "transfer_horn"
+  ],
+  "molts_kept": 6,
+  "molts_reverted": 0,
+  "metrics_before": {
+    "n_verified": 0,
+    "n_rejected": 0,
+    "n_types": 0,
+    "reject_rate": 0.0,
+    "transfer_accuracy": 0.0,
+    "lemma_reuse_rate": 0.0,
+    "n_schema_classes": 7,
+    "unlocked_schemas": [
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 0.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": false,
+    "language_generation": 0
+  },
+  "metrics_final": {
+    "n_verified": 140,
+    "n_rejected": 106,
+    "n_types": 19,
+    "reject_rate": 0.4309,
+    "transfer_accuracy": 0.5,
+    "lemma_reuse_rate": 0.8571,
+    "n_schema_classes": 10,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 6
+  },
+  "example_clauses": [
+    {
+      "status": "verified_rec",
+      "clause": "rec(fib, [1,1]).",
+      "reason": "critic holds_rec accepted; archived rec/2"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(sequences, bilinear_schema, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).",
+      "reason": "bilinear_schema operator (NOT old canned bilinear_fib); critic accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(geometry, geo_invent, 'geo_invent::L2_midline_parallel', 'BC \u2225 MN')).",
+      "reason": "geo_invent mutate_construction; engine proved then archived"
+    },
+    {
+      "status": "verified_period",
+      "clause": "true_mod(fib, 2, 3).",
+      "reason": "modperiod_schema search; holds_period accepted"
+    },
+    {
+      "status": "rejected",
+      "clause": "rejected('bilin_fib_bogus_const2', 'n=1: lhs=-1\u22602').",
+      "reason": "bilinear_schema bogus RHS; critic finite-fail"
+    }
+  ],
+  "elapsed_s": 20.328
+}

@@ -1,17 +1,18 @@
 {
-  "ticks_this_run": 5,
-  "total_steps": 55,
+  "ticks_this_run": 2,
+  "total_steps": 62,
   "backend": "swipl",
   "swipl": true,
-  "n_verified_facts": 43,
+  "n_verified_facts": 51,
   "n_rejected": 32,
-  "n_lemmas": 10,
-  "n_distinct_types": 15,
+  "n_lemmas": 14,
+  "n_distinct_types": 16,
   "distinct_types": [
     "bilinear_fib",
     "bit_fn",
     "boolean_from_examples",
     "euclid_conjectures",
+    "geo_invent",
     "lemma:EqAng",
     "lemma:EqSeg",
     "lemma:HalfSeg",
@@ -574,6 +575,76 @@
       "n_rejected": 32,
       "n_lemmas": 10,
       "tick": 55
+    },
+    {
+      "n_verified_facts": 45,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4156,
+      "n_rejected": 32,
+      "n_lemmas": 11,
+      "tick": 56
+    },
+    {
+      "n_verified_facts": 47,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.3333,
+      "reject_rate": 0.4051,
+      "n_rejected": 32,
+      "n_lemmas": 12,
+      "tick": 57
+    },
+    {
+      "n_verified_facts": 49,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.3951,
+      "n_rejected": 32,
+      "n_lemmas": 13,
+      "tick": 58
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.6,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 59
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.6,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 60
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.4,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 61
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.4,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 62
     }
   ],
   "baselines": {
@@ -658,132 +729,54 @@
   },
   "step_log_tail": [
     {
-      "tick": 51,
-      "world": "geometry",
-      "family": "euclid_conjectures",
-      "why": "UCB1 over 11 arms (world,family); picked geometry::euclid_conjectures because avg=1.179+1.4*sqrt(ln(50+1)/7)=1.049\u21922.228. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 1,
-      "outcomes": [
-        "duplicate_true"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "new_types": 0,
-        "transfer_hits": 0,
-        "dead_ok": 0,
-        "cost": 0.15,
-        "score": -0.15
-      },
-      "growth": "param at max \u2192 saturate",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 52,
-      "world": "geometry",
-      "family": "lemma_reuse",
-      "why": "UCB1 over 11 arms (world,family); picked geometry::lemma_reuse because avg=1.179+1.4*sqrt(ln(51+1)/7)=1.052\u21922.230. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 1,
-      "outcomes": [
-        "duplicate_true"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "new_types": 0,
-        "transfer_hits": 0,
-        "dead_ok": 0,
-        "cost": 0.15,
-        "score": -0.15
-      },
-      "growth": "param at max \u2192 saturate",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 53,
-      "world": "logic",
-      "family": "dead_end_const_true",
-      "why": "UCB1 over 11 arms (world,family); picked logic::dead_end_const_true because avg=0.600+1.4*sqrt(ln(52+1)/3)=1.611\u21922.211. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 3,
-      "outcomes": [
-        "duplicate_reject",
-        "duplicate_reject",
-        "duplicate_reject"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "new_types": 0,
-        "transfer_hits": 0,
-        "dead_ok": 3,
-        "cost": 0.15,
-        "score": 0.6
-      },
-      "growth": "dead-end \u2192 saturate (curiosity tax)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 54,
-      "world": "geometry",
-      "family": "dead_end_false_eq",
-      "why": "UCB1 over 11 arms (world,family); picked geometry::dead_end_false_eq because avg=0.200+1.4*sqrt(ln(53+1)/2)=1.977\u21922.177. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 1,
-      "outcomes": [
-        "duplicate_reject"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "new_types": 0,
-        "transfer_hits": 0,
-        "dead_ok": 1,
-        "cost": 0.05,
-        "score": 0.2
-      },
-      "growth": "dead-end \u2192 saturate (curiosity tax)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 55,
+      "tick": 61,
       "world": "sequences",
-      "family": "dead_end_always_prime",
-      "why": "UCB1 over 11 arms (world,family); picked sequences::dead_end_always_prime because avg=0.200+1.4*sqrt(ln(54+1)/2)=1.982\u21922.182. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 1,
-      "outcomes": [
-        "duplicate_reject"
-      ],
+      "family": "bilinear_schema",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.020+1.4*sqrt(ln(60+1)/1)=2.839\u21922.819. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
       "score_detail": {
         "new_true": 0,
         "new_reject": 0,
         "new_types": 0,
         "transfer_hits": 0,
-        "dead_ok": 1,
-        "cost": 0.05,
-        "score": 0.2
+        "dead_ok": 0,
+        "cost": 0.04,
+        "score": -0.04
       },
-      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "growth": "expand schema param 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 62,
+      "world": "sequences",
+      "family": "bilinear_schema",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.030+1.4*sqrt(ln(61+1)/2)=2.011\u21921.981. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.06,
+        "score": -0.06
+      },
+      "growth": "expand schema param 3\u21924",
       "unlock": null,
       "accepted": [],
       "rejected": [],
       "transfer": []
     }
   ],
-  "elapsed_s": 0.074,
+  "elapsed_s": 0.007,
   "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
   "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
   "transfer_accuracy": 0.5,
-  "lemma_reuse_rate": 0.5,
-  "reject_rate": 0.4267
+  "lemma_reuse_rate": 0.4,
+  "reject_rate": 0.3855
 }

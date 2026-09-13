@@ -283,3 +283,23 @@ holds_bit(9003, [0,1,1], 1).
 lemma('L2_EqAng', EqAng, '∠ABC = ∠ADC').
 % verified @ geometry/euclid_conjectures
 verified(fact(geometry, euclid_conjectures, 'geo_para_euclid_conjectures_p5::L2_EqAng', '∠ABC = ∠ADC')).
+lemma('L2_midline_parallel', Parallel, 'AC ∥ MX2').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L2_midline_parallel', 'AC ∥ MX2')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d1_s55', 'AC ∥ MX2')).
+lemma('L3_midline_parallel', Parallel, 'AC ∥ MP').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L3_midline_parallel', 'AC ∥ MP')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d2_s56', 'AC ∥ MP')).
+lemma('L4_midline_parallel', Parallel, 'AX3 ∥ X3X4').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L4_midline_parallel', 'AX3 ∥ X3X4')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d3_s57', 'AX3 ∥ X3X4')).
+lemma('L5_midline_parallel', Parallel, 'BC ∥ MN').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L5_midline_parallel', 'BC ∥ MN')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s58', 'BC ∥ MN')).

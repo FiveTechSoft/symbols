@@ -388,19 +388,26 @@ def _example_clauses(kernel: MotorKernel, n: int = 5) -> list[dict]:
             return
         picks.append({"status": kind, "clause": line[:200], "reason": reason})
 
-    for ln in recs[:2]:
+    for ln in recs[:1]:
         add("verified_rec", ln, "critic holds_rec accepted; archived rec/2")
     for ln in bilin[:1]:
-        add("verified", ln, "bilinear_schema operator; critic/finite check accepted")
+        add("verified", ln, "bilinear_schema operator (NOT old canned bilinear_fib); critic accepted")
     for ln in invent[:1]:
         add("verified", ln, "geo_invent mutate_construction; engine proved then archived")
     for ln in period[:1]:
         add("verified_period", ln, "modperiod_schema search; holds_period accepted")
+    # Prefer an explicit schema reject (bogus bilinear / dead-end)
     for ln in rejected:
-        if "bogus" in ln or "prime" in ln or "NEG_" in ln or "const" in ln:
-            add("rejected", ln, "critic finite-fail / dead-end")
+        if "bogus" in ln:
+            add("rejected", ln, "bilinear_schema bogus RHS; critic finite-fail")
+            break
+    for ln in rejected:
         if len(picks) >= n:
             break
+        if "bogus" in ln:
+            continue
+        if "prime" in ln or "NEG_" in ln or "lucas" in ln:
+            add("rejected", ln, "critic finite-fail / dead-end or failed transfer-shaped bilin")
     for ln in rejected:
         if len(picks) >= n:
             break

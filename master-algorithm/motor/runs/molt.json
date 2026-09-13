@@ -1,0 +1,909 @@
+{
+  "archive_dir": "/workspace/master-algorithm/motor/archive-sublime",
+  "skin_path": "/workspace/master-algorithm/motor/archive-sublime/skin.json",
+  "batch_ticks": 10,
+  "min_molts": 3,
+  "max_molts": 6,
+  "molts_attempted": 6,
+  "molts_kept": 6,
+  "molts_reverted": 0,
+  "metrics_before": {
+    "n_verified": 0,
+    "n_rejected": 0,
+    "n_types": 0,
+    "reject_rate": 0.0,
+    "transfer_accuracy": 0.0,
+    "lemma_reuse_rate": 0.0,
+    "n_schema_classes": 7,
+    "unlocked_schemas": [
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 0.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": false,
+    "language_generation": 0
+  },
+  "metrics_after_warmup": {
+    "n_verified": 7,
+    "n_rejected": 13,
+    "n_types": 7,
+    "reject_rate": 0.65,
+    "transfer_accuracy": 0.0,
+    "lemma_reuse_rate": 1.0,
+    "n_schema_classes": 7,
+    "unlocked_schemas": [
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 0.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": false,
+    "language_generation": 0
+  },
+  "metrics_final": {
+    "n_verified": 140,
+    "n_rejected": 106,
+    "n_types": 19,
+    "reject_rate": 0.4309,
+    "transfer_accuracy": 0.5,
+    "lemma_reuse_rate": 0.8571,
+    "n_schema_classes": 10,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 6
+  },
+  "molt_log": [
+    {
+      "molt_index": 0,
+      "generation": 1,
+      "saturation_reason": "schema ratio_scan saturated; 0 new verified and 0 new types this batch; reject_rate stuck + type plateau; transfer plateau",
+      "molt_actions": [
+        "raise_linrec_order 2\u21923",
+        "widen_coeff_range [-4,4]",
+        "unlock_schema bilinear_schema",
+        "raise_r_max 1\u21922",
+        "raise_mut_depth 1\u21922",
+        "novelty_bonus\u21920.5"
+      ],
+      "unlocked_before": [
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 7,
+        "n_rejected": 13,
+        "n_types": 7,
+        "reject_rate": 0.65,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 0
+      },
+      "metrics_after": {
+        "n_verified": 19,
+        "n_rejected": 28,
+        "n_types": 9,
+        "reject_rate": 0.5957,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 1
+      },
+      "keep": true,
+      "keep_reason": "n_verified 7\u219219; n_types 7\u21929; unlocked ['bilinear_schema']",
+      "ticks": 10,
+      "n_verified_delta": 12,
+      "n_types_delta": 2,
+      "action": "keep_skin"
+    },
+    {
+      "molt_index": 1,
+      "generation": 2,
+      "saturation_reason": "schema ratio_scan saturated; schema bilinear_schema saturated; 0 new verified and 0 new types this batch; reject_rate stuck + type plateau",
+      "molt_actions": [
+        "raise_linrec_order 3\u21924",
+        "widen_coeff_range [-5,5]",
+        "unlock_schema modperiod_schema",
+        "raise_m_max 4\u21926",
+        "raise_mut_depth 2\u21923",
+        "novelty_bonus\u21921.0"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 19,
+        "n_rejected": 28,
+        "n_types": 9,
+        "reject_rate": 0.5957,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 1
+      },
+      "metrics_after": {
+        "n_verified": 31,
+        "n_rejected": 42,
+        "n_types": 11,
+        "reject_rate": 0.5753,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 2
+      },
+      "keep": true,
+      "keep_reason": "n_verified 19\u219231; n_types 9\u219211; unlocked ['modperiod_schema']",
+      "ticks": 10,
+      "n_verified_delta": 12,
+      "n_types_delta": 2,
+      "action": "keep_skin"
+    },
+    {
+      "molt_index": 2,
+      "generation": 3,
+      "saturation_reason": "schema ratio_scan saturated; schema modperiod_schema saturated; schema bilinear_schema saturated; 0 new verified and 0 new types this batch",
+      "molt_actions": [
+        "raise_mut_depth 3\u21924",
+        "novelty_bonus\u21921.5"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 31,
+        "n_rejected": 42,
+        "n_types": 11,
+        "reject_rate": 0.5753,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 2
+      },
+      "metrics_after": {
+        "n_verified": 49,
+        "n_rejected": 42,
+        "n_types": 15,
+        "reject_rate": 0.4615,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8889,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 3
+      },
+      "keep": true,
+      "keep_reason": "n_verified 31\u219249; n_types 11\u219215; lucas_transfer 0.0\u21921.0",
+      "ticks": 10,
+      "n_verified_delta": 18,
+      "n_types_delta": 4,
+      "action": "keep_skin"
+    },
+    {
+      "molt_index": 3,
+      "generation": 4,
+      "saturation_reason": "schema linrec_scan saturated; schema ratio_scan saturated; schema modperiod_schema saturated; schema bilinear_schema saturated",
+      "molt_actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_schema bilinear_schema_r4_g4"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 49,
+        "n_rejected": 42,
+        "n_types": 15,
+        "reject_rate": 0.4615,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8889,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 3
+      },
+      "metrics_after": {
+        "n_verified": 87,
+        "n_rejected": 78,
+        "n_types": 17,
+        "reject_rate": 0.4727,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8182,
+        "n_schema_classes": 8,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 4
+      },
+      "keep": true,
+      "keep_reason": "n_verified 49\u219287; n_types 15\u219217; n_schema_classes 7\u21928; unlocked ['bilinear_schema_r4_g4']",
+      "ticks": 10,
+      "n_verified_delta": 38,
+      "n_types_delta": 2,
+      "action": "keep_skin"
+    },
+    {
+      "molt_index": 4,
+      "generation": 5,
+      "saturation_reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+      "molt_actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_schema bilinear_schema_r4_g5"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 87,
+        "n_rejected": 78,
+        "n_types": 17,
+        "reject_rate": 0.4727,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8182,
+        "n_schema_classes": 8,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 4
+      },
+      "metrics_after": {
+        "n_verified": 115,
+        "n_rejected": 94,
+        "n_types": 18,
+        "reject_rate": 0.4498,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8462,
+        "n_schema_classes": 9,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 5
+      },
+      "keep": true,
+      "keep_reason": "n_verified 87\u2192115; n_types 17\u219218; n_schema_classes 8\u21929; unlocked ['bilinear_schema_r4_g5']",
+      "ticks": 10,
+      "n_verified_delta": 28,
+      "n_types_delta": 1,
+      "action": "keep_skin"
+    },
+    {
+      "molt_index": 5,
+      "generation": 6,
+      "saturation_reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema bilinear_schema_r4_g4 saturated; schema bilinear_schema_r4_g5 saturated",
+      "molt_actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_schema bilinear_schema_r4_g6"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "metrics_before": {
+        "n_verified": 115,
+        "n_rejected": 94,
+        "n_types": 18,
+        "reject_rate": 0.4498,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8462,
+        "n_schema_classes": 9,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 5
+      },
+      "metrics_after": {
+        "n_verified": 140,
+        "n_rejected": 106,
+        "n_types": 19,
+        "reject_rate": 0.4309,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8571,
+        "n_schema_classes": 10,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 6
+      },
+      "keep": true,
+      "keep_reason": "n_verified 115\u2192140; n_types 18\u219219; n_schema_classes 9\u219210; unlocked ['bilinear_schema_r4_g6']",
+      "ticks": 10,
+      "n_verified_delta": 25,
+      "n_types_delta": 1,
+      "action": "keep_skin"
+    }
+  ],
+  "batch_log": [
+    {
+      "phase": "warmup",
+      "generation": 0,
+      "ticks": 10,
+      "metrics": {
+        "n_verified": 7,
+        "n_rejected": 13,
+        "n_types": 7,
+        "reject_rate": 0.65,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 0
+      },
+      "accepted_tail": [
+        {
+          "tick": 8,
+          "world": "sequences",
+          "family": "ratio_limits",
+          "why": "UCB1 over 9 arms (world,family); picked sequences::ratio_limits because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+          "n_conjectures": 2,
+          "outcomes": [
+            "new_true",
+            "new_reject"
+          ],
+          "score_detail": {
+            "new_true": 1,
+            "new_reject": 1,
+            "new_types": 1,
+            "transfer_hits": 0,
+            "dead_ok": 1,
+            "cost": 0.1,
+            "score": 1.65
+          },
+          "growth": "param at max \u2192 saturate schema",
+          "unlock": null,
+          "accepted": [
+            "ratio_fib_to_phi"
+          ],
+          "rejected": [
+            "NEG_ratio_fib_to_e"
+          ],
+          "transfer": []
+        },
+        {
+          "tick": 9,
+          "world": "geometry",
+          "family": "dead_end_false_eq",
+          "why": "UCB1 over 8 arms (world,family); picked geometry::dead_end_false_eq because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+          "n_conjectures": 1,
+          "outcomes": [
+            "new_reject"
+          ],
+          "score_detail": {
+            "new_true": 0,
+            "new_reject": 1,
+            "new_types": 0,
+            "transfer_hits": 0,
+            "dead_ok": 1,
+            "cost": 0.05,
+            "score": 0.2
+          },
+          "growth": "dead-end \u2192 saturate (curiosity tax)",
+          "unlock": null,
+          "accepted": [],
+          "rejected": [
+            "NEG_scalene_ab_eq_ac"
+          ],
+          "transfer": []
+        },
+        {
+          "tick": 10,
+          "world": "sequences",
+          "family": "dead_end_always_prime",
+          "why": "UCB1 over 7 arms (world,family); picked sequences::dead_end_always_prime because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+          "n_conjectures": 1,
+          "outcomes": [
+            "new_reject"
+          ],
+          "score_detail": {
+            "new_true": 0,
+            "new_reject": 1,
+            "new_types": 0,
+            "transfer_hits": 0,
+            "dead_ok": 1,
+            "cost": 0.05,
+            "score": 0.2
+          },
+          "growth": "dead-end \u2192 saturate (curiosity tax)",
+          "unlock": null,
+          "accepted": [],
+          "rejected": [
+            "NEG_fib_always_prime"
+          ],
+          "transfer": []
+        }
+      ]
+    },
+    {
+      "phase": "post_molt_0",
+      "generation": 1,
+      "keep": true,
+      "metrics": {
+        "n_verified": 19,
+        "n_rejected": 28,
+        "n_types": 9,
+        "reject_rate": 0.5957,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 1
+      }
+    },
+    {
+      "phase": "post_molt_1",
+      "generation": 2,
+      "keep": true,
+      "metrics": {
+        "n_verified": 31,
+        "n_rejected": 42,
+        "n_types": 11,
+        "reject_rate": 0.5753,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 0.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": false,
+        "language_generation": 2
+      }
+    },
+    {
+      "phase": "post_molt_2",
+      "generation": 3,
+      "keep": true,
+      "metrics": {
+        "n_verified": 49,
+        "n_rejected": 42,
+        "n_types": 15,
+        "reject_rate": 0.4615,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8889,
+        "n_schema_classes": 7,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 3
+      }
+    },
+    {
+      "phase": "post_molt_3",
+      "generation": 4,
+      "keep": true,
+      "metrics": {
+        "n_verified": 87,
+        "n_rejected": 78,
+        "n_types": 17,
+        "reject_rate": 0.4727,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8182,
+        "n_schema_classes": 8,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 4
+      }
+    },
+    {
+      "phase": "post_molt_4",
+      "generation": 5,
+      "keep": true,
+      "metrics": {
+        "n_verified": 115,
+        "n_rejected": 94,
+        "n_types": 18,
+        "reject_rate": 0.4498,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8462,
+        "n_schema_classes": 9,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 5
+      }
+    },
+    {
+      "phase": "post_molt_5",
+      "generation": 6,
+      "keep": true,
+      "metrics": {
+        "n_verified": 140,
+        "n_rejected": 106,
+        "n_types": 19,
+        "reject_rate": 0.4309,
+        "transfer_accuracy": 0.5,
+        "lemma_reuse_rate": 0.8571,
+        "n_schema_classes": 10,
+        "unlocked_schemas": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "lucas_transfer": 1.0,
+        "pell_transfer": 0.0,
+        "transfer_honest": true,
+        "language_generation": 6
+      }
+    }
+  ],
+  "example_clauses": [
+    {
+      "status": "verified_rec",
+      "clause": "rec(fib, [1,1]).",
+      "reason": "critic holds_rec accepted; archived rec/2"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(sequences, bilinear_schema, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).",
+      "reason": "bilinear_schema operator (NOT old canned bilinear_fib); critic accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(geometry, geo_invent, 'geo_invent::L2_midline_parallel', 'BC \u2225 MN')).",
+      "reason": "geo_invent mutate_construction; engine proved then archived"
+    },
+    {
+      "status": "verified_period",
+      "clause": "true_mod(fib, 2, 3).",
+      "reason": "modperiod_schema search; holds_period accepted"
+    },
+    {
+      "status": "rejected",
+      "clause": "rejected('bilin_fib_bogus_const2', 'n=1: lhs=-1\u22602').",
+      "reason": "bilinear_schema bogus RHS; critic finite-fail"
+    }
+  ],
+  "transfer_eval": {
+    "lucas": {
+      "transfer_from": "fib",
+      "transfer_coeffs": [
+        0,
+        0,
+        3,
+        2
+      ],
+      "transfer_accuracy": 1.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        1,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": true,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "pell": {
+      "transfer_from": "fib",
+      "transfer_coeffs": [
+        0,
+        0,
+        3,
+        2
+      ],
+      "transfer_accuracy": 0.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        2,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": false,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "summary": {
+      "lucas_transfer_beats_baseline": true,
+      "pell_transfer_beats_baseline": false,
+      "absorbed_intelligence": true,
+      "negative_transfer_pell_expected": true
+    }
+  },
+  "elapsed_s": 20.328,
+  "honesty": "Molt mutates hypothesis language (skin) only. Every verified/1 and rec/2 clause still requires critic acceptance. Reverted skins discard language mutations but keep critic-gated archive facts already written."
+}

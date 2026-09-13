@@ -243,26 +243,55 @@ class HypothesisLanguage:
             actions.append(f"raise_mut_depth {old}→{gi.mut_depth}")
 
         # 6) Novelty bonus so search doesn't only exploit [1,1]
+        structural = [a for a in actions if not a.startswith("novelty")]
         if lr:
             lr.novelty_bonus = min(2.0, lr.novelty_bonus + 0.5)
             actions.append(f"novelty_bonus→{lr.novelty_bonus}")
 
-        # 7) If nothing else, invent a fresh schema class name (operator variant)
-        if not actions:
-            new_id = f"linrec_scan_o{lr.order if lr else 2}_v{self.generation + 1}"
-            if new_id not in self.schemas and lr:
-                self.schemas[new_id] = SchemaClass(
-                    id=new_id,
-                    description=f"Mutant linrec scan at order≥{lr.order}",
-                    unlocked=True,
-                    origin=f"mutation:spawn_gen{self.generation + 1}",
-                    order=lr.order,
-                    order_max=lr.order_max,
-                    coeff_lo=lr.coeff_lo,
-                    coeff_hi=lr.coeff_hi,
-                    novelty_bonus=1.0,
-                )
-                actions.append(f"spawn_schema {new_id}")
+        # 7) If no structural growth left, spawn a fresh schema class (operator variant)
+        if not structural:
+            # Prefer bilinear/modperiod depth variants, else linrec mutant
+            bi = self.schemas.get("bilinear_schema")
+            mp = self.schemas.get("modperiod_schema")
+            if bi and bi.unlocked:
+                new_id = f"bilinear_schema_r{bi.r_max}_g{self.generation + 1}"
+                if new_id not in self.schemas:
+                    self.schemas[new_id] = SchemaClass(
+                        id=new_id,
+                        description=f"Mutant bilinear schema r_max={bi.r_max}",
+                        unlocked=True,
+                        origin=f"mutation:spawn_gen{self.generation + 1}",
+                        r_max=bi.r_max,
+                        r_cap=bi.r_cap,
+                    )
+                    actions.append(f"spawn_schema {new_id}")
+            elif mp and mp.unlocked:
+                new_id = f"modperiod_schema_m{mp.m_max}_g{self.generation + 1}"
+                if new_id not in self.schemas:
+                    self.schemas[new_id] = SchemaClass(
+                        id=new_id,
+                        description=f"Mutant modperiod m_max={mp.m_max}",
+                        unlocked=True,
+                        origin=f"mutation:spawn_gen{self.generation + 1}",
+                        m_max=mp.m_max,
+                        m_cap=mp.m_cap,
+                    )
+                    actions.append(f"spawn_schema {new_id}")
+            elif lr:
+                new_id = f"linrec_scan_o{lr.order}_v{self.generation + 1}"
+                if new_id not in self.schemas:
+                    self.schemas[new_id] = SchemaClass(
+                        id=new_id,
+                        description=f"Mutant linrec scan at order≥{lr.order}",
+                        unlocked=True,
+                        origin=f"mutation:spawn_gen{self.generation + 1}",
+                        order=lr.order,
+                        order_max=lr.order_max,
+                        coeff_lo=lr.coeff_lo,
+                        coeff_hi=lr.coeff_hi,
+                        novelty_bonus=1.0,
+                    )
+                    actions.append(f"spawn_schema {new_id}")
 
         self.generation += 1
         # Unsaturate productive arms so UCB revisits after molt

@@ -1,5 +1,5 @@
 {
-  "total_steps": 55,
+  "total_steps": 62,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -61,17 +61,17 @@
       "n_visits": 5,
       "total_reward": 4.379999999999999
     },
-    "sequences::bilinear_fib": {
-      "id": "bilinear_fib",
-      "description": "Cassini on Fibonacci only",
+    "sequences::bilinear_schema": {
+      "id": "bilinear_schema",
+      "description": "Bilinear identity schema: search offset r, sign pattern",
       "dead_end": false,
-      "param": 0,
-      "param_max": 0,
+      "param": 4,
+      "param_max": 4,
       "unlocked": true,
       "unlock_order": 5,
-      "saturated": true,
+      "saturated": false,
       "n_visits": 3,
-      "total_reward": 1.3499999999999999
+      "total_reward": -0.12
     },
     "logic::boolean_from_examples": {
       "id": "boolean_from_examples",
@@ -120,6 +120,18 @@
       "saturated": true,
       "n_visits": 8,
       "total_reward": 8.1
+    },
+    "geometry::geo_invent": {
+      "id": "geo_invent",
+      "description": "NEW: mutate constructions; invent lemma types (not canned Varignon)",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": true,
+      "n_visits": 4,
+      "total_reward": 5.6
     },
     "geometry::dead_end_false_eq": {
       "id": "dead_end_false_eq",
@@ -1714,6 +1726,176 @@
       "accepted": [],
       "rejected": [],
       "transfer": []
+    },
+    {
+      "tick": 56,
+      "world": "geometry",
+      "family": "geo_invent",
+      "why": "UCB1 over 1 arms (world,family); picked geometry::geo_invent because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.07,
+        "score": 1.43
+      },
+      "growth": "expand param 1\u21922",
+      "unlock": null,
+      "accepted": [
+        "geo_invent_d1_s55"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 57,
+      "world": "geometry",
+      "family": "geo_invent",
+      "why": "UCB1 over 1 arms (world,family); picked geometry::geo_invent because avg=1.430+1.4*sqrt(ln(56+1)/1)=2.815\u21924.245. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.09,
+        "score": 1.41
+      },
+      "growth": "expand param 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "geo_invent_d2_s56"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 58,
+      "world": "geometry",
+      "family": "geo_invent",
+      "why": "UCB1 over 1 arms (world,family); picked geometry::geo_invent because avg=1.420+1.4*sqrt(ln(57+1)/2)=1.995\u21923.415. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.11,
+        "score": 1.39
+      },
+      "growth": "expand param 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "geo_invent_d3_s57"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 59,
+      "world": "geometry",
+      "family": "geo_invent",
+      "why": "UCB1 over 1 arms (world,family); picked geometry::geo_invent because avg=1.410+1.4*sqrt(ln(58+1)/3)=1.632\u21923.042. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.13,
+        "score": 1.37
+      },
+      "growth": "param at max \u2192 saturate",
+      "unlock": null,
+      "accepted": [
+        "geo_invent_d4_s58"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 60,
+      "world": "sequences",
+      "family": "bilinear_schema",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.02,
+        "score": -0.02
+      },
+      "growth": "expand schema param 1\u21922",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 61,
+      "world": "sequences",
+      "family": "bilinear_schema",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.020+1.4*sqrt(ln(60+1)/1)=2.839\u21922.819. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.04,
+        "score": -0.04
+      },
+      "growth": "expand schema param 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 62,
+      "world": "sequences",
+      "family": "bilinear_schema",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.030+1.4*sqrt(ln(61+1)/2)=2.011\u21921.981. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.06,
+        "score": -0.06
+      },
+      "growth": "expand schema param 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
     }
   ],
   "curves": [
@@ -2266,6 +2448,76 @@
       "n_rejected": 32,
       "n_lemmas": 10,
       "tick": 55
+    },
+    {
+      "n_verified_facts": 45,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.4156,
+      "n_rejected": 32,
+      "n_lemmas": 11,
+      "tick": 56
+    },
+    {
+      "n_verified_facts": 47,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.3333,
+      "reject_rate": 0.4051,
+      "n_rejected": 32,
+      "n_lemmas": 12,
+      "tick": 57
+    },
+    {
+      "n_verified_facts": 49,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.5,
+      "reject_rate": 0.3951,
+      "n_rejected": 32,
+      "n_lemmas": 13,
+      "tick": 58
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.6,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 59
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.6,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 60
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.4,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 61
+    },
+    {
+      "n_verified_facts": 51,
+      "n_distinct_types": 16,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.4,
+      "reject_rate": 0.3855,
+      "n_rejected": 32,
+      "n_lemmas": 14,
+      "tick": 62
     }
   ],
   "baselines": {
@@ -2350,8 +2602,216 @@
     }
   },
   "geometry_schemas": [
-    "para_opp"
+    "para_opp",
+    "midline_parallel"
   ],
-  "geometry_lemma_cites": 0,
-  "geometry_lemma_attempts": 1
+  "geometry_lemma_cites": 2,
+  "geometry_lemma_attempts": 5,
+  "hypothesis_skin": {
+    "generation": 0,
+    "n_schema_classes": 7,
+    "n_unlocked": 5,
+    "unlocked": [
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "schemas": {
+      "linrec_scan": {
+        "id": "linrec_scan",
+        "description": "Scan small-int linear recurrence coeffs; grow order",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "transfer_horn": {
+        "id": "transfer_horn",
+        "description": "Reuse archived rec/2 across companions",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "ratio_scan": {
+        "id": "ratio_scan",
+        "description": "Consecutive-ratio limit hypotheses vs algebraic constants",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "dead_prime": {
+        "id": "dead_prime",
+        "description": "DEAD END: terms always prime",
+        "unlocked": true,
+        "dead_end": true,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "modperiod_schema": {
+        "id": "modperiod_schema",
+        "description": "Pisano-like period schema: search modulus m, discover p",
+        "unlocked": false,
+        "dead_end": false,
+        "origin": "seed_locked",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "bilinear_schema": {
+        "id": "bilinear_schema",
+        "description": "Bilinear identity schema: search offset r, sign pattern",
+        "unlocked": false,
+        "dead_end": false,
+        "origin": "seed_locked",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 4,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 3,
+        "total_reward": -0.12,
+        "saturated": false,
+        "ticks_no_new_type": 3,
+        "novelty_bonus": 0.0
+      },
+      "geo_invent": {
+        "id": "geo_invent",
+        "description": "Mutate constructions; archive new lemma schemas",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      }
+    },
+    "seen_coeff_fingerprints": [],
+    "molt_history": []
+  },
+  "schema_classes": [
+    {
+      "id": "linrec_scan",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "transfer_horn",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "ratio_scan",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "dead_prime",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "modperiod_schema",
+      "unlocked": false,
+      "origin": "seed_locked"
+    },
+    {
+      "id": "bilinear_schema",
+      "unlocked": false,
+      "origin": "seed_locked"
+    },
+    {
+      "id": "geo_invent",
+      "unlocked": true,
+      "origin": "seed"
+    }
+  ]
 }
