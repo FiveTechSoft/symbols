@@ -281,11 +281,14 @@ chat_learn_direct(S, V, O) :-
 % modelo pregunta ("What did S V?") y la siguiente linea de una palabra
 % completa el hecho. Sin el par, camino normal (UNKNOWN honesto).
 dialog_probe_missing([S, V]) :-
-    qnorm([S], S),
-    bb_rel_forms(V, _),
+    \+ qlead(S),
+    atom_length(S, LS), LS >= 2,
+    \+ is_determiner(V),
+    atom_length(V, LV), LV >= 3,
+    ( qnorm([S], S2) -> true ; S2 = S ),
     bb_stem(V, VB),
-    format('What did ~w ~w?~n', [S, VB]),
-    assertz(dialog_pending_teach(S, V)).
+    format('What did ~w ~w?~n', [S2, VB]),
+    assertz(dialog_pending_teach(S2, V)).
 
 % Bratko Why (no How): por que el sondeo, sin abandonar el slot.
 dialog_why_ask([why]).
@@ -352,6 +355,9 @@ dialog_meta_es([de, que|Rest]) :-
 dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
     book_anaphora(Rest, B), !,
+    about_entity(B, es).
+dialog_meta_es([de, que, trata, el, libro]) :- !,
+    live_books([B]), !,
     about_entity(B, es).
 dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
