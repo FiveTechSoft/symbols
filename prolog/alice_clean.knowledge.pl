@@ -1,5 +1,6 @@
 % alice_clean.knowledge.pl — Alicia curada a mano (usable-chat).
-% ~45 hechos verificados contra el libro (nada inferido, nada acusado:
+% ~45 hechos de argumento + tags de libro (is book / appears_in).
+% Verificados contra el libro (nada inferido, nada acusado:
 % el Knave NO consta como ladron). Irregulares en base (drink/eat/
 % meet/sing: el stemmer ingles no los une), resto en natural.
 % Refs curated_alice_N (provenance manual). Puerta: 17 checks.
@@ -48,6 +49,14 @@ memfact(hatter,attended,trial,1.0,1).
 memfact(sister,woke,alice,1.0,1).
 memfact(sister,read,book,1.0,1).
 memfact(footman,carries,letter,1.0,1).
+memfact(alice_in_wonderland,is,book,1.0,1).
+memfact(alice_in_wonderland,author,carroll,1.0,1).
+memfact(alice,appears_in,alice_in_wonderland,1.0,1).
+memfact(white_rabbit,appears_in,alice_in_wonderland,1.0,1).
+memfact(hatter,appears_in,alice_in_wonderland,1.0,1).
+memfact(queen,appears_in,alice_in_wonderland,1.0,1).
+memfact(cheshire_cat,appears_in,alice_in_wonderland,1.0,1).
+memfact(caterpillar,appears_in,alice_in_wonderland,1.0,1).
 provfact(alice,followed,white_rabbit,curated_alice_1,none,active).
 provfact(alice,drink,bottle,curated_alice_2,none,active).
 provfact(alice,eat,cake,curated_alice_3,none,active).
@@ -93,3 +102,11 @@ provfact(hatter,attended,trial,curated_alice_42,none,active).
 provfact(sister,woke,alice,curated_alice_43,none,active).
 provfact(sister,read,book,curated_alice_44,none,active).
 provfact(footman,carries,letter,curated_alice_45,none,active).
+provfact(alice_in_wonderland,is,book,curated_alice_46,none,active).
+provfact(alice_in_wonderland,author,carroll,curated_alice_47,none,active).
+provfact(alice,appears_in,alice_in_wonderland,curated_alice_48,none,active).
+provfact(white_rabbit,appears_in,alice_in_wonderland,curated_alice_49,none,active).
+provfact(hatter,appears_in,alice_in_wonderland,curated_alice_50,none,active).
+provfact(queen,appears_in,alice_in_wonderland,curated_alice_51,none,active).
+provfact(cheshire_cat,appears_in,alice_in_wonderland,curated_alice_52,none,active).
+provfact(caterpillar,appears_in,alice_in_wonderland,curated_alice_53,none,active).

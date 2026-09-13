@@ -155,7 +155,58 @@ run_cases :-
     % C3: phrase/2 ida y vuelta, terminales = simbolos vivos, sin lexico.
     dcg_roundtrip((ana, opened, door)),
     dcg_roundtrip((ana, abrio, puerta)),
-    dcg_roundtrip((alice, followed, white_rabbit)).
+    dcg_roundtrip((alice, followed, white_rabbit)),
+    % what happened to X: "to" cae (L=2); el verbo novel ancla el ente.
+    expect("what happened to the baby?", "turned"),
+    % and parte dos SVO (sujeto compartido); ate~eat no se duplica.
+    expect_all("nilo opened puerta and ate pan", ["Learned", "opened", "ate"]),
+    expect("opened puerta?", "nilo opened puerta"),
+    expect("ate pan?", "nilo"),
+    % she + verbo unico del grafo: no pregunta Do you mean.
+    expect_all("ria paints muro", ["Learned"]),
+    expect_all("gil cooks sopa", ["Learned"]),
+    capture("who paints muro?", _),
+    capture("who cooks sopa?", _),
+    capture("did she paint muro?", OutShe),
+    \+ sub_string(OutShe, _, _, _, "Do you mean"),
+    ( sub_string(OutShe, _, _, _, "Yes") -> true
+    ; format('FAIL unique-she paint: ~w~n', [OutShe]), fail
+    ),
+    % D3 pending no se traga una pregunta nueva (quien/who).
+    capture("did she win?", OutWin),
+    ( sub_string(OutWin, _, _, _, "Do you mean") -> true
+    ; format('FAIL expected clarify, got ~w~n', [OutWin]), fail
+    ),
+    capture("quien es ana?", OutQuien),
+    \+ sub_string(OutQuien, _, _, _, "Do you mean"),
+    ( sub_string(OutQuien, _, _, _, "opened") -> true
+    ; sub_string(OutQuien, _, _, _, "ana") -> true
+    ; format('FAIL quien-es swallowed: ~w~n', [OutQuien]), fail
+    ),
+    % and + objeto: comparte el verbo. "the" no se guarda como rel.
+    expect_all("nilo met rio and the sam", ["Learned"]),
+    expect("met rio?", "nilo"),
+    expect("met sam?", "nilo"),
+    \+ memory_relation(_, the, _, _, _),
+    \+ memory_relation(nilo, the, _, _, _),
+    % verbo novel sin prep corta: no volcar todos los hechos del ente.
+    capture("who loves ana?", OutLoves),
+    \+ sub_string(OutLoves, _, _, _, "opened door"),
+    % into entre verbo y objeto cae; el sujeto no es "the".
+    expect_all("kiko turned frog", ["Learned"]),
+    capture("the kiko turned into a frog", OutInto),
+    \+ sub_string(OutInto, _, _, _, "the --"),
+    \+ memory_relation(the, _, _, _, _),
+    expect("turned frog?", "kiko"),
+    % love hereda hugs (stem) via means, sin lista love/hugs.
+    expect_all("hugs means opened", ["Learned"]),
+    expect("did ana hug door?", "Yes"),
+    % verbo novel lejos en longitud: no se pega a otro del ente.
+    capture("did ana vanish door?", OutVan),
+    \+ sub_string(OutVan, _, _, _, "Yes"),
+    capture("ok", OutOk),
+    \+ sub_string(OutOk, _, _, _, "Learned"),
+    \+ sub_string(OutOk, _, _, _, "I don't know").
 
 dcg_roundtrip(T) :-
     ( surface_sent(T, Line),

@@ -1,5 +1,7 @@
 % bookbrain/chat.pl — chat libre sobre document.knowledge.
-% Uso: swipl -s chat.pl -g "chat('alice.knowledge.pl')" -t halt
+% Uso: swipl -s chat.pl -g "chat('alice_clean.knowledge.pl')" -t halt
+% Varios libros: chat(['alice_clean.knowledge.pl','plataforma_clean.knowledge.pl'])
+% save/load: el .knowledge.pl ya es el mapa procesado; load suma, save vuelca.
 % (o entubando preguntas por stdin). Formas: who/what/did/why/where/when,
 % "why?" solo (sigue a la ultima respuesta), "help", "quit".
 % Estado de dialogo: last_fact/3. Ante lo desconocido: UNKNOWN (nunca inventa).
@@ -75,7 +77,15 @@ bb_content(W) :-
 :- dynamic dialog_last_input/1.
 
 chat(File) :-
+    atom(File), !,
     bb_load(File),
+    writeln('BookBrain chat. Ask me anything (quit to exit).'),
+    chat_loop.
+chat(Files) :-
+    is_list(Files),
+    Files = [F|Rest],
+    bb_load(F),
+    maplist(bb_add, Rest),
     writeln('BookBrain chat. Ask me anything (quit to exit).'),
     chat_loop.
 
@@ -95,13 +105,48 @@ bb_load(File) :-
     dialog_reset,
     retractall(gapfact(_, _, _, _, _)),
     retractall(gapseq(_)),
-    consult(File),
-    forall(memfact(S, R, O, W, U), assertz(memory_relation(S, R, O, W, U))),
-    forall(provfact(S, R, O, Ref, T, St), assertz(prov(S, R, O, info(Ref, T, St)))),
     gaps_reset,
+    bb_import(File),
     gap_load,
     memory_size(NF),
     format('Loaded ~w facts from ~w.~n', [NF, File]).
+
+% Suma un .knowledge.pl ya procesado sin borrar lo cargado.
+bb_add(File) :-
+    bb_import(File),
+    gap_load,
+    memory_size(NF),
+    format('Added ~w. Memory now ~w facts.~n', [File, NF]).
+
+% Lee memfact/provfact/gapfact como datos (no consult: el segundo
+% archivo no puede redefinir el primero).
+bb_import(File) :-
+    setup_call_cleanup(
+        open(File, read, S, [encoding(utf8)]),
+        bb_import_stream(S),
+        close(S)).
+
+bb_import_stream(S) :-
+    read_term(S, T, []),
+    ( T == end_of_file -> true
+    ; bb_import_term(T),
+      bb_import_stream(S)
+    ).
+
+bb_import_term((:- _)) :- !.
+bb_import_term(memfact(A, R, O, W, U)) :-
+    ( memory_relation(A, R, O, _, _) -> true
+    ; assertz(memory_relation(A, R, O, W, U))
+    ), !.
+bb_import_term(provfact(A, R, O, Ref, T, St)) :-
+    ( prov(A, R, O, _) -> true
+    ; assertz(prov(A, R, O, info(Ref, T, St)))
+    ), !.
+bb_import_term(gapfact(Id, Q, St, C, E)) :-
+    assertz(gapfact(Id, Q, St, C, E)), !.
+bb_import_term(gapseq(N)) :-
+    assertz(gapseq(N)), !.
+bb_import_term(_).
 
 % save [nombre]: vuelca la memoria viva (base + lo ensenado en sesion) al
 % mismo formato memfact/provfact que bb_load/1 lee. Sin nombre -> session.
@@ -111,6 +156,16 @@ chat_save_cmd([save, Name|_]) :-
     \+ sub_atom(Name, _, _, _, '/'),
     \+ sub_atom(Name, _, _, _, '\\'),
     chat_save(Name), !.
+
+% load [nombre]: suma un .knowledge.pl ya procesado (sin borrar).
+chat_load_cmd([load, Name|_]) :-
+    atom(Name), Name \== load, Name \== '..',
+    \+ sub_atom(Name, _, _, _, '/'),
+    \+ sub_atom(Name, _, _, _, '\\'),
+    atom_concat(Name, '.knowledge.pl', F),
+    ( exists_file(F) -> bb_add(F)
+    ; format('No file ~w~n', [F])
+    ), !.
 
 chat_save(Alias) :-
     atom_concat(Alias, '.knowledge.pl', Out),
@@ -241,6 +296,7 @@ chat_line_tokens(L, Toks, Changed) :-
     ; Toks == [the, rest] -> dialog_more
     ; Toks == [save] -> chat_save(session)
     ; chat_save_cmd(Toks) -> true
+    ; chat_load_cmd(Toks) -> true
     ; Toks == [discover] -> chat_discover_all
     ; chat_discover_cmd(Toks) -> true
     ; chat_greet(Toks) -> true
@@ -257,7 +313,8 @@ chat_line_tokens(L, Toks, Changed) :-
         ( dialog_about_book(Toks) -> true
         ; dialog_meta_es(Toks) -> true
         ; dialog_single_about(Toks) -> true
-        ; dialog_ambiguity(Toks, P, Cs) ->
+        ; dialog_graph_resolve(Toks, ToksR) -> chat_ask(ToksR)
+        ; dialog_ambiguity_narrow(Toks, P, Cs) ->
             dialog_clarify(P, Cs),
             assertz(dialog_pending(Toks, P, Cs))
         ; dialog_ellipsis(Toks) -> true
@@ -273,22 +330,56 @@ chat_line_tokens(L, Toks, Changed) :-
 % "de que …?" sin anclas: de+que ya son interrogativos cerrados.
 dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
+    book_pin(Rest, B), !,
+    about_entity(B, es).
+dialog_meta_es([de, que|Rest]) :-
+    Rest \== [],
     \+ graph_pins([de, que|Rest], _, _), !,
     chat_known(es).
 
+% Unico ente = un titulo (is book) y ninguna rel viva: el mapa
+% describe ese libro (appears_in, author, set_in).
+book_pin(Toks, B) :-
+    nl_tokens(Toks, Packed),
+    findall(E, (member(W, Packed), pin_ent(W, E),
+                memory_relation(E, is, book, _, _)), Bs0),
+    sort(Bs0, [B]),
+    findall(E2, (member(W, Packed), pin_ent(W, E2), E2 \== B), Others),
+    Others == [].
+
 % "que X?" y X no vive en el mapa: pregunta por el propio KB.
+% Si el mapa tiene (Titulo, is, book), lista esos titulos (el grafo
+% distingue; no hay lista de libros en codigo).
 dialog_about_book([que, X]) :-
     \+ bb_content(X),
     \+ pin_rel(X, _), !,
-    memory_size(NF),
-    format('Hablamos de un libro con ~w hechos. ', [NF]),
-    chat_known(es).
+    chat_list_books(es).
 dialog_about_book([what, X]) :-
     \+ bb_content(X),
     \+ pin_rel(X, _), !,
+    chat_list_books(en).
+
+live_books(Bs) :-
+    findall(B, memory_relation(B, is, book, _, _), B0),
+    sort(B0, Bs).
+
+chat_list_books(Lang) :-
+    live_books(Bs),
     memory_size(NF),
-    format('This book holds ~w facts. ', [NF]),
-    chat_known(en).
+    ( Bs == [] ->
+        ( Lang == es ->
+            format('Hablamos de un libro con ~w hechos. ', [NF])
+        ; format('This book holds ~w facts. ', [NF])
+        ),
+        chat_known(Lang)
+    ; length(Bs, NB),
+      atomic_list_concat(Bs, ', ', L),
+      ( Lang == es ->
+          format('Hay ~w libros (~w hechos): ~w.~n', [NB, NF, L])
+      ; format('There are ~w books (~w facts): ~w.~n', [NB, NF, L])
+      ),
+      chat_known(Lang)
+    ).
 
 % D5 entidad suelta con '?': resumen (about). Sin '?' va a learn
 % (D3-abandon intacto: "Madrid" sin '?' sigue unknown).
@@ -296,12 +387,52 @@ dialog_single_about([X]) :-
     qnorm([X], X), !,
     about_entity(X, en).
 
-% D3: respuesta = entidad candidata (qnorm) -> prosigue; si no, nada.
+% Respuesta D3 = el candidato (articulos/glue fuera). Un interrogativo
+% o mas de un ancla es pregunta nueva: se abandona el pending.
 dialog_match_reply(Toks, Cs, C) :-
-    qnorm(Toks, C),
+    \+ (member(W, Toks), qlead(W)),
+    nl_tokens(Toks, Packed),
+    exclude(about_glue, Packed, [Name]),
+    qnorm([Name], C),
     member(C, Cs).
 
 dl_repl(P, C, W, O) :- ( W == P -> O = C ; O = W ).
+
+% El grafo desambigua: si el verbo anclado solo lo tiene un candidato
+% en el rol del pronombre, se sustituye. Si quedan 2+, se pregunta
+% solo entre esos (no entre todo el stack).
+dialog_graph_resolve(Toks, Out) :-
+    member(P, Toks),
+    dialog_pronoun(P),
+    dialog_candidates(P, Cs0),
+    length(Cs0, N), N >= 2,
+    graph_narrow(Toks, P, Cs0, [C]),
+    maplist(dl_repl(P, C), Toks, Out).
+
+dialog_ambiguity_narrow(Toks, P, Cs) :-
+    dialog_ambiguity(Toks, P, Cs0),
+    graph_narrow(Toks, P, Cs0, Cs),
+    length(Cs, M), M >= 2.
+
+graph_narrow(Toks, P, Cs0, Cs) :-
+    exclude(==(P), Toks, Rest),
+    ( Rest \== [],
+      nl_tokens(Rest, Packed),
+      findall(R, (member(W, Packed), pin_rel(W, R)), R0),
+      sort(R0, Rels),
+      Rels \== [] ->
+        dialog_tier(P, Role),
+        include(has_role_rel(Rels, Role), Cs0, Cs1),
+        ( Cs1 == [] -> Cs = Cs0 ; Cs = Cs1 )
+    ; Cs = Cs0
+    ).
+
+has_role_rel(Rels, subj, E) :-
+    member(R, Rels), memory_relation(E, R, _, _, _), !.
+has_role_rel(Rels, obj, E) :-
+    member(R, Rels), memory_relation(_, R, E, _, _), !.
+has_role_rel(Rels, both, E) :-
+    ( has_role_rel(Rels, subj, E) ; has_role_rel(Rels, obj, E) ), !.
 
 % Pregunta de aclaracion: hasta 5 candidatos en orden de recencia.
 dialog_clarify(_P, Cs) :-
@@ -355,6 +486,7 @@ chat_learn_sent(LS, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
     ; Toks = [W|_], qlead(W) -> chat_ask(Toks)
     ; dialog_probe_missing(Toks) -> true
+    ; chat_learn_conj(Toks) -> true
     ; learn_sentence(LS, stored(A, V, O, Src)) ->
         chat_after_learn(Src, A, V, O)
     ; learn_sentence(LS, stored_identity(X, Y, _)) ->
@@ -362,10 +494,9 @@ chat_learn_sent(LS, Toks) :-
         chat_recheck_gaps
     ; parse_svo_line(LS, (A, V, O)),
       memory_relation(_, V, _, _, _) ->
-        next_sentence_id(Src),
-        remember_tracked(A, V, O, Src, none),
-        chat_after_learn(Src, A, V, O)
+        chat_store(A, V, O)
     ; chat_learn_positional(Toks)
+    ; novel_short(Toks) -> true
     ; chat_ask(Toks)
     ).
 
@@ -377,9 +508,52 @@ chat_learn_positional(Toks) :-
     \+ qlead(F),
     \+ novel_short(Toks),
     positional_triple(Toks, A, V, O),
+    chat_store(A, V, O).
+
+% "S V O and V2 O2" / "S V O and O2": and/y ya es conjuncion cerrada
+% (D2). El sujeto se comparte; el segundo verbo, si es novel y unico
+% cerca de uno vivo del mismo par, se recanoniza (ate~eat).
+chat_learn_conj(Toks) :-
+    append(Left, [And|Right], Toks),
+    member(And, [and, y]),
+    Left \== [], Right \== [],
+    positional_triple(Left, A, V, O),
+    conj_right(A, V, Right, A2, V2, O2),
+    (A, V, O) \== (A2, V2, O2),
+    chat_store(A, V, O),
+    chat_store(A2, V2, O2).
+
+% Primero el objeto solo (and the queen): comparte el verbo. Si se
+% antepone el sujeto a un determinante, el 3-token lo tomaria por rel.
+conj_right(A, V, Right, A, V, O2) :-
+    nl_tokens(Right, [O2]),
+    O2 \== A,
+    O2 \== V.
+conj_right(A, _V, Right, A, V2, O2) :-
+    positional_triple([A|Right], A, V2, O2),
+    \+ is_determiner(V2).
+
+chat_store(A, V, O) :-
+    \+ is_determiner(A),
+    \+ is_determiner(V),
+    \+ is_determiner(O),
+    canon_rel(A, V, O, R),
     next_sentence_id(Src),
-    remember_tracked(A, V, O, Src, none),
-    chat_after_learn(Src, A, V, O).
+    remember_tracked(A, R, O, Src, none),
+    chat_after_learn(Src, A, R, O).
+
+% Verbo novel a distancia <=2 del unico predicado vivo del par (o
+% del sujeto si el objeto es nuevo): se reusa, no se duplica.
+canon_rel(S, V, O, R) :-
+    findall(Rx, (memory_relation(S, Rx, O, _, _),
+                 symbol_dist(V, Rx, D), D =< 2), R0),
+    sort(R0, [R]), !.
+canon_rel(S, V, _O, R) :-
+    \+ live_symbol(V),
+    findall(Rx, (memory_relation(S, Rx, _, _, _),
+                 symbol_dist(V, Rx, D), D =< 2), R0),
+    sort(R0, [R]), !.
+canon_rel(_S, V, _O, V).
 
 chat_after_learn(Src, A, V, O) :-
     chat_learned(Src, A, V, O),
@@ -442,11 +616,14 @@ positional_triple(Toks, A, V, O) :-
     mid_rel(Mid, V).
 
 mid_rel(Mid, V) :-
-    include(bb_content, Mid, Known),
+    include(bb_content, Mid, Known0),
+    exclude(is_determiner, Known0, Known),
     Known \== [], !,
     atomic_list_concat(Known, '_', V).
 mid_rel(Mid, V) :-
-    longest_mid(Mid, V).
+    exclude(is_determiner, Mid, Mid2),
+    Mid2 \== [],
+    longest_mid(Mid2, V).
 
 longest_mid([H|T], Best) :-
     atom_length(H, L),
@@ -461,10 +638,12 @@ longest_mid([H|T], Acc, AL, Best) :-
 % Empaqueta el tramo mas largo que ya es simbolo vivo (white+rabbit
 % = white_rabbit). Lo que no matchea se deja token a token.
 nl_tokens(Toks, Out) :-
-    span_pack(Toks, Packed),
+    span_pack(Toks, Packed0),
+    exclude(qlead, Packed0, Packed),
     % Tres tokens: el del medio es el hueco de relacion (SVO), aunque
     % el objeto ya viva en el mapa. Glue solo en tramos mas largos.
-    ( Packed = [A, M, _], \+ qlead(A), \+ qlead(M) -> Out = Packed
+    ( Packed = [A, M, _],
+      \+ is_determiner(A), \+ is_determiner(M) -> Out = Packed
     ; drop_glue(Packed, Out)
     ),
     Out \== [].
@@ -496,6 +675,23 @@ try_span([W|_], _, W, 1).
 % si el mapa no lo tiene, no es ancla.
 drop_glue([], []).
 drop_glue([U], [U]) :- !.
+% Determinante + ente: siempre cae (sintaxis). Aunque un error
+% previo hubiera guardado "the" como relacion, no es ancla.
+drop_glue([U, B|T], Out) :-
+    is_determiner(U),
+    map_entity(B), !,
+    drop_glue([B|T], Out).
+% Prep corta entre un novel L>=3 y un ente (dets en medio caen):
+% "happened to the baby" conserva happened+to+baby.
+drop_glue([U, P|T], Out) :-
+    \+ live_symbol(U), atom_length(U, LU), LU >= 3,
+    \+ is_determiner(P), \+ live_symbol(P),
+    atom_length(P, LP), LP =< 3,
+    append(Dets, [B|Rest], T),
+    forall(member(D, Dets), is_determiner(D)),
+    map_entity(B), !,
+    drop_glue([B|Rest], R2),
+    Out = [U, P, B|R2].
 drop_glue([U|T], Out) :-
     T \== [],
     atom_length(U, L), L =< 2, \+ pin_rel(U, _), !,
@@ -540,9 +736,9 @@ chat_note_told(V) :-
 % interrogativa ("Who reaches Oslo." no es un hecho). Lista cerrada de
 % auxiliares/interrogativos = sintaxis (como '?' o '.'), nunca lexico
 % de contenido: jamas puede ser sujeto de una declarativa.
-qlead(W) :- member(W, [who,what,when,where,why,how,
+qlead(W) :- member(W, [who,what,when,where,why,how,which,
                        did,does,do,is,are,was,were,
-                       quien,que,there]), !.
+                       quien,quienes,que,cual,cuales,there]), !.
 
 chat_identity(Lang) :-
     memory_size(NF),
@@ -625,23 +821,43 @@ about_entity(Name, Lang) :-
                      \+ sub_atom(O, _, _, _, '_ch')), Facts0),
     sort(Facts0, Facts),
     length(Facts, N),
-    ( N == 0 ->
-        ( Lang == es ->
-            format('No se casi nada de ~w.~n', [Name])
-        ; format('I know almost nothing about ~w.~n', [Name])
-        )
+    ( N > 0 ->
+        about_show(Name, Lang, N, outgoing),
+        show_facts(Name, Facts, 8),
+        about_sources(Name),
+        about_cast(Name),
+        dialog_reset,
+        dialog_note([Name], subj),
+        chat_set_last(Name, _, _)
+    ; findall((S, R), memory_relation(S, R, Name, _, _), In0),
+      sort(In0, In),
+      In \== [] ->
+        length(In, NI),
+        about_show(Name, Lang, NI, incoming),
+        show_facts_in(Name, In, 8),
+        dialog_reset,
+        dialog_note([Name], obj),
+        ( In = [(S0, R0)|_] -> chat_set_last(S0, R0, Name) ; true )
     ; ( Lang == es ->
-            format('Esto se de ~w (~w hechos):~n', [Name, N])
-      ; format('This is what I know about ~w (~w facts):~n', [Name, N])
-      ),
-      show_facts(Name, Facts, 8),
-      about_sources(Name),
-      % El tema del about es el unico sujeto: she/he recaen ahi
-      % (el mapa lo acaba de describir). D3 sigue vivo fuera de about.
-      dialog_reset,
-      dialog_note([Name], subj),
-      chat_set_last(Name, _, _)
+            format('No se casi nada de ~w.~n', [Name])
+      ; format('I know almost nothing about ~w.~n', [Name])
+      )
     ).
+
+about_show(Name, es, N, _) :-
+    format('Esto se de ~w (~w hechos):~n', [Name, N]).
+about_show(Name, en, N, _) :-
+    format('This is what I know about ~w (~w facts):~n', [Name, N]).
+
+% Quien aparece en un titulo: triples (S, appears_in, Libro) del mapa.
+about_cast(Name) :-
+    memory_relation(Name, is, book, _, _),
+    findall((S, appears_in, Name),
+            memory_relation(S, appears_in, Name, _, _), Ts0),
+    sort(Ts0, Ts),
+    Ts \== [], !,
+    forall(member(T, Ts), (surface_sent(T, Line), format('  ~w~n', [Line]))).
+about_cast(_).
 
 show_facts(_, _, 0) :- !.
 show_facts(_, [], _) :- !.
@@ -650,6 +866,14 @@ show_facts(N, [(R, O)|T], K) :-
     format('  ~w~n', [Line]),
     K1 is K - 1,
     show_facts(N, T, K1).
+
+show_facts_in(_, _, 0) :- !.
+show_facts_in(_, [], _) :- !.
+show_facts_in(Name, [(S, R)|T], K) :-
+    surface_sent((S, R, Name), Line),
+    format('  ~w~n', [Line]),
+    K1 is K - 1,
+    show_facts_in(Name, T, K1).
 
 % Fuentes de los hechos mostrados (3 primeras con Ref).
 about_sources(Name) :-
@@ -681,7 +905,8 @@ chat_help :-
     writeln('more (see the rest of long lists) | how many (count).'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
-    writeln('save [name] (keep session memory) | why? (about last answer) | quit').
+    writeln('save [name] (dump processed memory) | load [name] (add a .knowledge.pl)'),
+    writeln('why? (about last answer) | quit').
 
 % D10 pegamento social minimo (texto UI, no vocabulario del motor:
 % pares fijos de cortesia; lo abierto como "hablas como..." sigue
@@ -712,6 +937,9 @@ chat_ask(Toks) :-
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
+    ; book_pin(Toks, B) ->
+        ask_lang(Toks, Lang),
+        about_entity(B, Lang)
     ; graph_ask(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -730,8 +958,21 @@ chat_ask(Toks) :-
       last_fact(_, _, _),
       \+ graph_pins(Toks, _, _) ->
         chat_why_bare
+    ; dialog_last_input(Q), is_question(Q),
+      \+ graph_pins(Toks, _, _),
+      live_books([_|_]) ->
+        ask_lang(Toks, Lang),
+        chat_list_books(Lang)
     ; chat_ask_qp(Toks)
     ).
+
+ask_lang(Toks, es) :-
+    member(W, Toks),
+    qlead(W),
+    member(W, [quien, quienes, que, cual, cuales]), !.
+ask_lang(Toks, es) :-
+    member(de, Toks), !.
+ask_lang(_, en).
 
 % Pregunta contra el mapa vivo: los tokens que ya son relacion o
 % entidad anclan la consulta; el resto (interrogativos, determinantes,
@@ -750,10 +991,21 @@ graph_pins(Toks, Rels, Ents) :-
 
 pins_of(Packed, Rels, Ents) :-
     findall(R, (member(W, Packed), pin_rel(W, R)), R0),
-    sort(R0, Rels),
+    sort(R0, Rels0),
     findall(E, (member(W, Packed), pin_ent(W, E)), E0),
     sort(E0, Ents),
+    ( Ents \== [], Rels0 \== [] ->
+        include(rel_touches(Ents), Rels0, Rels1),
+        ( Rels1 == [] -> Rels = [] ; Rels = Rels1 )
+    ; Rels = Rels0
+    ),
     ( Rels \== [] ; Ents \== [] ).
+
+rel_touches(Ents, R) :-
+    member(E, Ents),
+    ( memory_relation(E, R, _, _, _)
+    ; memory_relation(_, R, E, _, _)
+    ), !.
 
 pin_rel(W, R) :-
     bb_rel_forms(W, Rs),
@@ -770,7 +1022,7 @@ fuzzy_rel(W, R) :-
     findall(D-Rel, (memory_relation(_, Rel, _, _, _),
                     atom_chars(Rel, [F|_]),
                     atom_length(Rel, LR),
-                    abs(LR - L) =< 2,
+                    abs(LR - L) =< 1,
                     symbol_dist(W, Rel, D),
                     D =< 2), DS),
     keysort(DS, [D0-R|_]),
@@ -834,17 +1086,26 @@ about_glue(W) :- qlead(W).
 about_glue(W) :- is_determiner(W).
 about_glue(W) :- atom_length(W, L), L =< 2.
 
-% "que paso con X" / "what happened to X": verbo novel + prep corta + ente.
+% "que paso con X" / "what happened to X": un verbo novel (L>=3) y el
+% resto glue (qlead/det/prep L=<3). "to" cae por longitud; el evento
+% sigue anclando el ente.
+happened_glue(W) :- about_glue(W).
+happened_glue(W) :- \+ live_symbol(W), atom_length(W, L), L =< 3.
+
+happened_event(W) :-
+    \+ happened_glue(W),
+    \+ live_symbol(W).
+
 happened_to(Packed, E) :-
-    append(Prefix, [E], Packed),
-    Prefix \== [],
-    member(P, Prefix),
+    pin_ent(E, E),
+    member(E, Packed),
+    include(happened_event, Packed, [U]),
+    U \== E,
+    atom_length(U, L), L >= 3,
+    member(P, Packed),
+    P \== U, P \== E,
     \+ live_symbol(P),
-    atom_length(P, LP), LP =< 3,
-    member(U, Prefix),
-    U \== P,
-    \+ live_symbol(U),
-    atom_length(U, LU), LU >= 3.
+    atom_length(P, LP), LP =< 3.
 % Un solo ente conocido y un token desconocido cerca (Levenshtein)
 % del UNICO predicado que toca ese ente: ate~eat sobre cake, sin lista.
 graph_fill(Toks, [], [E], answer(Xs, Facts)) :-
@@ -893,6 +1154,8 @@ unknown_near_d(Toks, R, MaxD) :-
     \+ qlead(W),
     atom_length(W, L),
     L >= 3,
+    atom_length(R, LR),
+    abs(LR - L) =< 1,
     symbol_dist(W, R, D),
     D =< MaxD.
 
@@ -1258,6 +1521,23 @@ means_triple(V, C) :-
     memory_relation(V, means, C, _, _).
 means_triple(V, C) :-
     memory_relation(V, significa, C, _, _).
+% love hereda loves means ama: mismo stem o +s (bb_stem('es')
+% recorta loves a lov). Sufijos cerrados, no lexico.
+means_triple(V, C) :-
+    memory_relation(A, Rel, C, _, _),
+    ( Rel == means ; Rel == significa ),
+    A \== V,
+    inflect_same(V, A).
+
+inflect_same(A, B) :-
+    bb_stem(A, S0), bb_ddouble(S0, X),
+    bb_stem(B, S1), bb_ddouble(S1, X).
+inflect_same(A, B) :-
+    ( atom_concat(A, s, B) ; atom_concat(B, s, A)
+    ; atom_concat(A, es, B) ; atom_concat(B, es, A)
+    ; atom_concat(A, ed, B) ; atom_concat(B, ed, A)
+    ; atom_concat(A, ing, B) ; atom_concat(B, ing, A)
+    ).
 
 bb_rel_forms_direct(V, Rs) :-
     bb_stem(V, St0),
