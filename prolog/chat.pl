@@ -263,7 +263,8 @@ chat_line_dispatch(L, Toks0) :-
 dialog_teach_reply(Toks, O) :-
     exclude(is_article, Toks, [O]),
     atom(O),
-    \+ member(O, [quit, exit, bye, help, why]),
+    \+ member(O, [quit, exit, bye, help, ayuda, why, discover, save, load,
+                   more, mas, the, rest, ayer, hoy, manana]),
     \+ dialog_pronoun(O),
     \+ member(O, [what, who, when, where, why, how, which, whom,
                   and, or, not, no, yes, do, does, did, is, are]).
@@ -1862,6 +1863,10 @@ chat_form([who, V], say, answer(Xs, Facts)) :-
     findall(S, member(S-_, SF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, SF), Facts).
+% who V? but no one V's: honest "no".
+chat_form([who, V], say, no) :-
+    bb_rel_forms(V, Rs),
+    \+ (member(Vr, Rs), memory_relation(_, Vr, _, _, _)).
 % who V E? but no one V's E: honest "no" (prevents graph fallback to outgoing).
 chat_form([who, V|Rest], say, no) :-
     qnorm(Rest, O),
