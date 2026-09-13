@@ -629,6 +629,15 @@ chat_learn_conj(Toks) :-
 
 % Primero el objeto solo (and the queen): comparte el verbo. Si se
 % antepone el sujeto a un determinante, el 3-token lo tomaria por rel.
+% Full SVO on right with new subject: two independent facts.
+conj_right(A, _V, Right, A2, V2, O2) :-
+    Right = [First|Rest],
+    First \== A,
+    \+ is_determiner(First),
+    Rest \== [],
+    positional_triple(Right, A2, V2, O2),
+    \+ is_determiner(V2).
+% Object only: shares subject from left.
 conj_right(A, V, Right, A, V, O2) :-
     nl_tokens(Right, [O2]),
     O2 \== A,
@@ -1346,10 +1355,12 @@ pol_neg(Toks, Clean) :-
 pol_flip(yes(_), no).
 pol_flip(no, yes_bare).
 
+tell_me_bare([tell, me]) :- !.
 tell_me_bare([tell, me|Rest]) :-
     Rest \== [],
     \+ member(about, Rest),
     \+ graph_pins([tell, me|Rest], _, _).
+tell_me_bare([cuentame]) :- !.
 tell_me_bare([cuentame|Rest]) :-
     Rest \== [],
     \+ member(de, Rest),
@@ -1685,6 +1696,12 @@ dialog_ell_build([where, did | Mid], X, [where, did | Mid2]) :-
 dialog_ell_build([when, did | Mid], X, [when, did | Mid2]) :-
     append(Pre, [_], Mid),
     append(Pre, [X], Mid2).
+% Spanish: quien V O -> quien V X
+dialog_ell_build([quien, V, _O], X, [quien, V, X]) :-
+    X \== V.
+% Spanish: que V S -> que V X
+dialog_ell_build([que, V, _S], X, [que, V, X]) :-
+    X \== V.
 dialog_ell_build(LQ, X, New) :-
     append(Pre, [_Last], LQ),
     Pre \== [],
