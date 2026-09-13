@@ -131,6 +131,8 @@ def _pack(text: str, tag: str, tribes: str, st: dict, topic=None) -> tuple[str, 
         st["transfer_dst"] = tag.split("-", 1)[-1]
     if "\n[" not in text:
         text = f"{text}\n[{tribes}]"
+    if tag != "unknown":
+        st["last_text"] = text
     return text, tag, st
 
 
@@ -292,6 +294,7 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
             st,
             topic=seq,
         )
+    st["transfer_dst"] = None
     return _pack(
         f"{seq}: {_formula(seq, can)}. "
         f"rec({seq},{can}). {cite}.",
@@ -311,7 +314,7 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
     if not src and topic == "transfer":
         # recover src from tag like transfer-X or from last rec topic
         src = last.get("last_src")
-    if (dst or str(tag).startswith("transfer-")) and (dst or True):
+    if str(tag).startswith("transfer-") or topic == "transfer":
         if not dst and str(tag).startswith("transfer-"):
             dst = tag.split("-", 1)[-1]
         if dst and dst in kb.get("recs", {}):
@@ -467,6 +470,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         "transfer_src": last.get("transfer_src"),
         "last_src": last.get("last_src"),
         "last_clause": last.get("last_clause"),
+        "last_text": last.get("last_text"),
     }
 
     # Self-knowledge speech acts (not domain math vocabulary)
@@ -599,6 +603,42 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
                     return _answer_transfer(kb, others[0], seqs[0], st)
         return _unknown(st)
 
+    # Claimed recurrence vs living rec/2 — critic, not a word list
+    conflict = deduce.claimed_rec_conflict(q, kb)
+    if conflict:
+        return _answer_rec(kb, conflict["seq"], st, reject_law=True)
+    parsed = deduce.parse_claimed_rec(q, {k.lower() for k in kb.get("recs") or {}})
+    if parsed:
+        seq, claimed = parsed
+        matches = []
+        for h, coefs in (kb.get("recs") or {}).items():
+            can = _canonical_rec(coefs)
+            if can == claimed:
+                matches.append(h)
+        if matches:
+            blob = " ".join(str(x) for x in (
+                last.get("topic"), last.get("last_text"), last.get("last_src"), seq
+            ) if x)
+            pick = next((h for h in matches if h == last.get("topic")), None)
+            if not pick:
+                pick = next((h for h in matches if h in blob), None)
+            if not pick and seq in matches:
+                pick = seq
+            if not pick:
+                pick = matches[0]
+            return _answer_rec(kb, pick, st)
+
+    # "demostrá esto": speech act on last clause (deixis, not a domain word)
+    deictic = set(deduce.tokenize(s)) <= {
+        "demostra", "demostrar", "demuestra", "prove", "prueba", "cite",
+        "esto", "esa", "eso", "this", "that", "it",
+    } or ( _is_prove_speech(s) and any(x in s.split() for x in ("esto", "eso", "this", "that"))
+           and not seqs and not deduce.looks_like_equation(s) )
+    if deictic and last.get("last_text") and (last.get("tag") or "") != "unknown":
+        st["tag"] = last.get("tag")
+        st["topic"] = last.get("topic")
+        return last["last_text"], last.get("tag") or "verified", st
+
     # Formula unification (child recognizes a shape it already proved)
     pf = deduce.prove_formula(q, kb)
     if pf:
@@ -609,10 +649,13 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     if hits:
         strong = [h for h in hits if h["score"] >= 2.0] or hits
         # Predicate-specialized kinds beat bare rec when explicitly bound
-        if any(h["kind"] == "period" for h in hits) and (
-            "true_mod" in bound or any(a.startswith("period") for a in bound)
+        per = [h for h in hits if h["kind"] == "period"]
+        if per and (
+            "true_mod" in bound
+            or any(a.startswith("period") for a in bound)
+            or per[0]["score"] >= 7.5
         ):
-            return _render_hit(next(h for h in hits if h["kind"] == "period"), kb, st, more=more)
+            return _render_hit(per[0], kb, st, more=more)
         if any(h["kind"] == "companion" for h in strong) and "companion" in bound:
             return _render_hit(next(h for h in strong if h["kind"] == "companion"), kb, st, more=more)
         if "lemma" in bound or any(h["kind"] == "lemma" and h["score"] >= 2.5 for h in hits):
@@ -631,8 +674,12 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         if strong:
             return _render_hit(strong[0], kb, st, more=more)
 
-    # Prove speech with nothing bound → UNKNOWN (no smuggled topic)
+    # Prove speech with nothing bound → last clause, else UNKNOWN
     if _is_prove_speech(s):
+        if last.get("last_text") and (last.get("tag") or "") != "unknown":
+            st["tag"] = last.get("tag")
+            st["topic"] = last.get("topic")
+            return last["last_text"], last.get("tag") or "verified", st
         return _unknown(st)
 
     return _unknown(st)

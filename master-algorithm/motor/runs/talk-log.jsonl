@@ -1625,3 +1625,74 @@
 {"q": "por que", "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Contraejemplo rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]", "tag": "transfer-pell"}
 {"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
 {"q": "BC ∥ MN", "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]", "tag": "lemma"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "que sabes", "a": "Lo unificado: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 140 verified, 106 rejected, 14 lemma. Fuera de theory.pl, silencio.\n[símbolo · crítico]", "tag": "summary"}
+{"q": "fibonacci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "por que", "a": "Porque comparten la ley: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "por que", "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Contraejemplo rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]", "tag": "transfer-pell"}
+{"q": "demostrá esto", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "creciste", "a": "Llevo 62 ticks. 140 hechos verificados, 19 tipos. Transferencia media 0.5. Reúso de lemas 0.8571. El crítico rechazó 106 conjeturas.\n[curiosidad · crítico]", "tag": "growth"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "demostrá cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "demostrá esto", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "identidad F(n+1)F(n-1)-F(n)^2", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fibonaci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "lucass", "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]", "tag": "rec-lucas"}
+{"q": "fibonaci es el doble siempre", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "F(n) = 2 F(n-1)", "a": "Demostrado: fib(n) = (1)*fib(n-1) + (1)*fib(n-2). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "verified"}
+{"q": "todos los fib son primos", "a": "Rechazado. rejected('NEG_fib_always_prime'): F(0)=0 not prime. No es siempre primo.\n[crítico]", "tag": "reject-prime"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "filotaxis", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "dime un teorema nuevo", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "dios", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "que hay de cenar", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "BC ∥ MN", "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]", "tag": "lemma"}
+{"q": "2·MN = BC", "a": "Demostrado: 2·MN = BC. verified geo_midline_euclid_conjectures_p0::L3_midline_half.\n[símbolo]", "tag": "verified"}
+{"q": "un lema", "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]", "tag": "lemma"}
+{"q": "geometria", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "true_mod", "a": "Periodos: π_fib(2)=3, π_fib(3)=8, π_fib(4)=6, π_fib(5)=20, π_lucas(2)=3, π_fib(7)=16. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "fib modulo 2", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "π", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "pisano", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "more", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "mas", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "fibonacci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "y pell", "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Crítico rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "por que", "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Contraejemplo rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]", "tag": "transfer-pell"}
+{"q": "demostrá esto", "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(fib,[1, 1]). Contraejemplo rejected('transfer_fib_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]", "tag": "transfer-pell"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "demostrá esto", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "identidad F(n+1)F(n-1)-F(n)^2", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "F(n) = 2 F(n-1)", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "fib modulo 2", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fibonacci", "a": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "rec-fib"}
+{"q": "fib modulo 2", "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "true_mod", "a": "Periodos: π_fib(2)=3, π_fib(3)=8, π_fib(4)=6, π_fib(5)=20, π_lucas(2)=3, π_fib(7)=16. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "lucas", "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]", "tag": "rec-lucas"}
+{"q": "se transfiere a lucas", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "demostrá esto", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "F(n) = 2 F(n-1)", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "L(n) = L(n-1) + L(n-2)", "a": "Demostrado: fib(n) = (1)*fib(n-1) + (1)*fib(n-2). verified rec_fib_o2_1_1.\n[símbolo]", "tag": "verified"}
+{"q": "BC ∥ MN", "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]", "tag": "lemma"}
+{"q": "demostrá esto", "a": "Lema L1_midline_parallel: BC ∥ MN. lemma/3.\n[símbolo · analogía]", "tag": "lemma"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "filotaxis", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "2·MN = BC", "a": "Demostrado: 2·MN = BC. verified geo_midline_euclid_conjectures_p0::L3_midline_half.\n[símbolo]", "tag": "verified"}
+{"q": "y pell", "a": "pell: P(n) = 2·P(n-1) + 1·P(n-2). rec(pell,[2, 1]). verified rec_pell_o2_2_1.\n[símbolo]", "tag": "rec-pell"}
+{"q": "por que", "a": "Porque comparten la ley: rec(fib,[1, 1]) y rec(lucas,[1, 1]). verified transfer_fib_to_lucas_1_1: TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2).\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda guarda silencio sin cláusula, y la curiosidad elige el próximo tick. Memoria viva: 140 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "lucas", "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]", "tag": "rec-lucas"}
+{"q": "L(n) = L(n-1) + L(n-2)", "a": "lucas: L(n) = 1·L(n-1) + 1·L(n-2). rec(lucas,[1, 1]). verified rec_lucas_o2_1_1.\n[símbolo]", "tag": "rec-lucas"}
+{"q": "y pell", "a": "No se transfiere. Analogía: companion, no clon. Símbolo: rec(pell,[2, 1]) vs rec(lucas,[1, 1]). Crítico rejected('transfer_lucas_to_pell_1_1'): n=2: pred=1 != obs=2.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "por que", "a": "Porque la ley no coincide: rec(pell,[2, 1]) vs rec(lucas,[1, 1]). Contraejemplo rejected('transfer_lucas_to_pell_1_1'): n=2: pred=1 != obs=2.\n[crítico · símbolo]", "tag": "transfer-pell"}
+{"q": "F(n) = 2 F(n-1)", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico rejected('rec_fib_o1_none_linrec_scan'): no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "fib modulo 2", "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "demostrá esto", "a": "Periodos: π_fib(2)=3. true_mod/3.\n[símbolo]", "tag": "period"}
+{"q": "identidad F(n+1)F(n-1)-F(n)^2", "a": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]", "tag": "verified"}
+{"q": "cassini", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\nNo invento.\n[duda · crítico]", "tag": "unknown"}

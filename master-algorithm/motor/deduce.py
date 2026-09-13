@@ -172,17 +172,23 @@ def bind_tokens(tokens: list[str], atoms: set[str], short_roots: set[str] | None
 
 
 
-def _norm_formula(s: str) -> str:
+def _norm_formula(s: str, rec_heads: set[str] | None = None) -> str:
+    """Normalize and punch holes: rec heads and single-letter seq(n) become •."""
     s = fold(s)
     s = s.replace(" ", "")
     s = s.replace("**", "^")
-    # collapse trivial wrappers
+    heads = sorted({h.lower() for h in (rec_heads or set())}, key=len, reverse=True)
+    for h in heads:
+        s = re.sub(rf"{re.escape(h)}(?=\()", "•", s)
+    # A lone letter immediately before (n is a hole (F(n), 2F(n-1), …)
+    s = re.sub(r"(?<![a-z0-9_•])[a-z](?=\(n)", "•", s)
+    s = re.sub(r"(?<=\d)[a-z](?=\(n)", "•", s)
     return s
 
 
-def formula_overlap(a: str, b: str) -> float:
+def formula_overlap(a: str, b: str, rec_heads: set[str] | None = None) -> float:
     """Normalized char-bigram overlap in [0,1]."""
-    x, y = _norm_formula(a), _norm_formula(b)
+    x, y = _norm_formula(a, rec_heads), _norm_formula(b, rec_heads)
     if not x or not y:
         return 0.0
     if x == y:
@@ -228,10 +234,11 @@ def prove_formula(q: str, kb: dict) -> dict | None:
             return None
         if not any(c in fq for c in ("(n+", "(n-", "^2", "(-1)", ")(")):
             return None
+    rec_heads = {k.lower() for k in (kb.get("recs") or {})}
     best = None
     best_score = 0.0
     for _w, _f, name, formula in kb.get("verified") or []:
-        sc = formula_overlap(q, formula)
+        sc = formula_overlap(q, formula, rec_heads)
         # slight boost if query also mentions a name atom already in formula/name
         if sc > best_score:
             best_score = sc
@@ -306,7 +313,7 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
         sc = _score_name_hit(bound, name, text)
         if "lemma" in bound and sc <= 0:
             sc = 3.0  # predicate head alone → list lemmas
-        fo = formula_overlap(q, text)
+        fo = formula_overlap(q, text, {k.lower() for k in (kb.get('recs') or {})})
         if fo >= FORMULA_THRESHOLD:
             sc = max(sc, 5.0 + fo)
         # short caption tokens (BC, MN) against lemma text
@@ -339,18 +346,24 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
             "atoms": bound & (set(_parts(name)) | {name.lower()}),
         })
 
-    # true_mod / periods
-    if "true_mod" in bound or any(a.startswith("period") for a in bound):
-        rows = kb.get("periods") or []
-        seqs = [s for s in (kb.get("recs") or {}) if s.lower() in bound]
-        picked = [(a, m, p) for a, m, p in rows if not seqs or a in seqs]
+    # true_mod / periods — also if a bound seq + a modulus digit appears
+    rows = kb.get("periods") or kb.get("pisano") or []
+    seqs_p = [s for s in (kb.get("recs") or {}) if s.lower() in bound]
+    digits = {tok for tok in tokens if tok.isdigit()}
+    mod_hit = bool(rows) and bool(seqs_p) and any(
+        str(m) in digits for _a, m, _p in rows if not seqs_p or _a in seqs_p
+    )
+    if "true_mod" in bound or any(a.startswith("period") for a in bound) or mod_hit:
+        picked = [(a, m, p) for a, m, p in rows if not seqs_p or a in seqs_p]
+        if mod_hit:
+            picked = [(a, m, p) for a, m, p in picked if str(m) in digits] or picked
         if picked:
             hits.append({
                 "kind": "period",
                 "name": "true_mod",
                 "formula": picked[:12],
-                "score": 7.0 if seqs else 4.0,
-                "atoms": ({"true_mod"} | {s.lower() for s in seqs}),
+                "score": 8.0 if mod_hit else (7.0 if seqs_p else 4.0),
+                "atoms": ({"true_mod"} | {s.lower() for s in seqs_p}),
             })
 
     # companion
@@ -392,6 +405,100 @@ def retrieve(q: str, kb: dict, last: dict | None = None) -> list[dict]:
     for h in ranked:
         h["bound"] = bound
     return ranked
+
+
+
+def parse_claimed_rec(q: str, rec_heads: set[str]) -> tuple[str | None, list[int]] | None:
+    """Parse seq(n)=a*seq(n-1)+b*seq(n-2) after hole-normalization. None if not a rec claim."""
+    if "=" not in (q or ""):
+        return None
+    heads = {h.lower() for h in rec_heads}
+    norm = _norm_formula(q, heads)
+    if "=" not in norm:
+        return None
+    lhs, rhs = norm.split("=", 1)
+    if "•(n)" not in lhs.replace(" ", "") and not re.match(r"•\(n\)$", lhs):
+        # only a recurrence claim if LHS is •(n)
+        if lhs not in ("•(n)", "•n"):
+            return None
+    # collect a•(n-k) terms
+    coeffs: dict[int, int] = {}
+    for m in re.finditer(r"([+-]?)(\d*)\*?•\(n-(\d+)\)", rhs):
+        sign, num, k = m.group(1), m.group(2), int(m.group(3))
+        a = int(num) if num else 1
+        if sign == "-":
+            a = -a
+        coeffs[k] = coeffs.get(k, 0) + a
+    # also 2•(n-1) without plus between 2 and •
+    if not coeffs:
+        return None
+    order = max(coeffs)
+    vec = [coeffs.get(i, 0) for i in range(1, order + 1)]
+    # which rec head? first bound-looking token that is a head
+    tokens = tokenize(q)
+    seq = None
+    for tok in tokens:
+        tl = tok.lower()
+        if tl in heads:
+            seq = tl
+            break
+        for h in heads:
+            if tl.startswith(h) and len(h) >= 3:
+                seq = h
+                break
+        if seq:
+            break
+    return seq, vec
+
+
+def claimed_rec_conflict(q: str, kb: dict) -> dict | None:
+    """If the question claims a rec that does not match the shortest living rec/2."""
+    heads = {k.lower() for k in (kb.get("recs") or {})}
+    parsed = parse_claimed_rec(q, heads)
+    if not parsed:
+        return None
+    seq, claimed = parsed
+    recs = kb.get("recs") or {}
+    if not seq or (seq not in recs and seq not in heads):
+        # hole-only: conflict if the claimed vector matches no living rec/2
+        mismatch = []
+        for h, coefs in recs.items():
+            cleaned = []
+            for c in coefs:
+                c = list(c)
+                while c and c[-1] == 0:
+                    c = c[:-1]
+                if c:
+                    cleaned.append(c)
+            if not cleaned:
+                continue
+            cleaned.sort(key=len)
+            can = cleaned[0]
+            if claimed == can:
+                return None  # it is someone's law
+            mismatch.append((h, can))
+        if mismatch:
+            h, can = mismatch[0]
+            return {"seq": h, "claimed": claimed, "canonical": can}
+        return None
+    # canonical shortest
+    coefs = kb["recs"].get(seq) or kb["recs"].get(seq.lower())
+    if not coefs:
+        return None
+    cleaned = []
+    for c in coefs:
+        c = list(c)
+        while c and c[-1] == 0:
+            c = c[:-1]
+        if c:
+            cleaned.append(c)
+    if not cleaned:
+        return None
+    cleaned.sort(key=len)
+    can = cleaned[0]
+    if claimed == can:
+        return None
+    return {"seq": seq, "claimed": claimed, "canonical": can}
 
 
 def bound_seqs(bound: set[str], kb: dict) -> list[str]:

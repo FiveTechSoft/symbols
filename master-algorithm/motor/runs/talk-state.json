@@ -1,1 +1,1 @@
-{"topic": "lemma", "tag": "lemma", "last_tag": "lemma", "transfer_dst": "pell", "transfer_src": "fib", "last_src": "fib", "last_clause": "bilin_fib_offset_pm1"}
+{"topic": "bilin_fib_offset_pm1", "tag": "unknown", "last_tag": "verified", "transfer_dst": "pell", "transfer_src": "lucas", "last_src": "lucas", "last_clause": "bilin_fib_offset_pm1", "last_text": "Demostrado: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. verified bilin_fib_offset_pm1.\n[símbolo]"}
