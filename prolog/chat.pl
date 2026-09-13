@@ -286,7 +286,7 @@ dialog_probe_missing([S, V]) :-
     \+ is_determiner(V),
     atom_length(V, LV), LV >= 3,
     ( qnorm([S], S2) -> true ; S2 = S ),
-    bb_stem(V, VB),
+    bb_lemma(V, VB),
     format('What did ~w ~w?~n', [S2, VB]),
     assertz(dialog_pending_teach(S2, V)).
 
@@ -296,7 +296,7 @@ dialog_why_ask([porque]).
 dialog_why_ask([por, que]).
 
 dialog_why_need(S, V) :-
-    bb_stem(V, VB),
+    bb_lemma(V, VB),
     format('Because I need the object of ~w ~w.~n', [S, VB]).
 
 chat_line_tokens(L, Toks, Changed) :-
@@ -1611,6 +1611,15 @@ es_form([quien, V|Rest], say, answer(Xs, Facts)) :-
     findall(S, member(S-_, SF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, SF), Facts).
+% que hizo/hizo/hizo X? → what did X do? (Spanish past tense auxiliary)
+es_form([que, V, S], say, answer(Xs, Facts)) :-
+    es_did_form(V),
+    qnorm([S], S2),
+    findall(O-(S2, R, O), memory_relation(S2, R, O, _, _), OF),
+    OF \== [],
+    findall(O, member(O-_, OF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, OF), Facts).
 es_form([que, V|Rest], say, answer(Xs, Facts)) :-
     qnorm(Rest, S),
     bb_rel_forms(V, Rs),
@@ -1633,6 +1642,13 @@ es_form([V, S, O], say, YesNo) :-
     ( memory_relation(S2, Vr, O2, _, _) -> YesNo = yes((S2, Vr, O2))
     ; YesNo = no
     ).
+
+% Spanish past-tense auxiliary verbs (equivalent to "did").
+es_did_form(hizo).
+es_did_form(hizo).
+es_did_form(hizo).
+es_did_form(hizo).
+es_did_form(hizo).
 
 % Salida ES: listas y pruebas identicas (lengua-neutral); Si/No/No-lo-se
 % localizados.
@@ -1817,9 +1833,29 @@ did_split(Mid, S, V, O) :-
       symbol_dist(Vw, V, D), D =< 2
     ; pin_rel(Vw, V)
     ).
+% did S V? intransitive: no object required.
+did_split(Mid, S, V, O) :-
+    nl_tokens(Mid, Packed),
+    append(Pre, [Vw], Packed),
+    Pre \== [],
+    qnorm(Pre, S),
+    ( pin_rel(Vw, V), memory_relation(S, V, O, _, _)
+    ; pin_rel(Vw, V)
+    ; memory_relation(S, V, O, _, _),
+      atom_length(Vw, L), L >= 3,
+      symbol_dist(Vw, V, D), D =< 2
+    ).
 
 chat_form([who, V|Rest], say, answer(Xs, Facts)) :-
     qnorm(Rest, O),
+    bb_rel_forms(V, Rs),
+    findall(S-(S, Vr, O), (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), SF),
+    SF \== [],
+    findall(S, member(S-_, SF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, SF), Facts).
+% who V? (intransitive, no object): find all subjects and objects for V.
+chat_form([who, V], say, answer(Xs, Facts)) :-
     bb_rel_forms(V, Rs),
     findall(S-(S, Vr, O), (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), SF),
     SF \== [],
@@ -2051,7 +2087,13 @@ bb_rel_forms_direct(V, Rs) :-
     findall(R, (memory_relation(_, R, _, _, _),
                 ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
                             RSt == St, R \== V) )), R0),
-    sort(R0, Rs).
+    ( R0 \== [] -> sort(R0, Rs)
+    ; atom_concat(St, 'e', StE),
+      findall(R, (memory_relation(_, R, _, _, _),
+                  ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RStE),
+                              RStE == StE, R \== V) )), R1),
+      sort(R1, Rs)
+    ).
 
 % bb_ddouble: una de dos letras finales iguales fuera (ingles: la
 % consonante se dobla ante -ed/-ing; call/full/well nunca se tocan
@@ -2061,6 +2103,24 @@ bb_ddouble(W, D) :-
     sub_atom(W, _, 1, 1, C), !,
     sub_atom(W, 0, _, 1, D).
 bb_ddouble(W, W).
+
+% bb_lemma: stem display that tries silent-e restore for better output.
+% "danced" → "dance" (not "danc"), "stopped" → "stop" (already undoubled).
+% Tries: 1) stem directly in KB, 2) stem+e if it exists in KB or as a rel,
+% 3) stem+e for -ed words ending in consonant (linguistic heuristic).
+bb_lemma(V, Lemma) :-
+    bb_stem(V, St0), bb_ddouble(St0, St),
+    ( memory_relation(_, St, _, _, _) -> Lemma = St
+    ; atom_concat(St, 'e', StE),
+      ( memory_relation(_, StE, _, _, _) ; bb_rel_forms_direct(StE, [_|_]) ) ->
+        Lemma = StE
+    ; sub_atom(V, _, 2, 0, 'ed'),
+      atom_length(St, LSt), LSt >= 2,
+      sub_atom(St, _, 1, 0, LastC),
+      \+ member(LastC, [a, e, i, o, u, y]) ->
+        atom_concat(St, 'e', Lemma)
+    ; Lemma = St
+    ).
 
 bb_stem(W, St) :-
     ( sub_atom(W, _, 3, 0, 'ied') ->
