@@ -87,6 +87,24 @@ run_two :-
     ( sub_string(OutOtr, _, _, _, "alice_in_wonderland") -> true
     ; format('FAIL otro libro: ~w~n', [OutOtr]), fail
     ),
+    capture("who besides alice met the hatter?", OutBes),
+    ( sub_string(OutBes, _, _, _, "No one else") -> true
+    ; format('FAIL besides: ~w~n', [OutBes]), fail
+    ),
+    capture("did alice eat cake or find the key?", OutOrVp),
+    ( sub_string(OutOrVp, _, _, _, "Yes") -> true
+    ; format('FAIL or-vp: ~w~n', [OutOrVp]), fail
+    ),
+    capture("is alice not in plataforma?", OutNot),
+    ( sub_string(OutNot, _, _, _, "Yes") -> true
+    ; format('FAIL not-in: ~w~n', [OutNot]), fail
+    ),
+    expect("where is plataforma set?", "set in"),
+    capture("list the characters in plataforma", OutList),
+    \+ sub_string(OutList, _, _, _, "Learned"),
+    ( sub_string(OutList, _, _, _, "michel") -> true
+    ; format('FAIL list chars: ~w~n', [OutList]), fail
+    ),
     delete_file('two_books_tmp.knowledge.pl').
 
 capture(Line, Out) :-

@@ -585,6 +585,9 @@ chat_learn(L, Toks, Changed) :-
 chat_learn_sent(LS, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
     ; Toks = [W|_], qlead(W) -> chat_ask(Toks)
+    ; book_pin(Toks, B) ->
+        ask_lang(Toks, Lang),
+        about_entity(B, Lang)
     ; dialog_probe_missing(Toks) -> true
     ; chat_learn_conj(Toks) -> true
     ; learn_sentence(LS, stored(A, V, O, Src)) ->
@@ -1058,8 +1061,18 @@ chat_ask(Toks) :-
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
+    ; ask_or_vp(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
+    ; ask_except(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
     ; pol_neg(Toks, Clean),
-      once(chat_form(Clean, _, A0)),
+      ( once(chat_form(Clean, _, A0))
+      ; once(graph_ask(Clean, _, A0))
+      ),
       pol_flip(A0, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -1193,6 +1206,46 @@ or_merge(no, yes(F), say, yes(F)).
 or_merge(yes(F1), yes(F2), say, yes_both(F1, F2)).
 or_merge(no, no, say, no).
 
+% "did alice eat cake or find the key": mismo sujeto, dos VP.
+ask_or_vp(Toks, Kind, Ans) :-
+    append([Did, S|Left], [Or|Right], Toks),
+    member(Did, [did, does, do]),
+    member(Or, [or, o]),
+    qnorm([S], E),
+    map_entity(E),
+    Left \== [], Right \== [],
+    Right = [B0|_],
+    \+ map_entity(B0),
+    once(chat_form([Did, S|Left], _, A1)),
+    once(chat_form([Did, S|Right], _, A2)),
+    or_merge(A1, A2, Kind, Ans).
+
+except_mark(besides).
+except_mark(except).
+except_mark(excepto).
+except_mark(salvo).
+
+% "who besides alice met the hatter": el ente tras besides se excluye.
+ask_except(Toks, say, Ans) :-
+    append(Left, [Ex, ETok|Right], Toks),
+    except_mark(Ex),
+    qnorm([ETok], E),
+    map_entity(E),
+    append(Left, Right, Core),
+    Core \== [],
+    once(( chat_form(Core, say, answer(Xs0, Facts0))
+         ; graph_ask(Core, say, answer(Xs0, Facts0))
+         )),
+    exclude(==(E), Xs0, Xs),
+    ( Xs == [] -> Ans = nobody
+    ; include(fact_mentions(Xs), Facts0, Facts),
+      Facts \== [],
+      Ans = answer(Xs, Facts)
+    ).
+
+fact_mentions(Xs, (S, _, O)) :-
+    ( member(S, Xs) ; member(O, Xs) ).
+
 % never/not invierte el si/no (polaridad cerrada, no lexico).
 pol_neg(Toks, Clean) :-
     member(Neg, [never, not]),
@@ -1245,6 +1298,13 @@ rel_touches(Ents, R) :-
 pin_rel(W, R) :-
     bb_rel_forms(W, Rs),
     member(R, Rs).
+% set → set_in, appears → appears_in: prefijo vivo + '_' en el grafo.
+pin_rel(W, R) :-
+    \+ map_entity(W),
+    atom_length(W, L), L >= 3,
+    memory_relation(_, R, _, _, _),
+    atom_concat(W, Rest, R),
+    sub_atom(Rest, 0, 1, _, '_').
 pin_rel(W, R) :-
     \+ bb_rel_forms(W, _),
     \+ map_entity(W),
@@ -1967,6 +2027,8 @@ chat_say(say, no) :-
     writeln('No.').
 chat_say(say, yes_bare) :-
     writeln('Yes.').
+chat_say(say, nobody) :-
+    writeln('No one else.').
 chat_say(say, explanation(S, Vr, O, Proof)) :-
     surface_sent((S, Vr, O), Line),
     writeln(Line),
