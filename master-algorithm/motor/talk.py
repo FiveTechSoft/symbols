@@ -1,69 +1,22 @@
 # MOLT_ROUND=1
 """Natural-language mouth over theory.pl. Never invents. Spanish first.
 
-Doctrine (BookBrain discipline, theory.pl ontology):
-  símbolo demuestra · analogía transfiere · crítico rechaza ·
-  UNKNOWN si no hay cláusula · curiosidad elige el próximo tick
-Answers are assembled from loaded clauses, not canned topic essays.
+Doctrine: the brain is theory.pl. Vocabulary is a byproduct of growth.
+Answers assemble from deduced clauses — no adult synonym dictionaries.
 """
 from __future__ import annotations
 
 import json
 import re
-import unicodedata
 from pathlib import Path
+
+from motor import deduce
 
 MOTOR_DIR = Path(__file__).resolve().parent
 THEORY = MOTOR_DIR / "archive" / "theory.pl"
 LATEST = MOTOR_DIR / "runs" / "latest.json"
 LOG = MOTOR_DIR / "runs" / "talk-log.jsonl"
 STATE = MOTOR_DIR / "runs" / "talk-state.json"
-
-# Soft typo / alias map → canonical sequence key present in theory
-SEQ_ALIASES = {
-    "fib": "fib",
-    "fibonacci": "fib",
-    "fibonaci": "fib",
-    "fibonacc": "fib",
-    "fibo": "fib",
-    "lucas": "lucas",
-    "lucass": "lucas",
-    "lukas": "lucas",
-    "luca": "lucas",
-    "pell": "pell",
-    "pel": "pell",
-    "pelle": "pell",
-}
-SEQ_NAMES = {"fib": "Fibonacci", "lucas": "Lucas", "pell": "Pell"}
-SEQ_LETTER = {"fib": "F", "lucas": "L", "pell": "P"}
-
-# Topics that are traps / out-of-theory — never invent
-TRAP_RE = re.compile(
-    r"\b(filotaxis|phyllotaxis|alma|soul|universo|dios|god|conciencia|"
-    r"consciousness|siempre\s+primo|always\s+prime|teorema\s+nuevo|"
-    r"inventa|inventame|cocina|receta|noticia|historia\s+de|"
-    r"politica|política|futbol|fútbol|clima|chisme)\b",
-    re.I,
-)
-
-
-def _fold(s: str) -> str:
-    """Lowercase, strip accents lightly, keep letters/digits/spaces."""
-    s = s.strip().lower()
-    s = "".join(
-        c for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
-    )
-    s = s.replace("¿", "").replace("?", "").replace("¡", "").replace("!", "")
-    s = s.replace("→", " to ").replace("->", " to ").replace("⇒", " to ")
-    s = s.replace("π", "pisano ")
-    # F(n) / L(n) / P(n) before stripping parens
-    s = re.sub(r"\bf\s*\(\s*n\s*\)", "fib", s)
-    s = re.sub(r"\bl\s*\(\s*n\s*\)", "lucas", s)
-    s = re.sub(r"\bp\s*\(\s*n\s*\)", "pell", s)
-    s = re.sub(r"[^\w\s+\-./=]", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
 
 
 def _tribes(*names: str) -> str:
@@ -90,20 +43,22 @@ def _load_theory(path: Path) -> dict:
         verified.append((m.group(1), m.group(2), m.group(3), m.group(4)))
 
     lemmas = re.findall(r"lemma\('([^']+)',\s*(\w+),\s*'([^']+)'\)\.", text)
-    pisano = [(s, int(m), int(p)) for s, m, p in re.findall(
+    periods = [(s, int(m), int(p)) for s, m, p in re.findall(
         r"true_mod\((\w+),\s*(\d+),\s*(\d+)\)\.", text
     )]
     companions = re.findall(r"companion\((\w+),\s*(\w+)\)\.", text)
     obs = re.findall(r"obs\((\w+),\s*(\d+),\s*(-?\d+)\)\.", text)
+    schemas = re.findall(r"schema\((\w+),\s*unlocked\((\w+)\)\)\.", text)
 
     return {
         "recs": recs,
         "rejected": rejected,
         "verified": verified,
         "lemmas": lemmas,
-        "pisano": pisano,
+        "periods": periods,
         "companions": companions,
         "obs": [(s, int(i), int(v)) for s, i, v in obs],
+        "schemas": schemas,
         "n": len(verified),
         "raw": text,
     }
@@ -123,7 +78,8 @@ def _canonical_rec(coefs: list[list[int]]) -> list[int] | None:
     return cleaned[0]
 
 
-def _formula(letter: str, coef: list[int]) -> str:
+def _formula(seq: str, coef: list[int]) -> str:
+    letter = seq[:1].upper() if seq else "X"
     parts = [f"{a}·{letter}(n-{i})" for i, a in enumerate(coef, 1)]
     return f"{letter}(n) = " + " + ".join(parts)
 
@@ -156,123 +112,11 @@ def _save_state(d: dict) -> None:
     STATE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
 
-def _find_seqs(s: str) -> list[str]:
-    """Return canonical seq keys in order of appearance (longest alias wins)."""
-    hits: list[tuple[int, str]] = []
-    for alias in sorted(SEQ_ALIASES, key=len, reverse=True):
-        for m in re.finditer(rf"\b{re.escape(alias)}\b", s):
-            key = SEQ_ALIASES[alias]
-            # skip if this span already covered by a longer alias
-            if any(m.start() < e and m.end() > st for st, e, _ in [(h[0], h[0]+len(h[1]), h[1]) for h in hits]):
-                continue
-            hits.append((m.start(), key))
-    hits.sort(key=lambda t: t[0])
-    found: list[str] = []
-    for _, key in hits:
-        if key not in found:
-            found.append(key)
-    return found
-
-
-def _verified_named(kb: dict, needle: str) -> list[tuple[str, str]]:
-    """Return (name, formula) where name or formula contains needle."""
-    needle = needle.lower()
-    hits = []
-    for _w, _f, name, formula in kb["verified"]:
-        if needle in name.lower() or needle in formula.lower():
-            hits.append((name, formula))
-    return hits
-
-
-def _rejected_named(kb: dict, needle: str) -> list[tuple[str, str]]:
-    needle = needle.lower()
-    return [(n, w) for n, w in kb["rejected"] if needle in n.lower() or needle in w.lower()]
-
-
-def _intent(s: str) -> dict:
-    """Parse a folded question into a soft intent bag."""
-    intent = {
-        "identity": False,
-        "growth": False,
-        "summary": False,
-        "why": False,
-        "more": False,
-        "transfer": False,
-        "prove": False,
-        "reject_law": False,  # false laws like "el doble", "siempre 2"
-        "follow": False,
-        "seqs": _find_seqs(s),
-        "topics": [],  # cassini, pisano, geometry, lemma, ratio, phi
-    }
-    if any(x in s for x in (
-        "quien eres", "que eres", "who are you", "what are you",
-        "tu tribu", "de que tribu", "your tribe", "what is your tribe",
-    )) or (s == "identidad" or s.startswith("identidad ") and "cassini" not in s):
-        intent["identity"] = True
-    if any(x in s for x in (
-        "creciste", "crecimiento", "growth", "como vas", "estado",
-        "cuanto creciste", "progreso",
-    )):
-        intent["growth"] = True
-    if any(x in s for x in (
-        "que sabes", "que conoces", "resumen", "what do you know",
-        "que sabes hacer", "inventario",
-    )):
-        intent["summary"] = True
-    if any(x in s for x in (
-        "por que", "porque", "why", "y eso", "y ahi",
-    )) or re.search(r"\b(razon|motivo)\b", s) and "aurea" not in s and "aureo" not in s:
-        intent["why"] = True
-    if re.search(r"\b(mas|more|otro|otros|sigue|continua)\b", s):
-        intent["more"] = True
-    if any(x in s for x in (
-        "transfer", "transfiere", "transferencia", "pasa a", "sirve para",
-        "aplica a", "comparte", "misma ley", "tambien a", "se pasa",
-        "clon", "misma recurrence", "misma recurrencia", "vale en",
-        "misma?", " misma", " a lukas", " a lucas", " a pell", " a fib",
-    )) or re.search(
-        r"\b(fib|lucas|pell|fibonaci|lukas|fibonacci)\s+(a|to)\s+(fib|lucas|pell|lukas|fibonacci)",
-        s,
-    ):
-        intent["transfer"] = True
-    # "fib y pell misma" / "fib y lucas misma"
-    if re.search(r"\b(fib|lucas|pell)\w*\s+y\s+(fib|lucas|pell)", s) and "mism" in s:
-        intent["transfer"] = True
-    # bare transfer_* clause names
-    if "transfer_" in s:
-        intent["transfer"] = True
-    if any(x in s for x in (
-        "demostra", "demostrar", "prove", "prueba", "demuestra", "cite",
-    )):
-        intent["prove"] = True
-    if any(x in s for x in (
-        "el doble", "siempre 2", "siempre dos", "es 2*", "es 2 ·",
-        "order 1", "orden 1", "solo el anterior", "2 veces", "dos veces",
-        "veces el anterior", "doble del anterior",
-    )):
-        intent["reject_law"] = True
-    if s.startswith("y ") or s in ("y", "y eso", "y ahi", "y luego"):
-        intent["follow"] = True
-    if "cassini" in s:
-        intent["topics"].append("cassini")
-    if any(x in s for x in ("pisano", "modulo", "modular", "periodo", "period",
-                            "true_mod", "true mod")) or "π" in s or s.startswith("pi "):
-        intent["topics"].append("pisano")
-    if any(x in s for x in ("geometr", "lema", "lemma", "varignon", "paralelo",
-                            "isoscel", "midline", "equilateral", "mediana",
-                            "geo_")):
-        intent["topics"].append("geometry")
-    if any(x in s for x in ("ratio", "phi", "oro", "limite", "aurea", "aureo", "golden")) and not s.startswith("neg_"):
-        intent["topics"].append("ratio")
-    if any(x in s for x in ("parity", "xor", "boolean", "bit_fn", "logica", "logica")):
-        intent["topics"].append("logic")
-    return intent
-
-
 def _unknown(st: dict) -> tuple[str, str, dict]:
     st["tag"] = "unknown"
     return (
-        "UNKNOWN. No hay cláusula. No invento.\n[duda · crítico]",
+        "UNKNOWN. No hay cláusula en theory.pl que unifique con eso.\n"
+        "No invento.\n[duda · crítico]",
         "unknown",
         st,
     )
@@ -285,46 +129,140 @@ def _pack(text: str, tag: str, tribes: str, st: dict, topic=None) -> tuple[str, 
         st["topic"] = topic
     if tag.startswith("transfer-"):
         st["transfer_dst"] = tag.split("-", 1)[-1]
-    if not text.endswith("\n") and "[" not in text.split("\n")[-1]:
-        text = f"{text}\n[{tribes}]"
-    elif "\n[" not in text:
+    if "\n[" not in text:
         text = f"{text}\n[{tribes}]"
     return text, tag, st
 
 
-def _answer_transfer(kb: dict, src: str | None, dst: str, st: dict) -> tuple[str, str, dict]:
-    """Transfer src→dst using rec + verified/rejected clauses."""
-    src = src or "fib"
+def _verified_named(kb: dict, needle: str) -> list[tuple[str, str]]:
+    needle = needle.lower()
+    return [
+        (name, formula)
+        for _w, _f, name, formula in kb["verified"]
+        if needle in name.lower() or needle in formula.lower()
+    ]
+
+
+def _rejected_named(kb: dict, needle: str) -> list[tuple[str, str]]:
+    needle = needle.lower()
+    return [(n, w) for n, w in kb["rejected"] if needle in n.lower() or needle in w.lower()]
+
+
+# --- speech-act detectors (dialogue / self-knowledge only; no domain lexicon) ---
+
+def _is_identity(s: str) -> bool:
+    if any(x in s for x in (
+        "quien eres", "que eres", "who are you", "what are you",
+        "tu tribu", "de que tribu", "your tribe", "what is your tribe",
+    )):
+        return True
+    # bare self-name only — not "identidad de <foreign word>"
+    if s in ("identidad", "identidad?", "tu identidad"):
+        return True
+    return False
+
+
+def _is_growth(s: str) -> bool:
+    return any(x in s for x in (
+        "creciste", "crecimiento", "growth", "como vas", "estado",
+        "cuanto creciste", "progreso",
+    ))
+
+
+def _is_summary(s: str) -> bool:
+    return any(x in s for x in (
+        "que sabes", "que conoces", "resumen", "what do you know",
+        "que sabes hacer", "inventario",
+    ))
+
+
+def _is_why(s: str) -> bool:
+    return any(x in s for x in ("por que", "porque", "why", "y eso", "y ahi"))
+
+
+def _is_more(s: str) -> bool:
+    return bool(re.search(r"\b(mas|more|otro|otros|sigue|continua)\b", s))
+
+
+def _is_follow(s: str) -> bool:
+    return s.startswith("y ") or s in ("y", "y eso", "y ahi", "y luego")
+
+
+def _is_transfer_speech(s: str) -> bool:
+    return any(x in s for x in (
+        "transfer", "transfiere", "transferencia", "pasa a", "sirve para",
+        "aplica a", "comparte", "misma ley", "tambien a", "se pasa",
+        "clon", "misma recurrence", "misma recurrencia", "vale en",
+    )) or bool(re.search(
+        r"\b\w+\s+(a|to)\s+\w+",
+        s,
+    )) and any(x in s for x in (" a ", " to ", "→", "->"))
+
+
+def _is_prove_speech(s: str) -> bool:
+    return any(x in s for x in (
+        "demostra", "demostrar", "prove", "prueba", "demuestra", "cite",
+    ))
+
+
+def _is_false_law_speech(s: str) -> bool:
+    """Arithmetic claim speech — not a domain name list."""
+    return any(x in s for x in (
+        "el doble", "siempre 2", "siempre dos", "es 2*", "order 1", "orden 1",
+        "solo el anterior", "2 veces", "dos veces", "veces el anterior",
+        "doble del anterior", "doble siempre",
+    ))
+
+
+def _is_prime_claim(s: str) -> bool:
+    return bool(re.search(
+        r"(siempre\s+primo|primo\s+siempre|always\s+prime|prime\s+always|"
+        r"todos\s+los\s+\w+\s+son\s+primos|never\s+composite|always_prime)",
+        s,
+    ))
+
+
+def _is_invent_speech(s: str) -> bool:
+    return bool(re.search(r"\b(inventa|inventame|teorema\s+nuevo|crea\s+una\s+ley)\b", s))
+
+
+def _answer_transfer(kb: dict, src: str, dst: str, st: dict) -> tuple[str, str, dict]:
     rec_src = _canonical_rec(kb["recs"].get(src, []))
     rec_dst = _canonical_rec(kb["recs"].get(dst, []))
-    # Prefer verified transfer clause
+    if rec_src is None or rec_dst is None:
+        return _unknown(st)
+    st["transfer_src"] = src
+    st["last_src"] = src
     vhits = _verified_named(kb, f"transfer_{src}_to_{dst}")
-    if not vhits:
-        vhits = _verified_named(kb, f"transfer_{dst}_to_{src}")  # symmetric share
     rhits = _rejected_named(kb, f"transfer_{src}_to_{dst}")
-    if not rhits:
-        rhits = _rejected_named(kb, f"transfer_{dst}_to_{src}")
-
-    same = rec_src is not None and rec_src == rec_dst
-    if same and (vhits or (rec_src == [1, 1] and {src, dst} <= {"fib", "lucas"})):
-        name = vhits[0][0] if vhits else f"transfer_{src}_to_{dst}"
-        formula = vhits[0][1] if vhits else f"rec({src},{rec_src}) = rec({dst},{rec_dst})"
+    same = rec_src == rec_dst
+    if same:
+        if vhits:
+            name, formula = vhits[0]
+            return _pack(
+                f"Sí se transfiere. Analogía: misma ley. "
+                f"Símbolo: rec({src},{rec_src}) y rec({dst},{rec_dst}). "
+                f"verified {name}: {formula}.",
+                f"transfer-{dst}",
+                _tribes("analogía", "símbolo"),
+                st,
+                topic="transfer",
+            )
         return _pack(
             f"Sí se transfiere. Analogía: misma ley. "
-            f"Símbolo: rec({src},{rec_src}) y rec({dst},{rec_dst}). "
-            f"verified {name}: {formula}.",
+            f"Símbolo: rec({src},{rec_src}) y rec({dst},{rec_dst}).",
             f"transfer-{dst}",
             _tribes("analogía", "símbolo"),
             st,
             topic="transfer",
         )
-    # Negative transfer (e.g. fib→pell)
-    why = rhits[0][1] if rhits else "la ley no coincide"
-    rname = rhits[0][0] if rhits else f"transfer_{src}_to_{dst}"
+    why = rhits[0][1] if rhits else "pred != obs / ley distinta"
+    rname = rhits[0][0] if rhits else None
+    cite = f"rejected('{rname}'): {why}" if rname else f"rec({dst},{rec_dst}) vs rec({src},{rec_src})"
     return _pack(
         f"No se transfiere. Analogía: companion, no clon. "
         f"Símbolo: rec({dst},{rec_dst}) vs rec({src},{rec_src}). "
-        f"Crítico rejected('{rname}'): {why}.",
+        f"Crítico {cite}.",
         f"transfer-{dst}",
         _tribes("analogía", "símbolo", "crítico"),
         st,
@@ -336,24 +274,26 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     can = _canonical_rec(kb["recs"].get(seq, []))
     if not can:
         return _unknown(st)
-    name = SEQ_NAMES.get(seq, seq)
-    letter = SEQ_LETTER.get(seq, seq)
     vhits = _verified_named(kb, f"rec_{seq}")
     cite = f"verified {vhits[0][0]}" if vhits else f"rec({seq},{can})"
     if reject_law:
-        # False law traps
-        rhits = _rejected_named(kb, f"rec_{seq}_order_1") or _rejected_named(kb, "NEG_fib_always_prime")
+        rhits = (
+            _rejected_named(kb, f"rec_{seq}_o1")
+            or _rejected_named(kb, f"rec_{seq}_order")
+            or _rejected_named(kb, "o1_none")
+        )
         why = rhits[0][1] if rhits else "no fit"
+        rname = rhits[0][0] if rhits else f"rec_{seq}_o1"
         return _pack(
-            f"Rechazado. No es esa ley. La ley es {_formula(letter, can)}. "
-            f"rec({seq},{can}). Crítico: {why}.",
+            f"Rechazado. No es esa ley. La ley es {_formula(seq, can)}. "
+            f"rec({seq},{can}). Crítico rejected('{rname}'): {why}.",
             f"reject-{seq}",
             _tribes("crítico", "símbolo"),
             st,
             topic=seq,
         )
     return _pack(
-        f"{name}: {_formula(letter, can)}. "
+        f"{seq}: {_formula(seq, can)}. "
         f"rec({seq},{can}). {cite}.",
         f"rec-{seq}",
         _tribes("símbolo"),
@@ -362,223 +302,76 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     )
 
 
-def _answer_cassini(kb: dict, st: dict) -> tuple[str, str, dict]:
-    hits = _verified_named(kb, "cassini")
-    if not hits:
-        return _unknown(st)
-    name, formula = hits[0]
-    return _pack(
-        f"Demostrado: {formula}. verified {name}. Símbolo puro.",
-        "cassini",
-        _tribes("símbolo"),
-        st,
-        topic="cassini",
-    )
-
-
-def _answer_pisano(kb: dict, seq: str | None, st: dict, more: bool = False) -> tuple[str, str, dict]:
-    rows = [(a, m, p) for a, m, p in kb["pisano"] if seq is None or a == seq]
-    if not rows:
-        # Maybe rejected insufficient prefix
-        rhits = _rejected_named(kb, "pisano")
-        if rhits:
-            return _pack(
-                f"Algunos periodos no caben en el prefijo. "
-                f"rejected('{rhits[0][0]}'): {rhits[0][1]}. Duda honesta.",
-                "pisano",
-                _tribes("símbolo", "duda"),
-                st,
-                topic="pisano",
-            )
-        return _unknown(st)
-    limit = 12 if more else 6
-    parts = [f"π_{a}({m})={p}" for a, m, p in rows[:limit]]
-    vhits = _verified_named(kb, "pisano")
-    cite = f"verified {vhits[0][0]}" if vhits else "true_mod/3"
-    return _pack(
-        f"Periodos: {', '.join(parts)}. {cite}.",
-        "pisano",
-        _tribes("símbolo"),
-        st,
-        topic="pisano",
-    )
-
-
-def _answer_geometry(kb: dict, st: dict, more: bool = False) -> tuple[str, str, dict]:
-    if not kb["lemmas"]:
-        return _unknown(st)
-    limit = 8 if more else 4
-    sample = "; ".join(f"{i}: {tx}" for i, _ty, tx in kb["lemmas"][:limit])
-    return _pack(
-        f"Lemas ({len(kb['lemmas'])}): {sample}. lemma/3.",
-        "geometry",
-        _tribes("símbolo", "analogía"),
-        st,
-        topic="geometry",
-    )
-
-
-def _answer_ratio(kb: dict, st: dict) -> tuple[str, str, dict]:
-    hits = _verified_named(kb, "ratio") or _verified_named(kb, "phi")
-    if not hits:
-        return _unknown(st)
-    return _pack(
-        f"verified {hits[0][0]}: {hits[0][1]}.",
-        "ratio",
-        _tribes("símbolo"),
-        st,
-        topic="ratio",
-    )
-
-
-def _answer_why(kb: dict, last_topic: str | None, last_tag: str | None, st: dict) -> tuple[str, str, dict]:
-    """Cite rejected/verified reason for last topic — tag-aware, no mix."""
-    topic = last_topic or ""
-    tag = last_tag or ""
-    if "transfer-pell" in (tag or "") or st.get("transfer_dst") == "pell" or (topic == "transfer" and "pell" in (tag or "")):
-        rhits = (
-            _rejected_named(kb, "transfer_fib_to_pell")
-            or _rejected_named(kb, "transfer_lucas_to_pell")
-            or _rejected_named(kb, "transfer")
-        )
-        rec_p = _canonical_rec(kb["recs"].get("pell", []))
-        rec_f = _canonical_rec(kb["recs"].get("fib", []))
-        why = rhits[0][1] if rhits else "pred != obs"
-        rname = rhits[0][0] if rhits else "transfer_fib_to_pell"
-        return _pack(
-            f"Porque la ley no coincide: rec(pell,{rec_p}) vs rec(fib,{rec_f}). "
-            f"Contraejemplo rejected('{rname}'): {why}.",
-            "transfer-pell",  # keep dst so next why/y-eso stay sharp
-            _tribes("crítico", "símbolo"),
-            st,
-            topic="transfer",
-        )
-    if "transfer-lucas" in (tag or "") or st.get("transfer_dst") == "lucas" or (topic == "transfer" and "lucas" in (tag or "")):
-        vhits = _verified_named(kb, "transfer_fib_to_lucas") or _verified_named(kb, "transfer")
-        rec_l = _canonical_rec(kb["recs"].get("lucas", []))
-        rec_f = _canonical_rec(kb["recs"].get("fib", []))
-        cite = f"verified {vhits[0][0]}: {vhits[0][1]}" if vhits else f"rec(fib,{rec_f}) = rec(lucas,{rec_l})"
-        return _pack(
-            f"Porque comparten la ley: rec(fib,{rec_f}) y rec(lucas,{rec_l}). {cite}.",
-            "transfer-lucas",
-            _tribes("analogía", "símbolo"),
-            st,
-            topic="transfer",
-        )
-    if "transfer" in tag or topic == "transfer":
-        rhits = _rejected_named(kb, "transfer_fib_to_pell") or _rejected_named(kb, "transfer")
-        vhits = _verified_named(kb, "transfer_fib_to_lucas") or _verified_named(kb, "transfer")
-        bits = []
-        if vhits:
-            bits.append(f"verified {vhits[0][0]}: {vhits[0][1]}")
-        if rhits:
-            bits.append(f"rejected('{rhits[0][0]}'): {rhits[0][1]}")
-        if bits:
-            return _pack(
-                "Porque " + " | ".join(bits) + ".",
-                "why",
-                _tribes("crítico", "símbolo"),
-                st,
-                topic=topic or "transfer",
-            )
-    if topic in ("fib", "lucas", "pell"):
+def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
+    """Speech act on last dialogue clause — src/dst come from state, not a word list."""
+    tag = last.get("tag") or last.get("last_tag") or ""
+    topic = last.get("topic") or ""
+    dst = last.get("transfer_dst")
+    src = last.get("transfer_src")
+    if not src and topic == "transfer":
+        # recover src from tag like transfer-X or from last rec topic
+        src = last.get("last_src")
+    if (dst or str(tag).startswith("transfer-")) and (dst or True):
+        if not dst and str(tag).startswith("transfer-"):
+            dst = tag.split("-", 1)[-1]
+        if dst and dst in kb.get("recs", {}):
+            # pick src: stored, or any other rec that has transfer clauses with dst
+            if not src or src not in kb.get("recs", {}):
+                # prefer a rec that differs from dst and appears in transfer_* names
+                cands = [k for k in kb["recs"] if k != dst]
+                src = cands[0] if cands else None
+            if src:
+                rec_s = _canonical_rec(kb["recs"].get(src, []))
+                rec_d = _canonical_rec(kb["recs"].get(dst, []))
+                if rec_s == rec_d:
+                    vhits = _verified_named(kb, f"transfer_{src}_to_{dst}")
+                    cite = (
+                        f"verified {vhits[0][0]}: {vhits[0][1]}"
+                        if vhits else f"rec({src},{rec_s}) = rec({dst},{rec_d})"
+                    )
+                    return _pack(
+                        f"Porque comparten la ley: rec({src},{rec_s}) y rec({dst},{rec_d}). {cite}.",
+                        f"transfer-{dst}",
+                        _tribes("analogía", "símbolo"),
+                        st,
+                        topic="transfer",
+                    )
+                rhits = _rejected_named(kb, f"transfer_{src}_to_{dst}") or _rejected_named(
+                    kb, f"transfer_{dst}_to_{src}"
+                )
+                if rhits:
+                    return _pack(
+                        f"Porque la ley no coincide: rec({dst},{rec_d}) vs rec({src},{rec_s}). "
+                        f"Contraejemplo rejected('{rhits[0][0]}'): {rhits[0][1]}.",
+                        f"transfer-{dst}",
+                        _tribes("crítico", "símbolo"),
+                        st,
+                        topic="transfer",
+                    )
+                return _pack(
+                    f"Porque la ley no coincide: rec({dst},{rec_d}) vs rec({src},{rec_s}).",
+                    f"transfer-{dst}",
+                    _tribes("crítico", "símbolo"),
+                    st,
+                    topic="transfer",
+                )
+    if topic in kb.get("recs", {}):
         can = _canonical_rec(kb["recs"].get(topic, []))
-        rhits = _rejected_named(kb, f"rec_{topic}")
-        extra = f" Crítico: rejected('{rhits[0][0]}'): {rhits[0][1]}." if rhits else ""
         return _pack(
-            f"Porque rec({topic},{can}) es la ley que cabe en obs/3.{extra}",
+            f"Porque rec({topic},{can}) es la ley que cabe en obs/3.",
             "why",
             _tribes("símbolo", "crítico"),
             st,
             topic=topic,
         )
-    if topic == "cassini":
-        hits = _verified_named(kb, "cassini")
-        if hits:
-            return _pack(
-                f"Porque verified {hits[0][0]}: {hits[0][1]}.",
-                "why",
-                _tribes("símbolo"),
-                st,
-                topic="cassini",
-            )
-    if topic == "pisano":
-        rhits = _rejected_named(kb, "pisano")
-        vhits = _verified_named(kb, "pisano")
-        bits = []
-        if vhits:
-            bits.append(f"verified {vhits[0][0]}: {vhits[0][1]}")
-        if rhits:
-            bits.append(f"rejected('{rhits[0][0]}'): {rhits[0][1]}")
-        if bits:
-            return _pack("Porque " + " | ".join(bits) + ".", "why", _tribes("crítico", "símbolo"), st, topic="pisano")
-    # Always-prime / reject traps
-    rhits = _rejected_named(kb, "always_prime") or _rejected_named(kb, "NEG_fib")
-    if rhits and ("primo" in (topic or "") or "reject" in tag):
+    if last.get("last_clause"):
         return _pack(
-            f"Porque rejected('{rhits[0][0]}'): {rhits[0][1]}.",
+            f"Porque verified/rejected {last['last_clause']}.",
             "why",
-            _tribes("crítico"),
-            st,
-        )
-    return _unknown(st)
-
-
-
-def _restate(kb: dict, last_topic: str | None, last_tag: str | None, st: dict) -> tuple[str, str, dict]:
-    """«y eso» — restate last proven point, teacher-style."""
-    tag = last_tag or ""
-    topic = last_topic or ""
-    if "transfer-lucas" in tag:
-        return _answer_transfer(kb, "fib", "lucas", st)
-    if "transfer-pell" in tag:
-        return _answer_transfer(kb, "fib", "pell", st)
-    if topic == "transfer" and "lucas" in tag:
-        return _answer_transfer(kb, "fib", "lucas", st)
-    if topic in ("fib", "lucas", "pell"):
-        return _answer_rec(kb, topic, st)
-    if topic == "cassini":
-        return _answer_cassini(kb, st)
-    if topic == "pisano":
-        return _answer_pisano(kb, None, st)
-    if topic == "geometry":
-        return _answer_geometry(kb, st)
-    if topic == "ratio":
-        return _answer_ratio(kb, st)
-    return _answer_why(kb, last_topic, last_tag, st)
-
-
-def _answer_more(kb: dict, last_topic: str | None, st: dict) -> tuple[str, str, dict]:
-    topic = last_topic or ""
-    if topic in ("fib", "lucas", "pell"):
-        coefs = kb["recs"].get(topic, [])
-        lines = [f"rec({topic},{c})" for c in coefs[:5]]
-        vhits = _verified_named(kb, f"rec_{topic}")
-        extra = "; ".join(f"{n}" for n, _ in vhits[:3])
-        return _pack(
-            f"Más cláusulas: {', '.join(lines)}. verified: {extra or '—'}.",
-            "more",
             _tribes("símbolo"),
             st,
-            topic=topic,
+            topic=topic or None,
         )
-    if topic == "geometry":
-        return _answer_geometry(kb, st, more=True)
-    if topic == "pisano":
-        return _answer_pisano(kb, None, st, more=True)
-    if topic == "transfer":
-        vhits = _verified_named(kb, "transfer")
-        rhits = _rejected_named(kb, "transfer")
-        parts = [f"✓ {n}" for n, _ in vhits[:4]] + [f"✗ {n}" for n, _ in rhits[:4]]
-        return _pack(
-            "Más transferencias: " + "; ".join(parts) + ".",
-            "more",
-            _tribes("analogía", "crítico"),
-            st,
-            topic="transfer",
-        )
-    if topic == "summary" or not topic:
-        return _answer_summary(kb, st)
     return _unknown(st)
 
 
@@ -591,7 +384,7 @@ def _answer_summary(kb: dict, st: dict) -> tuple[str, str, dict]:
     return _pack(
         f"Lo unificado: {recs}. "
         f"{len(kb['verified'])} verified, {len(kb['rejected'])} rejected, "
-        f"{len(kb['lemmas'])} lemma. Fuera de theory.pl, silencio (sin cláusula).",
+        f"{len(kb['lemmas'])} lemma. Fuera de theory.pl, silencio.",
         "summary",
         _tribes("símbolo", "crítico"),
         st,
@@ -599,89 +392,85 @@ def _answer_summary(kb: dict, st: dict) -> tuple[str, str, dict]:
     )
 
 
-def _answer_prime_trap(kb: dict, st: dict) -> tuple[str, str, dict]:
-    rhits = _rejected_named(kb, "always_prime") or _rejected_named(kb, "NEG_fib_always_prime")
-    if rhits:
+def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str, str, dict]:
+    kind = hit["kind"]
+    if kind == "rec":
+        return _answer_rec(kb, hit["name"], st)
+    if kind == "verified":
+        st["last_clause"] = hit["name"]
         return _pack(
-            f"Rechazado. rejected('{rhits[0][0]}'): {rhits[0][1]}. No es siempre primo.",
-            "reject-prime",
+            f"Demostrado: {hit['formula']}. verified {hit['name']}.",
+            "verified",
+            _tribes("símbolo"),
+            st,
+            topic=hit["name"],
+        )
+    if kind == "lemma":
+        limit = 8 if more else 4
+        # If weak predicate-only bind, list several lemmas
+        if hit["score"] < 3 and "lemma" in (hit.get("bound") or set()):
+            sample = "; ".join(f"{n}: {tx}" for n, _ty, tx in kb["lemmas"][:limit])
+            return _pack(
+                f"Lemas ({len(kb['lemmas'])}): {sample}. lemma/3.",
+                "lemma",
+                _tribes("símbolo", "analogía"),
+                st,
+                topic="lemma",
+            )
+        return _pack(
+            f"Lema {hit['name']}: {hit['formula']}. lemma/3.",
+            "lemma",
+            _tribes("símbolo", "analogía"),
+            st,
+            topic="lemma",
+        )
+    if kind == "rejected":
+        st["last_clause"] = hit["name"]
+        return _pack(
+            f"Rechazado. rejected('{hit['name']}'): {hit['formula']}.",
+            "reject-named",
             _tribes("crítico"),
             st,
             topic="reject",
         )
-    return _pack(
-        "UNKNOWN. No hay cláusula que diga 'siempre primo'. No invento.",
-        "unknown",
-        _tribes("duda", "crítico"),
-        st,
-    )
+    if kind == "period":
+        rows = hit["formula"]
+        limit = 12 if more else 6
+        parts = [f"π_{a}({m})={p}" for a, m, p in rows[:limit]]
+        return _pack(
+            f"Periodos: {', '.join(parts)}. true_mod/3.",
+            "period",
+            _tribes("símbolo"),
+            st,
+            topic="period",
+        )
+    if kind == "companion":
+        pairs = ", ".join(f"companion({a},{b})" for a, b in hit["formula"][:6])
+        return _pack(
+            f"{pairs}. companion/2.",
+            "companion",
+            _tribes("analogía", "símbolo"),
+            st,
+            topic="companion",
+        )
+    return _unknown(st)
 
 
 def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     last = last or {}
-    s = _fold(q)
+    s = deduce.fold(q)
     st: dict = {
         "topic": last.get("topic"),
         "tag": last.get("tag"),
         "last_tag": last.get("last_tag") or last.get("tag"),
         "transfer_dst": last.get("transfer_dst"),
+        "transfer_src": last.get("transfer_src"),
+        "last_src": last.get("last_src"),
+        "last_clause": last.get("last_clause"),
     }
 
-    # --- traps / out-of-theory (except always-prime which has rejected clause) ---
-    if re.search(
-        r"(siempre\s+primo|primo\s+siempre|always\s+prime|prime\s+always|"
-        r"todos\s+los\s+\w+\s+son\s+primos|never\s+composite|always_prime)",
-        s,
-    ):
-        return _answer_prime_trap(kb, st)
-
-    # Invent/adversarial always UNKNOWN (even if a seq word appears)
-    if re.search(r"\b(inventa|inventame|teorema\s+nuevo|crea\s+una\s+ley)\b", s):
-        return _unknown(st)
-    if re.search(r"\b(universo|universe|dios|god|alma|soul|filotaxis|conciencia)\b", s) and re.search(
-        r"\b(demostra|demostrar|prove|prueba|teorema)\b", s
-    ):
-        return _unknown(st)
-    if TRAP_RE.search(s) and not any(
-        k in s for k in ("fib", "lucas", "pell", "cassini", "pisano", "lema", "geometr", "rec")
-    ):
-        return _unknown(st)
-
-    intent = _intent(s)
-
-    # Follow-up resolution: "y pell", "y lucas", "y eso", bare "por que"
-    bare_why = intent["why"] and not intent["seqs"] and not intent["topics"]
-    y_eso = s in ("y eso", "y ahi", "y eso mismo", "eso") or s.endswith(" y eso")
-    if intent["follow"] or bare_why or y_eso:
-        extra = s
-        if s.startswith("y "):
-            extra = s[2:].strip()
-            if extra.startswith("a "):
-                extra = extra[2:].strip()
-        follow_seqs = _find_seqs(extra)
-        if follow_seqs and (
-            last.get("topic") in ("transfer", "fib", "lucas", "pell")
-            or (last.get("tag") or "").startswith("transfer")
-            or (last.get("tag") or "").startswith("rec")
-        ):
-            src = last.get("topic") if last.get("topic") in ("fib", "lucas", "pell") else "fib"
-            if last.get("topic") == "transfer":
-                src = "fib"
-            return _answer_transfer(kb, src, follow_seqs[0], st)
-        if y_eso or s in ("y eso", "y ahi"):
-            # After Lucas transfer → restate shared law; after Pell → restate refusal
-            return _restate(kb, last.get("topic"), last.get("tag") or last.get("last_tag"), st)
-        if intent["why"] or bare_why:
-            tag0 = last.get("tag") or last.get("last_tag") or ""
-            if last.get("transfer_dst") and "transfer-" not in str(tag0):
-                tag0 = f"transfer-{last['transfer_dst']}"
-            elif last.get("transfer_dst") and last["transfer_dst"] not in str(tag0):
-                tag0 = f"transfer-{last['transfer_dst']}"
-            return _answer_why(kb, last.get("topic"), tag0, st)
-        if intent["more"]:
-            return _answer_more(kb, last.get("topic"), st)
-
-    if intent["identity"]:
+    # Self-knowledge speech acts (not domain math vocabulary)
+    if _is_identity(s):
         return _pack(
             "Soy Master Algorithm. Mi tribu es la que unifica: "
             "el símbolo demuestra, la analogía transfiere, el crítico rechaza, "
@@ -692,158 +481,160 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             st,
             topic="identity",
         )
-
-    if intent["growth"]:
+    if _is_growth(s):
         return _pack(_growth(), "growth", _tribes("curiosidad", "crítico"), st, topic="growth")
 
-    if intent["summary"]:
+    # Invent speech → honest silence (no clause to invent from)
+    if _is_invent_speech(s):
+        return _unknown(st)
+
+    # Dialogue: why / more / follow on last state
+    bare_follow = _is_follow(s) or s in ("y eso", "y ahi", "eso")
+    why = _is_why(s)
+    more = _is_more(s)
+
+    tokens = deduce.tokenize(s)
+    atoms = deduce.lexicon_from_kb(kb)
+    short_roots = {k.lower() for k in kb.get("recs") or {}}
+    bound = deduce.bind_tokens(tokens, atoms, short_roots=short_roots)
+    seqs = deduce.bound_seqs(bound, kb)
+
+    # "y pell" / "y lucas" after transfer or rec
+    if bare_follow and s.startswith("y "):
+        extra = s[2:].strip()
+        if extra.startswith("a "):
+            extra = extra[2:].strip()
+        extra_bound = deduce.bind_tokens(deduce.tokenize(extra), atoms, short_roots=short_roots)
+        extra_seqs = deduce.bound_seqs(extra_bound, kb)
+        if extra_seqs and (
+            (last.get("tag") or "").startswith("transfer")
+            or (last.get("tag") or "").startswith("rec")
+            or last.get("topic") in kb.get("recs", {})
+            or last.get("topic") == "transfer"
+        ):
+            src = last.get("transfer_src") or last.get("last_src")
+            if last.get("topic") in kb.get("recs", {}):
+                src = last["topic"]
+            if not src:
+                others = [k for k in kb["recs"] if k != extra_seqs[0]]
+                src = others[0] if others else None
+            if not src:
+                return _unknown(st)
+            return _answer_transfer(kb, src, extra_seqs[0], st)
+
+    if why and not seqs and not (
+        deduce.looks_like_equation(s) or deduce.prove_formula(s, kb)
+    ):
+        # Speech act on last clause — no domain keyword needed
+        return _answer_why(kb, last, st)
+
+    if more and not seqs and last.get("topic"):
+        hits = deduce.retrieve(str(last.get("topic")), kb, last)
+        if hits:
+            return _render_hit(hits[0], kb, st, more=True)
+        if last.get("topic") == "summary":
+            return _answer_summary(kb, st)
+        return _unknown(st)
+
+    if _is_summary(s):
         return _answer_summary(kb, st)
 
-    # Topic-specific before why (cassini/pisano/geometry/ratio beat bare "razon")
-    if "cassini" in intent["topics"] and not intent["why"]:
-        return _answer_cassini(kb, st)
-    if "pisano" in intent["topics"] and not intent["why"]:
-        seq = intent["seqs"][0] if intent["seqs"] else None
-        return _answer_pisano(kb, seq, st, more=intent["more"])
-    if "geometry" in intent["topics"] and not intent["why"]:
-        return _answer_geometry(kb, st, more=intent["more"])
-    if "ratio" in intent["topics"]:
-        return _answer_ratio(kb, st)
-
-    if intent["why"] and (intent["seqs"] or intent["topics"] or last.get("topic")):
-        if intent["topics"]:
-            st["topic"] = intent["topics"][0]
-        elif intent["seqs"]:
-            st["topic"] = intent["seqs"][0]
-        tag0 = st.get("tag") or last.get("tag") or last.get("last_tag") or ""
-        dst = st.get("transfer_dst") or last.get("transfer_dst")
-        if dst and f"transfer-{dst}" not in str(tag0):
-            tag0 = f"transfer-{dst}"
-        return _answer_why(kb, st.get("topic") or last.get("topic"), tag0, st)
-
-    if intent["more"]:
-        topic = intent["seqs"][0] if intent["seqs"] else last.get("topic")
-        if intent["topics"]:
-            topic = intent["topics"][0]
-        return _answer_more(kb, topic, st)
-
-    # cassini with why already handled; allow prove-cassini fallthrough
-    if "cassini" in intent["topics"]:
-        return _answer_cassini(kb, st)
-    if "pisano" in intent["topics"]:
-        seq = intent["seqs"][0] if intent["seqs"] else None
-        return _answer_pisano(kb, seq, st, more=intent["more"])
-    if "geometry" in intent["topics"]:
-        return _answer_geometry(kb, st, more=intent["more"])
-
-    # Transfer: need destination (or src+dst)
-    if intent["transfer"]:
-        seqs = list(intent["seqs"])
-        # Parse transfer_SRC_to_DST clause names
-        m = re.search(r"transfer_(\w+)_to_(\w+)", s)
-        if m:
-            a, b = m.group(1), m.group(2)
-            # strip trailing coef junk like 1_1
-            for cand in (a, b):
-                pass
-            src_n = a.split("_")[0] if a.split("_")[0] in SEQ_NAMES else a
-            dst_n = b.split("_")[0] if b.split("_")[0] in SEQ_NAMES else b
-            # b may be "pell_1" etc.
-            for key in SEQ_NAMES:
-                if key in a and src_n not in SEQ_NAMES:
-                    src_n = key
-                if key in b:
-                    dst_n = key
-            if src_n in SEQ_NAMES and dst_n in SEQ_NAMES:
-                return _answer_transfer(kb, src_n, dst_n, st)
-        if len(seqs) >= 2:
-            return _answer_transfer(kb, seqs[0], seqs[1], st)
-        if len(seqs) == 1:
-            src = last.get("topic") if last.get("topic") in ("fib", "lucas", "pell") else "fib"
-            return _answer_transfer(kb, src, seqs[0], st)
-        if last.get("topic") in ("fib", "lucas", "pell"):
-            return _answer_transfer(kb, last["topic"], "lucas" if last["topic"] != "lucas" else "fib", st)
-        return _unknown(st)
-
-    # False-law traps with a sequence
-    if intent["reject_law"] and intent["seqs"]:
-        return _answer_rec(kb, intent["seqs"][0], st, reject_law=True)
-    if intent["reject_law"] and not intent["seqs"]:
-        # "el doble" alone after fib topic
-        topic = last.get("topic") if last.get("topic") in ("fib", "lucas", "pell") else "fib"
-        return _answer_rec(kb, topic, st, reject_law=True)
-
-    # Prove: route to matching clause; "demostrá esto" uses last topic
-    if intent["prove"]:
-        if "cassini" in intent["topics"] or "cassini" in s:
-            return _answer_cassini(kb, st)
-        if intent["seqs"]:
-            return _answer_rec(kb, intent["seqs"][0], st)
-        if "geometry" in intent["topics"]:
-            return _answer_geometry(kb, st)
-        if "esto" in s.split() or s.strip() in ("demostra esto", "demostrar esto", "prove this", "prueba esto"):
-            topic = last.get("topic")
-            tag = last.get("tag") or ""
-            if topic == "cassini" or "cassini" in tag:
-                return _answer_cassini(kb, st)
-            if topic in ("fib", "lucas", "pell"):
-                return _answer_rec(kb, topic, st)
-            if topic == "geometry":
-                return _answer_geometry(kb, st)
-            if topic == "pisano":
-                return _answer_pisano(kb, None, st)
-            if topic == "transfer" or tag.startswith("transfer"):
-                # restate last transfer with citation
-                return _restate(kb, topic, tag, st)
-            if topic == "ratio":
-                return _answer_ratio(kb, st)
-            return _unknown(st)
-        if any(x in s for x in ("nuevo", "universo", "alma", "teorema")):
-            return _unknown(st)
-        return _unknown(st)
-
-    # F(n) / L(n) / P(n) shorthand
-    if re.search(r"\bf\s*\(\s*n\s*\)", s) or re.search(r"\bf\(n\)", s):
-        intent["seqs"] = intent["seqs"] or ["fib"]
-    # Bare sequence → law
-    if intent["seqs"]:
-        # "más sobre X" already handled by more; if more+seq, show more for that seq
-        if intent["more"]:
-            st["topic"] = intent["seqs"][0]
-            return _answer_more(kb, intent["seqs"][0], st)
-        return _answer_rec(kb, intent["seqs"][0], st)
-
-    # Direct rejected/verified name lookup (NEG_* first — mortal to invent)
-    m = re.search(r"\b(neg_\w+|transfer_\w+|cassini_\w+|pisano_\w+|rec_\w+|ratio_\w+)\b", s)
-    if m:
-        name = m.group(1)
-        rhits = _rejected_named(kb, name)
-        # exact-ish: prefer rejected whose name contains the token
-        if name.startswith("neg_") or rhits:
-            if rhits:
-                return _pack(
-                    f"Rechazado. rejected('{rhits[0][0]}'): {rhits[0][1]}.",
-                    "reject-named",
-                    _tribes("crítico"),
-                    st,
-                    topic="reject",
-                )
-        vhits = _verified_named(kb, name)
-        if vhits and not name.startswith("neg_"):
+    # Prime claim: bind to rejected atoms containing prime / always
+    if _is_prime_claim(s):
+        rhits = (
+            _rejected_named(kb, "always_prime")
+            or _rejected_named(kb, "NEG_fib_always_prime")
+            or [h for h in deduce.retrieve(s, kb) if h["kind"] == "rejected"]
+        )
+        if isinstance(rhits, list) and rhits and isinstance(rhits[0], tuple):
             return _pack(
-                f"verified {vhits[0][0]}: {vhits[0][1]}.",
-                "verified-named",
-                _tribes("símbolo"),
-                st,
-            )
-        if rhits:
-            return _pack(
-                f"Rechazado. rejected('{rhits[0][0]}'): {rhits[0][1]}.",
-                "reject-named",
+                f"Rechazado. rejected('{rhits[0][0]}'): {rhits[0][1]}. No es siempre primo.",
+                "reject-prime",
                 _tribes("crítico"),
                 st,
                 topic="reject",
             )
+        if isinstance(rhits, list) and rhits and isinstance(rhits[0], dict):
+            return _render_hit(rhits[0], kb, st)
+
+    # False-law arithmetic speech + a bound seq (or last seq) → reject vs rec
+    if _is_false_law_speech(s):
+        seq = seqs[0] if seqs else (
+            last.get("topic") if last.get("topic") in kb.get("recs", {}) else None
+        )
+        if seq:
+            return _answer_rec(kb, seq, st, reject_law=True)
+
+    # Two bound seqs + "mism*" → transfer speech (no domain lexicon)
+    if len(seqs) >= 2 and "mism" in s:
+        return _answer_transfer(kb, seqs[0], seqs[1], st)
+
+    # Transfer speech + bound sequence atoms
+    if _is_transfer_speech(s) or "transfer_" in s:
+        m = re.search(r"transfer_(\w+)_to_(\w+)", s)
+        if m:
+            a, b = m.group(1), m.group(2)
+            src = next((k for k in kb["recs"] if k in a), None)
+            dst = next((k for k in kb["recs"] if k in b), None)
+            if src and dst:
+                return _answer_transfer(kb, src, dst, st)
+        if len(seqs) >= 2:
+            return _answer_transfer(kb, seqs[0], seqs[1], st)
+        if len(seqs) == 1:
+            src = last.get("topic") if last.get("topic") in kb.get("recs", {}) else None
+            if not src:
+                src = last.get("transfer_src") or last.get("last_src")
+            if not src:
+                # dest-only transfer speech: pick any other rec head as source
+                others = [k for k in kb["recs"] if k != seqs[0]]
+                src = others[0] if others else None
+            if src and seqs[0] != src:
+                return _answer_transfer(kb, src, seqs[0], st)
+            if src and seqs[0] == src:
+                others = [k for k in kb["recs"] if k != seqs[0]]
+                if others and (
+                    re.search(rf"\b(a|to|→|->)\s*{seqs[0]}", s)
+                    or "transfiere" in s or "transfer" in s
+                ):
+                    return _answer_transfer(kb, others[0], seqs[0], st)
+        return _unknown(st)
+
+    # Formula unification (child recognizes a shape it already proved)
+    pf = deduce.prove_formula(q, kb)
+    if pf:
+        return _render_hit(pf, kb, st)
+
+    # General retrieve from bound atoms
+    hits = deduce.retrieve(q, kb, last)
+    if hits:
+        strong = [h for h in hits if h["score"] >= 2.0] or hits
+        # Predicate-specialized kinds beat bare rec when explicitly bound
+        if any(h["kind"] == "period" for h in hits) and (
+            "true_mod" in bound or any(a.startswith("period") for a in bound)
+        ):
+            return _render_hit(next(h for h in hits if h["kind"] == "period"), kb, st, more=more)
+        if any(h["kind"] == "companion" for h in strong) and "companion" in bound:
+            return _render_hit(next(h for h in strong if h["kind"] == "companion"), kb, st, more=more)
+        if "lemma" in bound or any(h["kind"] == "lemma" and h["score"] >= 2.5 for h in hits):
+            lem = [h for h in hits if h["kind"] == "lemma"]
+            if lem:
+                return _render_hit(lem[0], kb, st, more=more)
+        # Named verified/rejected with stronger score than bare rec
+        if seqs and not deduce.looks_like_equation(s):
+            rec_hits = [h for h in strong if h["kind"] == "rec" and h["name"] in seqs]
+            # Prefer the living rec/2 when a sequence atom is bound (unless period/companion)
+            if rec_hits and not any(h["kind"] == "period" for h in strong) and "true_mod" not in bound:
+                return _answer_rec(kb, rec_hits[0]["name"], st)
+        named = [h for h in strong if h["kind"] in ("verified", "rejected", "lemma") and h["score"] >= 4]
+        if named and named[0]["score"] >= 5:
+            return _render_hit(named[0], kb, st, more=more)
+        if strong:
+            return _render_hit(strong[0], kb, st, more=more)
+
+    # Prove speech with nothing bound → UNKNOWN (no smuggled topic)
+    if _is_prove_speech(s):
+        return _unknown(st)
+
     return _unknown(st)
 
 

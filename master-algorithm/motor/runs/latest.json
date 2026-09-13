@@ -3,10 +3,10 @@
   "total_steps": 62,
   "backend": "swipl",
   "swipl": true,
-  "n_verified_facts": 51,
-  "n_rejected": 32,
+  "n_verified_facts": 140,
+  "n_rejected": 106,
   "n_lemmas": 14,
-  "n_distinct_types": 16,
+  "n_distinct_types": 19,
   "distinct_types": [
     "bilinear_fib",
     "bit_fn",
@@ -700,7 +700,7 @@
       ],
       "scratch_order2_accuracy": 1.0,
       "transfer_beats_no_archive": true,
-      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib→pell transfer should FAIL — that is an honest result."
     },
     "pell": {
       "transfer_from": "fib",
@@ -718,7 +718,7 @@
       ],
       "scratch_order2_accuracy": 1.0,
       "transfer_beats_no_archive": false,
-      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib→pell transfer should FAIL — that is an honest result."
     },
     "summary": {
       "lucas_transfer_beats_baseline": true,
@@ -732,7 +732,7 @@
       "tick": 61,
       "world": "sequences",
       "family": "bilinear_schema",
-      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.020+1.4*sqrt(ln(60+1)/1)=2.839\u21922.819. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.020+1.4*sqrt(ln(60+1)/1)=2.839→2.819. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+∞; saturated excluded.",
       "n_conjectures": 0,
       "outcomes": [],
       "score_detail": {
@@ -744,7 +744,7 @@
         "cost": 0.04,
         "score": -0.04
       },
-      "growth": "expand schema param 2\u21923",
+      "growth": "expand schema param 2→3",
       "unlock": null,
       "accepted": [],
       "rejected": [],
@@ -754,7 +754,7 @@
       "tick": 62,
       "world": "sequences",
       "family": "bilinear_schema",
-      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.030+1.4*sqrt(ln(61+1)/2)=2.011\u21921.981. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "why": "UCB1 over 1 arms (world,family); picked sequences::bilinear_schema because avg=-0.030+1.4*sqrt(ln(61+1)/2)=2.011→1.981. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+∞; saturated excluded.",
       "n_conjectures": 0,
       "outcomes": [],
       "score_detail": {
@@ -766,7 +766,7 @@
         "cost": 0.06,
         "score": -0.06
       },
-      "growth": "expand schema param 3\u21924",
+      "growth": "expand schema param 3→4",
       "unlock": null,
       "accepted": [],
       "rejected": [],
@@ -777,6 +777,12 @@
   "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
   "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
   "transfer_accuracy": 0.5,
-  "lemma_reuse_rate": 0.4,
-  "reject_rate": 0.3855
+  "lemma_reuse_rate": 0.8571,
+  "reject_rate": 0.4309,
+  "n_schema_classes": 10,
+  "language_generation": 6,
+  "molts_kept": 6,
+  "lucas_transfer": 1.0,
+  "pell_transfer": 0.0,
+  "skin": "archive-sublime-united"
 }

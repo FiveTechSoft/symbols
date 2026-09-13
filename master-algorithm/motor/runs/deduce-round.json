@@ -1,0 +1,31 @@
+{
+  "score": {
+    "n": 252,
+    "known_hit": 152,
+    "known_total": 153,
+    "known_rate": 0.9935,
+    "unknown_correct": 60,
+    "unknown_total": 60,
+    "reject_ok": 39,
+    "reject_total": 39,
+    "inventions": 0,
+    "followup_ok": 7,
+    "followup_total": 7,
+    "failures_n": 1
+  },
+  "failures": [
+    {
+      "i": 213,
+      "q": "2·MN = BC",
+      "expect": "known",
+      "tag": "verified",
+      "ok": false,
+      "invented": false,
+      "reasons": [
+        "missing:Lema"
+      ],
+      "a": "Demostrado: 2·MN = BC. verified geo_midline_euclid_conjectures_p0::L3_midline_half.\n[símbolo]"
+    }
+  ],
+  "n_results": 252
+}

@@ -1,1 +1,1 @@
-{"topic": "fib", "tag": "reject-fib", "last_tag": "reject-fib", "transfer_dst": "pell"}
+{"topic": "lemma", "tag": "lemma", "last_tag": "lemma", "transfer_dst": "pell", "transfer_src": "fib", "last_src": "fib", "last_clause": "bilin_fib_offset_pm1"}

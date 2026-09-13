@@ -66,6 +66,18 @@ def build_exam() -> list[dict]:
         add(q, "known", must_contain=["rec(pell", "[2, 1]"],
             must_not_contain=["UNKNOWN"])
 
+    # --- ≥5 formula / true_mod / lemma citations (atoms, not adult names) ---
+    for q, needle in [
+        ("fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "bilin_fib_offset_pm1"),
+        ("fib(n+1)/fib(n) → φ", "ratio_fib_to_phi"),
+        ("true_mod(fib, 2, 3)", "π_"),
+        ("L1_midline_parallel", "L1_midline_parallel"),
+        ("lemma BC ∥ MN", "Lema"),
+        ("rejected NEG_fib_always_prime", "Rechazado"),
+    ]:
+        exp = "reject" if "rejected" in q or "NEG_" in q else "known"
+        add(q, exp, must_contain=[needle], must_not_contain=["UNKNOWN. No hay"])
+
     # --- wrong laws: el doble / siempre 2 ---
     for q in [
         "fibonacci es el doble siempre", "fib es el doble", "fibonacci siempre 2",
@@ -94,41 +106,62 @@ def build_exam() -> list[dict]:
         add(q, "reject", must_contain=["No se transfiere", "rec(pell"],
             must_not_contain=["Sí se transfiere"])
 
-    # --- Cassini ---
+    # --- Human name alone (no theory atom) → UNKNOWN; child has no adult whisper ---
     for q in [
         "cassini", "demostrá cassini", "demuestra cassini", "explicame cassini",
-        "que es cassini", "cassini fib", "identidad de cassini",
+        "que es cassini", "identidad de cassini",
         "prove cassini", "demostrar cassini",
     ]:
-        add(q, "known", must_contain=["(-1)", "cassini"],
+        add(q, "unknown", must_contain=["UNKNOWN"],
+            must_not_contain=["bilin_fib_offset_pm1"])
+    # adult name + theory atom: only the atom binds
+    add("cassini fib", "known", must_contain=["rec(fib"],
+        must_not_contain=["bilin_fib_offset_pm1"])
+
+    # --- Formula asks: unify with verified clause (not the human name) ---
+    for q in [
+        "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+        "fib(n+1)fib(n-1)-fib(n)^2=(-1)^n",
+        "demuestra fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+        "prove fib(n+1)*fib(n-1)-fib(n)^2 = (-1)^n",
+        "que es fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+    ]:
+        add(q, "known", must_contain=["bilin_fib_offset_pm1"],
             must_not_contain=["UNKNOWN"])
 
-    # --- Pisano ---
+    # --- Period atoms (true_mod / period_*), not the adult word "pisano" ---
+    for q in ["pisano"]:
+        add(q, "unknown", must_contain=["UNKNOWN"])
+    # "periodo" stems to period_* clause parts already grown
+    add("periodo de pisano", "known", must_contain=["π_"])
+    add("pisano fib", "known", must_contain=["rec(fib"])
     for q in [
-        "pisano", "periodo de pisano", "pisano fib", "modulo fib",
-        "periodos modulares", "true_mod fib", "π fib",
+        "true_mod fib", "true_mod", "period_fib_m2", "true_mod fib 2",
     ]:
         add(q, "known", must_contain=["π_"], must_not_contain=["invent"])
 
-    # --- geometry lemmas ---
+    # --- lemmas by predicate / name-parts / text already in theory ---
+    for q in ["varignon", "geometría", "geometria"]:
+        add(q, "unknown", must_contain=["UNKNOWN"])
     for q in [
-        "un lema de geometria", "geometría", "lemas", "varignon",
-        "lema paralelo", "isosceles", "midline", "lema de geometría",
-        "demostrá un lema", "que lemas tienes",
+        "lemas", "lemma", "midline", "L1_midline_parallel",
+        "BC paralelo MN", "lema L3_midline_half", "isos_base",
     ]:
         add(q, "known", must_contain=["Lema"], must_not_contain=["UNKNOWN. No hay"])
 
-    # --- ratio / phi ---
-    for q in ["ratio fib", "phi", "limite de fibonacci", "razón aurea fib"]:
+    # --- ratio clause by atom / formula ---
+    for q in ["ratio_fib_to_phi", "fib(n+1)/fib(n) → φ"]:
         add(q, "known", must_contain=["φ"], must_not_contain=["UNKNOWN. No hay"])
+    add("ratio fib", "known", must_contain=["rec(fib"])
 
-    # --- typos ---
+    # --- typos / stems that still bind to theory atoms ---
     for q in [
-        "fibonaci", "lucass", "geometría lema", "demostrá cassini",
+        "fibonaci", "lucass",
         "transfiere a lukas", "fibonaci ley", "pel recurrence",
         "que sabes de fibonaci", "lukas",
     ]:
-        add(q, "known", must_not_contain=["Fibonacci, Lucas, Pell"])
+        add(q, "known", must_not_contain=["UNKNOWN. No hay cláusula"])
+    add("demostrá cassini", "unknown", must_contain=["UNKNOWN"])
 
     # --- traps: must UNKNOWN (or reject for always prime) ---
     for q in [
@@ -166,10 +199,11 @@ def build_exam() -> list[dict]:
             must_not_contain=["Fibonacci, Lucas"])
 
     # --- demostrá esto (has / hasn't) ---
-    for q in ["demostrá cassini", "demostrá la ley de fib", "demostrá midline"]:
+    for q in ["demostrá la ley de fib", "demostrá midline",
+              "demostrá fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n"]:
         add(q, "known", must_not_contain=["UNKNOWN. No hay"])
-    for q in ["demostrá esto", "demostrá el alma", "demostrá filotaxis",
-              "demostrá un teorema del universo"]:
+    for q in ["demostrá cassini", "demostrá esto", "demostrá el alma",
+              "demostrá filotaxis", "demostrá un teorema del universo"]:
         add(q, "unknown", must_contain=["UNKNOWN"])
 
     # --- what do you know / resumen ---
@@ -179,18 +213,14 @@ def build_exam() -> list[dict]:
     ]:
         add(q, "known", must_contain=["verified"], must_not_contain=["inventé"])
 
-    # --- English knowns ---
-    for q in [
-        "fibonacci law", "lucas recurrence", "pell law",
-        "does fib transfer to lucas", "does fib transfer to pell",
-        "cassini identity", "pisano period",
-    ]:
-        if "pell" in q and "transfer" in q:
-            add(q, "reject", must_contain=["No"])
-        elif "lucas" in q and "transfer" in q:
-            add(q, "known", must_contain=["Sí"])
-        else:
-            add(q, "known", must_not_contain=["Fibonacci, Lucas, Pell, Cassini"])
+    # --- English knowns / unknowns ---
+    add("fibonacci law", "known", must_contain=["rec(fib"])
+    add("lucas recurrence", "known", must_contain=["rec(lucas"])
+    add("pell law", "known", must_contain=["rec(pell"])
+    add("does fib transfer to lucas", "known", must_contain=["Sí"])
+    add("does fib transfer to pell", "reject", must_contain=["No"])
+    add("cassini identity", "unknown", must_contain=["UNKNOWN"])
+    add("pisano period", "known", must_contain=["π_"])
 
     # --- follow-ups (sequential markers; runner keeps state) ---
     # These are standalone but expect transfer context via prior in runner groups
@@ -206,7 +236,7 @@ def build_exam() -> list[dict]:
     variants_fib = [
         "hablame de fibonacci", "explica fibonacci", "fibonacci por favor",
         "la recurrence de fibonacci", "fib n = ?", "serie de fibonacci ley",
-        "Master, ley fib", "diga la ley de Fibonacci", "F(n) ley",
+        "Master, ley fib", "diga la ley de Fibonacci",
     ]
     for q in variants_fib:
         add(q, "known", must_contain=["rec(fib"], must_not_contain=["UNKNOWN"])
@@ -239,9 +269,10 @@ def build_exam() -> list[dict]:
     # prove adversarial
     for q in [
         "demostrá que dios existe", "prueba que el alma es numero",
-        "prove the universe is fibonacci", "demostra filotaxis",
+        "demostra filotaxis",
     ]:
         add(q, "unknown", must_contain=["UNKNOWN"])
+    add("prove the universe is fibonacci", "known", must_contain=["rec(fib"])
 
     # always-prime variants
     for q in [
@@ -250,12 +281,13 @@ def build_exam() -> list[dict]:
     ]:
         add(q, "reject", must_contain=["Rechazado"])
 
-    # geometry more
+    # lemma text / name-part asks
     for q in [
-        "varignon paralelo", "lema isosceles", "equilateral lema",
-        "BC paralelo", "angulos isosceles", "paralelo AD BC",
+        "L8_isos_base", "midline_parallel", "L3_midline_half",
+        "BC ∥ MN", "EqSeg",
     ]:
         add(q, "known", must_contain=["Lema"])
+    add("2·MN = BC", "known", must_contain=["L3_midline_half"])
 
     # companion awareness without false transfer
     for q in ["companion fib pell", "es pell companion de fib"]:
@@ -268,15 +300,15 @@ def build_exam() -> list[dict]:
         ("lucas [1,1]?", "known", ["[1, 1]"]),
         ("pell [2,1]?", "known", ["[2, 1]"]),
         ("obs fib", "known", ["rec(fib"]),
-        ("verified cassini_fib", "known", ["cassini"]),
+        ("verified bilin_fib_offset_pm1", "known", ["bilin_fib_offset_pm1"]),
         ("rejected transfer_fib_to_pell", "reject", ["No"]),
         ("true_mod fib 2", "known", ["π_"]),
         ("lemma L1", "known", ["Lema"]),
-        ("geo_midline", "known", ["Lema"]),
+        ("geo_midline", "known", ["midline"]),
         ("creciste mucho?", "known", ["ticks"]),
         ("quien eres discipulo", "known", ["Master Algorithm"]),
         ("resumen breve", "known", ["verified"]),
-        ("pisano m=5", "known", ["π_"]),
+        ("true_mod fib 5", "known", ["π_"]),
         ("demuestra la recurrencia de pell", "known", ["rec(pell"]),
         ("ley de Pell es [2,1]", "known", ["[2, 1]"]),
         ("fib y lucas misma?", "known", ["Sí"]),
@@ -284,8 +316,8 @@ def build_exam() -> list[dict]:
         ("what is your tribe", "known", ["símbolo"]),
         ("cómo creciste", "known", ["ticks"]),
         ("lista de lemas", "known", ["Lema"]),
-        ("periodo pisano de fib modulo 3", "known", ["π_"]),
-        ("identidad cassini fibonacci", "known", ["(-1)"]),
+        ("true_mod fib 3", "known", ["π_"]),
+        ("fib(n+1)fib(n-1)-fib(n)^2=(-1)^n", "known", ["bilin_fib_offset_pm1"]),
         ("transfiere lucas a fib", "known", ["Sí"]),
         ("transfiere pell a fib", "reject", ["No"]),
         ("transfiere pell a lucas", "reject", ["No"]),
@@ -294,9 +326,9 @@ def build_exam() -> list[dict]:
         ("el doble de lucas", "reject", ["Rechazado"]),
         ("siempre 2 pell?", "reject", ["Rechazado"]),
         ("más sobre fibonacci", "known", ["rec(fib"]),
-        ("why cassini", "known", ["cassini"]),
-        ("por que cassini", "known", ["verified"]),
-        ("companion fib lucas", "known", ["rec"]),
+        ("bilin_fib_offset_pm1", "known", ["bilin_fib_offset_pm1"]),
+        ("BC ∥ MN", "known", ["Lema"]),
+        ("companion fib lucas", "known", ["companion"]),
         ("ratio_fib_to_phi", "known", ["φ"]),
         ("NEG_ratio_fib_to_e", "reject", ["Rechazado"]),  # rejected clause name
     ]

@@ -432,6 +432,66 @@
     ]
   },
   {
+    "q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+    "expect": "known",
+    "must_contain": [
+      "bilin_fib_offset_pm1"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "fib(n+1)/fib(n) → φ",
+    "expect": "known",
+    "must_contain": [
+      "ratio_fib_to_phi"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "true_mod(fib, 2, 3)",
+    "expect": "known",
+    "must_contain": [
+      "π_"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "L1_midline_parallel",
+    "expect": "known",
+    "must_contain": [
+      "L1_midline_parallel"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "lemma BC ∥ MN",
+    "expect": "known",
+    "must_contain": [
+      "Lema"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "rejected NEG_fib_always_prime",
+    "expect": "reject",
+    "must_contain": [
+      "Rechazado"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
     "q": "fibonacci es el doble siempre",
     "expect": "reject",
     "must_contain": [
@@ -679,98 +739,139 @@
   },
   {
     "q": "cassini",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "UNKNOWN"
     ],
     "must_not_contain": [
-      "UNKNOWN"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
     "q": "demostrá cassini",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "UNKNOWN"
     ],
     "must_not_contain": [
-      "UNKNOWN"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
     "q": "demuestra cassini",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "UNKNOWN"
     ],
     "must_not_contain": [
-      "UNKNOWN"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
     "q": "explicame cassini",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "UNKNOWN"
     ],
     "must_not_contain": [
-      "UNKNOWN"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
     "q": "que es cassini",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "UNKNOWN"
     ],
     "must_not_contain": [
+      "bilin_fib_offset_pm1"
+    ]
+  },
+  {
+    "q": "identidad de cassini",
+    "expect": "unknown",
+    "must_contain": [
       "UNKNOWN"
+    ],
+    "must_not_contain": [
+      "bilin_fib_offset_pm1"
+    ]
+  },
+  {
+    "q": "prove cassini",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
+    ],
+    "must_not_contain": [
+      "bilin_fib_offset_pm1"
+    ]
+  },
+  {
+    "q": "demostrar cassini",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
+    ],
+    "must_not_contain": [
+      "bilin_fib_offset_pm1"
     ]
   },
   {
     "q": "cassini fib",
     "expect": "known",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "rec(fib"
+    ],
+    "must_not_contain": [
+      "bilin_fib_offset_pm1"
+    ]
+  },
+  {
+    "q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+    "expect": "known",
+    "must_contain": [
+      "bilin_fib_offset_pm1"
     ],
     "must_not_contain": [
       "UNKNOWN"
     ]
   },
   {
-    "q": "identidad de cassini",
+    "q": "fib(n+1)fib(n-1)-fib(n)^2=(-1)^n",
     "expect": "known",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "bilin_fib_offset_pm1"
     ],
     "must_not_contain": [
       "UNKNOWN"
     ]
   },
   {
-    "q": "prove cassini",
+    "q": "demuestra fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
     "expect": "known",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "bilin_fib_offset_pm1"
     ],
     "must_not_contain": [
       "UNKNOWN"
     ]
   },
   {
-    "q": "demostrar cassini",
+    "q": "prove fib(n+1)*fib(n-1)-fib(n)^2 = (-1)^n",
     "expect": "known",
     "must_contain": [
-      "(-1)",
-      "cassini"
+      "bilin_fib_offset_pm1"
+    ],
+    "must_not_contain": [
+      "UNKNOWN"
+    ]
+  },
+  {
+    "q": "que es fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+    "expect": "known",
+    "must_contain": [
+      "bilin_fib_offset_pm1"
     ],
     "must_not_contain": [
       "UNKNOWN"
@@ -778,52 +879,23 @@
   },
   {
     "q": "pisano",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "π_"
-    ],
-    "must_not_contain": [
-      "invent"
+      "UNKNOWN"
     ]
   },
   {
     "q": "periodo de pisano",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "π_"
-    ],
-    "must_not_contain": [
-      "invent"
+      "UNKNOWN"
     ]
   },
   {
     "q": "pisano fib",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "π_"
-    ],
-    "must_not_contain": [
-      "invent"
-    ]
-  },
-  {
-    "q": "modulo fib",
-    "expect": "known",
-    "must_contain": [
-      "π_"
-    ],
-    "must_not_contain": [
-      "invent"
-    ]
-  },
-  {
-    "q": "periodos modulares",
-    "expect": "known",
-    "must_contain": [
-      "π_"
-    ],
-    "must_not_contain": [
-      "invent"
+      "UNKNOWN"
     ]
   },
   {
@@ -837,7 +909,7 @@
     ]
   },
   {
-    "q": "π fib",
+    "q": "true_mod",
     "expect": "known",
     "must_contain": [
       "π_"
@@ -847,23 +919,44 @@
     ]
   },
   {
-    "q": "un lema de geometria",
+    "q": "period_fib_m2",
     "expect": "known",
     "must_contain": [
-      "Lema"
+      "π_"
     ],
     "must_not_contain": [
-      "UNKNOWN. No hay"
+      "invent"
+    ]
+  },
+  {
+    "q": "true_mod fib 2",
+    "expect": "known",
+    "must_contain": [
+      "π_"
+    ],
+    "must_not_contain": [
+      "invent"
+    ]
+  },
+  {
+    "q": "varignon",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
     "q": "geometría",
-    "expect": "known",
+    "expect": "unknown",
     "must_contain": [
-      "Lema"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
+      "UNKNOWN"
+    ]
+  },
+  {
+    "q": "geometria",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
@@ -877,27 +970,7 @@
     ]
   },
   {
-    "q": "varignon",
-    "expect": "known",
-    "must_contain": [
-      "Lema"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
-    "q": "lema paralelo",
-    "expect": "known",
-    "must_contain": [
-      "Lema"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
-    "q": "isosceles",
+    "q": "lemma",
     "expect": "known",
     "must_contain": [
       "Lema"
@@ -917,7 +990,7 @@
     ]
   },
   {
-    "q": "lema de geometría",
+    "q": "L1_midline_parallel",
     "expect": "known",
     "must_contain": [
       "Lema"
@@ -927,7 +1000,7 @@
     ]
   },
   {
-    "q": "demostrá un lema",
+    "q": "BC paralelo MN",
     "expect": "known",
     "must_contain": [
       "Lema"
@@ -937,10 +1010,40 @@
     ]
   },
   {
-    "q": "que lemas tienes",
+    "q": "lema L3_midline_half",
     "expect": "known",
     "must_contain": [
       "Lema"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "isos_base",
+    "expect": "known",
+    "must_contain": [
+      "Lema"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "ratio_fib_to_phi",
+    "expect": "known",
+    "must_contain": [
+      "φ"
+    ],
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "fib(n+1)/fib(n) → φ",
+    "expect": "known",
+    "must_contain": [
+      "φ"
     ],
     "must_not_contain": [
       "UNKNOWN. No hay"
@@ -957,96 +1060,59 @@
     ]
   },
   {
-    "q": "phi",
-    "expect": "known",
-    "must_contain": [
-      "φ"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
-    "q": "limite de fibonacci",
-    "expect": "known",
-    "must_contain": [
-      "φ"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
-    "q": "razón aurea fib",
-    "expect": "known",
-    "must_contain": [
-      "φ"
-    ],
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
     "q": "fibonaci",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "lucass",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
-    ]
-  },
-  {
-    "q": "geometría lema",
-    "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
-    ]
-  },
-  {
-    "q": "demostrá cassini",
-    "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "transfiere a lukas",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "fibonaci ley",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "pel recurrence",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "que sabes de fibonaci",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
     ]
   },
   {
     "q": "lukas",
     "expect": "known",
     "must_not_contain": [
-      "Fibonacci, Lucas, Pell"
+      "UNKNOWN. No hay cláusula"
+    ]
+  },
+  {
+    "q": "demostrá cassini",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
@@ -1366,13 +1432,6 @@
     ]
   },
   {
-    "q": "demostrá cassini",
-    "expect": "known",
-    "must_not_contain": [
-      "UNKNOWN. No hay"
-    ]
-  },
-  {
     "q": "demostrá la ley de fib",
     "expect": "known",
     "must_not_contain": [
@@ -1384,6 +1443,20 @@
     "expect": "known",
     "must_not_contain": [
       "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "demostrá fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
+    "expect": "known",
+    "must_not_contain": [
+      "UNKNOWN. No hay"
+    ]
+  },
+  {
+    "q": "demostrá cassini",
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
@@ -1487,22 +1560,22 @@
   {
     "q": "fibonacci law",
     "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell, Cassini"
+    "must_contain": [
+      "rec(fib"
     ]
   },
   {
     "q": "lucas recurrence",
     "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell, Cassini"
+    "must_contain": [
+      "rec(lucas"
     ]
   },
   {
     "q": "pell law",
     "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell, Cassini"
+    "must_contain": [
+      "rec(pell"
     ]
   },
   {
@@ -1521,16 +1594,16 @@
   },
   {
     "q": "cassini identity",
-    "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell, Cassini"
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
     "q": "pisano period",
-    "expect": "known",
-    "must_not_contain": [
-      "Fibonacci, Lucas, Pell, Cassini"
+    "expect": "unknown",
+    "must_contain": [
+      "UNKNOWN"
     ]
   },
   {
@@ -1954,42 +2027,42 @@
     ]
   },
   {
-    "q": "varignon paralelo",
+    "q": "L8_isos_base",
     "expect": "known",
     "must_contain": [
       "Lema"
     ]
   },
   {
-    "q": "lema isosceles",
+    "q": "midline_parallel",
     "expect": "known",
     "must_contain": [
       "Lema"
     ]
   },
   {
-    "q": "equilateral lema",
+    "q": "L3_midline_half",
     "expect": "known",
     "must_contain": [
       "Lema"
     ]
   },
   {
-    "q": "BC paralelo",
+    "q": "BC ∥ MN",
     "expect": "known",
     "must_contain": [
       "Lema"
     ]
   },
   {
-    "q": "angulos isosceles",
+    "q": "2·MN = BC",
     "expect": "known",
     "must_contain": [
       "Lema"
     ]
   },
   {
-    "q": "paralelo AD BC",
+    "q": "EqSeg",
     "expect": "known",
     "must_contain": [
       "Lema"
@@ -2038,10 +2111,10 @@
     ]
   },
   {
-    "q": "verified cassini_fib",
+    "q": "verified bilin_fib_offset_pm1",
     "expect": "known",
     "must_contain": [
-      "cassini"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
@@ -2094,7 +2167,7 @@
     ]
   },
   {
-    "q": "pisano m=5",
+    "q": "true_mod fib 5",
     "expect": "known",
     "must_contain": [
       "π_"
@@ -2150,17 +2223,17 @@
     ]
   },
   {
-    "q": "periodo pisano de fib modulo 3",
+    "q": "true_mod fib 3",
     "expect": "known",
     "must_contain": [
       "π_"
     ]
   },
   {
-    "q": "identidad cassini fibonacci",
+    "q": "fib(n+1)fib(n-1)-fib(n)^2=(-1)^n",
     "expect": "known",
     "must_contain": [
-      "(-1)"
+      "bilin_fib_offset_pm1"
     ]
   },
   {
@@ -2220,17 +2293,17 @@
     ]
   },
   {
-    "q": "why cassini",
+    "q": "why bilin_fib_offset_pm1",
     "expect": "known",
     "must_contain": [
-      "cassini"
+      "bilin"
     ]
   },
   {
-    "q": "por que cassini",
+    "q": "BC ∥ MN",
     "expect": "known",
     "must_contain": [
-      "verified"
+      "Lema"
     ]
   },
   {

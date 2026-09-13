@@ -86,6 +86,20 @@ obs(pell, 21, 38613965).
 obs(pell, 22, 93222358).
 obs(pell, 23, 225058681).
 obs(pell, 24, 543339720).
+% hypothesis-language skin gen=0
+schema(linrec_scan, unlocked(true)).
+% hypothesis-language skin gen=0
+schema(transfer_horn, unlocked(true)).
+% hypothesis-language skin gen=0
+schema(ratio_scan, unlocked(true)).
+% hypothesis-language skin gen=0
+schema(dead_prime, unlocked(true)).
+% hypothesis-language skin gen=0
+schema(modperiod_schema, unlocked(false)).
+% hypothesis-language skin gen=0
+schema(bilinear_schema, unlocked(false)).
+% hypothesis-language skin gen=0
+schema(geo_invent, unlocked(true)).
 lemma('L1_midline_parallel', Parallel, 'BC ∥ MN').
 % verified @ geometry/euclid_conjectures
 verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L1_midline_parallel', 'BC ∥ MN')).
@@ -107,11 +121,11 @@ rejected('bitfn_parity_is_const_0', 'bits=[0, 0, 1]: pred=0 != 1').
 % finite fail / dead-end
 rejected('bitfn_parity_is_const_1', 'bits=[0, 0, 0]: pred=1 != 0').
 % finite fail / dead-end
-rejected('rec_fib_order_1_none', 'no fit').
+rejected('rec_fib_o1_none_linrec_scan', 'no fit').
 % finite fail / dead-end
-rejected('rec_lucas_order_1_none', 'no fit').
+rejected('rec_lucas_o1_none_linrec_scan', 'no fit').
 % finite fail / dead-end
-rejected('rec_pell_order_1_none', 'no fit').
+rejected('rec_pell_o1_none_linrec_scan', 'no fit').
 % verified @ geometry/lemma_reuse
 verified(fact(geometry, lemma_reuse, 'geo_midline_lemma_reuse_p0', 'BC ∥ MN')).
 % finite fail / dead-end
@@ -120,28 +134,60 @@ rejected('NEG_parity_const1', 'bits=[0, 0, 0]: pred=1 != 0').
 rejected('NEG_and_all_const1', 'bits=[0, 0, 0]: pred=1 != 0').
 % finite fail / dead-end
 rejected('NEG_xor2_const1', 'bits=[0, 0, 0]: pred=1 != 0').
-% finite fail / dead-end
-rejected('NEG_scalene_ab_eq_ac', 'finite fail (expected)').
+lemma('L2_midline_parallel', Parallel, 'BC ∥ MN').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L2_midline_parallel', 'BC ∥ MN')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d1_s6', 'BC ∥ MN')).
 % verified @ sequences/ratio_limits
 verified(fact(sequences, ratio_limits, 'ratio_fib_to_phi', 'fib(n+1)/fib(n) → φ')).
 % finite fail / dead-end
 rejected('NEG_ratio_fib_to_e', '|ratio-e|=1.100e+00 (e=2.718282, φ=1.618034)').
 % finite fail / dead-end
+rejected('NEG_scalene_ab_eq_ac', 'finite fail (expected)').
+% finite fail / dead-end
 rejected('NEG_fib_always_prime', 'F(0)=0 not prime').
-lemma('L2_midline_half', HalfSeg, '2·NP = AB').
+% hypothesis-language skin gen=1
+schema(bilinear_schema, unlocked(true)).
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% finite fail / dead-end
+rejected('bilin_fib_bogus_const2', 'n=1: lhs=-1≠2').
+% finite fail / dead-end
+rejected('bilin_lucas_offset_pm1', 'fail n=1 lhs≠(-1)^n').
+% finite fail / dead-end
+rejected('bilin_lucas_r1', 'fail n=1').
+% finite fail / dead-end
+rejected('bilin_lucas_r2', 'fail n=2').
+% finite fail / dead-end
+rejected('bilin_lucas_bogus_const2', 'n=1: lhs=5≠2').
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% finite fail / dead-end
+rejected('bilin_lucas_r3', 'fail n=3').
+lemma('L3_midline_half', HalfSeg, '2·MN = BC').
 % verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_midline_full_euclid_conjectures_p1::L2_midline_half', '2·NP = AB')).
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_midline_full_euclid_conjectures_p1', '2·NP = AB')).
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_midline_full_lemma_reuse_p1', 'AC ∥ MP')).
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L3_midline_half', '2·MN = BC')).
+lemma('L4_midline_parallel', Parallel, 'AC ∥ MP').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L4_midline_parallel', 'AC ∥ MP')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d2_s15', 'AC ∥ MP')).
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% finite fail / dead-end
+rejected('bilin_lucas_r4', 'fail n=4').
 % finite fail / dead-end
 rejected('bitfn_and_all_is_parity', 'bits=[0, 0, 1]: pred=1 != 0').
 bit_fn('bitfn_and_all_is_and_all', and_all, and_all).
-holds_bit(2000, [0,0,0], 0).
-holds_bit(2001, [0,0,1], 0).
-holds_bit(2002, [0,1,0], 0).
-holds_bit(2003, [0,1,1], 0).
+holds_bit(0, [0,0,0], 0).
+holds_bit(1, [0,0,1], 0).
+holds_bit(2, [0,1,0], 0).
+holds_bit(3, [0,1,1], 0).
 % verified @ logic/boolean_from_examples
 verified(fact(logic, boolean_from_examples, 'bitfn_and_all_is_and_all', 'examples[and_all] ⊨ and_all')).
 % finite fail / dead-end
@@ -150,156 +196,544 @@ rejected('bitfn_and_all_is_xor2', 'bits=[0, 1, 0]: pred=1 != 0').
 rejected('bitfn_and_all_is_const_0', 'bits=[1, 1, 1]: pred=0 != 1').
 % finite fail / dead-end
 rejected('bitfn_and_all_is_const_1', 'bits=[0, 0, 0]: pred=1 != 0').
-lemma('L3_isos_base', EqAng, '∠ABC = ∠ACB').
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_isosceles_euclid_conjectures_p2::L3_isos_base', '∠ABC = ∠ACB')).
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_isosceles_euclid_conjectures_p2', '∠ABC = ∠ACB')).
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_isosceles_lemma_reuse_p2', '∠ABC = ∠ACB')).
+lemma('L5_midline_parallel', Parallel, 'MN ∥ NX2').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L5_midline_parallel', 'MN ∥ NX2')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d3_s18', 'MN ∥ NX2')).
 % finite fail / dead-end
 rejected('bitfn_xor2_is_parity', 'bits=[0, 0, 1]: pred=1 != 0').
 % finite fail / dead-end
 rejected('bitfn_xor2_is_and_all', 'bits=[0, 1, 0]: pred=0 != 1').
 bit_fn('bitfn_xor2_is_xor2', xor2, xor2).
-holds_bit(8000, [0,0,0], 0).
-holds_bit(8001, [0,0,1], 0).
-holds_bit(8002, [0,1,0], 1).
-holds_bit(8003, [0,1,1], 1).
+holds_bit(9000, [0,0,0], 0).
+holds_bit(9001, [0,0,1], 0).
+holds_bit(9002, [0,1,0], 1).
+holds_bit(9003, [0,1,1], 1).
 % verified @ logic/boolean_from_examples
 verified(fact(logic, boolean_from_examples, 'bitfn_xor2_is_xor2', 'examples[xor2] ⊨ xor2')).
 % finite fail / dead-end
 rejected('bitfn_xor2_is_const_0', 'bits=[0, 1, 0]: pred=0 != 1').
 % finite fail / dead-end
 rejected('bitfn_xor2_is_const_1', 'bits=[0, 0, 0]: pred=1 != 0').
-lemma('L4_EqSeg', EqSeg, 'AC = BC').
+% hypothesis-language skin gen=2
+schema(modperiod_schema, unlocked(true)).
+true_mod(fib, 2, 3).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m2', 'π_fib(2)=3')).
+true_mod(fib, 3, 8).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m3', 'π_fib(3)=8')).
+true_mod(fib, 4, 6).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m4', 'π_fib(4)=6')).
+true_mod(fib, 5, 20).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m5', 'π_fib(5)=20')).
+% finite fail / dead-end
+rejected('period_fib_m6', 'insufficient prefix').
+true_mod(lucas, 2, 3).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_lucas_m2', 'π_lucas(2)=3')).
+% finite fail / dead-end
+rejected('period_lucas_m3', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m4', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m5', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m6', 'insufficient prefix').
+true_mod(fib, 7, 16).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m7', 'π_fib(7)=16')).
+true_mod(fib, 8, 12).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m8', 'π_fib(8)=12')).
+% finite fail / dead-end
+rejected('period_lucas_m7', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m8', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_fib_m9', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_fib_m10', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m9', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m10', 'insufficient prefix').
+true_mod(fib, 11, 10).
+% verified @ sequences/modular_periods
+verified(fact(sequences, modular_periods, 'period_fib_m11', 'π_fib(11)=10')).
+% finite fail / dead-end
+rejected('period_fib_m12', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m11', 'insufficient prefix').
+% finite fail / dead-end
+rejected('period_lucas_m12', 'insufficient prefix').
+lemma('L6_midline_parallel', Parallel, 'BC ∥ MN').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L6_midline_parallel', 'BC ∥ MN')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d3_s25', 'BC ∥ MN')).
+lemma('L7_midline_parallel', Parallel, 'NP ∥ NX3').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L7_midline_parallel', 'NP ∥ NX3')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s29', 'NP ∥ NX3')).
+lemma('L8_isos_base', EqAng, '∠X0CX1 = ∠CX0X1').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L8_isos_base', '∠X0CX1 = ∠CX0X1')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s32', '∠X0CX1 = ∠CX0X1')).
+lemma('L9_EqSeg', EqSeg, 'BM = AM').
 % verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_equilateral_euclid_conjectures_p3::L4_EqSeg', 'AC = BC')).
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_equilateral_euclid_conjectures_p3', 'AC = BC')).
-lemma('L5_EqSeg', EqSeg, 'AC = BC').
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_equilateral_lemma_reuse_p3::L5_EqSeg', 'AC = BC')).
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_equilateral_lemma_reuse_p3', 'AC = BC')).
-lemma('L6_midline_parallel', Parallel, 'PQ ∥ RS').
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_varignon_euclid_conjectures_p4::L6_midline_parallel', 'PQ ∥ RS')).
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_varignon_euclid_conjectures_p4', 'PQ ∥ RS')).
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_varignon_lemma_reuse_p4', 'PQ ∥ RS')).
-lemma('L6_para_opp', Parallel, 'AD ∥ BC').
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_para_euclid_conjectures_p5::L6_para_opp', 'AD ∥ BC')).
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_para_euclid_conjectures_p5', 'AD ∥ BC')).
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_para_lemma_reuse_p5', 'AB ∥ CD')).
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L9_EqSeg', 'BM = AM')).
 % learned recurrence on fib
 rec(fib, [1,1]).
 % verified @ sequences/linear_recurrences
 verified(fact(sequences, linear_recurrences, 'rec_fib_o2_1_1', 'fib(n) = (1)*fib(n-1) + (1)*fib(n-2)')).
-% learned recurrence on lucas
-rec(lucas, [1,1]).
-% verified @ sequences/linear_recurrences
-verified(fact(sequences, linear_recurrences, 'rec_lucas_o2_1_1', 'lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2)')).
-% learned recurrence on pell
-rec(pell, [2,1]).
-% verified @ sequences/linear_recurrences
-verified(fact(sequences, linear_recurrences, 'rec_pell_o2_2_1', 'pell(n) = (2)*pell(n-1) + (1)*pell(n-2)')).
 % learned recurrence on fib
 rec(fib, [1,1,0]).
 % verified @ sequences/linear_recurrences
 verified(fact(sequences, linear_recurrences, 'rec_fib_o3_1_1_0', 'fib(n) = (1)*fib(n-1) + (1)*fib(n-2) + (0)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [0,2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_0_2_1', 'fib(n) = (0)*fib(n-1) + (2)*fib(n-2) + (1)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [1,1,0,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_1_0_0', 'fib(n) = (1)*fib(n-1) + (1)*fib(n-2) + (0)*fib(n-3) + (0)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [0,2,1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_2_1_0', 'fib(n) = (0)*fib(n-1) + (2)*fib(n-2) + (1)*fib(n-3) + (0)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [1,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o2_1_1', 'lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2)')).
 % learned recurrence on lucas
 rec(lucas, [1,1,0]).
 % verified @ sequences/linear_recurrences
 verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_1_1_0', 'lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2) + (0)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [0,2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_0_2_1', 'lucas(n) = (0)*lucas(n-1) + (2)*lucas(n-2) + (1)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [1,1,0,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_1_0_0', 'lucas(n) = (1)*lucas(n-1) + (1)*lucas(n-2) + (0)*lucas(n-3) + (0)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [0,2,1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_2_1_0', 'lucas(n) = (0)*lucas(n-1) + (2)*lucas(n-2) + (1)*lucas(n-3) + (0)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o2_2_1', 'pell(n) = (2)*pell(n-1) + (1)*pell(n-2)')).
 % learned recurrence on pell
 rec(pell, [2,1,0]).
 % verified @ sequences/linear_recurrences
 verified(fact(sequences, linear_recurrences, 'rec_pell_o3_2_1_0', 'pell(n) = (2)*pell(n-1) + (1)*pell(n-2) + (0)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [1,3,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o3_1_3_1', 'pell(n) = (1)*pell(n-1) + (3)*pell(n-2) + (1)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [2,1,0,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_2_1_0_0', 'pell(n) = (2)*pell(n-1) + (1)*pell(n-2) + (0)*pell(n-3) + (0)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [1,3,1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_1_3_1_0', 'pell(n) = (1)*pell(n-1) + (3)*pell(n-2) + (1)*pell(n-3) + (0)*pell(n-4)')).
+% hypothesis-language skin gen=4
+schema(bilinear_schema_r4_g4, unlocked(true)).
+% verified @ sequences/bilinear_schema_r4_g4
+verified(fact(sequences, bilinear_schema_r4_g4, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema_r4_g4
+verified(fact(sequences, bilinear_schema_r4_g4, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema_r4_g4
+verified(fact(sequences, bilinear_schema_r4_g4, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% verified @ sequences/bilinear_schema_r4_g4
+verified(fact(sequences, bilinear_schema_r4_g4, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% verified @ sequences/bilinear_schema_r4_g4
+verified(fact(sequences, bilinear_schema_r4_g4, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% learned recurrence on fib
+rec(fib, [2,0,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_2_0_-1', 'fib(n) = (2)*fib(n-1) + (0)*fib(n-2) + (-1)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [-1,3,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_-1_3_2', 'fib(n) = (-1)*fib(n-1) + (3)*fib(n-2) + (2)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [1,0,1,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_0_1_1', 'fib(n) = (1)*fib(n-1) + (0)*fib(n-2) + (1)*fib(n-3) + (1)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [2,0,-1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_2_0_-1_0', 'fib(n) = (2)*fib(n-1) + (0)*fib(n-2) + (-1)*fib(n-3) + (0)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [2,0,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_2_0_-1', 'lucas(n) = (2)*lucas(n-1) + (0)*lucas(n-2) + (-1)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [-1,3,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_-1_3_2', 'lucas(n) = (-1)*lucas(n-1) + (3)*lucas(n-2) + (2)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [1,0,1,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_0_1_1', 'lucas(n) = (1)*lucas(n-1) + (0)*lucas(n-2) + (1)*lucas(n-3) + (1)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [2,0,-1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_2_0_-1_0', 'lucas(n) = (2)*lucas(n-1) + (0)*lucas(n-2) + (-1)*lucas(n-3) + (0)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,-1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o3_3_-1_-1', 'pell(n) = (3)*pell(n-1) + (-1)*pell(n-2) + (-1)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [0,5,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o3_0_5_2', 'pell(n) = (0)*pell(n-1) + (5)*pell(n-2) + (2)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [2,0,2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_2_0_2_1', 'pell(n) = (2)*pell(n-1) + (0)*pell(n-2) + (2)*pell(n-3) + (1)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,-1,-1,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_-1_-1_0', 'pell(n) = (3)*pell(n-1) + (-1)*pell(n-2) + (-1)*pell(n-3) + (0)*pell(n-4)')).
+lemma('L10_para_opp', Parallel, 'AD ∥ BC').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L10_para_opp', 'AD ∥ BC')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s42', 'AD ∥ BC')).
+lemma('L11_EqSeg', EqSeg, 'BM = AM').
+% verified @ geometry/euclid_conjectures
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L11_EqSeg', 'BM = AM')).
 % verified @ sequences/transfer_recurrence
 verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_1', 'TRANSFER rec(lucas,[1, 1]) ⇒ try on fib: (1)*fib(n-1) + (1)*fib(n-2)')).
-% finite fail / dead-end
-rejected('transfer_pell_to_fib_2_1', 'n=2: pred=2 != obs=1').
 % verified @ sequences/transfer_recurrence
 verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_1_0', 'TRANSFER rec(lucas,[1, 1, 0]) ⇒ try on fib: (1)*fib(n-1) + (1)*fib(n-2) + (0)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_2_1', 'TRANSFER rec(lucas,[0, 2, 1]) ⇒ try on fib: (0)*fib(n-1) + (2)*fib(n-2) + (1)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_1_0_0', 'TRANSFER rec(lucas,[1, 1, 0, 0]) ⇒ try on fib: (1)*fib(n-1) + (1)*fib(n-2) + (0)*fib(n-3) + (0)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_2_1_0', 'TRANSFER rec(lucas,[0, 2, 1, 0]) ⇒ try on fib: (0)*fib(n-1) + (2)*fib(n-2) + (1)*fib(n-3) + (0)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_2_1', 'n=2: pred=2 != obs=1').
 % finite fail / dead-end
 rejected('transfer_pell_to_fib_2_1_0', 'n=3: pred=3 != obs=2').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_3_1', 'n=3: pred=4 != obs=2').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_2_1_0_0', 'n=4: pred=5 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_3_1_0', 'n=4: pred=6 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_2_0_-1', 'TRANSFER rec(lucas,[2, 0, -1]) ⇒ try on fib: (2)*fib(n-1) + (0)*fib(n-2) + (-1)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_3_2', 'TRANSFER rec(lucas,[-1, 3, 2]) ⇒ try on fib: (-1)*fib(n-1) + (3)*fib(n-2) + (2)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_0_1_1', 'TRANSFER rec(lucas,[1, 0, 1, 1]) ⇒ try on fib: (1)*fib(n-1) + (0)*fib(n-2) + (1)*fib(n-3) + (1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_2_0_-1_0', 'TRANSFER rec(lucas,[2, 0, -1, 0]) ⇒ try on fib: (2)*fib(n-1) + (0)*fib(n-2) + (-1)*fib(n-3) + (0)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_3_-1_-1', 'n=4: pred=4 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_0_5_2', 'n=3: pred=5 != obs=2').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_2_0_2_1', 'n=4: pred=6 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_3_-1_-1_0', 'n=4: pred=4 != obs=3').
 % verified @ sequences/transfer_recurrence
 verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_1', 'TRANSFER rec(fib,[1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2)')).
-% finite fail / dead-end
-rejected('transfer_pell_to_lucas_2_1', 'n=2: pred=4 != obs=3').
 % verified @ sequences/transfer_recurrence
 verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_1_0', 'TRANSFER rec(fib,[1, 1, 0]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2) + (0)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_2_1', 'TRANSFER rec(fib,[0, 2, 1]) ⇒ try on lucas: (0)*lucas(n-1) + (2)*lucas(n-2) + (1)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_1_0_0', 'TRANSFER rec(fib,[1, 1, 0, 0]) ⇒ try on lucas: (1)*lucas(n-1) + (1)*lucas(n-2) + (0)*lucas(n-3) + (0)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_2_1_0', 'TRANSFER rec(fib,[0, 2, 1, 0]) ⇒ try on lucas: (0)*lucas(n-1) + (2)*lucas(n-2) + (1)*lucas(n-3) + (0)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_2_1', 'n=2: pred=4 != obs=3').
 % finite fail / dead-end
 rejected('transfer_pell_to_lucas_2_1_0', 'n=3: pred=7 != obs=4').
 % finite fail / dead-end
-rejected('transfer_fib_to_pell_1_1', 'n=2: pred=1 != obs=2').
+rejected('transfer_pell_to_lucas_1_3_1', 'n=3: pred=8 != obs=4').
 % finite fail / dead-end
-rejected('transfer_lucas_to_pell_1_1', 'n=2: pred=1 != obs=2').
+rejected('transfer_pell_to_lucas_2_1_0_0', 'n=4: pred=11 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_1_3_1_0', 'n=4: pred=14 != obs=7').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_2_0_-1', 'TRANSFER rec(fib,[2, 0, -1]) ⇒ try on lucas: (2)*lucas(n-1) + (0)*lucas(n-2) + (-1)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_3_2', 'TRANSFER rec(fib,[-1, 3, 2]) ⇒ try on lucas: (-1)*lucas(n-1) + (3)*lucas(n-2) + (2)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_0_1_1', 'TRANSFER rec(fib,[1, 0, 1, 1]) ⇒ try on lucas: (1)*lucas(n-1) + (0)*lucas(n-2) + (1)*lucas(n-3) + (1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_2_0_-1_0', 'TRANSFER rec(fib,[2, 0, -1, 0]) ⇒ try on lucas: (2)*lucas(n-1) + (0)*lucas(n-2) + (-1)*lucas(n-3) + (0)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_3_-1_-1', 'n=3: pred=6 != obs=4').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_0_5_2', 'n=3: pred=9 != obs=4').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_2_0_2_1', 'n=4: pred=12 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_3_-1_-1_0', 'n=4: pred=8 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_1', 'n=2: pred=1 != obs=2').
 % finite fail / dead-end
 rejected('transfer_fib_to_pell_1_1_0', 'n=3: pred=3 != obs=5').
 % finite fail / dead-end
+rejected('transfer_fib_to_pell_0_2_1', 'n=3: pred=2 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_1_0_0', 'n=4: pred=7 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_2_1_0', 'n=4: pred=5 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_1_1', 'n=2: pred=1 != obs=2').
+% finite fail / dead-end
 rejected('transfer_lucas_to_pell_1_1_0', 'n=3: pred=3 != obs=5').
-true_mod(fib, 2, 3).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m2', 'π_fib(2)=3')).
-true_mod(fib, 3, 8).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m3', 'π_fib(3)=8')).
-true_mod(fib, 4, 6).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m4', 'π_fib(4)=6')).
-true_mod(fib, 5, 20).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m5', 'π_fib(5)=20')).
 % finite fail / dead-end
-rejected('pisano_fib_m6', 'insufficient prefix').
-true_mod(fib, 7, 16).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m7', 'π_fib(7)=16')).
-true_mod(fib, 8, 12).
-% verified @ sequences/modular_periods
-verified(fact(sequences, modular_periods, 'pisano_fib_m8', 'π_fib(8)=12')).
+rejected('transfer_lucas_to_pell_0_2_1', 'n=3: pred=2 != obs=5').
 % finite fail / dead-end
-rejected('pisano_fib_m9', 'insufficient prefix').
+rejected('transfer_lucas_to_pell_1_1_0_0', 'n=4: pred=7 != obs=12').
 % finite fail / dead-end
-rejected('pisano_fib_m10', 'insufficient prefix').
-% verified @ sequences/bilinear_fib
-verified(fact(sequences, bilinear_fib, 'cassini_fib', 'F(n+1)F(n-1)-F(n)^2 = (-1)^n')).
-lemma('L1_para_opp', Parallel, 'AB ∥ CD').
+rejected('transfer_lucas_to_pell_0_2_1_0', 'n=4: pred=5 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_2_0_-1', 'n=3: pred=4 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-1_3_2', 'n=3: pred=1 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_0_1_1', 'n=4: pred=6 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_2_0_-1_0', 'n=4: pred=9 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_2_0_-1', 'n=3: pred=4 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-1_3_2', 'n=3: pred=1 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_1_0_1_1', 'n=4: pred=6 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_2_0_-1_0', 'n=4: pred=9 != obs=12').
+% hypothesis-language skin gen=5
+schema(bilinear_schema_r4_g5, unlocked(true)).
+% verified @ sequences/bilinear_schema_r4_g5
+verified(fact(sequences, bilinear_schema_r4_g5, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema_r4_g5
+verified(fact(sequences, bilinear_schema_r4_g5, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema_r4_g5
+verified(fact(sequences, bilinear_schema_r4_g5, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% verified @ sequences/bilinear_schema_r4_g5
+verified(fact(sequences, bilinear_schema_r4_g5, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% verified @ sequences/bilinear_schema_r4_g5
+verified(fact(sequences, bilinear_schema_r4_g5, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% learned recurrence on fib
+rec(fib, [3,-1,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_3_-1_-2', 'fib(n) = (3)*fib(n-1) + (-1)*fib(n-2) + (-2)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [-2,4,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_-2_4_3', 'fib(n) = (-2)*fib(n-1) + (4)*fib(n-2) + (3)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [0,1,2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_1_2_1', 'fib(n) = (0)*fib(n-1) + (1)*fib(n-2) + (2)*fib(n-3) + (1)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [0,3,0,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_3_0_-1', 'fib(n) = (0)*fib(n-1) + (3)*fib(n-2) + (0)*fib(n-3) + (-1)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [3,-1,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_3_-1_-2', 'lucas(n) = (3)*lucas(n-1) + (-1)*lucas(n-2) + (-2)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [-2,4,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_-2_4_3', 'lucas(n) = (-2)*lucas(n-1) + (4)*lucas(n-2) + (3)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [0,1,2,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_1_2_1', 'lucas(n) = (0)*lucas(n-1) + (1)*lucas(n-2) + (2)*lucas(n-3) + (1)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [0,3,0,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_3_0_-1', 'lucas(n) = (0)*lucas(n-1) + (3)*lucas(n-2) + (0)*lucas(n-3) + (-1)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [4,-3,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o3_4_-3_-2', 'pell(n) = (4)*pell(n-1) + (-3)*pell(n-2) + (-2)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [5,-5,-3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o3_5_-5_-3', 'pell(n) = (5)*pell(n-1) + (-5)*pell(n-2) + (-3)*pell(n-3)')).
+% learned recurrence on pell
+rec(pell, [0,5,2,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_0_5_2_0', 'pell(n) = (0)*pell(n-1) + (5)*pell(n-2) + (2)*pell(n-3) + (0)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [1,2,3,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_1_2_3_1', 'pell(n) = (1)*pell(n-1) + (2)*pell(n-2) + (3)*pell(n-3) + (1)*pell(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_3_-1_-2', 'TRANSFER rec(lucas,[3, -1, -2]) ⇒ try on fib: (3)*fib(n-1) + (-1)*fib(n-2) + (-2)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-2_4_3', 'TRANSFER rec(lucas,[-2, 4, 3]) ⇒ try on fib: (-2)*fib(n-1) + (4)*fib(n-2) + (3)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_1_2_1', 'TRANSFER rec(lucas,[0, 1, 2, 1]) ⇒ try on fib: (0)*fib(n-1) + (1)*fib(n-2) + (2)*fib(n-3) + (1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_3_0_-1', 'TRANSFER rec(lucas,[0, 3, 0, -1]) ⇒ try on fib: (0)*fib(n-1) + (3)*fib(n-2) + (0)*fib(n-3) + (-1)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_4_-3_-2', 'n=3: pred=1 != obs=2').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_5_-5_-3', 'n=3: pred=0 != obs=2').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_0_5_2_0', 'n=4: pred=7 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_2_3_1', 'n=4: pred=7 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_3_-1_-2', 'TRANSFER rec(fib,[3, -1, -2]) ⇒ try on lucas: (3)*lucas(n-1) + (-1)*lucas(n-2) + (-2)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-2_4_3', 'TRANSFER rec(fib,[-2, 4, 3]) ⇒ try on lucas: (-2)*lucas(n-1) + (4)*lucas(n-2) + (3)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_1_2_1', 'TRANSFER rec(fib,[0, 1, 2, 1]) ⇒ try on lucas: (0)*lucas(n-1) + (1)*lucas(n-2) + (2)*lucas(n-3) + (1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_3_0_-1', 'TRANSFER rec(fib,[0, 3, 0, -1]) ⇒ try on lucas: (0)*lucas(n-1) + (3)*lucas(n-2) + (0)*lucas(n-3) + (-1)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_4_-3_-2', 'n=3: pred=5 != obs=4').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_5_-5_-3', 'n=4: pred=2 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_0_5_2_0', 'n=4: pred=17 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_1_2_3_1', 'n=4: pred=15 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_3_-1_-2', 'n=4: pred=11 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-2_4_3', 'n=3: pred=0 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_1_2_1', 'n=4: pred=4 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_3_0_-1', 'n=4: pred=6 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_3_-1_-2', 'n=4: pred=11 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-2_4_3', 'n=3: pred=0 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_0_1_2_1', 'n=4: pred=4 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_0_3_0_-1', 'n=4: pred=6 != obs=12').
+lemma('L12_midline_parallel', Parallel, 'CX0 ∥ X0X1').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L12_midline_parallel', 'CX0 ∥ X0X1')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s54', 'CX0 ∥ X0X1')).
+lemma('L13_EqSeg', EqSeg, 'BM = AM').
 % verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_para_euclid_conjectures_p5::L1_para_opp', 'AB ∥ CD')).
-lemma('L1_para_opp', Parallel, 'AD ∥ BC').
-% verified @ geometry/lemma_reuse
-verified(fact(geometry, lemma_reuse, 'geo_para_lemma_reuse_p5::L1_para_opp', 'AD ∥ BC')).
-holds_bit(9000, [0,0,0], 0).
-holds_bit(9001, [0,0,1], 0).
-holds_bit(9002, [0,1,0], 1).
-holds_bit(9003, [0,1,1], 1).
-lemma('L2_EqAng', EqAng, '∠ABC = ∠ADC').
-% verified @ geometry/euclid_conjectures
-verified(fact(geometry, euclid_conjectures, 'geo_para_euclid_conjectures_p5::L2_EqAng', '∠ABC = ∠ADC')).
-lemma('L2_midline_parallel', Parallel, 'AC ∥ MX2').
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L13_EqSeg', 'BM = AM')).
+% hypothesis-language skin gen=6
+schema(bilinear_schema_r4_g6, unlocked(true)).
+% verified @ sequences/bilinear_schema_r4_g6
+verified(fact(sequences, bilinear_schema_r4_g6, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema_r4_g6
+verified(fact(sequences, bilinear_schema_r4_g6, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema_r4_g6
+verified(fact(sequences, bilinear_schema_r4_g6, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% verified @ sequences/bilinear_schema_r4_g6
+verified(fact(sequences, bilinear_schema_r4_g6, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% verified @ sequences/bilinear_schema_r4_g6
+verified(fact(sequences, bilinear_schema_r4_g6, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% learned recurrence on fib
+rec(fib, [4,-2,-3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_4_-2_-3', 'fib(n) = (4)*fib(n-1) + (-2)*fib(n-2) + (-3)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [-3,5,4]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_-3_5_4', 'fib(n) = (-3)*fib(n-1) + (5)*fib(n-2) + (4)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [2,-1,0,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_2_-1_0_1', 'fib(n) = (2)*fib(n-1) + (-1)*fib(n-2) + (0)*fib(n-3) + (1)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [0,0,3,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_0_3_2', 'fib(n) = (0)*fib(n-1) + (0)*fib(n-2) + (3)*fib(n-3) + (2)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [4,-2,-3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_4_-2_-3', 'lucas(n) = (4)*lucas(n-1) + (-2)*lucas(n-2) + (-3)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [-3,5,4]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_-3_5_4', 'lucas(n) = (-3)*lucas(n-1) + (5)*lucas(n-2) + (4)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [2,-1,0,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_2_-1_0_1', 'lucas(n) = (2)*lucas(n-1) + (-1)*lucas(n-2) + (0)*lucas(n-3) + (1)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [0,0,3,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_0_3_2', 'lucas(n) = (0)*lucas(n-1) + (0)*lucas(n-2) + (3)*lucas(n-3) + (2)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [1,4,-1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_1_4_-1_-1', 'pell(n) = (1)*pell(n-1) + (4)*pell(n-2) + (-1)*pell(n-3) + (-1)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [2,2,-2,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_2_2_-2_-1', 'pell(n) = (2)*pell(n-1) + (2)*pell(n-2) + (-2)*pell(n-3) + (-1)*pell(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_4_-2_-3', 'TRANSFER rec(lucas,[4, -2, -3]) ⇒ try on fib: (4)*fib(n-1) + (-2)*fib(n-2) + (-3)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-3_5_4', 'TRANSFER rec(lucas,[-3, 5, 4]) ⇒ try on fib: (-3)*fib(n-1) + (5)*fib(n-2) + (4)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_2_-1_0_1', 'TRANSFER rec(lucas,[2, -1, 0, 1]) ⇒ try on fib: (2)*fib(n-1) + (-1)*fib(n-2) + (0)*fib(n-3) + (1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_0_3_2', 'TRANSFER rec(lucas,[0, 0, 3, 2]) ⇒ try on fib: (0)*fib(n-1) + (0)*fib(n-2) + (3)*fib(n-3) + (2)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_4_-1_-1', 'n=4: pred=5 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_2_2_-2_-1', 'n=4: pred=4 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_4_-2_-3', 'TRANSFER rec(fib,[4, -2, -3]) ⇒ try on lucas: (4)*lucas(n-1) + (-2)*lucas(n-2) + (-3)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-3_5_4', 'TRANSFER rec(fib,[-3, 5, 4]) ⇒ try on lucas: (-3)*lucas(n-1) + (5)*lucas(n-2) + (4)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_2_-1_0_1', 'TRANSFER rec(fib,[2, -1, 0, 1]) ⇒ try on lucas: (2)*lucas(n-1) + (-1)*lucas(n-2) + (0)*lucas(n-3) + (1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_0_3_2', 'TRANSFER rec(fib,[0, 0, 3, 2]) ⇒ try on lucas: (0)*lucas(n-1) + (0)*lucas(n-2) + (3)*lucas(n-3) + (2)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_1_4_-1_-1', 'n=4: pred=13 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_2_2_-2_-1', 'n=4: pred=10 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_4_-2_-3', 'n=3: pred=6 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-3_5_4', 'n=3: pred=-1 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_2_-1_0_1', 'n=4: pred=8 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_0_3_2', 'n=4: pred=3 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_4_-2_-3', 'n=3: pred=6 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-3_5_4', 'n=3: pred=-1 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_2_-1_0_1', 'n=4: pred=8 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_0_0_3_2', 'n=4: pred=3 != obs=12').
+lemma('L14_midline_parallel', Parallel, 'AB ∥ CD').
 % verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent::L2_midline_parallel', 'AC ∥ MX2')).
+verified(fact(geometry, geo_invent, 'geo_invent::L14_midline_parallel', 'AB ∥ CD')).
 % verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent_d1_s55', 'AC ∥ MX2')).
-lemma('L3_midline_parallel', Parallel, 'AC ∥ MP').
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent::L3_midline_parallel', 'AC ∥ MP')).
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent_d2_s56', 'AC ∥ MP')).
-lemma('L4_midline_parallel', Parallel, 'AX3 ∥ X3X4').
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent::L4_midline_parallel', 'AX3 ∥ X3X4')).
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent_d3_s57', 'AX3 ∥ X3X4')).
-lemma('L5_midline_parallel', Parallel, 'BC ∥ MN').
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent::L5_midline_parallel', 'BC ∥ MN')).
-% verified @ geometry/geo_invent
-verified(fact(geometry, geo_invent, 'geo_invent_d4_s58', 'BC ∥ MN')).
+verified(fact(geometry, geo_invent, 'geo_invent_d4_s64', 'AB ∥ CD')).
