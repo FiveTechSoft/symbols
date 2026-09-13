@@ -737,3 +737,31 @@ lemma('L14_midline_parallel', Parallel, 'AB ∥ CD').
 verified(fact(geometry, geo_invent, 'geo_invent::L14_midline_parallel', 'AB ∥ CD')).
 % verified @ geometry/geo_invent
 verified(fact(geometry, geo_invent, 'geo_invent_d4_s64', 'AB ∥ CD')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s2192', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s2192', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s2193', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s2193', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s2194', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s2194', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% finite fail / dead-end
+rejected('chance_bayes_swap_s2192', 'P(H|E)=0.9572290174677728 != P(H|¬E)=0.6357986130011273').
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_indep_near0_s2925', 'MI(X;Y)≈0 on generated independent joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_dep_pos_s2925', 'MI(X;Y)>0 on xor-coupled joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_indep_factorization_s2925', 'P(x,y)=P(x)P(y) on independent joint (eps)')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_and_related_s2925', 'MI>0 on (X, X∧Y) joint from full 2-bit table')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_parity_mod2_sum_o2', 'sum(bits) mod 2 invariant under permute')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_involution_double_o2', 'f(f(x))=x for swap/negate')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_z2_assoc_o2', 'Z2 addition associative on full table')).

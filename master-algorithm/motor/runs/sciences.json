@@ -1,0 +1,1098 @@
+{
+  "archive_dir": "/workspace/master-algorithm/motor/archive-sciences",
+  "ticks_per_batch": 6,
+  "max_molts": 3,
+  "philosophy": "tick \u2192 compare/extrapolate \u2192 if plateau then molt/spawn \u2192 forever",
+  "run_cap_note": "max_molts is a single-run cap only. UCB reopens saturated productive arms; science skins keep novelty_bonus \u2265 floor; molt spawns non-seed classes.",
+  "metrics_before": {
+    "n_verified_facts": 0,
+    "n_distinct_types": 0,
+    "transfer_accuracy": 0.0,
+    "lemma_reuse_rate": 0.0,
+    "reject_rate": 0.0,
+    "n_rejected": 0,
+    "n_lemmas": 0,
+    "science": {
+      "symmetry": {
+        "generation": 0,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "sym_compare_transfer",
+          "sym_dead_product",
+          "sym_group_table",
+          "sym_invariant_scan"
+        ],
+        "spawned": []
+      },
+      "chance": {
+        "generation": 0,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "chance_bayes_scan",
+          "chance_dead_negH",
+          "chance_entropy_scan"
+        ],
+        "spawned": []
+      },
+      "info": {
+        "generation": 0,
+        "n_schema_classes": 3,
+        "unlocked": [
+          "info_dead_mi0",
+          "info_mi_scan",
+          "info_transfer_bitfn"
+        ],
+        "spawned": []
+      },
+      "sequences": {
+        "generation": 0,
+        "n_schema_classes": 7,
+        "spawned": []
+      }
+    },
+    "spawned_schemas": [],
+    "n_spawned": 0,
+    "compare": {
+      "symmetry": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "chance": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "info": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    "n_verified": 0,
+    "n_types": 0
+  },
+  "metrics_final": {
+    "n_verified_facts": 47,
+    "n_distinct_types": 19,
+    "transfer_accuracy": 0.0,
+    "lemma_reuse_rate": 0.5,
+    "reject_rate": 0.3974,
+    "n_rejected": 31,
+    "n_lemmas": 2,
+    "science": {
+      "symmetry": {
+        "generation": 3,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "sym_compare_transfer",
+          "sym_dead_product",
+          "sym_group_table",
+          "sym_invariant_scan",
+          "sym_invariant_scan_n5_g2"
+        ],
+        "spawned": [
+          "sym_invariant_scan_n5_g2"
+        ]
+      },
+      "chance": {
+        "generation": 3,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "chance_bayes_scan",
+          "chance_dead_negH",
+          "chance_entropy_scan",
+          "chance_entropy_scan_n3_g2",
+          "chance_extrapolate"
+        ],
+        "spawned": [
+          "chance_entropy_scan_n3_g2"
+        ]
+      },
+      "info": {
+        "generation": 3,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "info_dead_mi0",
+          "info_mi_scan",
+          "info_mi_scan_n4_g2",
+          "info_transfer_bitfn"
+        ],
+        "spawned": [
+          "info_mi_scan_n4_g2"
+        ]
+      },
+      "sequences": {
+        "generation": 2,
+        "n_schema_classes": 7,
+        "spawned": []
+      }
+    },
+    "spawned_schemas": [
+      "chance_entropy_scan_n3_g2",
+      "info_mi_scan_n4_g2",
+      "sym_invariant_scan_n5_g2"
+    ],
+    "n_spawned": 3,
+    "compare": {
+      "symmetry": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "chance": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "info": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    "n_verified": 47,
+    "n_types": 19
+  },
+  "molt_log": [
+    {
+      "molt_index": 0,
+      "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+      "science_molts": [
+        {
+          "generation": 1,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "unlock_schema chance_extrapolate",
+            "raise_order chance_bayes_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_extrapolate"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_mi_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [],
+          "n_schema_classes": 3,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "sequences_molt": [
+        "raise_linrec_order 2\u21923",
+        "widen_coeff_range [-4,4]",
+        "unlock_schema bilinear_schema",
+        "raise_r_max 1\u21922",
+        "raise_mut_depth 1\u21922",
+        "novelty_bonus\u21920.5"
+      ],
+      "metrics_after": {
+        "n_verified_facts": 24,
+        "n_distinct_types": 11,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.4286,
+        "n_rejected": 18,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan"
+            ],
+            "spawned": []
+          },
+          "chance": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_extrapolate"
+            ],
+            "spawned": []
+          },
+          "info": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_transfer_bitfn"
+            ],
+            "spawned": []
+          },
+          "sequences": {
+            "generation": 1,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [],
+        "n_spawned": 0,
+        "compare": {
+          "symmetry": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          }
+        },
+        "n_verified": 24,
+        "n_types": 11
+      },
+      "n_spawned": 0,
+      "spawned": []
+    },
+    {
+      "molt_index": 1,
+      "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+      "science_molts": [
+        {
+          "generation": 2,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 4\u21925",
+            "spawn_schema sym_invariant_scan_n5_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "spawned": [
+            "sym_invariant_scan_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chance_entropy_scan 2\u21923",
+            "spawn_schema chance_entropy_scan_n3_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_extrapolate"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "spawned": [
+            "chance_entropy_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_transfer_bitfn 1\u21922",
+            "spawn_schema info_mi_scan_n4_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [
+            "info_mi_scan_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "sequences_molt": null,
+      "metrics_after": {
+        "n_verified_facts": 35,
+        "n_distinct_types": 15,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.4068,
+        "n_rejected": 24,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan",
+              "sym_invariant_scan_n5_g2"
+            ],
+            "spawned": [
+              "sym_invariant_scan_n5_g2"
+            ]
+          },
+          "chance": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_entropy_scan_n3_g2",
+              "chance_extrapolate"
+            ],
+            "spawned": [
+              "chance_entropy_scan_n3_g2"
+            ]
+          },
+          "info": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_mi_scan_n4_g2",
+              "info_transfer_bitfn"
+            ],
+            "spawned": [
+              "info_mi_scan_n4_g2"
+            ]
+          },
+          "sequences": {
+            "generation": 1,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [
+          "chance_entropy_scan_n3_g2",
+          "info_mi_scan_n4_g2",
+          "sym_invariant_scan_n5_g2"
+        ],
+        "n_spawned": 3,
+        "compare": {
+          "symmetry": {
+            "attempts": 2,
+            "hits": 1,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 3,
+            "hits": 2,
+            "misses": 1
+          }
+        },
+        "n_verified": 35,
+        "n_types": 15
+      },
+      "n_spawned": 3,
+      "spawned": [
+        "chance_entropy_scan_n3_g2",
+        "info_mi_scan_n4_g2",
+        "sym_invariant_scan_n5_g2"
+      ]
+    },
+    {
+      "molt_index": 2,
+      "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+      "science_molts": [
+        {
+          "generation": 3,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 5\u21926",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "spawned": [
+            "sym_invariant_scan_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chance_entropy_scan 4\u21925",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "spawned": [
+            "chance_entropy_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_transfer_bitfn 3\u21924",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [
+            "info_mi_scan_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "sequences_molt": [
+        "raise_linrec_order 3\u21924",
+        "widen_coeff_range [-5,5]",
+        "unlock_schema modperiod_schema",
+        "raise_m_max 4\u21926",
+        "raise_r_max 3\u21924",
+        "raise_mut_depth 2\u21923",
+        "novelty_bonus\u21921.0"
+      ],
+      "metrics_after": {
+        "n_verified_facts": 47,
+        "n_distinct_types": 19,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.3974,
+        "n_rejected": 31,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan",
+              "sym_invariant_scan_n5_g2"
+            ],
+            "spawned": [
+              "sym_invariant_scan_n5_g2"
+            ]
+          },
+          "chance": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_entropy_scan_n3_g2",
+              "chance_extrapolate"
+            ],
+            "spawned": [
+              "chance_entropy_scan_n3_g2"
+            ]
+          },
+          "info": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_mi_scan_n4_g2",
+              "info_transfer_bitfn"
+            ],
+            "spawned": [
+              "info_mi_scan_n4_g2"
+            ]
+          },
+          "sequences": {
+            "generation": 2,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [
+          "chance_entropy_scan_n3_g2",
+          "info_mi_scan_n4_g2",
+          "sym_invariant_scan_n5_g2"
+        ],
+        "n_spawned": 3,
+        "compare": {
+          "symmetry": {
+            "attempts": 4,
+            "hits": 3,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 4,
+            "hits": 4,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 4,
+            "hits": 3,
+            "misses": 1
+          }
+        },
+        "n_verified": 47,
+        "n_types": 19
+      },
+      "n_spawned": 3,
+      "spawned": [
+        "chance_entropy_scan_n3_g2",
+        "info_mi_scan_n4_g2",
+        "sym_invariant_scan_n5_g2"
+      ]
+    }
+  ],
+  "batch_log": [
+    {
+      "phase": "warmup",
+      "metrics": {
+        "n_verified_facts": 6,
+        "n_distinct_types": 5,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.4545,
+        "n_rejected": 5,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 0,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan"
+            ],
+            "spawned": []
+          },
+          "chance": {
+            "generation": 0,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan"
+            ],
+            "spawned": []
+          },
+          "info": {
+            "generation": 0,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_transfer_bitfn"
+            ],
+            "spawned": []
+          },
+          "sequences": {
+            "generation": 0,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [],
+        "n_spawned": 0,
+        "compare": {
+          "symmetry": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chance": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          }
+        },
+        "n_verified": 6,
+        "n_types": 5
+      }
+    },
+    {
+      "phase": "post_molt_0",
+      "metrics": {
+        "n_verified_facts": 24,
+        "n_distinct_types": 11,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.4286,
+        "n_rejected": 18,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan"
+            ],
+            "spawned": []
+          },
+          "chance": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_extrapolate"
+            ],
+            "spawned": []
+          },
+          "info": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_transfer_bitfn"
+            ],
+            "spawned": []
+          },
+          "sequences": {
+            "generation": 1,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [],
+        "n_spawned": 0,
+        "compare": {
+          "symmetry": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          }
+        },
+        "n_verified": 24,
+        "n_types": 11
+      }
+    },
+    {
+      "phase": "post_molt_1",
+      "metrics": {
+        "n_verified_facts": 35,
+        "n_distinct_types": 15,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.4068,
+        "n_rejected": 24,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan",
+              "sym_invariant_scan_n5_g2"
+            ],
+            "spawned": [
+              "sym_invariant_scan_n5_g2"
+            ]
+          },
+          "chance": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_entropy_scan_n3_g2",
+              "chance_extrapolate"
+            ],
+            "spawned": [
+              "chance_entropy_scan_n3_g2"
+            ]
+          },
+          "info": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_mi_scan_n4_g2",
+              "info_transfer_bitfn"
+            ],
+            "spawned": [
+              "info_mi_scan_n4_g2"
+            ]
+          },
+          "sequences": {
+            "generation": 1,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [
+          "chance_entropy_scan_n3_g2",
+          "info_mi_scan_n4_g2",
+          "sym_invariant_scan_n5_g2"
+        ],
+        "n_spawned": 3,
+        "compare": {
+          "symmetry": {
+            "attempts": 2,
+            "hits": 1,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 3,
+            "hits": 2,
+            "misses": 1
+          }
+        },
+        "n_verified": 35,
+        "n_types": 15
+      }
+    },
+    {
+      "phase": "post_molt_2",
+      "metrics": {
+        "n_verified_facts": 47,
+        "n_distinct_types": 19,
+        "transfer_accuracy": 0.0,
+        "lemma_reuse_rate": 1.0,
+        "reject_rate": 0.3974,
+        "n_rejected": 31,
+        "n_lemmas": 2,
+        "science": {
+          "symmetry": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "sym_compare_transfer",
+              "sym_dead_product",
+              "sym_group_table",
+              "sym_invariant_scan",
+              "sym_invariant_scan_n5_g2"
+            ],
+            "spawned": [
+              "sym_invariant_scan_n5_g2"
+            ]
+          },
+          "chance": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "chance_bayes_scan",
+              "chance_dead_negH",
+              "chance_entropy_scan",
+              "chance_entropy_scan_n3_g2",
+              "chance_extrapolate"
+            ],
+            "spawned": [
+              "chance_entropy_scan_n3_g2"
+            ]
+          },
+          "info": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "info_dead_mi0",
+              "info_mi_scan",
+              "info_mi_scan_n4_g2",
+              "info_transfer_bitfn"
+            ],
+            "spawned": [
+              "info_mi_scan_n4_g2"
+            ]
+          },
+          "sequences": {
+            "generation": 2,
+            "n_schema_classes": 7,
+            "spawned": []
+          }
+        },
+        "spawned_schemas": [
+          "chance_entropy_scan_n3_g2",
+          "info_mi_scan_n4_g2",
+          "sym_invariant_scan_n5_g2"
+        ],
+        "n_spawned": 3,
+        "compare": {
+          "symmetry": {
+            "attempts": 4,
+            "hits": 3,
+            "misses": 1
+          },
+          "chance": {
+            "attempts": 4,
+            "hits": 4,
+            "misses": 0
+          },
+          "info": {
+            "attempts": 4,
+            "hits": 3,
+            "misses": 1
+          }
+        },
+        "n_verified": 47,
+        "n_types": 19
+      }
+    }
+  ],
+  "compare_passes": [
+    {
+      "phase": "post_warmup",
+      "hits": 0,
+      "misses": 2
+    },
+    {
+      "phase": "post_molt_0",
+      "hits": 2,
+      "misses": 0
+    },
+    {
+      "phase": "post_molt_1",
+      "hits": 2,
+      "misses": 0
+    },
+    {
+      "phase": "post_molt_2",
+      "hits": 2,
+      "misses": 0
+    }
+  ],
+  "compare_detail_tail": [
+    {
+      "world": "symmetry",
+      "name": "transfer_parity_to_z2_parity_parity",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": true,
+      "transfer_source": "logic:parity",
+      "support": "COMPARE bit_fn:parity \u2192 Z2 xor table",
+      "counterexample": null
+    },
+    {
+      "world": "info",
+      "name": "transfer_bitfn_parity_parity_to_MI",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": true,
+      "transfer_source": "logic:parity",
+      "support": "MI=0.665189>0",
+      "counterexample": null
+    }
+  ],
+  "compare_totals": {
+    "hits": 2,
+    "misses": 0
+  },
+  "example_clauses": [
+    {
+      "status": "verified_emergent",
+      "clause": "verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)\u22480 on generated independent joint')).",
+      "reason": "verified under NON-SEED spawned schema; critic accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s1139', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).",
+      "reason": "science world; critic numeric/table gate accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s1139', 'logit(post)=logit(prior)+log(LR) on generated table')).",
+      "reason": "science world; critic numeric/table gate accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(symmetry, sym_compare_transfer, 'transfer_parity_to_z2_parity_parity', 'TRANSFER bit_fn(parity=parity) \u21d2 Z2/parity invariant')).",
+      "reason": "COMPARE/EXTRAPOLATE form; critic accepted"
+    },
+    {
+      "status": "verified",
+      "clause": "verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_parity_parity_to_MI', 'TRANSFER bit_fn(parity=parity) \u21d2 MI>0 on xor-coupled joint')).",
+      "reason": "COMPARE/EXTRAPOLATE form; critic accepted"
+    },
+    {
+      "status": "verified_bit_fn",
+      "clause": "bit_fn('bitfn_parity_is_parity', parity, parity).",
+      "reason": "logic bit_fn prior available for cross-world transfer"
+    },
+    {
+      "status": "rejected",
+      "clause": "rejected('chance_bayes_swap_s1139', 'P(H|E)=0.896539891664867 != P(H|\u00acE)=0.663110399724556').",
+      "reason": "science dead-end / broken hypothesis; critic finite-fail"
+    },
+    {
+      "status": "rejected",
+      "clause": "rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').",
+      "reason": "science dead-end / broken hypothesis; critic finite-fail"
+    }
+  ],
+  "beyond_limits": {
+    "clause": "verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)\u22480 on generated independent joint')).",
+    "world": "info",
+    "family": "info_mi_scan_n4_g2",
+    "note": "family/schema id not in original seed catalogs \u2014 emerged via molt/spawn"
+  },
+  "n_verified": 47,
+  "n_rejected": 31,
+  "n_types": 19,
+  "n_spawned": 3,
+  "spawned_schemas": [
+    "chance_entropy_scan_n3_g2",
+    "info_mi_scan_n4_g2",
+    "sym_invariant_scan_n5_g2"
+  ],
+  "elapsed_s": 0.358,
+  "human_seed": "Operator catalogs (SCIENCE_SEED / SEED_SCHEMAS), UCB constant, epsilon, finite-table generators, and the standing loop itself are human-authored. Every verified/1 still requires critic acceptance on obs."
+}

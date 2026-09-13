@@ -120,6 +120,13 @@ class MotorKernel:
                     unlocked_any = True
             pool = [a for a in self.arms.values() if a.unlocked and not a.saturated]
             if not pool:
+                # Eternal curiosity: saturated ≠ dead. Re-open productive arms
+                # (novelty stays > 0 in science skins; molt will spawn next).
+                for a in self.arms.values():
+                    if a.unlocked and not a.dead_end and a.saturated:
+                        a.saturated = False
+                pool = [a for a in self.arms.values() if a.unlocked and not a.saturated]
+            if not pool:
                 pool = [a for a in self.arms.values() if a.unlocked]
         if not pool:
             raise RuntimeError("no arms available")

@@ -1,5 +1,5 @@
 {
-  "total_steps": 70,
+  "total_steps": 73,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -73,6 +73,42 @@
       "n_visits": 6,
       "total_reward": 2.7800000000000002
     },
+    "sequences::bilinear_schema_r4_g4": {
+      "id": "bilinear_schema_r4_g4",
+      "description": "Mutant bilinear schema r_max=4",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 7,
+      "saturated": false,
+      "n_visits": 2,
+      "total_reward": -1.36
+    },
+    "sequences::bilinear_schema_r4_g5": {
+      "id": "bilinear_schema_r4_g5",
+      "description": "Mutant bilinear schema r_max=4",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 8,
+      "saturated": true,
+      "n_visits": 2,
+      "total_reward": -1.36
+    },
+    "sequences::bilinear_schema_r4_g6": {
+      "id": "bilinear_schema_r4_g6",
+      "description": "Mutant bilinear schema r_max=4",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 9,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": -0.68
+    },
     "logic::boolean_from_examples": {
       "id": "boolean_from_examples",
       "description": "Hypothesize parity/and_all/xor2/const against example tables; param=target index",
@@ -145,41 +181,137 @@
       "n_visits": 5,
       "total_reward": 1.0
     },
-    "sequences::bilinear_schema_r4_g4": {
-      "id": "bilinear_schema_r4_g4",
-      "description": "Mutant bilinear schema r_max=4",
+    "symmetry::sym_invariant_scan": {
+      "id": "sym_invariant_scan",
+      "description": "Scan discrete invariants (parity, mod-2 sum, involution)",
       "dead_end": false,
-      "param": 4,
-      "param_max": 4,
+      "param": 3,
+      "param_max": 6,
       "unlocked": true,
-      "unlock_order": 7,
+      "unlock_order": 0,
       "saturated": false,
-      "n_visits": 2,
-      "total_reward": -1.36
-    },
-    "sequences::bilinear_schema_r4_g5": {
-      "id": "bilinear_schema_r4_g5",
-      "description": "Mutant bilinear schema r_max=4",
-      "dead_end": false,
-      "param": 4,
-      "param_max": 4,
-      "unlocked": true,
-      "unlock_order": 8,
-      "saturated": true,
-      "n_visits": 2,
-      "total_reward": -1.36
-    },
-    "sequences::bilinear_schema_r4_g6": {
-      "id": "bilinear_schema_r4_g6",
-      "description": "Mutant bilinear schema r_max=4",
-      "dead_end": false,
-      "param": 4,
-      "param_max": 4,
-      "unlocked": true,
-      "unlock_order": 9,
-      "saturated": true,
       "n_visits": 1,
-      "total_reward": -0.68
+      "total_reward": 3.31
+    },
+    "symmetry::sym_group_table": {
+      "id": "sym_group_table",
+      "description": "Hypothesize Z2 / Klein composition-table laws",
+      "dead_end": false,
+      "param": 2,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "symmetry::sym_dead_product": {
+      "id": "sym_dead_product",
+      "description": "DEAD END: claim product conserved mod-2",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "symmetry::sym_compare_transfer": {
+      "id": "sym_compare_transfer",
+      "description": "COMPARE: reuse verified bit_fn/invariant across systems",
+      "dead_end": false,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "chance::chance_bayes_scan": {
+      "id": "chance_bayes_scan",
+      "description": "Tiny Bayes / log-odds identities on generated 2x2 tables",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 6.61
+    },
+    "chance::chance_entropy_scan": {
+      "id": "chance_entropy_scan",
+      "description": "Entropy inequalities on generated 2..k outcome dists",
+      "dead_end": false,
+      "param": 2,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "chance::chance_dead_negH": {
+      "id": "chance_dead_negH",
+      "description": "DEAD END: claim H(p)<0 or H decreases under mixing",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "chance::chance_extrapolate": {
+      "id": "chance_extrapolate",
+      "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 8,
+      "unlocked": false,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "info::info_mi_scan": {
+      "id": "info_mi_scan",
+      "description": "Mutual information / independence on tiny joint tables",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 4.76
+    },
+    "info::info_transfer_bitfn": {
+      "id": "info_transfer_bitfn",
+      "description": "COMPARE: transfer archived bit_fn prior into MI structure",
+      "dead_end": false,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "info::info_dead_mi0": {
+      "id": "info_dead_mi0",
+      "description": "DEAD END: claim MI always 0 on every joint",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
     }
   },
   "step_log": [
@@ -3064,6 +3196,107 @@
       "accepted": [],
       "rejected": [],
       "transfer": []
+    },
+    {
+      "tick": 71,
+      "world": "chance",
+      "family": "chance_bayes_scan",
+      "why": "UCB1 over 14 arms (world,family); picked chance::chance_bayes_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 1,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.39,
+        "score": 6.61
+      },
+      "growth": "extrapolate k 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "chance_bayes_id_s2192",
+        "chance_logodds_add_s2192",
+        "chance_bayes_id_s2193",
+        "chance_logodds_add_s2193",
+        "chance_bayes_id_s2194",
+        "chance_logodds_add_s2194"
+      ],
+      "rejected": [
+        "chance_bayes_swap_s2192"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 72,
+      "world": "info",
+      "family": "info_mi_scan",
+      "why": "UCB1 over 14 arms (world,family); picked info::info_mi_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.24,
+        "score": 4.76
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "info_MI_indep_near0_s2925",
+        "info_MI_dep_pos_s2925",
+        "info_indep_factorization_s2925",
+        "info_MI_and_related_s2925"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 73,
+      "world": "symmetry",
+      "family": "sym_invariant_scan",
+      "why": "UCB1 over 14 arms (world,family); picked symmetry::sym_invariant_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.19,
+        "score": 3.31
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "sym_parity_mod2_sum_o2",
+        "sym_involution_double_o2",
+        "sym_z2_assoc_o2"
+      ],
+      "rejected": [],
+      "transfer": []
     }
   ],
   "curves": [
@@ -3766,6 +3999,36 @@
       "n_rejected": 106,
       "n_lemmas": 14,
       "tick": 70
+    },
+    {
+      "n_verified_facts": 146,
+      "n_distinct_types": 20,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.4229,
+      "n_rejected": 107,
+      "n_lemmas": 14,
+      "tick": 71
+    },
+    {
+      "n_verified_facts": 150,
+      "n_distinct_types": 21,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.4163,
+      "n_rejected": 107,
+      "n_lemmas": 14,
+      "tick": 72
+    },
+    {
+      "n_verified_facts": 153,
+      "n_distinct_types": 22,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.4115,
+      "n_rejected": 107,
+      "n_lemmas": 14,
+      "tick": 73
     }
   ],
   "baselines": {
@@ -4360,5 +4623,321 @@
       "absorbed_intelligence": true,
       "negative_transfer_pell_expected": true
     }
-  }
+  },
+  "science_skins": {
+    "chance": {
+      "world_tag": "chance",
+      "generation": 0,
+      "n_schema_classes": 4,
+      "unlocked": [
+        "chance_bayes_scan",
+        "chance_dead_negH",
+        "chance_entropy_scan"
+      ],
+      "spawned": [],
+      "schemas": {
+        "chance_bayes_scan": {
+          "id": "chance_bayes_scan",
+          "description": "Tiny Bayes / log-odds identities on generated 2x2 tables",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 3,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "chance_entropy_scan": {
+          "id": "chance_entropy_scan",
+          "description": "Entropy inequalities on generated 2..k outcome dists",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 2,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "chance_dead_negH": {
+          "id": "chance_dead_negH",
+          "description": "DEAD END: claim H(p)<0 or H decreases under mixing",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        },
+        "chance_extrapolate": {
+          "id": "chance_extrapolate",
+          "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
+          "unlocked": false,
+          "dead_end": false,
+          "origin": "seed_locked",
+          "order": 3,
+          "order_max": 8,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        }
+      },
+      "molt_history": [],
+      "novelty_floor": 0.25
+    },
+    "info": {
+      "world_tag": "info",
+      "generation": 0,
+      "n_schema_classes": 3,
+      "unlocked": [
+        "info_dead_mi0",
+        "info_mi_scan",
+        "info_transfer_bitfn"
+      ],
+      "spawned": [],
+      "schemas": {
+        "info_mi_scan": {
+          "id": "info_mi_scan",
+          "description": "Mutual information / independence on tiny joint tables",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 3,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "info_transfer_bitfn": {
+          "id": "info_transfer_bitfn",
+          "description": "COMPARE: transfer archived bit_fn prior into MI structure",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "info_dead_mi0": {
+          "id": "info_dead_mi0",
+          "description": "DEAD END: claim MI always 0 on every joint",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        }
+      },
+      "molt_history": [],
+      "novelty_floor": 0.25
+    },
+    "symmetry": {
+      "world_tag": "symmetry",
+      "generation": 0,
+      "n_schema_classes": 4,
+      "unlocked": [
+        "sym_compare_transfer",
+        "sym_dead_product",
+        "sym_group_table",
+        "sym_invariant_scan"
+      ],
+      "spawned": [],
+      "schemas": {
+        "sym_invariant_scan": {
+          "id": "sym_invariant_scan",
+          "description": "Scan discrete invariants (parity, mod-2 sum, involution)",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 3,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 1,
+          "total_reward": 3.31,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "sym_group_table": {
+          "id": "sym_group_table",
+          "description": "Hypothesize Z2 / Klein composition-table laws",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 2,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "sym_dead_product": {
+          "id": "sym_dead_product",
+          "description": "DEAD END: claim product conserved mod-2",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        },
+        "sym_compare_transfer": {
+          "id": "sym_compare_transfer",
+          "description": "COMPARE: reuse verified bit_fn/invariant across systems",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        }
+      },
+      "molt_history": [],
+      "novelty_floor": 0.25
+    }
+  },
+  "chance_accepted": [
+    {
+      "kind": "bayes_id",
+      "order": 2
+    },
+    {
+      "kind": "logodds_add",
+      "order": 2
+    },
+    {
+      "kind": "bayes_id",
+      "order": 2
+    },
+    {
+      "kind": "logodds_add",
+      "order": 2
+    },
+    {
+      "kind": "bayes_id",
+      "order": 2
+    },
+    {
+      "kind": "logodds_add",
+      "order": 2
+    }
+  ]
 }

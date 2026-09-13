@@ -143,3 +143,16 @@ class LogicWorld(WorldBase):
             counterexample=cex,
             relation_type=conjecture.relation_type,
         )
+
+    def known_bit_fns(self) -> list[tuple[str, str, str]]:
+        """Expose archived bit_fn/3 for cross-world COMPARE transfer."""
+        if self._archive is None:
+            return []
+        if hasattr(self._archive, "list_bit_fns"):
+            return self._archive.list_bit_fns()
+        return []
+
+    def transfer_prior(self, archive_confirmed: dict) -> list[Conjecture]:
+        """Priors are the verified bit_fn matches — siblings may reuse them."""
+        # Logic does not re-hypothesize here; exposure is via known_bit_fns / archive.
+        return []

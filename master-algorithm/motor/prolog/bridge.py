@@ -157,6 +157,22 @@ class PrologArchive:
     def count_lemmas(self) -> int:
         return sum(1 for ln in self._lines if ln.startswith("lemma("))
 
+    def list_bit_fns(self) -> list[tuple[str, str, str]]:
+        """Return [(name, kind/target, spec/hyp), ...] from bit_fn/3 clauses."""
+        out = []
+        for ln in self._lines:
+            m = re.match(r"bit_fn\('([^']+)',\s*(\w+),\s*([^)]+)\)\.", ln)
+            if m:
+                spec = m.group(3).strip().strip("'")
+                out.append((m.group(1), m.group(2), spec))
+            else:
+                m2 = re.match(r"bit_fn\(([^,]+),\s*(\w+),\s*([^)]+)\)\.", ln)
+                if m2:
+                    name = m2.group(1).strip().strip("'")
+                    spec = m2.group(3).strip().strip("'")
+                    out.append((name, m2.group(2), spec))
+        return out
+
     def list_recs(self) -> list[tuple[str, list[int]]]:
         out = []
         for ln in self._lines:

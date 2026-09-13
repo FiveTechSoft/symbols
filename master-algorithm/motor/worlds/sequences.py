@@ -138,6 +138,8 @@ class SequencesWorld(WorldBase):
         for sid, sch in lang.schemas.items():
             if sid.startswith("geo_"):
                 continue  # geometry owns geo_invent
+            if sid.startswith(("sym_", "chance_", "info_")):
+                continue  # science worlds own these operators
             # Mutant linrec variants also become arms
             if sid.startswith("linrec_scan"):
                 fam_id = "linear_recurrences" if sid == "linrec_scan" else sid

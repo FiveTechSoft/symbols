@@ -1,0 +1,2299 @@
+{
+  "total_steps": 24,
+  "arms": {
+    "sequences::linear_recurrences": {
+      "id": "linear_recurrences",
+      "description": "Scan small-int linear recurrence coeffs; grow order",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": -0.17
+    },
+    "sequences::transfer_recurrence": {
+      "id": "transfer_recurrence",
+      "description": "Reuse archived rec/2 across companions",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 0.0
+    },
+    "sequences::ratio_limits": {
+      "id": "ratio_limits",
+      "description": "Consecutive-ratio limit hypotheses vs algebraic constants",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.65
+    },
+    "sequences::dead_end_always_prime": {
+      "id": "dead_end_always_prime",
+      "description": "DEAD END: terms always prime",
+      "dead_end": true,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 0.2
+    },
+    "sequences::modular_periods": {
+      "id": "modular_periods",
+      "description": "Pisano-like period schema: search modulus m, discover p",
+      "dead_end": false,
+      "param": 8,
+      "param_max": 12,
+      "unlocked": true,
+      "unlock_order": 4,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 4.88
+    },
+    "sequences::bilinear_schema": {
+      "id": "bilinear_schema",
+      "description": "Bilinear identity schema: search offset r, sign pattern",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 5,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 3.06
+    },
+    "logic::boolean_from_examples": {
+      "id": "boolean_from_examples",
+      "description": "Hypothesize parity/and_all/xor2/const against example tables; param=target index",
+      "dead_end": false,
+      "param": 1,
+      "param_max": 2,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.25
+    },
+    "logic::dead_end_const_true": {
+      "id": "dead_end_const_true",
+      "description": "DEAD END: claim every target is const(1)",
+      "dead_end": true,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 0.6
+    },
+    "geometry::euclid_conjectures": {
+      "id": "euclid_conjectures",
+      "description": "Axiom closure on seed constructions; grow template param",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.45
+    },
+    "geometry::lemma_reuse": {
+      "id": "lemma_reuse",
+      "description": "Re-close with lemmas enabled; measure citation",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.45
+    },
+    "geometry::geo_invent": {
+      "id": "geo_invent",
+      "description": "NEW: mutate constructions; invent lemma types (not canned Varignon)",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.43
+    },
+    "geometry::dead_end_false_eq": {
+      "id": "dead_end_false_eq",
+      "description": "DEAD END: AB=AC on scalene",
+      "dead_end": true,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 0.2
+    },
+    "symmetry::sym_invariant_scan": {
+      "id": "sym_invariant_scan",
+      "description": "Scan discrete invariants (parity, mod-2 sum, involution)",
+      "dead_end": false,
+      "param": 6,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 4.24
+    },
+    "symmetry::sym_group_table": {
+      "id": "sym_group_table",
+      "description": "Hypothesize Z2 / Klein composition-table laws",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 2.31
+    },
+    "symmetry::sym_dead_product": {
+      "id": "sym_dead_product",
+      "description": "DEAD END: claim product conserved mod-2",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 0.18
+    },
+    "symmetry::sym_compare_transfer": {
+      "id": "sym_compare_transfer",
+      "description": "COMPARE: reuse verified bit_fn/invariant across systems",
+      "dead_end": false,
+      "param": 2,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": -0.07
+    },
+    "chance::chance_bayes_scan": {
+      "id": "chance_bayes_scan",
+      "description": "Tiny Bayes / log-odds identities on generated 2x2 tables",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 6.59
+    },
+    "chance::chance_entropy_scan": {
+      "id": "chance_entropy_scan",
+      "description": "Entropy inequalities on generated 2..k outcome dists",
+      "dead_end": false,
+      "param": 5,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 7.09
+    },
+    "chance::chance_dead_negH": {
+      "id": "chance_dead_negH",
+      "description": "DEAD END: claim H(p)<0 or H decreases under mixing",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 0.38
+    },
+    "chance::chance_extrapolate": {
+      "id": "chance_extrapolate",
+      "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 8,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 5.49
+    },
+    "info::info_mi_scan": {
+      "id": "info_mi_scan",
+      "description": "Mutual information / independence on tiny joint tables",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 4.74
+    },
+    "info::info_transfer_bitfn": {
+      "id": "info_transfer_bitfn",
+      "description": "COMPARE: transfer archived bit_fn prior into MI structure",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": -0.09
+    },
+    "info::info_dead_mi0": {
+      "id": "info_dead_mi0",
+      "description": "DEAD END: claim MI always 0 on every joint",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 0.18
+    },
+    "symmetry::sym_invariant_scan_n5_g2": {
+      "id": "sym_invariant_scan_n5_g2",
+      "description": "Emergent operator from sym_invariant_scan @ order=5",
+      "dead_end": false,
+      "param": 5,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 4,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "chance::chance_entropy_scan_n3_g2": {
+      "id": "chance_entropy_scan_n3_g2",
+      "description": "Emergent operator from chance_entropy_scan @ order=3",
+      "dead_end": false,
+      "param": 3,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 4,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "info::info_mi_scan_n4_g2": {
+      "id": "info_mi_scan_n4_g2",
+      "description": "Emergent operator from info_mi_scan @ order=4",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 4.72
+    }
+  },
+  "step_log": [
+    {
+      "tick": 1,
+      "world": "geometry",
+      "family": "euclid_conjectures",
+      "why": "UCB1 over 20 arms (world,family); picked geometry::euclid_conjectures because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.05,
+        "score": 1.45
+      },
+      "growth": "expand param 0\u21921",
+      "unlock": null,
+      "accepted": [
+        "geo_midline_euclid_conjectures_p0"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 2,
+      "world": "sequences",
+      "family": "linear_recurrences",
+      "why": "UCB1 over 20 arms (world,family); picked sequences::linear_recurrences because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 3,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.17,
+        "score": -0.17
+      },
+      "growth": "expand schema param 1\u21922",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "rec_fib_o1_none_linrec_scan",
+        "rec_lucas_o1_none_linrec_scan",
+        "rec_pell_o1_none_linrec_scan"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 3,
+      "world": "geometry",
+      "family": "lemma_reuse",
+      "why": "UCB1 over 20 arms (world,family); picked geometry::lemma_reuse because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.05,
+        "score": 1.45
+      },
+      "growth": "expand param 0\u21921",
+      "unlock": null,
+      "accepted": [
+        "geo_midline_lemma_reuse_p0"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 4,
+      "world": "geometry",
+      "family": "geo_invent",
+      "why": "UCB1 over 20 arms (world,family); picked geometry::geo_invent because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.07,
+        "score": 1.43
+      },
+      "growth": "expand param 1\u21922",
+      "unlock": null,
+      "accepted": [
+        "geo_invent_d1_s3"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 5,
+      "world": "sequences",
+      "family": "ratio_limits",
+      "why": "UCB1 over 20 arms (world,family); picked sequences::ratio_limits because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.1,
+        "score": 1.65
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [
+        "ratio_fib_to_phi"
+      ],
+      "rejected": [
+        "NEG_ratio_fib_to_e"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 6,
+      "world": "geometry",
+      "family": "dead_end_false_eq",
+      "why": "UCB1 over 19 arms (world,family); picked geometry::dead_end_false_eq because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 1,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.05,
+        "score": 0.2
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_scalene_ab_eq_ac"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 7,
+      "world": "sequences",
+      "family": "dead_end_always_prime",
+      "why": "UCB1 over 22 arms (world,family); picked sequences::dead_end_always_prime because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 1,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.05,
+        "score": 0.2
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_fib_always_prime"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 8,
+      "world": "sequences",
+      "family": "bilinear_schema",
+      "why": "UCB1 over 21 arms (world,family); picked sequences::bilinear_schema because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 8,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 5,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.44,
+        "score": 3.06
+      },
+      "growth": "expand schema param 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "bilin_fib_offset_pm1",
+        "bilin_fib_r1",
+        "bilin_fib_r2"
+      ],
+      "rejected": [
+        "bilin_fib_bogus_const2",
+        "bilin_lucas_offset_pm1",
+        "bilin_lucas_r1",
+        "bilin_lucas_r2",
+        "bilin_lucas_bogus_const2"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 9,
+      "world": "chance",
+      "family": "chance_bayes_scan",
+      "why": "UCB1 over 21 arms (world,family); picked chance::chance_bayes_scan because never-tried \u2192 UCB=+\u221e +gap_bias(chance::chance_bayes_scan). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 1,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.41,
+        "score": 6.59
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chance_bayes_id_s1139",
+        "chance_logodds_add_s1139",
+        "chance_bayes_id_s1140",
+        "chance_logodds_add_s1140",
+        "chance_bayes_id_s1141",
+        "chance_logodds_add_s1141"
+      ],
+      "rejected": [
+        "chance_bayes_swap_s1139"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 10,
+      "world": "info",
+      "family": "info_mi_scan",
+      "why": "UCB1 over 21 arms (world,family); picked info::info_mi_scan because never-tried \u2192 UCB=+\u221e +gap_bias(info::info_mi_scan). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 4.74
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "info_MI_indep_near0_s2120",
+        "info_MI_dep_pos_s2120",
+        "info_indep_factorization_s2120",
+        "info_MI_and_related_s2120"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 11,
+      "world": "logic",
+      "family": "boolean_from_examples",
+      "why": "UCB1 over 21 arms (world,family); picked logic::boolean_from_examples because never-tried \u2192 UCB=+\u221e +gap_bias(logic::boolean_from_examples). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 5,
+      "outcomes": [
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 4,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.25,
+        "score": 1.25
+      },
+      "growth": "expand param 0\u21921",
+      "unlock": null,
+      "accepted": [
+        "bitfn_parity_is_parity"
+      ],
+      "rejected": [
+        "bitfn_parity_is_and_all",
+        "bitfn_parity_is_xor2",
+        "bitfn_parity_is_const_0",
+        "bitfn_parity_is_const_1"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 12,
+      "world": "symmetry",
+      "family": "sym_invariant_scan",
+      "why": "UCB1 over 21 arms (world,family); picked symmetry::sym_invariant_scan because never-tried \u2192 UCB=+\u221e +gap_bias(symmetry::sym_invariant_scan). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 4.24
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "sym_parity_mod2_sum_o3",
+        "sym_involution_double_o3",
+        "sym_z2_assoc_o3",
+        "sym_parity_mod2_sum_n_o3"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 13,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 24 arms (world,family); picked chance::chance_entropy_scan because never-tried \u2192 UCB=+\u221e +gap_bias(chance::chance_entropy_scan). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.41,
+        "score": 7.09
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k3_s1207",
+        "chance_H_le_logk_k3_s1207",
+        "chance_H_nonneg_k3_s1208",
+        "chance_H_le_logk_k3_s1208",
+        "chance_H_nonneg_k3_s1209",
+        "chance_H_le_logk_k3_s1209",
+        "chance_H_uni_max_k3_s1207"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 14,
+      "world": "info",
+      "family": "info_transfer_bitfn",
+      "why": "UCB1 over 24 arms (world,family); picked info::info_transfer_bitfn because never-tried \u2192 UCB=+\u221e +gap_bias(info::info_transfer_bitfn). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.09,
+        "score": -0.09
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_bitfn_parity_parity_to_MI"
+      ]
+    },
+    {
+      "tick": 15,
+      "world": "logic",
+      "family": "dead_end_const_true",
+      "why": "UCB1 over 24 arms (world,family); picked logic::dead_end_const_true because never-tried \u2192 UCB=+\u221e +gap_bias(logic::dead_end_const_true). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 3,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 3,
+        "cost": 0.15,
+        "score": 0.6
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_parity_const1",
+        "NEG_and_all_const1",
+        "NEG_xor2_const1"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 16,
+      "world": "sequences",
+      "family": "transfer_recurrence",
+      "why": "UCB1 over 23 arms (world,family); picked sequences::transfer_recurrence because never-tried \u2192 UCB=+\u221e +gap_bias(sequences::transfer_recurrence). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.0,
+        "score": 0.0
+      },
+      "growth": "waiting for rec/2 priors \u2014 do not saturate",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 17,
+      "world": "symmetry",
+      "family": "sym_group_table",
+      "why": "UCB1 over 23 arms (world,family); picked symmetry::sym_group_table because never-tried \u2192 UCB=+\u221e +gap_bias(symmetry::sym_group_table). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 1,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.19,
+        "score": 2.31
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "sym_z2_abelian_o2",
+        "sym_klein_every_nonid_order2_o2"
+      ],
+      "rejected": [
+        "sym_z2_claim_mult_o2"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 18,
+      "world": "chance",
+      "family": "chance_dead_negH",
+      "why": "UCB1 over 23 arms (world,family); picked chance::chance_dead_negH because never-tried \u2192 UCB=+\u221e +gap_bias(chance::chance_dead_negH). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 2,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 2,
+        "cost": 0.12,
+        "score": 0.38
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_chance_H_negative",
+        "NEG_chance_mix_decreases_H"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 19,
+      "world": "sequences",
+      "family": "modular_periods",
+      "why": "UCB1 over 25 arms (world,family); picked sequences::modular_periods because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 10,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 5,
+        "new_reject": 5,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.62,
+        "score": 4.88
+      },
+      "growth": "expand schema param 6\u21928",
+      "unlock": null,
+      "accepted": [
+        "period_fib_m2",
+        "period_fib_m3",
+        "period_fib_m4",
+        "period_fib_m5",
+        "period_lucas_m2"
+      ],
+      "rejected": [
+        "period_fib_m6",
+        "period_lucas_m3",
+        "period_lucas_m4",
+        "period_lucas_m5",
+        "period_lucas_m6"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 20,
+      "world": "info",
+      "family": "info_dead_mi0",
+      "why": "UCB1 over 25 arms (world,family); picked info::info_dead_mi0 because never-tried \u2192 UCB=+\u221e +gap_bias(info::info_dead_mi0). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 1,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.07,
+        "score": 0.18
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_info_MI_always_0"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 21,
+      "world": "symmetry",
+      "family": "sym_dead_product",
+      "why": "UCB1 over 24 arms (world,family); picked symmetry::sym_dead_product because never-tried \u2192 UCB=+\u221e +gap_bias(symmetry::sym_dead_product). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 1,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.07,
+        "score": 0.18
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax; molt will reopen others)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_sym_product_mod2_conserved"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 22,
+      "world": "chance",
+      "family": "chance_extrapolate",
+      "why": "UCB1 over 23 arms (world,family); picked chance::chance_extrapolate because never-tried \u2192 UCB=+\u221e +gap_bias(chance::chance_extrapolate). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "duplicate_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 3,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 5.49
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "extrap_H_le_logk_k4",
+        "extrap_H_nonneg_k4",
+        "extrap_H_uni_ge_peaked_k4"
+      ],
+      "rejected": [],
+      "transfer": [
+        "extrap_H_le_logk_k4",
+        "extrap_H_nonneg_k4",
+        "extrap_H_le_logk_k4",
+        "extrap_H_uni_ge_peaked_k4"
+      ]
+    },
+    {
+      "tick": 23,
+      "world": "info",
+      "family": "info_mi_scan_n4_g2",
+      "why": "UCB1 over 23 arms (world,family); picked info::info_mi_scan_n4_g2 because never-tried \u2192 UCB=+\u221e +gap_bias(info::info_mi_scan_n4_g2). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.28,
+        "score": 4.72
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "info_MI_indep_near0_s2290",
+        "info_MI_dep_pos_s2290",
+        "info_indep_factorization_s2290",
+        "info_MI_and_related_s2290"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 24,
+      "world": "symmetry",
+      "family": "sym_compare_transfer",
+      "why": "UCB1 over 22 arms (world,family); picked symmetry::sym_compare_transfer because never-tried \u2192 UCB=+\u221e +gap_bias(symmetry::sym_compare_transfer). Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.07,
+        "score": -0.07
+      },
+      "growth": "extrapolate order 1\u21922",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_parity_to_z2_parity_parity"
+      ]
+    }
+  ],
+  "curves": [
+    {
+      "n_verified_facts": 2,
+      "n_distinct_types": 2,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.0,
+      "n_rejected": 0,
+      "n_lemmas": 1,
+      "tick": 1
+    },
+    {
+      "n_verified_facts": 2,
+      "n_distinct_types": 2,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 0.0,
+      "reject_rate": 0.6,
+      "n_rejected": 3,
+      "n_lemmas": 1,
+      "tick": 2
+    },
+    {
+      "n_verified_facts": 3,
+      "n_distinct_types": 3,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.5,
+      "n_rejected": 3,
+      "n_lemmas": 1,
+      "tick": 3
+    },
+    {
+      "n_verified_facts": 5,
+      "n_distinct_types": 4,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.375,
+      "n_rejected": 3,
+      "n_lemmas": 2,
+      "tick": 4
+    },
+    {
+      "n_verified_facts": 6,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4,
+      "n_rejected": 4,
+      "n_lemmas": 2,
+      "tick": 5
+    },
+    {
+      "n_verified_facts": 6,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4545,
+      "n_rejected": 5,
+      "n_lemmas": 2,
+      "tick": 6
+    },
+    {
+      "n_verified_facts": 6,
+      "n_distinct_types": 5,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.5714,
+      "n_rejected": 8,
+      "n_lemmas": 2,
+      "tick": 7
+    },
+    {
+      "n_verified_facts": 9,
+      "n_distinct_types": 6,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.5909,
+      "n_rejected": 13,
+      "n_lemmas": 2,
+      "tick": 8
+    },
+    {
+      "n_verified_facts": 15,
+      "n_distinct_types": 7,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4828,
+      "n_rejected": 14,
+      "n_lemmas": 2,
+      "tick": 9
+    },
+    {
+      "n_verified_facts": 19,
+      "n_distinct_types": 8,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4242,
+      "n_rejected": 14,
+      "n_lemmas": 2,
+      "tick": 10
+    },
+    {
+      "n_verified_facts": 20,
+      "n_distinct_types": 10,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4737,
+      "n_rejected": 18,
+      "n_lemmas": 2,
+      "tick": 11
+    },
+    {
+      "n_verified_facts": 24,
+      "n_distinct_types": 11,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4286,
+      "n_rejected": 18,
+      "n_lemmas": 2,
+      "tick": 12
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3529,
+      "n_rejected": 18,
+      "n_lemmas": 2,
+      "tick": 13
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3529,
+      "n_rejected": 18,
+      "n_lemmas": 2,
+      "tick": 14
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3889,
+      "n_rejected": 21,
+      "n_lemmas": 2,
+      "tick": 15
+    },
+    {
+      "n_verified_facts": 33,
+      "n_distinct_types": 14,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3889,
+      "n_rejected": 21,
+      "n_lemmas": 2,
+      "tick": 16
+    },
+    {
+      "n_verified_facts": 35,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.386,
+      "n_rejected": 22,
+      "n_lemmas": 2,
+      "tick": 17
+    },
+    {
+      "n_verified_facts": 35,
+      "n_distinct_types": 15,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4068,
+      "n_rejected": 24,
+      "n_lemmas": 2,
+      "tick": 18
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 17,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4203,
+      "n_rejected": 29,
+      "n_lemmas": 2,
+      "tick": 19
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 17,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4286,
+      "n_rejected": 30,
+      "n_lemmas": 2,
+      "tick": 20
+    },
+    {
+      "n_verified_facts": 40,
+      "n_distinct_types": 17,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4366,
+      "n_rejected": 31,
+      "n_lemmas": 2,
+      "tick": 21
+    },
+    {
+      "n_verified_facts": 43,
+      "n_distinct_types": 18,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.4189,
+      "n_rejected": 31,
+      "n_lemmas": 2,
+      "tick": 22
+    },
+    {
+      "n_verified_facts": 47,
+      "n_distinct_types": 19,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3974,
+      "n_rejected": 31,
+      "n_lemmas": 2,
+      "tick": 23
+    },
+    {
+      "n_verified_facts": 47,
+      "n_distinct_types": 19,
+      "transfer_accuracy": 0.0,
+      "lemma_reuse_rate": 1.0,
+      "reject_rate": 0.3974,
+      "n_rejected": 31,
+      "n_lemmas": 2,
+      "tick": 24
+    }
+  ],
+  "baselines": {
+    "A_more_data_frozen_language": {
+      "points": [
+        {
+          "N": 20,
+          "n_true": 4,
+          "n_types": 4,
+          "types": [
+            "cassini",
+            "catalan",
+            "linear_recurrence",
+            "ratio_limit"
+          ]
+        },
+        {
+          "N": 40,
+          "n_true": 4,
+          "n_types": 4,
+          "types": [
+            "cassini",
+            "catalan",
+            "linear_recurrence",
+            "ratio_limit"
+          ]
+        }
+      ],
+      "type_growth_20_to_40": 0,
+      "verdict": "extra N adds no new relation types in frozen language"
+    },
+    "B_no_archive_no_transfer": {
+      "description": "no archive: frozen wrong prior [2,0] on Lucas",
+      "accuracy": 0.0,
+      "hits": 0,
+      "total": 23
+    }
+  },
+  "backend": "swipl",
+  "geometry_schemas": [
+    "midline_parallel"
+  ],
+  "geometry_lemma_cites": 1,
+  "geometry_lemma_attempts": 2,
+  "hypothesis_skin": {
+    "generation": 2,
+    "n_schema_classes": 7,
+    "n_unlocked": 7,
+    "unlocked": [
+      "bilinear_schema",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "schemas": {
+      "linrec_scan": {
+        "id": "linrec_scan",
+        "description": "Scan small-int linear recurrence coeffs; grow order",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 4,
+        "order_max": 4,
+        "coeff_lo": -5,
+        "coeff_hi": 5,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": -0.17,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 1.0
+      },
+      "transfer_horn": {
+        "id": "transfer_horn",
+        "description": "Reuse archived rec/2 across companions",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "ratio_scan": {
+        "id": "ratio_scan",
+        "description": "Consecutive-ratio limit hypotheses vs algebraic constants",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": 1.65,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "dead_prime": {
+        "id": "dead_prime",
+        "description": "DEAD END: terms always prime",
+        "unlocked": true,
+        "dead_end": true,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "modperiod_schema": {
+        "id": "modperiod_schema",
+        "description": "Pisano-like period schema: search modulus m, discover p",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "mutation:unlocked_gen2",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 8,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": 4.88,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "bilinear_schema": {
+        "id": "bilinear_schema",
+        "description": "Bilinear identity schema: search offset r, sign pattern",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "mutation:unlocked_gen1",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 4,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": 3.06,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "geo_invent": {
+        "id": "geo_invent",
+        "description": "Mutate constructions; archive new lemma schemas",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "seed",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 3,
+        "mut_cap": 4,
+        "n_visits": 0,
+        "total_reward": 0.0,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      }
+    },
+    "seen_coeff_fingerprints": [],
+    "molt_history": [
+      {
+        "generation": 1,
+        "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+        "actions": [
+          "raise_linrec_order 2\u21923",
+          "widen_coeff_range [-4,4]",
+          "unlock_schema bilinear_schema",
+          "raise_r_max 1\u21922",
+          "raise_mut_depth 1\u21922",
+          "novelty_bonus\u21920.5"
+        ],
+        "unlocked_before": [
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "unlocked_after": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "n_schema_classes": 7
+      },
+      {
+        "generation": 2,
+        "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+        "actions": [
+          "raise_linrec_order 3\u21924",
+          "widen_coeff_range [-5,5]",
+          "unlock_schema modperiod_schema",
+          "raise_m_max 4\u21926",
+          "raise_r_max 3\u21924",
+          "raise_mut_depth 2\u21923",
+          "novelty_bonus\u21921.0"
+        ],
+        "unlocked_before": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "unlocked_after": [
+          "bilinear_schema",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "n_schema_classes": 7
+      }
+    ]
+  },
+  "schema_classes": [
+    {
+      "id": "linrec_scan",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "transfer_horn",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "ratio_scan",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "dead_prime",
+      "unlocked": true,
+      "origin": "seed"
+    },
+    {
+      "id": "modperiod_schema",
+      "unlocked": true,
+      "origin": "mutation:unlocked_gen2"
+    },
+    {
+      "id": "bilinear_schema",
+      "unlocked": true,
+      "origin": "mutation:unlocked_gen1"
+    },
+    {
+      "id": "geo_invent",
+      "unlocked": true,
+      "origin": "seed"
+    }
+  ],
+  "transfer_eval": {
+    "lucas": {
+      "transfer_from": null,
+      "transfer_coeffs": null,
+      "transfer_accuracy": 0.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        1,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": false,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "pell": {
+      "transfer_from": null,
+      "transfer_coeffs": null,
+      "transfer_accuracy": 0.0,
+      "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
+      "baseline_frozen_order1": 0.0,
+      "scratch_order2_on_target": [
+        2,
+        1
+      ],
+      "scratch_order2_accuracy": 1.0,
+      "transfer_beats_no_archive": false,
+      "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
+    },
+    "summary": {
+      "lucas_transfer_beats_baseline": false,
+      "pell_transfer_beats_baseline": false,
+      "absorbed_intelligence": false,
+      "negative_transfer_pell_expected": true
+    }
+  },
+  "science_skins": {
+    "info": {
+      "world_tag": "info",
+      "generation": 3,
+      "n_schema_classes": 4,
+      "unlocked": [
+        "info_dead_mi0",
+        "info_mi_scan",
+        "info_mi_scan_n4_g2",
+        "info_transfer_bitfn"
+      ],
+      "spawned": [
+        "info_mi_scan_n4_g2"
+      ],
+      "schemas": {
+        "info_mi_scan": {
+          "id": "info_mi_scan",
+          "description": "Mutual information / independence on tiny joint tables",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 4,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "info_transfer_bitfn": {
+          "id": "info_transfer_bitfn",
+          "description": "COMPARE: transfer archived bit_fn prior into MI structure",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 4,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "info_dead_mi0": {
+          "id": "info_dead_mi0",
+          "description": "DEAD END: claim MI always 0 on every joint",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": true,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        },
+        "info_mi_scan_n4_g2": {
+          "id": "info_mi_scan_n4_g2",
+          "description": "Emergent operator from info_mi_scan @ order=4",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "molt:spawn_gen2",
+          "order": 4,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": true,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.7000000000000002
+        }
+      },
+      "molt_history": [
+        {
+          "generation": 1,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_mi_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [],
+          "n_schema_classes": 3,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_transfer_bitfn 1\u21922",
+            "spawn_schema info_mi_scan_n4_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [
+            "info_mi_scan_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "info",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order info_transfer_bitfn 3\u21924",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "unlocked_after": [
+            "info_dead_mi0",
+            "info_mi_scan",
+            "info_mi_scan_n4_g2",
+            "info_transfer_bitfn"
+          ],
+          "spawned": [
+            "info_mi_scan_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "novelty_floor": 0.25
+    },
+    "symmetry": {
+      "world_tag": "symmetry",
+      "generation": 3,
+      "n_schema_classes": 5,
+      "unlocked": [
+        "sym_compare_transfer",
+        "sym_dead_product",
+        "sym_group_table",
+        "sym_invariant_scan",
+        "sym_invariant_scan_n5_g2"
+      ],
+      "spawned": [
+        "sym_invariant_scan_n5_g2"
+      ],
+      "schemas": {
+        "sym_invariant_scan": {
+          "id": "sym_invariant_scan",
+          "description": "Scan discrete invariants (parity, mod-2 sum, involution)",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 6,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 1,
+          "total_reward": 4.24,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "sym_group_table": {
+          "id": "sym_group_table",
+          "description": "Hypothesize Z2 / Klein composition-table laws",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 3,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 1,
+          "total_reward": 2.31,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "sym_dead_product": {
+          "id": "sym_dead_product",
+          "description": "DEAD END: claim product conserved mod-2",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": true,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        },
+        "sym_compare_transfer": {
+          "id": "sym_compare_transfer",
+          "description": "COMPARE: reuse verified bit_fn/invariant across systems",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 2,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 1,
+          "total_reward": -0.07,
+          "saturated": false,
+          "ticks_no_new_type": 1,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "sym_invariant_scan_n5_g2": {
+          "id": "sym_invariant_scan_n5_g2",
+          "description": "Emergent operator from sym_invariant_scan @ order=5",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "molt:spawn_gen2",
+          "order": 5,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.7000000000000002
+        }
+      },
+      "molt_history": [
+        {
+          "generation": 1,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 4\u21925",
+            "spawn_schema sym_invariant_scan_n5_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "spawned": [
+            "sym_invariant_scan_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "symmetry",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order sym_invariant_scan 5\u21926",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "unlocked_after": [
+            "sym_compare_transfer",
+            "sym_dead_product",
+            "sym_group_table",
+            "sym_invariant_scan",
+            "sym_invariant_scan_n5_g2"
+          ],
+          "spawned": [
+            "sym_invariant_scan_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "novelty_floor": 0.25
+    },
+    "chance": {
+      "world_tag": "chance",
+      "generation": 3,
+      "n_schema_classes": 5,
+      "unlocked": [
+        "chance_bayes_scan",
+        "chance_dead_negH",
+        "chance_entropy_scan",
+        "chance_entropy_scan_n3_g2",
+        "chance_extrapolate"
+      ],
+      "spawned": [
+        "chance_entropy_scan_n3_g2"
+      ],
+      "schemas": {
+        "chance_bayes_scan": {
+          "id": "chance_bayes_scan",
+          "description": "Tiny Bayes / log-odds identities on generated 2x2 tables",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 4,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "chance_entropy_scan": {
+          "id": "chance_entropy_scan",
+          "description": "Entropy inequalities on generated 2..k outcome dists",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 5,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "chance_dead_negH": {
+          "id": "chance_dead_negH",
+          "description": "DEAD END: claim H(p)<0 or H decreases under mixing",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": true,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
+        },
+        "chance_extrapolate": {
+          "id": "chance_extrapolate",
+          "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "molt:unlocked_gen1",
+          "order": 4,
+          "order_max": 8,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.2999999999999998
+        },
+        "chance_entropy_scan_n3_g2": {
+          "id": "chance_entropy_scan_n3_g2",
+          "description": "Emergent operator from chance_entropy_scan @ order=3",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "molt:spawn_gen2",
+          "order": 3,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 1.7000000000000002
+        }
+      },
+      "molt_history": [
+        {
+          "generation": 1,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "unlock_schema chance_extrapolate",
+            "raise_order chance_bayes_scan 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_extrapolate"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chance_entropy_scan 2\u21923",
+            "spawn_schema chance_entropy_scan_n3_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_extrapolate"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "spawned": [
+            "chance_entropy_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "chance",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chance_entropy_scan 4\u21925",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "unlocked_after": [
+            "chance_bayes_scan",
+            "chance_dead_negH",
+            "chance_entropy_scan",
+            "chance_entropy_scan_n3_g2",
+            "chance_extrapolate"
+          ],
+          "spawned": [
+            "chance_entropy_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        }
+      ],
+      "novelty_floor": 0.25
+    }
+  },
+  "chance_accepted": [
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_uni_ge_peaked",
+      "order": 3
+    }
+  ]
+}
