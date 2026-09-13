@@ -356,9 +356,6 @@ dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
     book_anaphora(Rest, B), !,
     about_entity(B, es).
-dialog_meta_es([de, que, trata, el, libro]) :- !,
-    live_books([B]), !,
-    about_entity(B, es).
 dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
     \+ graph_pins([de, que|Rest], _, _), !,
@@ -409,8 +406,17 @@ book_anaphora(Toks, B) :-
     ( Ents == []
     ; Ents = [T], book_type(T)
     ),
-    \+ has_unknown_content(Packed),
     last_book(Bs, B).
+
+% "de que trata el libro": libro generico con verbo novel.
+book_anaphora(Rest, B) :-
+    member(D, Rest),
+    is_determiner(D),
+    member(W, Rest),
+    atom_length(W, L), L >= 3,
+    \+ bb_content(W),
+    \+ qlead(W),
+    live_books([B]), !.
 
 % "el otro libro": el titulo que no es el de recencia.
 book_other(Toks, B) :-
