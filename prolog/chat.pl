@@ -2084,6 +2084,11 @@ means_triple(V, C) :-
     memory_relation(V, means, C, _, _).
 means_triple(V, C) :-
     memory_relation(V, significa, C, _, _).
+% Reverse: teach "eat significa comio" → query "comio" resolves to "eat".
+means_triple(V, C) :-
+    memory_relation(C, means, V, _, _).
+means_triple(V, C) :-
+    memory_relation(C, significa, V, _, _).
 % love hereda loves means ama: mismo stem o +s (bb_stem('es')
 % recorta loves a lov). Sufijos cerrados, no lexico.
 means_triple(V, C) :-
