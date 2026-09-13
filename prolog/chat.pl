@@ -244,6 +244,9 @@ chat_line_dispatch(L, Toks0) :-
         dialog_substitute(ToksP, Toks, _),
         chat_line_tokens(L, Toks, yes)
     ; dialog_pending_teach(S, V),
+      dialog_why_ask(Toks0) ->
+        dialog_why_need(S, V)
+    ; dialog_pending_teach(S, V),
       dialog_teach_reply(Toks0, O) ->
         retractall(dialog_pending(_, _, _)),
         retractall(dialog_pending_teach(_, _)),
@@ -282,6 +285,15 @@ dialog_probe_missing([S, V]) :-
     bb_stem(V, VB),
     format('What did ~w ~w?~n', [S, VB]),
     assertz(dialog_pending_teach(S, V)).
+
+% Bratko Why (no How): por que el sondeo, sin abandonar el slot.
+dialog_why_ask([why]).
+dialog_why_ask([porque]).
+dialog_why_ask([por, que]).
+
+dialog_why_need(S, V) :-
+    bb_stem(V, VB),
+    format('Because I need the object of ~w ~w.~n', [S, VB]).
 
 chat_line_tokens(L, Toks, Changed) :-
     ( Toks == [] -> true
@@ -1011,6 +1023,10 @@ chat_why_bare :-
 
 chat_ask(Toks) :-
     ( dialog_has_pronoun(Toks) -> chat_unknown
+    ; rel_split(Toks, Left, Right), last_ent(Left, _) ->
+        ( rel_join(Left, Right) -> chat_ask(Left)
+        ; chat_unknown
+        )
     ; chat_form(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -1057,6 +1073,47 @@ ask_lang(Toks, es) :-
 ask_lang(Toks, es) :-
     member(de, Toks), !.
 ask_lang(_, en).
+
+% Relativa (Bratko DCG, sin lexico): "that"/"which"/"que" en medio
+% filtran el ente que precede. El join es un hecho vivo, o unknown.
+rel_mark(that).
+rel_mark(which).
+rel_mark(que).
+
+rel_split(Toks, Left, Right) :-
+    append(Left, [M|Right], Toks),
+    rel_mark(M),
+    Left \== [], Right \== [],
+    Toks \= [M|_].
+
+last_ent(Toks, E) :-
+    nl_tokens(Toks, Packed), !,
+    reverse(Packed, Rev),
+    member(W, Rev),
+    pin_ent(W, E), !.
+
+rel_join(Left, Right) :-
+    last_ent(Left, E),
+    rel_holds(Right, E).
+
+rel_holds(Right, E) :-
+    nl_tokens(Right, Packed), !,
+    pins_of(Packed, Rels, Ents),
+    ( member(R, Rels),
+      ( member(S, Ents),
+        ( memory_relation(S, R, E, _, _)
+        ; memory_relation(E, R, S, _, _)
+        )
+      ; Ents == [],
+        ( memory_relation(E, R, _, _, _)
+        ; memory_relation(_, R, E, _, _)
+        )
+      )
+    ; Rels == [], Ents = [S],
+      ( memory_relation(S, _, E, _, _)
+      ; memory_relation(E, _, S, _, _)
+      )
+    ), !.
 
 % Pregunta contra el mapa vivo: los tokens que ya son relacion o
 % entidad anclan la consulta; el resto (interrogativos, determinantes,

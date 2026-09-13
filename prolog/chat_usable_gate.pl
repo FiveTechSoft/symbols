@@ -206,7 +206,25 @@ run_cases :-
     \+ sub_string(OutVan, _, _, _, "Yes"),
     capture("ok", OutOk),
     \+ sub_string(OutOk, _, _, _, "Learned"),
-    \+ sub_string(OutOk, _, _, _, "I don't know").
+    \+ sub_string(OutOk, _, _, _, "I don't know"),
+    % Relativa: el ente ante that/que debe cumplir el hecho de la cola.
+    expect("who met rio that nilo met?", "nilo"),
+    capture("who ate cake that ana opened?", OutRel),
+    ( sub_string(OutRel, _, _, _, "I don't know") -> true
+    ; sub_string(OutRel, _, _, _, "No lo") -> true
+    ; format('FAIL relative should reject: ~w~n', [OutRel]), fail
+    ),
+    expect("who opened door that ana opened?", "ana"),
+    % Bratko Why: sondeo D4, why no abandona el slot.
+    capture("ana opened", OutProbe),
+    ( sub_string(OutProbe, _, _, _, "What did") -> true
+    ; format('FAIL D4 probe: ~w~n', [OutProbe]), fail
+    ),
+    capture("why", OutNeed),
+    ( sub_string(OutNeed, _, _, _, "object") -> true
+    ; format('FAIL D4 why: ~w~n', [OutNeed]), fail
+    ),
+    expect_all("door", ["Learned"]).
 
 dcg_roundtrip(T) :-
     ( surface_sent(T, Line),
