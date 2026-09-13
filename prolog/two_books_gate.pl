@@ -48,6 +48,15 @@ run_two :-
     capture("ok", OutOk),
     \+ sub_string(OutOk, _, _, _, "Learned"),
     \+ sub_string(OutOk, _, _, _, "I don't know"),
+    expect("quien es michel?", "Esto se de michel"),
+    expect("y quien es valerie?", "Esto se de valerie"),
+    expect("de que trata el libro?", "houellebecq"),
+    expect("que lecciones enseña el libro?", "plataforma"),
+    capture("en que se parece un libro al otro?", OutCmp),
+    ( sub_string(OutCmp, _, _, _, "author") -> true
+    ; format('FAIL compare: ~w~n', [OutCmp]), fail
+    ),
+    \+ sub_string(OutCmp, _, _, _, "I don't know"),
     delete_file('two_books_tmp.knowledge.pl').
 
 capture(Line, Out) :-

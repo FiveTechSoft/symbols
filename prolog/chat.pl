@@ -334,18 +334,70 @@ dialog_meta_es([de, que|Rest]) :-
     about_entity(B, es).
 dialog_meta_es([de, que|Rest]) :-
     Rest \== [],
+    book_anaphora(Rest, B), !,
+    about_entity(B, es).
+dialog_meta_es([de, que|Rest]) :-
+    Rest \== [],
     \+ graph_pins([de, que|Rest], _, _), !,
     chat_known(es).
 
 % Unico ente = un titulo (is book) y ninguna rel viva: el mapa
 % describe ese libro (appears_in, author, set_in).
+% Titulo dicho (plataforma, alice_in_wonderland). Sin pin_rel:
+% ese camino se cuelga con verbos novel (parece) via means/inflect.
 book_pin(Toks, B) :-
+    nl_tokens(Toks, Packed), !,
+    live_books(Bs),
+    findall(X, (member(X, Bs), packed_has(Packed, X)), [B]).
+
+packed_has(Packed, B) :-
+    member(W, Packed),
+    qnorm_atom(W, B).
+
+packed_names(Packed, Ents) :-
+    findall(E, (member(W, Packed), qnorm_atom(W, E), map_entity(E)), Es),
+    sort(Es, Ents).
+
+book_type(T) :-
+    live_books(Bs),
+    member(B, Bs),
+    memory_relation(B, is, T, _, _),
+    \+ member(T, Bs).
+
+other_word(W) :-
+    member(W, [other, others, otro, otra, otros, otras]).
+
+% "el libro" / "the book": tipo del grafo o cero entes; recencia
+% en la pila (ultimo titulo mencionado).
+book_anaphora(Toks, B) :-
+    live_books(Bs), Bs \== [],
     nl_tokens(Toks, Packed),
-    findall(E, (member(W, Packed), pin_ent(W, E),
-                memory_relation(E, is, book, _, _)), Bs0),
-    sort(Bs0, [B]),
-    findall(E2, (member(W, Packed), pin_ent(W, E2), E2 \== B), Others),
-    Others == [].
+    \+ include(packed_has(Packed), Bs, [_|_]),
+    \+ (member(W, Packed), other_word(W)),
+    packed_names(Packed, Ents),
+    ( Ents == []
+    ; Ents = [T], book_type(T)
+    ),
+    last_book(Bs, B).
+
+last_book(Bs, B) :-
+    dialog_stack(subj, Ss),
+    member(B, Ss),
+    memberchk(B, Bs), !.
+last_book(Bs, B) :-
+    dialog_stack(obj, Os),
+    member(B, Os),
+    memberchk(B, Bs), !.
+last_book([B], B).
+
+% Dos titulos vivos y "el otro": rels comunes del grafo, no invencion.
+book_compare(Toks) :-
+    live_books(Bs),
+    Bs = [_,_|_],
+    nl_tokens(Toks, Packed),
+    member(W, Packed),
+    other_word(W),
+    \+ include(packed_has(Packed), Bs, [_|_]).
 
 % "que X?" y X no vive en el mapa: pregunta por el propio KB.
 % Si el mapa tiene (Titulo, is, book), lista esos titulos (el grafo
@@ -362,6 +414,19 @@ dialog_about_book([what, X]) :-
 live_books(Bs) :-
     findall(B, memory_relation(B, is, book, _, _), B0),
     sort(B0, Bs).
+
+chat_compare_books(_Lang) :-
+    live_books(Bs),
+    findall(R, (append(_, [B1|Rest], Bs), member(B2, Rest),
+                memory_relation(B1, R, _, _, _),
+                memory_relation(B2, R, _, _, _)), R0),
+    sort(R0, Rs),
+    ( Rs == [] -> chat_list_books(en)
+    ; forall(member(R, Rs),
+             forall(member(B, Bs),
+                    forall(memory_relation(B, R, O, _, _),
+                           (surface_sent((B, R, O), Line), writeln(Line)))))
+    ).
 
 chat_list_books(Lang) :-
     live_books(Bs),
@@ -638,13 +703,13 @@ longest_mid([H|T], Acc, AL, Best) :-
 % Empaqueta el tramo mas largo que ya es simbolo vivo (white+rabbit
 % = white_rabbit). Lo que no matchea se deja token a token.
 nl_tokens(Toks, Out) :-
-    span_pack(Toks, Packed0),
+    span_pack(Toks, Packed0), !,
     exclude(qlead, Packed0, Packed),
     % Tres tokens: el del medio es el hueco de relacion (SVO), aunque
     % el objeto ya viva en el mapa. Glue solo en tramos mas largos.
     ( Packed = [A, M, _],
       \+ is_determiner(A), \+ is_determiner(M) -> Out = Packed
-    ; drop_glue(Packed, Out)
+    ; drop_glue(Packed, Out), !
     ),
     Out \== [].
 
@@ -690,11 +755,11 @@ drop_glue([U, P|T], Out) :-
     append(Dets, [B|Rest], T),
     forall(member(D, Dets), is_determiner(D)),
     map_entity(B), !,
-    drop_glue([B|Rest], R2),
+    drop_glue(Rest, R2),
     Out = [U, P, B|R2].
 drop_glue([U|T], Out) :-
     T \== [],
-    atom_length(U, L), L =< 2, \+ pin_rel(U, _), !,
+    atom_length(U, L), L =< 2, !,
     drop_glue(T, Out).
 drop_glue([U|T], Out) :-
     qlead(U), !,
@@ -804,6 +869,8 @@ chat_about(Toks) :-
     about_target(Toks, Lang, Name),
     about_entity(Name, Lang).
 
+about_target([y|Rest], Lang, Name) :- Rest \== [], about_target(Rest, Lang, Name).
+about_target([and|Rest], Lang, Name) :- Rest \== [], about_target(Rest, Lang, Name).
 about_target([hablame, de|Rest], es, Name) :- qnorm(Rest, Name).
 about_target([hablame|Rest], es, Name) :- qnorm(Rest, Name).
 about_target([cuentame, de|Rest], es, Name) :- qnorm(Rest, Name).
@@ -828,6 +895,7 @@ about_entity(Name, Lang) :-
         about_cast(Name),
         dialog_reset,
         dialog_note([Name], subj),
+        about_note_book(Name),
         chat_set_last(Name, _, _)
     ; findall((S, R), memory_relation(S, R, Name, _, _), In0),
       sort(In0, In),
@@ -837,6 +905,7 @@ about_entity(Name, Lang) :-
         show_facts_in(Name, In, 8),
         dialog_reset,
         dialog_note([Name], obj),
+        about_note_book(Name),
         ( In = [(S0, R0)|_] -> chat_set_last(S0, R0, Name) ; true )
     ; ( Lang == es ->
             format('No se casi nada de ~w.~n', [Name])
@@ -858,6 +927,15 @@ about_cast(Name) :-
     Ts \== [], !,
     forall(member(T, Ts), (surface_sent(T, Line), format('  ~w~n', [Line]))).
 about_cast(_).
+
+% El titulo sigue en el stack de objetos para "el libro".
+about_note_book(Name) :-
+    memory_relation(Name, appears_in, Book, _, _), !,
+    dialog_note([Book], obj).
+about_note_book(Name) :-
+    memory_relation(Name, is, book, _, _), !,
+    dialog_note([Name], obj).
+about_note_book(_).
 
 show_facts(_, _, 0) :- !.
 show_facts(_, [], _) :- !.
@@ -940,6 +1018,12 @@ chat_ask(Toks) :-
     ; book_pin(Toks, B) ->
         ask_lang(Toks, Lang),
         about_entity(B, Lang)
+    ; book_anaphora(Toks, B) ->
+        ask_lang(Toks, Lang),
+        about_entity(B, Lang)
+    ; book_compare(Toks) ->
+        ask_lang(Toks, Lang),
+        chat_compare_books(Lang)
     ; graph_ask(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
@@ -1215,8 +1299,12 @@ chat_say_es(_, unknown) :-
 % deja al camino normal (UNKNOWN honesto). Caso especial: who + X
 % persona sin objeto -> verificar candidato (Did X V O?).
 % Tras responder, chat_ask actualiza LastQ: encadena ("And Oslo?").
-dialog_ellipsis([and|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, continue).
-dialog_ellipsis([y|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, continue).
+dialog_ellipsis([and|Rest]) :-
+    Rest \== [], \+ (member(W, Rest), qlead(W)), !,
+    dialog_ell_span(Rest, continue).
+dialog_ellipsis([y|Rest]) :-
+    Rest \== [], \+ (member(W, Rest), qlead(W)), !,
+    dialog_ell_span(Rest, continue).
 dialog_ellipsis([what, about|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, about).
 dialog_ellipsis([how, about|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, about).
 dialog_ellipsis(_) :- fail.
