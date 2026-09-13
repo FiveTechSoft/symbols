@@ -1,11 +1,10 @@
-"""CLI: python -m motor tick|status|theory|live|vive"""
+"""CLI: python -m motor tick|status|theory|live|vive|talk"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -33,14 +32,27 @@ def main(argv: list[str] | None = None) -> int:
     p_vive.add_argument("--rounds", type=int, default=2)
     p_vive.add_argument("--tick-steps", type=int, default=5, dest="tick_steps")
 
+    p_talk = sub.add_parser("talk", help="Natural-language mouth over theory.pl")
+    p_talk.add_argument("-q", dest="question", help="One-shot question")
+    p_talk.add_argument("--growth", action="store_true", help="Ask creciste")
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "talk":
+        from motor.talk import main as talk_main
+
+        talk_argv: list[str] = []
+        if args.growth:
+            talk_argv.append("--growth")
+        if args.question:
+            talk_argv.extend(["-q", args.question])
+        return talk_main(talk_argv)
 
     if args.cmd == "live":
         live_pl = BOOKBRAIN / "live.pl"
         if not live_pl.exists():
             print(f"missing {live_pl}", file=sys.stderr)
             return 1
-        # exec swipl -q -s bookbrain/live.pl -g live
         cmd = ["swipl", "-q", "-s", str(live_pl), "-g", "live"]
         os.chdir(BOOKBRAIN)
         os.execvp(cmd[0], cmd)

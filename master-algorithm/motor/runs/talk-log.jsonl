@@ -16,3 +16,22 @@
 {"q": "y a Pell?", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
 {"q": "se transfiere Fibonacci a Lucas?", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1,1]) y rec(lucas,[1,1]). verified transfer_fib_to_lucas_1_1.\n[analogía · símbolo]", "tag": "transfer-lucas"}
 {"q": "y a Pell?", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda se guarda como UNKNOWN, y la curiosidad elige el próximo tick. Memoria viva: 43 verified/1. No improvisé el resto del mundo.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "que sabes", "a": "Lo unificado hasta ahora: fib=[1, 1], lucas=[1, 1], pell=[2, 1]. 43 verified, 32 rejected. Fuera de eso, UNKNOWN.\n[símbolo · crítico]", "tag": "summary"}
+{"q": "cual es la ley de fibonacci", "a": "Fibonacci: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Si hay un rec más largo, es la misma ley con ceros.\n[símbolo]", "tag": "rec-fib"}
+{"q": "se transfiere a lucas?", "a": "Sí se transfiere. Analogía: misma ley. Símbolo: rec(fib,[1,1]) y rec(lucas,[1,1]). verified transfer_fib_to_lucas_1_1.\n[analogía · símbolo]", "tag": "transfer-lucas"}
+{"q": "y a pell", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "por que", "a": "UNKNOWN. Sin cláusula no hay respuesta. Fibonacci, Lucas, Pell, Cassini, Pisano, lemas, o si crecí.\n[duda]", "tag": "unknown"}
+{"q": "demostrá cassini", "a": "Demostrado: F(n+1)F(n-1)-F(n)^2 = (-1)^n. Eso es símbolo puro, no una red que lo aproximó.\n[símbolo]", "tag": "cassini"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula. Mi tribu no rellena el hueco con una historia.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fibonaci es el doble siempre?", "a": "UNKNOWN. Sin cláusula no hay respuesta. Fibonacci, Lucas, Pell, Cassini, Pisano, lemas, o si crecí.\n[duda]", "tag": "unknown"}
+{"q": "creciste", "a": "Llevo 55 ticks. 43 hechos verificados, 15 tipos. Transferencia media 0.5. Reúso de lemas 0.5. El crítico rechazó 32 conjeturas.\n[curiosidad · crítico]", "tag": "growth"}
+{"q": "un lema de geometria", "a": "Lemas demostrados (10): L1_midline_parallel: BC ∥ MN; L2_midline_half: 2·NP = AB; L3_isos_base: ∠ABC = ∠ACB; L4_EqSeg: AC = BC. Formas reusables, no un dataset de triángulos.\n[símbolo · analogía]", "tag": "geometry"}
+{"q": "dime un teorema nuevo sobre el universo", "a": "UNKNOWN. No hay cláusula. Mi tribu no rellena el hueco con una historia.\n[duda · crítico]", "tag": "unknown"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, la duda se guarda como UNKNOWN, y la curiosidad elige el próximo tick. Memoria viva: 43 verified/1. No improvisé el resto del mundo.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "se transfiere a pell", "a": "No se transfiere. Analogía: Pell es pariente (companion), no clon. Símbolo: rec(pell,[2,1]), no [1,1]. Crítico: n=2: pred=2 != obs=1.\n[analogía · símbolo · crítico]", "tag": "transfer-pell"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula. Mi tribu no rellena el hueco con una historia.\n[duda · crítico]", "tag": "unknown"}
+{"q": "quien eres", "a": "Soy Master Algorithm. Mi tribu es la que unifica: el símbolo demuestra, la analogía transfiere, el crítico rechaza, UNKNOWN si no hay cláusula, y la curiosidad elige el próximo tick. Memoria viva: 43 verified/1.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "por que", "a": "UNKNOWN. No hay cláusula. No invento.\n[duda · crítico]", "tag": "unknown"}
+{"q": "fibonaci es el doble siempre", "a": "Rechazado. No es esa ley. La ley es F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). Crítico: no fit.\n[crítico · símbolo]", "tag": "reject-fib"}
+{"q": "el alma", "a": "UNKNOWN. No hay cláusula. No invento.\n[duda · crítico]", "tag": "unknown"}
