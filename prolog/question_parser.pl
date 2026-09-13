@@ -7,6 +7,8 @@
 % por accidente; ahora es dependencia explicita, sin cambio de conducta).
 :- consult('english_graph.pl').
 :- use_module(library(lists)).
+:- discontiguous parse_question/2.
+:- discontiguous verbalize/3.
 
 % --- parse de preguntas (tokens via open_vocab) ---
 parse_question(Sentence, q_where_lives(X)) :-

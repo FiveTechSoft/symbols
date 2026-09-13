@@ -1,4 +1,4 @@
-# Roadmap: symbols and relations (honest edition, 2026-09-12)
+# Roadmap: symbols and relations (honest edition, 2026-09-13)
 
 Core doctrine: the map holds only symbols and relations. Meaning is
 never hardcoded: it is read off the live graph (morphology, ranking,
@@ -32,18 +32,45 @@ EXP51 23/23, EXP52 27/27, EXP53 20/20, EXP45 demo 16/16):
   inference 0; gap decomposed exactly (no variables, no backtracking,
   no reverse QA in the QA path).
 
-Chat / BookBrain (new, untracked, verified 2026-09-12):
-- Loads, answers with proofs + chapter refs, learns assertions
-  in-session (loop closed: unknown → taught → answered with proof),
-  with anti-pollution probes (questions never ingested, DELTA=+1 exact).
-- No hardcoded content lexicon: content filter is memory-derived
-  (`bb_content/1`); only closed-class syntax is fixed (`?`, `.`,
-  interrogative/auxiliary guards, commands).
-- KB gate (new, see section 5): `alice.knowledge.pl` FAILS at 22% precision
-  (50-sample, seed 42, Gutenberg grounding + manual review, 2026-09-12).
-  File kept, quarantined: no demos on it until a regeneration passes.
-- Preflight: chat.pl, ask.pl, bookbrain.pl PASS. Project gate still
-  red only on `gaps.pl` (separate WIP).
+Chat / BookBrain (re-measured 2026-09-13, live session + `chat_usable_gate`):
+- Launch: `prolog/chat.bat` → `alice_clean.knowledge.pl` (45 hand-verified
+  facts, 18/18). Bulk `alice.knowledge.pl` stays quarantined (22%).
+- Loop closed: teach SVO (period optional) → ask by live-graph anchors
+  (no WH-word required: `abrio puerta?` → `ana abrio puerta.`) → proof.
+  Gate: `swipl -s chat_usable_gate.pl -g usable_gate -t halt` PASS.
+- Surface is now the triple said aloud (`alice followed white rabbit.`),
+  not a bare name. Glue next to a known entity is dropped (so `The queen
+  threatened alice` no longer stores `the` as subject). Spans join from
+  the live map (`white rabbit` = `white_rabbit`). No new content lexicon.
+- Live probe on alice_clean (2026-09-13, `probe_nl.pl`): she+find,
+  why-did find~found (via, not Yes), more continues the meet triples
+  (not a sorted leftover name), what-about queen is about (outgoing
+  facts), she after about = queen. And-X without a covering triple
+  stays unknown (GAP), not an about dump. parse_svo clash gone
+  (`parse_svo_line`). No new content lexicon: verbs from the live
+  map (pin_rel + unique S-O distance).
+- Still not a natural conversation: irregulars without a unique
+  predicate on that pair stay unknown unless taught (`ate means eat`
+  still the explicit path); long prose still positional-clausal
+  (`fell down the rabbit hole` → `fell_down_rabbit`); answers are
+  SVO, not English morphology. Warning (missing link_grammar binary)
+  on every load.
+- `save` exists (P0b). `gaps.pl` is consulted (C1). `discover` is
+  explicit, not automatic.
+- Preflight chat.pl PASS. Doctrine unchanged: open-class words = 0.
+
+Distance to a functional chat (2026-09-13, judgment, not a gate):
+- The project's own 5-minute demo holds: teach a fact, ask, demand
+  the proof. `chat_usable_gate` PASS. That is the floor, and it is
+  met.
+- A person can hold a short-SVO multi-turn over a curated KB
+  (anaphora, And-X, what-about, more, gaps, autosave, proofs). It
+  talks in triples (`alice eat cake.`), not English. That is a
+  working lab interlocutor, not a product chat.
+- The destination (LLM-like on books/manuals) is still one wall
+  away, and that wall is P2/canonization (Alice regen 2%), not
+  another C-item. C4 is optional. Irregulars without a unique
+  predicate, and long prose, stay unknown or clausal.
 
 ## 2. Destination
 
@@ -98,11 +125,80 @@ walkable.
 
 ## 3. Next steps, in order, each with a gate
 
+Strategy (binding 2026-09-13): **chat-first, knowledge-side
+self-improve, no new word lists, no CHAT-80 grammar.** Every item
+below is accepted only if a live dialogue gets better (or a gate
+proves it does not get worse). Order is value/cost for conversation,
+not research novelty.
+
+C-family (conversation product, now):
+- [x] C0 usable loop (done 2026-09-13): teach without period, ask
+  without WH-list (`graph_ask` pins live rel/ent), SVO surface,
+  glue/spans from the map. Gate: `chat_usable_gate` PASS + live
+  alice_clean (`alice followed white rabbit.`, `The queen…` does
+  not ingest `the`).
+- [x] C1 gap loop (done 2026-09-13): `gaps.pl` wired into chat.pl.
+  UNKNOWN on a '?' stores the surface question (no lexicon: the
+  question IS the data); after a learn, open gaps are retried via
+  `graph_ask`/`chat_form`. Persist `gapfact` with `save`. Gate:
+  `chat_usable_gate` (ask `abrio ventana?` → GAP open 1 → teach →
+  GAP resolved, 0 open) + live `abrio porton?` → taught → answered.
+  DELTA 1→0. No content words added.
+- [x] C2 autosave on quit (done 2026-09-13): `quit`/`EOF` writes
+  `session.knowledge.pl` (gitignored). Gate: live alice_clean quit
+  prints `Saved N facts -> session.knowledge.pl`. P0b command
+  remains for named dumps.
+- [x] C3 DCG surface (done 2026-09-13): `phrase(svo(S,V,O), Toks)`
+  generates and parses. Terminals = live symbols split on `_`
+  (white_rabbit → white rabbit), longest span first when parsing.
+  No content lexicon; `bb_content/1` cut is not used to enumerate
+  (that returned 1 symbol). Gate: `chat_usable_gate` PASS including
+  round-trip `(ana,opened,door)`, `(ana,abrio,puerta)`,
+  `(alice,followed,white_rabbit)`. Preflight clean (`{}/1` avoided:
+  svo/5 is the phrase/2 expansion). Learn path uses parse_svo_line
+  when V is already a live relation (positional.pl keeps
+  parse_svo/2 on token lists).
+- [ ] C4 discover-after-teach (optional, cost follows vocab): after
+  N new `told_rel` of the same relation, offer `discover` or run it
+  capped. Gate: P3 8/8 still green; a live taught composition
+  answers held-out without the user typing `discover`. Explicit
+  remains the default if the cap is expensive.
+
+Not C, still blocking the destination:
+- [ ] P2 BookBrain regen / canonization (RED 2%). C1–C2 are green
+  (2026-09-13): the chat can remember and re-ask, so a better book
+  ingest is no longer wasted. P2 is now the conversation-scale
+  blocker (real text), not a C-item.
+
+Prolog NL material (surveyed 2026-09-13, borrow-check):
+- CHAT-80 (Pereira & Warren 1982; SWI pack `chat80`, MIT, port by
+  Jan Wielemaker): English question → DCG/extraposition grammar →
+  Prolog query → geography DB. Closed lexicon (countries, rivers).
+  Single-shot QA, no learning, no multi-turn. Verdict **BORROW
+  MECHANISM, NOT GRAMMAR**: `phrase/2` is bidirectional (parse and
+  generate). Do **not** import the country list or the closed
+  English subset — that is the opposite of `bb_content/1`. Probe
+  queued: `pack_install(chat80)` + 3 packaged questions, record
+  that it cannot learn a new verb. C3 is that probe's useful
+  residue.
+- DCG (Pereira & Warren 1980; SWI `library(dcg/basics)`,
+  `library(dcg/high_order)`): the native way to say “this triple
+  *is* this sentence” in both directions. Fits C3. No content
+  words in the DCG: terminals come from the live map.
+- ELIZA-in-Prolog / `languages_bot` pack: pattern → canned reply.
+  Rejected (same class as D10-only: UI, not knowledge).
+- Attempto ACE / LogicMOO NLU: controlled English or a kitchen-sink
+  NLU kit. Too much lexicon, too little of our loop. Not borrowed.
+- This repo already: EXP45–49 (`conversation.pl`, `natural_parse.pl`)
+  are scripted dialogues on a closed verb set — mechanism research,
+  not the product. `chat.pl` is the product. Do not merge the EXP
+  verb lists back in.
+
 - [x] P0 — Close the loop (done 2026-09-12): teach → stored →
   answered with proof, anti-pollution verified, preflight clean.
-- [ ] P0b — Session persistence: a `save` command so taught facts
-  survive the session (same memfact/provfact format). Gate: teach,
-  save, reload, ask → same proof.
+- [x] P0b — Session persistence command (done 2026-09-12): `save`
+  / `save Name` dumps memfact/provfact. Gate 1/1. Remaining UX is
+  C2 (autosave on quit).
 - [x] P1 — Curated demo KBs only (done 2026-09-12): `prolog/demo.knowledge.pl`
   (20 hand-verified lexical facts, stem-compatible verbs) passes a
   16-question gate at 17/17 (who/what/did/why + bare why? + honest
@@ -348,6 +444,10 @@ when measured (never assumed); red stays red until re-measured.
 |----|------|-------|---------|
 | P0 loop-1 | teach→ask→proof, 1 fact | green 09-12 | 1/1 |
 | P0b save | same proof after reload | green 09-12 | 1/1 |
+| C0 usable | teach SVO, ask by graph, SVO surface | green 09-13 | `chat_usable_gate` PASS |
+| C1 gaps | UNKNOWN→teach→same Q answered | green 09-13 | 1→0 open |
+| C2 autosave | quit keeps taught facts | green 09-13 | session.knowledge.pl |
+| C3 DCG surface | phrase/2 round-trip, no lexicon | green 09-13 | 3/3 triples |
 | P1 curated KB | 16 questions, all proved | green 09-12 | 17/17 |
 | P2 regen | 50-gate on regenerated KB | RED 09-12 | 1/50 |
 | P3 discover | taught rule answers held-out | green 09-12 | 8/8 |
@@ -370,17 +470,24 @@ when measured (never assumed); red stays red until re-measured.
 | R7 contradiction | surfaced (stored only today) | pending | — |
 | golden-regen | numeric data in golden | pending | — |
 
-**Index: 17/23 = 74% (2026-09-12).**
+**Index: 21/26 = 81% (2026-09-13).** C0–C3 green. Denominator grew (C1–C3 added);
+the drop is accounting, not regression. C0 is the conversation
+floor: a live session that does not beat `chat_usable_gate` does not
+land.
 
-Destination estimate: ~50% (judgment, not a gate; was ~45%: first
-non-embarrassing book chat via curated Alicia). The index counts milestones equally;
-difficulty does not: the pending contain the two hardest problems
-(real-text ingest, golden regen), and the destination itself (books,
-manuals) measures 2–22%, not 73%. What is built — loops, dialogue,
-persistence, QA depth on curated data, gates — is the solid part of a
-product; most of the rest is one wall (un-simplified text) plus
-hardening. Standing commitment: keep measuring everything, report
-misses as data, never move a goalpost silently.
+Destination estimate: ~55% (judgment, not a gate; was ~50% before
+C1–C3 landed). The chat is a short-SVO interlocutor with proofs,
+gaps, and autosave — the 5-minute demo holds. It is not CHAT-80
+and not an LLM. What still moves the destination is P2 (real text)
+and answer morphology, not another dialogue C-item. The index
+counts milestones equally; difficulty does not: the pending
+contain the two hardest problems (real-text ingest, golden regen),
+and the destination itself (books, manuals) measures 2–22%, not
+81%. What is built — loops, dialogue, persistence, QA depth on
+curated data, gates — is the solid part of a product; most of the
+rest is one wall (un-simplified text) plus hardening. Standing
+commitment: keep measuring everything, report misses as data,
+never move a goalpost silently.
 
 Regression floor (any red = stop, regardless of the index):
 suite 36/36 (`ctest --test-dir build-gcc`), eval 87/87, hard ≥38/40,
@@ -440,3 +547,14 @@ map. Counts re-measured per milestone, never assumed down.
   weights, stemming, ILP-pending-check; build learning loop, fuzzy
   layer, sidecars, scale, gates); link_grammar lead for canonization;
   aleph-vs-discover borrow-check queued.
+- 2026-09-13: chat-first strategy rewritten as C-family (C0 done:
+  graph_ask + SVO surface + glue/spans, no content lexicon;
+  C1 gaps → C2 autosave → C3 DCG). CHAT-80 / DCG / ELIZA / ACE
+  surveyed: borrow `phrase/2` bidirectionality, reject closed
+  grammars and canned pattern bots. P2 unblocked once C1–C2
+  green (same day). `chat_usable_gate` is the conversation floor.
+- 2026-09-13: why-did / And-X / what-about / more / about-stack
+  measured on alice_clean (`probe_nl.pl`); verbs from the live
+  map (pin_rel + unique S-O), no content lexicon. Destination
+  estimate ~55%. The remaining chat distance is P2 (2%) and
+  SVO-not-English, not C4.

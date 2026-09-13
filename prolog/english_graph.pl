@@ -36,6 +36,7 @@ tokenize_en(Sentence, Tokens) :-
 
 punct('.'). punct(','). punct(';'). punct(':').
 punct('?'). punct('!').
+punct('¿'). punct('¡').
 empty_string("").
 
 % verb detection on raw tokens (before skip-filtering)

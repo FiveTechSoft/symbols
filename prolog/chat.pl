@@ -9,6 +9,7 @@
 :- consult('english_graph.pl').
 :- consult('positional.pl').
 :- consult('dialog_ref.pl').
+:- consult('gaps.pl').
 
 % Interfaz de datos: la aporta el .knowledge.pl que bb_load/1 consulta en
 % runtime (memfact/5 hechos, provfact/6 provenance). Declarada, no definida.
@@ -71,6 +72,7 @@ bb_content(W) :-
 % Relaciones ensenadas en sesion: candidatas a descubrir (P3). Se siembran
 % en chat_learn y las consume el comando discover. Interfaz propia.
 :- dynamic told_rel/1.
+:- dynamic dialog_last_input/1.
 
 chat(File) :-
     bb_load(File),
@@ -88,11 +90,16 @@ bb_load(File) :-
     retractall(dialog_lastoff(_)),
     retractall(dialog_pending(_, _, _)),
     retractall(dialog_pending_teach(_, _)),
+    retractall(dialog_last_input(_)),
     dialog_reset,
     dialog_reset,
+    retractall(gapfact(_, _, _, _, _)),
+    retractall(gapseq(_)),
     consult(File),
     forall(memfact(S, R, O, W, U), assertz(memory_relation(S, R, O, W, U))),
     forall(provfact(S, R, O, Ref, T, St), assertz(prov(S, R, O, info(Ref, T, St)))),
+    gaps_reset,
+    gap_load,
     memory_size(NF),
     format('Loaded ~w facts from ~w.~n', [NF, File]).
 
@@ -112,6 +119,7 @@ chat_save(Alias) :-
            format(S, 'memfact(~q,~q,~q,~q,~q).~n', [A, R, O, W, U])),
     forall(prov(A, R, O, info(Ref, T, St)),
            format(S, 'provfact(~q,~q,~q,~q,~q,~q).~n', [A, R, O, Ref, T, St])),
+    gap_save(S),
     close(S),
     memory_size(NF),
     format('Saved ~w facts -> ~w~n', [NF, Out]).
@@ -147,18 +155,24 @@ chat_loop :-
     write('> '),
     flush_output,
     catch(read_line_to_string(user_input, L), _, L = end_of_file),
-    ( L == end_of_file -> writeln('Bye.')
+    ( L == end_of_file -> chat_autosave, writeln('Bye.')
     ; gen_tokenize(L, Lower, _),
       exclude(gen_qmark, Lower, T0),
-      ( T0 == [quit] ; T0 == [exit] ; T0 == [bye] ) -> writeln('Bye.')
+      ( T0 == [quit] ; T0 == [exit] ; T0 == [bye] ) ->
+          chat_autosave, writeln('Bye.')
     ; chat_line(L),
       chat_loop
     ).
+
+chat_autosave :-
+    catch(chat_save(session), _, true).
 
 chat_line(L) :-
     catch(chat_line_guarded(L), E, format('UNKNOWN (~w).~n', [E])).
 
 chat_line_guarded(L) :-
+    retractall(dialog_last_input(_)),
+    assertz(dialog_last_input(L)),
     gen_tokenize(L, Lower, _),
     exclude(gen_qmark, Lower, Toks0),
     chat_line_dispatch(L, Toks0).
@@ -201,9 +215,7 @@ is_article(W) :- member(W, [the, a, an]).
 chat_learn_direct(S, V, O) :-
     next_sentence_id(Src),
     remember_tracked(S, V, O, Src, none),
-    format('Learned [~w]: ~w --~w--> ~w.~n', [Src, S, V, O]),
-    chat_note_told(V),
-    chat_set_last(S, V, O).
+    chat_after_learn(Src, S, V, O).
 
 % D4 iniciativa (patron EXP48): asercion de 2 tokens [Sujeto, Verbo]
 % con S conocido y V con familia en memoria = slot objeto ausente. El
@@ -241,9 +253,9 @@ chat_line_tokens(L, Toks, Changed) :-
         chat_known(en)
     ; ( Toks == [quien, conoces] ; Toks == [a, quien, conoces] ) ->
         chat_known(es)
-    ; chat_is_spanish(Toks) -> chat_spanish_help
     ; is_question(L) ->
-        ( dialog_meta_es(Toks) -> true
+        ( dialog_about_book(Toks) -> true
+        ; dialog_meta_es(Toks) -> true
         ; dialog_single_about(Toks) -> true
         ; dialog_ambiguity(Toks, P, Cs) ->
             dialog_clarify(P, Cs),
@@ -258,28 +270,25 @@ chat_line_tokens(L, Toks, Changed) :-
 % sabes / de que trata / protagonistas -> lo conocido). Verbos de
 % contenido en espanol ("quien abrio...") quedan FUERA a proposito:
 % exigen lexico verbal que no existe; responden unknown honesto.
-dialog_meta_es(Toks) :-
-    member(W, Toks),
-    member(W, [sabes, trata, protagonistas]), !,
+% "de que …?" sin anclas: de+que ya son interrogativos cerrados.
+dialog_meta_es([de, que|Rest]) :-
+    Rest \== [],
+    \+ graph_pins([de, que|Rest], _, _), !,
     chat_known(es).
 
-% Libro: de que libro hablamos (conteo + cabezas). Dispara con el
-% medio (libro/book) + sintaxis cerrada; jamas con contenido.
-dialog_book_cmd(Toks) :-
-    member(B, Toks),
-    member(B, [libro, book]),
-    forall(member(W, Toks),
-           member(W, [que, cual, es, el, libro, what, which, is, the,
-                      book, de, trata, habla, hablamos])), !,
-    dialog_book(Toks).
-
-dialog_book(Toks) :-
+% "que X?" y X no vive en el mapa: pregunta por el propio KB.
+dialog_about_book([que, X]) :-
+    \+ bb_content(X),
+    \+ pin_rel(X, _), !,
     memory_size(NF),
-    ( ( member(W, Toks), member(W, [que, cual, libro]) ) ->
-        format('Hablamos de un libro con ~w hechos. ', [NF])
-    ; format('This book holds ~w facts. ', [NF])
-    ),
+    format('Hablamos de un libro con ~w hechos. ', [NF]),
     chat_known(es).
+dialog_about_book([what, X]) :-
+    \+ bb_content(X),
+    \+ pin_rel(X, _), !,
+    memory_size(NF),
+    format('This book holds ~w facts. ', [NF]),
+    chat_known(en).
 
 % D5 entidad suelta con '?': resumen (about). Sin '?' va a learn
 % (D3-abandon intacto: "Madrid" sin '?' sigue unknown).
@@ -344,39 +353,181 @@ chat_learn(L, Toks, Changed) :-
 
 chat_learn_sent(LS, Toks) :-
     ( chat_form(Toks, _, _) -> chat_ask(Toks)
+    ; Toks = [W|_], qlead(W) -> chat_ask(Toks)
     ; dialog_probe_missing(Toks) -> true
     ; learn_sentence(LS, stored(A, V, O, Src)) ->
-        format('Learned [~w]: ~w --~w--> ~w.~n', [Src, A, V, O]),
-        chat_note_told(V),
-        chat_set_last(A, V, O)
+        chat_after_learn(Src, A, V, O)
     ; learn_sentence(LS, stored_identity(X, Y, _)) ->
-        format('Learned: ~w is ~w.~n', [X, Y])
-    ; chat_learn_positional(LS)
+        format('Learned: ~w is ~w.~n', [X, Y]),
+        chat_recheck_gaps
+    ; parse_svo_line(LS, (A, V, O)),
+      memory_relation(_, V, _, _, _) ->
+        next_sentence_id(Src),
+        remember_tracked(A, V, O, Src, none),
+        chat_after_learn(Src, A, V, O)
+    ; chat_learn_positional(Toks)
     ; chat_ask(Toks)
     ).
 
-chat_learn_positional(L) :-
-    ( string(L) -> S = L ; atom_string(L, S) ),
-    sub_string(S, _, _, 0, "."),
-    gen_tokenize(S, T0, _),
-    T0 = [F | _],
+% SVO estructural: el sujeto es el primer token, el objeto el ultimo,
+% la relacion el tramo intermedio. Ya estamos en la via de ensenar
+% (no hay '?' ni interrogativo inicial): el punto es opcional.
+chat_learn_positional(Toks) :-
+    Toks = [F | _],
     \+ qlead(F),
-    positional_triple(T0, A, V, O),
+    \+ novel_short(Toks),
+    positional_triple(Toks, A, V, O),
     next_sentence_id(Src),
     remember_tracked(A, V, O, Src, none),
-    format('Learned [~w]: ~w --~w--> ~w (by structure).~n', [Src, A, V, O]),
-    chat_note_told(V),
-    chat_set_last(A, V, O).
+    chat_after_learn(Src, A, V, O).
 
-% SVO estructural con determinantes fuera SOLO del tramo intermedio:
-% primero = sujeto y ultimo = objeto siempre se conservan ("LA" como
-% objeto en MIEMBRO_DE LA es contenido). Sin tramo -> falla honesto.
+chat_after_learn(Src, A, V, O) :-
+    chat_learned(Src, A, V, O),
+    chat_note_told(V),
+    chat_set_last(A, V, O),
+    chat_recheck_gaps.
+
+% Todos los tokens novel y alguno de longitud <= 2: es glue/clitico,
+% no un nombre (Zorin reaches Oslo sobrevive: todos >= 4).
+novel_short(Toks) :-
+    nl_tokens(Toks, Packed),
+    forall(member(W, Packed), \+ live_symbol(W)),
+    member(W, Packed),
+    atom_length(W, L),
+    L =< 2.
+
+chat_learned(Src, A, V, O) :-
+    surface_sent((A, V, O), Line),
+    format('Learned [~w]: ~w~n', [Src, Line]).
+
+% Hueco = la pregunta en superficie que el mapa no cubrio. Sin lexico:
+% al ensenar se reintenta cada abierta; si ahora hay ancla, se cierra.
+chat_recheck_gaps :-
+    ( gap(_, _, open, _, _) -> gap_recheck(chat_try_question) ; true ).
+
+chat_try_question(Q, Line) :-
+    gen_tokenize(Q, Lower, _),
+    exclude(gen_qmark, Lower, Toks),
+    ( chat_form(Toks, _, Ans), chat_ans_line(Ans, Line)
+    ; graph_ask(Toks, _, Ans), chat_ans_line(Ans, Line)
+    ; es_form(Toks, _, Ans), chat_ans_line(Ans, Line)
+    ),
+    Line \== unknown.
+
+chat_ans_line(answer(_, [T|_]), Line) :-
+    surface_sent(T, Line).
+chat_ans_line(yes((S, V, O)), Line) :-
+    surface_sent((S, V, O), Line).
+chat_ans_line(explanation(S, V, O, _), Line) :-
+    surface_sent((S, V, O), Line).
+
+chat_unknown :-
+    writeln("I don't know."),
+    chat_note_gap.
+
+chat_note_gap :-
+    dialog_last_input(Q),
+    is_question(Q), !,
+    gap_open(Q, chat).
+chat_note_gap.
+
+% SVO tras empaquetar spans del mapa y soltar glue (tokens que el
+% grafo no conoce pegados a una entidad que si). Sin listas: el
+% articulo cae porque no es simbolo; "Zorin" se queda porque el
+% vecino tampoco lo es (nombre novel).
 positional_triple(Toks, A, V, O) :-
-    append([A | Mid], [O], Toks),
+    nl_tokens(Toks, Packed),
+    append([A | Mid], [O], Packed),
     Mid \== [],
-    exclude(is_determiner, Mid, Mid2),
-    Mid2 \== [],
-    atomic_list_concat(Mid2, '_', V).
+    mid_rel(Mid, V).
+
+mid_rel(Mid, V) :-
+    include(bb_content, Mid, Known),
+    Known \== [], !,
+    atomic_list_concat(Known, '_', V).
+mid_rel(Mid, V) :-
+    longest_mid(Mid, V).
+
+longest_mid([H|T], Best) :-
+    atom_length(H, L),
+    longest_mid(T, H, L, Best).
+longest_mid([], B, _, B).
+longest_mid([H|T], Acc, AL, Best) :-
+    atom_length(H, L),
+    ( L > AL -> longest_mid(T, H, L, Best)
+    ; longest_mid(T, Acc, AL, Best)
+    ).
+
+% Empaqueta el tramo mas largo que ya es simbolo vivo (white+rabbit
+% = white_rabbit). Lo que no matchea se deja token a token.
+nl_tokens(Toks, Out) :-
+    span_pack(Toks, Packed),
+    % Tres tokens: el del medio es el hueco de relacion (SVO), aunque
+    % el objeto ya viva en el mapa. Glue solo en tramos mas largos.
+    ( Packed = [A, M, _], \+ qlead(A), \+ qlead(M) -> Out = Packed
+    ; drop_glue(Packed, Out)
+    ),
+    Out \== [].
+
+span_pack([], []).
+span_pack(Toks, [Name|Rest]) :-
+    longest_span(Toks, Name, N),
+    length(Used, N),
+    append(Used, Tail, Toks),
+    span_pack(Tail, Rest).
+
+longest_span(Toks, Name, N) :-
+    length(Toks, Max),
+    try_span(Toks, Max, Name, N).
+
+try_span(Toks, L, Name, L) :-
+    L >= 2,
+    length(Used, L),
+    append(Used, _, Toks),
+    atomic_list_concat(Used, '_', Name),
+    bb_content(Name), !.
+try_span(Toks, L, Name, N) :-
+    L > 1,
+    L1 is L - 1,
+    try_span(Toks, L1, Name, N).
+try_span([W|_], _, W, 1).
+
+% Glue = desconocido pegado a un simbolo conocido. No es lexico:
+% si el mapa no lo tiene, no es ancla.
+drop_glue([], []).
+drop_glue([U], [U]) :- !.
+drop_glue([U|T], Out) :-
+    T \== [],
+    atom_length(U, L), L =< 2, \+ pin_rel(U, _), !,
+    drop_glue(T, Out).
+drop_glue([U|T], Out) :-
+    qlead(U), !,
+    drop_glue(T, Out).
+drop_glue([A, U|T], Out) :-
+    qlead(U), !,
+    drop_glue([A|T], Out).
+drop_glue([U, B|T], Out) :-
+    glue_token(U),
+    \+ pin_rel(U, _),
+    map_entity(B),
+    ( is_determiner(U) ; atom_length(U, L), L =< 2 ), !,
+    drop_glue([B|T], Out).
+drop_glue([A, U, B|T], Out) :-
+    glue_token(U),
+    \+ pin_rel(U, _),
+    bb_content(A),
+    bb_content(B),
+    ( map_entity(A) ; map_entity(B) ), !,
+    drop_glue([A, B|T], Out).
+drop_glue([W|T], [W|R]) :-
+    drop_glue(T, R).
+
+glue_token(W) :- \+ bb_content(W).
+map_entity(W) :-
+    bb_content(W),
+    ( memory_relation(W, _, _, _, _)
+    ; memory_relation(_, _, W, _, _)
+    ).
 
 % Determinantes cerrados EN/ES fuera del SVO estructural (sintaxis;
 % las preposiciones se conservan: portan significado).
@@ -390,24 +541,8 @@ chat_note_told(V) :-
 % auxiliares/interrogativos = sintaxis (como '?' o '.'), nunca lexico
 % de contenido: jamas puede ser sujeto de una declarativa.
 qlead(W) :- member(W, [who,what,when,where,why,how,
-                       did,does,do,is,are,was,were]), !.
-
-% Deteccion de español sin listas: el corpus es ingles ASCII; una entrada
-% con caracteres no-ASCII (tildes, ñ, ¿¡) es casi seguro español.
-% Sin tildes cae a UNKNOWN honesto, sin inventar.
-chat_is_spanish(Toks) :-
-    member(W, Toks),
-    atom_chars(W, Cs),
-    member(C, Cs),
-    char_code(C, N), N > 127, !.
-
-chat_spanish_help :-
-    writeln('De momento solo entiendo preguntas en ingles, porque el libro esta en ingles.'),
-    writeln('Prueba por ejemplo:'),
-    writeln('  Who opened door?'),
-    writeln('  What did footman open?'),
-    writeln('  Why did Alice open door?'),
-    writeln('  Who do you know?').
+                       did,does,do,is,are,was,were,
+                       quien,que,there]), !.
 
 chat_identity(Lang) :-
     memory_size(NF),
@@ -499,17 +634,22 @@ about_entity(Name, Lang) :-
             format('Esto se de ~w (~w hechos):~n', [Name, N])
       ; format('This is what I know about ~w (~w facts):~n', [Name, N])
       ),
-      show_facts(Facts, 8),
+      show_facts(Name, Facts, 8),
       about_sources(Name),
+      % El tema del about es el unico sujeto: she/he recaen ahi
+      % (el mapa lo acaba de describir). D3 sigue vivo fuera de about.
+      dialog_reset,
+      dialog_note([Name], subj),
       chat_set_last(Name, _, _)
     ).
 
-show_facts(_, 0) :- !.
-show_facts([], _) :- !.
-show_facts([(R, O)|T], K) :-
-    format('  - ~w -> ~w~n', [R, O]),
+show_facts(_, _, 0) :- !.
+show_facts(_, [], _) :- !.
+show_facts(N, [(R, O)|T], K) :-
+    surface_sent((N, R, O), Line),
+    format('  ~w~n', [Line]),
     K1 is K - 1,
-    show_facts(T, K1).
+    show_facts(N, T, K1).
 
 % Fuentes de los hechos mostrados (3 primeras con Ref).
 about_sources(Name) :-
@@ -531,12 +671,13 @@ gen_qmark('?').
 chat_help :-
     writeln('who <verb> <obj>? | what did <s> <verb>? | did <s> <verb> <obj>?'),
     writeln('why did <s> <verb> <obj>? | where did <s> <verb>? | when did <s> <verb>?'),
-    writeln('Teach me facts ending with a period: Zorin reaches Oslo.'),
+    writeln('Teach me facts (SVO, period optional): Zorin reaches Oslo.'),
+    writeln('Ask with those same words: "reaches Oslo?" — the map fills the hole.'),
     writeln('he/she/it follow the conversation (one clear antecedent);'),
     writeln('with several antecedents I ask who you mean (answer a name).'),
     writeln('"And Madrid?" continues the last question (evidence or unknown).'),
     writeln('unfinished teaching ("Ana opened.") gets asked back once.'),
-    writeln('En español: ensena "Ana abrio puerta." y pregunta "Quien abrio puerta?".'),
+    writeln('Ensenar es SVO: "Ana abrio puerta". Preguntar: "Quien abrio puerta?".'),
     writeln('more (see the rest of long lists) | how many (count).'),
     writeln('ambiguous pronouns get an honest unknown, never a guess.'),
     writeln('discover [relation] (find rules in what you taught me)'),
@@ -556,7 +697,8 @@ chat_social([how, are, you]) :- !, writeln('I am well. Now ask me anything.').
 chat_why_bare :-
     ( last_fact(S, V, O) ->
         ( proof_for(S, V, O, Proof) ->
-            format('Because: ~w --~w--> ~w.~n', [S, V, O]),
+            surface_sent((S, V, O), Line),
+            format('Because: ~w~n', [Line]),
             chat_sources([(S, V, O)]),
             format('  via ~w~n', [Proof])
         ; writeln("I don't know why.")
@@ -565,8 +707,12 @@ chat_why_bare :-
     ).
 
 chat_ask(Toks) :-
-    ( dialog_has_pronoun(Toks) -> writeln("I don't know.")
+    ( dialog_has_pronoun(Toks) -> chat_unknown
     ; chat_form(Toks, Kind, Ans) ->
+        retractall(dialog_lastq(_)),
+        assertz(dialog_lastq(Toks)),
+        chat_say(Kind, Ans)
+    ; graph_ask(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say(Kind, Ans)
@@ -574,8 +720,186 @@ chat_ask(Toks) :-
         retractall(dialog_lastq(_)),
         assertz(dialog_lastq(Toks)),
         chat_say_es(Kind, Ans)
+    ; length(Toks, 1), Toks = [W],
+      atom_length(W, L), L >= 3,
+      last_fact(_, _, _),
+      \+ graph_pins(Toks, _, _) ->
+        chat_why_bare
+    ; length(Toks, 2),
+      Toks \= [que|_],
+      last_fact(_, _, _),
+      \+ graph_pins(Toks, _, _) ->
+        chat_why_bare
     ; chat_ask_qp(Toks)
     ).
+
+% Pregunta contra el mapa vivo: los tokens que ya son relacion o
+% entidad anclan la consulta; el resto (interrogativos, determinantes,
+% palabras nuevas) es el hueco. Sin listas de contenido: si el grafo
+% no conoce el ancla, falla honesto.
+graph_ask(Toks, say, Ans) :-
+    nl_tokens(Toks, Packed),
+    % why es interrogativo cerrado: no degradar a Yes/No de graph_fill.
+    \+ member(why, Packed),
+    pins_of(Packed, Rels, Ents),
+    graph_fill(Packed, Rels, Ents, Ans).
+
+graph_pins(Toks, Rels, Ents) :-
+    nl_tokens(Toks, Packed),
+    pins_of(Packed, Rels, Ents).
+
+pins_of(Packed, Rels, Ents) :-
+    findall(R, (member(W, Packed), pin_rel(W, R)), R0),
+    sort(R0, Rels),
+    findall(E, (member(W, Packed), pin_ent(W, E)), E0),
+    sort(E0, Ents),
+    ( Rels \== [] ; Ents \== [] ).
+
+pin_rel(W, R) :-
+    bb_rel_forms(W, Rs),
+    member(R, Rs).
+pin_rel(W, R) :-
+    \+ bb_rel_forms(W, _),
+    \+ map_entity(W),
+    fuzzy_rel(W, R).
+
+fuzzy_rel(W, R) :-
+    atom_chars(W, [F|Cs]),
+    length([F|Cs], L),
+    L >= 3,
+    findall(D-Rel, (memory_relation(_, Rel, _, _, _),
+                    atom_chars(Rel, [F|_]),
+                    atom_length(Rel, LR),
+                    abs(LR - L) =< 2,
+                    symbol_dist(W, Rel, D),
+                    D =< 2), DS),
+    keysort(DS, [D0-R|_]),
+    \+ (member(D1-R1, DS), R1 \== R, D1 =:= D0).
+
+% Entidad del mapa que no es relacion: si un token ya es verbo en
+% memoria, ancla como rel (pin_rel), no como objeto accidental.
+pin_ent(W, E) :-
+    \+ pin_rel(W, _),
+    qnorm_atom(W, E),
+    ( memory_relation(E, _, _, _, _)
+    ; memory_relation(_, _, E, _, _)
+    ).
+
+:- discontiguous graph_fill/4.
+graph_fill(_, Rels, [E], answer(Xs, Facts)) :-
+    Rels \== [],
+    findall(S-(S, R, E), (member(R, Rels), memory_relation(S, R, E, _, _)), SF),
+    SF \== [],
+    pack_pins(SF, Xs, Facts).
+graph_fill(_, Rels, [E], answer(Xs, Facts)) :-
+    Rels \== [],
+    findall(O-(E, R, O), (member(R, Rels), memory_relation(E, R, O, _, _)), OF),
+    OF \== [],
+    pack_pins(OF, Xs, Facts).
+graph_fill(Toks, Rels, [], answer(Xs, Facts)) :-
+    Rels \== [],
+    \+ stray_unknown(Toks, Rels),
+    findall(S-(S, R, O), (member(R, Rels), memory_relation(S, R, O, _, _)), SF),
+    SF \== [],
+    pack_pins(SF, Xs, Facts).
+
+% Token que no es interrogativo ni el verbo ancla: un objeto/sujeto
+% novel ("ventana") impide volcar todos los hechos de esa relacion.
+stray_unknown(Toks, Rels) :-
+    member(W, Toks),
+    \+ qlead(W),
+    \+ member(W, Rels),
+    \+ pin_rel(W, _),
+    \+ bb_content(W),
+    atom_length(W, L),
+    L >= 2.
+
+% Desconocido DETRAS del ente: verbo novel (go). Delante (there ana)
+% no bloquea el about.
+stray_after(Packed, E) :-
+    append(_, [E|Rest], Packed),
+    member(W, Rest),
+    \+ qlead(W),
+    \+ bb_content(W),
+    \+ pin_rel(W, _),
+    atom_length(W, L),
+    L >= 2.
+
+% About solo si no queda un verbo novel (L>=3) junto al ente.
+pack_is_about(Packed, E) :-
+    member(E, Packed),
+    forall(member(W, Packed), (W == E ; about_glue(W))).
+
+about_glue(W) :- qlead(W).
+about_glue(W) :- is_determiner(W).
+about_glue(W) :- atom_length(W, L), L =< 2.
+
+% "que paso con X" / "what happened to X": verbo novel + prep corta + ente.
+happened_to(Packed, E) :-
+    append(Prefix, [E], Packed),
+    Prefix \== [],
+    member(P, Prefix),
+    \+ live_symbol(P),
+    atom_length(P, LP), LP =< 3,
+    member(U, Prefix),
+    U \== P,
+    \+ live_symbol(U),
+    atom_length(U, LU), LU >= 3.
+% Un solo ente conocido y un token desconocido cerca (Levenshtein)
+% del UNICO predicado que toca ese ente: ate~eat sobre cake, sin lista.
+graph_fill(Toks, [], [E], answer(Xs, Facts)) :-
+    findall(R, (memory_relation(_, R, E, _, _)
+              ; memory_relation(E, R, _, _, _)), R0),
+    sort(R0, Rs),
+    member(R, Rs),
+    unknown_near(Toks, R),
+    \+ (member(R2, Rs), R2 \== R, unknown_near(Toks, R2)),
+    findall(S-(S, R, E), memory_relation(S, R, E, _, _), SF0),
+    findall(O-(E, R, O), memory_relation(E, R, O, _, _), OF0),
+    append(SF0, OF0, All),
+    All \== [],
+    pack_pins(All, Xs, Facts).
+% Un ente, ninguna relacion anclada, sin objeto novel: son los hechos
+% de ese ente (what did X …? se deduce del mapa, no de un verbo lista).
+graph_fill(Packed, [], [E], answer(Xs, Facts)) :-
+    ( pack_is_about(Packed, E) ; happened_to(Packed, E) ),
+    \+ stray_after(Packed, E),
+    findall(O-(E, R, O), memory_relation(E, R, O, _, _), OF),
+    OF \== [],
+    pack_pins(OF, Xs, Facts).
+
+graph_fill(_, Rels, [A, B], yes((S, R, O))) :-
+    member(R, Rels),
+    ( memory_relation(A, R, B, _, _) -> S = A, O = B
+    ; memory_relation(B, R, A, _, _) -> S = B, O = A
+    ).
+graph_fill(Toks, [], [A, B], yes((S, R, O))) :-
+    findall(Rx, (memory_relation(A, Rx, B, _, _)
+               ; memory_relation(B, Rx, A, _, _)), R0),
+    sort(R0, Rs),
+    member(R, Rs),
+    unknown_near_d(Toks, R, 3),
+    \+ (member(R2, Rs), R2 \== R, unknown_near_d(Toks, R2, 3)),
+    ( memory_relation(A, R, B, _, _) -> S = A, O = B
+    ; S = B, O = A
+    ).
+
+unknown_near(Toks, R) :-
+    unknown_near_d(Toks, R, 2).
+
+unknown_near_d(Toks, R, MaxD) :-
+    member(W, Toks),
+    \+ bb_content(W),
+    \+ qlead(W),
+    atom_length(W, L),
+    L >= 3,
+    symbol_dist(W, R, D),
+    D =< MaxD.
+
+pack_pins(Pairs, Xs, Facts) :-
+    findall(X, member(X-_, Pairs), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, Pairs), Facts).
 
 % D6 formas ES (espejo estructural de chat_form; interrogativos cerrados
 % como '?' y qlead). Sin lexico verbal ES: V debe existir en memoria.
@@ -618,7 +942,8 @@ chat_say_es(say, yes((S, V, O))) :-
 chat_say_es(say, no) :-
     writeln('No.').
 chat_say_es(_, unknown) :-
-    writeln('No lo sé.').
+    writeln('No lo sé.'),
+    chat_note_gap.
 
 % D2 elipsis: "And Madrid?" continua el esqueleto anterior con X en el
 % slot (who/did/why/where/when: ultimo; what: sujeto). Solo formas con
@@ -627,18 +952,37 @@ chat_say_es(_, unknown) :-
 % deja al camino normal (UNKNOWN honesto). Caso especial: who + X
 % persona sin objeto -> verificar candidato (Did X V O?).
 % Tras responder, chat_ask actualiza LastQ: encadena ("And Oslo?").
-dialog_ellipsis([and, X]) :- !, dialog_ell_entity(X).
-dialog_ellipsis([what, about, X]) :- !, dialog_ell_entity(X).
-dialog_ellipsis([how, about, X]) :- !, dialog_ell_entity(X).
+dialog_ellipsis([and|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, continue).
+dialog_ellipsis([y|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, continue).
+dialog_ellipsis([what, about|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, about).
+dialog_ellipsis([how, about|Rest]) :- Rest \== [], !, dialog_ell_span(Rest, about).
 dialog_ellipsis(_) :- fail.
 
-dialog_ell_entity(X) :-
+dialog_ell_span(Rest, Mode) :-
+    nl_tokens(Rest, Packed),
+    Packed = [X],
+    dialog_ell_entity(X, Mode).
+
+% what/how about X: si X tiene hechos salientes, es el tema (el mapa
+% lo dice). Si no, cae a continuar LastQ. And/y siempre continua.
+dialog_ell_entity(X, about) :-
+    qnorm([X], X),
+    memory_relation(X, _, _, _, _),
+    about_entity(X, en), !.
+dialog_ell_entity(X, about) :-
+    dialog_ell_entity(X, continue).
+dialog_ell_entity(X, continue) :-
     qnorm([X], X),
     dialog_lastq(LQ),
-    dialog_ell_build(LQ, X, NewT),
-    ( dialog_probe(NewT) -> chat_ask(NewT)
+    ( dialog_ell_build(LQ, X, NewT), dialog_probe(NewT) -> chat_ask(NewT)
     ; dialog_ell_verify(LQ, X)
-    ).
+    ; lastq_rel(LQ, V), graph_ask([V, X], _, _) -> chat_ask([V, X])
+    ; dialog_ell_build(LQ, X, NewT) -> chat_ask(NewT)
+    ), !.
+
+lastq_rel(LQ, V) :-
+    member(W, LQ),
+    pin_rel(W, V).
 
 % Verificar-candidato: who [who,V,O] + X persona -> Did X V O?
 dialog_ell_verify([who, V, O], X) :-
@@ -646,9 +990,12 @@ dialog_ell_verify([who, V, O], X) :-
     dialog_probe([did, X, V, O]), !,
     chat_ask([did, X, V, O]).
 
-dialog_ell_build([who, V, _O], X, [who, V, X]).
-dialog_ell_build([what, did, _S, V], X, [what, did, X, V]).
-dialog_ell_build([did, S, V, _O], X, [did, S, V, X]).
+dialog_ell_build([who, V, _O], X, [who, V, X]) :-
+    X \== V.
+dialog_ell_build([what, did, _S, V], X, [what, did, X, V]) :-
+    X \== V.
+dialog_ell_build([did, S, V, _O], X, [did, S, V, X]) :-
+    X \== S, X \== V.
 dialog_ell_build([why, did | Mid], X, [why, did | Mid2]) :-
     append(Pre, [_], Mid),
     append(Pre, [X], Mid2).
@@ -658,6 +1005,11 @@ dialog_ell_build([where, did | Mid], X, [where, did | Mid2]) :-
 dialog_ell_build([when, did | Mid], X, [when, did | Mid2]) :-
     append(Pre, [_], Mid),
     append(Pre, [X], Mid2).
+dialog_ell_build(LQ, X, New) :-
+    append(Pre, [_Last], LQ),
+    Pre \== [],
+    \+ member(X, Pre),
+    append(Pre, [X], New).
 
 % Sonda: la forma resuelve con respuestas (yes/no son compuestos con
 % la tripla; no, solo de did, es respuesta cerrada genuina porque las
@@ -667,6 +1019,8 @@ dialog_probe(T) :-
     ; chat_form(T, _, yes(_)) -> true
     ; chat_form(T, _, no) -> true
     ; chat_form(T, _, explanation(_, _, _, _)) -> true
+    ; graph_ask(T, _, answer(Xs2, _)), Xs2 \== []
+    ; graph_ask(T, _, yes(_))
     ).
 
 % X en tier de sujetos (persona candidata a verificar).
@@ -681,7 +1035,7 @@ chat_ask_qp(Toks) :-
     atomic_list_concat(Toks, ' ', S),
     ( parse_question(S, QP), answer_query(QP, Ans) ->
         chat_say_qp(Ans)
-    ; writeln("I don't know.")
+    ; chat_unknown
     ).
 
 chat_say_qp(answer(Xs, retrieved, Facts)) :-
@@ -698,7 +1052,7 @@ chat_say_qp(yes) :- writeln('Yes.').
 chat_say_qp(no) :- writeln('No.').
 chat_say_qp(explanation(S, V, O, Proof)) :-
     chat_say(say, explanation(S, V, O, Proof)).
-chat_say_qp(unknown) :- writeln("I don't know.").
+chat_say_qp(unknown) :- chat_unknown.
 
 cap_list(Xs, K, Show, Rest) :-
     length(Xs, N),
@@ -730,12 +1084,26 @@ remember_proof(_).
 
 % ---- formas ----
 % Sujeto multi-palabra: V = primer token con formas en memoria.
+last_live_ent(Toks, E) :-
+    reverse(Toks, Rev),
+    member(W, Rev),
+    pin_ent(W, E), !.
+
+% Hueco verbal: formas vivas (stem/alias) o, si el par S-O tiene un
+% solo predicado a distancia <= 2, ese (find~found). Sin lista.
 did_split(Mid, S, V, O) :-
-    append(Pre, [V|Post], Mid),
+    nl_tokens(Mid, Packed),
+    append(Pre, [Vw|Post], Packed),
     Pre \== [], Post \== [],
     qnorm(Pre, S),
     qnorm(Post, O),
-    bb_rel_forms(V, _).
+    ( pin_rel(Vw, V), memory_relation(S, V, O, _, _)
+    ; findall(R, memory_relation(S, R, O, _, _), R0),
+      sort(R0, [V]),
+      atom_length(Vw, L), L >= 3,
+      symbol_dist(Vw, V, D), D =< 2
+    ; pin_rel(Vw, V)
+    ).
 
 chat_form([who, V|Rest], say, answer(Xs, Facts)) :-
     qnorm(Rest, O),
@@ -760,25 +1128,20 @@ chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
 chat_form([how, many|Mid], say, count(N)) :-
     append(Pre, [V], Mid),
     Pre \== [],
-    qnorm(Pre, S),
+    last_live_ent(Pre, S),
     bb_rel_forms(V, Rs),
     findall(O, (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), Os0),
     sort(Os0, Os),
     Os \== [],
     length(Os, N).
 chat_form([did|Mid], say, YesNo) :-
-    ( did_split(Mid, S, V, O),
-      bb_rel_forms(V, Rs),
-      member(Vr, Rs),
-      memory_relation(S, Vr, O, _, _) ->
-        YesNo = yes((S, Vr, O))
+    did_split(Mid, S, V, O),
+    ( memory_relation(S, V, O, _, _) -> YesNo = yes((S, V, O))
     ; YesNo = no
     ).
-chat_form([why, did|Mid], say, explanation(S, Vr, O, Proof)) :-
+chat_form([why, did|Mid], say, explanation(S, V, O, Proof)) :-
     did_split(Mid, S, V, O),
-    bb_rel_forms(V, Rs),
-    member(Vr, Rs),
-    proof_for(S, Vr, O, Proof).
+    proof_for(S, V, O, Proof).
 chat_form([where, did|Mid], say, answer(Xs, Facts)) :-
     append(Pre, [V], Mid),
     Pre \== [],
@@ -816,16 +1179,17 @@ chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
 % existir. La respuesta final exige tripla real: lo difuso propone,
 % la evidencia dispone.
 qnorm(Toks, Name) :-
-    findall(W2, (member(W, Toks), qnorm_atom(W, W2)), Ws),
-    Ws \== [],
-    atomic_list_concat(Ws, '_', Name),
-    bb_content(Name).
+    nl_tokens(Toks, Packed),
+    Packed \== [],
+    atomic_list_concat(Packed, '_', Name),
+    bb_content(Name), !.
 qnorm(Toks, Name) :-
     findall(W2, (member(W, Toks), fuzzy_keep(W, W2)), Ws),
     Ws \== [],
     atomic_list_concat(Ws, '_', Name),
     bb_content(Name),
-    format('(assuming ~w)~n', [Name]).
+    \+ member(Name, Toks),
+    !.
 
 % Alias ensenados ("puerta means door"): el mapeo gana al propio
 % token (el mapeo ES el conocimiento; el hecho means sigue consultable
@@ -930,61 +1294,141 @@ bb_stem(W, St) :-
     ).
 
 % ---- salida ----
+:- discontiguous chat_say/2.
 chat_say(say, answer(Xs, Facts)) :-
-    length(Xs, N),
-    ( N =< 5 -> Show = Xs, Rest = 0
-    ; length(Show, 5), append(Show, _, Xs), Rest is N - 5
+    ( Facts \== [] ->
+        cap_list(Facts, 5, Show, Rest),
+        forall(member(T, Show), (surface_sent(T, Line), writeln(Line))),
+        ( Rest == 0 -> true
+        ; format('... (and ~w more)~n', [Rest])
+        ),
+        length(Show, Shown)
+    ; length(Xs, N),
+      ( N =< 5 -> Show = Xs, Rest = 0
+      ; length(Show, 5), append(Show, _, Xs), Rest is N - 5
+      ),
+      atomic_list_concat(Show, ', ', L),
+      ( Rest == 0 -> format('~w.~n', [L])
+      ; format('~w... (and ~w more)~n', [L, Rest])
+      ),
+      length(Show, Shown)
     ),
-    atomic_list_concat(Show, ', ', L),
-    ( Rest == 0 -> format('~w.~n', [L])
-    ; format('~w... (and ~w more)~n', [L, Rest])
-    ),
-    length(Show, Shown),
     retractall(dialog_lastlist(_)),
-    assertz(dialog_lastlist(Xs)),
+    ( Facts \== [] -> assertz(dialog_lastlist(Facts))
+    ; assertz(dialog_lastlist(Xs))
+    ),
     retractall(dialog_lastoff(_)),
     assertz(dialog_lastoff(Shown)),
     chat_remember(Xs, Facts),
     chat_sources(Facts).
 
+% Superficie SVO desde el grafo: los '_' del simbolo son espacios
+% (white_rabbit -> "white rabbit"). Sin lexico extra.
+% C3: la frase ES la tripla. phrase/2 genera y parsea. Los terminales
+% salen del mapa vivo (simbolo partido por '_'), nunca de una lista.
+surface_sent((S, V, O), Line) :-
+    ( phrase(svo(S, V, O), Toks) ->
+        atomic_list_concat(Toks, ' ', Body),
+        atom_concat(Body, '.', Line)
+    ; surface_atom(S, Ss),
+      surface_atom(V, Vs),
+      surface_atom(O, Os),
+      format(atom(Line), '~w ~w ~w.', [Ss, Vs, Os])
+    ).
+
+surface_atom(A, Out) :-
+    atomic_list_concat(Parts, '_', A),
+    atomic_list_concat(Parts, ' ', Out).
+
+parse_svo_line(Line, (S, V, O)) :-
+    gen_tokenize(Line, Toks, _),
+    exclude(gen_qmark, Toks, T0),
+    T0 \== [],
+    phrase(svo(S, V, O), T0).
+
+% phrase/2 llama svo/5 (NT + dos extra). Sin { }/1: el preflight
+% no admite el wrap DCG de llaves, y los terminales siguen saliendo
+% del mapa (span_words), no de una lista.
+svo(S, V, O, A, D) :-
+    map_span(S, A, B),
+    map_span(V, B, C),
+    map_span(O, C, D).
+
+map_span(Sym, A, C) :-
+    span_words(Sym, Ws),
+    dcg_toks(Ws, A, C).
+
+span_words(Sym, Ws) :-
+    nonvar(Sym), !,
+    bb_content(Sym),
+    atomic_list_concat(Ws, '_', Sym).
+span_words(Sym, Ws) :-
+    findall(N-S-W,
+            ( live_symbol(S),
+              atomic_list_concat(W, '_', S),
+              length(W, N) ),
+            All0),
+    sort(All0, All),
+    sort(0, @>=, All, Sorted),
+    member(_-Sym-Ws, Sorted).
+
+% Sin el corte de bb_content/1: hay que enumerar el mapa para parsear.
+live_symbol(S) :- memory_relation(S, _, _, _, _).
+live_symbol(S) :- memory_relation(_, S, _, _, _).
+live_symbol(S) :- memory_relation(_, _, S, _, _).
+
+dcg_toks([W], [W|R], R).
+dcg_toks([W|Rest], [W|T], R) :-
+    dcg_toks(Rest, T, R).
+
 % D7 more: continua la ultima lista plana (las razonadas muestran sus
 % 3 pruebas y ahi terminan: "Nothing more.").
 dialog_more :-
-    dialog_lastlist(Xs),
+    dialog_lastlist(Items),
     dialog_lastoff(K),
-    length(Xs, N),
+    length(Items, N),
     K < N, !,
     Want is min(K + 5, N) - K,
     length(Prefix, K),
-    append(Prefix, Rest, Xs),
+    append(Prefix, Rest, Items),
     length(Show, Want),
     append(Show, _, Rest),
     K2 is K + Want,
-    atomic_list_concat(Show, ', ', L),
-    ( K2 < N -> R is N - K2, format('~w... (and ~w more)~n', [L, R])
-    ; format('~w.~n', [L])
-    ),
+    more_show(Show, K2, N),
     retractall(dialog_lastoff(_)),
     assertz(dialog_lastoff(K2)).
 dialog_more :-
     writeln('Nothing more.').
+
+more_show(Show, K2, N) :-
+    Show = [(_, _, _)|_], !,
+    forall(member(T, Show), (surface_sent(T, Line), writeln(Line))),
+    ( K2 < N -> R is N - K2, format('... (and ~w more)~n', [R]) ; true ).
+more_show(Show, K2, N) :-
+    atomic_list_concat(Show, ', ', L),
+    ( K2 < N -> R is N - K2, format('~w... (and ~w more)~n', [L, R])
+    ; format('~w.~n', [L])
+    ).
 
 % D7 how-many: cuenta objetos distintos de (S, V) (M2 en dialogo).
 chat_say(say, count(N)) :-
     format('~w.~n', [N]).
 chat_say(say, yes((S, V, O))) :-
     writeln('Yes.'),
+    surface_sent((S, V, O), Line),
+    writeln(Line),
     chat_set_last(S, V, O),
     chat_sources([(S, V, O)]).
 chat_say(say, no) :-
     writeln('No.').
 chat_say(say, explanation(S, Vr, O, Proof)) :-
-    format('~w --~w--> ~w.~n', [S, Vr, O]),
+    surface_sent((S, Vr, O), Line),
+    writeln(Line),
     chat_set_last(S, Vr, O),
     format('  via ~w~n', [Proof]),
     chat_sources([(S, Vr, O)]).
 chat_say(_, unknown) :-
-    writeln("I don't know.").
+    chat_unknown.
 
 chat_remember(Xs, Facts) :-
     ( Facts = [(S, V, O)|_] -> chat_set_last(S, V, O)
@@ -998,10 +1442,17 @@ chat_set_last(S, V, O) :-
     dialog_note([S], subj),
     dialog_note([O], obj).
 
-chat_sources([]).
-chat_sources([(S, R, O)|T]) :-
+chat_sources(Facts) :-
+    cap_list(Facts, 5, Show, Rest),
+    chat_sources_show(Show),
+    ( Rest == 0 -> true
+    ; format('  ... (~w more)~n', [Rest])
+    ).
+
+chat_sources_show([]).
+chat_sources_show([(S, R, O)|T]) :-
     ( prov(S, R, O, info(Ref, _, _)) ->
         format('  [~w] ~w --~w--> ~w~n', [Ref, S, R, O])
     ; format('  [noref] ~w --~w--> ~w~n', [S, R, O])
     ),
-    chat_sources(T).
+    chat_sources_show(T).
