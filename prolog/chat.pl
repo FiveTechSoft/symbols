@@ -1460,12 +1460,13 @@ fuzzy_rel(W, R) :-
     atom_chars(W, [F|Cs]),
     length([F|Cs], L),
     L >= 3,
+    MaxD is L // 3,
     findall(D-Rel, (memory_relation(_, Rel, _, _, _),
                     atom_chars(Rel, [F|_]),
                     atom_length(Rel, LR),
                     abs(LR - L) =< 1,
                     symbol_dist(W, Rel, D),
-                    D =< 2), DS),
+                    D =< MaxD), DS),
     keysort(DS, [D0-R|_]),
     \+ (member(D1-R1, DS), R1 \== R, D1 =:= D0).
 
@@ -1609,7 +1610,16 @@ graph_fill(Toks, [], [A, B], yes((S, R, O))) :-
     ).
 
 unknown_near(Toks, R) :-
-    unknown_near_d(Toks, R, 2).
+    member(W, Toks),
+    \+ bb_content(W),
+    \+ qlead(W),
+    atom_length(W, L),
+    L >= 3,
+    MaxD is L // 3,
+    atom_length(R, LR),
+    abs(LR - L) =< 1,
+    symbol_dist(W, R, D),
+    D =< MaxD.
 
 unknown_near_d(Toks, R, MaxD) :-
     member(W, Toks),
