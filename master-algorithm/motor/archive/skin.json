@@ -1,7 +1,7 @@
 {
-  "generation": 12,
-  "n_schema_classes": 16,
-  "n_unlocked": 16,
+  "generation": 13,
+  "n_schema_classes": 17,
+  "n_unlocked": 17,
   "unlocked": [
     "bilinear_schema",
     "bilinear_schema_r4_g4",
@@ -12,6 +12,7 @@
     "bit_circuit_compose",
     "dead_prime",
     "delta_conserv",
+    "form_gate",
     "geo_invent",
     "linrec_scan",
     "modperiod_schema",
@@ -37,8 +38,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 10,
-      "total_reward": 58.17,
+      "n_visits": 11,
+      "total_reward": 57.46,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -81,8 +82,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 6,
-      "total_reward": 2.3999999999999995,
+      "n_visits": 7,
+      "total_reward": 2.2999999999999994,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -147,8 +148,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 6,
-      "total_reward": 2.7800000000000002,
+      "n_visits": 7,
+      "total_reward": 2.1,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -301,7 +302,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 2,
+      "n_visits": 3,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -323,7 +324,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 2,
+      "n_visits": 3,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -345,7 +346,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
+      "n_visits": 2,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -357,6 +358,28 @@
       "unlocked": true,
       "dead_end": false,
       "origin": "mutation:lever_spawn_gen12",
+      "order": 1,
+      "order_max": 4,
+      "coeff_lo": -3,
+      "coeff_hi": 3,
+      "m_max": 4,
+      "m_cap": 12,
+      "r_max": 1,
+      "r_cap": 4,
+      "mut_depth": 1,
+      "mut_cap": 4,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "saturated": false,
+      "ticks_no_new_type": 0,
+      "novelty_bonus": 0.0
+    },
+    "form_gate": {
+      "id": "form_gate",
+      "description": "form-gate: identity \u2260 defining law (carve false analogies)",
+      "unlocked": true,
+      "dead_end": false,
+      "origin": "mutation:lever_spawn_gen13",
       "order": 1,
       "order_max": 4,
       "coeff_lo": -3,
@@ -427,7 +450,11 @@
     "2,-2,1,2",
     "3,-2,-1,1",
     "2,3,-4,-2",
-    "3,-3,3,2"
+    "3,-3,3,2",
+    "-1,1,4,2",
+    "-1,5,0,-2",
+    "3,1,-5,-2",
+    "4,-2,-4,-1"
   ],
   "molt_history": [
     {
@@ -838,6 +865,52 @@
         "transfer_horn"
       ],
       "n_schema_classes": 16
+    },
+    {
+      "generation": 13,
+      "reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema bilinear_schema saturated",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_lever form_gate"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "bit_circuit_compose",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "bit_circuit_compose",
+        "dead_prime",
+        "delta_conserv",
+        "form_gate",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 17
     }
   ]
 }

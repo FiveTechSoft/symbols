@@ -1880,3 +1880,63 @@ rejected('transfer_fib_to_pell_-1_5_0_-2', 'n=4: pred=5 != obs=12').
 rejected('transfer_lucas_to_pell_-1_1_4_2', 'n=4: pred=1 != obs=12').
 % finite fail / dead-end
 rejected('transfer_lucas_to_pell_-1_5_0_-2', 'n=4: pred=5 != obs=12').
+lemma('L5_midline_parallel', Parallel, 'BC ∥ MN').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L5_midline_parallel', 'BC ∥ MN')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d2_s251', 'BC ∥ MN')).
+% verified @ electro/electro_ohm
+verified(fact(electro, electro_ohm, 'electro_ohm_V_eq_IR_n6_s5770', 'V=IR on generated triples (eps)')).
+% finite fail / dead-end
+rejected('electro_ohm_broken_add_s5770', 'V≠I+R (as required)').
+% verified @ astro/astro_kepler_scan
+verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n6', 'T^2/a^3 constant within eps on circular table')).
+% finite fail / dead-end
+rejected('astro_kepler_wrong_exp_n6', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').
+% verified @ loop/loop_pred_scan
+verified(fact(loop, loop_pred_scan, 'loop_pred_dx_eq_action_s9811', 'next_x = x + a (Δ(position)=action) on held-out starts')).
+% finite fail / dead-end
+rejected('loop_pred_ignore_action_s9811', 'finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_double_action_s9811', 'finite fail: x0=-6.0 pred=-4.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_overfit_one_x0_s9811', 'fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0').
+lemma('L6_midline_parallel', Parallel, 'BM ∥ MX4').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L6_midline_parallel', 'BM ∥ MX4')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d3_s257', 'BM ∥ MX4')).
+lemma('L7_EqSeg', EqSeg, 'CN = AN').
+% verified @ geometry/euclid_conjectures
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L7_EqSeg', 'CN = AN')).
+% hypothesis-language skin gen=13
+schema(form_gate, unlocked(true)).
+% learned recurrence on fib
+rec(fib, [0,-1,4,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_-1_4_3', 'fib(n) = (0)*fib(n-1) + (-1)*fib(n-2) + (4)*fib(n-3) + (3)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [1,3,-2,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_3_-2_-2', 'fib(n) = (1)*fib(n-1) + (3)*fib(n-2) + (-2)*fib(n-3) + (-2)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [0,-1,4,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_-1_4_3', 'lucas(n) = (0)*lucas(n-1) + (-1)*lucas(n-2) + (4)*lucas(n-3) + (3)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [1,3,-2,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_3_-2_-2', 'lucas(n) = (1)*lucas(n-1) + (3)*lucas(n-2) + (-2)*lucas(n-3) + (-2)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [4,-5,2,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_4_-5_2_2', 'pell(n) = (4)*pell(n-1) + (-5)*pell(n-2) + (2)*pell(n-3) + (2)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [5,-5,-3,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_5_-5_-3_0', 'pell(n) = (5)*pell(n-1) + (-5)*pell(n-2) + (-3)*pell(n-3) + (0)*pell(n-4)')).
+lemma('L8_midline_parallel', Parallel, 'AB ∥ NP').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L8_midline_parallel', 'AB ∥ NP')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d1_s265', 'AB ∥ NP')).
