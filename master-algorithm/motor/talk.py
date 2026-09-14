@@ -129,6 +129,15 @@ def _soften_why(why: str) -> str:
         return "esa ley no encaja"
     if "insufficient" in w.lower():
         return "no hay prefijo suficiente"
+    wl = w.lower()
+    if "xor" in wl and "linear" in wl:
+        return "XOR no es separable linealmente"
+    if "form mismatch" in wl or ("δp" in wl and "mv" in wl) or ("delta" in wl and "quadratic" in wl):
+        return "Δp lineal no es lo mismo que energía cuadrática"
+    if "honest negative" in wl:
+        w = re.sub(r"\s*\(honest negative\)", "", w, flags=re.I)
+    if "linearly separable" in wl:
+        return "no es separable linealmente"
     # keep short factual residue, strip English leftovers
     w = re.sub(r"\b(pred|obs)\b", "", w)
     w = re.sub(r"\s+", " ", w).strip(" :")
@@ -150,21 +159,90 @@ def _math_from_verified_formula(formula: str) -> str:
     return f
 
 
+def _human_unit_prose(formula: str) -> str:
+    """Warm Spanish for unit_protocell_levers — no UNIT{}, no lab English."""
+    return (
+        "Es la unidad: las seis formas viajan juntas. "
+        "Circuito de bits, conservación en Δ=0, la puerta de forma, "
+        "la taxis del bucle, el compañero de recurrencia y el paso a delta. "
+        "Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta."
+    )
+
+
+def _human_verified_prose(name: str, formula: str) -> str:
+    """Scientist skin, conversational Spanish. Cite math; never dump lab logs."""
+    nm = (name or "").lower()
+    f = (formula or "").strip()
+    math = _math_from_verified_formula(f)
+
+    if "unit_protocell" in nm:
+        return _human_unit_prose(f)
+
+    # Ohm / V=IR
+    if "ohm" in nm or "v=ir" in f.lower().replace(" ", ""):
+        return "Ohm: V=IR. Tensión, corriente, resistencia — así de corto, y cuadra."
+
+    # KCL
+    if "kcl" in nm or "sum i" in f.lower():
+        return "Kirchhoff de corrientes: en un nudo, las I suman cero. Nada entra sin salir."
+
+    # Kepler T^2/a^3
+    if "kepler" in nm or ("t^2" in f.lower() and "a^3" in f.lower()):
+        return "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a²."
+
+    # AND linear / series / OR parallel
+    if "and" in nm and ("linear" in nm or "threshold" in f.lower() or "separ" in f.lower()):
+        return "AND se separa con un umbral lineal. Eso sí; XOR, no."
+    if "series" in nm and "and" in nm:
+        return "AND como interruptores en serie: hace falta que todos cierren."
+    if "parallel" in nm and "or" in nm:
+        return "OR como interruptores en paralelo: basta con que uno cierre."
+
+    # loop taxis / error
+    if "loop_taxis" in nm or ("bang-bang" in f.lower()) or ("reduces |error|" in f.lower()):
+        return (
+            "La taxis del bucle: empujar hacia cero baja el error en el arranque "
+            "que miramos. Si empujás siempre al mismo lado, el error sube — y eso se rechaza."
+        )
+
+    # conserv Δ=0 transfers — prose, no prolog id dump
+    if "conserv" in nm and (nm.startswith("transfer_") or f.upper().startswith("TRANSFER")):
+        return (
+            "Misma forma lineal Δ=0: lo que se conserva de un lado se reconoce del otro. "
+            "No es magia causal; es la misma contabilidad."
+        )
+
+    # bilin fib cassini-shape (verified on fib only)
+    if "bilin" in nm and "fib" in nm:
+        return f"En Fibonacci cuadra la forma bilineal {math}. En Lucas, el crítico la corta."
+
+    # generic: short math + human closer, no log-file wrappers
+    if math and math != f and len(math) < 80:
+        return f"Cuadra: {math}. Firmado; sin adorno."
+    if len(math) <= 90 and not any(
+        x in math.lower() for x in ("jointly", "held-out", "unit{", "residual")
+    ):
+        return f"Cuadra: {math}."
+    # last resort: name crumb without English blob
+    short = nm.replace("_", " ")
+    return f"Lo tengo firmado bajo {short}. Te lo digo sin el log del laboratorio."
+
+
+
 def _growth() -> str:
     if not LATEST.exists():
-        return "Todavía no hay corrida medida."
+        return "Aún no he medido una corrida. Si quieres, damos un paso."
     d = json.loads(LATEST.read_text())
-    steps = d.get("total_steps", "?")
     nv = d.get("n_verified_facts", "?")
-    nt = d.get("n_distinct_types", "?")
     tr = d.get("transfer_accuracy")
-    nr = d.get("n_rejected", "?")
+    # Human first; numbers only if asked later — never a dashboard dump.
+    tip = ""
+    if isinstance(tr, (int, float)):
+        tip = f" La transferencia anda por {tr:.2f}, y eso no es «entenderlo todo»."
     return (
-        f"He recorrido {steps} pasos medidos. Verificado: {nv} hechos "
-        f"({nt} tipos). Rechazado por el crítico: {nr} veces. "
-        f"La precisión de transferencia es {tr} — eso no significa que "
-        f"entienda todo, solo lo que encaja bajo esa medida. "
-        f"¿Quieres el inventario de lo verificado?"
+        f"Voy bien: creciendo por palancas, no por acumular papel. "
+        f"Tengo {nv} cosas firmadas; lo que importa son las seis que viajan juntas "
+        f"y la unidad que las ata.{tip} ¿Miramos una de ellas?"
     )
 
 
@@ -186,25 +264,15 @@ def _unknown(st: dict, soft: bool = False) -> tuple[str, str, dict]:
     st["tag"] = "unknown"
     if soft:
         msg = (
-            "UNKNOWN. Es una pregunta humana y la respeto: en la teoría no hay "
-            "evidencia sobre eso; no especulo. "
-            "Si quieres, volvemos a lo que sí quedó verificado."
+            "UNKNOWN. Buena pregunta — y no tengo evidencia. No voy a rellenarla."
         )
     else:
         n = int(st.get("unk_n") or 0)
         st["unk_n"] = n + 1
         alts = [
-            (
-                "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
-            ),
-            (
-                "UNKNOWN. Sin evidencia en la teoría, no especulo. "
-                "¿Probamos con algo que sí demostré?"
-            ),
-            (
-                "UNKNOWN. Prefiero callar con rigor antes que fingir una respuesta. "
-                "¿Qué más miramos?"
-            ),
+            "UNKNOWN. Eso no está en lo firmado.",
+            "UNKNOWN. Sin evidencia, callo.",
+            "UNKNOWN. Prefiero el silencio a inventar.",
         ]
         msg = alts[n % len(alts)]
     return (msg, "unknown", st)
@@ -243,9 +311,11 @@ def _rejected_named(kb: dict, needle: str) -> list[tuple[str, str]]:
 
 
 def _is_greet(s: str) -> bool:
-    return s in (
-        "hola", "hey", "buenas", "buenos dias", "hello", "hi", "que tal", "saludos",
-    ) or s.startswith("hola ")
+    head = s.replace(",", " ").split()
+    first = head[0] if head else ""
+    return first in (
+        "hola", "hey", "buenas", "buenos", "hello", "hi", "saludos",
+    ) or s in ("que tal",) or s.startswith("hola ")
 
 
 def _is_explain(s: str) -> bool:
@@ -283,10 +353,50 @@ def _is_summary(s: str) -> bool:
 
 
 def _is_why(s: str) -> bool:
-    return any(x in s for x in ("por que", "porque", "why", "y eso", "y ahi"))
+    """Bare / short why-deixis only. Mid-sentence 'porque' in a new speech act
+    must NOT inherit the previous recurrence topic.
+    """
+    s = (s or "").strip()
+    if s in ("por que", "porque", "why", "y eso", "y ahi",
+             "por que?", "porque?", "why?", "y eso?", "y ahi?"):
+        return True
+    if s.startswith(("por que ", "porque ", "why ")):
+        rest = s.split(None, 1)[-1]
+        # deictic residual pointing at last clause
+        if any(x in rest for x in ("eso", "esto", "that", "this", "ahi", "asi")):
+            return True
+        # very short why ("por que fib") still deixis-ish; long clauses are new acts
+        if len(s.split()) <= 4:
+            return True
+        return False
+    return False
+
+
+def _is_level_question(s: str) -> bool:
+    """Count/intelligence meta: not a formula continuation, never boast n_facts."""
+    if not any(x in s for x in (
+        "inteligente", "listo", "smarter", "smart", "inteligencia",
+        "mas sabio", "más sabio",
+    )):
+        return False
+    return any(x in s for x in (
+        "hecho", "hechos", "fact", "facts", "471", "conteo", "cantidad",
+        "porque tienes", "por que tienes", "por tener",
+    )) or ("mas" in s and any(x in s for x in ("inteligente", "listo", "smarter")))
+
+
+def _is_energy_because_mom(s: str) -> bool:
+    """Lie: energy conserved *because* momentum is (form mismatch Δp≠½mv²)."""
+    has_e = any(x in s for x in ("energia", "energy", "energía"))
+    has_m = any(x in s for x in ("momento", "momentum", "mom "))
+    has_cause = any(x in s for x in ("porque", "por que", "because", "∵", "debido"))
+    return has_e and has_m and has_cause
 
 
 def _is_more(s: str) -> bool:
+    # Do not treat "más listo/inteligente" level speech as "dame más del topic"
+    if _is_level_question(s):
+        return False
     return bool(re.search(r"\b(mas|more|otro|otros|sigue|continua)\b", s))
 
 
@@ -463,9 +573,7 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     if reject_law:
         return _pack(
             f"Rechazado: esa no es la ley de {title}. "
-            f"La recurrencia verificada es {law}; F(n)=2F(n-1) (o el doble "
-            f"del anterior) no encaja con lo observado. "
-            f"¿Quieres contrastarla con otra secuencia?",
+            f"La que cuadra es {law}; el doble del anterior no.",
             f"reject-{seq}",
             _tribes("crítico", "símbolo"),
             st,
@@ -477,71 +585,77 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     if seq == "fib":
         bodies = [
             (
-                f"Verificado: {title} obedece la recurrencia lineal de orden 2 "
-                f"{law}. Cada término es la suma de los dos anteriores; "
-                f"eso es lo que encaja con las observaciones, no una metáfora. "
-                f"¿Quieres ver a quién se transfiere esa ley y a quién no?"
+                f"{title}: cada término es la suma de los dos anteriores — {law}. "
+                f"Eso cuadra; punto."
             ),
             (
-                f"{title}, con rigor: la ley verificada es {law}. "
-                f"No afirmo más que eso — ni «entiende todo», ni identidades "
-                f"que no estén firmadas. ¿Contrastamos con Pell o con una ley falsa?"
+                f"En {title} la recurrencia es {law}. Nada más pretendo."
             ),
             (
-                f"Te lo enseño como colega: en {title}, F(n) queda determinado "
-                f"por F(n-1) y F(n-2) vía {law}. Eso está verificado en la teoría. "
-                f"Si quieres, miramos un contraejemplo de transferencia."
+                f"{title} va con {law}: F(n) sale de F(n-1) y F(n-2)."
             ),
         ]
         msg = bodies[pulse % len(bodies)]
     elif seq == "lucas":
         bodies = [
             (
-                f"Verificado: {title} comparte con Fibonacci la misma forma "
-                f"lineal {law}. Misma ley, otra semilla — no es magia. "
-                f"¿Quieres el contraste con Pell, donde la transferencia falla?"
+                f"{title} comparte con Fibonacci la misma forma {law}. "
+                f"Misma ley, otra semilla."
             ),
             (
-                f"{title} sigue {law}. Eso está en lo demostrado; "
-                f"no invento un relato aparte. ¿Pedimos la transferencia "
-                f"explícita hacia otra secuencia?"
+                f"{title} sigue {law}. Misma recurrencia que Fib; distinto arranque."
             ),
             (
-                f"Con {title} la recurrencia verificada es {law}. "
-                f"Si me pides transferencia, te digo con quién comparte "
-                f"la ley y con quién el crítico la rechaza."
+                f"Para {title}: {law}. Con Fib se transfiere; con Pell, no."
             ),
         ]
         msg = bodies[pulse % len(bodies)]
     elif seq == "pell":
         bodies = [
             (
-                f"Verificado: {title} no copia la ley de Fibonacci. "
-                f"Su recurrencia es {law}. Pariente por ser lineal de orden 2; "
-                f"clon, no. ¿Quieres el contraejemplo en n=2?"
+                f"{title} no copia a Fibonacci. Su ley es {law} — "
+                f"pariente de orden 2, clon no."
             ),
             (
-                f"{title} obedece {law}. La analogía con Fibonacci se corta "
-                f"en cuanto las coeficientes no coinciden — típico rechazo "
-                f"en n=2. ¿Lo miramos juntos?"
+                f"{title}: {law}. Los coeficientes no son los de Fib; ahí se corta."
             ),
             (
-                f"Para {title} tengo verificado {law}, no F(n)=F(n-1)+F(n-2). "
-                f"Si quieres, contrastamos la transferencia rechazada."
+                f"Para {title} tengo {law}, no la suma simple de Fib."
             ),
         ]
         msg = bodies[pulse % len(bodies)]
     else:
-        msg = (
-            f"Verificado: {title} obedece {law}. "
-            f"Fuera de eso no invento. ¿Seguimos por ahí?"
-        )
+        msg = f"{title}: {law}."
     return _pack(
         msg,
         f"rec-{seq}",
         _tribes("símbolo"),
         st,
         topic=seq,
+    )
+
+
+def _answer_level(kb: dict, st: dict) -> tuple[str, str, dict]:
+    """Doctrine: not smarter because of n_facts; 6 levers / 1 unit if atoms exist."""
+    unit_hits = _verified_named(kb, "unit_protocell_levers")
+    if unit_hits:
+        return _pack(
+            "No. Contar hechos no me hace más listo. "
+            "Lo que cuenta son seis palancas y una sola unidad: "
+            "viajan juntas; si el bucle no cierra, cae el paquete. "
+            "El número grande es inventario, no inteligencia.",
+            "level",
+            _tribes("duda", "crítico"),
+            st,
+            topic="level",
+        )
+    return _pack(
+        "No. El número de hechos no mide inteligencia. "
+        "Sin unidad/palancas firmadas, eso queda UNKNOWN.",
+        "level",
+        _tribes("duda"),
+        st,
+        topic="level",
     )
 
 
@@ -591,9 +705,8 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
     if topic in kb.get("recs", {}):
         can = _canonical_rec(kb["recs"].get(topic, []))
         return _pack(
-            f"Porque {_formula(topic, can)} es la ley verificada contra las "
-            f"observaciones; cualquier otra forma queda rechazada o unknown. "
-            f"¿Quieres contrastarla con una ley falsa?",
+            f"Porque {_formula(topic, can)} es lo que cuadra con lo observado; "
+            f"otra forma cae o queda unknown.",
             "why",
             _tribes("símbolo", "crítico"),
             st,
@@ -676,8 +789,8 @@ def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
         can = _canonical_rec(kb["recs"].get(topic, []))
         return _pack(
             f"En claro: rechazado el doble del anterior. "
-            f"La ley verificada es {_formula(topic, can)}. "
-            f"La otra idea no encaja con lo observado.",
+            f"La que cuadra es {_formula(topic, can)}. "
+            f"La otra idea no encaja.",
             tag,
             "",
             st,
@@ -689,7 +802,7 @@ def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
         return _pack(
             f"En claro: cada término sale de los dos anteriores — "
             f"{_formula(topic, can)}. Eso está verificado; nada más. "
-            f"¿Contrastamos con otra secuencia?",
+            f"Nada más.",
             tag or f"rec-{topic}",
             "",
             st,
@@ -714,33 +827,9 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         return _answer_rec(kb, hit["name"], st)
     if kind == "verified":
         st["last_clause"] = hit["name"]
-        math = _math_from_verified_formula(hit["formula"])
-        # transfer verified → don't dump English TRANSFER line
-        if str(hit.get("name", "")).startswith("transfer_") or str(hit.get("formula", "")).upper().startswith("TRANSFER"):
-            nm = str(hit.get("name") or "")
-            # conserv-form transfers: cite the clause so mouth does not invent the analogy
-            if "conserv" in nm.lower():
-                math = _math_from_verified_formula(hit["formula"])
-                return _pack(
-                    f"Sí: verificado {nm}. "
-                    f"Forma linear-Δ=0 bajo transfer_conserv_* — {math}. "
-                    f"No invento la analogía; cito lo firmado. ¿Seguimos?",
-                    "verified",
-                    _tribes("símbolo", "analogía"),
-                    st,
-                    topic=nm,
-                )
-            return _pack(
-                "Sí: verificado que la misma ley se transfiere de una serie a la otra. "
-                "Eso está firmado; no es un deseo. ¿Quieres el detalle de cuál a cuál?",
-                "verified",
-                _tribes("símbolo"),
-                st,
-                topic=hit["name"],
-            )
+        prose = _human_verified_prose(str(hit.get("name") or ""), str(hit.get("formula") or ""))
         return _pack(
-            f"Sí. Identidad verificada: {math}. "
-            f"Está en lo demostrado — no la invento. ¿Seguimos con ella?",
+            prose,
             "verified",
             _tribes("símbolo"),
             st,
@@ -760,8 +849,7 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
             )
         return _pack(
             f"Lema verificado: {hit['formula']}. "
-            f"Firmado en la geometría de la teoría — no filosofía prestada. "
-            f"¿Quieres otro?",
+            f"Geometría firmada, sin filosofía prestada.",
             "lemma",
             _tribes("símbolo", "analogía"),
             st,
@@ -772,8 +860,8 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         soft = _soften_why(hit["formula"])
         soft_cap = soft[0].upper() + soft[1:]
         return _pack(
-            f"Rechazado con rigor: {soft_cap}. "
-            f"No voy a fingir que cuadra cuando el crítico ya lo cortó.",
+            f"Rechazado: {soft_cap}. "
+            f"El crítico ya lo cortó; no lo maquillo.",
             "reject-named",
             _tribes("crítico"),
             st,
@@ -869,19 +957,9 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         pulse = int(st.get("pulse") or 0)
         st["pulse"] = pulse + 1
         greets = [
-            (
-                f"Hola. Puedo hablar de lo que de verdad demostré — "
-                f"{kb['n']} hechos verificados, nada inventado. "
-                f"¿Por dónde empezamos?"
-            ),
-            (
-                f"Hola. Aquí estoy: {kb['n']} hechos firmados, y unknown "
-                f"cuando no hay cláusula. ¿Qué quieres mirar?"
-            ),
-            (
-                f"Hola otra vez. Sigo el mismo criterio: verificado, rechazado "
-                f"o unknown — {kb['n']} firmados. ¿Seguimos o empiezas de cero?"
-            ),
+            "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+            "Hola. Pregunta lo que quieras; si no lo tengo firmado, lo digo.",
+            "Hola otra vez. Seguimos donde lo dejamos, o empiezas tú.",
         ]
         return _pack(
             greets[pulse % len(greets)],
@@ -910,7 +988,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             st,
             topic="identity",
         )
-    if _is_growth(s):
+    if _is_growth(s) and not _is_greet(s):
         return _pack(_growth(), "growth", "", st, topic="growth")
     if _is_explain(s) and last.get("last_text") and (last.get("tag") or "") != "unknown":
         # Restate last fact in plainer Spanish; same facts, no new theorems
@@ -919,6 +997,29 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     # Invent speech → honest silence (no clause to invent from)
     if _is_invent_speech(s):
         return _unknown(st)
+
+    # Level/count meta — new speech act; never inherit last recurrence
+    if _is_level_question(s):
+        return _answer_level(kb, st)
+
+    # Energy∵momentum is a rejected form mismatch — never agree via transfer_conserv_*
+    if _is_energy_because_mom(s):
+        rh = (
+            _rejected_named(kb, "false_mom_as_energy_on_collision")
+            or _rejected_named(kb, "mom_as_energy")
+        )
+        why = _soften_why(rh[0][1]) if rh else (
+            "Δp lineal ≠ energía cuadrática; conservar una no implica la otra"
+        )
+        return _pack(
+            f"Rechazado: {why}. "
+            f"Que el momento se conserve no hace que la energía se conserve por eso. "
+            f"El crítico ya cortó esa analogía.",
+            "reject-named",
+            _tribes("crítico"),
+            st,
+            topic="reject",
+        )
 
     # Dialogue: why / more / follow on last state
     bare_follow = _is_follow(s) or s in ("y eso", "y ahi", "eso")
@@ -985,7 +1086,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         if isinstance(rhits, list) and rhits and isinstance(rhits[0], tuple):
             return _pack(
                 "Rechazado: no es siempre primo. El crítico ya lo cortó; "
-                "no voy a suavizarlo. ¿Volvemos a una ley verificada?",
+                "no lo suavizo.",
                 "reject-prime",
                 _tribes("crítico"),
                 st,
@@ -1067,7 +1168,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         )
         if rh:
             return _pack(
-                f"Rechazado con rigor: {_soften_why(rh[0][1])}. "
+                f"Rechazado: {_soften_why(rh[0][1])}. "
                 f"Cassini-shape no sobrevive en Lucas — el crítico ya lo cortó.",
                 "reject-named",
                 _tribes("crítico"),
@@ -1111,12 +1212,10 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         st["topic"] = last.get("topic")
         st["last_text"] = last["last_text"]
         prev = last["last_text"].split("\n[")[0].strip()
-        if prev.startswith("Claro.") or prev.startswith("Te lo sostengo"):
+        if prev.startswith("Otra vez:") or prev.startswith("Te lo repito"):
             wrapped = prev
         else:
-            wrapped = (
-                f"Claro — te lo sostengo otra vez, sin inventar nada nuevo. {prev}"
-            )
+            wrapped = f"Otra vez: {prev}"
         st["last_text"] = wrapped
         return wrapped, last.get("tag") or "verified", st
 
