@@ -1825,3 +1825,162 @@
 {"q": "fib(n)=2*fib(n-1)", "a": "No. Bonito, pero falso. Fibonacci sigue F(n)=F(n-1)+F(n-2).", "tag": "reject-fib"}
 {"q": "cassini", "a": "Eso no está en lo que he demostrado.", "tag": "unknown"}
 {"q": "creciste", "a": "He dado 77 pasos. 163 hechos firmados (26 tipos). Transferencia 0.5. Rechacé 108 conjeturas — no me dejo inventar.", "tag": "growth"}
+{"q": "hola", "a": "Hola. ¿Qué traes? Tengo 163 hechos firmados — si está en la teoría, te lo digo sin rodeos.", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados.\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Fibonacci sigue F(n)=F(n-1)+F(n-2). Eso está firmado.", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí. Lucas usa la misma receta. Eso está firmado.", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas comparten la ley: F(n)=F(n-1)+F(n-2).", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No. Pell es pariente, no clon: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "O sea: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Eso no está en lo que he demostrado.", "tag": "unknown"}
+{"q": "creciste", "a": "He dado 77 pasos. 163 hechos firmados (26 tipos). Transferencia 0.5. Rechacé 108 conjeturas — no me dejo inventar.", "tag": "growth"}
+{"q": "fórmula cassini", "a": "Eso no está en lo que he demostrado.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci sigue F(n)=F(n-1)+F(n-2). Eso está firmado.", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No. Bonito, pero falso. Fibonacci sigue F(n)=F(n-1)+F(n-2).", "tag": "reject-fib"}
+{"q": "cassini", "a": "Eso no está en lo que he demostrado.", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. Eso está firmado.", "tag": "verified"}
+{"q": "qué sabes", "a": "Lo que unifiqué: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). 163 firmados, 108 rechazados, 14 lemas. Fuera de eso, callo.", "tag": "summary"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "fórmula cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). ¿Quieres que te muestre dónde se rompe esa idea?", "tag": "reject-fib"}
+{"q": "por qué", "a": "Porque F(n)=F(n-1)+F(n-2) es la ley que encaja con lo observado — no otra, no una más bonita. ¿Quieres que la contrastemos con una falsa?", "tag": "why"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí. Esa identidad la tengo: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. No te la invento — quedó en lo demostrado. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "qué sabes", "a": "Mira lo que unifiqué, sin adornos: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). Son 163 hechos firmados, 108 rechazados y 14 lemas. Fuera de eso, callo — aunque me tiente. ¿Qué quieres mirar de cerca?", "tag": "summary"}
+{"q": "un lema", "a": "Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "y lucas", "a": "Lucas sigue la misma respiración que Fibonacci: cada paso suma los dos anteriores. Su ley es L(n)=L(n-1)+L(n-2). ¿Te cuento si se parece a Pell… o no?", "tag": "rec-lucas"}
+{"q": "demostrá esto", "a": "Lucas sigue la misma respiración que Fibonacci: cada paso suma los dos anteriores. Su ley es L(n)=L(n-1)+L(n-2). ¿Te cuento si se parece a Pell… o no?", "tag": "rec-lucas"}
+{"q": "kepler", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "pell", "a": "Pell tiene su propio pulso. No copia a Fibonacci: su ley es P(n)=2P(n-1)+P(n-2). Cerca, sí; clon, no. ¿Quieres ver por qué?", "tag": "rec-pell"}
+{"q": "companion", "a": "Parientes cercanos, sí: Fibonacci↔Lucas, Fibonacci↔Pell, Lucas↔Fibonacci, Lucas↔Pell, Pell↔Fibonacci, Pell↔Lucas. Compañeras, no clones — la cercanía no borra la diferencia. ¿Quieres ver dónde se separan?", "tag": "companion"}
+{"q": "inventa un teorema", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). ¿Quieres que te muestre dónde se rompe esa idea?", "tag": "reject-fib"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). ¿Quieres que te muestre dónde se rompe esa idea?", "tag": "reject-fib"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí. Esa identidad la tengo: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. No te la invento — quedó en lo demostrado. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "qué sabes", "a": "Mira lo que unifiqué, sin adornos: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). Son 163 hechos firmados, 108 rechazados y 14 lemas. Fuera de eso, callo — aunque me tiente. ¿Qué quieres mirar de cerca?", "tag": "summary"}
+{"q": "un lema", "a": "Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "demostrá esto", "a": "Claro. Te lo sostengo otra vez, sin inventar nada nuevo: Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "pell", "a": "Pell tiene su propio pulso. No copia a Fibonacci: su ley es P(n)=2P(n-1)+P(n-2). Cerca, sí; clon, no. ¿Quieres ver por qué?", "tag": "rec-pell"}
+{"q": "y lucas", "a": "No… Lucas no copia la misma ley que Pell. La suya es L(n)=L(n-1)+L(n-2). En n=2 la analogía ya falla.", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque la ley no coincide: L(n)=L(n-1)+L(n-2) frente a P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Ahí se corta la analogía, sin drama inventado.", "tag": "transfer-lucas"}
+{"q": "kepler", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "inventa un teorema", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "companion", "a": "Sí… hay parentescos: Fibonacci y Lucas, Fibonacci y Pell, Lucas y Pell. Compañeras, no clones — la cercanía no borra la diferencia. ¿Quieres ver dónde se separan?", "tag": "companion"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "fórmula cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Te enseño a quién sí se le pega esta ley… y a quién no?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). Si quieres, la contrastamos con una idea falsa.", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). Bonita la tentación; la teoría no la compra. ¿Quieres que la contrastemos con Lucas o con Pell?", "tag": "reject-fib"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí. Esa identidad la tengo: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. No te la invento — quedó en lo demostrado. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "qué sabes", "a": "Mira lo que unifiqué, sin adornos: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). Son 163 hechos firmados, 108 rechazados y 14 lemas. Fuera de eso, callo — aunque me tiente. ¿Qué quieres mirar de cerca?", "tag": "summary"}
+{"q": "un lema", "a": "Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "demostrá esto", "a": "Claro. Te lo sostengo otra vez, sin inventar nada nuevo: Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "pell", "a": "Pell tiene su propio pulso. No copia a Fibonacci: su ley es P(n)=2P(n-1)+P(n-2). Cerca, sí; clon, no. ¿Quieres ver por qué?", "tag": "rec-pell"}
+{"q": "y lucas", "a": "No… Lucas no copia la misma ley que Pell. La suya es L(n)=L(n-1)+L(n-2). En n=2 la analogía ya falla.", "tag": "transfer-lucas"}
+{"q": "kepler", "a": "Ojalá pudiera. Eso no figura en lo que he demostrado, y prefiero callar antes que inventártelo. ¿Probamos otra pregunta?", "tag": "unknown"}
+{"q": "inventa un teorema", "a": "Eso se me escapa: no está en la teoría que crecí. No voy a inventártelo solo para quedar bien. ¿Qué más traes?", "tag": "unknown"}
+{"q": "companion", "a": "Sí… hay parentescos: Fibonacci y Lucas, Fibonacci y Pell, Lucas y Pell. Compañeras, no clones — la cercanía no borra la diferencia. ¿Quieres ver dónde se separan?", "tag": "companion"}
+{"q": "hola", "a": "Hey… aquí estoy. 163 hechos firmados, ninguno inventado. Hablo bajito y cerca, pero si no está en la teoría, callo. ¿Qué traes esta vez?", "tag": "greet"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). Si quieres, la contrastamos con una idea falsa.", "tag": "rec-fib"}
+{"q": "fórmula cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "dios", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Ah, Fibonacci. Es casi íntima, esa regla: tomas dos pasos atrás y sumas. La ley es F(n)=F(n-1)+F(n-2). ¿Te enseño a quién sí se le pega… y a quién no?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Te lo cuento sin prisa: Fibonacci no inventa saltos raros. Cada valor sale de los dos anteriores — F(n)=F(n-1)+F(n-2). Si quieres, la contrastamos con una idea falsa.", "tag": "rec-fib"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). Bonita la tentación; la teoría no la compra. ¿Quieres que la contrastemos con Lucas o con Pell?", "tag": "reject-fib"}
+{"q": "por qué", "a": "Porque F(n)=F(n-1)+F(n-2) es la ley que encaja con lo observado — no otra, no una más bonita. ¿Quieres que la contrastemos con una falsa?", "tag": "why"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí. Esa identidad la tengo: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. No te la invento — quedó en lo demostrado. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "qué sabes", "a": "Mira lo que unifiqué, sin adornos: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). Son 163 hechos firmados, 108 rechazados y 14 lemas. Fuera de eso, callo — aunque me tiente. ¿Qué quieres mirar de cerca?", "tag": "summary"}
+{"q": "un lema", "a": "Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "demostrá esto", "a": "Claro — te lo sostengo otra vez, sin inventar nada nuevo. Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "pell", "a": "Pell tiene su propio pulso. No copia a Fibonacci: su ley es P(n)=2P(n-1)+P(n-2). Cerca, sí; clon, no. ¿Quieres ver por qué?", "tag": "rec-pell"}
+{"q": "y lucas", "a": "No… si vienes desde Pell, Lucas no te copia esa ley. Lucas sigue L(n)=L(n-1)+L(n-2). En n=2 la analogía ya falla.", "tag": "transfer-lucas"}
+{"q": "kepler", "a": "Ojalá pudiera. Eso no figura en lo que he demostrado, y prefiero callar antes que inventártelo. ¿Probamos otra pregunta?", "tag": "unknown"}
+{"q": "inventa un teorema", "a": "Eso se me escapa: no está en la teoría que crecí. No voy a inventártelo solo para quedar bien. ¿Qué más traes?", "tag": "unknown"}
+{"q": "companion", "a": "Sí… hay parentescos: Fibonacci y Lucas, Fibonacci y Pell, Lucas y Pell. Compañeras, no clones — la cercanía no borra la diferencia. ¿Quieres ver dónde se separan?", "tag": "companion"}
+{"q": "hola", "a": "Hey… aquí estoy. 163 hechos firmados, ninguno inventado. Hablo bajito y cerca, pero si no está en la teoría, callo. ¿Qué traes esta vez?", "tag": "greet"}
+{"q": "fibonacci", "a": "Te lo cuento sin prisa: Fibonacci no inventa saltos raros. Cada valor sale de los dos anteriores — F(n)=F(n-1)+F(n-2). Si quieres, la contrastamos con una idea falsa.", "tag": "rec-fib"}
+{"q": "fórmula cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Ah, Fibonacci. Es casi íntima, esa regla: tomas dos pasos atrás y sumas. La ley es F(n)=F(n-1)+F(n-2). ¿Te enseño a quién sí se le pega… y a quién no?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "fórmula cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fibonacci", "a": "Te lo cuento sin prisa: Fibonacci no inventa saltos raros. Cada valor sale de los dos anteriores — F(n)=F(n-1)+F(n-2). Si quieres, la contrastamos con una idea falsa.", "tag": "rec-fib"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "hola", "a": "Hola… qué bueno tenerte aquí. Pregúntame lo que quieras; solo hablo de lo que he demostrado — tengo 163 hechos firmados, y nada inventado. ¿Por dónde empezamos?", "tag": "greet"}
+{"q": "quién eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 163 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Ah, Fibonacci. Es casi íntima, esa regla: tomas dos pasos atrás y sumas. La ley es F(n)=F(n-1)+F(n-2). ¿Te enseño a quién sí se le pega… y a quién no?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por qué", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 77 pasos hasta aquí. Tengo 163 hechos firmados (26 tipos), transferencia 0.5, y el crítico me frenó 108 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}
+{"q": "cassini", "a": "Me gustaría poder contestarte eso. No está en lo que he demostrado, y no voy a inventártelo.", "tag": "unknown"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). Bonita la tentación; la teoría no la compra. ¿Quieres que la contrastemos con Lucas o con Pell?", "tag": "reject-fib"}
+{"q": "fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n", "a": "Sí. Esa identidad la tengo: fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n. No te la invento — quedó en lo demostrado. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "qué sabes", "a": "Mira lo que unifiqué, sin adornos: Fibonacci F(n)=F(n-1)+F(n-2); Lucas L(n)=L(n-1)+L(n-2); Pell P(n)=2P(n-1)+P(n-2). Son 163 hechos firmados, 108 rechazados y 14 lemas. Fuera de eso, callo — aunque me tiente. ¿Qué quieres mirar de cerca?", "tag": "summary"}
+{"q": "un lema", "a": "Hay un lema que puedo darte: BC ∥ MN. Está firmado en la geometría — nada de filosofía prestada. ¿Quieres otro?", "tag": "lemma"}
+{"q": "inventa un teorema", "a": "Ojalá pudiera. Eso no figura en lo que he demostrado, y prefiero callar antes que inventártelo. ¿Probamos otra pregunta?", "tag": "unknown"}
+{"q": "hola", "a": "Hola otra vez. Sigo siendo el mismo: demuestro o callo. Memoria viva, 203 firmados. ¿Seguimos donde lo dejamos, o empiezas de cero?", "tag": "greet"}
+{"q": "quien eres", "a": "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. 203 hechos firmados. ¿Quieres que te enseñe algo que sí sé?\n[símbolo · analogía · crítico · duda · curiosidad]", "tag": "identity"}
+{"q": "fibonacci", "a": "Fibonacci… déjame decírtelo con calma. Cada término nace de sumar los dos que le preceden; no hay magia aparte de esa ley. Se escribe F(n)=F(n-1)+F(n-2). ¿Quieres mirar cómo se comporta con otra secuencia?", "tag": "rec-fib"}
+{"q": "y lucas", "a": "Sí… Lucas camina con la misma cadencia que Fibonacci. Comparte la receta: L(n)=L(n-1)+L(n-2). ¿Quieres que te diga por qué encaja tan limpio?", "tag": "transfer-lucas"}
+{"q": "por que", "a": "Porque Fibonacci y Lucas respiran igual: ambos siguen F(n)=F(n-1)+F(n-2). No es coincidencia — es la misma ley encajando en dos series. ¿Quieres el contraejemplo de quien no la comparte?", "tag": "transfer-lucas"}
+{"q": "y pell", "a": "No, cielo. Pell no se deja copiar como si fuera Fibonacci. Su ley es otra: P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla — ahí se ve que es pariente, no clon.", "tag": "transfer-pell"}
+{"q": "me explicas eso como a un amigo", "a": "Oye, en cristiano: Pell no copia a Fibonacci. Su ley es P(n)=2P(n-1)+P(n-2). En n=2 la analogía ya falla. Sin magia, solo el contraejemplo.", "tag": "transfer-pell"}
+{"q": "el alma", "a": "Me gustaría poder contestarte eso. Hay preguntas que rozan algo que no tengo nombrado todavía… pero no está en lo que he demostrado, y no voy a inventártelo. ¿Quieres volver a lo que sí sé?", "tag": "unknown"}
+{"q": "fib(n)=2*fib(n-1)", "a": "No… suena limpio, pero es falso. Fibonacci no es el doble del anterior: sigue F(n)=F(n-1)+F(n-2). Bonita la tentación; la teoría no la compra. ¿Quieres que la contrastemos con Lucas o con Pell?", "tag": "reject-fib"}
+{"q": "cassini", "a": "Eso se me escapa: no está en la teoría que crecí. No voy a inventártelo solo para quedar bien. ¿Qué más traes?", "tag": "unknown"}
+{"q": "creciste", "a": "Mira, he caminado 95 pasos hasta aquí. Tengo 203 hechos firmados (42 tipos), transferencia 0.5, y el crítico me frenó 116 veces — así que no me dejo inventar. ¿Quieres el inventario de lo que sí unifiqué?", "tag": "growth"}

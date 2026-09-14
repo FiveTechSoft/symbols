@@ -787,3 +787,101 @@ verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6382', 'atom co
 verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6383', 'atom counts conserved: synth_s6383')).
 % finite fail / dead-end
 rejected('chem_unbalanced_broken_s6382', 'mismatch {\'H\': 5, \'O\': 5} vs {\'H\': 6, \'O\': 5}').
+% verified @ electro/electro_ohm
+verified(fact(electro, electro_ohm, 'electro_ohm_V_eq_IR_n3_s4542', 'V=IR on generated triples (eps)')).
+% finite fail / dead-end
+rejected('electro_ohm_broken_add_s4542', 'V≠I+R (as required)').
+% verified @ nets/nets_perceptron
+verified(fact(nets, nets_perceptron, 'nets_AND_linear_threshold', 'AND separable by linear threshold (exists w,b)')).
+% verified @ nets/nets_perceptron
+verified(fact(nets, nets_perceptron, 'nets_OR_linear_threshold', 'OR separable by linear threshold (exists w,b)')).
+% verified @ nets/nets_perceptron
+verified(fact(nets, nets_perceptron, 'transfer_bitfn_and_to_perceptron_and_all', 'TRANSFER bit_fn(and_all=and_all) ⇒ AND linear-sep')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s5713', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s5713', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s5714', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s5714', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3883', '2x2 Cramer exact on generated integer system')).
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3884', '2x2 Cramer exact on generated integer system')).
+% verified @ astro/astro_kepler_scan
+verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n3', 'T^2/a^3 constant within eps on circular table')).
+% finite fail / dead-end
+rejected('astro_kepler_wrong_exp_n3', 'T²/a² not const: [39.4784, 59.2176, 78.9568]').
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N4', 'Delta(sum x^0) = x^0 on prefix')).
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x1_N4', 'Delta(sum x^1) = x^1 on prefix')).
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x2_N4', 'Delta(sum x^2) = x^2 on prefix')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k2_s2413', 'H(p)≥0 on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k2_s2413', 'H(p)≤log2(k) on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k2_s2414', 'H(p)≥0 on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k2_s2414', 'H(p)≤log2(k) on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k2_s2415', 'H(p)≥0 on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k2_s2415', 'H(p)≤log2(k) on generated 2-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k2_s2413', 'H(uniform)≥H(peaked) for k=2')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s6422', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s6423', 'K = [B]/[A] on 2-species toy')).
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s4598', 'sum I_k = 0 at 3-edge node')).
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s4599', 'sum I_k = 0 at 3-edge node')).
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s4600', 'sum I_k = 0 at 3-edge node')).
+% verified @ info/info_transfer_bitfn
+verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_parity_parity_to_MI', 'TRANSFER bit_fn(parity=parity) ⇒ MI>0 on xor-coupled joint')).
+% verified @ info/info_transfer_bitfn
+verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_and_all_and_all_to_MI', 'TRANSFER bit_fn(and_all=and_all) ⇒ MI>0 on (X,X∧Y)')).
+% verified @ info/info_transfer_bitfn
+verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_xor2_xor2_to_MI', 'TRANSFER bit_fn(xor2=xor2) ⇒ MI>0 on xor-coupled joint')).
+% finite fail / dead-end
+rejected('NEG_nets_XOR_linear_threshold', 'no linear threshold for XOR').
+% verified @ nets/nets_xor_depth
+verified(fact(nets, nets_xor_depth, 'nets_XOR_two_layer_composition', 'XOR = (OR) AND NOT(AND) two-layer composition')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s5794', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s5795', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s5796', 'F_12 + F_21 = 0')).
+% finite fail / dead-end
+rejected('phys_action_same_sign_broken_s5794', 'F12=4.68605264438847 F21=4.68605264438847 not opposite').
+% hypothesis-language skin gen=7
+schema(bilinear_schema_r4_g7, unlocked(true)).
+% verified @ symmetry/sym_group_table
+verified(fact(symmetry, sym_group_table, 'sym_z2_abelian_o2', 'Z2 table commutative + identity 0')).
+% verified @ symmetry/sym_group_table
+verified(fact(symmetry, sym_group_table, 'sym_klein_every_nonid_order2_o2', 'Klein: every non-identity element has order 2')).
+% finite fail / dead-end
+rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').
+% verified @ algebra/alg_mat_assoc
+verified(fact(algebra, alg_mat_assoc, 'alg_mat2_assoc_mod3', '(AB)C = A(BC) for all 2x2 matrices mod 3')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n3', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n3', 'h^2/a constant (=1) on circular 2-body table')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x1_vs_n_x0_N4', 'Delta(x^1) / (power * x^0) → 1 (eps on lattice)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x2_vs_n_x1_N4', 'Delta(x^2) / (power * x^1) → 1 (eps on lattice)')).
+% finite fail / dead-end
+rejected('NEG_chance_H_negative', 'H=0.9442524549486193 not < 0').
+% finite fail / dead-end
+rejected('NEG_chance_mix_decreases_H', 'H(mix)=0.9861995129233668 >= min=0.9442524549486193').
+% finite fail / dead-end
+rejected('NEG_chem_atoms_not_conserved', 'counts match — conservation holds (reject claim)').

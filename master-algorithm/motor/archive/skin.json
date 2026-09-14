@@ -1,12 +1,13 @@
 {
-  "generation": 6,
-  "n_schema_classes": 10,
-  "n_unlocked": 10,
+  "generation": 7,
+  "n_schema_classes": 11,
+  "n_unlocked": 11,
   "unlocked": [
     "bilinear_schema",
     "bilinear_schema_r4_g4",
     "bilinear_schema_r4_g5",
     "bilinear_schema_r4_g6",
+    "bilinear_schema_r4_g7",
     "dead_prime",
     "geo_invent",
     "linrec_scan",
@@ -31,8 +32,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 4,
-      "total_reward": 37.39,
+      "n_visits": 5,
+      "total_reward": 46.96,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -75,8 +76,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 5,
-      "total_reward": 2.2499999999999996,
+      "n_visits": 6,
+      "total_reward": 2.3999999999999995,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -119,8 +120,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 6,
-      "total_reward": 2.9000000000000004,
+      "n_visits": 7,
+      "total_reward": 1.5600000000000003,
       "saturated": false,
       "ticks_no_new_type": 1,
       "novelty_bonus": 0.0
@@ -207,8 +208,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
-      "total_reward": -0.68,
+      "n_visits": 2,
+      "total_reward": -1.36,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -219,6 +220,28 @@
       "unlocked": true,
       "dead_end": false,
       "origin": "mutation:spawn_gen6",
+      "order": 1,
+      "order_max": 4,
+      "coeff_lo": -3,
+      "coeff_hi": 3,
+      "m_max": 4,
+      "m_cap": 12,
+      "r_max": 4,
+      "r_cap": 4,
+      "mut_depth": 1,
+      "mut_cap": 4,
+      "n_visits": 1,
+      "total_reward": -0.68,
+      "saturated": false,
+      "ticks_no_new_type": 0,
+      "novelty_bonus": 0.0
+    },
+    "bilinear_schema_r4_g7": {
+      "id": "bilinear_schema_r4_g7",
+      "description": "Mutant bilinear schema r_max=4",
+      "unlocked": true,
+      "dead_end": false,
+      "origin": "mutation:spawn_gen7",
       "order": 1,
       "order_max": 4,
       "coeff_lo": -3,
@@ -262,7 +285,13 @@
     "4,-3,-2",
     "5,-5,-3",
     "0,5,2,0",
-    "1,2,3,1"
+    "1,2,3,1",
+    "4,-2,-3",
+    "-3,5,4",
+    "2,-1,0,1",
+    "0,0,3,2",
+    "1,4,-1,-1",
+    "2,2,-2,-1"
   ],
   "molt_history": [
     {
@@ -439,6 +468,40 @@
         "transfer_horn"
       ],
       "n_schema_classes": 10
+    },
+    {
+      "generation": 7,
+      "reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_schema bilinear_schema_r4_g7"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 11
     }
   ]
 }

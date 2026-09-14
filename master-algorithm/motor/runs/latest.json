@@ -1,14 +1,18 @@
 {
-  "ticks_this_run": 2,
-  "total_steps": 77,
+  "ticks_this_run": 6,
+  "total_steps": 95,
   "backend": "swipl",
   "swipl": true,
-  "n_verified_facts": 163,
-  "n_rejected": 108,
+  "n_verified_facts": 203,
+  "n_rejected": 116,
   "n_lemmas": 14,
-  "n_distinct_types": 26,
+  "n_distinct_types": 42,
   "distinct_types": [
+    "alg_linear_2x2",
+    "alg_mat_assoc",
     "alg_poly_zn",
+    "astro_angmom_scan",
+    "astro_kepler_scan",
     "astro_period_scan",
     "bilinear_schema",
     "bilinear_schema_r4_g4",
@@ -16,12 +20,19 @@
     "bilinear_schema_r4_g6",
     "bit_fn",
     "boolean_from_examples",
+    "calc_ft_discrete",
     "calc_fwd_diff",
+    "calc_power_diff",
     "chance_bayes_scan",
+    "chance_entropy_scan",
     "chem_atom_balance",
+    "chem_equilibrium_K",
+    "electro_kirchhoff",
+    "electro_ohm",
     "euclid_conjectures",
     "geo_invent",
     "info_mi_scan",
+    "info_transfer_bitfn",
     "lemma:EqAng",
     "lemma:EqSeg",
     "lemma:HalfSeg",
@@ -31,7 +42,12 @@
     "linear_recurrences",
     "modular_period",
     "modular_periods",
+    "nets_perceptron",
+    "nets_xor_depth",
+    "phys_action_reaction",
+    "phys_collision",
     "ratio_limits",
+    "sym_group_table",
     "sym_invariant_scan",
     "transfer_recurrence"
   ],
@@ -805,6 +821,186 @@
       "n_rejected": 108,
       "n_lemmas": 14,
       "tick": 77
+    },
+    {
+      "n_verified_facts": 164,
+      "n_distinct_types": 27,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3993,
+      "n_rejected": 109,
+      "n_lemmas": 14,
+      "tick": 78
+    },
+    {
+      "n_verified_facts": 167,
+      "n_distinct_types": 28,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3949,
+      "n_rejected": 109,
+      "n_lemmas": 14,
+      "tick": 79
+    },
+    {
+      "n_verified_facts": 171,
+      "n_distinct_types": 29,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3893,
+      "n_rejected": 109,
+      "n_lemmas": 14,
+      "tick": 80
+    },
+    {
+      "n_verified_facts": 173,
+      "n_distinct_types": 30,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3865,
+      "n_rejected": 109,
+      "n_lemmas": 14,
+      "tick": 81
+    },
+    {
+      "n_verified_facts": 174,
+      "n_distinct_types": 31,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3873,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 82
+    },
+    {
+      "n_verified_facts": 177,
+      "n_distinct_types": 32,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3833,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 83
+    },
+    {
+      "n_verified_facts": 184,
+      "n_distinct_types": 33,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3741,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 84
+    },
+    {
+      "n_verified_facts": 186,
+      "n_distinct_types": 34,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3716,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 85
+    },
+    {
+      "n_verified_facts": 189,
+      "n_distinct_types": 35,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3679,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 86
+    },
+    {
+      "n_verified_facts": 192,
+      "n_distinct_types": 36,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3642,
+      "n_rejected": 110,
+      "n_lemmas": 14,
+      "tick": 87
+    },
+    {
+      "n_verified_facts": 193,
+      "n_distinct_types": 37,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3651,
+      "n_rejected": 111,
+      "n_lemmas": 14,
+      "tick": 88
+    },
+    {
+      "n_verified_facts": 196,
+      "n_distinct_types": 38,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3636,
+      "n_rejected": 112,
+      "n_lemmas": 14,
+      "tick": 89
+    },
+    {
+      "n_verified_facts": 198,
+      "n_distinct_types": 39,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3633,
+      "n_rejected": 113,
+      "n_lemmas": 14,
+      "tick": 90
+    },
+    {
+      "n_verified_facts": 199,
+      "n_distinct_types": 40,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3622,
+      "n_rejected": 113,
+      "n_lemmas": 14,
+      "tick": 91
+    },
+    {
+      "n_verified_facts": 201,
+      "n_distinct_types": 41,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3599,
+      "n_rejected": 113,
+      "n_lemmas": 14,
+      "tick": 92
+    },
+    {
+      "n_verified_facts": 203,
+      "n_distinct_types": 42,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3576,
+      "n_rejected": 113,
+      "n_lemmas": 14,
+      "tick": 93
+    },
+    {
+      "n_verified_facts": 203,
+      "n_distinct_types": 42,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3616,
+      "n_rejected": 115,
+      "n_lemmas": 14,
+      "tick": 94
+    },
+    {
+      "n_verified_facts": 203,
+      "n_distinct_types": 42,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3636,
+      "n_rejected": 116,
+      "n_lemmas": 14,
+      "tick": 95
     }
   ],
   "baselines": {
@@ -891,73 +1087,177 @@
   },
   "step_log_tail": [
     {
-      "tick": 76,
-      "world": "calculus",
-      "family": "calc_fwd_diff",
-      "why": "UCB1 over 42 arms (world,family); picked calculus::calc_fwd_diff because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "tick": 90,
+      "world": "symmetry",
+      "family": "sym_group_table",
+      "why": "UCB1 over 52 arms (world,family); picked symmetry::sym_group_table because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
       "n_conjectures": 3,
       "outcomes": [
-        "new_true",
-        "new_true",
-        "new_true"
-      ],
-      "score_detail": {
-        "new_true": 3,
-        "new_reject": 0,
-        "new_types": 1,
-        "transfer_hits": 0,
-        "dead_ok": 0,
-        "cost": 0.23,
-        "score": 3.27
-      },
-      "growth": "extrapolate N 4\u21925",
-      "unlock": null,
-      "accepted": [
-        "calc_delta_fib_N4",
-        "calc_delta_lucas_N4",
-        "calc_delta_fib_eq_prev_N4"
-      ],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 77,
-      "world": "chem",
-      "family": "chem_atom_balance",
-      "why": "UCB1 over 42 arms (world,family); picked chem::chem_atom_balance because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 4,
-      "outcomes": [
-        "new_true",
         "new_true",
         "new_true",
         "new_reject"
       ],
       "score_detail": {
-        "new_true": 3,
+        "new_true": 2,
         "new_reject": 1,
         "new_types": 1,
         "transfer_hits": 0,
         "dead_ok": 0,
-        "cost": 0.24,
-        "score": 3.26
+        "cost": 0.19,
+        "score": 2.31
       },
-      "growth": "extrapolate 2\u21923",
+      "growth": "extrapolate order 2\u21923",
       "unlock": null,
       "accepted": [
-        "chem_atom_balance_2H2+O2\u21922H2O",
-        "chem_atom_balance_synth_s6382",
-        "chem_atom_balance_synth_s6383"
+        "sym_z2_abelian_o2",
+        "sym_klein_every_nonid_order2_o2"
       ],
       "rejected": [
-        "chem_unbalanced_broken_s6382"
+        "sym_z2_claim_mult_o2"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 91,
+      "world": "algebra",
+      "family": "alg_mat_assoc",
+      "why": "UCB1 over 52 arms (world,family); picked algebra::alg_mat_assoc because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.11,
+        "score": 1.39
+      },
+      "growth": "extrapolate mod/order 3\u21925",
+      "unlock": null,
+      "accepted": [
+        "alg_mat2_assoc_mod3"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 92,
+      "world": "astro",
+      "family": "astro_angmom_scan",
+      "why": "UCB1 over 52 arms (world,family); picked astro::astro_angmom_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.16,
+        "score": 2.34
+      },
+      "growth": "extrapolate n_bodies 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "astro_h_eq_sqrt_a_n3",
+        "astro_h2_over_a_const_n3"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 93,
+      "world": "calculus",
+      "family": "calc_power_diff",
+      "why": "UCB1 over 52 arms (world,family); picked calculus::calc_power_diff because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.14,
+        "score": 2.36
+      },
+      "growth": "extrapolate N 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "calc_delta_x1_vs_n_x0_N4",
+        "calc_delta_x2_vs_n_x1_N4"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 94,
+      "world": "chance",
+      "family": "chance_dead_negH",
+      "why": "UCB1 over 52 arms (world,family); picked chance::chance_dead_negH because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 2,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 2,
+        "cost": 0.12,
+        "score": 0.38
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_chance_H_negative",
+        "NEG_chance_mix_decreases_H"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 95,
+      "world": "chem",
+      "family": "chem_dead_noatoms",
+      "why": "UCB1 over 51 arms (world,family); picked chem::chem_dead_noatoms because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 1,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 1,
+        "cost": 0.07,
+        "score": 0.18
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [
+        "NEG_chem_atoms_not_conserved"
       ],
       "transfer": []
     }
   ],
-  "elapsed_s": 0.016,
+  "elapsed_s": 0.583,
   "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
   "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
   "transfer_accuracy": 0.5,
   "lemma_reuse_rate": 0.7857,
-  "reject_rate": 0.3985
+  "reject_rate": 0.3636
 }

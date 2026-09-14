@@ -1,0 +1,176 @@
+{
+  "emerged": true,
+  "before": {
+    "n_verified": 163,
+    "n_rejected": 108,
+    "n_types": 26,
+    "reject_rate": 0.3985,
+    "transfer_accuracy": 0.5,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 10,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 6
+  },
+  "final": {
+    "n_verified": 203,
+    "n_rejected": 116,
+    "n_types": 42,
+    "reject_rate": 0.3636,
+    "transfer_accuracy": 0.5,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 11,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 7
+  },
+  "delta": {
+    "n_verified": 40,
+    "n_types": 16,
+    "n_schema_classes": 1,
+    "n_rejected": 8,
+    "new_unlocked": [
+      "bilinear_schema_r4_g7"
+    ]
+  },
+  "molt": {
+    "action": "keep_skin",
+    "saturation_reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+    "molt_info": {
+      "generation": 7,
+      "reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_schema bilinear_schema_r4_g7"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 11
+    },
+    "keep_reason": "n_verified 196\u2192203; n_types 38\u219242; n_schema_classes 10\u219211; unlocked ['bilinear_schema_r4_g7']",
+    "before": {
+      "n_verified": 196,
+      "n_rejected": 112,
+      "n_types": 38,
+      "reject_rate": 0.3636,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "n_schema_classes": 10,
+      "unlocked_schemas": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "lucas_transfer": 1.0,
+      "pell_transfer": 0.0,
+      "transfer_honest": true,
+      "language_generation": 6
+    },
+    "after": {
+      "n_verified": 203,
+      "n_rejected": 116,
+      "n_types": 42,
+      "reject_rate": 0.3636,
+      "transfer_accuracy": 0.5,
+      "lemma_reuse_rate": 0.7857,
+      "n_schema_classes": 11,
+      "unlocked_schemas": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "lucas_transfer": 1.0,
+      "pell_transfer": 0.0,
+      "transfer_honest": true,
+      "language_generation": 7
+    }
+  },
+  "new_clauses_sample": [
+    "rejected('NEG_chance_H_negative', 'H=0.9442524549486193 not < 0').",
+    "rejected('NEG_chance_mix_decreases_H', 'H(mix)=0.9861995129233668 >= min=0.9442524549486193').",
+    "rejected('NEG_chem_atoms_not_conserved', 'counts match \u2014 conservation holds (reject claim)').",
+    "rejected('NEG_nets_XOR_linear_threshold', 'no linear threshold for XOR').",
+    "rejected('astro_kepler_wrong_exp_n3', 'T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568]').",
+    "rejected('electro_ohm_broken_add_s4542', 'V\u2260I+R (as required)').",
+    "rejected('phys_action_same_sign_broken_s5794', 'F12=4.68605264438847 F21=4.68605264438847 not opposite').",
+    "rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').",
+    "schema(bilinear_schema_r4_g7, unlocked(true)).",
+    "verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3883', '2x2 Cramer exact on generated integer system')).",
+    "verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3884', '2x2 Cramer exact on generated integer system')).",
+    "verified(fact(algebra, alg_mat_assoc, 'alg_mat2_assoc_mod3', '(AB)C = A(BC) for all 2x2 matrices mod 3')).",
+    "verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n3', 'h^2/a constant (=1) on circular 2-body table')).",
+    "verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n3', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).",
+    "verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n3', 'T^2/a^3 constant within eps on circular table')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N4', 'Delta(sum x^0) = x^0 on prefix')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x1_N4', 'Delta(sum x^1) = x^1 on prefix')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x2_N4', 'Delta(sum x^2) = x^2 on prefix')).",
+    "verified(fact(calculus, calc_power_diff, 'calc_delta_x1_vs_n_x0_N4', 'Delta(x^1) / (power * x^0) \u2192 1 (eps on lattice)')).",
+    "verified(fact(calculus, calc_power_diff, 'calc_delta_x2_vs_n_x1_N4', 'Delta(x^2) / (power * x^1) \u2192 1 (eps on lattice)'))."
+  ],
+  "n_new_clauses": 49
+}
