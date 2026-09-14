@@ -1497,3 +1497,15 @@ rejected('transfer_fib_to_pell_-1_2_3_1', 'n=4: pred=2 != obs=12').
 rejected('transfer_lucas_to_pell_3_-1_-2_0', 'n=4: pred=11 != obs=12').
 % finite fail / dead-end
 rejected('transfer_lucas_to_pell_-1_2_3_1', 'n=4: pred=2 != obs=12').
+% verified @ algebra/alg_mat_assoc
+verified(fact(algebra, alg_mat_assoc, 'alg_mat2_assoc_mod5', '(AB)C = A(BC) for all 2x2 matrices mod 5')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6884', 'atom counts conserved: synth_s6884')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6885', 'atom counts conserved: synth_s6885')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6886', 'atom counts conserved: synth_s6886')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6887', 'atom counts conserved: synth_s6887')).
+% finite fail / dead-end
+rejected('chem_unbalanced_broken_s6884', 'mismatch {\'H\': 4, \'O\': 3} vs {\'H\': 5, \'O\': 3}').

@@ -83,3 +83,11 @@ obs(pell, 21, 38613965).
 obs(pell, 22, 93222358).
 obs(pell, 23, 225058681).
 obs(pell, 24, 543339720).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_binom_expand_mod5', '(x+y)^2 ≡ x^2+2xy+y^2 (mod 5) exhaustive')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_distrib_mod5', 'x(y+z) ≡ xy+xz (mod 5)')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n3', 'T increases with a on generated circular table')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_pos_n3', 'T>0 and a>0 for all generated bodies')).

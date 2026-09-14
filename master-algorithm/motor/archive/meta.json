@@ -1,5 +1,5 @@
 {
-  "total_steps": 175,
+  "total_steps": 177,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -143,6 +143,19 @@
       "n_visits": 1,
       "total_reward": -0.68,
       "ticks_no_new_form_family": 0
+    },
+    "sequences::delta_conserv": {
+      "id": "delta_conserv",
+      "description": "\u0394\u2218conserv: discrete difference of a \u0394=0 additive invariant",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 12,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "ticks_no_new_form_family": 1
     },
     "logic::boolean_from_examples": {
       "id": "boolean_from_examples",
@@ -460,14 +473,14 @@
       "id": "alg_mat_assoc",
       "description": "Associativity of 2x2 matrix mult mod p",
       "dead_end": false,
-      "param": 5,
+      "param": 7,
       "param_max": 7,
       "unlocked": true,
       "unlock_order": 2,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 1.39,
-      "ticks_no_new_form_family": 0
+      "n_visits": 2,
+      "total_reward": 1.2599999999999998,
+      "ticks_no_new_form_family": 1
     },
     "algebra::alg_dead_binom": {
       "id": "alg_dead_binom",
@@ -759,14 +772,14 @@
       "id": "chem_atom_balance",
       "description": "Atom-count conservation on generated tiny reaction tables",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 2,
-      "total_reward": 4.6,
-      "ticks_no_new_form_family": 1
+      "n_visits": 3,
+      "total_reward": 5.92,
+      "ticks_no_new_form_family": 2
     },
     "chem::chem_equilibrium_K": {
       "id": "chem_equilibrium_K",
@@ -857,19 +870,6 @@
       "saturated": true,
       "n_visits": 1,
       "total_reward": -0.07,
-      "ticks_no_new_form_family": 1
-    },
-    "sequences::delta_conserv": {
-      "id": "delta_conserv",
-      "description": "\u0394\u2218conserv: discrete difference of a \u0394=0 additive invariant",
-      "dead_end": false,
-      "param": 0,
-      "param_max": 0,
-      "unlocked": true,
-      "unlock_order": 12,
-      "saturated": true,
-      "n_visits": 1,
-      "total_reward": 0.0,
       "ticks_no_new_form_family": 1
     }
   },
@@ -8710,6 +8710,87 @@
       "accepted": [],
       "rejected": [],
       "transfer": []
+    },
+    {
+      "tick": 176,
+      "world": "algebra",
+      "family": "alg_mat_assoc",
+      "why": "UCB1 over 47 arms (world,family); picked algebra::alg_mat_assoc because avg=1.390+1.4*sqrt(ln(175+1)/1)=3.183\u21924.573. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 1,
+        "form_families": [
+          "alg_mat_assoc"
+        ],
+        "dead_ok": 0,
+        "cost": 0.15,
+        "score": -0.13,
+        "reward_raw": 0.02
+      },
+      "growth": "extrapolate mod/order 5\u21927",
+      "unlock": null,
+      "accepted": [
+        "alg_mat2_assoc_mod5"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 177,
+      "world": "chem",
+      "family": "chem_atom_balance",
+      "why": "UCB1 over 47 arms (world,family); picked chem::chem_atom_balance because avg=2.300+1.4*sqrt(ln(176+1)/2)=2.252\u21924.552. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 6,
+      "outcomes": [
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 4,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 1,
+        "n_offpath": 0,
+        "form_families": [
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0"
+        ],
+        "dead_ok": 0,
+        "cost": 0.38,
+        "score": 1.32,
+        "reward_raw": 1.7
+      },
+      "growth": "extrapolate 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "chem_atom_balance_synth_s6884",
+        "chem_atom_balance_synth_s6885",
+        "chem_atom_balance_synth_s6886",
+        "chem_atom_balance_synth_s6887"
+      ],
+      "rejected": [
+        "chem_unbalanced_broken_s6884"
+      ],
+      "transfer": []
     }
   ],
   "curves": [
@@ -10462,6 +10543,26 @@
       "n_rejected": 181,
       "n_lemmas": 14,
       "tick": 175
+    },
+    {
+      "n_verified_facts": 421,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3007,
+      "n_rejected": 181,
+      "n_lemmas": 14,
+      "tick": 176
+    },
+    {
+      "n_verified_facts": 425,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2998,
+      "n_rejected": 182,
+      "n_lemmas": 14,
+      "tick": 177
     }
   ],
   "baselines": {
@@ -11687,7 +11788,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 5,
+          "order": 7,
           "order_max": 7,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -12024,7 +12125,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
