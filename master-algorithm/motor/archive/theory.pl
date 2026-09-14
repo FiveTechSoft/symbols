@@ -2012,3 +2012,117 @@ lemma('L6_midline_parallel', Parallel, 'AB ∥ NX2').
 verified(fact(geometry, geo_invent, 'geo_invent::L6_midline_parallel', 'AB ∥ NX2')).
 % verified @ geometry/geo_invent
 verified(fact(geometry, geo_invent, 'geo_invent_d1_s290', 'AB ∥ NX2')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_3_-3_0_2', 'TRANSFER rec(lucas,[3, -3, 0, 2]) ⇒ try on fib: (3)*fib(n-1) + (-3)*fib(n-2) + (0)*fib(n-3) + (2)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-2_4_3_0', 'TRANSFER rec(lucas,[-2, 4, 3, 0]) ⇒ try on fib: (-2)*fib(n-1) + (4)*fib(n-2) + (3)*fib(n-3) + (0)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_3_-4_5_3', 'n=4: pred=7 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_5_-4_-5_-1', 'n=4: pred=1 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_3_-3_0_2', 'TRANSFER rec(fib,[3, -3, 0, 2]) ⇒ try on lucas: (3)*lucas(n-1) + (-3)*lucas(n-2) + (0)*lucas(n-3) + (2)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-2_4_3_0', 'TRANSFER rec(fib,[-2, 4, 3, 0]) ⇒ try on lucas: (-2)*lucas(n-1) + (4)*lucas(n-2) + (3)*lucas(n-3) + (0)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_3_-4_5_3', 'n=4: pred=11 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_5_-4_-5_-1', 'n=4: pred=1 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_3_-3_0_2', 'n=4: pred=9 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-2_4_3_0', 'n=4: pred=1 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_3_-3_0_2', 'n=4: pred=9 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-2_4_3_0', 'n=4: pred=1 != obs=12').
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7778', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7778', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7779', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7779', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7780', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7780', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7781', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7781', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7782', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7782', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s7783', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s7783', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s6259', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s6259', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s6260', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s6260', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s6261', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s6261', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k6_s6259', 'H(uniform)≥H(peaked) for k=6')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s6274', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s6274', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s6275', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s6275', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s6276', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s6276', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% finite fail / dead-end
+rejected('chance_bayes_swap_s6274', 'P(H|E)=0.23215878401412207 != P(H|¬E)=0.42703956975055113').
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_indep_near0_s6047', 'MI(X;Y)≈0 on generated independent joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_dep_pos_s6047', 'MI(X;Y)>0 on xor-coupled joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_indep_factorization_s6047', 'P(x,y)=P(x)P(y) on independent joint (eps)')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_and_related_s6047', 'MI>0 on (X, X∧Y) joint from full 2-bit table')).
+% learned recurrence on fib
+rec(fib, [-1,0,5,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_0_5_3', 'fib(n) = (-1)*fib(n-1) + (0)*fib(n-2) + (5)*fib(n-3) + (3)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [1,-2,3,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_-2_3_3', 'fib(n) = (1)*fib(n-1) + (-2)*fib(n-2) + (3)*fib(n-3) + (3)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-1,0,5,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_0_5_3', 'lucas(n) = (-1)*lucas(n-1) + (0)*lucas(n-2) + (5)*lucas(n-3) + (3)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [1,-2,3,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_-2_3_3', 'lucas(n) = (1)*lucas(n-1) + (-2)*lucas(n-2) + (3)*lucas(n-3) + (3)*lucas(n-4)')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s7570', 'atom counts conserved: synth_s7570')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s7571', 'atom counts conserved: synth_s7571')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s7572', 'atom counts conserved: synth_s7572')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s7573', 'atom counts conserved: synth_s7573')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s7574', 'atom counts conserved: synth_s7574')).
+% finite fail / dead-end
+rejected('chem_unbalanced_broken_s7570', 'mismatch {\'H\': 5, \'O\': 1} vs {\'H\': 6, \'O\': 1}').
+holds_bit(2, [0,1,0], 1).
+holds_bit(3, [0,1,1], 1).
