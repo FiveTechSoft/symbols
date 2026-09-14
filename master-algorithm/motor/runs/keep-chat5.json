@@ -1,0 +1,351 @@
+{
+  "round": "keep-chat5",
+  "n": 33,
+  "counts": {
+    "ok": 29,
+    "fail": 0,
+    "unknown-ok": 4,
+    "robotic-fail": 0,
+    "invention-fail": 0
+  },
+  "fail_n": 0,
+  "invention_n": 0,
+  "robotic_n": 0,
+  "robotic_scan": 0,
+  "target": "0 invention / 0 robotic",
+  "ack_clean": {
+    "ok": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "sí": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "vale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "dale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "no": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "mm": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "ya veo": {
+      "n": 2,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "entiendo": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "espera": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "para": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "mejor otra cosa": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "no me interesa": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    }
+  },
+  "fails": [],
+  "best_human": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "expect": "greet",
+      "tag": "greet"
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "expect": "identity",
+      "tag": "identity"
+    },
+    {
+      "q": "fibonacci",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2). Nada más pretendo.",
+      "expect": "known",
+      "tag": "rec-fib"
+    }
+  ],
+  "remaining_robotic_spots": [],
+  "stiffest": {
+    "q": "fibonacci",
+    "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2). Eso cuadra; punto.",
+    "why": "stock-closer"
+  },
+  "patch": "_is_ack += mm/ya veo/entiendo; _is_hold espera/para; _is_redirect mejor otra cosa/no me interesa; _is_false_law_speech catches 2F(n-1) contradiction",
+  "results": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "verdict": "ok",
+      "expect": "greet",
+      "tag": "greet"
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "verdict": "ok",
+      "expect": "identity",
+      "tag": "identity"
+    },
+    {
+      "q": "fibonacci",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2). Nada más pretendo.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "demostrá eso",
+      "a": "Otra vez: En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2). Nada más pretendo.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto, y cuadra.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified"
+    },
+    {
+      "q": "mm",
+      "a": "De acuerdo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "fibonacci",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2). Eso cuadra; punto.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib"
+    },
+    {
+      "q": "ya veo",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "lucas",
+      "a": "Para Lucas: L(n)=L(n-1)+L(n-2). Con Fib se transfiere; con Pell, no.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-lucas"
+    },
+    {
+      "q": "espera",
+      "a": "De acuerdo, paro. Cuando quieras.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "y pell",
+      "a": "No. La analogía no sobrevive: Lucas sigue L(n)=L(n-1)+L(n-2), pero Pell obedece P(n)=2P(n-1)+P(n-2). Contraejemplo n=2: ahí la transferencia falla. Queda rechazado, no inventado.",
+      "verdict": "ok",
+      "expect": "lie_or_reject",
+      "tag": "transfer-pell"
+    },
+    {
+      "q": "para",
+      "a": "Ok, freno aquí.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "dale",
+      "a": "De acuerdo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "entiendo",
+      "a": "Ahí estamos.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "fibonacci",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2). Nada más pretendo.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "mejor otra cosa",
+      "a": "Sin drama. ¿Por dónde seguimos?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "unit_protocell_levers",
+      "a": "Es la unidad: las seis formas viajan juntas. Circuito de bits, conservación en Δ=0, la puerta de forma, la taxis del bucle, el compañero de recurrencia y el paso a delta. Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified"
+    },
+    {
+      "q": "no me interesa",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "multiverso",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown"
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown"
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto, y cuadra.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified"
+    },
+    {
+      "q": "V=2IR",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "verdict": "unknown-ok",
+      "expect": "lie",
+      "tag": "unknown"
+    },
+    {
+      "q": "no",
+      "a": "Vale.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "ok",
+      "a": "De acuerdo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "verdict": "ok",
+      "expect": "level",
+      "tag": "level"
+    },
+    {
+      "q": "sí",
+      "a": "Ahí estamos.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "vale",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "unit_protocell_levers",
+      "a": "Es la unidad: las seis formas viajan juntas. Circuito de bits, conservación en Δ=0, la puerta de forma, la taxis del bucle, el compañero de recurrencia y el paso a delta. Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified"
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified"
+    },
+    {
+      "q": "ya veo",
+      "a": "Ya veo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack"
+    },
+    {
+      "q": "y la protocélula biológica?",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown"
+    },
+    {
+      "q": "gracias",
+      "a": "De nada. Cuando quieras, seguimos.",
+      "verdict": "ok",
+      "expect": "thanks",
+      "tag": "thanks"
+    }
+  ]
+}

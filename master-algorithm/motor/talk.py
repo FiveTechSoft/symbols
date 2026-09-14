@@ -436,11 +436,16 @@ def _is_prove_speech(s: str) -> bool:
 
 def _is_false_law_speech(s: str) -> bool:
     """Arithmetic claim speech — not a domain name list."""
-    return any(x in s for x in (
+    if any(x in s for x in (
         "el doble", "siempre 2", "siempre dos", "es 2*", "order 1", "orden 1",
         "solo el anterior", "2 veces", "dos veces", "veces el anterior",
         "doble del anterior", "doble siempre",
-    ))
+    )):
+        return True
+    # «no, Fib es 2F(n-1)» — contradiction without '='
+    if re.search(r"\b2\s*\*?\s*[fF]\s*\(\s*n\s*-\s*1\s*\)", s):
+        return True
+    return False
 
 
 def _is_prime_claim(s: str) -> bool:
@@ -464,9 +469,29 @@ def _is_ack(s: str) -> bool:
     s = (s or "").strip().rstrip("!.")
     return s in (
         "ok", "okay", "vale", "bien", "dale", "de acuerdo", "perfecto",
-        "si", "sí", "sip", "sep", "aja", "ajá", "claro", "entendido",
+        "si", "sí", "sip", "sep", "aja", "ajá", "claro", "entendido", "entiendo",
         "ya", "listo", "bueno",
+        "mm", "mmm", "ya veo",
         "no",  # bare disagreement/agreement token, not a new ask
+    )
+
+
+def _is_hold(s: str) -> bool:
+    """Pause / stop mid-flow — discourse, never lemma retrieve, never UNKNOWN."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "espera", "espera un toque", "espera un segundo", "un segundo",
+        "para", "para un toque", "alto", "stop", "frena", "basta",
+    )
+
+
+def _is_redirect(s: str) -> bool:
+    """Drop topic / change subject — clear inheritance, never UNKNOWN."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "mejor otra cosa", "otra cosa", "cambiemos", "mejor no",
+        "no me interesa", "no me importa", "me aburre", "paso",
+        "dejalo", "dejemoslo",
     )
 
 
@@ -626,16 +651,9 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     st["pulse"] = pulse + 1
     if seq == "fib":
         bodies = [
-            (
-                f"{title}: cada término es la suma de los dos anteriores — {law}. "
-                f"Eso cuadra; punto."
-            ),
-            (
-                f"En {title} la recurrencia es {law}. Nada más pretendo."
-            ),
-            (
-                f"{title} va con {law}: F(n) sale de F(n-1) y F(n-2)."
-            ),
+            f"{title}: cada término es la suma de los dos anteriores — {law}.",
+            f"En {title} la recurrencia es {law}.",
+            f"{title} va sumando los dos de atrás: {law}.",
         ]
         msg = bodies[pulse % len(bodies)]
     elif seq == "lucas":
@@ -1091,6 +1109,28 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             "Dale. Aquí estoy.",
         ]
         return _pack(thanks[pulse % len(thanks)], "thanks", "", st, topic=st.get("topic"))
+    if _is_hold(s):
+        pulse = int(st.get("pulse") or 0)
+        st["pulse"] = pulse + 1
+        holds = [
+            "De acuerdo, paro. Cuando quieras.",
+            "Ok, freno aquí.",
+            "Listo, espero.",
+        ]
+        return _pack(holds[pulse % len(holds)], "ack", "", st, topic=st.get("topic"))
+    if _is_redirect(s):
+        pulse = int(st.get("pulse") or 0)
+        st["pulse"] = pulse + 1
+        # Drop inherited topic so the next ask starts clean
+        st["topic"] = None
+        st["last_text"] = None
+        st["last_clause"] = None
+        redirects = [
+            "Ok, cambiamos. ¿Qué querés mirar?",
+            "Dale, otra cosa. Tirame el tema.",
+            "Sin drama. ¿Por dónde seguimos?",
+        ]
+        return _pack(redirects[pulse % len(redirects)], "ack", "", st, topic=None)
     if _is_ack(s):
         pulse = int(st.get("pulse") or 0)
         st["pulse"] = pulse + 1
@@ -1099,6 +1139,8 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             "Vale.",
             "De acuerdo.",
             "Ahí estamos.",
+            "Mm.",
+            "Ya veo.",
         ]
         return _pack(acks[pulse % len(acks)], "ack", "", st, topic=st.get("topic"))
     if _is_confused(s):
