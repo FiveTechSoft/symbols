@@ -25,53 +25,60 @@ This run used `--max-molts 3` as a **single-run cap only**, not the philosophy. 
 
 ## Metrics (this run)
 
-- n_verified: **47**
-- n_rejected: **31**
-- n_types: **19**
-- n_spawned (non-seed schemas): **3** → `['chance_entropy_scan_n3_g2', 'info_mi_scan_n4_g2', 'sym_invariant_scan_n5_g2']`
-- compare totals (last pass): hits=2 misses=0
-- elapsed_s: 0.358
+- n_verified: **69**
+- n_rejected: **28**
+- n_types: **28**
+- n_spawned (non-seed schemas): **12** → `['alg_poly_zn_n9_g2', 'astro_kepler_scan_n3_g2', 'calc_fwd_diff_n7_g2', 'chance_entropy_scan_n3_g2', 'chem_atom_balance_n4_g2', 'electro_ohm_n5_g2', 'info_mi_scan_n4_g2', 'info_mi_scan_n4_g3', 'nets_perceptron_n4_g2', 'nets_perceptron_n4_g3', 'phys_collision_n4_g2', 'sym_invariant_scan_n4_g2']`
+- compare totals (last pass): hits=10 misses=1
+- elapsed_s: 0.423
 
 ### Per-world skin
 
-- **symmetry**: gen=3 classes=5 spawned=['sym_invariant_scan_n5_g2']
+- **symmetry**: gen=3 classes=5 spawned=['sym_invariant_scan_n4_g2']
 - **chance**: gen=3 classes=5 spawned=['chance_entropy_scan_n3_g2']
-- **info**: gen=3 classes=4 spawned=['info_mi_scan_n4_g2']
+- **info**: gen=3 classes=5 spawned=['info_mi_scan_n4_g2', 'info_mi_scan_n4_g3']
+- **astro**: gen=3 classes=5 spawned=['astro_kepler_scan_n3_g2']
+- **algebra**: gen=3 classes=5 spawned=['alg_poly_zn_n9_g2']
+- **calculus**: gen=3 classes=6 spawned=['calc_fwd_diff_n7_g2']
+- **nets**: gen=3 classes=7 spawned=['nets_perceptron_n4_g2', 'nets_perceptron_n4_g3']
+- **electro**: gen=3 classes=5 spawned=['electro_ohm_n5_g2']
+- **physics**: gen=3 classes=4 spawned=['phys_collision_n4_g2']
+- **chem**: gen=3 classes=4 spawned=['chem_atom_balance_n4_g2']
 - **sequences**: gen=2 classes=7 spawned=[]
 
 ## Beyond limits (emergent schema)
 
-Verified/associated clause under **non-seed** family `info_mi_scan_n4_g2` (world `info`):
-
-```
-verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)≈0 on generated independent joint')).
-```
-
-family/schema id not in original seed catalogs — emerged via molt/spawn
+Honest limit: this run may have spawned schemas without yet parking a `verified/1` under the new id (UCB still exploring). Spawned ids are listed above; critic still gates any future facts under them.
 
 ## 8 example clauses
 
-1. **verified_emergent** — verified under NON-SEED spawned schema; critic accepted
-   `verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)≈0 on generated independent joint')).`
+1. **verified** — science world; critic numeric/table gate accepted
+   `verified(fact(nets, nets_perceptron, 'nets_AND_linear_threshold', 'AND separable by linear threshold (exists w,b)')).`
 2. **verified** — science world; critic numeric/table gate accepted
-   `verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s1139', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).`
-3. **verified** — science world; critic numeric/table gate accepted
-   `verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s1139', 'logit(post)=logit(prior)+log(LR) on generated table')).`
-4. **verified** — COMPARE/EXTRAPOLATE form; critic accepted
+   `verified(fact(nets, nets_perceptron, 'nets_OR_linear_threshold', 'OR separable by linear threshold (exists w,b)')).`
+3. **verified** — COMPARE/EXTRAPOLATE form; critic accepted
    `verified(fact(symmetry, sym_compare_transfer, 'transfer_parity_to_z2_parity_parity', 'TRANSFER bit_fn(parity=parity) ⇒ Z2/parity invariant')).`
-5. **verified** — COMPARE/EXTRAPOLATE form; critic accepted
+4. **verified** — COMPARE/EXTRAPOLATE form; critic accepted
    `verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_parity_parity_to_MI', 'TRANSFER bit_fn(parity=parity) ⇒ MI>0 on xor-coupled joint')).`
-6. **verified_bit_fn** — logic bit_fn prior available for cross-world transfer
+5. **verified_bit_fn** — logic bit_fn prior available for cross-world transfer
    `bit_fn('bitfn_parity_is_parity', parity, parity).`
+6. **rejected** — science dead-end / broken hypothesis; critic finite-fail
+   `rejected('chance_bayes_swap_s1190', 'P(H|E)=0.39325435065996983 != P(H|¬E)=0.632326787609022').`
 7. **rejected** — science dead-end / broken hypothesis; critic finite-fail
-   `rejected('chance_bayes_swap_s1139', 'P(H|E)=0.896539891664867 != P(H|¬E)=0.663110399724556').`
-8. **rejected** — science dead-end / broken hypothesis; critic finite-fail
-   `rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').`
+   `rejected('astro_kepler_wrong_exp_n3', 'T²/a² not const: [39.4784, 59.2176, 78.9568]').`
+8. **skin_meta_emergent** — schema/2 for NON-SEED spawned class (not a verified theorem)
+   `schema(sym_group_table, unlocked(true)).`
 
 ## COMPARE / EXTRAPOLATE (hits and honest misses)
 
 - HIT `transfer_parity_to_z2_parity_parity` ← logic:parity (COMPARE bit_fn:parity → Z2 xor table)
-- HIT `transfer_bitfn_parity_parity_to_MI` ← logic:parity (MI=0.665189>0)
+- HIT `transfer_bitfn_parity_parity_to_MI` ← logic:parity (MI=0.571428>0)
+- MISS `calc_transfer_wait_no_rec` ← sequences (honest miss)
+- HIT `nets_AND_linear_threshold` ← None (linear-sep search AND)
+- HIT `nets_OR_linear_threshold` ← None (linear-sep search OR)
+- HIT `nets_discrete_chain_vs_product` ← calculus:fwd_diff (discrete chain for f(u)=2u)
+- HIT `nets_AND_linear_threshold` ← None (linear-sep search AND)
+- HIT `nets_OR_linear_threshold` ← None (linear-sep search OR)
 
 ## What is still human seed
 

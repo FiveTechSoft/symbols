@@ -1,0 +1,235 @@
+{
+  "archive": "motor/archive-stem",
+  "metrics": {
+    "n_verified_facts": 128,
+    "n_distinct_types": 41,
+    "n_spawned": 22,
+    "spawned_schemas": [
+      "alg_poly_zn_n11_g4",
+      "alg_poly_zn_n9_g2",
+      "astro_kepler_scan_n3_g2",
+      "astro_kepler_scan_n4_g4",
+      "calc_fwd_diff_n7_g2",
+      "calc_fwd_diff_n9_g4",
+      "chance_entropy_scan_n3_g2",
+      "chance_entropy_scan_n6_g4",
+      "chem_atom_balance_n4_g2",
+      "chem_atom_balance_n5_g4",
+      "electro_ohm_n5_g2",
+      "electro_ohm_n8_g4",
+      "info_mi_scan_n4_g2",
+      "info_mi_scan_n4_g3",
+      "info_mi_scan_n4_g4",
+      "nets_perceptron_n4_g2",
+      "nets_perceptron_n4_g3",
+      "nets_perceptron_n4_g4",
+      "phys_collision_n4_g2",
+      "phys_collision_n6_g4",
+      "sym_invariant_scan_n4_g2",
+      "sym_invariant_scan_n6_g4"
+    ]
+  },
+  "n_rejected": 42,
+  "science": {
+    "astro": {
+      "generation": 4,
+      "n_schema_classes": 6,
+      "unlocked": [
+        "astro_angmom_scan",
+        "astro_dead_linear",
+        "astro_kepler_scan",
+        "astro_kepler_scan_n3_g2",
+        "astro_kepler_scan_n4_g4",
+        "astro_period_scan"
+      ],
+      "spawned": [
+        "astro_kepler_scan_n3_g2",
+        "astro_kepler_scan_n4_g4"
+      ]
+    },
+    "algebra": {
+      "generation": 4,
+      "n_schema_classes": 6,
+      "unlocked": [
+        "alg_dead_binom",
+        "alg_linear_2x2",
+        "alg_mat_assoc",
+        "alg_poly_zn",
+        "alg_poly_zn_n11_g4",
+        "alg_poly_zn_n9_g2"
+      ],
+      "spawned": [
+        "alg_poly_zn_n11_g4",
+        "alg_poly_zn_n9_g2"
+      ]
+    },
+    "calculus": {
+      "generation": 4,
+      "n_schema_classes": 7,
+      "unlocked": [
+        "calc_dead_zero",
+        "calc_ft_discrete",
+        "calc_fwd_diff",
+        "calc_fwd_diff_n7_g2",
+        "calc_fwd_diff_n9_g4",
+        "calc_power_diff",
+        "calc_transfer_rec"
+      ],
+      "spawned": [
+        "calc_fwd_diff_n7_g2",
+        "calc_fwd_diff_n9_g4"
+      ]
+    },
+    "nets": {
+      "generation": 4,
+      "n_schema_classes": 8,
+      "unlocked": [
+        "nets_chain_transfer",
+        "nets_dead_any_eta",
+        "nets_grad_step",
+        "nets_perceptron",
+        "nets_perceptron_n4_g2",
+        "nets_perceptron_n4_g3",
+        "nets_perceptron_n4_g4",
+        "nets_xor_depth"
+      ],
+      "spawned": [
+        "nets_perceptron_n4_g2",
+        "nets_perceptron_n4_g3",
+        "nets_perceptron_n4_g4"
+      ]
+    },
+    "electro": {
+      "generation": 4,
+      "n_schema_classes": 6,
+      "unlocked": [
+        "electro_dead_noconserve",
+        "electro_kirchhoff",
+        "electro_ohm",
+        "electro_ohm_n5_g2",
+        "electro_ohm_n8_g4",
+        "electro_switch_transfer"
+      ],
+      "spawned": [
+        "electro_ohm_n5_g2",
+        "electro_ohm_n8_g4"
+      ]
+    },
+    "physics": {
+      "generation": 4,
+      "n_schema_classes": 5,
+      "unlocked": [
+        "phys_action_reaction",
+        "phys_collision",
+        "phys_collision_n4_g2",
+        "phys_collision_n6_g4",
+        "phys_dead_nomom"
+      ],
+      "spawned": [
+        "phys_collision_n4_g2",
+        "phys_collision_n6_g4"
+      ]
+    },
+    "chem": {
+      "generation": 4,
+      "n_schema_classes": 5,
+      "unlocked": [
+        "chem_atom_balance",
+        "chem_atom_balance_n4_g2",
+        "chem_atom_balance_n5_g4",
+        "chem_dead_noatoms",
+        "chem_equilibrium_K"
+      ],
+      "spawned": [
+        "chem_atom_balance_n4_g2",
+        "chem_atom_balance_n5_g4"
+      ]
+    }
+  },
+  "clauses": [
+    {
+      "status": "verified",
+      "world": "astro",
+      "clause": "verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n3', 'T^2/a^3 constant within eps on circular table')).",
+      "reason": "Kepler T\u00b2/a\u00b3 constancy on generated circular table"
+    },
+    {
+      "status": "rejected",
+      "world": "astro",
+      "clause": "rejected('astro_kepler_wrong_exp_n3', 'T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568]').",
+      "reason": "broken Kepler exponent T\u00b2/a\u00b2 \u2014 critic finite-fail"
+    },
+    {
+      "status": "verified",
+      "world": "algebra",
+      "clause": "verified(fact(algebra, alg_poly_zn, 'alg_binom_expand_mod6', '(x+y)^2 \u2261 x^2+2xy+y^2 (mod 6) exhaustive')).",
+      "reason": "poly identity on Z/nZ \u2014 exhaustive critic"
+    },
+    {
+      "status": "rejected",
+      "world": "algebra",
+      "clause": "rejected('NEG_alg_binom_no_cross', 'x=1,y=1: (x+y)^2=1 != x^2+y^2=2').",
+      "reason": "dead-end (x+y)\u00b2=x\u00b2+y\u00b2 rejected"
+    },
+    {
+      "status": "verified",
+      "world": "calculus",
+      "clause": "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N4', 'Delta(sum x^0) = x^0 on prefix')).",
+      "reason": "discrete FTC / fwd-diff on prefix"
+    },
+    {
+      "status": "rejected",
+      "world": "calculus",
+      "clause": "rejected('NEG_calc_delta_always_zero', 'Delta[0]=1.0 != 0').",
+      "reason": "dead-end \u0394\u22610 rejected"
+    },
+    {
+      "status": "verified",
+      "world": "nets",
+      "clause": "verified(fact(nets, nets_xor_depth, 'nets_XOR_two_layer_composition', 'XOR = (OR) AND NOT(AND) two-layer composition')).",
+      "reason": "XOR via 2-layer/composition \u2014 lesson not a blog post"
+    },
+    {
+      "status": "rejected",
+      "world": "nets",
+      "clause": "rejected('NEG_nets_XOR_linear_threshold', 'no linear threshold for XOR').",
+      "reason": "XOR single linear threshold MUST fail"
+    },
+    {
+      "status": "verified",
+      "world": "electro",
+      "clause": "verified(fact(electro, electro_ohm, 'electro_ohm_V_eq_IR_n5_s4096', 'V=IR on generated triples (eps)')).",
+      "reason": "Ohm V=IR on generated triples"
+    },
+    {
+      "status": "rejected",
+      "world": "electro",
+      "clause": "rejected('NEG_electro_current_not_conserved', 'sum=0.0\u22480 so conservation holds (reject claim)').",
+      "reason": "current non-conservation / broken Ohm rejected"
+    },
+    {
+      "status": "verified",
+      "world": "physics",
+      "clause": "verified(fact(physics, phys_collision, 'phys_mom_conserve_s5157', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).",
+      "reason": "1D elastic momentum conservation"
+    },
+    {
+      "status": "rejected",
+      "world": "physics",
+      "clause": "rejected('NEG_phys_momentum_not_conserved', '|\u0394p|=0.0\u22480 (conservation holds)').",
+      "reason": "dead-end momentum-not-conserved rejected"
+    },
+    {
+      "status": "verified",
+      "world": "chem",
+      "clause": "verified(fact(chem, chem_atom_balance, 'chem_atom_balance_2H2+O2\u21922H2O', 'atom counts conserved: 2H2+O2\u21922H2O')).",
+      "reason": "atom-count conservation on generated reaction"
+    },
+    {
+      "status": "rejected",
+      "world": "chem",
+      "clause": "rejected('NEG_chem_atoms_not_conserved', 'counts match \u2014 conservation holds (reject claim)').",
+      "reason": "atoms-not-conserved / unbalanced rejected"
+    }
+  ]
+}

@@ -765,3 +765,25 @@ verified(fact(symmetry, sym_invariant_scan, 'sym_parity_mod2_sum_o2', 'sum(bits)
 verified(fact(symmetry, sym_invariant_scan, 'sym_involution_double_o2', 'f(f(x))=x for swap/negate')).
 % verified @ symmetry/sym_invariant_scan
 verified(fact(symmetry, sym_invariant_scan, 'sym_z2_assoc_o2', 'Z2 addition associative on full table')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_binom_expand_mod5', '(x+y)^2 ≡ x^2+2xy+y^2 (mod 5) exhaustive')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_distrib_mod5', 'x(y+z) ≡ xy+xz (mod 5)')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n3', 'T increases with a on generated circular table')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_pos_n3', 'T>0 and a>0 for all generated bodies')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_fib_N4', 'Delta(fib)[n] = fib[n+1]-fib[n] well-defined')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_lucas_N4', 'Delta(lucas)[n] = lucas[n+1]-lucas[n] well-defined')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_fib_eq_prev_N4', 'Delta(fib)[n] = fib[n-1] for n>=1')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_2H2+O2→2H2O', 'atom counts conserved: 2H2+O2→2H2O')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6382', 'atom counts conserved: synth_s6382')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6383', 'atom counts conserved: synth_s6383')).
+% finite fail / dead-end
+rejected('chem_unbalanced_broken_s6382', 'mismatch {\'H\': 5, \'O\': 5} vs {\'H\': 6, \'O\': 5}').

@@ -31,11 +31,18 @@ RUNS = MOTOR_DIR / "runs"
 SEED_SCIENCE = None  # filled lazily
 
 
+STEM_WORLDS = (
+    "symmetry", "chance", "info",
+    "astro", "algebra", "calculus", "nets",
+    "electro", "physics", "chem",
+)
+
+
 def _prefer_science_arms(kernel) -> list[str]:
     keys = []
     for k, fam in kernel.arms.items():
         w = k.split("::")[0]
-        if w in ("symmetry", "chance", "info", "logic"):
+        if w in STEM_WORLDS or w == "logic":
             keys.append(k)
         if "transfer" in k or "compare" in k or "extrapolate" in k:
             if k not in keys:
@@ -44,7 +51,7 @@ def _prefer_science_arms(kernel) -> list[str]:
 
 
 def _science_worlds(kernel):
-    return {n: kernel.worlds[n] for n in ("symmetry", "chance", "info") if n in kernel.worlds}
+    return {n: kernel.worlds[n] for n in STEM_WORLDS if n in kernel.worlds}
 
 
 def _molt_sciences(kernel, reason: str) -> list[dict]:
@@ -203,7 +210,7 @@ def _example_clauses(kernel, n: int = 8) -> list[dict]:
             break
     # 2 science verified (non-transfer)
     for ln in verified:
-        if any(w in ln for w in ("symmetry", "chance", "info")) and "transfer_" not in ln and "extrap_" not in ln:
+        if any(w in ln for w in STEM_WORLDS) and "transfer_" not in ln and "extrap_" not in ln:
             add("verified", ln, "science world; critic numeric/table gate accepted")
         if len([p for p in picks if p["status"] == "verified"]) >= 2:
             break
@@ -218,7 +225,7 @@ def _example_clauses(kernel, n: int = 8) -> list[dict]:
     if bit_fns:
         add("verified_bit_fn", bit_fns[0], "logic bit_fn prior available for cross-world transfer")
     # ≥2 rejected — prefer science dead-ends / broken tables
-    prefer = ("NEG_chance", "NEG_info", "NEG_sym", "bayes_swap", "z2_claim_mult", "product_mod2")
+    prefer = ("NEG_chance", "NEG_info", "NEG_sym", "NEG_astro", "NEG_alg", "NEG_calc", "NEG_nets", "NEG_electro", "NEG_phys", "NEG_chem", "bayes_swap", "z2_claim_mult", "product_mod2", "XOR_linear", "kepler_wrong")
     sci_rej = [ln for ln in rejected if any(s in ln for s in prefer)]
     sci_rej += [ln for ln in rejected if "wait_no_bitfn" in ln and ln not in sci_rej]
     for ln in sci_rej:
@@ -230,7 +237,7 @@ def _example_clauses(kernel, n: int = 8) -> list[dict]:
             break
         add("rejected", ln, "critic rejected")
     for ln in schemas:
-        if "_g" in ln and any(p in ln for p in ("sym_", "chance_", "info_", "bilinear")):
+        if "_g" in ln and any(p in ln for p in ("sym_", "chance_", "info_", "astro_", "alg_", "calc_", "nets_", "electro_", "phys_", "chem_", "bilinear")):
             add("skin_meta_emergent", ln, "schema/2 for NON-SEED spawned class (not a verified theorem)")
             break
     return picks[:n]

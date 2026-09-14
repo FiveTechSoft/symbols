@@ -92,6 +92,196 @@ SCIENCE_SEED: dict[str, dict[str, Any]] = {
         "dead_end": True,
         "origin": "seed",
     },
+    # --- astro ---
+    "astro_period_scan": {
+        "description": "Scan periods T vs semi-major a on generated circular orbits",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 8,
+    },
+    "astro_kepler_scan": {
+        "description": "Scan T^2/a^3 constancy (Kepler-3 form) within eps",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 8,
+    },
+    "astro_angmom_scan": {
+        "description": "Angular-momentum-like invariant on discrete 2-body circular table",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 6,
+    },
+    "astro_dead_linear": {
+        "description": "DEAD END: claim T proportional to a",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- algebra ---
+    "alg_poly_zn": {
+        "description": "Polynomial identities on small Z/nZ ((x+y)^2 vs expand)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 5,
+        "order_max": 13,
+    },
+    "alg_linear_2x2": {
+        "description": "Exact 2x2 linear systems over Q (integer dets)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 6,
+    },
+    "alg_mat_assoc": {
+        "description": "Associativity of 2x2 matrix mult mod p",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 7,
+    },
+    "alg_dead_binom": {
+        "description": "DEAD END: claim (x+y)^2 = x^2+y^2",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- calculus ---
+    "calc_fwd_diff": {
+        "description": "Forward difference Delta on fib/lucas and simple polynomials",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 4,
+        "order_max": 12,
+    },
+    "calc_ft_discrete": {
+        "description": "Discrete FTC: Delta(sum f) = f on finite prefixes",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 4,
+        "order_max": 12,
+    },
+    "calc_power_diff": {
+        "description": "Delta(x^n) ~ n x^{n-1} on integer lattice",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 6,
+    },
+    "calc_transfer_rec": {
+        "description": "TRANSFER: rec/2 prior for Delta structure on that sequence",
+        "unlocked": True,
+        "origin": "seed",
+    },
+    "calc_dead_zero": {
+        "description": "DEAD END: claim Delta is always zero",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- nets (connectionist miniature) ---
+    "nets_perceptron": {
+        "description": "Tiny linear threshold on AND/OR tables",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 4,
+    },
+    "nets_xor_depth": {
+        "description": "XOR: single linear threshold fail; 2-layer/composition may hold",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 4,
+    },
+    "nets_grad_step": {
+        "description": "One gradient step on 2-weight squared-error toy",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 4,
+    },
+    "nets_chain_transfer": {
+        "description": "TRANSFER: discrete chain rule Delta(f(g)) vs product of Deltas",
+        "unlocked": True,
+        "origin": "seed",
+    },
+    "nets_dead_any_eta": {
+        "description": "DEAD END: claim loss always decreases for any eta",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- electro ---
+    "electro_ohm": {
+        "description": "Ohm V=IR on generated (V,I,R) triples",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 8,
+    },
+    "electro_kirchhoff": {
+        "description": "Kirchhoff current sum=0 at a node (tiny 3-edge net)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 6,
+    },
+    "electro_switch_transfer": {
+        "description": "TRANSFER: AND/OR as series/parallel switches from logic bit_fn",
+        "unlocked": True,
+        "origin": "seed",
+    },
+    "electro_dead_noconserve": {
+        "description": "DEAD END: claim current not conserved at node",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- physics ---
+    "phys_collision": {
+        "description": "1D elastic collision: momentum+energy on generated m,v",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 6,
+    },
+    "phys_action_reaction": {
+        "description": "Action=reaction pair on generated force samples",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "phys_dead_nomom": {
+        "description": "DEAD END: claim momentum not conserved in elastic 1D",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+    # --- chem ---
+    "chem_atom_balance": {
+        "description": "Atom-count conservation on generated tiny reaction tables",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "chem_equilibrium_K": {
+        "description": "K=products/reactants on 2-species equilibrium toy",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "chem_dead_noatoms": {
+        "description": "DEAD END: claim atoms not conserved in reaction",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
 }
 
 
@@ -102,7 +292,7 @@ class ScienceLanguage:
     schemas: dict[str, SchemaClass] = field(default_factory=dict)
     generation: int = 0
     molt_history: list[dict] = field(default_factory=list)
-    world_tag: str = "science"  # "symmetry" | "chance" | "info"
+    world_tag: str = "science"  # +astro/algebra/calculus/nets/electro/physics/chem
     novelty_floor: float = 0.25  # NEVER let novelty die
 
     @classmethod
@@ -111,6 +301,13 @@ class ScienceLanguage:
             "symmetry": "sym_",
             "chance": "chance_",
             "info": "info_",
+            "astro": "astro_",
+            "algebra": "alg_",
+            "calculus": "calc_",
+            "nets": "nets_",
+            "electro": "electro_",
+            "physics": "phys_",
+            "chem": "chem_",
         }[world_tag]
         schemas = {}
         for sid, spec in SCIENCE_SEED.items():
@@ -131,7 +328,18 @@ class ScienceLanguage:
 
     def seed_ids(self) -> set[str]:
         return {sid for sid in SCIENCE_SEED if sid.startswith(
-            {"symmetry": "sym_", "chance": "chance_", "info": "info_"}[self.world_tag]
+            {
+                "symmetry": "sym_",
+                "chance": "chance_",
+                "info": "info_",
+                "astro": "astro_",
+                "algebra": "alg_",
+                "calculus": "calc_",
+                "nets": "nets_",
+                "electro": "electro_",
+                "physics": "phys_",
+                "chem": "chem_",
+            }[self.world_tag]
         )}
 
     def spawned_ids(self) -> list[str]:
@@ -214,7 +422,11 @@ class ScienceLanguage:
         if need_spawn:
             base = None
             for cand in ("sym_invariant_scan", "chance_entropy_scan", "info_mi_scan",
-                         "sym_group_table", "chance_bayes_scan", "info_transfer_bitfn"):
+                         "sym_group_table", "chance_bayes_scan", "info_transfer_bitfn",
+                         "astro_kepler_scan", "astro_period_scan", "alg_poly_zn",
+                         "alg_linear_2x2", "calc_fwd_diff", "calc_ft_discrete",
+                         "nets_perceptron", "nets_xor_depth", "nets_grad_step",
+                         "electro_ohm", "phys_collision", "chem_atom_balance"):
                 if cand in self.schemas and self.schemas[cand].unlocked:
                     base = self.schemas[cand]
                     break

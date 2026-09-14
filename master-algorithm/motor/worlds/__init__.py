@@ -7,6 +7,13 @@ from .geometry_world import GeometryWorld
 from .symmetry import SymmetryWorld
 from .chance import ChanceWorld
 from .info import InfoWorld
+from .astro import AstroWorld
+from .algebra import AlgebraWorld
+from .calculus import CalculusWorld
+from .nets import NetsWorld
+from .electro import ElectroWorld
+from .physics import PhysicsWorld
+from .chem import ChemWorld
 
 
 def build_worlds():
@@ -18,6 +25,13 @@ def build_worlds():
         "symmetry": SymmetryWorld(),
         "chance": ChanceWorld(),
         "info": InfoWorld(),
+        "astro": AstroWorld(),
+        "algebra": AlgebraWorld(),
+        "calculus": CalculusWorld(),
+        "nets": NetsWorld(),
+        "electro": ElectroWorld(),
+        "physics": PhysicsWorld(),
+        "chem": ChemWorld(),
     }
 
 
@@ -32,5 +46,12 @@ __all__ = [
     "SymmetryWorld",
     "ChanceWorld",
     "InfoWorld",
+    "AstroWorld",
+    "AlgebraWorld",
+    "CalculusWorld",
+    "NetsWorld",
+    "ElectroWorld",
+    "PhysicsWorld",
+    "ChemWorld",
     "build_worlds",
 ]

@@ -1,5 +1,5 @@
 {
-  "archive_dir": "/workspace/master-algorithm/motor/archive-sciences",
+  "archive_dir": "/workspace/master-algorithm/motor/archive-stem",
   "ticks_per_batch": 6,
   "max_molts": 3,
   "philosophy": "tick \u2192 compare/extrapolate \u2192 if plateau then molt/spawn \u2192 forever",
@@ -44,6 +44,83 @@
         ],
         "spawned": []
       },
+      "astro": {
+        "generation": 0,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "astro_angmom_scan",
+          "astro_dead_linear",
+          "astro_kepler_scan",
+          "astro_period_scan"
+        ],
+        "spawned": []
+      },
+      "algebra": {
+        "generation": 0,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "alg_dead_binom",
+          "alg_linear_2x2",
+          "alg_mat_assoc",
+          "alg_poly_zn"
+        ],
+        "spawned": []
+      },
+      "calculus": {
+        "generation": 0,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "calc_dead_zero",
+          "calc_ft_discrete",
+          "calc_fwd_diff",
+          "calc_power_diff",
+          "calc_transfer_rec"
+        ],
+        "spawned": []
+      },
+      "nets": {
+        "generation": 0,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "nets_chain_transfer",
+          "nets_dead_any_eta",
+          "nets_grad_step",
+          "nets_perceptron",
+          "nets_xor_depth"
+        ],
+        "spawned": []
+      },
+      "electro": {
+        "generation": 0,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "electro_dead_noconserve",
+          "electro_kirchhoff",
+          "electro_ohm",
+          "electro_switch_transfer"
+        ],
+        "spawned": []
+      },
+      "physics": {
+        "generation": 0,
+        "n_schema_classes": 3,
+        "unlocked": [
+          "phys_action_reaction",
+          "phys_collision",
+          "phys_dead_nomom"
+        ],
+        "spawned": []
+      },
+      "chem": {
+        "generation": 0,
+        "n_schema_classes": 3,
+        "unlocked": [
+          "chem_atom_balance",
+          "chem_dead_noatoms",
+          "chem_equilibrium_K"
+        ],
+        "spawned": []
+      },
       "sequences": {
         "generation": 0,
         "n_schema_classes": 7,
@@ -67,18 +144,53 @@
         "attempts": 0,
         "hits": 0,
         "misses": 0
+      },
+      "astro": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "algebra": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "calculus": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "nets": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "electro": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "physics": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "chem": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
       }
     },
     "n_verified": 0,
     "n_types": 0
   },
   "metrics_final": {
-    "n_verified_facts": 47,
-    "n_distinct_types": 19,
+    "n_verified_facts": 69,
+    "n_distinct_types": 28,
     "transfer_accuracy": 0.0,
-    "lemma_reuse_rate": 0.5,
-    "reject_rate": 0.3974,
-    "n_rejected": 31,
+    "lemma_reuse_rate": 1.0,
+    "reject_rate": 0.2887,
+    "n_rejected": 28,
     "n_lemmas": 2,
     "science": {
       "symmetry": {
@@ -89,10 +201,10 @@
           "sym_dead_product",
           "sym_group_table",
           "sym_invariant_scan",
-          "sym_invariant_scan_n5_g2"
+          "sym_invariant_scan_n4_g2"
         ],
         "spawned": [
-          "sym_invariant_scan_n5_g2"
+          "sym_invariant_scan_n4_g2"
         ]
       },
       "chance": {
@@ -111,15 +223,117 @@
       },
       "info": {
         "generation": 3,
-        "n_schema_classes": 4,
+        "n_schema_classes": 5,
         "unlocked": [
           "info_dead_mi0",
           "info_mi_scan",
           "info_mi_scan_n4_g2",
+          "info_mi_scan_n4_g3",
           "info_transfer_bitfn"
         ],
         "spawned": [
-          "info_mi_scan_n4_g2"
+          "info_mi_scan_n4_g2",
+          "info_mi_scan_n4_g3"
+        ]
+      },
+      "astro": {
+        "generation": 3,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "astro_angmom_scan",
+          "astro_dead_linear",
+          "astro_kepler_scan",
+          "astro_kepler_scan_n3_g2",
+          "astro_period_scan"
+        ],
+        "spawned": [
+          "astro_kepler_scan_n3_g2"
+        ]
+      },
+      "algebra": {
+        "generation": 3,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "alg_dead_binom",
+          "alg_linear_2x2",
+          "alg_mat_assoc",
+          "alg_poly_zn",
+          "alg_poly_zn_n9_g2"
+        ],
+        "spawned": [
+          "alg_poly_zn_n9_g2"
+        ]
+      },
+      "calculus": {
+        "generation": 3,
+        "n_schema_classes": 6,
+        "unlocked": [
+          "calc_dead_zero",
+          "calc_ft_discrete",
+          "calc_fwd_diff",
+          "calc_fwd_diff_n7_g2",
+          "calc_power_diff",
+          "calc_transfer_rec"
+        ],
+        "spawned": [
+          "calc_fwd_diff_n7_g2"
+        ]
+      },
+      "nets": {
+        "generation": 3,
+        "n_schema_classes": 7,
+        "unlocked": [
+          "nets_chain_transfer",
+          "nets_dead_any_eta",
+          "nets_grad_step",
+          "nets_perceptron",
+          "nets_perceptron_n4_g2",
+          "nets_perceptron_n4_g3",
+          "nets_xor_depth"
+        ],
+        "spawned": [
+          "nets_perceptron_n4_g2",
+          "nets_perceptron_n4_g3"
+        ]
+      },
+      "electro": {
+        "generation": 3,
+        "n_schema_classes": 5,
+        "unlocked": [
+          "electro_dead_noconserve",
+          "electro_kirchhoff",
+          "electro_ohm",
+          "electro_ohm_n5_g2",
+          "electro_switch_transfer"
+        ],
+        "spawned": [
+          "electro_ohm_n5_g2"
+        ]
+      },
+      "physics": {
+        "generation": 3,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "phys_action_reaction",
+          "phys_collision",
+          "phys_collision_n4_g2",
+          "phys_dead_nomom"
+        ],
+        "spawned": [
+          "phys_collision_n4_g2"
+        ]
+      },
+      "chem": {
+        "generation": 3,
+        "n_schema_classes": 4,
+        "unlocked": [
+          "chem_atom_balance",
+          "chem_atom_balance_n4_g2",
+          "chem_dead_noatoms",
+          "chem_equilibrium_K"
+        ],
+        "spawned": [
+          "chem_atom_balance_n4_g2"
         ]
       },
       "sequences": {
@@ -129,16 +343,25 @@
       }
     },
     "spawned_schemas": [
+      "alg_poly_zn_n9_g2",
+      "astro_kepler_scan_n3_g2",
+      "calc_fwd_diff_n7_g2",
       "chance_entropy_scan_n3_g2",
+      "chem_atom_balance_n4_g2",
+      "electro_ohm_n5_g2",
       "info_mi_scan_n4_g2",
-      "sym_invariant_scan_n5_g2"
+      "info_mi_scan_n4_g3",
+      "nets_perceptron_n4_g2",
+      "nets_perceptron_n4_g3",
+      "phys_collision_n4_g2",
+      "sym_invariant_scan_n4_g2"
     ],
-    "n_spawned": 3,
+    "n_spawned": 12,
     "compare": {
       "symmetry": {
-        "attempts": 0,
-        "hits": 0,
-        "misses": 0
+        "attempts": 4,
+        "hits": 2,
+        "misses": 2
       },
       "chance": {
         "attempts": 0,
@@ -146,13 +369,48 @@
         "misses": 0
       },
       "info": {
+        "attempts": 4,
+        "hits": 2,
+        "misses": 2
+      },
+      "astro": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "algebra": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "calculus": {
+        "attempts": 4,
+        "hits": 0,
+        "misses": 4
+      },
+      "nets": {
+        "attempts": 4,
+        "hits": 4,
+        "misses": 0
+      },
+      "electro": {
+        "attempts": 6,
+        "hits": 4,
+        "misses": 2
+      },
+      "physics": {
+        "attempts": 0,
+        "hits": 0,
+        "misses": 0
+      },
+      "chem": {
         "attempts": 0,
         "hits": 0,
         "misses": 0
       }
     },
-    "n_verified": 47,
-    "n_types": 19
+    "n_verified": 69,
+    "n_types": 28
   },
   "molt_log": [
     {
@@ -228,6 +486,174 @@
           "spawned": [],
           "n_schema_classes": 3,
           "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "astro",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order astro_period_scan 3\u21924",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_period_scan"
+          ],
+          "unlocked_after": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_period_scan"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "algebra",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order alg_poly_zn 5\u21926",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn"
+          ],
+          "unlocked_after": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "calculus",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order calc_fwd_diff 4\u21925",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "unlocked_after": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "spawned": [],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "nets",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order nets_perceptron 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_xor_depth"
+          ],
+          "unlocked_after": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_xor_depth"
+          ],
+          "spawned": [],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "electro",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order electro_ohm 3\u21924",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_switch_transfer"
+          ],
+          "unlocked_after": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_switch_transfer"
+          ],
+          "spawned": [],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "physics",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order phys_collision 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_dead_nomom"
+          ],
+          "unlocked_after": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_dead_nomom"
+          ],
+          "spawned": [],
+          "n_schema_classes": 3,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 1,
+          "world_tag": "chem",
+          "reason": "plateau/curiosity molt 1/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chem_atom_balance 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chem_atom_balance",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "unlocked_after": [
+            "chem_atom_balance",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "spawned": [],
+          "n_schema_classes": 3,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
         }
       ],
       "sequences_molt": [
@@ -239,12 +665,12 @@
         "novelty_bonus\u21920.5"
       ],
       "metrics_after": {
-        "n_verified_facts": 24,
-        "n_distinct_types": 11,
+        "n_verified_facts": 26,
+        "n_distinct_types": 13,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.4286,
-        "n_rejected": 18,
+        "reject_rate": 0.381,
+        "n_rejected": 16,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -279,6 +705,83 @@
             ],
             "spawned": []
           },
+          "astro": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_period_scan"
+            ],
+            "spawned": []
+          },
+          "algebra": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn"
+            ],
+            "spawned": []
+          },
+          "calculus": {
+            "generation": 1,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": []
+          },
+          "nets": {
+            "generation": 1,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_xor_depth"
+            ],
+            "spawned": []
+          },
+          "electro": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_switch_transfer"
+            ],
+            "spawned": []
+          },
+          "physics": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_dead_nomom"
+            ],
+            "spawned": []
+          },
+          "chem": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": []
+          },
           "sequences": {
             "generation": 1,
             "n_schema_classes": 7,
@@ -302,10 +805,45 @@
             "attempts": 1,
             "hits": 0,
             "misses": 1
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          },
+          "nets": {
+            "attempts": 1,
+            "hits": 1,
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 2,
+            "hits": 1,
+            "misses": 1
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 24,
-        "n_types": 11
+        "n_verified": 26,
+        "n_types": 13
       },
       "n_spawned": 0,
       "spawned": []
@@ -319,8 +857,8 @@
           "world_tag": "symmetry",
           "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
           "actions": [
-            "raise_order sym_invariant_scan 4\u21925",
-            "spawn_schema sym_invariant_scan_n5_g2",
+            "raise_order sym_invariant_scan 3\u21924",
+            "spawn_schema sym_invariant_scan_n4_g2",
             "novelty_floor\u22650.25; arms reopened"
           ],
           "unlocked_before": [
@@ -334,10 +872,10 @@
             "sym_dead_product",
             "sym_group_table",
             "sym_invariant_scan",
-            "sym_invariant_scan_n5_g2"
+            "sym_invariant_scan_n4_g2"
           ],
           "spawned": [
-            "sym_invariant_scan_n5_g2"
+            "sym_invariant_scan_n4_g2"
           ],
           "n_schema_classes": 5,
           "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
@@ -375,7 +913,7 @@
           "world_tag": "info",
           "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
           "actions": [
-            "raise_order info_transfer_bitfn 1\u21922",
+            "raise_order info_mi_scan 3\u21924",
             "spawn_schema info_mi_scan_n4_g2",
             "novelty_floor\u22650.25; arms reopened"
           ],
@@ -395,16 +933,212 @@
           ],
           "n_schema_classes": 4,
           "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "astro",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order astro_period_scan 5\u21926",
+            "spawn_schema astro_kepler_scan_n3_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_period_scan"
+          ],
+          "unlocked_after": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_kepler_scan_n3_g2",
+            "astro_period_scan"
+          ],
+          "spawned": [
+            "astro_kepler_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "algebra",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order alg_poly_zn 8\u21929",
+            "spawn_schema alg_poly_zn_n9_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn"
+          ],
+          "unlocked_after": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn",
+            "alg_poly_zn_n9_g2"
+          ],
+          "spawned": [
+            "alg_poly_zn_n9_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "calculus",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order calc_fwd_diff 6\u21927",
+            "spawn_schema calc_fwd_diff_n7_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "unlocked_after": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_fwd_diff_n7_g2",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "spawned": [
+            "calc_fwd_diff_n7_g2"
+          ],
+          "n_schema_classes": 6,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "nets",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order nets_perceptron 3\u21924",
+            "spawn_schema nets_perceptron_n4_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_xor_depth"
+          ],
+          "unlocked_after": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_perceptron_n4_g2",
+            "nets_xor_depth"
+          ],
+          "spawned": [
+            "nets_perceptron_n4_g2"
+          ],
+          "n_schema_classes": 6,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "electro",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order electro_ohm 4\u21925",
+            "spawn_schema electro_ohm_n5_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_switch_transfer"
+          ],
+          "unlocked_after": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_ohm_n5_g2",
+            "electro_switch_transfer"
+          ],
+          "spawned": [
+            "electro_ohm_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "physics",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order phys_collision 3\u21924",
+            "spawn_schema phys_collision_n4_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_dead_nomom"
+          ],
+          "unlocked_after": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_collision_n4_g2",
+            "phys_dead_nomom"
+          ],
+          "spawned": [
+            "phys_collision_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 2,
+          "world_tag": "chem",
+          "reason": "plateau/curiosity molt 2/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chem_atom_balance 3\u21924",
+            "spawn_schema chem_atom_balance_n4_g2",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chem_atom_balance",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "unlocked_after": [
+            "chem_atom_balance",
+            "chem_atom_balance_n4_g2",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "spawned": [
+            "chem_atom_balance_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
         }
       ],
       "sequences_molt": null,
       "metrics_after": {
-        "n_verified_facts": 35,
-        "n_distinct_types": 15,
+        "n_verified_facts": 45,
+        "n_distinct_types": 19,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.4068,
-        "n_rejected": 24,
+        "reject_rate": 0.3284,
+        "n_rejected": 22,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -415,10 +1149,10 @@
               "sym_dead_product",
               "sym_group_table",
               "sym_invariant_scan",
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ],
             "spawned": [
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ]
           },
           "chance": {
@@ -448,6 +1182,104 @@
               "info_mi_scan_n4_g2"
             ]
           },
+          "astro": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_kepler_scan_n3_g2",
+              "astro_period_scan"
+            ],
+            "spawned": [
+              "astro_kepler_scan_n3_g2"
+            ]
+          },
+          "algebra": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn",
+              "alg_poly_zn_n9_g2"
+            ],
+            "spawned": [
+              "alg_poly_zn_n9_g2"
+            ]
+          },
+          "calculus": {
+            "generation": 2,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_fwd_diff_n7_g2",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": [
+              "calc_fwd_diff_n7_g2"
+            ]
+          },
+          "nets": {
+            "generation": 2,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_perceptron_n4_g2",
+              "nets_xor_depth"
+            ],
+            "spawned": [
+              "nets_perceptron_n4_g2"
+            ]
+          },
+          "electro": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_ohm_n5_g2",
+              "electro_switch_transfer"
+            ],
+            "spawned": [
+              "electro_ohm_n5_g2"
+            ]
+          },
+          "physics": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_collision_n4_g2",
+              "phys_dead_nomom"
+            ],
+            "spawned": [
+              "phys_collision_n4_g2"
+            ]
+          },
+          "chem": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_atom_balance_n4_g2",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": [
+              "chem_atom_balance_n4_g2"
+            ]
+          },
           "sequences": {
             "generation": 1,
             "n_schema_classes": 7,
@@ -455,16 +1287,23 @@
           }
         },
         "spawned_schemas": [
+          "alg_poly_zn_n9_g2",
+          "astro_kepler_scan_n3_g2",
+          "calc_fwd_diff_n7_g2",
           "chance_entropy_scan_n3_g2",
+          "chem_atom_balance_n4_g2",
+          "electro_ohm_n5_g2",
           "info_mi_scan_n4_g2",
-          "sym_invariant_scan_n5_g2"
+          "nets_perceptron_n4_g2",
+          "phys_collision_n4_g2",
+          "sym_invariant_scan_n4_g2"
         ],
-        "n_spawned": 3,
+        "n_spawned": 10,
         "compare": {
           "symmetry": {
             "attempts": 2,
-            "hits": 1,
-            "misses": 1
+            "hits": 0,
+            "misses": 2
           },
           "chance": {
             "attempts": 0,
@@ -472,19 +1311,61 @@
             "misses": 0
           },
           "info": {
-            "attempts": 3,
+            "attempts": 2,
+            "hits": 0,
+            "misses": 2
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 2,
+            "hits": 0,
+            "misses": 2
+          },
+          "nets": {
+            "attempts": 2,
             "hits": 2,
-            "misses": 1
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 4,
+            "hits": 2,
+            "misses": 2
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 35,
-        "n_types": 15
+        "n_verified": 45,
+        "n_types": 19
       },
-      "n_spawned": 3,
+      "n_spawned": 10,
       "spawned": [
+        "alg_poly_zn_n9_g2",
+        "astro_kepler_scan_n3_g2",
+        "calc_fwd_diff_n7_g2",
         "chance_entropy_scan_n3_g2",
+        "chem_atom_balance_n4_g2",
+        "electro_ohm_n5_g2",
         "info_mi_scan_n4_g2",
-        "sym_invariant_scan_n5_g2"
+        "nets_perceptron_n4_g2",
+        "phys_collision_n4_g2",
+        "sym_invariant_scan_n4_g2"
       ]
     },
     {
@@ -496,7 +1377,7 @@
           "world_tag": "symmetry",
           "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
           "actions": [
-            "raise_order sym_invariant_scan 5\u21926",
+            "raise_order sym_invariant_scan 4\u21925",
             "novelty_floor\u22650.25; arms reopened"
           ],
           "unlocked_before": [
@@ -504,17 +1385,17 @@
             "sym_dead_product",
             "sym_group_table",
             "sym_invariant_scan",
-            "sym_invariant_scan_n5_g2"
+            "sym_invariant_scan_n4_g2"
           ],
           "unlocked_after": [
             "sym_compare_transfer",
             "sym_dead_product",
             "sym_group_table",
             "sym_invariant_scan",
-            "sym_invariant_scan_n5_g2"
+            "sym_invariant_scan_n4_g2"
           ],
           "spawned": [
-            "sym_invariant_scan_n5_g2"
+            "sym_invariant_scan_n4_g2"
           ],
           "n_schema_classes": 5,
           "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
@@ -524,7 +1405,7 @@
           "world_tag": "chance",
           "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
           "actions": [
-            "raise_order chance_entropy_scan 4\u21925",
+            "raise_order chance_entropy_scan 3\u21924",
             "novelty_floor\u22650.25; arms reopened"
           ],
           "unlocked_before": [
@@ -552,7 +1433,8 @@
           "world_tag": "info",
           "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
           "actions": [
-            "raise_order info_transfer_bitfn 3\u21924",
+            "raise_order info_transfer_bitfn 1\u21922",
+            "spawn_schema info_mi_scan_n4_g3",
             "novelty_floor\u22650.25; arms reopened"
           ],
           "unlocked_before": [
@@ -565,10 +1447,211 @@
             "info_dead_mi0",
             "info_mi_scan",
             "info_mi_scan_n4_g2",
+            "info_mi_scan_n4_g3",
             "info_transfer_bitfn"
           ],
           "spawned": [
-            "info_mi_scan_n4_g2"
+            "info_mi_scan_n4_g2",
+            "info_mi_scan_n4_g3"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "astro",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order astro_period_scan 6\u21927",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_kepler_scan_n3_g2",
+            "astro_period_scan"
+          ],
+          "unlocked_after": [
+            "astro_angmom_scan",
+            "astro_dead_linear",
+            "astro_kepler_scan",
+            "astro_kepler_scan_n3_g2",
+            "astro_period_scan"
+          ],
+          "spawned": [
+            "astro_kepler_scan_n3_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "algebra",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order alg_poly_zn 9\u219210",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn",
+            "alg_poly_zn_n9_g2"
+          ],
+          "unlocked_after": [
+            "alg_dead_binom",
+            "alg_linear_2x2",
+            "alg_mat_assoc",
+            "alg_poly_zn",
+            "alg_poly_zn_n9_g2"
+          ],
+          "spawned": [
+            "alg_poly_zn_n9_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "calculus",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order calc_fwd_diff 7\u21928",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_fwd_diff_n7_g2",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "unlocked_after": [
+            "calc_dead_zero",
+            "calc_ft_discrete",
+            "calc_fwd_diff",
+            "calc_fwd_diff_n7_g2",
+            "calc_power_diff",
+            "calc_transfer_rec"
+          ],
+          "spawned": [
+            "calc_fwd_diff_n7_g2"
+          ],
+          "n_schema_classes": 6,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "nets",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order nets_xor_depth 2\u21923",
+            "spawn_schema nets_perceptron_n4_g3",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_perceptron_n4_g2",
+            "nets_xor_depth"
+          ],
+          "unlocked_after": [
+            "nets_chain_transfer",
+            "nets_dead_any_eta",
+            "nets_grad_step",
+            "nets_perceptron",
+            "nets_perceptron_n4_g2",
+            "nets_perceptron_n4_g3",
+            "nets_xor_depth"
+          ],
+          "spawned": [
+            "nets_perceptron_n4_g2",
+            "nets_perceptron_n4_g3"
+          ],
+          "n_schema_classes": 7,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "electro",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order electro_ohm 6\u21927",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_ohm_n5_g2",
+            "electro_switch_transfer"
+          ],
+          "unlocked_after": [
+            "electro_dead_noconserve",
+            "electro_kirchhoff",
+            "electro_ohm",
+            "electro_ohm_n5_g2",
+            "electro_switch_transfer"
+          ],
+          "spawned": [
+            "electro_ohm_n5_g2"
+          ],
+          "n_schema_classes": 5,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "physics",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order phys_collision 5\u21926",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_collision_n4_g2",
+            "phys_dead_nomom"
+          ],
+          "unlocked_after": [
+            "phys_action_reaction",
+            "phys_collision",
+            "phys_collision_n4_g2",
+            "phys_dead_nomom"
+          ],
+          "spawned": [
+            "phys_collision_n4_g2"
+          ],
+          "n_schema_classes": 4,
+          "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
+        },
+        {
+          "generation": 3,
+          "world_tag": "chem",
+          "reason": "plateau/curiosity molt 3/3 (run cap \u2014 philosophy is forever)",
+          "actions": [
+            "raise_order chem_equilibrium_K 2\u21923",
+            "novelty_floor\u22650.25; arms reopened"
+          ],
+          "unlocked_before": [
+            "chem_atom_balance",
+            "chem_atom_balance_n4_g2",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "unlocked_after": [
+            "chem_atom_balance",
+            "chem_atom_balance_n4_g2",
+            "chem_dead_noatoms",
+            "chem_equilibrium_K"
+          ],
+          "spawned": [
+            "chem_atom_balance_n4_g2"
           ],
           "n_schema_classes": 4,
           "philosophy": "tick\u2192compare/extrapolate\u2192if plateau then molt/spawn\u2192forever"
@@ -584,12 +1667,12 @@
         "novelty_bonus\u21921.0"
       ],
       "metrics_after": {
-        "n_verified_facts": 47,
-        "n_distinct_types": 19,
+        "n_verified_facts": 69,
+        "n_distinct_types": 28,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.3974,
-        "n_rejected": 31,
+        "reject_rate": 0.2887,
+        "n_rejected": 28,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -600,10 +1683,10 @@
               "sym_dead_product",
               "sym_group_table",
               "sym_invariant_scan",
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ],
             "spawned": [
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ]
           },
           "chance": {
@@ -622,15 +1705,117 @@
           },
           "info": {
             "generation": 3,
-            "n_schema_classes": 4,
+            "n_schema_classes": 5,
             "unlocked": [
               "info_dead_mi0",
               "info_mi_scan",
               "info_mi_scan_n4_g2",
+              "info_mi_scan_n4_g3",
               "info_transfer_bitfn"
             ],
             "spawned": [
-              "info_mi_scan_n4_g2"
+              "info_mi_scan_n4_g2",
+              "info_mi_scan_n4_g3"
+            ]
+          },
+          "astro": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_kepler_scan_n3_g2",
+              "astro_period_scan"
+            ],
+            "spawned": [
+              "astro_kepler_scan_n3_g2"
+            ]
+          },
+          "algebra": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn",
+              "alg_poly_zn_n9_g2"
+            ],
+            "spawned": [
+              "alg_poly_zn_n9_g2"
+            ]
+          },
+          "calculus": {
+            "generation": 3,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_fwd_diff_n7_g2",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": [
+              "calc_fwd_diff_n7_g2"
+            ]
+          },
+          "nets": {
+            "generation": 3,
+            "n_schema_classes": 7,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_perceptron_n4_g2",
+              "nets_perceptron_n4_g3",
+              "nets_xor_depth"
+            ],
+            "spawned": [
+              "nets_perceptron_n4_g2",
+              "nets_perceptron_n4_g3"
+            ]
+          },
+          "electro": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_ohm_n5_g2",
+              "electro_switch_transfer"
+            ],
+            "spawned": [
+              "electro_ohm_n5_g2"
+            ]
+          },
+          "physics": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_collision_n4_g2",
+              "phys_dead_nomom"
+            ],
+            "spawned": [
+              "phys_collision_n4_g2"
+            ]
+          },
+          "chem": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_atom_balance_n4_g2",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": [
+              "chem_atom_balance_n4_g2"
             ]
           },
           "sequences": {
@@ -640,36 +1825,89 @@
           }
         },
         "spawned_schemas": [
+          "alg_poly_zn_n9_g2",
+          "astro_kepler_scan_n3_g2",
+          "calc_fwd_diff_n7_g2",
           "chance_entropy_scan_n3_g2",
+          "chem_atom_balance_n4_g2",
+          "electro_ohm_n5_g2",
           "info_mi_scan_n4_g2",
-          "sym_invariant_scan_n5_g2"
+          "info_mi_scan_n4_g3",
+          "nets_perceptron_n4_g2",
+          "nets_perceptron_n4_g3",
+          "phys_collision_n4_g2",
+          "sym_invariant_scan_n4_g2"
         ],
-        "n_spawned": 3,
+        "n_spawned": 12,
         "compare": {
           "symmetry": {
-            "attempts": 4,
-            "hits": 3,
-            "misses": 1
+            "attempts": 3,
+            "hits": 1,
+            "misses": 2
           },
           "chance": {
-            "attempts": 4,
-            "hits": 4,
+            "attempts": 0,
+            "hits": 0,
             "misses": 0
           },
           "info": {
-            "attempts": 4,
+            "attempts": 3,
+            "hits": 1,
+            "misses": 2
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 3,
+            "hits": 0,
+            "misses": 3
+          },
+          "nets": {
+            "attempts": 3,
             "hits": 3,
-            "misses": 1
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 5,
+            "hits": 3,
+            "misses": 2
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 47,
-        "n_types": 19
+        "n_verified": 69,
+        "n_types": 28
       },
-      "n_spawned": 3,
+      "n_spawned": 12,
       "spawned": [
+        "alg_poly_zn_n9_g2",
+        "astro_kepler_scan_n3_g2",
+        "calc_fwd_diff_n7_g2",
         "chance_entropy_scan_n3_g2",
+        "chem_atom_balance_n4_g2",
+        "electro_ohm_n5_g2",
         "info_mi_scan_n4_g2",
-        "sym_invariant_scan_n5_g2"
+        "info_mi_scan_n4_g3",
+        "nets_perceptron_n4_g2",
+        "nets_perceptron_n4_g3",
+        "phys_collision_n4_g2",
+        "sym_invariant_scan_n4_g2"
       ]
     }
   ],
@@ -716,6 +1954,83 @@
             ],
             "spawned": []
           },
+          "astro": {
+            "generation": 0,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_period_scan"
+            ],
+            "spawned": []
+          },
+          "algebra": {
+            "generation": 0,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn"
+            ],
+            "spawned": []
+          },
+          "calculus": {
+            "generation": 0,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": []
+          },
+          "nets": {
+            "generation": 0,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_xor_depth"
+            ],
+            "spawned": []
+          },
+          "electro": {
+            "generation": 0,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_switch_transfer"
+            ],
+            "spawned": []
+          },
+          "physics": {
+            "generation": 0,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_dead_nomom"
+            ],
+            "spawned": []
+          },
+          "chem": {
+            "generation": 0,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": []
+          },
           "sequences": {
             "generation": 0,
             "n_schema_classes": 7,
@@ -739,6 +2054,41 @@
             "attempts": 0,
             "hits": 0,
             "misses": 0
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "nets": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
         "n_verified": 6,
@@ -748,12 +2098,12 @@
     {
       "phase": "post_molt_0",
       "metrics": {
-        "n_verified_facts": 24,
-        "n_distinct_types": 11,
+        "n_verified_facts": 26,
+        "n_distinct_types": 13,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.4286,
-        "n_rejected": 18,
+        "reject_rate": 0.381,
+        "n_rejected": 16,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -788,6 +2138,83 @@
             ],
             "spawned": []
           },
+          "astro": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_period_scan"
+            ],
+            "spawned": []
+          },
+          "algebra": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn"
+            ],
+            "spawned": []
+          },
+          "calculus": {
+            "generation": 1,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": []
+          },
+          "nets": {
+            "generation": 1,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_xor_depth"
+            ],
+            "spawned": []
+          },
+          "electro": {
+            "generation": 1,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_switch_transfer"
+            ],
+            "spawned": []
+          },
+          "physics": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_dead_nomom"
+            ],
+            "spawned": []
+          },
+          "chem": {
+            "generation": 1,
+            "n_schema_classes": 3,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": []
+          },
           "sequences": {
             "generation": 1,
             "n_schema_classes": 7,
@@ -811,21 +2238,56 @@
             "attempts": 1,
             "hits": 0,
             "misses": 1
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 1,
+            "hits": 0,
+            "misses": 1
+          },
+          "nets": {
+            "attempts": 1,
+            "hits": 1,
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 2,
+            "hits": 1,
+            "misses": 1
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 24,
-        "n_types": 11
+        "n_verified": 26,
+        "n_types": 13
       }
     },
     {
       "phase": "post_molt_1",
       "metrics": {
-        "n_verified_facts": 35,
-        "n_distinct_types": 15,
+        "n_verified_facts": 45,
+        "n_distinct_types": 19,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.4068,
-        "n_rejected": 24,
+        "reject_rate": 0.3284,
+        "n_rejected": 22,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -836,10 +2298,10 @@
               "sym_dead_product",
               "sym_group_table",
               "sym_invariant_scan",
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ],
             "spawned": [
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ]
           },
           "chance": {
@@ -867,6 +2329,104 @@
             ],
             "spawned": [
               "info_mi_scan_n4_g2"
+            ]
+          },
+          "astro": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_kepler_scan_n3_g2",
+              "astro_period_scan"
+            ],
+            "spawned": [
+              "astro_kepler_scan_n3_g2"
+            ]
+          },
+          "algebra": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn",
+              "alg_poly_zn_n9_g2"
+            ],
+            "spawned": [
+              "alg_poly_zn_n9_g2"
+            ]
+          },
+          "calculus": {
+            "generation": 2,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_fwd_diff_n7_g2",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": [
+              "calc_fwd_diff_n7_g2"
+            ]
+          },
+          "nets": {
+            "generation": 2,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_perceptron_n4_g2",
+              "nets_xor_depth"
+            ],
+            "spawned": [
+              "nets_perceptron_n4_g2"
+            ]
+          },
+          "electro": {
+            "generation": 2,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_ohm_n5_g2",
+              "electro_switch_transfer"
+            ],
+            "spawned": [
+              "electro_ohm_n5_g2"
+            ]
+          },
+          "physics": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_collision_n4_g2",
+              "phys_dead_nomom"
+            ],
+            "spawned": [
+              "phys_collision_n4_g2"
+            ]
+          },
+          "chem": {
+            "generation": 2,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_atom_balance_n4_g2",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": [
+              "chem_atom_balance_n4_g2"
             ]
           },
           "sequences": {
@@ -876,16 +2436,23 @@
           }
         },
         "spawned_schemas": [
+          "alg_poly_zn_n9_g2",
+          "astro_kepler_scan_n3_g2",
+          "calc_fwd_diff_n7_g2",
           "chance_entropy_scan_n3_g2",
+          "chem_atom_balance_n4_g2",
+          "electro_ohm_n5_g2",
           "info_mi_scan_n4_g2",
-          "sym_invariant_scan_n5_g2"
+          "nets_perceptron_n4_g2",
+          "phys_collision_n4_g2",
+          "sym_invariant_scan_n4_g2"
         ],
-        "n_spawned": 3,
+        "n_spawned": 10,
         "compare": {
           "symmetry": {
             "attempts": 2,
-            "hits": 1,
-            "misses": 1
+            "hits": 0,
+            "misses": 2
           },
           "chance": {
             "attempts": 0,
@@ -893,24 +2460,59 @@
             "misses": 0
           },
           "info": {
-            "attempts": 3,
+            "attempts": 2,
+            "hits": 0,
+            "misses": 2
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 2,
+            "hits": 0,
+            "misses": 2
+          },
+          "nets": {
+            "attempts": 2,
             "hits": 2,
-            "misses": 1
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 4,
+            "hits": 2,
+            "misses": 2
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 35,
-        "n_types": 15
+        "n_verified": 45,
+        "n_types": 19
       }
     },
     {
       "phase": "post_molt_2",
       "metrics": {
-        "n_verified_facts": 47,
-        "n_distinct_types": 19,
+        "n_verified_facts": 69,
+        "n_distinct_types": 28,
         "transfer_accuracy": 0.0,
         "lemma_reuse_rate": 1.0,
-        "reject_rate": 0.3974,
-        "n_rejected": 31,
+        "reject_rate": 0.2887,
+        "n_rejected": 28,
         "n_lemmas": 2,
         "science": {
           "symmetry": {
@@ -921,10 +2523,10 @@
               "sym_dead_product",
               "sym_group_table",
               "sym_invariant_scan",
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ],
             "spawned": [
-              "sym_invariant_scan_n5_g2"
+              "sym_invariant_scan_n4_g2"
             ]
           },
           "chance": {
@@ -943,15 +2545,117 @@
           },
           "info": {
             "generation": 3,
-            "n_schema_classes": 4,
+            "n_schema_classes": 5,
             "unlocked": [
               "info_dead_mi0",
               "info_mi_scan",
               "info_mi_scan_n4_g2",
+              "info_mi_scan_n4_g3",
               "info_transfer_bitfn"
             ],
             "spawned": [
-              "info_mi_scan_n4_g2"
+              "info_mi_scan_n4_g2",
+              "info_mi_scan_n4_g3"
+            ]
+          },
+          "astro": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "astro_angmom_scan",
+              "astro_dead_linear",
+              "astro_kepler_scan",
+              "astro_kepler_scan_n3_g2",
+              "astro_period_scan"
+            ],
+            "spawned": [
+              "astro_kepler_scan_n3_g2"
+            ]
+          },
+          "algebra": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "alg_dead_binom",
+              "alg_linear_2x2",
+              "alg_mat_assoc",
+              "alg_poly_zn",
+              "alg_poly_zn_n9_g2"
+            ],
+            "spawned": [
+              "alg_poly_zn_n9_g2"
+            ]
+          },
+          "calculus": {
+            "generation": 3,
+            "n_schema_classes": 6,
+            "unlocked": [
+              "calc_dead_zero",
+              "calc_ft_discrete",
+              "calc_fwd_diff",
+              "calc_fwd_diff_n7_g2",
+              "calc_power_diff",
+              "calc_transfer_rec"
+            ],
+            "spawned": [
+              "calc_fwd_diff_n7_g2"
+            ]
+          },
+          "nets": {
+            "generation": 3,
+            "n_schema_classes": 7,
+            "unlocked": [
+              "nets_chain_transfer",
+              "nets_dead_any_eta",
+              "nets_grad_step",
+              "nets_perceptron",
+              "nets_perceptron_n4_g2",
+              "nets_perceptron_n4_g3",
+              "nets_xor_depth"
+            ],
+            "spawned": [
+              "nets_perceptron_n4_g2",
+              "nets_perceptron_n4_g3"
+            ]
+          },
+          "electro": {
+            "generation": 3,
+            "n_schema_classes": 5,
+            "unlocked": [
+              "electro_dead_noconserve",
+              "electro_kirchhoff",
+              "electro_ohm",
+              "electro_ohm_n5_g2",
+              "electro_switch_transfer"
+            ],
+            "spawned": [
+              "electro_ohm_n5_g2"
+            ]
+          },
+          "physics": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "phys_action_reaction",
+              "phys_collision",
+              "phys_collision_n4_g2",
+              "phys_dead_nomom"
+            ],
+            "spawned": [
+              "phys_collision_n4_g2"
+            ]
+          },
+          "chem": {
+            "generation": 3,
+            "n_schema_classes": 4,
+            "unlocked": [
+              "chem_atom_balance",
+              "chem_atom_balance_n4_g2",
+              "chem_dead_noatoms",
+              "chem_equilibrium_K"
+            ],
+            "spawned": [
+              "chem_atom_balance_n4_g2"
             ]
           },
           "sequences": {
@@ -961,53 +2665,97 @@
           }
         },
         "spawned_schemas": [
+          "alg_poly_zn_n9_g2",
+          "astro_kepler_scan_n3_g2",
+          "calc_fwd_diff_n7_g2",
           "chance_entropy_scan_n3_g2",
+          "chem_atom_balance_n4_g2",
+          "electro_ohm_n5_g2",
           "info_mi_scan_n4_g2",
-          "sym_invariant_scan_n5_g2"
+          "info_mi_scan_n4_g3",
+          "nets_perceptron_n4_g2",
+          "nets_perceptron_n4_g3",
+          "phys_collision_n4_g2",
+          "sym_invariant_scan_n4_g2"
         ],
-        "n_spawned": 3,
+        "n_spawned": 12,
         "compare": {
           "symmetry": {
-            "attempts": 4,
-            "hits": 3,
-            "misses": 1
+            "attempts": 3,
+            "hits": 1,
+            "misses": 2
           },
           "chance": {
-            "attempts": 4,
-            "hits": 4,
+            "attempts": 0,
+            "hits": 0,
             "misses": 0
           },
           "info": {
-            "attempts": 4,
+            "attempts": 3,
+            "hits": 1,
+            "misses": 2
+          },
+          "astro": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "algebra": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "calculus": {
+            "attempts": 3,
+            "hits": 0,
+            "misses": 3
+          },
+          "nets": {
+            "attempts": 3,
             "hits": 3,
-            "misses": 1
+            "misses": 0
+          },
+          "electro": {
+            "attempts": 5,
+            "hits": 3,
+            "misses": 2
+          },
+          "physics": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
+          },
+          "chem": {
+            "attempts": 0,
+            "hits": 0,
+            "misses": 0
           }
         },
-        "n_verified": 47,
-        "n_types": 19
+        "n_verified": 69,
+        "n_types": 28
       }
     }
   ],
   "compare_passes": [
     {
       "phase": "post_warmup",
-      "hits": 0,
-      "misses": 2
+      "hits": 4,
+      "misses": 4
     },
     {
       "phase": "post_molt_0",
-      "hits": 2,
-      "misses": 0
+      "hits": 4,
+      "misses": 4
     },
     {
       "phase": "post_molt_1",
-      "hits": 2,
-      "misses": 0
+      "hits": 8,
+      "misses": 1
     },
     {
       "phase": "post_molt_2",
-      "hits": 2,
-      "misses": 0
+      "hits": 10,
+      "misses": 1
     }
   ],
   "compare_detail_tail": [
@@ -1028,28 +2776,113 @@
       "outcome": "duplicate_true",
       "from_transfer": true,
       "transfer_source": "logic:parity",
-      "support": "MI=0.665189>0",
+      "support": "MI=0.571428>0",
+      "counterexample": null
+    },
+    {
+      "world": "calculus",
+      "name": "calc_transfer_wait_no_rec",
+      "true": false,
+      "outcome": "duplicate_reject",
+      "from_transfer": true,
+      "transfer_source": "sequences",
+      "support": "honest miss",
+      "counterexample": "no rec/2 in archive"
+    },
+    {
+      "world": "nets",
+      "name": "nets_AND_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search AND",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_OR_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search OR",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_discrete_chain_vs_product",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": true,
+      "transfer_source": "calculus:fwd_diff",
+      "support": "discrete chain for f(u)=2u",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_AND_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search AND",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_OR_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search OR",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_AND_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search AND",
+      "counterexample": null
+    },
+    {
+      "world": "nets",
+      "name": "nets_OR_linear_threshold",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": false,
+      "transfer_source": null,
+      "support": "linear-sep search OR",
+      "counterexample": null
+    },
+    {
+      "world": "electro",
+      "name": "electro_parallel_OR_table",
+      "true": true,
+      "outcome": "duplicate_true",
+      "from_transfer": true,
+      "transfer_source": "logic:or_form",
+      "support": "parallel\u2261OR",
       "counterexample": null
     }
   ],
   "compare_totals": {
-    "hits": 2,
-    "misses": 0
+    "hits": 10,
+    "misses": 1
   },
   "example_clauses": [
     {
-      "status": "verified_emergent",
-      "clause": "verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)\u22480 on generated independent joint')).",
-      "reason": "verified under NON-SEED spawned schema; critic accepted"
-    },
-    {
       "status": "verified",
-      "clause": "verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s1139', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).",
+      "clause": "verified(fact(nets, nets_perceptron, 'nets_AND_linear_threshold', 'AND separable by linear threshold (exists w,b)')).",
       "reason": "science world; critic numeric/table gate accepted"
     },
     {
       "status": "verified",
-      "clause": "verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s1139', 'logit(post)=logit(prior)+log(LR) on generated table')).",
+      "clause": "verified(fact(nets, nets_perceptron, 'nets_OR_linear_threshold', 'OR separable by linear threshold (exists w,b)')).",
       "reason": "science world; critic numeric/table gate accepted"
     },
     {
@@ -1069,30 +2902,39 @@
     },
     {
       "status": "rejected",
-      "clause": "rejected('chance_bayes_swap_s1139', 'P(H|E)=0.896539891664867 != P(H|\u00acE)=0.663110399724556').",
+      "clause": "rejected('chance_bayes_swap_s1190', 'P(H|E)=0.39325435065996983 != P(H|\u00acE)=0.632326787609022').",
       "reason": "science dead-end / broken hypothesis; critic finite-fail"
     },
     {
       "status": "rejected",
-      "clause": "rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').",
+      "clause": "rejected('astro_kepler_wrong_exp_n3', 'T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568]').",
       "reason": "science dead-end / broken hypothesis; critic finite-fail"
+    },
+    {
+      "status": "skin_meta_emergent",
+      "clause": "schema(sym_group_table, unlocked(true)).",
+      "reason": "schema/2 for NON-SEED spawned class (not a verified theorem)"
     }
   ],
-  "beyond_limits": {
-    "clause": "verified(fact(info, info_mi_scan_n4_g2, 'info_MI_indep_near0_s2290', 'MI(X;Y)\u22480 on generated independent joint')).",
-    "world": "info",
-    "family": "info_mi_scan_n4_g2",
-    "note": "family/schema id not in original seed catalogs \u2014 emerged via molt/spawn"
-  },
-  "n_verified": 47,
-  "n_rejected": 31,
-  "n_types": 19,
-  "n_spawned": 3,
+  "beyond_limits": null,
+  "n_verified": 69,
+  "n_rejected": 28,
+  "n_types": 28,
+  "n_spawned": 12,
   "spawned_schemas": [
+    "alg_poly_zn_n9_g2",
+    "astro_kepler_scan_n3_g2",
+    "calc_fwd_diff_n7_g2",
     "chance_entropy_scan_n3_g2",
+    "chem_atom_balance_n4_g2",
+    "electro_ohm_n5_g2",
     "info_mi_scan_n4_g2",
-    "sym_invariant_scan_n5_g2"
+    "info_mi_scan_n4_g3",
+    "nets_perceptron_n4_g2",
+    "nets_perceptron_n4_g3",
+    "phys_collision_n4_g2",
+    "sym_invariant_scan_n4_g2"
   ],
-  "elapsed_s": 0.358,
+  "elapsed_s": 0.423,
   "human_seed": "Operator catalogs (SCIENCE_SEED / SEED_SCHEMAS), UCB constant, epsilon, finite-table generators, and the standing loop itself are human-authored. Every verified/1 still requires critic acceptance on obs."
 }
