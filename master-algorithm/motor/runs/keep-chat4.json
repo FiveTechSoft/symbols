@@ -113,7 +113,7 @@
     },
     {
       "q": "vale",
-      "a": "Bien. Seguimos cuando quieras.",
+      "a": "Mm.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
@@ -141,7 +141,7 @@
     },
     {
       "q": "dale",
-      "a": "De acuerdo.",
+      "a": "Bien. Seguimos cuando quieras.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
@@ -155,7 +155,7 @@
     },
     {
       "q": "ok",
-      "a": "Ahí estamos.",
+      "a": "Vale.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
@@ -190,7 +190,7 @@
     },
     {
       "q": "no",
-      "a": "Bien. Seguimos cuando quieras.",
+      "a": "De acuerdo.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
@@ -211,7 +211,7 @@
     },
     {
       "q": "sí",
-      "a": "De acuerdo.",
+      "a": "Mm.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
@@ -232,7 +232,7 @@
     },
     {
       "q": "vale",
-      "a": "Ahí estamos.",
+      "a": "Ya veo.",
       "verdict": "ok",
       "expect": "banter",
       "tag": "ack"
