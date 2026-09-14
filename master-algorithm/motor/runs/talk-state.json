@@ -1,1 +1,1 @@
-{"topic": "fib", "tag": "rec-fib", "last_tag": "rec-fib", "transfer_dst": null, "transfer_src": "lucas", "last_src": "lucas", "last_clause": "period_fib_m6", "last_text": "fib: F(n) = 1·F(n-1) + 1·F(n-2). rec(fib,[1, 1]). verified rec_fib_o2_1_1.\n[símbolo]"}
+{"topic": "growth", "tag": "growth", "last_tag": "growth", "transfer_dst": "pell", "transfer_src": "fib", "last_src": "fib", "last_clause": null, "last_text": "He dado 77 pasos. 163 hechos firmados (26 tipos). Transferencia 0.5. Rechacé 108 conjeturas — no me dejo inventar."}

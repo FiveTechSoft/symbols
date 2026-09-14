@@ -79,84 +79,21 @@ def _canonical_rec(coefs: list[list[int]]) -> list[int] | None:
 
 
 def _formula(seq: str, coef: list[int]) -> str:
-    """Human math: F(n)=F(n-1)+F(n-2), P(n)=2P(n-1)+P(n-2). No 1· noise."""
-    letter = {"fib": "F", "lucas": "L", "pell": "P"}.get(
-        seq, (seq[:1].upper() if seq else "X")
-    )
-    chunks: list[tuple[str, str]] = []
-    for i, a in enumerate(coef, 1):
-        if a == 0:
-            continue
-        term = f"{letter}(n-{i})"
-        if a == 1:
-            chunks.append(("+", term))
-        elif a == -1:
-            chunks.append(("-", term))
-        elif a > 0:
-            chunks.append(("+", f"{a}{term}"))
-        else:
-            chunks.append(("-", f"{-a}{term}"))
-    if not chunks:
-        return f"{letter}(n)=0"
-    sign0, t0 = chunks[0]
-    body = t0 if sign0 == "+" else f"-{t0}"
-    for sign, t in chunks[1:]:
-        body += ("+" if sign == "+" else "-") + t
-    return f"{letter}(n)={body}"
-
-
-def _title(seq: str) -> str:
-    return {"fib": "Fibonacci", "lucas": "Lucas", "pell": "Pell"}.get(seq, seq)
-
-
-def _fail_n(why: str) -> str | None:
-    m = re.search(r"n\s*=\s*(\d+)", why or "")
-    return m.group(1) if m else None
-
-
-def _soften_why(why: str) -> str:
-    """Turn critic blobs into plain Spanish; never invent numbers."""
-    n = _fail_n(why)
-    if n:
-        return f"En n={n} la analogía ya falla"
-    w = (why or "").strip()
-    if not w or w in ("no fit", "pred != obs / ley distinta"):
-        return "esa ley no encaja"
-    if "insufficient" in w.lower():
-        return "no hay prefijo suficiente"
-    # keep short factual residue, strip English leftovers
-    w = re.sub(r"\b(pred|obs)\b", "", w)
-    w = re.sub(r"\s+", " ", w).strip(" :")
-    return w or "esa ley no encaja"
-
-
-def _math_from_verified_formula(formula: str) -> str:
-    """Drop English TRANSFER wrappers; keep the identity/math body."""
-    f = (formula or "").strip()
-    if f.upper().startswith("TRANSFER"):
-        m = re.search(r"try on \w+:\s*(.+)$", f, re.I)
-        if m:
-            body = m.group(1).strip()
-            # (1)*lucas(n-1) + (1)*lucas(n-2) → keep as math-ish, light cleanup
-            body = re.sub(r"\((\-?\d+)\)\*", r"\1*", body)
-            body = body.replace("1*", "").replace(" + -", " - ")
-            return body
-        return "misma ley en la otra secuencia"
-    return f
+    letter = seq[:1].upper() if seq else "X"
+    parts = [f"{a}·{letter}(n-{i})" for i, a in enumerate(coef, 1)]
+    return f"{letter}(n) = " + " + ".join(parts)
 
 
 def _growth() -> str:
     if not LATEST.exists():
-        return "Todavía no hay corrida medida."
+        return "Todavía no hay corrida medida (latest.json)."
     d = json.loads(LATEST.read_text())
-    steps = d.get("total_steps", "?")
-    nv = d.get("n_verified_facts", "?")
-    nt = d.get("n_distinct_types", "?")
-    tr = d.get("transfer_accuracy")
-    nr = d.get("n_rejected", "?")
     return (
-        f"He dado {steps} pasos. {nv} hechos firmados ({nt} tipos). "
-        f"Transferencia {tr}. Rechacé {nr} conjeturas — no me dejo inventar."
+        f"Llevo {d.get('total_steps', '?')} pasos. "
+        f"Tengo {d.get('n_verified_facts', '?')} hechos que el crítico aceptó "
+        f"({d.get('n_distinct_types', '?')} tipos). "
+        f"Transferencia {d.get('transfer_accuracy')}. "
+        f"Rechazó {d.get('n_rejected', '?')} conjeturas."
     )
 
 
@@ -176,7 +113,7 @@ def _save_state(d: dict) -> None:
 
 def _unknown(st: dict) -> tuple[str, str, dict]:
     st["tag"] = "unknown"
-    return ("Eso no está en lo que he demostrado.", "unknown", st)
+    return ("No lo sé. No hay cláusula para eso.", "unknown", st)
 
 
 def _pack(text: str, tag: str, tribes: str, st: dict, topic=None) -> tuple[str, str, dict]:
@@ -311,30 +248,33 @@ def _answer_transfer(kb: dict, src: str, dst: str, st: dict) -> tuple[str, str, 
     vhits = _verified_named(kb, f"transfer_{src}_to_{dst}")
     rhits = _rejected_named(kb, f"transfer_{src}_to_{dst}")
     same = rec_src == rec_dst
-    ts, td = _title(src), _title(dst)
     if same:
-        # warm, short — facts from matching rec/2 (+ optional verified transfer)
-        msg = f"Sí. {td} usa la misma receta."
         if vhits:
-            msg = f"Sí. {td} usa la misma receta. Eso está firmado."
+            name, formula = vhits[0]
+            return _pack(
+                f"Sí se transfiere. Analogía: misma ley. "
+                f"Símbolo: rec({src},{rec_src}) y rec({dst},{rec_dst}). "
+                f"verified {name}: {formula}.",
+                f"transfer-{dst}",
+                _tribes("analogía", "símbolo"),
+                st,
+                topic="transfer",
+            )
         return _pack(
-            msg,
+            f"Sí se transfiere. Analogía: misma ley. "
+            f"Símbolo: rec({src},{rec_src}) y rec({dst},{rec_dst}).",
             f"transfer-{dst}",
             _tribes("analogía", "símbolo"),
             st,
             topic="transfer",
         )
-    why = rhits[0][1] if rhits else ""
-    fail = _soften_why(why) if why else "las leyes no coinciden"
-    # cite law in math, not internal names
-    msg = (
-        f"No. {td} es pariente, no clon: {_formula(dst, rec_dst)}. "
-        f"{fail[0].upper() + fail[1:] if fail else 'Las leyes no coinciden'}."
-    )
-    # tidy double period
-    msg = re.sub(r"\.\.$", ".", msg)
+    why = rhits[0][1] if rhits else "pred != obs / ley distinta"
+    rname = rhits[0][0] if rhits else None
+    cite = f"rejected('{rname}'): {why}" if rname else f"rec({dst},{rec_dst}) vs rec({src},{rec_src})"
     return _pack(
-        msg,
+        f"No se transfiere. Analogía: companion, no clon. "
+        f"Símbolo: rec({dst},{rec_dst}) vs rec({src},{rec_src}). "
+        f"Crítico {cite}.",
         f"transfer-{dst}",
         _tribes("analogía", "símbolo", "crítico"),
         st,
@@ -346,17 +286,19 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
     can = _canonical_rec(kb["recs"].get(seq, []))
     if not can:
         return _unknown(st)
-    law = _formula(seq, can)
-    title = _title(seq)
+    vhits = _verified_named(kb, f"rec_{seq}")
+    cite = f"verified {vhits[0][0]}" if vhits else f"rec({seq},{can})"
     if reject_law:
         rhits = (
             _rejected_named(kb, f"rec_{seq}_o1")
             or _rejected_named(kb, f"rec_{seq}_order")
             or _rejected_named(kb, "o1_none")
         )
-        # refusal can tease without being mean; law stays true
+        why = rhits[0][1] if rhits else "no fit"
+        rname = rhits[0][0] if rhits else f"rec_{seq}_o1"
         return _pack(
-            f"No. Bonito, pero falso. {title} sigue {law}.",
+            f"Rechazado. No es esa ley. La ley es {_formula(seq, can)}. "
+            f"rec({seq},{can}). Crítico rejected('{rname}'): {why}.",
             f"reject-{seq}",
             _tribes("crítico", "símbolo"),
             st,
@@ -364,7 +306,8 @@ def _answer_rec(kb: dict, seq: str, st: dict, reject_law: bool = False) -> tuple
         )
     st["transfer_dst"] = None
     return _pack(
-        f"{title} sigue {law}. Eso está firmado.",
+        f"{seq}: {_formula(seq, can)}. "
+        f"rec({seq},{can}). {cite}.",
         f"rec-{seq}",
         _tribes("símbolo"),
         st,
@@ -379,21 +322,28 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
     dst = last.get("transfer_dst")
     src = last.get("transfer_src")
     if not src and topic == "transfer":
+        # recover src from tag like transfer-X or from last rec topic
         src = last.get("last_src")
     if str(tag).startswith("transfer-") or topic == "transfer":
         if not dst and str(tag).startswith("transfer-"):
             dst = tag.split("-", 1)[-1]
         if dst and dst in kb.get("recs", {}):
+            # pick src: stored, or any other rec that has transfer clauses with dst
             if not src or src not in kb.get("recs", {}):
+                # prefer a rec that differs from dst and appears in transfer_* names
                 cands = [k for k in kb["recs"] if k != dst]
                 src = cands[0] if cands else None
             if src:
                 rec_s = _canonical_rec(kb["recs"].get(src, []))
                 rec_d = _canonical_rec(kb["recs"].get(dst, []))
-                ts, td = _title(src), _title(dst)
                 if rec_s == rec_d:
+                    vhits = _verified_named(kb, f"transfer_{src}_to_{dst}")
+                    cite = (
+                        f"verified {vhits[0][0]}: {vhits[0][1]}"
+                        if vhits else f"rec({src},{rec_s}) = rec({dst},{rec_d})"
+                    )
                     return _pack(
-                        f"Porque {ts} y {td} comparten la ley: {_formula(src, rec_s)}.",
+                        f"Porque comparten la ley: rec({src},{rec_s}) y rec({dst},{rec_d}). {cite}.",
                         f"transfer-{dst}",
                         _tribes("analogía", "símbolo"),
                         st,
@@ -402,10 +352,17 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
                 rhits = _rejected_named(kb, f"transfer_{src}_to_{dst}") or _rejected_named(
                     kb, f"transfer_{dst}_to_{src}"
                 )
-                fail = _soften_why(rhits[0][1]) if rhits else "las leyes no coinciden"
+                if rhits:
+                    return _pack(
+                        f"Porque la ley no coincide: rec({dst},{rec_d}) vs rec({src},{rec_s}). "
+                        f"Contraejemplo rejected('{rhits[0][0]}'): {rhits[0][1]}.",
+                        f"transfer-{dst}",
+                        _tribes("crítico", "símbolo"),
+                        st,
+                        topic="transfer",
+                    )
                 return _pack(
-                    f"Porque la ley no coincide: {_formula(dst, rec_d)} frente a "
-                    f"{_formula(src, rec_s)}. {fail[0].upper() + fail[1:]}.",
+                    f"Porque la ley no coincide: rec({dst},{rec_d}) vs rec({src},{rec_s}).",
                     f"transfer-{dst}",
                     _tribes("crítico", "símbolo"),
                     st,
@@ -414,16 +371,15 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
     if topic in kb.get("recs", {}):
         can = _canonical_rec(kb["recs"].get(topic, []))
         return _pack(
-            f"Porque {_formula(topic, can)} es la ley que encaja con lo observado.",
+            f"Porque rec({topic},{can}) es la ley que cabe en obs/3.",
             "why",
             _tribes("símbolo", "crítico"),
             st,
             topic=topic,
         )
-    if last.get("last_text"):
-        # point back without dumping clause names
+    if last.get("last_clause"):
         return _pack(
-            "Porque eso es lo que ya quedó firmado (o rechazado) en la teoría.",
+            f"Porque verified/rejected {last['last_clause']}.",
             "why",
             _tribes("símbolo"),
             st,
@@ -433,95 +389,20 @@ def _answer_why(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
 
 
 def _answer_summary(kb: dict, st: dict) -> tuple[str, str, dict]:
-    named = []
-    for name, cs in sorted(kb["recs"].items()):
-        can = _canonical_rec(cs)
-        if can:
-            named.append(f"{_title(name)} {_formula(name, can)}")
-    body = "; ".join(named) if named else "nada aún"
+    recs = ", ".join(
+        f"{name}={_canonical_rec(cs)}"
+        for name, cs in sorted(kb["recs"].items())
+        if _canonical_rec(cs)
+    )
     return _pack(
-        f"Lo que unifiqué: {body}. "
-        f"{len(kb['verified'])} firmados, {len(kb['rejected'])} rechazados, "
-        f"{len(kb['lemmas'])} lemas. Fuera de eso, callo.",
+        f"Lo unificado: {recs}. "
+        f"{len(kb['verified'])} verified, {len(kb['rejected'])} rejected, "
+        f"{len(kb['lemmas'])} lemma. Fuera de theory.pl, silencio.",
         "summary",
         _tribes("símbolo", "crítico"),
         st,
         topic="summary",
     )
-
-
-def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
-    """Restate last fact in plainer Spanish — SAME facts, no new theorems."""
-    tag = (last.get("tag") or "")
-    topic = last.get("topic")
-    src = last.get("transfer_src") or last.get("last_src")
-    dst = last.get("transfer_dst")
-
-    if tag.startswith("transfer-") or topic == "transfer":
-        if not dst and tag.startswith("transfer-"):
-            dst = tag.split("-", 1)[-1]
-        if dst and dst in kb.get("recs", {}):
-            if not src or src not in kb.get("recs", {}):
-                cands = [k for k in kb["recs"] if k != dst]
-                src = cands[0] if cands else None
-            if src:
-                rs = _canonical_rec(kb["recs"].get(src, []))
-                rd = _canonical_rec(kb["recs"].get(dst, []))
-                if rs == rd:
-                    return _pack(
-                        f"Mira: {_title(src)} y {_title(dst)} hacen lo mismo — "
-                        f"suman los dos anteriores. Misma receta.",
-                        tag or f"transfer-{dst}",
-                        "",
-                        st,
-                        topic="transfer",
-                    )
-                rhits = _rejected_named(kb, f"transfer_{src}_to_{dst}") or _rejected_named(
-                    kb, f"transfer_{dst}_to_{src}"
-                )
-                fail = _soften_why(rhits[0][1]) if rhits else "en cuanto miras los números, no cuadra"
-                return _pack(
-                    f"O sea: {_title(dst)} no copia a {_title(src)}. "
-                    f"Su ley es {_formula(dst, rd)}. {fail[0].upper() + fail[1:]}.",
-                    tag or f"transfer-{dst}",
-                    "",
-                    st,
-                    topic="transfer",
-                )
-
-    if tag.startswith("reject-") and topic in kb.get("recs", {}):
-        can = _canonical_rec(kb["recs"].get(topic, []))
-        return _pack(
-            f"Te lo pongo fácil: no es el doble del anterior. "
-            f"Es {_formula(topic, can)}.",
-            tag,
-            "",
-            st,
-            topic=topic,
-        )
-
-    if topic in kb.get("recs", {}):
-        can = _canonical_rec(kb["recs"].get(topic, []))
-        return _pack(
-            f"En cristiano: cada término sale de los dos de antes — "
-            f"{_formula(topic, can)}. Y eso está firmado.",
-            tag or f"rec-{topic}",
-            "",
-            st,
-            topic=topic,
-        )
-
-    prev = (last.get("last_text") or "").split("\n[")[0].strip()
-    if prev:
-        # already human voice; just soften the lead-in
-        return _pack(
-            f"Te lo digo más bajito: {prev}",
-            tag or "verified",
-            "",
-            st,
-            topic=topic,
-        )
-    return _unknown(st)
 
 
 def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str, str, dict]:
@@ -530,18 +411,8 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         return _answer_rec(kb, hit["name"], st)
     if kind == "verified":
         st["last_clause"] = hit["name"]
-        math = _math_from_verified_formula(hit["formula"])
-        # transfer verified → don't dump English TRANSFER line
-        if str(hit.get("name", "")).startswith("transfer_") or str(hit.get("formula", "")).upper().startswith("TRANSFER"):
-            return _pack(
-                "Sí: la misma ley se pasa. Eso está firmado.",
-                "verified",
-                _tribes("símbolo"),
-                st,
-                topic=hit["name"],
-            )
         return _pack(
-            f"Sí: {math}. Eso está firmado.",
+            f"Demostrado: {hit['formula']}. verified {hit['name']}.",
             "verified",
             _tribes("símbolo"),
             st,
@@ -549,17 +420,18 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         )
     if kind == "lemma":
         limit = 8 if more else 4
+        # If weak predicate-only bind, list several lemmas
         if hit["score"] < 3 and "lemma" in (hit.get("bound") or set()):
-            sample = "; ".join(f"{tx}" for _n, _ty, tx in kb["lemmas"][:limit])
+            sample = "; ".join(f"{n}: {tx}" for n, _ty, tx in kb["lemmas"][:limit])
             return _pack(
-                f"Tengo {len(kb['lemmas'])} lemas. Por ejemplo: {sample}.",
+                f"Lemas ({len(kb['lemmas'])}): {sample}. lemma/3.",
                 "lemma",
                 _tribes("símbolo", "analogía"),
                 st,
                 topic="lemma",
             )
         return _pack(
-            f"Lema: {hit['formula']}. Firmado en la geometría.",
+            f"Lema {hit['name']}: {hit['formula']}. lemma/3.",
             "lemma",
             _tribes("símbolo", "analogía"),
             st,
@@ -567,9 +439,8 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         )
     if kind == "rejected":
         st["last_clause"] = hit["name"]
-        soft = _soften_why(hit["formula"])
         return _pack(
-            f"Eso lo rechacé. {soft[0].upper() + soft[1:]}.",
+            f"Rechazado. rejected('{hit['name']}'): {hit['formula']}.",
             "reject-named",
             _tribes("crítico"),
             st,
@@ -580,25 +451,22 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         limit = 12 if more else 6
         parts = [f"π_{a}({m})={p}" for a, m, p in rows[:limit]]
         return _pack(
-            f"Periodos: {', '.join(parts)}.",
+            f"Periodos: {', '.join(parts)}. true_mod/3.",
             "period",
             _tribes("símbolo"),
             st,
             topic="period",
         )
     if kind == "companion":
-        pairs = []
-        for a, b in hit["formula"][:6]:
-            pairs.append(f"{_title(a)}↔{_title(b)}")
+        pairs = ", ".join(f"companion({a},{b})" for a, b in hit["formula"][:6])
         return _pack(
-            f"Parientes: {', '.join(pairs)}. Compañeras, no clones.",
+            f"{pairs}. companion/2.",
             "companion",
             _tribes("analogía", "símbolo"),
             st,
             topic="companion",
         )
     return _unknown(st)
-
 
 
 def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
@@ -618,7 +486,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     # Self-knowledge speech acts (not domain math vocabulary)
     if _is_greet(s):
         return _pack(
-            f"Hola. ¿Qué traes? Tengo {kb['n']} hechos firmados — si está en la teoría, te lo digo sin rodeos.",
+            f"Hola. Soy Master Algorithm. {kb['n']} hechos firmados. Pregunta; si no hay cláusula, callo.",
             "greet",
             "",
             st,
@@ -627,13 +495,13 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     if _is_identity(s):
         want_tribe = any(x in s for x in ("tribu", "tribe", "quien eres", "que eres", "who are you"))
         body = (
-            "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. "
-            f"Un poco intenso, sí. {kb['n']} hechos firmados."
+            "Soy Master Algorithm. Demuestro, transfiero, rechazo, o callo. "
+            f"{kb['n']} hechos en la teoría."
         )
         if want_tribe:
             body = (
                 "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, "
-                "el crítico rechaza, y sin cláusula callo — con un poco de calor, si me dejas. "
+                "el crítico rechaza, y sin cláusula callo. "
                 f"{kb['n']} hechos firmados."
             )
         return _pack(
@@ -646,8 +514,15 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     if _is_growth(s):
         return _pack(_growth(), "growth", "", st, topic="growth")
     if _is_explain(s) and last.get("last_text") and (last.get("tag") or "") != "unknown":
-        # Restate last fact in plainer Spanish; same facts, no new theorems
-        return _answer_explain(kb, last, st)
+        # Restate last clause; do not invent a friendlier theorem
+        prev = last["last_text"].split("\n[")[0]
+        return _pack(
+            f"En corto: {prev}",
+            last.get("tag") or "verified",
+            "",
+            st,
+            topic=last.get("topic"),
+        )
 
     # Invent speech → honest silence (no clause to invent from)
     if _is_invent_speech(s):
@@ -713,7 +588,7 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         )
         if isinstance(rhits, list) and rhits and isinstance(rhits[0], tuple):
             return _pack(
-                f"No. No es siempre primo — eso ya lo rechacé.",
+                f"Rechazado. rejected('{rhits[0][0]}'): {rhits[0][1]}. No es siempre primo.",
                 "reject-prime",
                 _tribes("crítico"),
                 st,
@@ -871,7 +746,7 @@ def talk_once(q: str, last: dict | None = None) -> str:
 
 
 def repl() -> None:
-    print("Master Algorithm. Pregunta con ganas; si no hay cláusula, callo. quit para salir.")
+    print("Master Algorithm. Mi tribu demuestra o calla. quit para salir.")
     last = _load_state()
     while True:
         try:
