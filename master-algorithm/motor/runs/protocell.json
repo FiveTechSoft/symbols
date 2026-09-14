@@ -1,0 +1,210 @@
+{
+  "lived": true,
+  "died": false,
+  "n_individuals": 1,
+  "n_facts_before": 428,
+  "n_levers_selected_separately": 6,
+  "unit_name": "unit_protocell_levers",
+  "unit_levers": [
+    "bit_circuit",
+    "conserv_delta0",
+    "form_gate",
+    "loop_taxis",
+    "rec_companion",
+    "rec_to_delta"
+  ],
+  "heldout_x0": [
+    4.5,
+    -3.25
+  ],
+  "joint_ok": true,
+  "joint_reason": "unit jointly closes: error down on new x0 AND conserv holds AND rec/\u0394 consistent",
+  "joint_metrics": {
+    "mean_err_drop": 3.25,
+    "mean_conserv_residual": 0.0,
+    "n_transfer_ok": 2,
+    "mode": "bit_gated_taxis"
+  },
+  "per_x0": [
+    {
+      "x0": 4.5,
+      "err_before": 4.5,
+      "err_after": 0.5,
+      "err_drop": 4.0,
+      "conserv_residual": 0.0,
+      "rec_to_delta_ok": true,
+      "rec_to_delta_max_err": 0.0,
+      "taxis_ok": true,
+      "companion_ok": true,
+      "joint_ok": true,
+      "brightness_x0": 0.4375
+    },
+    {
+      "x0": -3.25,
+      "err_before": 3.25,
+      "err_after": 0.75,
+      "err_drop": 2.5,
+      "conserv_residual": 0.0,
+      "rec_to_delta_ok": true,
+      "rec_to_delta_max_err": 0.0,
+      "taxis_ok": true,
+      "companion_ok": true,
+      "joint_ok": true,
+      "brightness_x0": 0.59375
+    }
+  ],
+  "solos_all_pass": true,
+  "solos": {
+    "conserv_delta0": {
+      "pass": true
+    },
+    "loop_taxis": {
+      "pass": true
+    },
+    "bit_circuit": {
+      "pass": true
+    },
+    "rec_to_delta": {
+      "pass": true
+    },
+    "rec_companion": {
+      "pass": true
+    },
+    "form_gate": {
+      "pass": true
+    }
+  },
+  "negatives": [
+    {
+      "tag": "missing_taxis",
+      "name": "NEG_unit_missing_taxis",
+      "levers": [
+        "bit_circuit",
+        "conserv_delta0",
+        "form_gate",
+        "rec_companion",
+        "rec_to_delta"
+      ],
+      "ok": false,
+      "rejected": true,
+      "conflict": true,
+      "reason": "bundle missing taxis (notebook of laws, no loop) \u2014 joint fail",
+      "metrics": {
+        "tag": "missing_taxis",
+        "mode": "notebook_no_taxis",
+        "n_transfer_ok": 0
+      },
+      "per_x0": [
+        {
+          "x0": 4.5,
+          "err_before": 4.5,
+          "err_after": 4.5,
+          "err_drop": 0.0,
+          "conserv_residual": 0.0,
+          "rec_to_delta_ok": true,
+          "rec_to_delta_max_err": 0.0,
+          "taxis_ok": false,
+          "companion_ok": false,
+          "joint_ok": false,
+          "brightness_x0": 0.4375
+        },
+        {
+          "x0": -3.25,
+          "err_before": 3.25,
+          "err_after": 3.25,
+          "err_drop": 0.0,
+          "conserv_residual": 0.0,
+          "rec_to_delta_ok": true,
+          "rec_to_delta_max_err": 0.0,
+          "taxis_ok": false,
+          "companion_ok": false,
+          "joint_ok": false,
+          "brightness_x0": 0.59375
+        }
+      ]
+    },
+    {
+      "tag": "off_path_bilinear",
+      "name": "NEG_unit_offpath_bilinear",
+      "levers": [
+        "bilinear_schema",
+        "bit_circuit",
+        "conserv_delta0",
+        "form_gate",
+        "loop_taxis",
+        "rec_companion",
+        "rec_to_delta"
+      ],
+      "ok": false,
+      "rejected": true,
+      "conflict": false,
+      "reason": "off-path individual (bilinear/energy/matmul) \u2014 form_gate reject",
+      "metrics": {
+        "tag": "off_path"
+      },
+      "per_x0": []
+    },
+    {
+      "tag": "off_path_energy",
+      "name": "NEG_unit_offpath_energy",
+      "levers": [
+        "bit_circuit",
+        "conserv_delta0",
+        "loop_taxis",
+        "phys_energy",
+        "rec_companion",
+        "rec_to_delta"
+      ],
+      "ok": false,
+      "rejected": true,
+      "conflict": false,
+      "reason": "off-path individual (bilinear/energy/matmul) \u2014 form_gate reject",
+      "metrics": {
+        "tag": "off_path"
+      },
+      "per_x0": []
+    },
+    {
+      "tag": "clone_rec_pad",
+      "name": "NEG_unit_clone_rec_pad",
+      "levers": [
+        "bit_circuit",
+        "conserv_delta0",
+        "form_gate",
+        "loop_taxis",
+        "rec_companion",
+        "rec_order_clone",
+        "rec_to_delta"
+      ],
+      "ok": false,
+      "rejected": true,
+      "conflict": false,
+      "reason": "clone pad (rec_order) \u2014 not a new individual (brute)",
+      "metrics": {
+        "tag": "clone_pad"
+      },
+      "per_x0": []
+    }
+  ],
+  "conflict_catch_worked": true,
+  "all_negatives_rejected": true,
+  "world_verify_true": true,
+  "verified_names": [
+    "unit_protocell_levers"
+  ],
+  "rejected_names": [
+    "NEG_unit_missing_taxis",
+    "NEG_unit_offpath_bilinear",
+    "NEG_unit_offpath_energy",
+    "NEG_unit_clone_rec_pad"
+  ],
+  "scratch": "/workspace/master-algorithm/motor/archive-protocell",
+  "n_facts_after": 428,
+  "merge": {
+    "added_verified": [],
+    "added_rejected": []
+  },
+  "elapsed_s": 0.158,
+  "n_facts_before_leap": 425,
+  "doctrine_before": "425 facts / 6 levers"
+}

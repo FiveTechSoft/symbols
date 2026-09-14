@@ -39,6 +39,11 @@ LEVER_FAMILIES = frozenset({
     "form_gate",           # lever 6: identity ≠ defining law
 })
 
+# Unit of selection (protocell) — not a 7th lever; one individual above the six
+UNIT_FAMILIES = frozenset({
+    "unit_protocell",
+})
+
 LEVER_NAMES = {
     1: ("rec_companion", "additive rec → companion world (Fib→Lucas; Fib→Pell carve)"),
     2: ("conserv_delta0", "linear Δ=0 → another additive world (chem/phys/electro + loop Δx=action)"),
@@ -72,6 +77,7 @@ OFF_PATH_FAMILIES = frozenset({
 
 # Reject → lever it carves
 CARVING_REJECT_MAP: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"NEG_unit_|unit_protocell.*reject|missing taxis|off-path individual|clone pad"), "unit_protocell"),
     (re.compile(r"false_fib_rec_on_trib|false_fib_padded|transfer_.*pell.*reject|NEG_.*pell"), "rec_companion"),
     (re.compile(r"false_mom_as_energy|NEG_phys_momentum|NEG_chem_atoms|NEG_electro_current"), "conserv_delta0"),
     (re.compile(r"NEG_calc_delta|false_.*delta"), "rec_to_delta"),
@@ -93,6 +99,12 @@ def form_family_id(
     nm = (name or "").strip()
     w = (world or "").strip()
     low = f"{fam} {nm} {formula}".lower()
+
+    # --- unit of selection (protocell) — one individual, not more clauses ---
+    if w == "protocell" or fam == "unit_joint" or nm.startswith("unit_protocell") or "unit of selection" in low:
+        return "unit_protocell"
+    if nm.startswith("NEG_unit_"):
+        return "unit_protocell"
 
     # --- off-path / clone first (so they never steal a lever id) ---
     if fam.startswith("bilinear_schema") or "bilinear" in fam or nm.startswith("bilin_"):
@@ -236,7 +248,9 @@ def form_family_id(
 
 
 def tag_family(fid: str) -> str:
-    """lever | clone | off-path"""
+    """lever | clone | off-path | unit"""
+    if fid in UNIT_FAMILIES or fid == "unit_protocell":
+        return "unit"
     if fid in LEVER_FAMILIES:
         return "lever"
     if fid in OFF_PATH_FAMILIES or fid.startswith("bilinear"):
@@ -311,6 +325,7 @@ class UnderstandReport:
     unique_form_score: float = 0.0
     lever_ids: list[str] = field(default_factory=list)
     noise_ids: list[str] = field(default_factory=list)
+    n_individuals: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -318,6 +333,7 @@ class UnderstandReport:
             "n_families": self.n_families,
             "n_necessary": self.n_necessary,
             "n_noise_facts": self.n_noise_facts,
+            "n_individuals": self.n_individuals,
             "necessary_ids": self.necessary_ids,
             "unique_form_score": self.unique_form_score,
             "lever_ids": self.lever_ids,
@@ -351,10 +367,11 @@ def analyze(theory_path: Path | None = None) -> UnderstandReport:
         has_carve = fid in carving_fams
         n = len(facts)
         clone_counts[fid] = n
-        if tag != "lever":
+        if tag not in ("lever", "unit"):
             n_noise += n
 
         # Necessary = LEVER that transferred OR whose reject carved the form
+        # Unit is a higher-level individual (not a 7th lever / not noise)
         is_necessary = tag == "lever" and (transferred or has_carve)
 
         families[fid] = {
@@ -392,6 +409,9 @@ def analyze(theory_path: Path | None = None) -> UnderstandReport:
     score_denom = n_nec + n_non_lever_fams
     unique = (n_nec / score_denom) if score_denom else 0.0
 
+    n_individuals = sum(
+        m["n_facts"] for fid, m in families.items() if m.get("tag") == "unit"
+    )
     return UnderstandReport(
         n_facts=len(verified),
         n_families=len(families),
@@ -402,7 +422,8 @@ def analyze(theory_path: Path | None = None) -> UnderstandReport:
         clone_counts=clone_counts,
         unique_form_score=round(unique, 4),
         lever_ids=sorted(fid for fid, m in families.items() if m["tag"] == "lever"),
-        noise_ids=sorted(fid for fid, m in families.items() if m["tag"] != "lever"),
+        noise_ids=sorted(fid for fid, m in families.items() if m["tag"] not in ("lever", "unit")),
+        n_individuals=n_individuals,
     )
 
 

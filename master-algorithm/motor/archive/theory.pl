@@ -1509,3 +1509,21 @@ verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6886', 'atom co
 verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6887', 'atom counts conserved: synth_s6887')).
 % finite fail / dead-end
 rejected('chem_unbalanced_broken_s6884', 'mismatch {\'H\': 4, \'O\': 3} vs {\'H\': 5, \'O\': 3}').
+% verified @ protocell/unit_joint
+verified(fact(protocell, unit_joint, 'unit_protocell_levers', 'UNIT{bit_circuit,conserv_delta0,form_gate,loop_taxis,rec_companion,rec_to_delta} jointly closes on held-out x0 (conserv residual ∝ loop error drop)')).
+% finite fail / dead-end
+rejected('NEG_unit_missing_taxis', 'bundle missing taxis (notebook of laws, no loop) — joint fail').
+% finite fail / dead-end
+rejected('NEG_unit_offpath_bilinear', 'off-path individual (bilinear/energy/matmul) — form_gate reject').
+% finite fail / dead-end
+rejected('NEG_unit_offpath_energy', 'off-path individual (bilinear/energy/matmul) — form_gate reject').
+% finite fail / dead-end
+rejected('NEG_unit_clone_rec_pad', 'clone pad (rec_order) — not a new individual (brute)').
+% verified @ electro/electro_ohm
+verified(fact(electro, electro_ohm, 'electro_ohm_V_eq_IR_n4_s5243', 'V=IR on generated triples (eps)')).
+% finite fail / dead-end
+rejected('electro_ohm_broken_add_s5243', 'V≠I+R (as required)').
+% verified @ astro/astro_kepler_scan
+verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n4', 'T^2/a^3 constant within eps on circular table')).
+% finite fail / dead-end
+rejected('astro_kepler_wrong_exp_n4', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').

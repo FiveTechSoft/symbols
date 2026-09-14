@@ -1,5 +1,5 @@
 {
-  "total_steps": 177,
+  "total_steps": 179,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -395,14 +395,14 @@
       "id": "astro_kepler_scan",
       "description": "Scan T^2/a^3 constancy (Kepler-3 form) within eps",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 8,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 1.34,
-      "ticks_no_new_form_family": 0
+      "n_visits": 2,
+      "total_reward": 1.1800000000000002,
+      "ticks_no_new_form_family": 1
     },
     "astro::astro_angmom_scan": {
       "id": "astro_angmom_scan",
@@ -655,14 +655,14 @@
       "id": "electro_ohm",
       "description": "Ohm V=IR on generated (V,I,R) triples",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 8,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 1.34,
-      "ticks_no_new_form_family": 0
+      "n_visits": 2,
+      "total_reward": 1.1800000000000002,
+      "ticks_no_new_form_family": 1
     },
     "electro::electro_kirchhoff": {
       "id": "electro_kirchhoff",
@@ -8791,6 +8791,80 @@
         "chem_unbalanced_broken_s6884"
       ],
       "transfer": []
+    },
+    {
+      "tick": 178,
+      "world": "electro",
+      "family": "electro_ohm",
+      "why": "UCB1 over 47 arms (world,family); picked electro::electro_ohm because avg=1.340+1.4*sqrt(ln(177+1)/1)=3.187\u21924.527. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 1,
+        "form_families": [
+          "noise::electro::electro_ohm_V_eq_IR",
+          "noise::electro::electro_ohm_broken_add"
+        ],
+        "dead_ok": 0,
+        "cost": 0.18,
+        "score": -0.16,
+        "reward_raw": 0.02
+      },
+      "growth": "extrapolate 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "electro_ohm_V_eq_IR_n4_s5243"
+      ],
+      "rejected": [
+        "electro_ohm_broken_add_s5243"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 179,
+      "world": "astro",
+      "family": "astro_kepler_scan",
+      "why": "UCB1 over 47 arms (world,family); picked astro::astro_kepler_scan because avg=1.340+1.4*sqrt(ln(178+1)/1)=3.189\u21924.529. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 1,
+        "form_families": [
+          "kepler_power",
+          "kepler_power"
+        ],
+        "dead_ok": 0,
+        "cost": 0.18,
+        "score": -0.16,
+        "reward_raw": 0.02
+      },
+      "growth": "extrapolate n_bodies 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "astro_kepler3_const_n4"
+      ],
+      "rejected": [
+        "astro_kepler_wrong_exp_n4"
+      ],
+      "transfer": []
     }
   ],
   "curves": [
@@ -10563,6 +10637,26 @@
       "n_rejected": 182,
       "n_lemmas": 14,
       "tick": 177
+    },
+    {
+      "n_verified_facts": 427,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3046,
+      "n_rejected": 187,
+      "n_lemmas": 14,
+      "tick": 178
+    },
+    {
+      "n_verified_facts": 428,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3052,
+      "n_rejected": 188,
+      "n_lemmas": 14,
+      "tick": 179
     }
   ],
   "baselines": {
@@ -11871,7 +11965,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -12230,7 +12324,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
