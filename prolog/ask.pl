@@ -94,9 +94,11 @@ norm_name(Toks, Name) :-
 % (A,means|significa,C), un nivel, como en chat.pl.
 bb_rel_forms(V, Rs) :-
     bb_rel_forms_direct(V, Rs0),
+    findall(R, (irregular_form(V, Base),
+                bb_rel_forms_direct(Base, RBase), member(R, RBase)), RsI),
     findall(R, (means_triple(V, C),
                 bb_rel_forms_direct(C, RC), member(R, RC)), Rs1),
-    append(Rs0, Rs1, Rall),
+    append([Rs0, RsI, Rs1], Rall),
     sort(Rall, Rs),
     Rs \== [].
 

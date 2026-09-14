@@ -976,7 +976,20 @@ chat_greet([buenas, noches]) :- !, writeln('Hola. Preguntame lo que quieras sobr
 % Resumen de entidad: primeros hechos (no-eventos) + total.
 chat_about(Toks) :-
     about_target(Toks, Lang, Name), !,
-    about_entity(Name, Lang).
+    ( ( member(who, Toks) ; member(what, Toks) ),
+      member(is, Toks) ->
+        about_entity_brief(Name, Lang)
+    ; about_entity(Name, Lang)
+    ).
+
+about_entity_brief(Name, Lang) :-
+    ( memory_relation(Name, is, book, _, _) ->
+        format('  ~w is book.~n', [Name])
+    ; memory_relation(Name, appears_in, Book, _, _),
+      memory_relation(Book, is, book, _, _) ->
+        format('  ~w appears in ~w.~n', [Name, Book])
+    ; about_entity(Name, Lang)
+    ).
 
 about_target([y|Rest], Lang, Name) :- Rest \== [], about_target(Rest, Lang, Name).
 about_target([and|Rest], Lang, Name) :- Rest \== [], about_target(Rest, Lang, Name).
@@ -1945,6 +1958,35 @@ chat_form([who, V], say, no) :-
 % who V? verb unknown: "No one" (honest).
 chat_form([who, V], say, no_one) :-
     \+ (bb_rel_forms(V, Rs), Rs \== []).
+% who is E? / what is E? — entity type from KB (includes book title alias resolution).
+chat_form([who, is, E], say, answer([Type], [(EName, is, Type)])) :-
+    qnorm([E], EName),
+    memory_relation(EName, is, Type, _, _), !.
+chat_form([what, is, E], say, answer([Type], [(EName, is, Type)])) :-
+    qnorm([E], EName),
+    memory_relation(EName, is, Type, _, _), !.
+chat_form([who, is, E], say, answer([Type], [(B, is, Type)])) :-
+    live_books(Bs),
+    nl_tokens([E], Packed),
+    member(B, Bs),
+    ( member(W, Packed), qnorm_atom(W, B) -> true
+    ; member(W, Packed),
+      atom_string(W, Ws),
+      atom_string(B, BsS),
+      sub_string(BsS, _, _, _, Ws)
+    ),
+    memory_relation(B, is, Type, _, _), !.
+chat_form([what, is, E], say, answer([Type], [(B, is, Type)])) :-
+    live_books(Bs),
+    nl_tokens([E], Packed),
+    member(B, Bs),
+    ( member(W, Packed), qnorm_atom(W, B) -> true
+    ; member(W, Packed),
+      atom_string(W, Ws),
+      atom_string(B, BsS),
+      sub_string(BsS, _, _, _, Ws)
+    ),
+    memory_relation(B, is, Type, _, _), !.
 % who V E? verb known but no one V's E: honest "no".
 chat_form([who, V|Rest], say, no) :-
     qnorm(Rest, O),
@@ -2063,6 +2105,101 @@ chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
     memory_relation(S, V, O, _, _),
     Xs = [O],
     Facts = [(S, V, O)].
+% when was E V? (passive): infer the relation and return facts.
+% Includes book alias resolution (substring matching for title tokens).
+chat_form([when, was, E, V|Rest], say, answer(Xs, Facts)) :-
+    ( qnorm([E], EName) -> true ; EName = E ),
+    bb_rel_forms(V, Rs),
+    Rs \== [],
+    ( findall(Fact, (member(Vr, Rs),
+                     ( memory_relation(EName, Vr, _, _, _) ; memory_relation(_, Vr, EName, _, _)),
+                     memory_relation(S, Vr, O, _, _),
+                     (S == EName ; O == EName),
+                     Fact = (S, Vr, O)), FF0),
+      FF0 \== [] -> FF = FF0
+    ; live_books(Bs),
+      nl_tokens([E], Packed),
+      member(B, Bs),
+      ( packed_has(Packed, B) -> true
+      ; member(W, Packed),
+        atom_string(W, Ws),
+        atom_string(B, BsS),
+        sub_string(BsS, _, _, _, Ws)
+      ),
+      findall(Fact, (member(Vr, Rs),
+                     ( memory_relation(B, Vr, _, _, _) ; memory_relation(_, Vr, B, _, _)),
+                     memory_relation(S, Vr, O, _, _),
+                     (S == B ; O == B),
+                     Fact = (S, Vr, O)), FF)
+    ),
+    FF \== [],
+    findall(O, member((_, _, O), FF), Xs0),
+    sort(Xs0, Xs),
+    Facts = FF.
+% when was E V? (passive, verb unknown): entity inference fallback.
+% When bb_rel_forms fails, look at what relations touch the entity
+% and return all of them — the system deduces, not hardcodes.
+% Guard: only when entity has ≤6 relations (avoid dumping everything).
+% For books: exclude appears_in (character-level, not book-level).
+chat_form([when, was, E, V|Rest], say, answer(Xs, Facts)) :-
+    \+ (bb_rel_forms(V, Rs), Rs \== []),
+    ( qnorm([E], EName) -> true ; EName = E ),
+    % Try direct entity first.
+    ( findall(R, (memory_relation(EName, R, _, _, _) ; memory_relation(_, R, EName, _, _)), R0),
+      sort(R0, Rs0),
+      Rs0 \== [], length(Rs0, NR), NR =< 6 -> Rs = Rs0, Target = EName
+    ; live_books(Bs),
+      nl_tokens([E], Packed),
+      member(B, Bs),
+      ( packed_has(Packed, B) -> true
+      ; member(W, Packed),
+        atom_string(W, Ws),
+        atom_string(B, BsS),
+        sub_string(BsS, _, _, _, Ws)
+      ),
+      findall(R, (memory_relation(B, R, _, _, _) ; memory_relation(_, R, B, _, _)), R1),
+      sort(R1, RsAll),
+      RsAll \== [], length(RsAll, NRAll), NRAll =< 10,
+      exclude(==(appears_in), RsAll, Rs),
+      Rs \== [], Target = B
+    ),
+    findall(Fact, (member(Vr, Rs),
+                   memory_relation(S, Vr, O, _, _),
+                   (S == Target ; O == Target),
+                   Fact = (S, Vr, O)), FF),
+    FF \== [],
+    findall(O, member((_, _, O), FF), Xs0),
+    sort(Xs0, Xs),
+    Facts = FF.
+% who is R of E? (e.g. "who is author of alice?"): R is a relation.
+chat_form([who, is, R, of|Rest], say, answer(Xs, Facts)) :-
+    qnorm(Rest, O),
+    O \== [],
+    ( pin_rel(R, Rf) -> true ; Rf = R ),
+    % Try direct match first, then book alias resolution (substring).
+    ( findall(X-(X, Rf, O), memory_relation(X, Rf, O, _, _), SF0),
+      findall(X-(O, Rf, X), memory_relation(O, Rf, X, _, _), SF1),
+      append(SF0, SF1, SF2),
+      SF2 \== [] -> SF = SF2
+    ; live_books(Bs),
+      nl_tokens(Rest, Packed),
+      member(B, Bs),
+      ( packed_has(Packed, B) -> true
+      ; member(W, Packed),
+        atom_string(W, Ws),
+        atom_string(B, BsS),
+        sub_string(BsS, _, _, _, Ws)
+      ),
+      findall(X-(X, Rf, B), memory_relation(X, Rf, B, _, _), SF3),
+      findall(X-(B, Rf, X), memory_relation(B, Rf, X, _, _), SF4),
+      append(SF3, SF4, SF5),
+      SF = SF5
+    ),
+    sort(SF, SFSorted),
+    SFSorted \== [],
+    findall(S, member(S-_, SFSorted), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, SFSorted), Facts).
 
 % qnorm (nombre publico): por token, alias ensenado gana; si no,
 % contenido propio; si nada resuelve, fallback difuso (Levenshtein
@@ -2186,6 +2323,10 @@ irregular_form(ran, run).
 irregular_form(led, lead).
 irregular_form(felt, feel).
 irregular_form(brought, bring).
+irregular_form(wrote, write).
+irregular_form(written, write).
+irregular_form(drank, drink).
+irregular_form(drunk, drink).
 irregular_form(began, begin).
 irregular_form(kept, keep).
 irregular_form(held, hold).

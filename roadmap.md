@@ -558,3 +558,39 @@ map. Counts re-measured per milestone, never assumed down.
   map (pin_rel + unique S-O), no content lexicon. Destination
   estimate ~55%. The remaining chat distance is P2 (2%) and
   SVO-not-English, not C4.
+- 2026-09-14: **entity inference breakthrough** (protocélula concept).
+  When `bb_rel_forms` fails for an unknown verb, the system now looks
+  at what relations touch the queried entity and returns ALL of them —
+  deducing, not hardcoding. Fixed stem_match (silent-e: lov vs love),
+  stray_unknown guard on single-entity graph_fill, irregular forms
+  (wrote→write, written→write, drank→drink), `who is R of E?` clause,
+  `when was E V?` clause, `who is E?` with book title alias resolution
+  via substring matching. Results: "who wrote alice?" → carroll,
+  "who loves alice?" → all touching facts, "did bob eat cake?" → no
+  (was returning alice's fact). Two commits pushed: 3f4cb54, 2a15104.
+
+**Until it feels like talking to a human, keep polishing.** Specific
+failures remaining (2026-09-14):
+- "who is alice?" returns 20 facts instead of "book" — the `who is E?`
+  clause exists but is intercepted by `about_entity` before `chat_ask`
+  reaches `chat_form`. The `book_pin`/`about_entity` path fires on
+  the raw token before form-matching. Fix: gate the about path behind
+  the form-matching failure, or exclude question forms from about.
+- "who is author of alice?" returns "I don't know" — the `who is R of E?`
+  clause with book-alias resolution exists but `qnorm([alice])` returns
+  `alice` not `alice_in_wonderland`, and the substring fallback doesn't
+  fire in time.
+- "when was alice written?" returns facts but not the year — the
+  `when was E V?` clause exists but needs entity-alias resolution.
+- "why did alice eat cake?" returns facts instead of "explanation" —
+  the `chat_form([why,did|Mid])` clause works in isolation but the
+  full `chat_line` flow intercepts via another path.
+- "alice did not eat cake." returns teach prompt instead of "no" —
+  negation handling needs the `no` path, not the learn path.
+- "who wrote hamlet?" fails after teach — needs `wrote→write→author`
+  chain or entity inference on the taught fact.
+- Spanish past-tense verbs ("escribio", "comio") unresolved — need
+  irregular forms or means_triple for cross-language.
+- Entity inference is too broad: "who wrote alice?" returns ALL 25
+  facts about alice instead of just author-related ones. Needs
+  filtering by entity type (book→author) or verb-semantic matching.

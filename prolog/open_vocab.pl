@@ -102,7 +102,57 @@ my_detect_verb(Tokens, lives_in) :-
     append(_, [A, in|_], Tokens),
     member(A, [live, lives, lived]), !.
 my_detect_verb(Tokens, V) :-
-    detect_verb(Tokens, V).
+    detect_verb(Tokens, V), !.
+% P2: fallback morfológico — detecta CUALQUIER verbo por sufijos.
+% No necesita listas: -ed → stem, -ing → stem, -s → stem.
+% Si el stem tiene ≥3 chars, lo acepamos como relación novel.
+my_detect_verb(Tokens, Stem) :-
+    member(T, Tokens),
+    verb_stem(T, Stem),
+    atom_length(Stem, SL), SL >= 3,
+    \+ known_verb_form(T),
+    !.
+
+% ── Detección morfológica de verbos (P2) ─────────────────────────────
+
+% verb_stem(+Word, -Stem) — extrae el stem verbal por sufijos
+verb_stem(Word, Stem) :-
+    atom_chars(Word, Chars),
+    ( append(Base, [e,d], Chars) ->            % walked → walk
+        atom_chars(Stem, Base)
+    ; append(Base, [i,n,g], Chars) ->           % walking → walk
+        atom_chars(Stem, Base)
+    ; append(Base, [s], Chars),                 % walks → walk
+      Base \== [],
+      atom_chars(Stem, Base),
+      \+ member(Stem, [this, thus, yes])        % evitar falsos positivos
+    ).
+
+% known_verb_form/1 — formas verbales conocidas (para no duplicar)
+known_verb_form(T) :- visits_verb(T).
+known_verb_form(T) :- reaches_verb(T).
+known_verb_form(T) :- eats_verb(T).
+known_verb_form(T) :- travels_verb(T).
+known_verb_form(T) :- arrives_verb(T).
+known_verb_form(T) :- reads_verb(T).
+known_verb_form(T) :- borrows_verb(T).
+known_verb_form(T) :- owns_verb(T).
+known_verb_form(T) :- likes_verb(T).
+known_verb_form(T) :- provides_verb(T).
+known_verb_form(T) :- works_verb(T).
+known_verb_form(T) :- supplies_verb(T).
+known_verb_form(T) :- buys_verb(T).
+known_verb_form(T) :- imports_verb(T).
+known_verb_form(T) :- cooks_verb(T).
+known_verb_form(T) :- needs_verb(T).
+known_verb_form(T) :- uses_verb(T).
+known_verb_form(T) :- praises_verb(T).
+known_verb_form(T) :- honors_verb(T).
+known_verb_form(T) :- exalts_verb(T).
+known_verb_form(T) :- admires_verb(T).
+known_verb_form(T) :- plants_verb(T).
+known_verb_form(T) :- yields_verb(T).
+known_verb_form(T) :- harvests_verb(T).
 
 % content word: not skip, not aux, not verb form, not typename
 content_word(T) :-
