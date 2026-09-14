@@ -1940,3 +1940,75 @@ lemma('L8_midline_parallel', Parallel, 'AB ∥ NP').
 verified(fact(geometry, geo_invent, 'geo_invent::L8_midline_parallel', 'AB ∥ NP')).
 % verified @ geometry/geo_invent
 verified(fact(geometry, geo_invent, 'geo_invent_d1_s265', 'AB ∥ NP')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_-1_4_3', 'TRANSFER rec(lucas,[0, -1, 4, 3]) ⇒ try on fib: (0)*fib(n-1) + (-1)*fib(n-2) + (4)*fib(n-3) + (3)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_3_-2_-2', 'TRANSFER rec(lucas,[1, 3, -2, -2]) ⇒ try on fib: (1)*fib(n-1) + (3)*fib(n-2) + (-2)*fib(n-3) + (-2)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_4_-5_2_2', 'n=4: pred=5 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_5_-5_-3_0', 'n=4: pred=2 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_-1_4_3', 'TRANSFER rec(fib,[0, -1, 4, 3]) ⇒ try on lucas: (0)*lucas(n-1) + (-1)*lucas(n-2) + (4)*lucas(n-3) + (3)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_3_-2_-2', 'TRANSFER rec(fib,[1, 3, -2, -2]) ⇒ try on lucas: (1)*lucas(n-1) + (3)*lucas(n-2) + (-2)*lucas(n-3) + (-2)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_4_-5_2_2', 'n=5: pred=16 != obs=11').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_5_-5_-3_0', 'n=4: pred=2 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_-1_4_3', 'n=4: pred=2 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_3_-2_-2', 'n=4: pred=9 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_0_-1_4_3', 'n=4: pred=2 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_1_3_-2_-2', 'n=4: pred=9 != obs=12').
+lemma('L5_EqSeg', EqSeg, 'AM = BM').
+% verified @ geometry/euclid_conjectures
+verified(fact(geometry, euclid_conjectures, 'geo_midline_euclid_conjectures_p0::L5_EqSeg', 'AM = BM')).
+% verified @ geometry/lemma_reuse
+verified(fact(geometry, lemma_reuse, 'geo_midline_full_lemma_reuse_p1', 'AB ∥ NP')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_fib_to_delta_N5', 'TRANSFER rec(fib,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_lucas_to_delta_N5', 'TRANSFER rec(lucas,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_fib_to_delta_N6', 'TRANSFER rec(fib,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_lucas_to_delta_N6', 'TRANSFER rec(lucas,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_fib_to_delta_N7', 'TRANSFER rec(fib,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_lucas_to_delta_N7', 'TRANSFER rec(lucas,[1, 1]) ⇒ Delta structure matches recurrence')).
+% hypothesis-language skin gen=14
+schema(companion_rec, unlocked(true)).
+% learned recurrence on fib
+rec(fib, [3,-3,0,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_3_-3_0_2', 'fib(n) = (3)*fib(n-1) + (-3)*fib(n-2) + (0)*fib(n-3) + (2)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [-2,4,3,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-2_4_3_0', 'fib(n) = (-2)*fib(n-1) + (4)*fib(n-2) + (3)*fib(n-3) + (0)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [3,-3,0,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_3_-3_0_2', 'lucas(n) = (3)*lucas(n-1) + (-3)*lucas(n-2) + (0)*lucas(n-3) + (2)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-2,4,3,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-2_4_3_0', 'lucas(n) = (-2)*lucas(n-1) + (4)*lucas(n-2) + (3)*lucas(n-3) + (0)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,-4,5,3]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_-4_5_3', 'pell(n) = (3)*pell(n-1) + (-4)*pell(n-2) + (5)*pell(n-3) + (3)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [5,-4,-5,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_5_-4_-5_-1', 'pell(n) = (5)*pell(n-1) + (-4)*pell(n-2) + (-5)*pell(n-3) + (-1)*pell(n-4)')).
+lemma('L6_midline_parallel', Parallel, 'AB ∥ NX2').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L6_midline_parallel', 'AB ∥ NX2')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d1_s290', 'AB ∥ NX2')).
