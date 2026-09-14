@@ -1,0 +1,249 @@
+{
+  "archive_dir": "/workspace/master-algorithm/motor/archive-loop",
+  "elapsed_s": 0.268,
+  "ticks": 6,
+  "warm_total_steps": 6,
+  "demo": {
+    "x0": 5.0,
+    "brightness_x0": 0.375,
+    "bangbang": {
+      "err_before": 5.0,
+      "err_after": 0.0,
+      "T": 8
+    },
+    "linear_gain": {
+      "err_before": 5.0,
+      "err_after": 0.015625,
+      "T": 10
+    },
+    "always_right": {
+      "err_before": 5.0,
+      "err_after": 10.0,
+      "T": 5
+    }
+  },
+  "pred_err_max": 0.0,
+  "n_verified": 4,
+  "n_rejected": 8,
+  "verified_names": [
+    "loop_pred_dx_eq_action_s7069",
+    "loop_taxis_bangbang_s7069",
+    "loop_taxis_linear_gain_s7069",
+    "transfer_conserv_delta0_to_loop_dx_eq_a"
+  ],
+  "rejected_names": [
+    "NEG_loop_policy_increases_error",
+    "loop_pred_double_action_s7069",
+    "loop_pred_ignore_action_s7069",
+    "loop_pred_overfit_one_x0_s7069",
+    "loop_taxis_always_left_s7069",
+    "loop_taxis_always_right_s7069",
+    "transfer_conserv_to_loop_position_frozen",
+    "transfer_rec11_to_loop_position"
+  ],
+  "delta_eq_action_transferred": true,
+  "rec11_result": "miss",
+  "explicit_attempts": [
+    {
+      "name": "loop_taxis_bangbang_s7069",
+      "family": "loop_taxis_scan",
+      "true": true,
+      "outcome": "new_true",
+      "support": "taxis bangbang heldout: x0=-6.0 6\u21920; x0=1.5 1.5\u21920.5; x0=7.0 7\u21920; x0=-3.5 3.5\u21920.5",
+      "counterexample": null,
+      "relation_type": "taxis",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_taxis_linear_gain_s7069",
+      "family": "loop_taxis_scan",
+      "true": true,
+      "outcome": "new_true",
+      "support": "taxis linear: x0=-6.0 6\u21920.0312; x0=1.5 1.5\u21920.00146; x0=7.0 7\u21920.0625; x0=-3.5 3.5\u21920.00586",
+      "counterexample": null,
+      "relation_type": "taxis",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_taxis_always_right_s7069",
+      "family": "loop_taxis_scan",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "increases error: x0=2.0 2\u21927; x0=4.0 4\u21929; x0=6.0 6\u219211",
+      "counterexample": "increases error: x0=2.0 2\u21927; x0=4.0 4\u21929; x0=6.0 6\u219211",
+      "relation_type": "taxis_neg",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_taxis_always_left_s7069",
+      "family": "loop_taxis_scan",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "increases error: x0=-2.0 2\u21927; x0=-4.0 4\u21929; x0=-5.0 5\u219210",
+      "counterexample": "increases error: x0=-2.0 2\u21927; x0=-4.0 4\u21929; x0=-5.0 5\u219210",
+      "relation_type": "taxis_neg",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_pred_dx_eq_action_s7069",
+      "family": "loop_pred_scan",
+      "true": true,
+      "outcome": "new_true",
+      "support": "pred_err_max=0.00e+00 n=20 heldout=[-6.0, 1.5, 7.0, -3.5]",
+      "counterexample": null,
+      "relation_type": "prediction",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_pred_ignore_action_s7069",
+      "family": "loop_pred_scan",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0",
+      "counterexample": "finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0",
+      "relation_type": "prediction_neg",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_pred_double_action_s7069",
+      "family": "loop_pred_scan",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "finite fail: x0=-6.0 pred=-4.0 obs=-5.0",
+      "counterexample": "finite fail: x0=-6.0 pred=-4.0 obs=-5.0",
+      "relation_type": "prediction_neg",
+      "from_transfer": false
+    },
+    {
+      "name": "loop_pred_overfit_one_x0_s7069",
+      "family": "loop_pred_scan",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0",
+      "counterexample": "fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0",
+      "relation_type": "prediction_overfit",
+      "from_transfer": false
+    },
+    {
+      "name": "transfer_conserv_delta0_to_loop_dx_eq_a",
+      "family": "loop_transfer_form",
+      "true": true,
+      "outcome": "new_true",
+      "support": "TRANSFER \u0394=0 shape \u2192 \u0394x-a=0 resid_max=0.00e+00",
+      "counterexample": null,
+      "relation_type": "transfer_form",
+      "from_transfer": true
+    },
+    {
+      "name": "transfer_rec11_to_loop_position",
+      "family": "loop_transfer_form",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "n=2: pred=9.0 != obs=3.0",
+      "counterexample": "n=2: pred=9.0 != obs=3.0",
+      "relation_type": "transfer_miss",
+      "from_transfer": true
+    },
+    {
+      "name": "transfer_conserv_to_loop_position_frozen",
+      "family": "loop_transfer_form",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "finite fail: x0=-6.0 moved under a=1",
+      "counterexample": "finite fail: x0=-6.0 moved under a=1",
+      "relation_type": "transfer_miss",
+      "from_transfer": true
+    },
+    {
+      "name": "NEG_loop_policy_increases_error",
+      "family": "loop_dead_wrong_policy",
+      "true": false,
+      "outcome": "new_reject",
+      "support": "finite fail (dead-end): deltas=[-4.0, -4.0]",
+      "counterexample": "finite fail (dead-end): deltas=[-4.0, -4.0]",
+      "relation_type": "dead_end:bad_policy",
+      "from_transfer": false
+    }
+  ],
+  "merge": {
+    "added_verified": [
+      "loop_taxis_bangbang_s7069",
+      "loop_taxis_linear_gain_s7069",
+      "loop_pred_dx_eq_action_s7069",
+      "transfer_conserv_delta0_to_loop_dx_eq_a"
+    ],
+    "added_rejected": [
+      "loop_taxis_always_right_s7069",
+      "loop_taxis_always_left_s7069",
+      "loop_pred_ignore_action_s7069",
+      "loop_pred_double_action_s7069",
+      "loop_pred_overfit_one_x0_s7069",
+      "transfer_rec11_to_loop_position",
+      "transfer_conserv_to_loop_position_frozen",
+      "NEG_loop_policy_increases_error"
+    ]
+  },
+  "observe": {
+    "closed_loop": "observe\u2192act\u2192critic",
+    "x0": 3.0,
+    "brightness_x0": 0.625,
+    "err_before": 3.0,
+    "err_after_bangbang_T4": 0.0,
+    "hidden_law": "next_x = x + a",
+    "n_schema_classes": 4,
+    "generation": 0,
+    "taxis_bangbang": [
+      {
+        "x0": -6.0,
+        "err_before": 6.0,
+        "err_after": 0.0,
+        "delta": 6.0
+      },
+      {
+        "x0": 1.5,
+        "err_before": 1.5,
+        "err_after": 0.5,
+        "delta": 1.0
+      },
+      {
+        "x0": 7.0,
+        "err_before": 7.0,
+        "err_after": 0.0,
+        "delta": 7.0
+      },
+      {
+        "x0": -3.5,
+        "err_before": 3.5,
+        "err_after": 0.5,
+        "delta": 3.0
+      }
+    ],
+    "taxis_linear": [
+      {
+        "x0": -6.0,
+        "err_before": 6.0,
+        "err_after": 0.03125,
+        "delta": 5.96875
+      },
+      {
+        "x0": 1.5,
+        "err_before": 1.5,
+        "err_after": 0.00146484375,
+        "delta": 1.49853515625
+      },
+      {
+        "x0": 7.0,
+        "err_before": 7.0,
+        "err_after": 0.0625,
+        "delta": 6.9375
+      },
+      {
+        "x0": -3.5,
+        "err_before": 3.5,
+        "err_after": 0.005859375,
+        "delta": 3.494140625
+      }
+    ],
+    "pred_err_max": 0.0
+  }
+}

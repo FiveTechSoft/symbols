@@ -242,56 +242,63 @@ class HypothesisLanguage:
             gi.saturated = False
             actions.append(f"raise_mut_depth {old}→{gi.mut_depth}")
 
-        # 6) Novelty bonus so search doesn't only exploit [1,1]
-        structural = [a for a in actions if not a.startswith("novelty")]
+        # 6) Novelty bonus (not a leap — just pressure)
         if lr:
             lr.novelty_bonus = min(2.0, lr.novelty_bonus + 0.5)
             actions.append(f"novelty_bonus→{lr.novelty_bonus}")
 
-        # 7) If no structural growth left, spawn a fresh schema class (operator variant)
+        # Structural leap = unlock new schema OR raise genuine capacity — NOT coeff widen,
+        # NOT bilinear_gN / linrec_oN clone suffixes (those are brute force).
+        structural = [
+            a for a in actions
+            if a.startswith("unlock_schema")
+            or a.startswith("raise_linrec_order")
+            or a.startswith("raise_mut_depth")
+            or a.startswith("raise_m_max")
+            or a.startswith("raise_r_max")
+        ]
+
+        # 7) Spawn ONLY a lever composition (one-word operator on the 6 evidence levers).
+        # Forbidden: bilinear_gN, coeff-scan clones, matmul, entropy clones, random min/max.
+        # Allowed: compose/transfer levers — e.g. delta_conserv, taxis_conserv, rec_to_delta,
+        #          bit_circuit_compose, form_gate.
         if not structural:
-            # Prefer bilinear/modperiod depth variants, else linrec mutant
-            bi = self.schemas.get("bilinear_schema")
-            mp = self.schemas.get("modperiod_schema")
-            if bi and bi.unlocked:
-                new_id = f"bilinear_schema_r{bi.r_max}_g{self.generation + 1}"
-                if new_id not in self.schemas:
-                    self.schemas[new_id] = SchemaClass(
-                        id=new_id,
-                        description=f"Mutant bilinear schema r_max={bi.r_max}",
-                        unlocked=True,
-                        origin=f"mutation:spawn_gen{self.generation + 1}",
-                        r_max=bi.r_max,
-                        r_cap=bi.r_cap,
-                    )
-                    actions.append(f"spawn_schema {new_id}")
-            elif mp and mp.unlocked:
-                new_id = f"modperiod_schema_m{mp.m_max}_g{self.generation + 1}"
-                if new_id not in self.schemas:
-                    self.schemas[new_id] = SchemaClass(
-                        id=new_id,
-                        description=f"Mutant modperiod m_max={mp.m_max}",
-                        unlocked=True,
-                        origin=f"mutation:spawn_gen{self.generation + 1}",
-                        m_max=mp.m_max,
-                        m_cap=mp.m_cap,
-                    )
-                    actions.append(f"spawn_schema {new_id}")
-            elif lr:
-                new_id = f"linrec_scan_o{lr.order}_v{self.generation + 1}"
-                if new_id not in self.schemas:
-                    self.schemas[new_id] = SchemaClass(
-                        id=new_id,
-                        description=f"Mutant linrec scan at order≥{lr.order}",
-                        unlocked=True,
-                        origin=f"mutation:spawn_gen{self.generation + 1}",
-                        order=lr.order,
-                        order_max=lr.order_max,
-                        coeff_lo=lr.coeff_lo,
-                        coeff_hi=lr.coeff_hi,
-                        novelty_bonus=1.0,
-                    )
-                    actions.append(f"spawn_schema {new_id}")
+            LEVER_SPAWNS = [
+                ("delta_conserv", "Δ∘conserv: discrete difference of a Δ=0 additive invariant"),
+                ("taxis_conserv", "taxis on additive invariant: sign(error)→action on Δ=0 residual"),
+                ("rec_to_delta", "rec→Δ: lift additive recurrence into discrete calculus Δ"),
+                ("bit_circuit_compose", "bit-circuit compose: series-AND / parallel-OR transfer"),
+                ("form_gate", "form-gate: identity ≠ defining law (carve false analogies)"),
+                ("companion_rec", "companion-rec: additive rec form → new companion world"),
+            ]
+            spawned = False
+            for new_id, desc in LEVER_SPAWNS:
+                if new_id in self.schemas:
+                    continue
+                # require a related seed unlocked so spawn is transfer/compose, not random
+                need = {
+                    "delta_conserv": ("linrec_scan", "transfer_horn"),
+                    "taxis_conserv": ("transfer_horn", "linrec_scan"),
+                    "rec_to_delta": ("linrec_scan", "transfer_horn"),
+                    "bit_circuit_compose": ("transfer_horn",),
+                    "form_gate": ("bilinear_schema", "transfer_horn"),
+                    "companion_rec": ("transfer_horn", "linrec_scan"),
+                }[new_id]
+                if not any(
+                    (self.schemas.get(n) and self.schemas[n].unlocked) for n in need
+                ):
+                    continue
+                self.schemas[new_id] = SchemaClass(
+                    id=new_id,
+                    description=desc,
+                    unlocked=True,
+                    origin=f"mutation:lever_spawn_gen{self.generation + 1}",
+                )
+                actions.append(f"spawn_lever {new_id}")
+                spawned = True
+                break
+            if not spawned:
+                actions.append("spawn_skip: no new lever composition available")
 
         self.generation += 1
         # Unsaturate productive arms so UCB revisits after molt

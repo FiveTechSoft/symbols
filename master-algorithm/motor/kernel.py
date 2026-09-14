@@ -85,6 +85,7 @@ class MotorKernel:
         self.curves: list[dict] = list(self.archive.meta.get("curves", []))
         # Confirmed facts index (Python mirror of verified/1 for quick checks)
         self.prefer_arms: list[str] = []
+        self._known_form_families: set[str] | None = None
         self.confirmed: dict[str, VerifiedFact] = {}
         for name in self.archive.verified_names():
             self.confirmed[name] = VerifiedFact(
@@ -165,26 +166,105 @@ class MotorKernel:
         return best[3], best[4], why
 
     def _score(self, facts: list[VerifiedFact], fam: FamilySpec, outcomes: list[str]) -> tuple[float, dict]:
+        """Form-family aware score.
+
+        Pay for evolutionary leaps on the 6 evidence levers — not clone mills.
+          - new_true of ALREADY-known form_family: ~0.05 (farming dies)
+          - new lever form_family: large reward
+          - successful transfer into a new world: largest
+          - honest reject that distinguishes two families: understanding (not waste)
+          - off-path / clone (bilinear, matmul, entropy k-sweep, coeff scan): ~0
+        """
+        from .understand import form_family_id, tag_family, known_form_families
+
         new_true = sum(1 for o in outcomes if o == "new_true")
         new_reject = sum(1 for o in outcomes if o == "new_reject")
+        known = getattr(self, "_known_form_families", None)
+        if known is None:
+            try:
+                known = known_form_families(self.archive.theory_path)
+            except Exception:
+                known = set()
+            # exclude facts we are about to ingest this tick (they are already in archive
+            # only after _ingest — so known is pre-tick; good)
+            self._known_form_families = known
+
         dead_ok = 0
         for f, o in zip(facts, outcomes):
             if fam.dead_end or f.name.startswith("NEG_"):
                 if not f.true and o in ("new_reject", "duplicate_reject"):
                     dead_ok += 1
-        new_types = len({f.relation_type for f, o in zip(facts, outcomes) if o == "new_true"})
-        transfer_hits = sum(1 for f, o in zip(facts, outcomes) if o == "new_true" and f.from_transfer)
-        novelty = 1.0 * new_true + 0.5 * new_types + 0.25 * dead_ok + 0.75 * transfer_hits
+
+        reward = 0.0
+        n_new_family = 0
+        n_known_clone = 0
+        n_transfer_new_world = 0
+        n_carve_reject = 0
+        n_offpath = 0
+        family_ids: list[str] = []
+
+        for f, o in zip(facts, outcomes):
+            fid = form_family_id(f.world, f.family, f.name, f.formula)
+            tag = tag_family(fid)
+            family_ids.append(fid)
+
+            if o == "new_true":
+                if tag == "off-path" or tag == "clone":
+                    # clone / multiply / matrix mills: essentially zero
+                    reward += 0.02
+                    n_offpath += 1
+                    n_known_clone += 1
+                elif fid in known:
+                    # already-known form_family (even lever): tiny — stop farming
+                    reward += 0.05
+                    n_known_clone += 1
+                else:
+                    # genuinely new form_family on a lever
+                    reward += 3.0
+                    n_new_family += 1
+                    known.add(fid)
+                if f.from_transfer and tag == "lever":
+                    # transfer into a (companion/additive) world: largest
+                    if fid in known or tag == "lever":
+                        reward += 2.0  # stacked on top
+                        n_transfer_new_world += 1
+            elif o == "new_reject":
+                # honest reject that carves / distinguishes families
+                carve = (
+                    f.name.startswith("false_")
+                    or f.name.startswith("NEG_")
+                    or (f.counterexample and (
+                        "mismatch" in (f.counterexample or "").lower()
+                        or "form-family" in (f.counterexample or "").lower()
+                    ))
+                )
+                if carve and tag == "lever":
+                    reward += 1.5
+                    n_carve_reject += 1
+                elif carve:
+                    reward += 0.4  # still some signal
+                    n_carve_reject += 1
+                elif fam.dead_end or f.name.startswith("NEG_"):
+                    reward += 0.25
+                    dead_ok += 1
+
         cost = 0.05 * len(facts) + 0.02 * fam.param
-        score = novelty - cost
+        score = reward - cost
+        # refresh cache
+        self._known_form_families = known
         return score, {
             "new_true": new_true,
             "new_reject": new_reject,
-            "new_types": new_types,
-            "transfer_hits": transfer_hits,
+            "n_new_form_family": n_new_family,
+            "n_known_clone": n_known_clone,
+            "n_transfer_new_world": n_transfer_new_world,
+            "n_carve_reject": n_carve_reject,
+            "n_offpath": n_offpath,
+            "form_families": family_ids,
             "dead_ok": dead_ok,
             "cost": round(cost, 4),
             "score": round(score, 4),
+            "reward_raw": round(reward, 4),
         }
 
     def _ingest(self, fact: VerifiedFact) -> str:
@@ -216,6 +296,13 @@ class MotorKernel:
         fam = self.arms[arm_key(world_name, fam_id)]
         world = self.worlds[world_name]
 
+        # Snapshot form families BEFORE ingest so clone reward stays tiny
+        if self._known_form_families is None:
+            try:
+                from .understand import known_form_families
+                self._known_form_families = known_form_families(self.archive.theory_path)
+            except Exception:
+                self._known_form_families = set()
         conjectures = world.hypothesize(fam, self.confirmed, self.total_steps)
         facts: list[VerifiedFact] = []
         outcomes: list[str] = []
@@ -229,6 +316,14 @@ class MotorKernel:
         score, detail = self._score(facts, fam, outcomes)
         fam.n_visits += 1
         fam.total_reward += score
+        # Saturate clone mills: 0 new form_families for K ticks even if new_true>0
+        K_FORM = 3
+        if detail.get("n_new_form_family", 0) == 0:
+            fam.ticks_no_new_form_family = getattr(fam, "ticks_no_new_form_family", 0) + 1
+        else:
+            fam.ticks_no_new_form_family = 0
+        if fam.ticks_no_new_form_family >= K_FORM and not fam.dead_end:
+            fam.saturated = True
         growth = world.expand_family(fam, detail["new_true"])
 
         # If all this world's unlocked families saturated → unlock next

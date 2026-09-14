@@ -1,5 +1,5 @@
 {
-  "total_steps": 151,
+  "total_steps": 175,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -10,8 +10,9 @@
       "unlocked": true,
       "unlock_order": 0,
       "saturated": true,
-      "n_visits": 7,
-      "total_reward": 60.300000000000004
+      "n_visits": 8,
+      "total_reward": 59.59,
+      "ticks_no_new_form_family": 1
     },
     "sequences::transfer_recurrence": {
       "id": "transfer_recurrence",
@@ -22,8 +23,9 @@
       "unlocked": true,
       "unlock_order": 1,
       "saturated": true,
-      "n_visits": 11,
-      "total_reward": 47.7
+      "n_visits": 13,
+      "total_reward": 41.7,
+      "ticks_no_new_form_family": 2
     },
     "sequences::ratio_limits": {
       "id": "ratio_limits",
@@ -35,7 +37,8 @@
       "unlock_order": 2,
       "saturated": false,
       "n_visits": 6,
-      "total_reward": 2.3999999999999995
+      "total_reward": 2.3999999999999995,
+      "ticks_no_new_form_family": 0
     },
     "sequences::dead_end_always_prime": {
       "id": "dead_end_always_prime",
@@ -47,7 +50,8 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 5,
-      "total_reward": 1.0
+      "total_reward": 1.0,
+      "ticks_no_new_form_family": 0
     },
     "sequences::modular_periods": {
       "id": "modular_periods",
@@ -59,7 +63,8 @@
       "unlock_order": 4,
       "saturated": false,
       "n_visits": 7,
-      "total_reward": 1.5600000000000003
+      "total_reward": 1.5600000000000003,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema": {
       "id": "bilinear_schema",
@@ -71,7 +76,8 @@
       "unlock_order": 5,
       "saturated": false,
       "n_visits": 6,
-      "total_reward": 2.7800000000000002
+      "total_reward": 2.7800000000000002,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema_r4_g4": {
       "id": "bilinear_schema_r4_g4",
@@ -83,7 +89,8 @@
       "unlock_order": 7,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": -1.36
+      "total_reward": -1.36,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema_r4_g5": {
       "id": "bilinear_schema_r4_g5",
@@ -95,7 +102,8 @@
       "unlock_order": 8,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": -1.36
+      "total_reward": -1.36,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema_r4_g6": {
       "id": "bilinear_schema_r4_g6",
@@ -107,7 +115,8 @@
       "unlock_order": 9,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": -0.68
+      "total_reward": -0.68,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema_r4_g7": {
       "id": "bilinear_schema_r4_g7",
@@ -119,7 +128,8 @@
       "unlock_order": 10,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": -0.68
+      "total_reward": -0.68,
+      "ticks_no_new_form_family": 0
     },
     "sequences::bilinear_schema_r4_g8": {
       "id": "bilinear_schema_r4_g8",
@@ -129,9 +139,10 @@
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 11,
-      "saturated": true,
+      "saturated": false,
       "n_visits": 1,
-      "total_reward": -0.68
+      "total_reward": -0.68,
+      "ticks_no_new_form_family": 0
     },
     "logic::boolean_from_examples": {
       "id": "boolean_from_examples",
@@ -143,7 +154,8 @@
       "unlock_order": 0,
       "saturated": true,
       "n_visits": 3,
-      "total_reward": 3.69
+      "total_reward": 3.69,
+      "ticks_no_new_form_family": 0
     },
     "logic::dead_end_const_true": {
       "id": "dead_end_const_true",
@@ -155,7 +167,8 @@
       "unlock_order": 1,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.6
+      "total_reward": 0.6,
+      "ticks_no_new_form_family": 0
     },
     "geometry::euclid_conjectures": {
       "id": "euclid_conjectures",
@@ -167,7 +180,8 @@
       "unlock_order": 0,
       "saturated": false,
       "n_visits": 5,
-      "total_reward": 1.2499999999999998
+      "total_reward": 1.2499999999999998,
+      "ticks_no_new_form_family": 0
     },
     "geometry::lemma_reuse": {
       "id": "lemma_reuse",
@@ -179,7 +193,8 @@
       "unlock_order": 1,
       "saturated": false,
       "n_visits": 5,
-      "total_reward": 1.2499999999999998
+      "total_reward": 1.2499999999999998,
+      "ticks_no_new_form_family": 0
     },
     "geometry::geo_invent": {
       "id": "geo_invent",
@@ -191,7 +206,8 @@
       "unlock_order": 2,
       "saturated": false,
       "n_visits": 9,
-      "total_reward": 12.470000000000002
+      "total_reward": 12.470000000000002,
+      "ticks_no_new_form_family": 0
     },
     "geometry::dead_end_false_eq": {
       "id": "dead_end_false_eq",
@@ -203,31 +219,34 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 5,
-      "total_reward": 1.0
+      "total_reward": 1.0,
+      "ticks_no_new_form_family": 0
     },
     "symmetry::sym_invariant_scan": {
       "id": "sym_invariant_scan",
       "description": "Scan discrete invariants (parity, mod-2 sum, involution)",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.31
+      "n_visits": 2,
+      "total_reward": 3.19,
+      "ticks_no_new_form_family": 1
     },
     "symmetry::sym_group_table": {
       "id": "sym_group_table",
       "description": "Hypothesize Z2 / Klein composition-table laws",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.31
+      "n_visits": 2,
+      "total_reward": 2.14,
+      "ticks_no_new_form_family": 1
     },
     "symmetry::sym_dead_product": {
       "id": "sym_dead_product",
@@ -239,7 +258,8 @@
       "unlock_order": 2,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "symmetry::sym_compare_transfer": {
       "id": "sym_compare_transfer",
@@ -251,7 +271,8 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": 3.7399999999999998
+      "total_reward": 3.7399999999999998,
+      "ticks_no_new_form_family": 0
     },
     "chance::chance_bayes_scan": {
       "id": "chance_bayes_scan",
@@ -263,7 +284,8 @@
       "unlock_order": 0,
       "saturated": true,
       "n_visits": 3,
-      "total_reward": 19.77
+      "total_reward": 19.77,
+      "ticks_no_new_form_family": 0
     },
     "chance::chance_entropy_scan": {
       "id": "chance_entropy_scan",
@@ -275,7 +297,8 @@
       "unlock_order": 1,
       "saturated": true,
       "n_visits": 5,
-      "total_reward": 35.35
+      "total_reward": 35.35,
+      "ticks_no_new_form_family": 0
     },
     "chance::chance_dead_negH": {
       "id": "chance_dead_negH",
@@ -287,19 +310,21 @@
       "unlock_order": 2,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.38
+      "total_reward": 0.38,
+      "ticks_no_new_form_family": 0
     },
     "chance::chance_extrapolate": {
       "id": "chance_extrapolate",
       "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
       "dead_end": false,
-      "param": 5,
+      "param": 6,
       "param_max": 8,
       "unlocked": true,
       "unlock_order": 3,
       "saturated": false,
-      "n_visits": 2,
-      "total_reward": 5.21
+      "n_visits": 3,
+      "total_reward": 4.91,
+      "ticks_no_new_form_family": 1
     },
     "info::info_mi_scan": {
       "id": "info_mi_scan",
@@ -311,7 +336,8 @@
       "unlock_order": 0,
       "saturated": true,
       "n_visits": 3,
-      "total_reward": 14.219999999999999
+      "total_reward": 14.219999999999999,
+      "ticks_no_new_form_family": 0
     },
     "info::info_transfer_bitfn": {
       "id": "info_transfer_bitfn",
@@ -323,7 +349,8 @@
       "unlock_order": 1,
       "saturated": false,
       "n_visits": 3,
-      "total_reward": 5.18
+      "total_reward": 5.18,
+      "ticks_no_new_form_family": 0
     },
     "info::info_dead_mi0": {
       "id": "info_dead_mi0",
@@ -335,19 +362,21 @@
       "unlock_order": 2,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "astro::astro_period_scan": {
       "id": "astro_period_scan",
       "description": "Scan periods T vs semi-major a on generated circular orbits",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 8,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.34
+      "n_visits": 2,
+      "total_reward": 2.1999999999999997,
+      "ticks_no_new_form_family": 1
     },
     "astro::astro_kepler_scan": {
       "id": "astro_kepler_scan",
@@ -359,19 +388,21 @@
       "unlock_order": 1,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": 1.34
+      "total_reward": 1.34,
+      "ticks_no_new_form_family": 0
     },
     "astro::astro_angmom_scan": {
       "id": "astro_angmom_scan",
       "description": "Angular-momentum-like invariant on discrete 2-body circular table",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 2,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.34
+      "n_visits": 2,
+      "total_reward": 2.1999999999999997,
+      "ticks_no_new_form_family": 1
     },
     "astro::astro_dead_linear": {
       "id": "astro_dead_linear",
@@ -383,7 +414,8 @@
       "unlock_order": 3,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "astro::astro_transfer_form": {
       "id": "astro_transfer_form",
@@ -395,31 +427,34 @@
       "unlock_order": 4,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": 4.16
+      "total_reward": 4.16,
+      "ticks_no_new_form_family": 0
     },
     "algebra::alg_poly_zn": {
       "id": "alg_poly_zn",
       "description": "Polynomial identities on small Z/nZ ((x+y)^2 vs expand)",
       "dead_end": false,
-      "param": 7,
+      "param": 9,
       "param_max": 13,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.3
+      "n_visits": 2,
+      "total_reward": 2.0999999999999996,
+      "ticks_no_new_form_family": 1
     },
     "algebra::alg_linear_2x2": {
       "id": "alg_linear_2x2",
       "description": "Exact 2x2 linear systems over Q (integer dets)",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.36
+      "n_visits": 2,
+      "total_reward": 2.2399999999999998,
+      "ticks_no_new_form_family": 1
     },
     "algebra::alg_mat_assoc": {
       "id": "alg_mat_assoc",
@@ -431,7 +466,8 @@
       "unlock_order": 2,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": 1.39
+      "total_reward": 1.39,
+      "ticks_no_new_form_family": 0
     },
     "algebra::alg_dead_binom": {
       "id": "alg_dead_binom",
@@ -443,43 +479,47 @@
       "unlock_order": 3,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "calculus::calc_fwd_diff": {
       "id": "calc_fwd_diff",
       "description": "Forward difference Delta on fib/lucas and simple polynomials",
       "dead_end": false,
-      "param": 5,
+      "param": 6,
       "param_max": 12,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.27
+      "n_visits": 2,
+      "total_reward": 3.17,
+      "ticks_no_new_form_family": 1
     },
     "calculus::calc_ft_discrete": {
       "id": "calc_ft_discrete",
       "description": "Discrete FTC: Delta(sum f) = f on finite prefixes",
       "dead_end": false,
-      "param": 5,
+      "param": 6,
       "param_max": 12,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.27
+      "n_visits": 2,
+      "total_reward": 3.17,
+      "ticks_no_new_form_family": 1
     },
     "calculus::calc_power_diff": {
       "id": "calc_power_diff",
       "description": "Delta(x^n) ~ n x^{n-1} on integer lattice",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 2,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.36
+      "n_visits": 2,
+      "total_reward": 2.1999999999999997,
+      "ticks_no_new_form_family": 1
     },
     "calculus::calc_transfer_rec": {
       "id": "calc_transfer_rec",
@@ -491,7 +531,8 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": -0.0600000000000005
+      "total_reward": -0.0600000000000005,
+      "ticks_no_new_form_family": 0
     },
     "calculus::calc_dead_zero": {
       "id": "calc_dead_zero",
@@ -503,7 +544,8 @@
       "unlock_order": 4,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "calculus::calc_transfer_form": {
       "id": "calc_transfer_form",
@@ -515,7 +557,8 @@
       "unlock_order": 5,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": -1.7800000000000002
+      "total_reward": -1.7800000000000002,
+      "ticks_no_new_form_family": 0
     },
     "nets::nets_perceptron": {
       "id": "nets_perceptron",
@@ -527,43 +570,47 @@
       "unlock_order": 0,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": 4.35
+      "total_reward": 4.35,
+      "ticks_no_new_form_family": 0
     },
     "nets::nets_xor_depth": {
       "id": "nets_xor_depth",
       "description": "XOR: single linear threshold fail; 2-layer/composition may hold",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 1.6099999999999999
+      "n_visits": 2,
+      "total_reward": 1.45,
+      "ticks_no_new_form_family": 1
     },
     "nets::nets_grad_step": {
       "id": "nets_grad_step",
       "description": "One gradient step on 2-weight squared-error toy",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 2,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.36
+      "n_visits": 2,
+      "total_reward": 2.1999999999999997,
+      "ticks_no_new_form_family": 1
     },
     "nets::nets_chain_transfer": {
       "id": "nets_chain_transfer",
       "description": "TRANSFER: discrete chain rule Delta(f(g)) vs product of Deltas",
       "dead_end": false,
-      "param": 2,
+      "param": 3,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 3,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.18
+      "n_visits": 2,
+      "total_reward": 2.0900000000000003,
+      "ticks_no_new_form_family": 1
     },
     "nets::nets_dead_any_eta": {
       "id": "nets_dead_any_eta",
@@ -575,7 +622,8 @@
       "unlock_order": 4,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "nets::nets_transfer_form": {
       "id": "nets_transfer_form",
@@ -587,7 +635,8 @@
       "unlock_order": 5,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": 1.85
+      "total_reward": 1.85,
+      "ticks_no_new_form_family": 0
     },
     "electro::electro_ohm": {
       "id": "electro_ohm",
@@ -599,19 +648,21 @@
       "unlock_order": 0,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": 1.34
+      "total_reward": 1.34,
+      "ticks_no_new_form_family": 0
     },
     "electro::electro_kirchhoff": {
       "id": "electro_kirchhoff",
       "description": "Kirchhoff current sum=0 at a node (tiny 3-edge net)",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.29
+      "n_visits": 2,
+      "total_reward": 3.21,
+      "ticks_no_new_form_family": 1
     },
     "electro::electro_switch_transfer": {
       "id": "electro_switch_transfer",
@@ -623,7 +674,8 @@
       "unlock_order": 2,
       "saturated": false,
       "n_visits": 2,
-      "total_reward": 1.9899999999999998
+      "total_reward": 1.9899999999999998,
+      "ticks_no_new_form_family": 0
     },
     "electro::electro_dead_noconserve": {
       "id": "electro_dead_noconserve",
@@ -635,7 +687,8 @@
       "unlock_order": 3,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "electro::electro_transfer_form": {
       "id": "electro_transfer_form",
@@ -647,7 +700,8 @@
       "unlock_order": 4,
       "saturated": false,
       "n_visits": 3,
-      "total_reward": 6.72
+      "total_reward": 6.72,
+      "ticks_no_new_form_family": 0
     },
     "physics::phys_collision": {
       "id": "phys_collision",
@@ -659,19 +713,21 @@
       "unlock_order": 0,
       "saturated": true,
       "n_visits": 5,
-      "total_reward": 40.1
+      "total_reward": 40.1,
+      "ticks_no_new_form_family": 0
     },
     "physics::phys_action_reaction": {
       "id": "phys_action_reaction",
       "description": "Action=reaction pair on generated force samples",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.26
+      "n_visits": 2,
+      "total_reward": 3.15,
+      "ticks_no_new_form_family": 1
     },
     "physics::phys_dead_nomom": {
       "id": "phys_dead_nomom",
@@ -683,7 +739,8 @@
       "unlock_order": 2,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "physics::phys_transfer_form": {
       "id": "phys_transfer_form",
@@ -695,31 +752,34 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 3,
-      "total_reward": 6.72
+      "total_reward": 6.72,
+      "ticks_no_new_form_family": 0
     },
     "chem::chem_atom_balance": {
       "id": "chem_atom_balance",
       "description": "Atom-count conservation on generated tiny reaction tables",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 3.26
+      "n_visits": 2,
+      "total_reward": 4.6,
+      "ticks_no_new_form_family": 1
     },
     "chem::chem_equilibrium_K": {
       "id": "chem_equilibrium_K",
       "description": "K=products/reactants on 2-species equilibrium toy",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.36
+      "n_visits": 2,
+      "total_reward": 2.21,
+      "ticks_no_new_form_family": 1
     },
     "chem::chem_dead_noatoms": {
       "id": "chem_dead_noatoms",
@@ -731,7 +791,8 @@
       "unlock_order": 2,
       "saturated": true,
       "n_visits": 1,
-      "total_reward": 0.18
+      "total_reward": 0.18,
+      "ticks_no_new_form_family": 0
     },
     "chem::chem_transfer_form": {
       "id": "chem_transfer_form",
@@ -743,19 +804,21 @@
       "unlock_order": 3,
       "saturated": false,
       "n_visits": 3,
-      "total_reward": 6.72
+      "total_reward": 6.72,
+      "ticks_no_new_form_family": 0
     },
     "loop::loop_taxis_scan": {
       "id": "loop_taxis_scan",
       "description": "1D taxis: bang-bang / linear gain reduce |error| on held-out x0",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 2.24
+      "n_visits": 2,
+      "total_reward": 2.06,
+      "ticks_no_new_form_family": 1
     },
     "loop::loop_pred_scan": {
       "id": "loop_pred_scan",
@@ -767,19 +830,21 @@
       "unlock_order": 1,
       "saturated": false,
       "n_visits": 1,
-      "total_reward": 1.24
+      "total_reward": 1.24,
+      "ticks_no_new_form_family": 0
     },
     "loop::loop_transfer_form": {
       "id": "loop_transfer_form",
       "description": "TRANSFER: conserv \u0394=0 \u2192 \u0394(position)=action; rec[1,1] mostly miss",
       "dead_end": false,
-      "param": 2,
+      "param": 3,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 2,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 1,
+      "total_reward": -0.19000000000000003,
+      "ticks_no_new_form_family": 1
     },
     "loop::loop_dead_wrong_policy": {
       "id": "loop_dead_wrong_policy",
@@ -789,9 +854,23 @@
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 3,
-      "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": -0.07,
+      "ticks_no_new_form_family": 1
+    },
+    "sequences::delta_conserv": {
+      "id": "delta_conserv",
+      "description": "\u0394\u2218conserv: discrete difference of a \u0394=0 additive invariant",
+      "dead_end": false,
+      "param": 0,
+      "param_max": 0,
+      "unlocked": true,
+      "unlock_order": 12,
+      "saturated": true,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "ticks_no_new_form_family": 1
     }
   },
   "step_log": [
@@ -7029,6 +7108,1608 @@
         "loop_pred_overfit_one_x0_s8653"
       ],
       "transfer": []
+    },
+    {
+      "tick": 152,
+      "world": "loop",
+      "family": "loop_transfer_form",
+      "why": "UCB1 over 47 arms (world,family); picked loop::loop_transfer_form because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "conserv_delta0",
+          "loop_taxis",
+          "conserv_delta0"
+        ],
+        "dead_ok": 0,
+        "cost": 0.19,
+        "score": -0.19,
+        "reward_raw": 0.0
+      },
+      "growth": "extrapolate 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_conserv_delta0_to_loop_dx_eq_a"
+      ]
+    },
+    {
+      "tick": 153,
+      "world": "loop",
+      "family": "loop_dead_wrong_policy",
+      "why": "UCB1 over 47 arms (world,family); picked loop::loop_dead_wrong_policy because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "loop_taxis"
+        ],
+        "dead_ok": 1,
+        "cost": 0.07,
+        "score": -0.07,
+        "reward_raw": 0.0
+      },
+      "growth": "dead-end \u2192 saturate (curiosity tax)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 154,
+      "world": "symmetry",
+      "family": "sym_invariant_scan",
+      "why": "UCB1 over 46 arms (world,family); picked symmetry::sym_invariant_scan because avg=3.310+1.4*sqrt(ln(153+1)/1)=3.142\u21926.452. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 4,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "bit_circuit",
+          "sym_invariant",
+          "sym_invariant",
+          "bit_circuit"
+        ],
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.12,
+        "reward_raw": 0.14
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "sym_parity_mod2_sum_o3",
+        "sym_involution_double_o3",
+        "sym_z2_assoc_o3",
+        "sym_parity_mod2_sum_n_o3"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 155,
+      "world": "electro",
+      "family": "electro_kirchhoff",
+      "why": "UCB1 over 46 arms (world,family); picked electro::electro_kirchhoff because avg=3.290+1.4*sqrt(ln(154+1)/1)=3.144\u21926.434. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0"
+        ],
+        "dead_ok": 0,
+        "cost": 0.23,
+        "score": -0.08,
+        "reward_raw": 0.15
+      },
+      "growth": "extrapolate 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "electro_KCL_node_s5082",
+        "electro_KCL_node_s5083",
+        "electro_KCL_node_s5084"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 156,
+      "world": "calculus",
+      "family": "calc_fwd_diff",
+      "why": "UCB1 over 46 arms (world,family); picked calculus::calc_fwd_diff because avg=3.270+1.4*sqrt(ln(155+1)/1)=3.146\u21926.416. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta"
+        ],
+        "dead_ok": 0,
+        "cost": 0.25,
+        "score": -0.1,
+        "reward_raw": 0.15
+      },
+      "growth": "extrapolate N 5\u21926",
+      "unlock": null,
+      "accepted": [
+        "calc_delta_fib_N5",
+        "calc_delta_lucas_N5",
+        "calc_delta_fib_eq_prev_N5"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 157,
+      "world": "calculus",
+      "family": "calc_ft_discrete",
+      "why": "UCB1 over 46 arms (world,family); picked calculus::calc_ft_discrete because avg=3.270+1.4*sqrt(ln(156+1)/1)=3.148\u21926.418. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta"
+        ],
+        "dead_ok": 0,
+        "cost": 0.25,
+        "score": -0.1,
+        "reward_raw": 0.15
+      },
+      "growth": "extrapolate N 5\u21926",
+      "unlock": null,
+      "accepted": [
+        "calc_ft_x0_N5",
+        "calc_ft_x1_N5",
+        "calc_ft_x2_N5"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 158,
+      "world": "chem",
+      "family": "chem_atom_balance",
+      "why": "UCB1 over 46 arms (world,family); picked chem::chem_atom_balance because avg=3.260+1.4*sqrt(ln(157+1)/1)=3.150\u21926.410. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 5,
+      "outcomes": [
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 1,
+        "n_offpath": 0,
+        "form_families": [
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0"
+        ],
+        "dead_ok": 0,
+        "cost": 0.31,
+        "score": 1.34,
+        "reward_raw": 1.65
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chem_atom_balance_synth_s6788",
+        "chem_atom_balance_synth_s6789",
+        "chem_atom_balance_synth_s6790"
+      ],
+      "rejected": [
+        "chem_unbalanced_broken_s6788"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 159,
+      "world": "physics",
+      "family": "phys_action_reaction",
+      "why": "UCB1 over 46 arms (world,family); picked physics::phys_action_reaction because avg=3.260+1.4*sqrt(ln(158+1)/1)=3.152\u21926.412. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "conserv_delta0",
+          "conserv_delta0",
+          "conserv_delta0",
+          "noise::physics::phys_action_same_sign_broken"
+        ],
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.11,
+        "reward_raw": 0.15
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "phys_action_reaction_s6425",
+        "phys_action_reaction_s6426",
+        "phys_action_reaction_s6427"
+      ],
+      "rejected": [
+        "phys_action_same_sign_broken_s6425"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 160,
+      "world": "algebra",
+      "family": "alg_linear_2x2",
+      "why": "UCB1 over 46 arms (world,family); picked algebra::alg_linear_2x2 because avg=2.360+1.4*sqrt(ln(159+1)/1)=3.154\u21925.514. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "noise::algebra::alg_solve_2x2",
+          "noise::algebra::alg_solve_2x2"
+        ],
+        "dead_ok": 0,
+        "cost": 0.16,
+        "score": -0.12,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate mod/order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "alg_solve_2x2_s4752",
+        "alg_solve_2x2_s4753"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 161,
+      "world": "chem",
+      "family": "chem_equilibrium_K",
+      "why": "UCB1 over 46 arms (world,family); picked chem::chem_equilibrium_K because avg=2.360+1.4*sqrt(ln(160+1)/1)=3.156\u21925.516. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 3,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 3,
+        "form_families": [
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def"
+        ],
+        "dead_ok": 0,
+        "cost": 0.21,
+        "score": -0.15,
+        "reward_raw": 0.06
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chem_K_def_s6803",
+        "chem_K_def_s6804",
+        "chem_K_def_s6805"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 162,
+      "world": "calculus",
+      "family": "calc_power_diff",
+      "why": "UCB1 over 46 arms (world,family); picked calculus::calc_power_diff because avg=2.360+1.4*sqrt(ln(161+1)/1)=3.158\u21925.518. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta"
+        ],
+        "dead_ok": 0,
+        "cost": 0.21,
+        "score": -0.16,
+        "reward_raw": 0.05
+      },
+      "growth": "extrapolate N 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "calc_delta_x3_vs_n_x2_N4"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 163,
+      "world": "nets",
+      "family": "nets_grad_step",
+      "why": "UCB1 over 46 arms (world,family); picked nets::nets_grad_step because avg=2.360+1.4*sqrt(ln(162+1)/1)=3.160\u21925.520. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "nets_dot",
+          "nets_dot"
+        ],
+        "dead_ok": 0,
+        "cost": 0.16,
+        "score": -0.16,
+        "reward_raw": 0.0
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 164,
+      "world": "sequences",
+      "family": "delta_conserv",
+      "why": "UCB1 over 50 arms (world,family); picked sequences::delta_conserv because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 0,
+      "outcomes": [],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [],
+        "dead_ok": 0,
+        "cost": 0.0,
+        "score": 0.0,
+        "reward_raw": 0.0
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 165,
+      "world": "sequences",
+      "family": "linear_recurrences",
+      "why": "UCB1 over 49 arms (world,family); picked sequences::linear_recurrences because avg=8.614+1.4*sqrt(ln(164+1)/7)=1.196\u21929.810. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 15,
+      "outcomes": [
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 6,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 6,
+        "form_families": [
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone",
+          "rec_order_clone"
+        ],
+        "dead_ok": 0,
+        "cost": 0.83,
+        "score": -0.71,
+        "reward_raw": 0.12
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [
+        "rec_fib_o4_3_-1_-2_0",
+        "rec_fib_o4_-1_2_3_1",
+        "rec_lucas_o4_3_-1_-2_0",
+        "rec_lucas_o4_-1_2_3_1",
+        "rec_pell_o4_2_-1_4_2",
+        "rec_pell_o4_4_-4_0_1"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 166,
+      "world": "astro",
+      "family": "astro_period_scan",
+      "why": "UCB1 over 48 arms (world,family); picked astro::astro_period_scan because avg=2.340+1.4*sqrt(ln(165+1)/1)=3.165\u21925.505. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "noise::astro::astro_T_increases_with_a",
+          "noise::astro::astro_T_pos"
+        ],
+        "dead_ok": 0,
+        "cost": 0.18,
+        "score": -0.14,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate n_bodies 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "astro_T_increases_with_a_n4",
+        "astro_T_pos_n4"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 167,
+      "world": "astro",
+      "family": "astro_angmom_scan",
+      "why": "UCB1 over 48 arms (world,family); picked astro::astro_angmom_scan because avg=2.340+1.4*sqrt(ln(166+1)/1)=3.167\u21925.507. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "kepler_power",
+          "kepler_power"
+        ],
+        "dead_ok": 0,
+        "cost": 0.18,
+        "score": -0.14,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate n_bodies 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "astro_h_eq_sqrt_a_n4",
+        "astro_h2_over_a_const_n4"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 168,
+      "world": "symmetry",
+      "family": "sym_group_table",
+      "why": "UCB1 over 48 arms (world,family); picked symmetry::sym_group_table because avg=2.310+1.4*sqrt(ln(167+1)/1)=3.169\u21925.479. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "sym_invariant",
+          "sym_invariant",
+          "sym_invariant"
+        ],
+        "dead_ok": 0,
+        "cost": 0.21,
+        "score": -0.17,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "sym_z2_abelian_o3",
+        "sym_klein_every_nonid_order2_o3"
+      ],
+      "rejected": [
+        "sym_z2_claim_mult_o3"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 169,
+      "world": "algebra",
+      "family": "alg_poly_zn",
+      "why": "UCB1 over 48 arms (world,family); picked algebra::alg_poly_zn because avg=2.300+1.4*sqrt(ln(168+1)/1)=3.171\u21925.471. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "noise::algebra::alg_binom_expand_mod7",
+          "noise::algebra::alg_distrib_mod7"
+        ],
+        "dead_ok": 0,
+        "cost": 0.24,
+        "score": -0.2,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate mod/order 7\u21929",
+      "unlock": null,
+      "accepted": [
+        "alg_binom_expand_mod7",
+        "alg_distrib_mod7"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 170,
+      "world": "loop",
+      "family": "loop_taxis_scan",
+      "why": "UCB1 over 48 arms (world,family); picked loop::loop_taxis_scan because avg=2.240+1.4*sqrt(ln(169+1)/1)=3.173\u21925.413. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 2,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "loop_taxis",
+          "loop_taxis",
+          "loop_taxis",
+          "loop_taxis"
+        ],
+        "dead_ok": 0,
+        "cost": 0.28,
+        "score": -0.18,
+        "reward_raw": 0.1
+      },
+      "growth": "extrapolate 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "loop_taxis_bangbang_s8863",
+        "loop_taxis_linear_gain_s8863"
+      ],
+      "rejected": [
+        "loop_taxis_always_right_s8863",
+        "loop_taxis_always_left_s8863"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 171,
+      "world": "nets",
+      "family": "nets_chain_transfer",
+      "why": "UCB1 over 48 arms (world,family); picked nets::nets_chain_transfer because avg=2.180+1.4*sqrt(ln(170+1)/1)=3.175\u21925.355. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "nets_dot"
+        ],
+        "dead_ok": 0,
+        "cost": 0.09,
+        "score": -0.09,
+        "reward_raw": 0.0
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "nets_discrete_chain_vs_product"
+      ]
+    },
+    {
+      "tick": 172,
+      "world": "sequences",
+      "family": "transfer_recurrence",
+      "why": "UCB1 over 48 arms (world,family); picked sequences::transfer_recurrence because avg=4.336+1.4*sqrt(ln(171+1)/11)=0.958\u21925.294. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 142,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_reject",
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 8,
+        "n_new_form_family": 0,
+        "n_known_clone": 4,
+        "n_transfer_new_world": 4,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion"
+        ],
+        "dead_ok": 0,
+        "cost": 7.1,
+        "score": 1.1,
+        "reward_raw": 8.2
+      },
+      "growth": "transfer absorbed \u2014 keep arm for other companions",
+      "unlock": null,
+      "accepted": [
+        "transfer_lucas_to_fib_3_-1_-2_0",
+        "transfer_lucas_to_fib_-1_2_3_1",
+        "transfer_fib_to_lucas_3_-1_-2_0",
+        "transfer_fib_to_lucas_-1_2_3_1"
+      ],
+      "rejected": [
+        "transfer_pell_to_fib_2_-1_4_2",
+        "transfer_pell_to_fib_4_-4_0_1",
+        "transfer_pell_to_lucas_2_-1_4_2",
+        "transfer_pell_to_lucas_4_-4_0_1",
+        "transfer_fib_to_pell_3_-1_-2_0",
+        "transfer_fib_to_pell_-1_2_3_1",
+        "transfer_lucas_to_pell_3_-1_-2_0",
+        "transfer_lucas_to_pell_-1_2_3_1"
+      ],
+      "transfer": [
+        "transfer_lucas_to_fib_1_1",
+        "transfer_lucas_to_fib_1_1_0",
+        "transfer_lucas_to_fib_0_2_1",
+        "transfer_lucas_to_fib_1_1_0_0",
+        "transfer_lucas_to_fib_0_2_1_0",
+        "transfer_lucas_to_fib_2_0_-1",
+        "transfer_lucas_to_fib_-1_3_2",
+        "transfer_lucas_to_fib_1_0_1_1",
+        "transfer_lucas_to_fib_2_0_-1_0",
+        "transfer_lucas_to_fib_3_-1_-2",
+        "transfer_lucas_to_fib_-2_4_3",
+        "transfer_lucas_to_fib_0_1_2_1",
+        "transfer_lucas_to_fib_0_3_0_-1",
+        "transfer_lucas_to_fib_4_-2_-3",
+        "transfer_lucas_to_fib_-3_5_4",
+        "transfer_lucas_to_fib_2_-1_0_1",
+        "transfer_lucas_to_fib_0_0_3_2",
+        "transfer_lucas_to_fib_5_-3_-4",
+        "transfer_lucas_to_fib_1_2_-1_-1",
+        "transfer_lucas_to_fib_-1_3_2_0",
+        "transfer_pell_to_fib_3_0_-3_-1",
+        "transfer_lucas_to_fib_1_-1_2_2",
+        "transfer_lucas_to_fib_2_1_-2_-1",
+        "transfer_lucas_to_fib_3_0_-3_-1",
+        "transfer_lucas_to_fib_3_-1_-2_0",
+        "transfer_lucas_to_fib_-1_2_3_1",
+        "transfer_fib_to_lucas_1_1",
+        "transfer_fib_to_lucas_1_1_0",
+        "transfer_fib_to_lucas_0_2_1",
+        "transfer_fib_to_lucas_1_1_0_0",
+        "transfer_fib_to_lucas_0_2_1_0",
+        "transfer_fib_to_lucas_2_0_-1",
+        "transfer_fib_to_lucas_-1_3_2",
+        "transfer_fib_to_lucas_1_0_1_1",
+        "transfer_fib_to_lucas_2_0_-1_0",
+        "transfer_fib_to_lucas_3_-1_-2",
+        "transfer_fib_to_lucas_-2_4_3",
+        "transfer_fib_to_lucas_0_1_2_1",
+        "transfer_fib_to_lucas_0_3_0_-1",
+        "transfer_fib_to_lucas_4_-2_-3",
+        "transfer_fib_to_lucas_-3_5_4",
+        "transfer_fib_to_lucas_2_-1_0_1",
+        "transfer_fib_to_lucas_0_0_3_2",
+        "transfer_fib_to_lucas_5_-3_-4",
+        "transfer_fib_to_lucas_1_2_-1_-1",
+        "transfer_fib_to_lucas_-1_3_2_0",
+        "transfer_pell_to_lucas_3_0_-3_-1",
+        "transfer_fib_to_lucas_1_-1_2_2",
+        "transfer_fib_to_lucas_2_1_-2_-1",
+        "transfer_fib_to_lucas_3_0_-3_-1",
+        "transfer_fib_to_lucas_3_-1_-2_0",
+        "transfer_fib_to_lucas_-1_2_3_1",
+        "transfer_fib_to_pell_3_0_-3_-1",
+        "transfer_lucas_to_pell_3_0_-3_-1"
+      ]
+    },
+    {
+      "tick": 173,
+      "world": "sequences",
+      "family": "transfer_recurrence",
+      "why": "UCB1 over 48 arms (world,family); picked sequences::transfer_recurrence because avg=4.067+1.4*sqrt(ln(172+1)/12)=0.917\u21924.984. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 142,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion",
+          "rec_companion"
+        ],
+        "dead_ok": 0,
+        "cost": 7.1,
+        "score": -7.1,
+        "reward_raw": 0.0
+      },
+      "growth": "all sequences have rec \u2014 saturate transfer",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_lucas_to_fib_1_1",
+        "transfer_lucas_to_fib_1_1_0",
+        "transfer_lucas_to_fib_0_2_1",
+        "transfer_lucas_to_fib_1_1_0_0",
+        "transfer_lucas_to_fib_0_2_1_0",
+        "transfer_lucas_to_fib_2_0_-1",
+        "transfer_lucas_to_fib_-1_3_2",
+        "transfer_lucas_to_fib_1_0_1_1",
+        "transfer_lucas_to_fib_2_0_-1_0",
+        "transfer_lucas_to_fib_3_-1_-2",
+        "transfer_lucas_to_fib_-2_4_3",
+        "transfer_lucas_to_fib_0_1_2_1",
+        "transfer_lucas_to_fib_0_3_0_-1",
+        "transfer_lucas_to_fib_4_-2_-3",
+        "transfer_lucas_to_fib_-3_5_4",
+        "transfer_lucas_to_fib_2_-1_0_1",
+        "transfer_lucas_to_fib_0_0_3_2",
+        "transfer_lucas_to_fib_5_-3_-4",
+        "transfer_lucas_to_fib_1_2_-1_-1",
+        "transfer_lucas_to_fib_-1_3_2_0",
+        "transfer_pell_to_fib_3_0_-3_-1",
+        "transfer_lucas_to_fib_1_-1_2_2",
+        "transfer_lucas_to_fib_2_1_-2_-1",
+        "transfer_lucas_to_fib_3_0_-3_-1",
+        "transfer_lucas_to_fib_3_-1_-2_0",
+        "transfer_lucas_to_fib_-1_2_3_1",
+        "transfer_fib_to_lucas_1_1",
+        "transfer_fib_to_lucas_1_1_0",
+        "transfer_fib_to_lucas_0_2_1",
+        "transfer_fib_to_lucas_1_1_0_0",
+        "transfer_fib_to_lucas_0_2_1_0",
+        "transfer_fib_to_lucas_2_0_-1",
+        "transfer_fib_to_lucas_-1_3_2",
+        "transfer_fib_to_lucas_1_0_1_1",
+        "transfer_fib_to_lucas_2_0_-1_0",
+        "transfer_fib_to_lucas_3_-1_-2",
+        "transfer_fib_to_lucas_-2_4_3",
+        "transfer_fib_to_lucas_0_1_2_1",
+        "transfer_fib_to_lucas_0_3_0_-1",
+        "transfer_fib_to_lucas_4_-2_-3",
+        "transfer_fib_to_lucas_-3_5_4",
+        "transfer_fib_to_lucas_2_-1_0_1",
+        "transfer_fib_to_lucas_0_0_3_2",
+        "transfer_fib_to_lucas_5_-3_-4",
+        "transfer_fib_to_lucas_1_2_-1_-1",
+        "transfer_fib_to_lucas_-1_3_2_0",
+        "transfer_pell_to_lucas_3_0_-3_-1",
+        "transfer_fib_to_lucas_1_-1_2_2",
+        "transfer_fib_to_lucas_2_1_-2_-1",
+        "transfer_fib_to_lucas_3_0_-3_-1",
+        "transfer_fib_to_lucas_3_-1_-2_0",
+        "transfer_fib_to_lucas_-1_2_3_1",
+        "transfer_fib_to_pell_3_0_-3_-1",
+        "transfer_lucas_to_pell_3_0_-3_-1"
+      ]
+    },
+    {
+      "tick": 174,
+      "world": "chance",
+      "family": "chance_extrapolate",
+      "why": "UCB1 over 47 arms (world,family); picked chance::chance_extrapolate because avg=2.605+1.4*sqrt(ln(173+1)/2)=2.249\u21924.854. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "noise::chance::extrap_H_le_logk",
+          "noise::chance::extrap_H_nonneg",
+          "noise::chance::extrap_H_le_logk",
+          "noise::chance::extrap_H_uni_ge_peaked"
+        ],
+        "dead_ok": 0,
+        "cost": 0.3,
+        "score": -0.3,
+        "reward_raw": 0.0
+      },
+      "growth": "extrapolate k 5\u21926",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "extrap_H_le_logk_k7",
+        "extrap_H_nonneg_k7",
+        "extrap_H_le_logk_k7",
+        "extrap_H_uni_ge_peaked_k7"
+      ]
+    },
+    {
+      "tick": 175,
+      "world": "nets",
+      "family": "nets_xor_depth",
+      "why": "UCB1 over 47 arms (world,family); picked nets::nets_xor_depth because avg=1.610+1.4*sqrt(ln(174+1)/1)=3.182\u21924.792. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "duplicate_reject",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "nets_dot",
+          "nets_dot"
+        ],
+        "dead_ok": 1,
+        "cost": 0.16,
+        "score": -0.16,
+        "reward_raw": 0.0
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
     }
   ],
   "curves": [
@@ -8541,6 +10222,246 @@
       "n_rejected": 168,
       "n_lemmas": 14,
       "tick": 151
+    },
+    {
+      "n_verified_facts": 375,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3094,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 152
+    },
+    {
+      "n_verified_facts": 375,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3094,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 153
+    },
+    {
+      "n_verified_facts": 379,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3071,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 154
+    },
+    {
+      "n_verified_facts": 382,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3055,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 155
+    },
+    {
+      "n_verified_facts": 385,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3038,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 156
+    },
+    {
+      "n_verified_facts": 388,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3022,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 157
+    },
+    {
+      "n_verified_facts": 391,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3018,
+      "n_rejected": 169,
+      "n_lemmas": 14,
+      "tick": 158
+    },
+    {
+      "n_verified_facts": 394,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3014,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 159
+    },
+    {
+      "n_verified_facts": 396,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3004,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 160
+    },
+    {
+      "n_verified_facts": 399,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2988,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 161
+    },
+    {
+      "n_verified_facts": 400,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2982,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 162
+    },
+    {
+      "n_verified_facts": 400,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2982,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 163
+    },
+    {
+      "n_verified_facts": 400,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2982,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 164
+    },
+    {
+      "n_verified_facts": 406,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2951,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 165
+    },
+    {
+      "n_verified_facts": 408,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2941,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 166
+    },
+    {
+      "n_verified_facts": 410,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2931,
+      "n_rejected": 170,
+      "n_lemmas": 14,
+      "tick": 167
+    },
+    {
+      "n_verified_facts": 412,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2933,
+      "n_rejected": 171,
+      "n_lemmas": 14,
+      "tick": 168
+    },
+    {
+      "n_verified_facts": 414,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2923,
+      "n_rejected": 171,
+      "n_lemmas": 14,
+      "tick": 169
+    },
+    {
+      "n_verified_facts": 416,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2937,
+      "n_rejected": 173,
+      "n_lemmas": 14,
+      "tick": 170
+    },
+    {
+      "n_verified_facts": 416,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2937,
+      "n_rejected": 173,
+      "n_lemmas": 14,
+      "tick": 171
+    },
+    {
+      "n_verified_facts": 420,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3012,
+      "n_rejected": 181,
+      "n_lemmas": 14,
+      "tick": 172
+    },
+    {
+      "n_verified_facts": 420,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3012,
+      "n_rejected": 181,
+      "n_lemmas": 14,
+      "tick": 173
+    },
+    {
+      "n_verified_facts": 420,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3012,
+      "n_rejected": 181,
+      "n_lemmas": 14,
+      "tick": 174
+    },
+    {
+      "n_verified_facts": 420,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3012,
+      "n_rejected": 181,
+      "n_lemmas": 14,
+      "tick": 175
     }
   ],
   "baselines": {
@@ -8581,9 +10502,9 @@
   },
   "backend": "swipl",
   "hypothesis_skin": {
-    "generation": 8,
-    "n_schema_classes": 12,
-    "n_unlocked": 12,
+    "generation": 9,
+    "n_schema_classes": 13,
+    "n_unlocked": 13,
     "unlocked": [
       "bilinear_schema",
       "bilinear_schema_r4_g4",
@@ -8592,6 +10513,7 @@
       "bilinear_schema_r4_g7",
       "bilinear_schema_r4_g8",
       "dead_prime",
+      "delta_conserv",
       "geo_invent",
       "linrec_scan",
       "modperiod_schema",
@@ -8615,8 +10537,8 @@
         "r_cap": 4,
         "mut_depth": 1,
         "mut_cap": 4,
-        "n_visits": 7,
-        "total_reward": 60.300000000000004,
+        "n_visits": 8,
+        "total_reward": 59.59,
         "saturated": true,
         "ticks_no_new_type": 0,
         "novelty_bonus": 2.0
@@ -8859,6 +10781,28 @@
         "mut_cap": 4,
         "n_visits": 1,
         "total_reward": -0.68,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "delta_conserv": {
+        "id": "delta_conserv",
+        "description": "\u0394\u2218conserv: discrete difference of a \u0394=0 additive invariant",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "mutation:lever_spawn_gen9",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 1,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": 0.0,
         "saturated": true,
         "ticks_no_new_type": 0,
         "novelty_bonus": 0.0
@@ -8905,7 +10849,11 @@
       "1,-1,2,2",
       "2,1,-2,-1",
       "0,4,4,1",
-      "1,1,5,2"
+      "1,1,5,2",
+      "3,-1,-2,0",
+      "-1,2,3,1",
+      "2,-1,4,2",
+      "4,-4,0,1"
     ],
     "molt_history": [
       {
@@ -9152,6 +11100,44 @@
           "transfer_horn"
         ],
         "n_schema_classes": 12
+      },
+      {
+        "generation": 9,
+        "reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g8 saturated; transfer plateau",
+        "actions": [
+          "novelty_bonus\u21922.0",
+          "spawn_lever delta_conserv"
+        ],
+        "unlocked_before": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "bilinear_schema_r4_g7",
+          "bilinear_schema_r4_g8",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "unlocked_after": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "bilinear_schema_r4_g7",
+          "bilinear_schema_r4_g8",
+          "dead_prime",
+          "delta_conserv",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "n_schema_classes": 13
       }
     ]
   },
@@ -9215,6 +11201,11 @@
       "id": "bilinear_schema_r4_g8",
       "unlocked": true,
       "origin": "mutation:spawn_gen8"
+    },
+    {
+      "id": "delta_conserv",
+      "unlocked": true,
+      "origin": "mutation:lever_spawn_gen9"
     }
   ],
   "geometry_schemas": [
@@ -9229,10 +11220,10 @@
     "lucas": {
       "transfer_from": "fib",
       "transfer_coeffs": [
+        -1,
+        2,
         3,
-        0,
-        -3,
-        -1
+        1
       ],
       "transfer_accuracy": 1.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0,
@@ -9248,12 +11239,12 @@
     "pell": {
       "transfer_from": "fib",
       "transfer_coeffs": [
+        -1,
+        2,
         3,
-        0,
-        -3,
-        -1
+        1
       ],
-      "transfer_accuracy": 1.0,
+      "transfer_accuracy": 0.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
       "baseline_frozen_order1": 0.0,
       "scratch_order2_on_target": [
@@ -9261,14 +11252,14 @@
         1
       ],
       "scratch_order2_accuracy": 1.0,
-      "transfer_beats_no_archive": true,
+      "transfer_beats_no_archive": false,
       "note": "Lucas shares fib's [1,1] law so transfer should hit; Pell is [2,1] so fib\u2192pell transfer should FAIL \u2014 that is an honest result."
     },
     "summary": {
       "lucas_transfer_beats_baseline": true,
-      "pell_transfer_beats_baseline": true,
+      "pell_transfer_beats_baseline": false,
       "absorbed_intelligence": true,
-      "negative_transfer_pell_expected": false,
+      "negative_transfer_pell_expected": true,
       "cross_world_intelligence": 0.5714,
       "cross_world_new_positives": [
         "rec fib\u2192\u0394(fib)",
@@ -9429,7 +11420,7 @@
           "unlocked": false,
           "dead_end": false,
           "origin": "seed_locked",
-          "order": 5,
+          "order": 6,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9442,7 +11433,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 1,
+          "ticks_no_new_type": 2,
           "novelty_bonus": 0.25
         }
       },
@@ -9548,7 +11539,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9558,8 +11549,8 @@
           "r_cap": 4,
           "mut_depth": 1,
           "mut_cap": 4,
-          "n_visits": 1,
-          "total_reward": 3.31,
+          "n_visits": 2,
+          "total_reward": 3.19,
           "saturated": false,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
@@ -9570,7 +11561,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9580,8 +11571,8 @@
           "r_cap": 4,
           "mut_depth": 1,
           "mut_cap": 4,
-          "n_visits": 1,
-          "total_reward": 2.31,
+          "n_visits": 2,
+          "total_reward": 2.14,
           "saturated": false,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
@@ -9652,7 +11643,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 7,
+          "order": 9,
           "order_max": 13,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9674,7 +11665,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9757,7 +11748,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9801,7 +11792,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9885,7 +11876,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 5,
+          "order": 6,
           "order_max": 12,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9907,7 +11898,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 5,
+          "order": 6,
           "order_max": 12,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -9929,7 +11920,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10033,7 +12024,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10055,7 +12046,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10160,7 +12151,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10288,7 +12279,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10301,7 +12292,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         },
         "nets_grad_step": {
@@ -10310,6 +12301,28 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
+          "order": 4,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 1,
+          "novelty_bonus": 0.25
+        },
+        "nets_chain_transfer": {
+          "id": "nets_chain_transfer",
+          "description": "TRANSFER: discrete chain rule Delta(f(g)) vs product of Deltas",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
           "order": 3,
           "order_max": 4,
           "coeff_lo": -3,
@@ -10323,29 +12336,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
-          "novelty_bonus": 0.25
-        },
-        "nets_chain_transfer": {
-          "id": "nets_chain_transfer",
-          "description": "TRANSFER: discrete chain rule Delta(f(g)) vs product of Deltas",
-          "unlocked": true,
-          "dead_end": false,
-          "origin": "seed",
-          "order": 2,
-          "order_max": 4,
-          "coeff_lo": -3,
-          "coeff_hi": 3,
-          "m_max": 4,
-          "m_cap": 12,
-          "r_max": 1,
-          "r_cap": 4,
-          "mut_depth": 1,
-          "mut_cap": 4,
-          "n_visits": 0,
-          "total_reward": 0.0,
-          "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         },
         "nets_dead_any_eta": {
@@ -10436,7 +12427,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10518,7 +12509,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10562,7 +12553,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 2,
+          "order": 3,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -10596,7 +12587,7 @@
           "mut_cap": 4,
           "n_visits": 0,
           "total_reward": 0.0,
-          "saturated": false,
+          "saturated": true,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.0
         }

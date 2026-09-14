@@ -18,6 +18,7 @@ class FamilySpec:
     saturated: bool = False
     n_visits: int = 0
     total_reward: float = 0.0
+    ticks_no_new_form_family: int = 0
 
     @property
     def avg_reward(self) -> float:

@@ -526,37 +526,47 @@ class ScienceLanguage:
             need_spawn = True
 
         if need_spawn:
-            base = None
-            for cand in ("sym_invariant_scan", "chance_entropy_scan", "info_mi_scan",
-                         "sym_group_table", "chance_bayes_scan", "info_transfer_bitfn",
-                         "astro_kepler_scan", "astro_period_scan", "alg_poly_zn",
-                         "alg_linear_2x2", "calc_fwd_diff", "calc_ft_discrete",
-                         "nets_perceptron", "nets_xor_depth", "nets_grad_step",
-                         "electro_ohm", "phys_collision", "chem_atom_balance", "loop_taxis_scan", "loop_pred_scan",
-                         "chem_transfer_form", "phys_transfer_form", "electro_transfer_form",
-                         "nets_transfer_form", "calc_transfer_form", "astro_transfer_form"):
-                if cand in self.schemas and self.schemas[cand].unlocked:
-                    base = self.schemas[cand]
-                    break
-            if base is None:
-                # any productive unlocked
-                prod = [s for s in self.schemas.values() if s.unlocked and not s.dead_end]
-                base = prod[0] if prod else None
-            if base is not None:
-                new_id = f"{base.id}_n{base.order}_g{self.generation + 1}"
-                # ensure not colliding with seed
-                assert new_id not in SCIENCE_SEED
-                if new_id not in self.schemas:
-                    self.schemas[new_id] = SchemaClass(
-                        id=new_id,
-                        description=f"Emergent operator from {base.id} @ order={base.order}",
-                        unlocked=True,
-                        origin=f"molt:spawn_gen{self.generation + 1}",
-                        order=base.order,
-                        order_max=base.order_max,
-                        novelty_bonus=max(1.0, self.novelty_floor),
-                    )
-                    actions.append(f"spawn_schema {new_id}")
+            # ONLY lever compositions (evidence levers). Never bilinear_gN,
+            # never base_n*_g* clones, never entropy/matmul/perceptron farms.
+            LEVER_SPAWNS = [
+                ("delta_conserv", "Δ∘conserv"),
+                ("taxis_conserv", "taxis on additive invariant"),
+                ("rec_to_delta", "rec→discrete Δ"),
+                ("bit_circuit_compose", "AND=series OR=parallel compose"),
+                ("form_gate", "identity≠defining-law gate"),
+                ("companion_rec", "additive rec → companion"),
+                ("taxis_on_conserv", "sign(error)→action on Δ=0 residual"),
+            ]
+            related = {
+                "delta_conserv": ("calc_fwd_diff", "phys_collision", "chem_atom_balance", "loop_pred_scan"),
+                "taxis_conserv": ("loop_taxis_scan", "phys_collision", "chem_atom_balance"),
+                "rec_to_delta": ("calc_fwd_diff", "calc_ft_discrete"),
+                "bit_circuit_compose": ("info_transfer_bitfn", "electro_ohm", "sym_invariant_scan"),
+                "form_gate": ("phys_transfer_form", "chem_transfer_form", "electro_transfer_form"),
+                "companion_rec": ("calc_transfer_form", "sym_compare_transfer"),
+                "taxis_on_conserv": ("loop_taxis_scan", "loop_pred_scan", "phys_collision"),
+            }
+            spawned = False
+            for new_id, desc in LEVER_SPAWNS:
+                if new_id in self.schemas or new_id in SCIENCE_SEED:
+                    continue
+                need = related[new_id]
+                if not any(n in self.schemas and self.schemas[n].unlocked for n in need):
+                    continue
+                self.schemas[new_id] = SchemaClass(
+                    id=new_id,
+                    description=f"Lever compose: {desc}",
+                    unlocked=True,
+                    origin=f"molt:lever_spawn_gen{self.generation + 1}",
+                    order=1,
+                    order_max=1,
+                    novelty_bonus=max(1.0, self.novelty_floor),
+                )
+                actions.append(f"spawn_lever {new_id}")
+                spawned = True
+                break
+            if not spawned:
+                actions.append("spawn_skip: no new lever composition (refuse clone suffix)")
 
         # 4) Novelty floor + bump (eternal curiosity)
         for s in self.schemas.values():
