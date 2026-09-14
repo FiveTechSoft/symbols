@@ -325,6 +325,36 @@ SCIENCE_SEED: dict[str, dict[str, Any]] = {
         "order": 3,
         "order_max": 8,
     },
+
+    # --- loop (closed observe→act→critic) ---
+    "loop_taxis_scan": {
+        "description": "1D taxis: bang-bang / linear gain reduce |error| on held-out x0",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 6,
+    },
+    "loop_pred_scan": {
+        "description": "Predict next_x from action; reject ignore-a / overfit-one-x0",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 6,
+    },
+    "loop_transfer_form": {
+        "description": "TRANSFER: conserv Δ=0 → Δ(position)=action; rec[1,1] mostly miss",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 4,
+    },
+    "loop_dead_wrong_policy": {
+        "description": "DEAD END: claim error-increasing policy is taxis",
+        "unlocked": True,
+        "dead_end": True,
+        "origin": "seed",
+    },
+
 }
 
 
@@ -351,6 +381,7 @@ class ScienceLanguage:
             "electro": "electro_",
             "physics": "phys_",
             "chem": "chem_",
+            "loop": "loop_",
         }[world_tag]
         schemas = {}
         for sid, spec in SCIENCE_SEED.items():
@@ -382,6 +413,7 @@ class ScienceLanguage:
                 "electro": "electro_",
                 "physics": "phys_",
                 "chem": "chem_",
+                "loop": "loop_",
             }[self.world_tag]
         )}
 
@@ -430,6 +462,7 @@ class ScienceLanguage:
             "electro": "electro_",
             "physics": "phys_",
             "chem": "chem_",
+            "loop": "loop_",
         }[self.world_tag]
         for sid, spec in SCIENCE_SEED.items():
             if not sid.startswith(prefix):
@@ -499,7 +532,7 @@ class ScienceLanguage:
                          "astro_kepler_scan", "astro_period_scan", "alg_poly_zn",
                          "alg_linear_2x2", "calc_fwd_diff", "calc_ft_discrete",
                          "nets_perceptron", "nets_xor_depth", "nets_grad_step",
-                         "electro_ohm", "phys_collision", "chem_atom_balance",
+                         "electro_ohm", "phys_collision", "chem_atom_balance", "loop_taxis_scan", "loop_pred_scan",
                          "chem_transfer_form", "phys_transfer_form", "electro_transfer_form",
                          "nets_transfer_form", "calc_transfer_form", "astro_transfer_form"):
                 if cand in self.schemas and self.schemas[cand].unlocked:

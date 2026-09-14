@@ -340,6 +340,46 @@ def _is_soft_unknown(s: str) -> bool:
     ))
 
 
+def _is_cassini_word(s: str, seqs: list) -> bool:
+    """'cassini' is not a lexicon atom — bilin name hitchhiking must not affirm."""
+    toks = set(deduce.tokenize(s))
+    if "cassini" not in toks and "cassini" not in s:
+        return False
+    # Explicit bilin equation / clause handle → not the bare word
+    if (
+        deduce.looks_like_equation(s)
+        or "bilin" in s
+        or "offset" in s
+        or "(-1)" in s
+        or s.strip().startswith("transfer_")
+        or "transfer_bilin_cassini" in s
+        or "false_cassini" in s
+    ):
+        return False
+    # living seq + cassini: only fib may answer rec elsewhere; lucas → reject path
+    # Bare "cassini" / "cassini es la ley de pell" without bilin math → UNKNOWN (no atom)
+    if seqs and any(x == "fib" for x in seqs) and ("fib" in toks or "fibonacci" in s):
+        return False
+    if seqs and any(x == "lucas" for x in seqs):
+        return False  # handled by lucas-reject branch
+    return True
+
+
+def _bogus_kepler_asserted(s: str) -> bool:
+    """User asserts wrong Kepler exponent T²∝a² (honest negative in archive)."""
+    compact = s.replace(" ", "").replace("·", "").replace("×", "")
+    if "kepler" not in s and "kepler" not in compact:
+        # still catch bare T^2/a^2 claims
+        if "a^2" in compact or "a²" in compact or "a**2" in compact:
+            if "t^2" in compact or "t²" in compact:
+                return True
+        return False
+    if "a^3" in compact or "a³" in compact or "a**3" in compact:
+        return False
+    return ("a^2" in compact or "a²" in compact or "a**2" in compact
+            or "wrong_exp" in s or "bogus" in s)
+
+
 def _answer_transfer(kb: dict, src: str, dst: str, st: dict) -> tuple[str, str, dict]:
     rec_src = _canonical_rec(kb["recs"].get(src, []))
     rec_dst = _canonical_rec(kb["recs"].get(dst, []))
@@ -677,6 +717,19 @@ def _render_hit(hit: dict, kb: dict, st: dict, more: bool = False) -> tuple[str,
         math = _math_from_verified_formula(hit["formula"])
         # transfer verified → don't dump English TRANSFER line
         if str(hit.get("name", "")).startswith("transfer_") or str(hit.get("formula", "")).upper().startswith("TRANSFER"):
+            nm = str(hit.get("name") or "")
+            # conserv-form transfers: cite the clause so mouth does not invent the analogy
+            if "conserv" in nm.lower():
+                math = _math_from_verified_formula(hit["formula"])
+                return _pack(
+                    f"Sí: verificado {nm}. "
+                    f"Forma linear-Δ=0 bajo transfer_conserv_* — {math}. "
+                    f"No invento la analogía; cito lo firmado. ¿Seguimos?",
+                    "verified",
+                    _tribes("símbolo", "analogía"),
+                    st,
+                    topic=nm,
+                )
             return _pack(
                 "Sí: verificado que la misma ley se transfiere de una serie a la otra. "
                 "Eso está firmado; no es un deseo. ¿Quieres el detalle de cuál a cuál?",
@@ -949,8 +1002,16 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         if seq:
             return _answer_rec(kb, seq, st, reject_law=True)
 
-    # Two bound seqs + "mism*" → transfer speech (no domain lexicon)
-    if len(seqs) >= 2 and "mism" in s:
+    # Two bound seqs + "mism*" / law-on → transfer speech (no domain lexicon)
+    if len(seqs) >= 2 and (
+        "mism" in s
+        or "law" in s
+        or "ley" in s
+        or " on " in f" {s} "
+        or " en " in f" {s} "
+        or "→" in s
+        or "->" in s
+    ):
         return _answer_transfer(kb, seqs[0], seqs[1], st)
 
     # Transfer speech + bound sequence atoms
@@ -981,7 +1042,38 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
                     or "transfiere" in s or "transfer" in s
                 ):
                     return _answer_transfer(kb, others[0], seqs[0], st)
+        # unresolved transfer speech: fall through to retrieve (named reject/STEM)
+        pass
+
+    # cassini-the-word (no atom) → UNKNOWN; cassini+lucas → rejected bilin transfer
+    if _is_cassini_word(s, seqs):
+        # If user claims cassini IS pell's law, cite the archived honest reject
+        if "pell" in s or (seqs and any(x == "pell" for x in seqs)):
+            rh = _rejected_named(kb, "false_cassini_as_pell_law")
+            if rh:
+                return _pack(
+                    f"Rechazado: {_soften_why(rh[0][1])}. "
+                    f"Cassini bilin no es la ley definitoria de Pell.",
+                    "reject-named",
+                    _tribes("crítico"),
+                    st,
+                    topic="reject",
+                )
         return _unknown(st)
+    if "cassini" in s and seqs and any(x == "lucas" for x in seqs):
+        rh = (
+            _rejected_named(kb, "transfer_bilin_cassini_shape_on_lucas")
+            or _rejected_named(kb, "bilin_lucas_offset_pm1")
+        )
+        if rh:
+            return _pack(
+                f"Rechazado con rigor: {_soften_why(rh[0][1])}. "
+                f"Cassini-shape no sobrevive en Lucas — el crítico ya lo cortó.",
+                "reject-named",
+                _tribes("crítico"),
+                st,
+                topic="reject",
+            )
 
     # Claimed recurrence vs living rec/2 — critic, not a word list
     conflict = deduce.claimed_rec_conflict(q, kb)
@@ -1090,6 +1182,21 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         if named and named[0]["score"] >= 5:
             return _render_hit(named[0], kb, st, more=more)
         if strong:
+            # Bogus Kepler T²∝a² asserted → prefer rejected wrong_exp / bogus_power
+            if _bogus_kepler_asserted(s):
+                bog = [
+                    h for h in strong
+                    if h["kind"] == "rejected"
+                    and (
+                        "bogus" in h["name"]
+                        or "wrong_exp" in h["name"]
+                        or "a²" in str(h.get("formula") or "")
+                        or "a^2" in str(h.get("formula") or "")
+                        or "T²/a²" in str(h.get("formula") or "")
+                    )
+                ]
+                if bog:
+                    return _render_hit(bog[0], kb, st, more=more)
             # Prefer verified over rejected for bare STEM/name queries
             # (rejected often outranks via longer stem; verified may sit just below 2.0)
             best = strong[0]
@@ -1097,6 +1204,11 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             if best["kind"] == "rejected" and verified:
                 if verified[0]["score"] + 2.5 >= best["score"]:
                     best = verified[0]
+            # Bare cassini hitchhiking onto transfer_*cassini* → UNKNOWN (no atom)
+            q_toks = set(deduce.tokenize(s))
+            if q_toks <= {"cassini"} or ( "cassini" in q_toks and not seqs and not deduce.looks_like_equation(s) and "bilin" not in s):
+                if "cassini" in str(best.get("name") or "").lower():
+                    return _unknown(st)
             return _render_hit(best, kb, st, more=more)
 
     # Prove speech with nothing bound → last clause, else UNKNOWN

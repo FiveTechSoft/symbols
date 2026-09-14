@@ -14,6 +14,7 @@ from .nets import NetsWorld
 from .electro import ElectroWorld
 from .physics import PhysicsWorld
 from .chem import ChemWorld
+from .loop import LoopWorld
 
 
 def build_worlds():
@@ -32,6 +33,7 @@ def build_worlds():
         "electro": ElectroWorld(),
         "physics": PhysicsWorld(),
         "chem": ChemWorld(),
+        "loop": LoopWorld(),
     }
 
 
@@ -53,5 +55,6 @@ __all__ = [
     "ElectroWorld",
     "PhysicsWorld",
     "ChemWorld",
+    "LoopWorld",
     "build_worlds",
 ]

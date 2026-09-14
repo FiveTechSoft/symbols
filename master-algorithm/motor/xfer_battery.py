@@ -408,6 +408,288 @@ def run_battery(kernel=None, ingest: bool = False) -> dict[str, Any]:
         ingested=ingested,
     )
 
+
+    # ----- f) DEMAND-15 FALSE ANALOGIES (critic MUST miss) -----
+    from .worlds.conserv_form import criticize_claimed_transfer, form_transfer_allowed
+
+    # 1) momentum-Δ=0 claimed as energy ½mv² on same collision
+    ok_f, why_f = criticize_claimed_transfer("conserv_mom", "energy_half_mv2", {"c": c})
+    name = "false_mom_as_energy_on_collision"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "physics", "false_analogy", "FALSE mom-Δ=0 as energy ½mv²", ok_f, why_f)
+    add(
+        "FALSE mom-Δ=0 as energy ½mv²",
+        "conserv_mom",
+        "physics",
+        "miss",
+        "hit" if ok_f else "miss",
+        why_f,
+        name=name,
+        ingested=ingested,
+    )
+
+    # 2) series-AND claimed as parallel OR
+    ok_fam, why_fam = form_transfer_allowed("series_and", "parallel_or")
+    # also table check: AND table ≠ OR table
+    table_eq = all((a & b) == (a | b) for a in (0, 1) for b in (0, 1))
+    ok_f = ok_fam and table_eq  # both must hold for a hit; expect miss
+    why_f = why_fam if not ok_fam else ("series∧≡parallel∨ UNEXPECTED" if table_eq else "series∧≠parallel∨ on (0,1)")
+    name = "false_series_and_as_parallel_or"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "electro", "false_analogy", "FALSE series-AND as parallel-OR", ok_f, why_f)
+    add(
+        "FALSE series-AND as parallel-OR",
+        "series_and",
+        "electro",
+        "miss",
+        "hit" if ok_f else "miss",
+        why_f,
+        name=name,
+        ingested=ingested,
+    )
+
+    # 3) fib rec [1,1] on trib/tribonacci (order-3)
+    trib = [0, 0, 1]
+    for _i in range(14):
+        trib.append(trib[-1] + trib[-2] + trib[-3])
+    ok_trib, why_trib = _rec_holds(trib, [1, 1])
+    name = "false_fib_rec_on_trib"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "sequences", "false_analogy", "FALSE fib[1,1] on trib", ok_trib, why_trib)
+    add(
+        "FALSE fib[1,1] on trib",
+        "rec(fib,[1,1])",
+        "sequences",
+        "miss",
+        "hit" if ok_trib else "miss",
+        why_trib,
+        name=name,
+        ingested=ingested,
+    )
+    ok_pad, why_pad = _rec_holds(trib, [1, 1, 0])
+    name = "false_fib_padded_on_trib"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "sequences", "false_analogy", "FALSE fib[1,1,0] on trib", ok_pad, why_pad)
+    add(
+        "FALSE fib[1,1,0] padded on trib",
+        "rec(fib,[1,1,0])",
+        "sequences",
+        "miss",
+        "hit" if ok_pad else "miss",
+        why_pad,
+        name=name,
+        ingested=ingested,
+    )
+
+    # 4) Kepler T²/a³ claimed as Ohm on resistor table
+    ohm = _gen_ohm_triples(5, 7) if "_gen_ohm_triples" in dir() else None
+    from .worlds.electro import _gen_ohm_triples as _ohm_gen
+    ohm = _ohm_gen(5, 7)
+    ratios_ko = [t["V"] ** 2 / (t["R"] ** 3 + 1e-15) for t in ohm]
+    ok_ko = all(abs(x - ratios_ko[0]) < 1e-6 for x in ratios_ko)
+    ok_fam, why_fam = form_transfer_allowed("kepler_t2_a3", "ohm_vir")
+    ok_f = ok_fam and ok_ko
+    why_f = why_fam if not ok_fam else (
+        f"T²/a³-shape on Ohm not const: {[round(x, 4) for x in ratios_ko]}"
+        if not ok_ko
+        else "UNEXPECTED Kepler-const on Ohm"
+    )
+    name = "false_kepler_as_ohm_on_resistor"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "electro", "false_analogy", "FALSE Kepler as Ohm", ok_f, why_f)
+    add(
+        "FALSE Kepler as Ohm on resistor",
+        "kepler T²/a³",
+        "electro",
+        "miss",
+        "hit" if ok_f else "miss",
+        why_f,
+        name=name,
+        ingested=ingested,
+    )
+
+    # 5) cassini bilinear claimed as law of Pell
+    # Identity may hold on Pell (same Q=-1 Lucas seq), but bilin ≠ defining rec [2,1].
+    P = seq_world.data["pell"]
+    ok_id, s_id, c_id = verify_bilinear(P, {"form": "offset_pm1", "r": 1, "seq": "pell"}, N)
+    ok_fam, why_fam = form_transfer_allowed("bilin_cassini", "pell_rec")
+    # False claim = bilin IS pell's law → form gate rejects even if identity holds
+    ok_f = ok_fam  # must be False
+    why_f = why_fam + (f"; identity_on_pell={ok_id}" if ok_id else f"; id_fail={c_id}")
+    name = "false_cassini_as_pell_law"
+    ingested = False
+    if ingest:
+        ingested = _ingest(
+            kernel, name, "sequences", "false_analogy",
+            "FALSE cassini bilin as Pell defining law", ok_f, why_f,
+        )
+    add(
+        "FALSE cassini bilin as Pell law",
+        "bilinear cassini",
+        "sequences",
+        "miss",
+        "hit" if ok_f else "miss",
+        why_f,
+        name=name,
+        ingested=ingested,
+    )
+
+    # 6) bit_fn XOR claimed as AND (and reverse)
+    xor_as_and = all((a ^ b) == (1 if (a == 1 and b == 1) else 0) for a in (0, 1) for b in (0, 1))
+    ok_fam, why_fam = form_transfer_allowed("bit_xor", "bit_and")
+    ok_f = ok_fam and xor_as_and
+    why_f = why_fam if not ok_fam else ("XOR≡AND UNEXPECTED" if xor_as_and else "XOR≠AND on (1,1)")
+    name = "false_xor_as_and"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "logic", "false_analogy", "FALSE XOR as AND", ok_f, why_f)
+    add(
+        "FALSE XOR as AND",
+        "bit_fn(xor)",
+        "logic",
+        "miss",
+        "hit" if ok_f else "miss",
+        why_f,
+        name=name,
+        ingested=ingested,
+    )
+    and_as_xor = all((a & b) == (a ^ b) for a in (0, 1) for b in (0, 1))
+    ok_fam2, why_fam2 = form_transfer_allowed("bit_and", "bit_xor")
+    ok_f2 = ok_fam2 and and_as_xor
+    why_f2 = why_fam2 if not ok_fam2 else ("AND≡XOR UNEXPECTED" if and_as_xor else "AND≠XOR")
+    name = "false_and_as_xor"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "logic", "false_analogy", "FALSE AND as XOR", ok_f2, why_f2)
+    add(
+        "FALSE AND as XOR",
+        "bit_fn(and)",
+        "logic",
+        "miss",
+        "hit" if ok_f2 else "miss",
+        why_f2,
+        name=name,
+        ingested=ingested,
+    )
+
+    # ----- g) HARDER TRUE transfers (new distinct form-families) -----
+    # g1) parallel switches ≡ OR (electro already has parallel critic on generated table)
+    ok_par = all((a | b) == (1 if a + b >= 1 else 0) for a in (0, 1) for b in (0, 1))
+    name = "transfer_parallel_switches_equiv_OR"
+    formula = "TRANSFER OR-form ⇒ parallel switches ≡ OR on {0,1}^2"
+    ingested = False
+    if ingest:
+        ingested = _ingest(
+            kernel, name, "electro", "electro_switch_transfer", formula, ok_par, "parallel≡OR"
+        )
+    add(
+        "parallel switches ≡ OR",
+        "bit_or / parallel",
+        "electro",
+        "hit",
+        "hit" if ok_par else "miss",
+        "parallel≡OR" if ok_par else "fail",
+        name=name,
+        ingested=ingested,
+    )
+
+    # g2) rec [1,1] → Lucas Δ (may already exist; still score as form reuse of rec→Δ)
+    from .worlds.calculus import _lucas as _lucas_seq
+    Lvals = _lucas_seq(12)
+    ok_ld = True
+    why_ld = "TRANSFER rec([1,1])→Delta=prev on lucas"
+    for n in range(1, len(Lvals) - 1):
+        if Lvals[n + 1] - Lvals[n] != Lvals[n - 1]:
+            ok_ld = False
+            why_ld = f"n={n}"
+            break
+    name = "transfer_rec_11_to_lucas_delta_N12"
+    formula = "TRANSFER rec([1,1]) ⇒ Delta structure on lucas"
+    ingested = False
+    if ingest:
+        ingested = _ingest(kernel, name, "calculus", "calc_transfer_rec", formula, ok_ld, why_ld)
+    add(
+        "rec[1,1]→Lucas Δ",
+        "rec([1,1])",
+        "calculus",
+        "hit",
+        "hit" if ok_ld else "miss",
+        why_ld,
+        name=name,
+        ingested=ingested,
+    )
+
+    # g3) algebra form reuse: distrib mod5 → mod7 (poly identity), mat_assoc mod3 → mod5
+    import itertools as _it
+    import random as _rnd
+    from .worlds.algebra import _mat_mul_mod as _mm
+
+    m_dst = 7
+    ok_dist = True
+    for x, y, z in _it.product(range(m_dst), repeat=3):
+        lhs = (x * ((y + z) % m_dst)) % m_dst
+        rhs = ((x * y) % m_dst + (x * z) % m_dst) % m_dst
+        if lhs != rhs:
+            ok_dist = False
+            break
+    name = "transfer_alg_distrib_mod5_to_mod7"
+    formula = "TRANSFER poly distrib form (mod5 prior) ⇒ exhaustive distrib mod 7"
+    ingested = False
+    if ingest:
+        ingested = _ingest(
+            kernel, name, "algebra", "alg_poly_zn", formula, ok_dist,
+            "exhaustive distrib mod 7" if ok_dist else "fail",
+        )
+    add(
+        "alg distrib mod5→mod7",
+        "poly_distrib",
+        "algebra",
+        "hit",
+        "hit" if ok_dist else "miss",
+        "exhaustive distrib mod 7" if ok_dist else "fail",
+        name=name,
+        ingested=ingested,
+    )
+
+    modp = 5
+    ok_ma = True
+    rng = _rnd.Random(modp * 17)
+    for _ in range(80):
+        def _rndm():
+            return (
+                (rng.randrange(modp), rng.randrange(modp)),
+                (rng.randrange(modp), rng.randrange(modp)),
+            )
+        A, B, C = _rndm(), _rndm(), _rndm()
+        lhs = _mm(_mm(A, B, modp), C, modp)
+        rhs = _mm(A, _mm(B, C, modp), modp)
+        if lhs != rhs:
+            ok_ma = False
+            break
+    name = "transfer_alg_mat_assoc_mod3_to_mod5"
+    formula = "TRANSFER mat assoc form (mod3 prior) ⇒ sampled 2x2 assoc mod 5"
+    ingested = False
+    if ingest:
+        ingested = _ingest(
+            kernel, name, "algebra", "alg_mat_assoc", formula, ok_ma,
+            "sampled 2x2 assoc mod 5" if ok_ma else "fail",
+        )
+    add(
+        "alg mat_assoc mod3→mod5",
+        "mat_assoc",
+        "algebra",
+        "hit",
+        "hit" if ok_ma else "miss",
+        "sampled 2x2 assoc mod 5" if ok_ma else "fail",
+        name=name,
+        ingested=ingested,
+    )
+
     # Also run world-native transfer families for extra coverage / archive
     if ingest:
         prefer = [
@@ -470,9 +752,65 @@ def run_battery(kernel=None, ingest: bool = False) -> dict[str, Any]:
             "bit_fn XOR→linear perceptron",
             "Kepler → bogus T²∝a²",
             "bilinear cassini → lucas",
+            "FALSE mom-Δ=0 as energy ½mv²",
+            "FALSE series-AND as parallel-OR",
+            "FALSE fib[1,1] on trib",
+            "FALSE fib[1,1,0] padded on trib",
+            "FALSE Kepler as Ohm on resistor",
+            "FALSE cassini bilin as Pell law",
+            "FALSE XOR as AND",
+            "FALSE AND as XOR",
         )
         and a.result != "skip"
     )
+
+    # Unique form-family score: conservation counts once; Kepler-on-own-table = re-verify
+    FAMILY_OF = {
+        "rec fib→lucas": "rec_11",
+        "rec fib→pell": "rec_11",
+        "rec fib→Δ(fib)": "rec_to_delta",
+        "rec[1,1]→Lucas Δ": "rec_to_delta",
+        "bit_fn AND→nets perceptron": "bit_and_linear",
+        "bit_fn AND→electro switch": "bit_and_series",
+        "bit_fn XOR→linear perceptron": "bit_xor_linear",
+        "chem atom-balance → physics momentum": "conserv_delta0",
+        "chem atom-balance → electro KCL": "conserv_delta0",
+        "physics momentum → chem atoms": "conserv_delta0",
+        "physics momentum → electro KCL": "conserv_delta0",
+        "electro KCL → chem atoms": "conserv_delta0",
+        "electro KCL → physics momentum": "conserv_delta0",
+        "Kepler T²∝a³ → same table": "kepler_reverify",
+        "Kepler → bogus T²∝a²": "kepler_bogus",
+        "bilinear cassini → fib": "bilin_cassini",
+        "bilinear cassini → lucas": "bilin_cassini",
+        "parallel switches ≡ OR": "bit_or_parallel",
+        "alg distrib mod5→mod7": "poly_distrib_reuse",
+        "alg mat_assoc mod3→mod5": "mat_assoc_reuse",
+    }
+    unique_hit_families = set()
+    unique_miss_families = set()
+    for a in scored:
+        fam = FAMILY_OF.get(a.pair, a.pair)
+        if a.pair.startswith("FALSE "):
+            fam = "false:" + a.pair
+        if a.result == "hit":
+            # kepler same-table is re-verify, not a transfer family hit
+            if fam == "kepler_reverify":
+                continue
+            unique_hit_families.add(fam)
+        elif a.result == "miss":
+            unique_miss_families.add(fam)
+    # unique-form intelligence: distinct true transfer families / (those + distinct honest-miss families that are real attempts)
+    # Count false-analogy misses as critic successes but not as "intelligence hits"
+    true_unique = {f for f in unique_hit_families if not str(f).startswith("false:")}
+    # denominator: true unique hits + unique negative form attempts (excl pure false:* from denom of "smart"? 
+    # Demand: unique-form score — conservation once; report honestly if lower
+    n_unique_pos = len(true_unique)
+    # negative unique among non-FALSE scored misses that were expected transfer tests
+    neg_transfer_fams = {FAMILY_OF.get(a.pair, a.pair) for a in scored if a.result == "miss" and not a.pair.startswith("FALSE ")}
+    n_unique_neg = len(neg_transfer_fams)
+    unique_denom = n_unique_pos + n_unique_neg
+    unique_form_score = (n_unique_pos / unique_denom) if unique_denom else 0.0
 
     # New positives besides fib→lucas
     new_pos = [
@@ -481,6 +819,9 @@ def run_battery(kernel=None, ingest: bool = False) -> dict[str, Any]:
         if a.pair
         not in ("rec fib→lucas",)
     ]
+
+    false_analogies = [a for a in attempts if a.pair.startswith("FALSE ")]
+    false_ok = all(a.result == "miss" for a in false_analogies)
 
     payload = {
         "forms": {
@@ -494,20 +835,32 @@ def run_battery(kernel=None, ingest: bool = False) -> dict[str, Any]:
         "n_miss": n_neg,
         "n_skip": len(skips),
         "intelligence_metric": round(intelligence, 4),
+        "unique_form_score": round(unique_form_score, 4),
+        "unique_form_hits": sorted(true_unique),
+        "unique_form_negatives": sorted(neg_transfer_fams),
+        "n_unique_pos": n_unique_pos,
+        "n_unique_neg": n_unique_neg,
         "definition": "positive_transfers / (positive+negative attempts); skips excluded",
+        "unique_definition": "distinct form-family hits / (hits+neg families); conserv_delta0 counts once; kepler same-table excluded as re-verify",
         "honest_positives": [a.pair for a in honest_pos],
         "honest_negatives": [a.pair for a in honest_neg],
         "unexpected": [asdict(a) for a in unexpected],
         "new_positives_besides_fib_lucas": [a.pair for a in new_pos],
         "required_negatives_still_failing": required_neg_ok,
+        "false_analogies_all_reject": false_ok,
+        "false_analogy_pairs": [a.pair for a in false_analogies],
         "baseline_note": "legacy fib→lucas/pell average was 0.5; this battery is the live intelligence metric",
     }
     if ingest:
         kernel.archive.meta["xfer_battery"] = {
             "intelligence_metric": payload["intelligence_metric"],
+            "unique_form_score": payload["unique_form_score"],
             "n_hit": n_pos,
             "n_miss": n_neg,
+            "n_unique_pos": n_unique_pos,
+            "n_unique_neg": n_unique_neg,
             "required_negatives_still_failing": required_neg_ok,
+            "false_analogies_all_reject": false_ok,
         }
         kernel.archive.save_meta()
         kernel._persist_arms()
@@ -583,9 +936,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(json.dumps({
         "wrote": str(out),
         "intelligence_metric": payload["intelligence_metric"],
+        "unique_form_score": payload.get("unique_form_score"),
         "n_hit": payload["n_hit"],
         "n_miss": payload["n_miss"],
         "n_skip": payload["n_skip"],
+        "n_unique_pos": payload.get("n_unique_pos"),
+        "unique_form_hits": payload.get("unique_form_hits"),
+        "false_analogies_all_reject": payload.get("false_analogies_all_reject"),
         "new_positives_besides_fib_lucas": payload["new_positives_besides_fib_lucas"],
         "required_negatives_still_failing": payload["required_negatives_still_failing"],
         "unexpected": [u["pair"] for u in payload["unexpected"]],

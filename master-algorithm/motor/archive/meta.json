@@ -1,5 +1,5 @@
 {
-  "total_steps": 147,
+  "total_steps": 151,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -309,9 +309,9 @@
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 0,
-      "saturated": false,
-      "n_visits": 2,
-      "total_reward": 9.5
+      "saturated": true,
+      "n_visits": 3,
+      "total_reward": 14.219999999999999
     },
     "info::info_transfer_bitfn": {
       "id": "info_transfer_bitfn",
@@ -657,9 +657,9 @@
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 0,
-      "saturated": false,
-      "n_visits": 4,
-      "total_reward": 28.32
+      "saturated": true,
+      "n_visits": 5,
+      "total_reward": 40.1
     },
     "physics::phys_action_reaction": {
       "id": "phys_action_reaction",
@@ -744,6 +744,54 @@
       "saturated": false,
       "n_visits": 3,
       "total_reward": 6.72
+    },
+    "loop::loop_taxis_scan": {
+      "id": "loop_taxis_scan",
+      "description": "1D taxis: bang-bang / linear gain reduce |error| on held-out x0",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 0,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 2.24
+    },
+    "loop::loop_pred_scan": {
+      "id": "loop_pred_scan",
+      "description": "Predict next_x from action; reject ignore-a / overfit-one-x0",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 6,
+      "unlocked": true,
+      "unlock_order": 1,
+      "saturated": false,
+      "n_visits": 1,
+      "total_reward": 1.24
+    },
+    "loop::loop_transfer_form": {
+      "id": "loop_transfer_form",
+      "description": "TRANSFER: conserv \u0394=0 \u2192 \u0394(position)=action; rec[1,1] mostly miss",
+      "dead_end": false,
+      "param": 2,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 2,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
+    },
+    "loop::loop_dead_wrong_policy": {
+      "id": "loop_dead_wrong_policy",
+      "description": "DEAD END: claim error-increasing policy is taxis",
+      "dead_end": true,
+      "param": 1,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 3,
+      "saturated": false,
+      "n_visits": 0,
+      "total_reward": 0.0
     }
   },
   "step_log": [
@@ -6835,6 +6883,152 @@
         "transfer_bitfn_and_all_and_all_to_MI",
         "transfer_bitfn_xor2_xor2_to_MI"
       ]
+    },
+    {
+      "tick": 148,
+      "world": "physics",
+      "family": "phys_collision",
+      "why": "UCB1 over 45 arms (world,family); picked physics::phys_collision because avg=7.080+1.4*sqrt(ln(147+1)/4)=1.565\u21928.645. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 12,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 12,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.72,
+        "score": 11.78
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "phys_mom_conserve_s6329",
+        "phys_energy_conserve_s6329",
+        "phys_mom_conserve_s6330",
+        "phys_energy_conserve_s6330",
+        "phys_mom_conserve_s6331",
+        "phys_energy_conserve_s6331",
+        "phys_mom_conserve_s6332",
+        "phys_energy_conserve_s6332",
+        "phys_mom_conserve_s6333",
+        "phys_energy_conserve_s6333",
+        "phys_mom_conserve_s6334",
+        "phys_energy_conserve_s6334"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 149,
+      "world": "info",
+      "family": "info_mi_scan",
+      "why": "UCB1 over 44 arms (world,family); picked info::info_mi_scan because avg=4.750+1.4*sqrt(ln(148+1)/2)=2.214\u21926.964. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.28,
+        "score": 4.72
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "info_MI_indep_near0_s3928",
+        "info_MI_dep_pos_s3928",
+        "info_indep_factorization_s3928",
+        "info_MI_and_related_s3928"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 150,
+      "world": "loop",
+      "family": "loop_taxis_scan",
+      "why": "UCB1 over 47 arms (world,family); picked loop::loop_taxis_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 2,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 2.24
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "loop_taxis_bangbang_s8642",
+        "loop_taxis_linear_gain_s8642"
+      ],
+      "rejected": [
+        "loop_taxis_always_right_s8642",
+        "loop_taxis_always_left_s8642"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 151,
+      "world": "loop",
+      "family": "loop_pred_scan",
+      "why": "UCB1 over 47 arms (world,family); picked loop::loop_pred_scan because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_reject",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 3,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 1.24
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "loop_pred_dx_eq_action_s8653"
+      ],
+      "rejected": [
+        "loop_pred_ignore_action_s8653",
+        "loop_pred_double_action_s8653",
+        "loop_pred_overfit_one_x0_s8653"
+      ],
+      "transfer": []
     }
   ],
   "curves": [
@@ -8307,6 +8501,46 @@
       "n_rejected": 155,
       "n_lemmas": 14,
       "tick": 147
+    },
+    {
+      "n_verified_facts": 364,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2987,
+      "n_rejected": 155,
+      "n_lemmas": 14,
+      "tick": 148
+    },
+    {
+      "n_verified_facts": 368,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2964,
+      "n_rejected": 155,
+      "n_lemmas": 14,
+      "tick": 149
+    },
+    {
+      "n_verified_facts": 374,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3061,
+      "n_rejected": 165,
+      "n_lemmas": 14,
+      "tick": 150
+    },
+    {
+      "n_verified_facts": 375,
+      "n_distinct_types": 59,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3094,
+      "n_rejected": 168,
+      "n_lemmas": 14,
+      "tick": 151
     }
   ],
   "baselines": {
@@ -9244,7 +9478,7 @@
           "mut_cap": 4,
           "n_visits": 0,
           "total_reward": 0.0,
-          "saturated": false,
+          "saturated": true,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
         },
@@ -10192,7 +10426,7 @@
           "mut_cap": 4,
           "n_visits": 0,
           "total_reward": 0.0,
-          "saturated": false,
+          "saturated": true,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
         },
@@ -10261,6 +10495,110 @@
           "saturated": false,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
+        }
+      },
+      "molt_history": [],
+      "novelty_floor": 0.25
+    },
+    "loop": {
+      "world_tag": "loop",
+      "generation": 0,
+      "n_schema_classes": 4,
+      "unlocked": [
+        "loop_dead_wrong_policy",
+        "loop_pred_scan",
+        "loop_taxis_scan",
+        "loop_transfer_form"
+      ],
+      "spawned": [],
+      "schemas": {
+        "loop_taxis_scan": {
+          "id": "loop_taxis_scan",
+          "description": "1D taxis: bang-bang / linear gain reduce |error| on held-out x0",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 4,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "loop_pred_scan": {
+          "id": "loop_pred_scan",
+          "description": "Predict next_x from action; reject ignore-a / overfit-one-x0",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 4,
+          "order_max": 6,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "loop_transfer_form": {
+          "id": "loop_transfer_form",
+          "description": "TRANSFER: conserv \u0394=0 \u2192 \u0394(position)=action; rec[1,1] mostly miss",
+          "unlocked": true,
+          "dead_end": false,
+          "origin": "seed",
+          "order": 2,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.25
+        },
+        "loop_dead_wrong_policy": {
+          "id": "loop_dead_wrong_policy",
+          "description": "DEAD END: claim error-increasing policy is taxis",
+          "unlocked": true,
+          "dead_end": true,
+          "origin": "seed",
+          "order": 1,
+          "order_max": 4,
+          "coeff_lo": -3,
+          "coeff_hi": 3,
+          "m_max": 4,
+          "m_cap": 12,
+          "r_max": 1,
+          "r_cap": 4,
+          "mut_depth": 1,
+          "mut_cap": 4,
+          "n_visits": 0,
+          "total_reward": 0.0,
+          "saturated": false,
+          "ticks_no_new_type": 0,
+          "novelty_bonus": 0.0
         }
       },
       "molt_history": [],
@@ -10471,12 +10809,25 @@
   ],
   "xfer_battery": {
     "intelligence_metric": 0.5714,
-    "unique_form_score": 0.6923,
     "n_hit": 16,
     "n_miss": 12,
-    "n_unique_pos": 9,
-    "n_unique_neg": 4,
     "required_negatives_still_failing": true,
-    "false_analogies_all_reject": true
+    "new_positives_besides_fib_lucas": [
+      "rec fib\u2192\u0394(fib)",
+      "bit_fn AND\u2192nets perceptron",
+      "bit_fn AND\u2192electro switch",
+      "chem atom-balance \u2192 physics momentum",
+      "chem atom-balance \u2192 electro KCL",
+      "physics momentum \u2192 chem atoms",
+      "physics momentum \u2192 electro KCL",
+      "electro KCL \u2192 chem atoms",
+      "electro KCL \u2192 physics momentum",
+      "Kepler T\u00b2\u221da\u00b3 \u2192 same table",
+      "bilinear cassini \u2192 fib",
+      "parallel switches \u2261 OR",
+      "rec[1,1]\u2192Lucas \u0394",
+      "alg distrib mod5\u2192mod7",
+      "alg mat_assoc mod3\u2192mod5"
+    ]
   }
 }

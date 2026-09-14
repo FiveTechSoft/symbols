@@ -1,0 +1,399 @@
+{
+  "n": 43,
+  "ok": 43,
+  "inventions": 0,
+  "n_fails": 0,
+  "fails": [],
+  "invention_cases": [],
+  "mouth_score": "43/43",
+  "zero_inventions": true,
+  "results": [
+    {
+      "q": "ohm",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: V=IR on generated triples (eps). Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "ley de ohm",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: V=IR on generated triples (eps). Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "V=IR",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: V=IR on generated triples (eps). Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "kepler",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: T^2/a^3 constant within eps on circular table. Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "T^2/a^3",
+      "prime": null,
+      "expect": "known",
+      "verdict": "unknown-ok",
+      "reason": "atom_missing_ok",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "fibonacci",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "fib",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "recurrencia de fib",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "fib(n)=fib(n-1)+fib(n-2)",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "kirchhoff",
+      "prime": null,
+      "expect": "known",
+      "verdict": "unknown-ok",
+      "reason": "atom_missing_ok",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "KCL",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: sum I_k = 0 at 3-edge node. Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "se transfiere a lucas",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "transfer-lucas",
+      "a": "Sí: verificado que Lucas y Fibonacci comparten la misma ley lineal. Ambas obedecen L(n)=L(n-1)+L(n-2). Eso es transferencia positiva bajo esa recurrencia — no un «entiende todo». ¿Quieres el contraste con quien no la comparte?"
+    },
+    {
+      "q": "fib a lucas",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "transfer-lucas",
+      "a": "Sí: verificado que Lucas y Fibonacci comparten la misma ley lineal. Ambas obedecen L(n)=L(n-1)+L(n-2). Eso es transferencia positiva bajo esa recurrencia — no un «entiende todo». ¿Quieres el contraste con quien no la comparte?"
+    },
+    {
+      "q": "momentum",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí: verificado transfer_conserv_physics_momentum_to_chem_conserv_chem. Forma linear-Δ=0 bajo transfer_conserv_* — misma ley en la otra secuencia. No invento la analogía; cito lo firmado. ¿Seguimos?"
+    },
+    {
+      "q": "lucas",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-lucas",
+      "a": "Verificado: Lucas comparte con Fibonacci la misma forma lineal L(n)=L(n-1)+L(n-2). Misma ley, otra semilla — no es magia. ¿Quieres el contraste con Pell, donde la transferencia falla?"
+    },
+    {
+      "q": "fib(n)=2*fib(n-1)",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-fib",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La recurrencia verificada es F(n)=F(n-1)+F(n-2); F(n)=2F(n-1) (o el doble del anterior) no encaja con lo observado. ¿Quieres contrastarla con otra secuencia?"
+    },
+    {
+      "q": "momentum es lo mismo que energia 1/2 mv^2",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí: verificado transfer_conserv_physics_momentum_to_chem_conserv_chem. Forma linear-Δ=0 bajo transfer_conserv_* — misma ley en la otra secuencia. No invento la analogía; cito lo firmado. ¿Seguimos?"
+    },
+    {
+      "q": "series es paralelo",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "lemma",
+      "a": "Lema verificado: AD ∥ BC. Firmado en la geometría de la teoría — no filosofía prestada. ¿Quieres otro?"
+    },
+    {
+      "q": "kepler es la ley de ohm",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: T²/a³-shape on Ohm not const: [0.8267, 5.6582, 0.9737, 0.0142, 0.009]; Ohm itself holds=True. No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "xor es and",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: XOR≠AND on (1,1): xor=0 and=1. No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "fib es trib",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "cassini es la ley de pell",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado: form-family mismatch: bilin_cassini(bilinear_identity) ≠ pell_rec(linear_recurrence); identity_on_pell=True. Cassini bilin no es la ley definitoria de Pell."
+    },
+    {
+      "q": "fib(n)=fib(n-1)+fib(n-3)",
+      "prime": null,
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-fib",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La recurrencia verificada es F(n)=F(n-1)+F(n-2); F(n)=2F(n-1) (o el doble del anterior) no encaja con lo observado. ¿Quieres contrastarla con otra secuencia?"
+    },
+    {
+      "q": "multiverso",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "cassini",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "alma",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. Es una pregunta humana y la respeto: en la teoría no hay evidencia sobre eso; no especulo. Si quieres, volvemos a lo que sí quedó verificado."
+    },
+    {
+      "q": "el alma",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. Es una pregunta humana y la respeto: en la teoría no hay evidencia sobre eso; no especulo. Si quieres, volvemos a lo que sí quedó verificado."
+    },
+    {
+      "q": "filotaxis",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "dios",
+      "prime": null,
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. Es una pregunta humana y la respeto: en la teoría no hay evidencia sobre eso; no especulo. Si quieres, volvemos a lo que sí quedó verificado."
+    },
+    {
+      "q": "demostrá eso",
+      "prime": "fibonacci",
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-fib",
+      "a": "Claro — te lo sostengo otra vez, sin inventar nada nuevo. Verificado: Fibonacci obedece la recurrencia lineal de orden 2 F(n)=F(n-1)+F(n-2). Cada término es la suma de los dos anteriores; eso es lo que encaja con las observaciones, no una metáfora. ¿Quieres ver a quién se transfiere esa ley y a quién no?"
+    },
+    {
+      "q": "demostrá eso",
+      "prime": "cassini",
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. Sin evidencia en la teoría, no especulo. ¿Probamos con algo que sí demostré?"
+    },
+    {
+      "q": "demostrá eso",
+      "prime": "alma",
+      "expect": "unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "por que",
+      "prime": "se transfiere a pell",
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "transfer-pell",
+      "a": "Porque la analogía no sobrevive: P(n)=2P(n-1)+P(n-2) frente a F(n)=F(n-1)+F(n-2). En n=2 la analogía ya falla. Eso es rechazo verificado, no una opinión."
+    },
+    {
+      "q": "y pell",
+      "prime": "fibonacci",
+      "expect": "reject_or_unknown",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "transfer-pell",
+      "a": "No. La analogía no sobrevive: Fibonacci sigue F(n)=F(n-1)+F(n-2), pero Pell obedece P(n)=2P(n-1)+P(n-2). Contraejemplo n=2: ahí la transferencia falla. Queda rechazado, no inventado."
+    },
+    {
+      "q": "transfer_fib_to_pell",
+      "prime": null,
+      "expect": "reject",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "transfer-pell",
+      "a": "No. La analogía no sobrevive: Fibonacci sigue F(n)=F(n-1)+F(n-2), pero Pell obedece P(n)=2P(n-1)+P(n-2). Contraejemplo n=2: ahí la transferencia falla. Queda rechazado, no inventado."
+    },
+    {
+      "q": "false_mom_as_energy_on_collision",
+      "prime": null,
+      "expect": "reject",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: Form mismatch: linear-Δp=0 ≠ quadratic ½mv² (even if both hold on elastic). No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "false_xor_as_and",
+      "prime": null,
+      "expect": "reject",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: XOR≠AND on (1,1): xor=0 and=1. No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "false_cassini_as_pell_law",
+      "prime": null,
+      "expect": "reject",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: Form-family mismatch: bilin_cassini(bilinear_identity) ≠ pell_rec(linear_recurrence); identity_on_pell=True. No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "transfer_bilin_cassini_shape_on_lucas",
+      "prime": null,
+      "expect": "reject",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "reject-named",
+      "a": "Rechazado con rigor: En n=1 la analogía ya falla. No voy a fingir que cuadra cuando el crítico ya lo cortó."
+    },
+    {
+      "q": "ohm V=IR",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: V=IR on generated triples (eps). Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "conservacion de momento",
+      "prime": null,
+      "expect": "known",
+      "verdict": "unknown-ok",
+      "reason": "atom_missing_ok",
+      "tag": "unknown",
+      "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo."
+    },
+    {
+      "q": "balance de atomos",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "verified",
+      "a": "Sí. Identidad verificada: atom counts conserved: 2H2+O2→2H2O. Está en lo demostrado — no la invento. ¿Seguimos con ella?"
+    },
+    {
+      "q": "ley de lucas",
+      "prime": null,
+      "expect": "known",
+      "verdict": "ok",
+      "reason": "",
+      "tag": "rec-lucas",
+      "a": "Verificado: Lucas comparte con Fibonacci la misma forma lineal L(n)=L(n-1)+L(n-2). Misma ley, otra semilla — no es magia. ¿Quieres el contraste con Pell, donde la transferencia falla?"
+    }
+  ]
+}

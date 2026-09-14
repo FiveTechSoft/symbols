@@ -1295,3 +1295,75 @@ verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_pell_3_0_-3_-1'
 verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n4', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).
 % finite fail / dead-end
 rejected('transfer_kepler_bogus_power_n4', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6329', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6329', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6330', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6330', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6331', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6331', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6332', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6332', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6333', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6333', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6334', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6334', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_indep_near0_s3928', 'MI(X;Y)≈0 on generated independent joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_dep_pos_s3928', 'MI(X;Y)>0 on xor-coupled joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_indep_factorization_s3928', 'P(x,y)=P(x)P(y) on independent joint (eps)')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_and_related_s3928', 'MI>0 on (X, X∧Y) joint from full 2-bit table')).
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_bangbang_s7069', 'bang-bang toward 0 reduces |error| over T on held-out x0')).
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_linear_gain_s7069', 'a=-k*x (k=0.5) reduces |error| over T on held-out x0')).
+% finite fail / dead-end
+rejected('loop_taxis_always_right_s7069', 'increases error: x0=2.0 2→7; x0=4.0 4→9; x0=6.0 6→11').
+% finite fail / dead-end
+rejected('loop_taxis_always_left_s7069', 'increases error: x0=-2.0 2→7; x0=-4.0 4→9; x0=-5.0 5→10').
+% verified @ loop/loop_pred_scan
+verified(fact(loop, loop_pred_scan, 'loop_pred_dx_eq_action_s7069', 'next_x = x + a (Δ(position)=action) on held-out starts')).
+% finite fail / dead-end
+rejected('loop_pred_ignore_action_s7069', 'finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_double_action_s7069', 'finite fail: x0=-6.0 pred=-4.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_overfit_one_x0_s7069', 'fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0').
+% verified @ loop/loop_transfer_form
+verified(fact(loop, loop_transfer_form, 'transfer_conserv_delta0_to_loop_dx_eq_a', 'TRANSFER linear-Δ=0 ⇒ Δ(position)-action=0 (next_x=x+a)')).
+% finite fail / dead-end
+rejected('transfer_rec11_to_loop_position', 'n=2: pred=9.0 != obs=3.0').
+% finite fail / dead-end
+rejected('transfer_conserv_to_loop_position_frozen', 'finite fail: x0=-6.0 moved under a=1').
+% finite fail / dead-end
+rejected('NEG_loop_policy_increases_error', 'finite fail (dead-end): deltas=[-4.0, -4.0]').
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_bangbang_s8642', 'bang-bang toward 0 reduces |error| over T on held-out x0')).
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_linear_gain_s8642', 'a=-k*x (k=0.5) reduces |error| over T on held-out x0')).
+% finite fail / dead-end
+rejected('loop_taxis_always_right_s8642', 'increases error: x0=2.0 2→7; x0=4.0 4→9; x0=6.0 6→11').
+% finite fail / dead-end
+rejected('loop_taxis_always_left_s8642', 'increases error: x0=-2.0 2→7; x0=-4.0 4→9; x0=-5.0 5→10').
+% verified @ loop/loop_pred_scan
+verified(fact(loop, loop_pred_scan, 'loop_pred_dx_eq_action_s8653', 'next_x = x + a (Δ(position)=action) on held-out starts')).
+% finite fail / dead-end
+rejected('loop_pred_ignore_action_s8653', 'finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_double_action_s8653', 'finite fail: x0=-6.0 pred=-4.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_overfit_one_x0_s8653', 'fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0').
