@@ -1,0 +1,857 @@
+{
+  "round": "keep-chat14",
+  "n": 26,
+  "continuous": true,
+  "counts": {
+    "ok": 23,
+    "fail": 0,
+    "unknown-ok": 3,
+    "robotic-fail": 0,
+    "invention-fail": 0
+  },
+  "fail_n": 0,
+  "invention_n": 0,
+  "robotic_n": 0,
+  "robotic_scan": 0,
+  "long_unit_dump_n": 0,
+  "target": "0 invention / 0 robotic",
+  "score": "0/0",
+  "spine_required": [
+    "hola",
+    "fib",
+    "mentira 2F",
+    "ok",
+    "unidad",
+    "más corto",
+    "gracias",
+    "en cristiano",
+    "cassini",
+    "eres más listo porque tienes 471 hechos?"
+  ],
+  "spine_ok": true,
+  "spine_samples": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "tag": "greet",
+      "verdict": "ok",
+      "topic_after": "identity"
+    },
+    {
+      "q": "fib",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "ok",
+      "a": "De acuerdo.",
+      "tag": "ack",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "más corto",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "gracias",
+      "a": "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+      "tag": "thanks",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "tag": "unknown",
+      "verdict": "unknown-ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "tag": "level",
+      "verdict": "ok",
+      "topic_after": "level"
+    }
+  ],
+  "lie_after_truth_ok": true,
+  "warmth_ok": true,
+  "warm_invent_n": 0,
+  "soft_mystery_ok": true,
+  "warm_samples": [],
+  "soft_mystery_samples": [],
+  "da_igual_no_force": true,
+  "da_igual_samples": [
+    {
+      "q": "da igual",
+      "a": "Ok.",
+      "tag": "ack",
+      "verdict": "ok",
+      "forces_topic_q": false
+    }
+  ],
+  "lie_samples": [
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    }
+  ],
+  "bit_circuit_atoms": true,
+  "bit_circuit_ok": true,
+  "pell_ok": true,
+  "robot_ok": true,
+  "cuentame_algo_honest": true,
+  "cuentame_modes": [],
+  "cuentame_samples": [],
+  "edge_report": {
+    "incomplete": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "lo de fib",
+          "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "aquello de la unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "tell": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "redirect": {
+      "n": 1,
+      "ok": 1,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "da igual",
+          "a": "Ok.",
+          "tag": "ack",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "lie_after_truth": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "mentira 2F",
+          "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+          "tag": "reject-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "no, Fib es 2F(n-1)",
+          "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+          "tag": "reject-fib",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "deixis": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "explain": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "en cristiano",
+          "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el re",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "en cristiano",
+          "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el re",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "typo": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "impatient": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "más corto",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "más corto",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "warmth": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "soft_mystery": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "pell": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "robot": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    },
+    "bit_circuit": {
+      "n": 0,
+      "ok": 0,
+      "fail": 0,
+      "samples": []
+    }
+  },
+  "ack_clean": {
+    "ok": {
+      "n": 2,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "sí": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "vale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "dale": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "mm": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "ya veo": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "entiendo": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "espera": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "para": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "mejor otra cosa": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "da igual": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "me da igual": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    }
+  },
+  "fails": [],
+  "unit_samples": [
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "long_dump": true,
+      "lever_hits": 6
+    },
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "long_dump": true,
+      "lever_hits": 6
+    }
+  ],
+  "best_human": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "expect": "greet",
+      "tag": "greet"
+    },
+    {
+      "q": "fib",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "expect": "known",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "expect": "lie",
+      "tag": "reject-fib"
+    }
+  ],
+  "remaining_robotic_spots": [],
+  "remaining_stock_phrases": [],
+  "stiffest": null,
+  "spot_hard": {
+    "level_471": true,
+    "ok_after_fib": true,
+    "thanks_then_explain": true,
+    "mas_corto_after_unit": true,
+    "mentira_2F": true,
+    "bare_cassini": true
+  },
+  "patch": "none (0/0 — no talk.py patch this round)",
+  "transcript": [
+    {
+      "turn": 1,
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "tag": "greet",
+      "verdict": "ok"
+    },
+    {
+      "turn": 2,
+      "q": "fib",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 3,
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 4,
+      "q": "ok",
+      "a": "De acuerdo.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 5,
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 6,
+      "q": "más corto",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 7,
+      "q": "gracias",
+      "a": "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+      "tag": "thanks",
+      "verdict": "ok"
+    },
+    {
+      "turn": 8,
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 9,
+      "q": "cassini",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 10,
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "tag": "level",
+      "verdict": "ok"
+    },
+    {
+      "turn": 11,
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 12,
+      "q": "espera",
+      "a": "Listo, espero.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 13,
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 14,
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 15,
+      "q": "ok",
+      "a": "Vale.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 16,
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 17,
+      "q": "más corto",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 18,
+      "q": "multiverso",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 19,
+      "q": "vale",
+      "a": "Ahí estamos.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 20,
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 21,
+      "q": "gracias",
+      "a": "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+      "tag": "thanks",
+      "verdict": "ok"
+    },
+    {
+      "turn": 22,
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 23,
+      "q": "cassini",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 24,
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "tag": "level",
+      "verdict": "ok"
+    },
+    {
+      "turn": 25,
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "tag": "identity",
+      "verdict": "ok"
+    },
+    {
+      "turn": 26,
+      "q": "da igual",
+      "a": "Ok.",
+      "tag": "ack",
+      "verdict": "ok"
+    }
+  ],
+  "results": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "verdict": "ok",
+      "expect": "greet",
+      "tag": "greet",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "fib",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "fib_setup",
+      "spine": true
+    },
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib",
+      "edge": "lie_after_truth",
+      "spine": true
+    },
+    {
+      "q": "ok",
+      "a": "De acuerdo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "ok_after_fib",
+      "spine": true
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "deixis",
+      "spine": true
+    },
+    {
+      "q": "más corto",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "shorten",
+      "tag": "verified",
+      "edge": "impatient",
+      "spine": true
+    },
+    {
+      "q": "gracias",
+      "a": "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+      "verdict": "ok",
+      "expect": "thanks",
+      "tag": "thanks",
+      "edge": "thanks_before_explain",
+      "spine": true
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "explain",
+      "spine": true
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": "bare_unknown",
+      "spine": true
+    },
+    {
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "verdict": "ok",
+      "expect": "level",
+      "tag": "level",
+      "edge": "level_471",
+      "spine": true
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "espera",
+      "a": "Listo, espero.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "incomplete",
+      "spine": false
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib",
+      "edge": "lie_after_truth",
+      "spine": false
+    },
+    {
+      "q": "ok",
+      "a": "Vale.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "ok_after_fib",
+      "spine": false
+    },
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "incomplete",
+      "spine": false
+    },
+    {
+      "q": "más corto",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "shorten",
+      "tag": "verified",
+      "edge": "impatient",
+      "spine": false
+    },
+    {
+      "q": "multiverso",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": "bare_unknown",
+      "spine": false
+    },
+    {
+      "q": "vale",
+      "a": "Ahí estamos.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "deixis",
+      "spine": false
+    },
+    {
+      "q": "gracias",
+      "a": "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+      "verdict": "ok",
+      "expect": "thanks",
+      "tag": "thanks",
+      "edge": "thanks_before_explain",
+      "spine": false
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "explain",
+      "spine": false
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": "bare_unknown",
+      "spine": false
+    },
+    {
+      "q": "eres más listo porque tienes 471 hechos?",
+      "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.",
+      "verdict": "ok",
+      "expect": "level",
+      "tag": "level",
+      "edge": "level_471",
+      "spine": false
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "verdict": "ok",
+      "expect": "identity",
+      "tag": "identity",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "da igual",
+      "a": "Ok.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect",
+      "spine": false
+    }
+  ]
+}
