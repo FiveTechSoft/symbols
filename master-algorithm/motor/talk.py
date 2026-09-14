@@ -1036,13 +1036,20 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     # General retrieve from bound atoms
     hits = deduce.retrieve(q, kb, last)
     if hits:
-        # No weak-score fallback: score < 2.0 is noise (identity/exact false binds)
-        strong = [h for h in hits if h["score"] >= 2.0]
-        strong = [h for h in strong if _hit_grounded(tokens, h)] or [
-            h for h in strong if h.get("kind") in ("rec", "period", "companion", "lemma")
-        ]
+        # Prefer score≥2; allow grounded mid-score (≥1.5) for schema names (geo_invent)
+        # Ungrounded weak hits (identity/exact stem noise) stay out.
+        strong = [h for h in hits if h["score"] >= 2.0 and _hit_grounded(tokens, h)]
         if not strong:
-            # cassini-the-word / meta crumbs / stem noise → honest unknown
+            strong = [
+                h for h in hits
+                if h["score"] >= 1.5 and _hit_grounded(tokens, h)
+            ]
+        if not strong:
+            strong = [
+                h for h in hits
+                if h["score"] >= 2.0 and h.get("kind") in ("rec", "period", "companion", "lemma")
+            ]
+        if not strong:
             if _is_soft_unknown(s):
                 return _unknown(st, soft=True)
             return _unknown(st)
