@@ -466,6 +466,7 @@ def _is_ack(s: str) -> bool:
         "ok", "okay", "vale", "bien", "dale", "de acuerdo", "perfecto",
         "si", "sí", "sip", "sep", "aja", "ajá", "claro", "entendido",
         "ya", "listo", "bueno",
+        "no",  # bare disagreement/agreement token, not a new ask
     )
 
 
