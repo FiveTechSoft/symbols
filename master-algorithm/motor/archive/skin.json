@@ -1,7 +1,7 @@
 {
-  "generation": 11,
-  "n_schema_classes": 15,
-  "n_unlocked": 15,
+  "generation": 12,
+  "n_schema_classes": 16,
+  "n_unlocked": 16,
   "unlocked": [
     "bilinear_schema",
     "bilinear_schema_r4_g4",
@@ -9,6 +9,7 @@
     "bilinear_schema_r4_g6",
     "bilinear_schema_r4_g7",
     "bilinear_schema_r4_g8",
+    "bit_circuit_compose",
     "dead_prime",
     "delta_conserv",
     "geo_invent",
@@ -36,8 +37,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 9,
-      "total_reward": 58.88,
+      "n_visits": 10,
+      "total_reward": 58.17,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -234,8 +235,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
-      "total_reward": -0.68,
+      "n_visits": 2,
+      "total_reward": -1.36,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -256,8 +257,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
-      "total_reward": -0.68,
+      "n_visits": 2,
+      "total_reward": -1.36,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -278,8 +279,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
-      "total_reward": -0.68,
+      "n_visits": 2,
+      "total_reward": -1.36,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 0.0
@@ -322,7 +323,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
+      "n_visits": 2,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -334,6 +335,28 @@
       "unlocked": true,
       "dead_end": false,
       "origin": "mutation:lever_spawn_gen11",
+      "order": 1,
+      "order_max": 4,
+      "coeff_lo": -3,
+      "coeff_hi": 3,
+      "m_max": 4,
+      "m_cap": 12,
+      "r_max": 1,
+      "r_cap": 4,
+      "mut_depth": 1,
+      "mut_cap": 4,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "saturated": false,
+      "ticks_no_new_type": 0,
+      "novelty_bonus": 0.0
+    },
+    "bit_circuit_compose": {
+      "id": "bit_circuit_compose",
+      "description": "bit-circuit compose: series-AND / parallel-OR transfer",
+      "unlocked": true,
+      "dead_end": false,
+      "origin": "mutation:lever_spawn_gen12",
       "order": 1,
       "order_max": 4,
       "coeff_lo": -3,
@@ -400,7 +423,11 @@
     "-1,4,1,-1",
     "0,4,-1,-2",
     "4,-3,-2,0",
-    "1,5,-3,-2"
+    "1,5,-3,-2",
+    "2,-2,1,2",
+    "3,-2,-1,1",
+    "2,3,-4,-2",
+    "3,-3,3,2"
   ],
   "molt_history": [
     {
@@ -767,6 +794,50 @@
         "transfer_horn"
       ],
       "n_schema_classes": 15
+    },
+    {
+      "generation": 12,
+      "reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g6 saturated; schema bilinear_schema_r4_g7 saturated; schema bilinear_schema_r4_g8 saturated",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_lever bit_circuit_compose"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "bit_circuit_compose",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 16
     }
   ]
 }

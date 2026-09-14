@@ -1761,3 +1761,122 @@ rejected('electro_ohm_broken_add_s5580', 'V≠I+R (as required)').
 verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n5', 'T^2/a^3 constant within eps on circular table')).
 % finite fail / dead-end
 rejected('astro_kepler_wrong_exp_n5', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s7048', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s7049', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s7050', 'F_12 + F_21 = 0')).
+% finite fail / dead-end
+rejected('phys_action_same_sign_broken_s7048', 'F12=4.875611685567913 F21=4.875611685567913 not opposite').
+% verified @ loop/loop_pred_scan
+verified(fact(loop, loop_pred_scan, 'loop_pred_dx_eq_action_s9513', 'next_x = x + a (Δ(position)=action) on held-out starts')).
+% finite fail / dead-end
+rejected('loop_pred_ignore_action_s9513', 'finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_double_action_s9513', 'finite fail: x0=-6.0 pred=-4.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_overfit_one_x0_s9513', 'fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0').
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s5568', '2x2 Cramer exact on generated integer system')).
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s5569', '2x2 Cramer exact on generated integer system')).
+% verified @ astro/astro_transfer_form
+verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n7', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).
+% finite fail / dead-end
+rejected('transfer_kepler_bogus_power_n7', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n6', 'T increases with a on generated circular table')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_pos_n6', 'T>0 and a>0 for all generated bodies')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n6', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n6', 'h^2/a constant (=1) on circular 2-body table')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7190', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7191', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7192', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7193', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7194', 'K = [B]/[A] on 2-species toy')).
+% hypothesis-language skin gen=12
+schema(bit_circuit_compose, unlocked(true)).
+% learned recurrence on fib
+rec(fib, [-1,1,4,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_1_4_2', 'fib(n) = (-1)*fib(n-1) + (1)*fib(n-2) + (4)*fib(n-3) + (2)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [-1,5,0,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_5_0_-2', 'fib(n) = (-1)*fib(n-1) + (5)*fib(n-2) + (0)*fib(n-3) + (-2)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-1,1,4,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_1_4_2', 'lucas(n) = (-1)*lucas(n-1) + (1)*lucas(n-2) + (4)*lucas(n-3) + (2)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-1,5,0,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_5_0_-2', 'lucas(n) = (-1)*lucas(n-1) + (5)*lucas(n-2) + (0)*lucas(n-3) + (-2)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,1,-5,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_1_-5_-2', 'pell(n) = (3)*pell(n-1) + (1)*pell(n-2) + (-5)*pell(n-3) + (-2)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [4,-2,-4,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_4_-2_-4_-1', 'pell(n) = (4)*pell(n-1) + (-2)*pell(n-2) + (-4)*pell(n-3) + (-1)*pell(n-4)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x1_vs_n_x0_N5', 'Delta(x^1) / (power * x^0) → 1 (eps on lattice)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x2_vs_n_x1_N5', 'Delta(x^2) / (power * x^1) → 1 (eps on lattice)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x3_vs_n_x2_N5', 'Delta(x^3) / (power * x^2) → 1 (eps on lattice)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x4_vs_n_x3_N5', 'Delta(x^4) / (power * x^3) → 1 (eps on lattice)')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x5_vs_n_x4_N5', 'Delta(x^5) / (power * x^4) → 1 (eps on lattice)')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_binom_expand_mod11', '(x+y)^2 ≡ x^2+2xy+y^2 (mod 11) exhaustive')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'alg_distrib_mod11', 'x(y+z) ≡ xy+xz (mod 11)')).
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_bangbang_s9690', 'bang-bang toward 0 reduces |error| over T on held-out x0')).
+% verified @ loop/loop_taxis_scan
+verified(fact(loop, loop_taxis_scan, 'loop_taxis_linear_gain_s9690', 'a=-k*x (k=0.5) reduces |error| over T on held-out x0')).
+% finite fail / dead-end
+rejected('loop_taxis_always_right_s9690', 'increases error: x0=2.0 2→7; x0=4.0 4→9; x0=6.0 6→11').
+% finite fail / dead-end
+rejected('loop_taxis_always_left_s9690', 'increases error: x0=-2.0 2→7; x0=-4.0 4→9; x0=-5.0 5→10').
+lemma('L5_midline_parallel', Parallel, 'AB ∥ NX2').
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent::L5_midline_parallel', 'AB ∥ NX2')).
+% verified @ geometry/geo_invent
+verified(fact(geometry, geo_invent, 'geo_invent_d1_s246', 'AB ∥ NX2')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_1_4_2', 'TRANSFER rec(lucas,[-1, 1, 4, 2]) ⇒ try on fib: (-1)*fib(n-1) + (1)*fib(n-2) + (4)*fib(n-3) + (2)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_5_0_-2', 'TRANSFER rec(lucas,[-1, 5, 0, -2]) ⇒ try on fib: (-1)*fib(n-1) + (5)*fib(n-2) + (0)*fib(n-3) + (-2)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_3_1_-5_-2', 'n=4: pred=2 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_4_-2_-4_-1', 'n=4: pred=2 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_1_4_2', 'TRANSFER rec(fib,[-1, 1, 4, 2]) ⇒ try on lucas: (-1)*lucas(n-1) + (1)*lucas(n-2) + (4)*lucas(n-3) + (2)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_5_0_-2', 'TRANSFER rec(fib,[-1, 5, 0, -2]) ⇒ try on lucas: (-1)*lucas(n-1) + (5)*lucas(n-2) + (0)*lucas(n-3) + (-2)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_3_1_-5_-2', 'n=4: pred=6 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_4_-2_-4_-1', 'n=4: pred=4 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-1_1_4_2', 'n=4: pred=1 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-1_5_0_-2', 'n=4: pred=5 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-1_1_4_2', 'n=4: pred=1 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-1_5_0_-2', 'n=4: pred=5 != obs=12').
