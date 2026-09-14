@@ -1,12 +1,12 @@
 {
   "ticks_this_run": 2,
-  "total_steps": 177,
+  "total_steps": 179,
   "backend": "swipl",
   "swipl": true,
-  "n_verified_facts": 425,
-  "n_rejected": 182,
+  "n_verified_facts": 428,
+  "n_rejected": 188,
   "n_lemmas": 14,
-  "n_distinct_types": 59,
+  "n_distinct_types": 60,
   "distinct_types": [
     "alg_linear_2x2",
     "alg_mat_assoc",
@@ -66,7 +66,8 @@
     "sym_compare_transfer",
     "sym_group_table",
     "sym_invariant_scan",
-    "transfer_recurrence"
+    "transfer_recurrence",
+    "unit_joint"
   ],
   "curves": [
     {
@@ -1838,6 +1839,26 @@
       "n_rejected": 182,
       "n_lemmas": 14,
       "tick": 177
+    },
+    {
+      "n_verified_facts": 427,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3046,
+      "n_rejected": 187,
+      "n_lemmas": 14,
+      "tick": 178
+    },
+    {
+      "n_verified_facts": 428,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3052,
+      "n_rejected": 188,
+      "n_lemmas": 14,
+      "tick": 179
     }
   ],
   "baselines": {
@@ -1998,91 +2019,84 @@
   },
   "step_log_tail": [
     {
-      "tick": 176,
-      "world": "algebra",
-      "family": "alg_mat_assoc",
-      "why": "UCB1 over 47 arms (world,family); picked algebra::alg_mat_assoc because avg=1.390+1.4*sqrt(ln(175+1)/1)=3.183\u21924.573. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 1,
+      "tick": 178,
+      "world": "electro",
+      "family": "electro_ohm",
+      "why": "UCB1 over 47 arms (world,family); picked electro::electro_ohm because avg=1.340+1.4*sqrt(ln(177+1)/1)=3.187\u21924.527. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
       "outcomes": [
-        "new_true"
+        "new_true",
+        "new_reject"
       ],
       "score_detail": {
         "new_true": 1,
-        "new_reject": 0,
+        "new_reject": 1,
         "n_new_form_family": 0,
         "n_known_clone": 1,
         "n_transfer_new_world": 0,
         "n_carve_reject": 0,
         "n_offpath": 1,
         "form_families": [
-          "alg_mat_assoc"
+          "noise::electro::electro_ohm_V_eq_IR",
+          "noise::electro::electro_ohm_broken_add"
         ],
         "dead_ok": 0,
-        "cost": 0.15,
-        "score": -0.13,
+        "cost": 0.18,
+        "score": -0.16,
         "reward_raw": 0.02
-      },
-      "growth": "extrapolate mod/order 5\u21927",
-      "unlock": null,
-      "accepted": [
-        "alg_mat2_assoc_mod5"
-      ],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 177,
-      "world": "chem",
-      "family": "chem_atom_balance",
-      "why": "UCB1 over 47 arms (world,family); picked chem::chem_atom_balance because avg=2.300+1.4*sqrt(ln(176+1)/2)=2.252\u21924.552. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 6,
-      "outcomes": [
-        "duplicate_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_reject"
-      ],
-      "score_detail": {
-        "new_true": 4,
-        "new_reject": 1,
-        "n_new_form_family": 0,
-        "n_known_clone": 4,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 1,
-        "n_offpath": 0,
-        "form_families": [
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0"
-        ],
-        "dead_ok": 0,
-        "cost": 0.38,
-        "score": 1.32,
-        "reward_raw": 1.7
       },
       "growth": "extrapolate 4\u21925",
       "unlock": null,
       "accepted": [
-        "chem_atom_balance_synth_s6884",
-        "chem_atom_balance_synth_s6885",
-        "chem_atom_balance_synth_s6886",
-        "chem_atom_balance_synth_s6887"
+        "electro_ohm_V_eq_IR_n4_s5243"
       ],
       "rejected": [
-        "chem_unbalanced_broken_s6884"
+        "electro_ohm_broken_add_s5243"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 179,
+      "world": "astro",
+      "family": "astro_kepler_scan",
+      "why": "UCB1 over 47 arms (world,family); picked astro::astro_kepler_scan because avg=1.340+1.4*sqrt(ln(178+1)/1)=3.189\u21924.529. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 1,
+        "form_families": [
+          "kepler_power",
+          "kepler_power"
+        ],
+        "dead_ok": 0,
+        "cost": 0.18,
+        "score": -0.16,
+        "reward_raw": 0.02
+      },
+      "growth": "extrapolate n_bodies 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "astro_kepler3_const_n4"
+      ],
+      "rejected": [
+        "astro_kepler_wrong_exp_n4"
       ],
       "transfer": []
     }
   ],
-  "elapsed_s": 0.123,
+  "elapsed_s": 0.12,
   "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
   "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
   "transfer_accuracy": 0.5714,
   "lemma_reuse_rate": 0.7857,
-  "reject_rate": 0.2998
+  "reject_rate": 0.3052
 }
