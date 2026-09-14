@@ -4,7 +4,12 @@
       propagate/5,
       extract_trajectory/5,
       answer_query/4,
-      field_to_string/2
+      field_to_string/2,
+      resolve_sentences/3,
+      resolve_sentence_pronouns/3,
+      tokens_to_string/2,
+      extract_referents/3,
+      resolve_query_pronouns/4
     ]).
 
 :- use_module(library(lists)).
@@ -43,6 +48,7 @@ dedup_main_edges(Edges, Tokens, Cleaned) :-
     ), BiPairs),
     ( BiPairs = [_|_] ->
         % Break cycles using article-based language detection
+        % (per-sentence tokens: single noun per sentence is correct)
         ( Tokens \= [], detect_noun_from_article(Tokens, MainTargets, Noun) ->
             findall(E, (
                 member(E, Edges),
@@ -280,14 +286,29 @@ propagate(Graph, Field0, QueryType, Hops, FinalField) :-
     propagate(Graph, Field1, QueryType, Hops1, FinalField).
 
 propagate_one(graph(_Nodes, Edges), QueryType, Field0, Field1) :-
+    % Direct edges: Source has energy -> Target gets energy
     findall(energy(Target, NewE), (
-        member(edge(Source, _Rel, Target, Type), Edges),
+        member(edge(Source, _R1, Target, Type), Edges),
         member(energy(Source, E0), Field0),
         E0 > 0.01,
         propagation_weight(QueryType, Type, W),
         decay_factor(D),
         NewE is E0 * W * D
-    ), Contributions),
+    ), DirectContribs),
+    % Compound-source edges (temporal/indirect): e.g. edge(comprar(mary,house), tiempo, yesterday, temporal)
+    % Energy flows from compound parts (mary, house) to Target (yesterday)
+    findall(energy(Target, NewE), (
+        member(edge(Source, _R2, Target, Type), Edges),
+        compound(Source),
+        Source =.. [_|Args],
+        member(Arg, Args), atom(Arg),
+        member(energy(Arg, E0), Field0),
+        E0 > 0.01,
+        propagation_weight(QueryType, Type, W),
+        decay_factor(D),
+        NewE is E0 * W * D
+    ), CompoundContribs),
+    append(DirectContribs, CompoundContribs, Contributions),
     merge_energy(Contributions, Field0, Field1).
 
 decay_factor(0.85).
@@ -319,13 +340,31 @@ merge_energy([energy(N, E)|Rest], Field0, FieldFinal) :-
 % WHAT -> main-edge target, WHO -> main-edge source.
 
 extract_trajectory(graph(_Nodes, Edges), Field, QueryType, QueryTokens, trajectory(Path, TotalEnergy)) :-
-    find_subject(Field, Edges, QueryType, Subject),
+    find_subject(Field, Edges, QueryType, QueryTokens, Subject),
     find_destination(Edges, Field, QueryType, Subject, QueryTokens, Destination),
     find_path(Subject, Destination, Edges, Field, Path),
     path_energy(Path, Field, TotalEnergy).
 
+% Query tense from auxiliaries (function words only, no content hardcoding)
+% past: did/was/were | present: does/do/is/are
+query_tense(QueryTokens, past) :-
+    ( member(did, QueryTokens) ; member(was, QueryTokens) ; member(were, QueryTokens) ), !.
+query_tense(QueryTokens, present) :-
+    ( member(does, QueryTokens) ; member(do, QueryTokens) ;
+      member(is, QueryTokens) ; member(are, QueryTokens) ), !.
+query_tense(_, unknown).
+
+% Does a main target have a temporal edge? (direct or via compound containing it)
+has_temporal(Target, Edges) :-
+    member(edge(Target, _, _, temporal), Edges), !.
+has_temporal(Target, Edges) :-
+    member(edge(Source, _, _, temporal), Edges),
+    compound(Source), Source =.. [_|Args], member(Target, Args), !.
+
 % Find the query subject
-find_subject(Field, Edges, QueryType, Subject) :-
+% Note: QueryTokens reserved for future tense-aware subject selection;
+% currently WHAT uses agent + tense-aware object selection in find_best_object/5
+find_subject(Field, Edges, QueryType, _QueryTokens, Subject) :-
     % For WHO: look for source of main edges (the agent)
     ( QueryType = who ->
         findall(N, (
@@ -334,15 +373,10 @@ find_subject(Field, Edges, QueryType, Subject) :-
         ), Agents),
         Agents = [Subject|_]
     ;
-    % For WHAT: look for object of main edges
+    % For WHAT: return the agent (source), let find_best_object pick tense-appropriate target
+    % This avoids prematurely picking first object when multiple exist (house vs car)
     ( QueryType = what ->
-        findall(T, (
-            member(edge(_, _, T, main), Edges),
-            member(energy(T, E), Field), E > 0.3, atom(T), \+ compound(T)
-        ), Objects),
-        ( Objects = [Subject|_] -> true ;
-            find_main_agent(Field, Edges, Subject)
-        )
+        find_main_agent(Field, Edges, Subject)
     ;
     % For WHERE/WHEN/COLOR: look for subject connected to the answer type
     find_main_agent(Field, Edges, Subject)
@@ -373,7 +407,7 @@ find_destination(Edges, Field, QueryType, Subject, QueryTokens, Destination) :-
     ; QueryType = color_query ->
         find_best_attribute(Subject, Edges, Field, Destination)
     ; QueryType = what ->
-        find_best_object(Subject, Edges, Field, Destination)
+        find_best_object(Subject, Edges, Field, QueryTokens, Destination)
     ; QueryType = who ->
         Destination = Subject
     ;
@@ -415,7 +449,13 @@ find_best_location(Subject, Edges, Field, QueryTokens, Dest) :-
     ).
 
 find_best_temporal(Subject, Edges, Field, Dest) :-
+    % Direct temporal edge from Subject
     ( member(edge(Subject, _, D, temporal), Edges), member(energy(D, E), Field), E > 0.3 ->
+        Dest = D
+    % Compound-source temporal: edge(comprar(Subject,Obj), tiempo, D, temporal)
+    ; member(edge(Source, _, D, temporal), Edges), compound(Source),
+      Source =.. [_|Args], member(Subject, Args),
+      member(energy(D, E), Field), E > 0.3 ->
         Dest = D
     ;
         findall(D, (
@@ -444,27 +484,39 @@ find_best_attribute(Subject, Edges, Field, Dest) :-
         )
     ).
 
-find_best_object(Subject, Edges, Field, Dest) :-
+% Target has an attribute descriptor (e.g. house->blue): it's a noun object, not a bare place
+has_attribute(Target, Edges) :-
+    member(edge(Target, _, _, attribute), Edges), !.
+
+find_best_object(Subject, Edges, Field, QueryTokens, Dest) :-
     findall(D, (
         member(edge(Subject, _, D, main), Edges),
         atom(D), \+ compound(D)
     ), AllTargets0),
     sort(AllTargets0, AllTargets),
-    % Prefer: node that is TARGET of attribute from another target (it's the noun)
-    % Exclude: node that is SOURCE of attribute to another target (it's the adjective)
-    ( AllTargets = [D|_] ->
-        ( member(Other, AllTargets), Other \= D,
-          member(edge(Other, _, D, attribute), Edges) ->
-            Dest = D
-        ;
-            member(energy(D, E), Field), E > 0.3, Dest = D
+    query_tense(QueryTokens, Tense),
+    ( AllTargets = [Single] ->
+        Dest = Single
+    ; AllTargets = [_|_] ->
+        % Multiple candidates: tense + temporal first, then noun-with-attribute, then energy
+        % past (did/was) -> prefers target WITH temporal (bought yesterday)
+        % present (does/is) -> prefers target WITHOUT temporal (has now)
+        ( Tense = past, member(Cand, AllTargets), has_temporal(Cand, Edges),
+          member(energy(Cand, E), Field), E > 0.2 -> Dest = Cand
+        ; Tense = present, member(Cand, AllTargets), \+ has_temporal(Cand, Edges),
+          has_attribute(Cand, Edges),
+          member(energy(Cand, E), Field), E > 0.2 -> Dest = Cand
+        ; Tense = present, member(Cand, AllTargets), \+ has_temporal(Cand, Edges),
+          member(energy(Cand, E), Field), E > 0.2 -> Dest = Cand
+        % Fallback: prefer noun objects (with attributes) over bare places (berlin/paris)
+        ; member(Cand, AllTargets), has_attribute(Cand, Edges),
+          member(energy(Cand, E), Field), E > 0.2 -> Dest = Cand
+        ; member(Cand, AllTargets), member(energy(Cand, E), Field), E > 0.3 -> Dest = Cand
+        ; AllTargets = [Dest|_]
         )
     ;
-        findall(D-E, (
-            member(edge(Subject, _, D, main), Edges),
-            member(energy(D, E), Field), E > 0.3, atom(D), \+ compound(D)
-        ), Objects),
-        ( Objects = [D-_|_] -> Dest = D ; Dest = Subject )
+        % No direct main targets (Subject is already the object): return Subject
+        Dest = Subject
     ).
 
 % Find shortest path between two nodes (wrapper)
@@ -482,12 +534,17 @@ bfs(QUEUE, Goal, _Edges, _Field, _MaxLen, Path) :-
     QUEUE = [Path|_],
     Path = [Goal|_], !.
 % Expand first path in queue
+% Traversal includes: direct edges (Current->Next) AND compound-source edges
+% (e.g. edge(comprar(mary,house), tiempo, yesterday) traversable from mary or house)
 bfs(QUEUE, Goal, Edges, Field, MaxLen, Result) :-
     QUEUE = [Path|Rest],
     Path = [Current|_],
     length(Path, Len), Len < MaxLen,
     findall([Next|Path], (
-        member(edge(Current, _, Next, _), Edges),
+        ( member(edge(Current, _, Next, _), Edges)
+        ; member(edge(Source, _, Next, _), Edges), compound(Source),
+          Source =.. [_|Args], member(Current, Args)
+        ),
         member(energy(Next, E), Field), E > 0.01,
         \+ member(Next, Path)
     ), NewPaths),
@@ -510,22 +567,29 @@ path_energy(Path, Field, Total) :-
 answer_query(Text, QueryText, Result, Details) :-
     % Split multi-sentence text and merge relations
     split_string(Text, ".", "", Parts),
-    maplist(parse_part, Parts, AllRelations),
+    % Parse sentences with coreference resolution
+    resolve_sentences(Parts, AllRelations),
     flatten(AllRelations, Relations),
-    % Collect tokens from first sentence for article detection
-    Parts = [FirstPart|_],
-    ( parse_part_tokens(FirstPart, FirstTokens) ->
-        SentenceTokens = FirstTokens
-    ;
-        SentenceTokens = []
-    ),
+    % Collect tokens from ALL sentences for article detection in dedup
+    findall(Tokens, (
+        member(Part, Parts),
+        string_to_atom(Part, Atom),
+        atom_string(Atom, Str),
+        string_length(Str, Len), Len > 1,
+        parser_v2:normalize_text(Str, Tokens)
+    ), TokenLists),
+    flatten(TokenLists, AllTokens),
     ( Relations = [] ->
         Result = unknown,
         Details = details(query_type=unknown, field=[], trajectory=[], energy=0)
     ;
         maplist(rel_to_compact, Relations, CompactRels),
-        build_graph(CompactRels, SentenceTokens, Graph),
-        parser_v2:normalize_text(QueryText, QueryTokens),
+        build_graph(CompactRels, AllTokens, Graph),
+        % Extract referents from text for query resolution
+        extract_referents(Relations, Subject, Object),
+        % Resolve pronouns in query
+        parser_v2:normalize_text(QueryText, QueryTokens0),
+        resolve_query_pronouns(QueryTokens0, Subject, Object, QueryTokens),
         parser_v2:query_type(QueryType, QueryTokens),
         init_energy(Graph, QueryType, QueryTokens, Field0),
         propagate(Graph, Field0, QueryType, 3, FieldFinal),
@@ -540,6 +604,85 @@ answer_query(Text, QueryText, Result, Details) :-
             Details = details(query_type=QueryType, field=FieldFinal, trajectory=Path, energy=Energy)
         )
     ).
+
+% ════════════════════════════════════════════════════════════════════
+%  COREFERENCE RESOLUTION
+% ════════════════════════════════════════════════════════════════════
+
+% Parse sentences with coreference: first sentence establishes referents
+resolve_sentences([], _, []).
+resolve_sentences([Part|Rest], PrevSubject, [Rels|RelsRest]) :-
+    string_to_atom(Part, Atom),
+    atom_string(Atom, Str),
+    string_length(Str, Len),
+    Len > 1,
+    !,
+    parser_v2:normalize_text(Str, Tokens0),
+    resolve_sentence_pronouns(Tokens0, PrevSubject, Tokens),
+    tokens_to_string(Tokens, ResolvedStr),
+    parser_v2:parse_sentence(ResolvedStr, Rels),
+    ( member(relation(main, _, [Subj, _]), Rels) ->
+        NewSubject = Subj
+    ; NewSubject = PrevSubject
+    ),
+    resolve_sentences(Rest, NewSubject, RelsRest).
+resolve_sentences([_|Rest], PrevSubject, RelsRest) :-
+    resolve_sentences(Rest, PrevSubject, RelsRest).
+
+resolve_sentences([], []).
+resolve_sentences([Part|Rest], [Rels|RelsRest]) :-
+    resolve_sentences([Part|Rest], unknown, [Rels|RelsRest]).
+
+% Per-sentence dedup: handle bidirectional attribute edges
+dedup_per_sentence(Relations, Tokens, Cleaned) :-
+    extract_nodes_edges(Relations, _, Edges0),
+    sort(Edges0, Edges),
+    dedup_main_edges(Edges, Tokens, CleanedEdges),
+    maplist(edge_to_rel, CleanedEdges, CleanedRels),
+    sort(CleanedRels, Cleaned).
+
+edge_to_rel(edge(A, Pred, B, Type), relation(Type, Pred, [A,B])).
+
+% Convert list of atoms to space-separated string
+tokens_to_string(Tokens, Str) :-
+    atomic_list_concat(Tokens, ' ', Atom),
+    atom_string(Atom, Str).
+
+% Resolve pronouns in sentence tokens
+resolve_sentence_pronouns([], _, []).
+resolve_sentence_pronouns([she|T], Subject, [Subject|TResolved]) :-
+    Subject \== unknown, !,
+    resolve_sentence_pronouns(T, Subject, TResolved).
+resolve_sentence_pronouns([he|T], Subject, [Subject|TResolved]) :-
+    Subject \== unknown, !,
+    resolve_sentence_pronouns(T, Subject, TResolved).
+resolve_sentence_pronouns([it|T], Subject, [Subject|TResolved]) :-
+    Subject \== unknown, !,
+    resolve_sentence_pronouns(T, Subject, TResolved).
+resolve_sentence_pronouns([H|T], Subject, [H|TResolved]) :-
+    resolve_sentence_pronouns(T, Subject, TResolved).
+
+% Extract referents from relations: first main edge subject and object
+extract_referents(Relations, Subject, Object) :-
+    % Find first main edge (may be relation/3 or rel/3)
+    ( member(relation(main, _, [Subject, Object]), Relations) -> true
+    ; member(rel(main, _, [Subject, Object]), Relations) -> true
+    ), !.
+extract_referents(_, unknown, unknown).
+
+% Resolve pronouns in query tokens using referents from text
+resolve_query_pronouns([], _, _, []).
+resolve_query_pronouns([she|T], Subject, Object, [Subject|TResolved]) :-
+    Subject \== unknown, !,
+    resolve_query_pronouns(T, Subject, Object, TResolved).
+resolve_query_pronouns([he|T], Subject, Object, [Subject|TResolved]) :-
+    Subject \== unknown, !,
+    resolve_query_pronouns(T, Subject, Object, TResolved).
+resolve_query_pronouns([it|T], Subject, Object, [Object|TResolved]) :-
+    Object \== unknown, !,
+    resolve_query_pronouns(T, Subject, Object, TResolved).
+resolve_query_pronouns([H|T], Subject, Object, [H|TResolved]) :-
+    resolve_query_pronouns(T, Subject, Object, TResolved).
 
 parse_part(Part, Relations) :-
     string_to_atom(Part, Atom),

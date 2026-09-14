@@ -1,7 +1,7 @@
 :- module(parser_v2,
     [ parse_sentence/2,
       parse_and_attend/4,
-      attention/4,
+      attention/3,
       top_k/3,
       normalize_text/2,
       sentence_relations/2,
@@ -11,7 +11,9 @@
       head_weight/2,
       score_relation/3,
       compatibility/3,
-      query_bonus/3
+      query_bonus/3,
+      article/1,
+      content_word/1
     ]).
 
 :- use_module(library(lists)).
@@ -26,9 +28,14 @@ known_symbol(libro).  known_symbol(empresa).
 known_symbol(manzana). known_symbol(bicicleta).
 known_symbol(madrid).  known_symbol(barcelona).
 known_symbol(malaga).  known_symbol(marbella).
+known_symbol(john).   known_symbol(mary).
+known_symbol(peter).  known_symbol(anne).
+known_symbol(london). known_symbol(paris).
 
 known_relation(juan, vive_en, madrid).
 known_relation(maria, vive_en, barcelona).
+known_relation(john, lives_in, london).
+known_relation(mary, lives_in, paris).
 
 
 % ════════════════════════════════════════════════════════════════════
@@ -59,54 +66,63 @@ normalize_atom(Atom, Normalized) :-
 
 
 % ════════════════════════════════════════════════════════════════════
-%  LEXICONS
+%  FUNCTION WORDS — bilingual (the ONLY hardcoded set)
 % ════════════════════════════════════════════════════════════════════
-
-subject(juan).   subject(maria).   subject(pedro).  subject(ana).
-
-object(coche).   object(casa).     object(libro).   object(empresa).
-object(manzana). object(bicicleta).
 
 article(el). article(la). article(un). article(una).
 article(los). article(las). article(unos). article(unas).
-
-verb_family(compro, comprar).   verb_family(compra, comprar).
-verb_family(compran, comprar).
-verb_family(vive, vivir).       verb_family(viven, vivir).
-verb_family(vivia, vivir).
-verb_family(tiene, tener).      verb_family(tienen, tener).
-verb_family(tenia, tener).
-verb_family(visitó, visitar).   verb_family(visitamos, visitar).
-verb_family(visito, visitar).
-verb_family(llevo, llevar).     verb_family(llevar, llevar).
-verb_family(lleva, llevar).
-verb_family(trabaja, trabajar).  verb_family(trabajan, trabajar).
-verb_family(trabajo, trabajar).
-verb_family(esta, estar).        verb_family(estado, estar).
-
-adjective_color(rojo).   adjective_color(roja).
-adjective_color(azul).   adjective_color(verde).
-adjective_color(blanco). adjective_color(blanca).
-adjective_color(negro).  adjective_color(negra).
-adjective_size(grande).  adjective_size(pequeno).
-adjective_size(largo).   adjective_size(larga).
-
-location(madrid).  location(barcelona). location(malaga).  location(marbella).
-
-temporal(ayer).  temporal(hoy).  temporal(manana).
-temporal(antes). temporal(despues). temporal(2025). temporal(2020).
-
-negation(no).
-
-conjunction(y). conjunction(pero).
-
-pronoun(lo). pronoun(la). pronoun(le). pronoun(se).
+article(a). article(an). article(the).
 
 preposition(para). preposition(desde). preposition(en). preposition(a).
+preposition(for). preposition(from). preposition(in). preposition(to).
+preposition(on). preposition(at). preposition(since).
+
+% Language-specific articles (subset of article/1 above, for pattern disambiguation)
+article_en(a). article_en(an). article_en(the).
+article_es(el). article_es(la). article_es(un). article_es(una).
+article_es(los). article_es(las). article_es(unos). article_es(unas).
+
+% Preposition roles (subsets of preposition/1, deduced from usage):
+% location: "en/in/on/at" (vive en, in madrid, in barcelona)
+% indirect: "para/for/to" (para Maria, for Mary)
+% temporal: "desde/from/since" (desde 2020, since 2020)
+location_prep(en). location_prep(in). location_prep(on). location_prep(at).
+indirect_prep(para). indirect_prep(for). indirect_prep(to).
+temporal_prep(desde). temporal_prep(from). temporal_prep(since).
+
+conjunction(y). conjunction(pero).
+conjunction(and). conjunction(but).
+
+pronoun(lo). pronoun(la). pronoun(le). pronoun(se).
+pronoun(it). pronoun(him). pronoun(her).
+pronoun(she). pronoun(he). pronoun(they). pronoun(himself). pronoun(herself).
+
+negation(no). negation(not).
+
+auxiliary(does). auxiliary(do). auxiliary(did).
+auxiliary(is). auxiliary(are). auxiliary(was). auxiliary(were).
+
+
+% ════════════════════════════════════════════════════════════════════
+%  DEDUCTION — classify by POSITION, not by hardcoded word lists
+% ════════════════════════════════════════════════════════════════════
+
+% ── Content word: anything not a function word ─────────────────────
+content_word(X) :- atom(X),
+    \+ article(X), \+ preposition(X), \+ conjunction(X),
+    \+ pronoun(X), \+ negation(X), \+ auxiliary(X).
+
+% ── Location: after a preposition (deduced from context) ───────────
+% The pattern itself tells us: if a token follows a preposition, it's a location.
+% We check this by looking at the token's position relative to prepositions.
+
+% ── Temporal: numbers OR last token before end of sentence ─────────
+% Numbers are always temporal. Other temporal words are deduced by position.
 
 
 % ════════════════════════════════════════════════════════════════════
 %  PARSER — pattern matching → relation(Type, Predicate, Args)
+%  Word types are DEDUCED from position in the pattern, not from lexicons
 % ════════════════════════════════════════════════════════════════════
 
 sentence_relations(Tokens, Relations) :-
@@ -138,151 +154,243 @@ all_clause_relations(Tokens, Relations) :-
     findall(R, pattern(Tokens, R), Relations), !.
 
 pattern(Tokens, Relation) :- p1(Tokens, Relation).
+pattern(Tokens, Relation) :- p1e(Tokens, Relation).
 pattern(Tokens, Relation) :- p2(Tokens, Relation).
 pattern(Tokens, Relation) :- p3(Tokens, Relation).
+pattern(Tokens, Relation) :- p3e(Tokens, Relation).
 pattern(Tokens, Relation) :- p4(Tokens, Relation).
+pattern(Tokens, Relation) :- p4e(Tokens, Relation).
 pattern(Tokens, Relation) :- p5(Tokens, Relation).
 pattern(Tokens, Relation) :- p6(Tokens, Relation).
 pattern(Tokens, Relation) :- p7(Tokens, Relation).
 pattern(Tokens, Relation) :- p8(Tokens, Relation).
 pattern(Tokens, Relation) :- p9(Tokens, Relation).
 pattern(Tokens, Relation) :- p10(Tokens, Relation).
+pattern(Tokens, Relation) :- p10e(Tokens, Relation).
 pattern(Tokens, Relation) :- p11(Tokens, Relation).
 pattern(Tokens, Relation) :- p12(Tokens, Relation).
 pattern(Tokens, Relation) :- p13(Tokens, Relation).
 pattern(Tokens, Relation) :- p14(Tokens, Relation).
 
 
-% ── P1: S V Art O Adj en Place Time ────────────────────────────────
-p1([S,V,Art,O,Adj,en,Place,Time], relation(main, comprar, [S,O])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), location(Place), temporal(Time).
-p1([S,V,Art,O,Adj,en,Place,Time], relation(attribute, color, [O,Adj])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), location(Place), temporal(Time).
-p1([S,V,Art,O,Adj,en,Place,Time], relation(location, ubicado_en, [O,Place])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), location(Place), temporal(Time).
-p1([S,V,Art,O,Adj,en,Place,Time], relation(temporal, tiempo, [comprar(S,O),Time])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), location(Place), temporal(Time).
+% ── P1: S V Art O Adj Prep Place Time (Spanish: art noun adj) ──────
+% Position AFTER article and BEFORE preposition = attribute (deduced)
+p1([S,V,Art,O,Adj,Prep,Place,Time], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1([S,V,Art,O,Adj,Prep,Place,Time], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1([S,V,Art,O,Adj,Prep,Place,Time], relation(location, ubicado_en, [O,Place])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1([S,V,Art,O,Adj,Prep,Place,Time], relation(temporal, tiempo, [comprar(S,O),Time])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
 
 
-% ── P2: S V en Place ───────────────────────────────────────────────
-p2([S,V,en,Place], relation(main, vivir, [S,Place])) :-
-    subject(S), verb_family(V,vivir), location(Place).
+% ── P1e: S V Art Adj O Prep Place Time (English: art adj noun) ─────
+p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(location, ubicado_en, [O,Place])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
+p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(temporal, tiempo, [comprar(S,O),Time])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), content_word(Time),
+    location_prep(Prep), Adj \== O.
 
 
-% ── P3: S V Art O Adj en Place ─────────────────────────────────────
-p3([S,V,Art,O,Adj,en,Place], relation(main, tener, [S,O])) :-
-    subject(S), verb_family(V,tener), article(Art), object(O),
-    adjective_size(Adj), location(Place).
-p3([S,V,Art,O,Adj,en,Place], relation(attribute, tamano, [O,Adj])) :-
-    subject(S), verb_family(V,tener), article(Art), object(O),
-    adjective_size(Adj), location(Place).
-p3([S,V,Art,O,Adj,en,Place], relation(location, ubicado_en, [O,Place])) :-
-    subject(S), verb_family(V,tener), article(Art), object(O),
-    adjective_size(Adj), location(Place).
+% ── P2: S V Prep Place ─────────────────────────────────────────────
+p2([S,V,Prep,Place], relation(main, vivir, [S,Place])) :-
+    content_word(S), content_word(V), content_word(Place),
+    preposition(Prep).
 
 
-% ── P4: S V Art O Adj para Person ──────────────────────────────────
-p4([S,V,Art,O,Adj,para,Person], relation(main, comprar, [S,O])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), subject(Person).
-p4([S,V,Art,O,Adj,para,Person], relation(attribute, color, [O,Adj])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), subject(Person).
-p4([S,V,Art,O,Adj,para,Person], relation(indirect, para, [comprar(S,O),Person])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O),
-    adjective_color(Adj), subject(Person).
+% ── P3: S V Art O Adj Prep Place (Spanish: art noun adj) ───────────
+p3([S,V,Art,O,Adj,Prep,Place], relation(main, tener, [S,O])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place),
+    location_prep(Prep), Adj \== O.
+p3([S,V,Art,O,Adj,Prep,Place], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place),
+    location_prep(Prep), Adj \== O.
+p3([S,V,Art,O,Adj,Prep,Place], relation(location, ubicado_en, [O,Place])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Place),
+    location_prep(Prep), Adj \== O.
+
+% ── P3e: S V Art Adj O Prep Place (English: art adj noun) ──────────
+p3e([S,V,Art,Adj,O,Prep,Place], relation(main, tener, [S,O])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), location_prep(Prep), Adj \== O.
+p3e([S,V,Art,Adj,O,Prep,Place], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), location_prep(Prep), Adj \== O.
+p3e([S,V,Art,Adj,O,Prep,Place], relation(location, ubicado_en, [O,Place])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Place), location_prep(Prep), Adj \== O.
 
 
-% ── P5: S no V en Place ────────────────────────────────────────────
-p5([S,no,V,en,Place], relation(negation, negado, [vivir(S,Place)])) :-
-    subject(S), negation(no), verb_family(V,vivir), location(Place).
+% ── P4: S V Art O Adj Prep Person (Spanish: art noun adj) ──────────
+p4([S,V,Art,O,Adj,Prep,Person], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Person),
+    indirect_prep(Prep), Adj \== O.
+p4([S,V,Art,O,Adj,Prep,Person], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Person),
+    indirect_prep(Prep), Adj \== O.
+p4([S,V,Art,O,Adj,Prep,Person], relation(indirect, para, [comprar(S,O),Person])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O),
+    content_word(Adj), content_word(Person),
+    indirect_prep(Prep), Adj \== O.
+
+% ── P4e: S V Art Adj O Prep Person (English: art adj noun) ─────────
+p4e([S,V,Art,Adj,O,Prep,Person], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Person), indirect_prep(Prep), Adj \== O.
+p4e([S,V,Art,Adj,O,Prep,Person], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Person), indirect_prep(Prep), Adj \== O.
+p4e([S,V,Art,Adj,O,Prep,Person], relation(indirect, para, [comprar(S,O),Person])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    content_word(Person), indirect_prep(Prep), Adj \== O.
 
 
-% ── P6: S V O en Time ──────────────────────────────────────────────
-p6([S,V,O,en,Time], relation(main, visitar, [S,O])) :-
-    subject(S), verb_family(V,visitar), temporal(Time),
-    ( object(O) ; location(O) ).
-p6([S,V,O,en,Time], relation(temporal, tiempo, [visitar(S,O),Time])) :-
-    subject(S), verb_family(V,visitar), temporal(Time),
-    ( object(O) ; location(O) ).
+% ── P5: S no/not V Prep Place ──────────────────────────────────────
+p5([S,Neg,V,Prep,Place], relation(negation, negado, [vivir(S,Place)])) :-
+    content_word(S), negation(Neg), content_word(V),
+    preposition(Prep), content_word(Place).
+
+% ── P5e: S aux not/no V Prep Place (English negation with auxiliary) ─
+p5([S,Aux,Neg,V,Prep,Place], relation(negation, negado, [vivir(S,Place)])) :-
+    content_word(S), auxiliary(Aux), negation(Neg), content_word(V),
+    preposition(Prep), content_word(Place).
 
 
-% ── P7: S V Art O y lo V a Place ────────────────────────────────────
-p7([S,V1,Art,O,Conj,Pron,V2,a,Place], relation(main, comprar, [S,O])) :-
-    subject(S), verb_family(V1,comprar), article(Art), object(O),
-    conjunction(Conj), pronoun(Pron), verb_family(V2,llevar), location(Place).
-p7([S,V1,Art,O,Conj,Pron,V2,a,Place], relation(main, llevar, [S,O])) :-
-    subject(S), verb_family(V1,comprar), article(Art), object(O),
-    conjunction(Conj), pronoun(Pron), verb_family(V2,llevar), location(Place).
-p7([S,V1,Art,O,Conj,Pron,V2,a,Place], relation(location, llevar_destino, [O,Place])) :-
-    subject(S), verb_family(V1,comprar), article(Art), object(O),
-    conjunction(Conj), pronoun(Pron), verb_family(V2,llevar), location(Place).
+% ── P6: S V O Prep Time ────────────────────────────────────────────
+p6([S,V,O,Prep,Time], relation(main, visitar, [S,O])) :-
+    content_word(S), content_word(V), content_word(O),
+    preposition(Prep), ( number(Time) ; content_word(Time) ).
+p6([S,V,O,Prep,Time], relation(temporal, tiempo, [visitar(S,O),Time])) :-
+    content_word(S), content_word(V), content_word(O),
+    preposition(Prep), ( number(Time) ; content_word(Time) ).
 
 
-% ── P8: S V Art O. Art O V en Place (coreference) ──────────────────
-p8([S,V1,Art,O,Art2,O2,V2,en,Place], relation(main, tener, [S,O])) :-
-    subject(S), verb_family(V1,tener), article(Art), object(O),
-    article(Art2), object(O2), O == O2, verb_family(V2,estar), location(Place).
-p8([S,V1,Art,O,Art2,O2,V2,en,Place], relation(location, ubicado_en, [O,Place])) :-
-    subject(S), verb_family(V1,tener), article(Art), object(O),
-    article(Art2), object(O2), O == O2, verb_family(V2,estar), location(Place).
+% ── P7: S V Art O Conj Pron V Prep Place ───────────────────────────
+p7([S,V1,Art,O,Conj,Pron,V2,Prep,Place], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V1), article(Art), content_word(O),
+    conjunction(Conj), pronoun(Pron), content_word(V2),
+    preposition(Prep), content_word(Place).
+p7([S,V1,Art,O,Conj,Pron,V2,Prep,Place], relation(main, llevar, [S,O])) :-
+    content_word(S), content_word(V1), article(Art), content_word(O),
+    conjunction(Conj), pronoun(Pron), content_word(V2),
+    preposition(Prep), content_word(Place).
+p7([S,V1,Art,O,Conj,Pron,V2,Prep,Place], relation(location, llevar_destino, [O,Place])) :-
+    content_word(S), content_word(V1), article(Art), content_word(O),
+    conjunction(Conj), pronoun(Pron), content_word(V2),
+    preposition(Prep), content_word(Place).
 
 
-% ── P9: S V en Place desde Time ────────────────────────────────────
-p9([S,V,en,Place,desde,Time], relation(main, trabajar, [S,Place])) :-
-    subject(S), verb_family(V,trabajar), location(Place), temporal(Time).
-p9([S,V,en,Place,desde,Time], relation(temporal, desde, [trabajar(S,Place),Time])) :-
-    subject(S), verb_family(V,trabajar), location(Place), temporal(Time).
+% ── P8: S V1 Art O Art2 O2 V2 Prep Place ───────────────────────────
+p8([S,V1,Art,O,Art2,O2,V2,Prep,Place], relation(main, tener, [S,O])) :-
+    content_word(S), content_word(V1), article(Art), content_word(O),
+    article(Art2), content_word(O2), O == O2, content_word(V2),
+    preposition(Prep), content_word(Place).
+p8([S,V1,Art,O,Art2,O2,V2,Prep,Place], relation(location, ubicado_en, [O,Place])) :-
+    content_word(S), content_word(V1), article(Art), content_word(O),
+    article(Art2), content_word(O2), O == O2, content_word(V2),
+    preposition(Prep), content_word(Place).
 
 
-% ── P10: S V Art O Adj (no location) ───────────────────────────────
+% ── P9: S V Prep Place Prep2 Time ──────────────────────────────────
+p9([S,V,Prep,Place,Prep2,Time], relation(main, trabajar, [S,Place])) :-
+    content_word(S), content_word(V), preposition(Prep), content_word(Place),
+    preposition(Prep2), ( number(Time) ; content_word(Time) ).
+p9([S,V,Prep,Place,Prep2,Time], relation(temporal, desde, [trabajar(S,Place),Time])) :-
+    content_word(S), content_word(V), preposition(Prep), content_word(Place),
+    preposition(Prep2), ( number(Time) ; content_word(Time) ).
+
+
+% ── P10: S V Art O Adj (no preposition, Spanish) ───────────────────
 p10([S,V,Art,O,Adj], relation(main, comprar, [S,O])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O), adjective_color(Adj).
-p10([S,V,Art,O,Adj], relation(attribute, color, [O,Adj])) :-
-    subject(S), verb_family(V,comprar), article(Art), object(O), adjective_color(Adj).
+    content_word(S), content_word(V), article_es(Art), content_word(O), content_word(Adj),
+    Adj \== O.
+p10([S,V,Art,O,Adj], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_es(Art), content_word(O), content_word(Adj),
+    Adj \== O.
+
+% ── P10e: S V Art Adj O (no preposition, English) ──────────────────
+p10e([S,V,Art,Adj,O], relation(main, comprar, [S,O])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    Adj \== O.
+p10e([S,V,Art,Adj,O], relation(attribute, attribute, [O,Adj])) :-
+    content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
+    Adj \== O.
 
 
 % ── P11: S V Art O (simple) ────────────────────────────────────────
 p11([S,V,Art,O], relation(main, tener, [S,O])) :-
-    subject(S), verb_family(V,tener), article(Art), object(O).
+    content_word(S), content_word(V), article(Art), content_word(O).
 
 
-% ── P12: S V O (no article, simple) ────────────────────────────────
+% ── P12: S V O (no article) ────────────────────────────────────────
 p12([S,V,O], relation(main, visitar, [S,O])) :-
-    subject(S), verb_family(V,visitar), object(O).
+    content_word(S), content_word(V), content_word(O).
 
 
-% ── P13: S V O a Place ─────────────────────────────────────────────
-p13([S,V,O,a,Place], relation(main, llevar, [S,O])) :-
-    subject(S), verb_family(V,llevar), object(O), location(Place).
-p13([S,V,O,a,Place], relation(location, llevar_destino, [O,Place])) :-
-    subject(S), verb_family(V,llevar), object(O), location(Place).
+% ── P13: S V O Prep Place ──────────────────────────────────────────
+p13([S,V,O,Prep,Place], relation(main, llevar, [S,O])) :-
+    content_word(S), content_word(V), content_word(O),
+    preposition(Prep), content_word(Place).
+p13([S,V,O,Prep,Place], relation(location, llevar_destino, [O,Place])) :-
+    content_word(S), content_word(V), content_word(O),
+    preposition(Prep), content_word(Place).
 
 
-% ── P14: S V en Place (estar, etc.) ────────────────────────────────
-p14([S,V,en,Place], relation(location, ubicado_en, [S,Place])) :-
-    object(S), verb_family(V,estar), location(Place).
+% ── P14: S V Prep Place ────────────────────────────────────────────
+p14([S,V,Prep,Place], relation(location, ubicado_en, [S,Place])) :-
+    content_word(S), content_word(V), preposition(Prep), content_word(Place).
 
 
 % ════════════════════════════════════════════════════════════════════
-%  QUERIES — tipos de pregunta
+%  QUERIES — bilingual, keyword-based (function words only)
 % ════════════════════════════════════════════════════════════════════
 
 :- discontiguous query_weight/3.
 :- discontiguous query_weight_extra/3.
 
-query_type(color_query, Tokens) :- ( member(color, Tokens) ; member(rojo, Tokens) ; member(roja, Tokens) ; member(azul, Tokens) ; member(negro, Tokens) ; member(negra, Tokens) ), !.
-query_type(size_query, Tokens) :- ( member(grande, Tokens) ; member(pequeno, Tokens) ; member(size, Tokens) ; member(tipo, Tokens) ), !.
-query_type(what,    Tokens) :- member(que, Tokens), !.
-query_type(where,   Tokens) :- ( member(donde, Tokens) ; member(ciudad, Tokens) ), !.
-query_type(when,    Tokens) :- ( member(cuando, Tokens) ; member(desde, Tokens) ; member(ano, Tokens) ), !.
+% Spanish: compound phrases first, then interrogatives, then descriptors
+query_type(color_query, Tokens) :- ( member(color, Tokens) ; member(tono, Tokens) ; member(tonos, Tokens) ), \+ ( member(quien, Tokens) ; member(donde, Tokens) ; member(cuando, Tokens) ; member(como, Tokens) ), !.
+query_type(size_query, Tokens) :- ( member(grande, Tokens) ; member(pequeno, Tokens) ; member(tipo, Tokens) ; member(amplia, Tokens) ; member(amplio, Tokens) ; member(dimensiones, Tokens) ; member(tamano, Tokens) ), \+ ( member(quien, Tokens) ; member(donde, Tokens) ; member(cuando, Tokens) ; member(que, Tokens) ; member(como, Tokens) ), !.
 query_type(who,     Tokens) :- ( member(quien, Tokens) ; member(para, Tokens) ), !.
-query_type(how,    Tokens) :- member(como, Tokens), !.
+query_type(what,    Tokens) :- member(que, Tokens), !.
+query_type(where,   Tokens) :- ( member(donde, Tokens) ; member(ciudad, Tokens) ; member(ubicacion, Tokens) ; member(sitio, Tokens) ; member(lugar, Tokens) ), !.
+query_type(when,    Tokens) :- ( member(cuando, Tokens) ; member(ano, Tokens) ; member(epoca, Tokens) ; member(momento, Tokens) ; member(fecha, Tokens) ), !.
 query_type(negation, Tokens) :- member(no, Tokens), !.
+query_type(how,    Tokens) :- member(como, Tokens), !.
+% English: compound phrases first, then interrogatives, then descriptors
+query_type(color_query, Tokens) :- ( member(red, Tokens) ; member(blue, Tokens) ; member(green, Tokens) ; member(black, Tokens) ; member(white, Tokens) ; member(yellow, Tokens) ; member(color, Tokens) ; member(shade, Tokens) ; member(tone, Tokens) ), \+ ( member(who, Tokens) ; member(whom, Tokens) ; member(where, Tokens) ; member(when, Tokens) ; member(how, Tokens) ), !.
+query_type(size_query, Tokens) :- ( member(big, Tokens) ; member(small, Tokens) ; member(large, Tokens) ; member(huge, Tokens) ; member(tiny, Tokens) ; member(dimensions, Tokens) ; member(spacious, Tokens) ), \+ ( member(who, Tokens) ; member(whom, Tokens) ; member(where, Tokens) ; member(when, Tokens) ; member(what, Tokens) ; member(how, Tokens) ), !.
+query_type(who,     Tokens) :- ( member(who, Tokens) ; member(whom, Tokens) ), !.
+query_type(what,    Tokens) :- member(what, Tokens), !.
+query_type(where,   Tokens) :- ( member(where, Tokens) ; member(location, Tokens) ; member(city, Tokens) ), !.
+query_type(when,    Tokens) :- ( member(when, Tokens) ; member(time, Tokens) ; member(year, Tokens) ; member(period, Tokens) ), !.
+query_type(negation, Tokens) :- member(not, Tokens), !.
+query_type(how,    Tokens) :- member(how, Tokens), !.
 query_type(unknown, _).
 
 
@@ -302,9 +410,6 @@ head_weight(novelty,   0.15).
 %  QUERY-DEPENDENT WEIGHTS
 % ════════════════════════════════════════════════════════════════════
 
-% query_weight(QueryType, Head, Weight) — override for specific queries
-% Default: use head_weight/2
-
 query_weight(what, relation,  0.35).
 query_weight(what, entity,    0.25).
 query_weight(what, position,  0.05).
@@ -318,7 +423,6 @@ query_weight(where, position,  0.05).
 query_weight(where, discourse, 0.10).
 query_weight(where, temporal,  0.10).
 query_weight(where, novelty,   0.10).
-% boost location
 query_weight_extra(where, location, 0.30).
 query_weight_extra(where, main, 0.10).
 
@@ -342,7 +446,6 @@ query_weight(negation, position,  0.10).
 query_weight(negation, discourse, 0.15).
 query_weight(negation, temporal,  0.10).
 query_weight(negation, novelty,   0.10).
-% negation gets a flat boost
 query_weight_extra(negation, negation, 0.30).
 
 query_weight(color_query, relation,  0.20).
@@ -394,8 +497,9 @@ score_relation(QueryType, Relation, scored(Relation, Score, Heads)) :-
     BaseScore is WR + WE + WP + WD + WT + WN,
     compatibility(QueryType, Typ,Compat),
     ( query_bonus(QueryType, Typ, Bonus) -> true ; Bonus = 0.0 ),
-    Score is BaseScore + Compat + Bonus,
-    Heads = heads(relation-R, entity-E, position-P, discourse-D, temporal-T, novelty-N, type-Typ, compat-Compat, bonus-Bonus).
+    conflict(QueryType, Typ, Conflict),
+    Score is BaseScore + Compat + Bonus - Conflict,
+    Heads = heads(relation-R, entity-E, position-P, discourse-D, temporal-T, novelty-N, type-Typ, compat-Compat, bonus-Bonus, conflict-Conflict).
 
 
 get_weight(QueryType, Head, Value, Weight) :-
@@ -403,10 +507,7 @@ get_weight(QueryType, Head, Value, Weight) :-
     Weight is Base * Value.
 
 
-% ── COMPATIBILITY: how well does this relation type match this query? ──
-
-% compatibility(QueryType, RelationType, Score)
-% Range: 0.0 (incompatible) → 2.0 (perfect match with strong boost)
+% ── COMPATIBILITY ──────────────────────────────────────────────────
 
 compatibility(where,     location,    2.0).
 compatibility(where,     main,        0.6).
@@ -422,8 +523,8 @@ compatibility(when,      attribute,   0.2).
 compatibility(when,      negation,    0.3).
 compatibility(when,      indirect,    0.2).
 
-compatibility(what,      main,        1.5).
-compatibility(what,      attribute,   0.8).
+compatibility(what,      main,        1.0).
+compatibility(what,      attribute,   0.9).
 compatibility(what,      location,    0.5).
 compatibility(what,      temporal,    0.4).
 compatibility(what,      indirect,    0.6).
@@ -460,34 +561,52 @@ compatibility(size_query, indirect,  0.1).
 compatibility(unknown,   main,        0.7).
 compatibility(unknown,   _,           0.5).
 
-compatibility(color_query, attribute, 1.0).
-compatibility(color_query, main,      0.4).
-compatibility(color_query, location,  0.2).
-compatibility(color_query, temporal,  0.1).
-compatibility(color_query, negation,  0.1).
-compatibility(color_query, indirect,  0.1).
 
-compatibility(size_query, attribute, 1.0).
-compatibility(size_query, main,      0.5).
-compatibility(size_query, location,  0.3).
-compatibility(size_query, temporal,  0.1).
-compatibility(size_query, negation,  0.1).
-compatibility(size_query, indirect,  0.1).
+% ── QUERY BONUS ────────────────────────────────────────────────────
 
-
-% ── QUERY BONUS: explicit boost for specific combinations ───────────
-
-% query_bonus(QueryType, RelationType, Bonus)
-% Used for edge cases where compatibility alone isn't enough
-
-% "para quien" → indirect gets a strong boost
 query_bonus(who, indirect, 0.25).
-
-% "donde" + negation → still relevant but shouldn't beat location
 query_bonus(where, negation, -0.10).
-
-% "cuando" + main verb → temporal context boost
 query_bonus(when, main, 0.10).
+
+
+% ── CONFLICT ───────────────────────────────────────────────────────
+
+conflict(where,     main,        0.5).
+conflict(where,     attribute,   0.3).
+conflict(where,     temporal,    0.2).
+conflict(where,     indirect,    0.2).
+
+conflict(when,      main,        0.5).
+conflict(when,      location,    0.3).
+conflict(when,      attribute,   0.2).
+conflict(when,      indirect,    0.2).
+
+conflict(what,      main,        0.3).
+conflict(what,      location,    0.2).
+conflict(what,      temporal,    0.2).
+conflict(what,      indirect,    0.2).
+
+conflict(who,       attribute,   0.3).
+conflict(who,       location,    0.2).
+conflict(who,       temporal,    0.2).
+
+conflict(negation,  attribute,   0.3).
+conflict(negation,  indirect,    0.2).
+conflict(negation,  temporal,    0.2).
+
+conflict(color_query, main,      0.6).
+conflict(color_query, location,  0.3).
+conflict(color_query, temporal,  0.2).
+conflict(color_query, negation,  0.2).
+conflict(color_query, indirect,  0.2).
+
+conflict(size_query,  main,      0.5).
+conflict(size_query,  location,  0.3).
+conflict(size_query,  temporal,  0.2).
+conflict(size_query,  negation,  0.2).
+conflict(size_query,  indirect,  0.2).
+
+conflict(_,          _,          0.0).
 
 
 % ── HEAD 0: TYPE ──────────────────────────────────────────────────
