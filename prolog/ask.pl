@@ -110,8 +110,13 @@ bb_rel_forms_direct(V, Rs) :-
     bb_ddouble(St0, St),
     findall(R, (memory_relation(_, R, _, _, _),
                 ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RSt),
-                            RSt == St, R \== V) )), R0),
+                            stem_match(St, RSt), R \== V) )), R0),
     sort(R0, Rs).
+
+stem_match(A, B) :-
+    A == B
+ ;  atom_concat(A, 'e', B)
+ ;  atom_concat(B, 'e', A).
 
 bb_ddouble(W, D) :-
     sub_atom(W, _, 1, 0, C),

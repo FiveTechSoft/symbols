@@ -1945,12 +1945,32 @@ chat_form([who, V], say, no) :-
 % who V? verb unknown: "No one" (honest).
 chat_form([who, V], say, no_one) :-
     \+ (bb_rel_forms(V, Rs), Rs \== []).
-% who V E? but no one V's E: honest "no" (prevents graph fallback to outgoing).
+% who V E? verb known but no one V's E: honest "no".
 chat_form([who, V|Rest], say, no) :-
     qnorm(Rest, O),
     O \== [],
-    \+ (bb_rel_forms(V, Rs), member(Vr, Rs),
+    bb_rel_forms(V, Rs),
+    Rs \== [],
+    \+ (member(Vr, Rs),
         ( memory_relation(_, Vr, O, _, _) ; memory_relation(O, Vr, _, _, _))).
+% who V E? verb unknown: infer relation from entity context.
+% When bb_rel_forms fails, look at what relations touch the entity
+% and return all of them — the system deduces, not hardcodes.
+chat_form([who, V|Rest], say, answer(Xs, Facts)) :-
+    qnorm(Rest, O),
+    O \== [],
+    \+ (bb_rel_forms(V, Rs), Rs \== []),
+    findall(R, (memory_relation(O, R, _, _, _) ; memory_relation(_, R, O, _, _)), R0),
+    sort(R0, Rs),
+    Rs \== [],
+    findall(X-(X, Vr, O), (member(Vr, Rs), memory_relation(X, Vr, O, _, _)), SF0),
+    findall(X-(O, Vr, X), (member(Vr, Rs), memory_relation(O, Vr, X, _, _)), SF1),
+    append(SF0, SF1, SF2),
+    sort(SF2, SF),
+    SF \== [],
+    findall(S, member(S-_, SF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, SF), Facts).
 chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     append(Pre, [V], Mid),
     Pre \== [],
