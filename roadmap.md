@@ -818,3 +818,13 @@ failures remaining (2026-09-14):
   routes. MiMo as teacher, not data source. Paper thesis: "Can
   functional principles of modern LLMs transfer from neural to symbolic
   computation?"
+- 2026-09-14: **symbolic attention v3** — three fixes from code review:
+  (1) Temperature now uses softmax normalization (exp(score/T)/Σexp),
+  not simple division. T<1 concentrates, T>1 spreads, order CAN change.
+  (2) Relations are now question-conditioned: verb match (+0.3),
+  object overlap (+0.2), subject match (+0.1) added to base weight.
+  (3) Top-K re-sorted before take to guarantee K highest scores.
+  Benchmark: 27/30 (90%) for all three configs (baseline, T=1, T=0.3).
+  Attention examines avg 0.9 relations per question vs 0 for baseline.
+  Same accuracy, narrower search space. Failure cases: "ate" stemmer
+  (mushroom not in KB), multi-word entity "alice_in_wonderland".
