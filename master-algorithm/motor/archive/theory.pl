@@ -1527,3 +1527,129 @@ rejected('electro_ohm_broken_add_s5243', 'V≠I+R (as required)').
 verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n4', 'T^2/a^3 constant within eps on circular table')).
 % finite fail / dead-end
 rejected('astro_kepler_wrong_exp_n4', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').
+% verified @ loop/loop_pred_scan
+verified(fact(loop, loop_pred_scan, 'loop_pred_dx_eq_action_s8984', 'next_x = x + a (Δ(position)=action) on held-out starts')).
+% finite fail / dead-end
+rejected('loop_pred_ignore_action_s8984', 'finite fail: x0=-6.0 a=1.0 pred=-6.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_double_action_s8984', 'finite fail: x0=-6.0 pred=-4.0 obs=-5.0').
+% finite fail / dead-end
+rejected('loop_pred_overfit_one_x0_s8984', 'fails new x0: new_x0=-6.0 pred=3.0 obs=-5.0').
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s5307', 'sum I_k = 0 at 3-edge node')).
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s5308', 'sum I_k = 0 at 3-edge node')).
+% verified @ electro/electro_kirchhoff
+verified(fact(electro, electro_kirchhoff, 'electro_KCL_node_s5309', 'sum I_k = 0 at 3-edge node')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_parity_mod2_sum_o4', 'sum(bits) mod 2 invariant under permute')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_involution_double_o4', 'f(f(x))=x for swap/negate')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_z2_assoc_o4', 'Z2 addition associative on full table')).
+% verified @ symmetry/sym_invariant_scan
+verified(fact(symmetry, sym_invariant_scan, 'sym_parity_mod2_sum_n_o4', 'parity conserved on 4-bit strings')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_fib_N6', 'Delta(fib)[n] = fib[n+1]-fib[n] well-defined')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_lucas_N6', 'Delta(lucas)[n] = lucas[n+1]-lucas[n] well-defined')).
+% verified @ calculus/calc_fwd_diff
+verified(fact(calculus, calc_fwd_diff, 'calc_delta_fib_eq_prev_N6', 'Delta(fib)[n] = fib[n-1] for n>=1')).
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N6', 'Delta(sum x^0) = x^0 on prefix')).
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x1_N6', 'Delta(sum x^1) = x^1 on prefix')).
+% verified @ calculus/calc_ft_discrete
+verified(fact(calculus, calc_ft_discrete, 'calc_ft_x2_N6', 'Delta(sum x^2) = x^2 on prefix')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s6714', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s6715', 'F_12 + F_21 = 0')).
+% verified @ physics/phys_action_reaction
+verified(fact(physics, phys_action_reaction, 'phys_action_reaction_s6716', 'F_12 + F_21 = 0')).
+% finite fail / dead-end
+rejected('phys_action_same_sign_broken_s6714', 'F12=1.4231307597366212 F21=1.4231307597366212 not opposite').
+% hypothesis-language skin gen=10
+schema(taxis_conserv, unlocked(true)).
+% learned recurrence on fib
+rec(fib, [-1,4,1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_4_1_-1', 'fib(n) = (-1)*fib(n-1) + (4)*fib(n-2) + (1)*fib(n-3) + (-1)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [0,4,-1,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_0_4_-1_-2', 'fib(n) = (0)*fib(n-1) + (4)*fib(n-2) + (-1)*fib(n-3) + (-2)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-1,4,1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_4_1_-1', 'lucas(n) = (-1)*lucas(n-1) + (4)*lucas(n-2) + (1)*lucas(n-3) + (-1)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [0,4,-1,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_0_4_-1_-2', 'lucas(n) = (0)*lucas(n-1) + (4)*lucas(n-2) + (-1)*lucas(n-3) + (-2)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [4,-3,-2,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_4_-3_-2_0', 'pell(n) = (4)*pell(n-1) + (-3)*pell(n-2) + (-2)*pell(n-3) + (0)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [1,5,-3,-2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_1_5_-3_-2', 'pell(n) = (1)*pell(n-1) + (5)*pell(n-2) + (-3)*pell(n-3) + (-2)*pell(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_4_1_-1', 'TRANSFER rec(lucas,[-1, 4, 1, -1]) ⇒ try on fib: (-1)*fib(n-1) + (4)*fib(n-2) + (1)*fib(n-3) + (-1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_0_4_-1_-2', 'TRANSFER rec(lucas,[0, 4, -1, -2]) ⇒ try on fib: (0)*fib(n-1) + (4)*fib(n-2) + (-1)*fib(n-3) + (-2)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_4_-3_-2_0', 'n=5: pred=4 != obs=5').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_5_-3_-2', 'n=4: pred=4 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_4_1_-1', 'TRANSFER rec(fib,[-1, 4, 1, -1]) ⇒ try on lucas: (-1)*lucas(n-1) + (4)*lucas(n-2) + (1)*lucas(n-3) + (-1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_4_-1_-2', 'TRANSFER rec(fib,[0, 4, -1, -2]) ⇒ try on lucas: (0)*lucas(n-1) + (4)*lucas(n-2) + (-1)*lucas(n-3) + (-2)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_4_-3_-2_0', 'n=4: pred=5 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_1_5_-3_-2', 'n=4: pred=12 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-1_4_1_-1', 'n=4: pred=4 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_0_4_-1_-2', 'n=4: pred=7 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-1_4_1_-1', 'n=4: pred=4 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_0_4_-1_-2', 'n=4: pred=7 != obs=12').
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6980', 'atom counts conserved: synth_s6980')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6981', 'atom counts conserved: synth_s6981')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6982', 'atom counts conserved: synth_s6982')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6983', 'atom counts conserved: synth_s6983')).
+% verified @ chem/chem_atom_balance
+verified(fact(chem, chem_atom_balance, 'chem_atom_balance_synth_s6984', 'atom counts conserved: synth_s6984')).
+% finite fail / dead-end
+rejected('chem_unbalanced_broken_s6980', 'mismatch {\'H\': 3, \'O\': 1} vs {\'H\': 4, \'O\': 1}').
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s5182', '2x2 Cramer exact on generated integer system')).
+% verified @ algebra/alg_linear_2x2
+verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s5183', '2x2 Cramer exact on generated integer system')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s6999', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7000', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7001', 'K = [B]/[A] on 2-species toy')).
+% verified @ chem/chem_equilibrium_K
+verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7002', 'K = [B]/[A] on 2-species toy')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n5', 'T increases with a on generated circular table')).
+% verified @ astro/astro_period_scan
+verified(fact(astro, astro_period_scan, 'astro_T_pos_n5', 'T>0 and a>0 for all generated bodies')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n5', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).
+% verified @ astro/astro_angmom_scan
+verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n5', 'h^2/a constant (=1) on circular 2-body table')).
+% verified @ calculus/calc_power_diff
+verified(fact(calculus, calc_power_diff, 'calc_delta_x4_vs_n_x3_N4', 'Delta(x^4) / (power * x^3) → 1 (eps on lattice)')).

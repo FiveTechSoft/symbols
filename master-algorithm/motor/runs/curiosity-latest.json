@@ -1,64 +1,10 @@
 {
   "emerged": true,
   "before": {
-    "n_verified": 375,
-    "n_rejected": 168,
-    "n_types": 59,
-    "reject_rate": 0.3094,
-    "transfer_accuracy": 0.5714,
-    "lemma_reuse_rate": 0.7857,
-    "n_schema_classes": 12,
-    "unlocked_schemas": [
-      "bilinear_schema",
-      "bilinear_schema_r4_g4",
-      "bilinear_schema_r4_g5",
-      "bilinear_schema_r4_g6",
-      "bilinear_schema_r4_g7",
-      "bilinear_schema_r4_g8",
-      "dead_prime",
-      "geo_invent",
-      "linrec_scan",
-      "modperiod_schema",
-      "ratio_scan",
-      "transfer_horn"
-    ],
-    "lucas_transfer": 1.0,
-    "pell_transfer": 1.0,
-    "transfer_honest": false,
-    "language_generation": 8
-  },
-  "after_tick": {
-    "n_verified": 400,
-    "n_rejected": 170,
-    "n_types": 59,
-    "reject_rate": 0.2982,
-    "transfer_accuracy": 0.5714,
-    "lemma_reuse_rate": 0.7857,
-    "n_schema_classes": 12,
-    "unlocked_schemas": [
-      "bilinear_schema",
-      "bilinear_schema_r4_g4",
-      "bilinear_schema_r4_g5",
-      "bilinear_schema_r4_g6",
-      "bilinear_schema_r4_g7",
-      "bilinear_schema_r4_g8",
-      "dead_prime",
-      "geo_invent",
-      "linrec_scan",
-      "modperiod_schema",
-      "ratio_scan",
-      "transfer_horn"
-    ],
-    "lucas_transfer": 1.0,
-    "pell_transfer": 1.0,
-    "transfer_honest": false,
-    "language_generation": 8
-  },
-  "final": {
-    "n_verified": 420,
-    "n_rejected": 181,
-    "n_types": 59,
-    "reject_rate": 0.3012,
+    "n_verified": 428,
+    "n_rejected": 188,
+    "n_types": 60,
+    "reject_rate": 0.3052,
     "transfer_accuracy": 0.5714,
     "lemma_reuse_rate": 0.7857,
     "n_schema_classes": 13,
@@ -82,27 +28,84 @@
     "transfer_honest": true,
     "language_generation": 9
   },
+  "after_tick": {
+    "n_verified": 445,
+    "n_rejected": 192,
+    "n_types": 60,
+    "reject_rate": 0.3014,
+    "transfer_accuracy": 0.5714,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 13,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
+      "dead_prime",
+      "delta_conserv",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 9
+  },
+  "final": {
+    "n_verified": 471,
+    "n_rejected": 201,
+    "n_types": 60,
+    "reject_rate": 0.2991,
+    "transfer_accuracy": 0.5714,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 14,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
+      "dead_prime",
+      "delta_conserv",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "taxis_conserv",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 10
+  },
   "delta": {
-    "n_verified": 45,
+    "n_verified": 43,
     "n_types": 0,
     "n_schema_classes": 1,
     "n_rejected": 13,
     "new_unlocked": [
-      "delta_conserv"
+      "taxis_conserv"
     ]
   },
   "tick_steps": 12,
   "saturated": true,
-  "saturation_reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g8 saturated; transfer plateau",
+  "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
   "molt": {
     "action": "keep_skin",
-    "saturation_reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g8 saturated; transfer plateau",
+    "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
     "molt_info": {
-      "generation": 9,
-      "reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g8 saturated; transfer plateau",
+      "generation": 10,
+      "reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
       "actions": [
         "novelty_bonus\u21922.0",
-        "spawn_lever delta_conserv"
+        "spawn_lever taxis_conserv"
       ],
       "unlocked_before": [
         "bilinear_schema",
@@ -112,6 +115,7 @@
         "bilinear_schema_r4_g7",
         "bilinear_schema_r4_g8",
         "dead_prime",
+        "delta_conserv",
         "geo_invent",
         "linrec_scan",
         "modperiod_schema",
@@ -131,43 +135,17 @@
         "linrec_scan",
         "modperiod_schema",
         "ratio_scan",
+        "taxis_conserv",
         "transfer_horn"
       ],
-      "n_schema_classes": 13
+      "n_schema_classes": 14
     },
-    "keep_reason": "n_verified 400\u2192420; n_schema_classes 12\u219213; unlocked ['delta_conserv']",
+    "keep_reason": "n_verified 445\u2192471; n_schema_classes 13\u219214; unlocked ['taxis_conserv']",
     "metrics_before": {
-      "n_verified": 400,
-      "n_rejected": 170,
-      "n_types": 59,
-      "reject_rate": 0.2982,
-      "transfer_accuracy": 0.5714,
-      "lemma_reuse_rate": 0.7857,
-      "n_schema_classes": 12,
-      "unlocked_schemas": [
-        "bilinear_schema",
-        "bilinear_schema_r4_g4",
-        "bilinear_schema_r4_g5",
-        "bilinear_schema_r4_g6",
-        "bilinear_schema_r4_g7",
-        "bilinear_schema_r4_g8",
-        "dead_prime",
-        "geo_invent",
-        "linrec_scan",
-        "modperiod_schema",
-        "ratio_scan",
-        "transfer_horn"
-      ],
-      "lucas_transfer": 1.0,
-      "pell_transfer": 1.0,
-      "transfer_honest": false,
-      "language_generation": 8
-    },
-    "metrics_after": {
-      "n_verified": 420,
-      "n_rejected": 181,
-      "n_types": 59,
-      "reject_rate": 0.3012,
+      "n_verified": 445,
+      "n_rejected": 192,
+      "n_types": 60,
+      "reject_rate": 0.3014,
       "transfer_accuracy": 0.5714,
       "lemma_reuse_rate": 0.7857,
       "n_schema_classes": 13,
@@ -190,21 +168,50 @@
       "pell_transfer": 0.0,
       "transfer_honest": true,
       "language_generation": 9
+    },
+    "metrics_after": {
+      "n_verified": 471,
+      "n_rejected": 201,
+      "n_types": 60,
+      "reject_rate": 0.2991,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "n_schema_classes": 14,
+      "unlocked_schemas": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "lucas_transfer": 1.0,
+      "pell_transfer": 0.0,
+      "transfer_honest": true,
+      "language_generation": 10
     }
   },
   "recent_clauses": [
-    "verified(fact(algebra, alg_poly_zn, 'alg_binom_expand_mod7', '(x+y)^2 \u2261 x^2+2xy+y^2 (mod 7) exhaustive')).",
-    "verified(fact(algebra, alg_poly_zn, 'alg_distrib_mod7', 'x(y+z) \u2261 xy+xz (mod 7)')).",
-    "verified(fact(loop, loop_taxis_scan, 'loop_taxis_bangbang_s8863', 'bang-bang toward 0 reduces |error| over T on held-out x0')).",
-    "verified(fact(loop, loop_taxis_scan, 'loop_taxis_linear_gain_s8863', 'a=-k*x (k=0.5) reduces |error| over T on held-out x0')).",
-    "verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_3_-1_-2_0', 'TRANSFER rec(lucas,[3, -1, -2, 0]) \u21d2 try on fib: (3)*fib(n-1) + (-1)*fib(n-2) + (-2)*fib(n-3) + (0)*fib(n-4)')).",
-    "verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_2_3_1', 'TRANSFER rec(lucas,[-1, 2, 3, 1]) \u21d2 try on fib: (-1)*fib(n-1) + (2)*fib(n-2) + (3)*fib(n-3) + (1)*fib(n-4)')).",
-    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_3_-1_-2_0', 'TRANSFER rec(fib,[3, -1, -2, 0]) \u21d2 try on lucas: (3)*lucas(n-1) + (-1)*lucas(n-2) + (-2)*lucas(n-3) + (0)*lucas(n-4)')).",
-    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_2_3_1', 'TRANSFER rec(fib,[-1, 2, 3, 1]) \u21d2 try on lucas: (-1)*lucas(n-1) + (2)*lucas(n-2) + (3)*lucas(n-3) + (1)*lucas(n-4)'))."
+    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7000', 'K = [B]/[A] on 2-species toy')).",
+    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7001', 'K = [B]/[A] on 2-species toy')).",
+    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7002', 'K = [B]/[A] on 2-species toy')).",
+    "verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n5', 'T increases with a on generated circular table')).",
+    "verified(fact(astro, astro_period_scan, 'astro_T_pos_n5', 'T>0 and a>0 for all generated bodies')).",
+    "verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n5', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).",
+    "verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n5', 'h^2/a constant (=1) on circular 2-body table')).",
+    "verified(fact(calculus, calc_power_diff, 'calc_delta_x4_vs_n_x3_N4', 'Delta(x^4) / (power * x^3) \u2192 1 (eps on lattice)'))."
   ],
   "warm_summary": {
-    "total_steps": 163,
-    "n_verified_facts": 400,
-    "n_distinct_types": 59
+    "total_steps": 191,
+    "n_verified_facts": 445,
+    "n_distinct_types": 60
   }
 }

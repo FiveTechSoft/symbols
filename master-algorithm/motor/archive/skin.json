@@ -1,7 +1,7 @@
 {
-  "generation": 9,
-  "n_schema_classes": 13,
-  "n_unlocked": 13,
+  "generation": 10,
+  "n_schema_classes": 14,
+  "n_unlocked": 14,
   "unlocked": [
     "bilinear_schema",
     "bilinear_schema_r4_g4",
@@ -15,6 +15,7 @@
     "linrec_scan",
     "modperiod_schema",
     "ratio_scan",
+    "taxis_conserv",
     "transfer_horn"
   ],
   "schemas": {
@@ -34,8 +35,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 7,
-      "total_reward": 60.300000000000004,
+      "n_visits": 8,
+      "total_reward": 59.59,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -298,6 +299,28 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "saturated": false,
+      "ticks_no_new_type": 0,
+      "novelty_bonus": 0.0
+    },
+    "taxis_conserv": {
+      "id": "taxis_conserv",
+      "description": "taxis on additive invariant: sign(error)\u2192action on \u0394=0 residual",
+      "unlocked": true,
+      "dead_end": false,
+      "origin": "mutation:lever_spawn_gen10",
+      "order": 1,
+      "order_max": 4,
+      "coeff_lo": -3,
+      "coeff_hi": 3,
+      "m_max": 4,
+      "m_cap": 12,
+      "r_max": 1,
+      "r_cap": 4,
+      "mut_depth": 1,
+      "mut_cap": 4,
       "n_visits": 0,
       "total_reward": 0.0,
       "saturated": false,
@@ -346,7 +369,11 @@
     "1,-1,2,2",
     "2,1,-2,-1",
     "0,4,4,1",
-    "1,1,5,2"
+    "1,1,5,2",
+    "3,-1,-2,0",
+    "-1,2,3,1",
+    "2,-1,4,2",
+    "4,-4,0,1"
   ],
   "molt_history": [
     {
@@ -631,6 +658,46 @@
         "transfer_horn"
       ],
       "n_schema_classes": 13
+    },
+    {
+      "generation": 10,
+      "reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_lever taxis_conserv"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 14
     }
   ]
 }
