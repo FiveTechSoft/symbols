@@ -51,7 +51,7 @@ test_data(106, "Juan compro un coche rojo en Madrid ayer", "que coche compro jua
 test_data(107, "Juan compro un coche rojo en Madrid ayer", "quien compro un coche", main).
 test_data(108, "Juan compro un coche rojo en Madrid ayer", "juan compro algo", main).
 test_data(109, "Juan compro un coche rojo en Madrid ayer", "el coche es rojo", attribute).
-test_data(110, "Juan compro un coche rojo en Madrid ayer", "que coche tiene juan", attribute).
+test_data(110, "Juan compro un coche rojo en Madrid ayer", "que coche tiene juan", main).
 
 % S2: Maria vive en Barcelona
 test_data(201, "Maria vive en Barcelona", "donde vive maria", main).
