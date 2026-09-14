@@ -282,6 +282,49 @@ SCIENCE_SEED: dict[str, dict[str, Any]] = {
         "dead_end": True,
         "origin": "seed",
     },
+    # --- cross-world transfer_form (linear conservation / form reuse) ---
+    "chem_transfer_form": {
+        "description": "TRANSFER_FORM: reuse linear Δ=0 conservation prior (mom/KCL → atom balance)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "phys_transfer_form": {
+        "description": "TRANSFER_FORM: reuse linear Δ=0 conservation prior (atom/KCL → momentum)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "electro_transfer_form": {
+        "description": "TRANSFER_FORM: reuse linear Δ=0 conservation prior (atom/mom → KCL)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 5,
+    },
+    "nets_transfer_form": {
+        "description": "TRANSFER_FORM: bit_fn AND/XOR → perceptron / linear-threshold critic",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 2,
+        "order_max": 4,
+    },
+    "calc_transfer_form": {
+        "description": "TRANSFER_FORM: rec/2 prior → discrete Δ structure (alias of calc_transfer_rec)",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 4,
+        "order_max": 12,
+    },
+    "astro_transfer_form": {
+        "description": "TRANSFER_FORM: Kepler T²∝a³ vs bogus other power on same table",
+        "unlocked": True,
+        "origin": "seed",
+        "order": 3,
+        "order_max": 8,
+    },
 }
 
 
@@ -373,6 +416,36 @@ class ScienceLanguage:
             if s.unlocked and not s.dead_end:
                 s.novelty_bonus = max(s.novelty_bonus, self.novelty_floor)
 
+    def merge_missing_seeds(self) -> list[str]:
+        """Ensure newly authored SCIENCE_SEED schemas appear even if skin is older."""
+        added: list[str] = []
+        prefix = {
+            "symmetry": "sym_",
+            "chance": "chance_",
+            "info": "info_",
+            "astro": "astro_",
+            "algebra": "alg_",
+            "calculus": "calc_",
+            "nets": "nets_",
+            "electro": "electro_",
+            "physics": "phys_",
+            "chem": "chem_",
+        }[self.world_tag]
+        for sid, spec in SCIENCE_SEED.items():
+            if not sid.startswith(prefix):
+                continue
+            if sid in self.schemas:
+                continue
+            self.schemas[sid] = SchemaClass(id=sid, **spec)
+            if not self.schemas[sid].dead_end:
+                self.schemas[sid].novelty_bonus = max(
+                    self.schemas[sid].novelty_bonus, self.novelty_floor
+                )
+            added.append(sid)
+        if added:
+            self.ensure_novelty_alive()
+        return added
+
     def molt(self, reason: str) -> dict:
         """
         tick→compare→plateau→molt/spawn→forever.
@@ -426,7 +499,9 @@ class ScienceLanguage:
                          "astro_kepler_scan", "astro_period_scan", "alg_poly_zn",
                          "alg_linear_2x2", "calc_fwd_diff", "calc_ft_discrete",
                          "nets_perceptron", "nets_xor_depth", "nets_grad_step",
-                         "electro_ohm", "phys_collision", "chem_atom_balance"):
+                         "electro_ohm", "phys_collision", "chem_atom_balance",
+                         "chem_transfer_form", "phys_transfer_form", "electro_transfer_form",
+                         "nets_transfer_form", "calc_transfer_form", "astro_transfer_form"):
                 if cand in self.schemas and self.schemas[cand].unlocked:
                     base = self.schemas[cand]
                     break

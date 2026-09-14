@@ -54,8 +54,13 @@ class AstroWorld(WorldBase):
                     world_tag="astro",
                 )
                 self.language.ensure_novelty_alive()
+                self.language.merge_missing_seeds()
             except Exception:
                 pass
+        else:
+            # fresh seed language — still merge in case SCIENCE_SEED grew
+            if hasattr(self.language, "merge_missing_seeds"):
+                self.language.merge_missing_seeds()
 
     def persist_skin(self) -> None:
         if self._archive is None:
@@ -168,6 +173,33 @@ class AstroWorld(WorldBase):
                     formula="h^2/a constant (=1) on circular 2-body table",
                     payload={"kind": "angmom_h2_a", "table": table, "schema": fid, "order": n},
                     relation_type="angmom",
+                )
+            )
+
+        elif "transfer_form" in fid:
+            # Kepler T²∝a³ hit + bogus other power must reject
+            out.append(
+                Conjecture(
+                    name=f"transfer_kepler3_form_n{n}",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER Kepler form T^2/a^3 constancy on circular table",
+                    payload={"kind": "kepler3", "table": table, "schema": fid, "order": n, "eps": EPS},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="astro:kepler3",
+                )
+            )
+            out.append(
+                Conjecture(
+                    name=f"transfer_kepler_bogus_power_n{n}",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER bogus T^2/a^2 (wrong exponent) — must REJECT",
+                    payload={"kind": "kepler_broken_exp", "table": table, "schema": fid, "order": n},
+                    relation_type="transfer_form_neg",
+                    from_transfer=True,
+                    transfer_source="astro:kepler3_bogus",
                 )
             )
 
@@ -289,3 +321,9 @@ class AstroWorld(WorldBase):
                 arms[key].param_max = fam.param_max
                 if not fam.saturated:
                     arms[key].saturated = False
+
+    def transfer_prior(self, archive_confirmed: dict) -> list[Conjecture]:
+        for fid, fam in self.families().items():
+            if "transfer_form" in fid and fam.unlocked:
+                return self.hypothesize(fam, archive_confirmed, step=-1)
+        return []

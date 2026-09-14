@@ -76,8 +76,13 @@ class CalculusWorld(WorldBase):
                     world_tag="calculus",
                 )
                 self.language.ensure_novelty_alive()
+                self.language.merge_missing_seeds()
             except Exception:
                 pass
+        else:
+            # fresh seed language — still merge in case SCIENCE_SEED grew
+            if hasattr(self.language, "merge_missing_seeds"):
+                self.language.merge_missing_seeds()
 
     def persist_skin(self) -> None:
         if self._archive is None:
@@ -185,7 +190,7 @@ class CalculusWorld(WorldBase):
                     )
                 )
 
-        elif "transfer_rec" in fid:
+        elif "transfer_rec" in fid or "transfer_form" in fid:
             recs = self._archived_recs()
             if not recs:
                 out.append(

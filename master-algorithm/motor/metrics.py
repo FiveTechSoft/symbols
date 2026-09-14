@@ -39,17 +39,20 @@ def _predict_next(vals: list[int], coeffs: list[int], n: int) -> int:
 
 def _quick_transfer_accuracy(kernel: "MotorKernel") -> float:
     """
-    Fib archive → next-term on Lucas (and Pell) vs chance of wrong coeffs.
-    Uses archived rec/2 clauses; if none yet, returns 0.0.
+    Prefer cross-world xfer_battery intelligence metric when available;
+    else fall back to Fib→Lucas/Pell next-term average (legacy 0.5 baseline).
     """
+    # Live battery metric cached on meta after xfer_battery --ingest / transfer_eval
+    cached = (kernel.archive.meta or {}).get("xfer_battery", {})
+    if isinstance(cached, dict) and "intelligence_metric" in cached:
+        return float(cached["intelligence_metric"])
+
     seq_world = kernel.worlds.get("sequences")
     if not seq_world:
         return 0.0
     recs = {s: c for s, c in kernel.archive.list_recs()}
-    # Prefer fib recurrence as source
     src_coeffs = recs.get("fib")
     if not src_coeffs:
-        # any rec
         if not recs:
             return 0.0
         src_coeffs = next(iter(recs.values()))
@@ -146,6 +149,32 @@ def transfer_eval(kernel: "MotorKernel") -> dict[str, Any]:
         "absorbed_intelligence": bool(lucas_ok),
         "negative_transfer_pell_expected": not pell_ok,
     }
+    # Cross-world battery (COMPARE / transfer_form)
+    try:
+        from .xfer_battery import run_battery
+
+        bat = run_battery(kernel=kernel, ingest=False)
+        results["xfer_battery"] = {
+            "intelligence_metric": bat["intelligence_metric"],
+            "n_hit": bat["n_hit"],
+            "n_miss": bat["n_miss"],
+            "n_skip": bat["n_skip"],
+            "new_positives_besides_fib_lucas": bat["new_positives_besides_fib_lucas"],
+            "required_negatives_still_failing": bat["required_negatives_still_failing"],
+            "honest_positives": bat["honest_positives"],
+            "honest_negatives": bat["honest_negatives"],
+        }
+        results["summary"]["cross_world_intelligence"] = bat["intelligence_metric"]
+        results["summary"]["cross_world_new_positives"] = bat["new_positives_besides_fib_lucas"]
+        kernel.archive.meta["xfer_battery"] = {
+            "intelligence_metric": bat["intelligence_metric"],
+            "n_hit": bat["n_hit"],
+            "n_miss": bat["n_miss"],
+            "required_negatives_still_failing": bat["required_negatives_still_failing"],
+            "new_positives_besides_fib_lucas": bat["new_positives_besides_fib_lucas"],
+        }
+    except Exception as e:
+        results["xfer_battery"] = {"error": str(e)}
     return results
 
 

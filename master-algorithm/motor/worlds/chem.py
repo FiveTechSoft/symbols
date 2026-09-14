@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from .base import Conjecture, FamilySpec, VerifiedFact, WorldBase
 from .science_lang import ScienceLanguage
+from .conserv_form import linear_constraint_holds
 
 EPS = 1e-9
 
@@ -84,8 +85,13 @@ class ChemWorld(WorldBase):
                     world_tag="chem",
                 )
                 self.language.ensure_novelty_alive()
+                self.language.merge_missing_seeds()
             except Exception:
                 pass
+        else:
+            # fresh seed language — still merge in case SCIENCE_SEED grew
+            if hasattr(self.language, "merge_missing_seeds"):
+                self.language.merge_missing_seeds()
 
     def persist_skin(self) -> None:
         if self._archive is None:
@@ -168,6 +174,64 @@ class ChemWorld(WorldBase):
                     )
                 )
 
+        elif "transfer_form" in fid:
+            from .physics import _gen_collision
+            from .electro import _gen_kirchhoff_node
+            # Reuse linear Δ=0 prior from physics/electro on chem reactions
+            rx = _reaction_water()
+            out.append(
+                Conjecture(
+                    name="transfer_conserv_mom_shape_to_chem_atoms",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER linear-Δ=0 (momentum shape) ⇒ atom counts balanced",
+                    payload={"kind": "conserv_chem", "rx": rx, "schema": fid, "src_form": "physics:momentum"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="physics:momentum",
+                )
+            )
+            out.append(
+                Conjecture(
+                    name="transfer_conserv_kcl_shape_to_chem_atoms",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER linear-Δ=0 (KCL shape) ⇒ atom counts balanced",
+                    payload={"kind": "conserv_chem", "rx": rx, "schema": fid, "src_form": "electro:kcl"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="electro:kcl",
+                )
+            )
+            # Also check the form on a generated physics collision / KCL as cross-world probes
+            # that chem world can critic via shared shape (skip if shape world-bound — still attempt)
+            c = _gen_collision(7011)
+            out.append(
+                Conjecture(
+                    name="transfer_chem_conserv_form_on_physics_mom",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER chem atom-Δ=0 form ⇒ try on physics momentum",
+                    payload={"kind": "conserv_mom", "c": c, "schema": fid, "src_form": "chem:atoms"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="chem:atoms",
+                )
+            )
+            node = _gen_kirchhoff_node(7012)
+            out.append(
+                Conjecture(
+                    name="transfer_chem_conserv_form_on_electro_kcl",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER chem atom-Δ=0 form ⇒ try on electro KCL",
+                    payload={"kind": "conserv_kcl", "node": node, "schema": fid, "src_form": "chem:atoms"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="chem:atoms",
+                )
+            )
+
         elif "dead_noatoms" in fid or fid.startswith("chem_dead"):
             rx = _reaction_water()
             out.append(
@@ -202,6 +266,12 @@ class ChemWorld(WorldBase):
             ok = abs(pred - toy["K"]) < 1e-9
             cex = None if ok else f"B/A={pred} != K={toy['K']}"
             support = f"K={toy['K']:.6f}" if ok else "finite fail"
+
+        elif kind in ("conserv_chem", "conserv_mom", "conserv_kcl"):
+            ok, support = linear_constraint_holds(kind, p)
+            cex = None if ok else support
+            support = f"TRANSFER_FORM {p.get('src_form','?')} → {support}"
+            self.compare_log.append({"hit": ok, "kind": kind, "src": p.get("src_form")})
 
         elif kind == "dead_noatoms":
             rx = p["rx"]
@@ -263,3 +333,9 @@ class ChemWorld(WorldBase):
                 arms[key].param_max = fam.param_max
                 if not fam.saturated:
                     arms[key].saturated = False
+
+    def transfer_prior(self, archive_confirmed: dict) -> list[Conjecture]:
+        for fid, fam in self.families().items():
+            if "transfer_form" in fid and fam.unlocked:
+                return self.hypothesize(fam, archive_confirmed, step=-1)
+        return []

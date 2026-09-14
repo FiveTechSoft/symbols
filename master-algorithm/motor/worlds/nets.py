@@ -69,8 +69,13 @@ class NetsWorld(WorldBase):
                     world_tag="nets",
                 )
                 self.language.ensure_novelty_alive()
+                self.language.merge_missing_seeds()
             except Exception:
                 pass
+        else:
+            # fresh seed language — still merge in case SCIENCE_SEED grew
+            if hasattr(self.language, "merge_missing_seeds"):
+                self.language.merge_missing_seeds()
 
     def persist_skin(self) -> None:
         if self._archive is None:
@@ -225,6 +230,66 @@ class NetsWorld(WorldBase):
                 )
             )
 
+        elif "transfer_form" in fid:
+            bit_fns = self._archived_bit_fns()
+            and_prior = any(h == "and_all" for _, _, h in bit_fns)
+            xor_prior = any(h == "xor2" for _, _, h in bit_fns)
+            if and_prior or True:  # always attempt AND shape; hit if bit_fn present or table holds
+                out.append(
+                    Conjecture(
+                        name="transfer_bitfn_and_to_perceptron_form",
+                        family=fid,
+                        world=self.name,
+                        formula="TRANSFER bit_fn(and_all) ⇒ AND linear-sep (perceptron)",
+                        payload={
+                            "kind": "transfer_and_sep",
+                            "src_hyp": "and_all",
+                            "src_name": "bit_fn:and_all",
+                            "gate": "AND",
+                            "table": AND_TABLE,
+                            "schema": fid,
+                            "require_prior": and_prior,
+                        },
+                        relation_type="transfer_form",
+                        from_transfer=True,
+                        transfer_source="logic:and_all",
+                    )
+                )
+            # XOR as linear MUST fail (honest negative transfer)
+            out.append(
+                Conjecture(
+                    name="transfer_bitfn_xor_to_linear_perceptron",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER bit_fn(xor2) ⇒ XOR linear-sep (must FAIL)",
+                    payload={
+                        "kind": "transfer_xor_linear",
+                        "src_hyp": "xor2",
+                        "src_name": "bit_fn:xor2",
+                        "gate": "XOR",
+                        "table": XOR_TABLE,
+                        "schema": fid,
+                        "require_prior": xor_prior,
+                    },
+                    relation_type="transfer_form_neg",
+                    from_transfer=True,
+                    transfer_source="logic:xor2",
+                )
+            )
+            # electro switch target for AND
+            out.append(
+                Conjecture(
+                    name="transfer_bitfn_and_to_switch_shape",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER bit_fn(and_all) ⇒ series-switch ≡ AND table",
+                    payload={"kind": "series_and_shape", "schema": fid},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="logic:and_all",
+                )
+            )
+
         elif "dead_any_eta" in fid or fid.startswith("nets_dead"):
             out.append(
                 Conjecture(
@@ -269,6 +334,22 @@ class NetsWorld(WorldBase):
             support = f"linear-sep search {gate}" if ok else "finite fail"
             if kind == "transfer_and_sep":
                 self.compare_log.append({"hit": ok, "src": p.get("src_name")})
+
+        elif kind == "transfer_xor_linear":
+            table = []
+            for item in p["table"]:
+                xy, y = item
+                table.append(((int(xy[0]), int(xy[1])), int(y)))
+            ok = _exists_linear(table)  # expect False
+            cex = None if ok else "no linear threshold for XOR (expected reject)"
+            support = "unexpected linear XOR" if ok else "finite fail (XOR not linear)"
+            self.compare_log.append({"hit": False, "kind": "xor_linear_neg", "ok_claim": ok})
+
+        elif kind == "series_and_shape":
+            ok = all((a & b) == (1 if (a == 1 and b == 1) else 0) for a in (0, 1) for b in (0, 1))
+            support = "series≡AND" if ok else "fail"
+            cex = None if ok else "series/AND mismatch"
+            self.compare_log.append({"hit": ok, "kind": "series_and_shape"})
 
         elif kind == "xor_two_layer":
             ok = all(_xor_two_layer(x0, x1) == y for (x0, x1), y in XOR_TABLE)

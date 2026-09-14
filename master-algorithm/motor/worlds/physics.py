@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from .base import Conjecture, FamilySpec, VerifiedFact, WorldBase
 from .science_lang import ScienceLanguage
+from .conserv_form import linear_constraint_holds
 
 EPS = 1e-8
 
@@ -56,8 +57,13 @@ class PhysicsWorld(WorldBase):
                     world_tag="physics",
                 )
                 self.language.ensure_novelty_alive()
+                self.language.merge_missing_seeds()
             except Exception:
                 pass
+        else:
+            # fresh seed language — still merge in case SCIENCE_SEED grew
+            if hasattr(self.language, "merge_missing_seeds"):
+                self.language.merge_missing_seeds()
 
     def persist_skin(self) -> None:
         if self._archive is None:
@@ -152,6 +158,61 @@ class PhysicsWorld(WorldBase):
                 )
             )
 
+        elif "transfer_form" in fid:
+            from .chem import _reaction_water
+            from .electro import _gen_kirchhoff_node
+            c = _gen_collision(8011)
+            out.append(
+                Conjecture(
+                    name="transfer_conserv_atom_shape_to_physics_mom",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER linear-Δ=0 (atom-balance shape) ⇒ momentum conserved",
+                    payload={"kind": "conserv_mom", "c": c, "schema": fid, "src_form": "chem:atoms"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="chem:atoms",
+                )
+            )
+            out.append(
+                Conjecture(
+                    name="transfer_conserv_kcl_shape_to_physics_mom",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER linear-Δ=0 (KCL shape) ⇒ momentum conserved",
+                    payload={"kind": "conserv_mom", "c": c, "schema": fid, "src_form": "electro:kcl"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="electro:kcl",
+                )
+            )
+            rx = _reaction_water()
+            out.append(
+                Conjecture(
+                    name="transfer_phys_conserv_form_on_chem_atoms",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER physics mom-Δ=0 form ⇒ try on chem atom balance",
+                    payload={"kind": "conserv_chem", "rx": rx, "schema": fid, "src_form": "physics:momentum"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="physics:momentum",
+                )
+            )
+            node = _gen_kirchhoff_node(8012)
+            out.append(
+                Conjecture(
+                    name="transfer_phys_conserv_form_on_electro_kcl",
+                    family=fid,
+                    world=self.name,
+                    formula="TRANSFER physics mom-Δ=0 form ⇒ try on electro KCL",
+                    payload={"kind": "conserv_kcl", "node": node, "schema": fid, "src_form": "physics:momentum"},
+                    relation_type="transfer_form",
+                    from_transfer=True,
+                    transfer_source="physics:momentum",
+                )
+            )
+
         elif "dead_nomom" in fid or fid.startswith("phys_dead"):
             c = _gen_collision(seed)
             out.append(
@@ -202,6 +263,12 @@ class PhysicsWorld(WorldBase):
             ok = abs(p["F12"] + p["F21"]) < EPS  # will be FALSE when same sign nonzero
             cex = None if ok else f"F12={p['F12']} F21={p['F21']} not opposite"
             support = "unexpected" if ok else "finite fail"
+
+        elif kind in ("conserv_chem", "conserv_mom", "conserv_kcl"):
+            ok, support = linear_constraint_holds(kind, p)
+            cex = None if ok else support
+            support = f"TRANSFER_FORM {p.get('src_form','?')} → {support}"
+            self.compare_log.append({"hit": ok, "kind": kind, "src": p.get("src_form")})
 
         elif kind == "dead_nomom":
             c = p["c"]
@@ -263,3 +330,9 @@ class PhysicsWorld(WorldBase):
                 arms[key].param_max = fam.param_max
                 if not fam.saturated:
                     arms[key].saturated = False
+
+    def transfer_prior(self, archive_confirmed: dict) -> list[Conjecture]:
+        for fid, fam in self.families().items():
+            if "transfer_form" in fid and fam.unlocked:
+                return self.hypothesize(fam, archive_confirmed, step=-1)
+        return []

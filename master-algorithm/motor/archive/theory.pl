@@ -885,3 +885,89 @@ rejected('NEG_chance_H_negative', 'H=0.9442524549486193 not < 0').
 rejected('NEG_chance_mix_decreases_H', 'H(mix)=0.9861995129233668 >= min=0.9442524549486193').
 % finite fail / dead-end
 rejected('NEG_chem_atoms_not_conserved', 'counts match — conservation holds (reject claim)').
+% verified @ calculus/calc_transfer_form
+verified(fact(calculus, calc_transfer_form, 'transfer_rec_fib_to_delta_N12', 'TRANSFER rec(fib,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ nets/nets_transfer_form
+verified(fact(nets, nets_transfer_form, 'transfer_bitfn_and_to_perceptron_form', 'TRANSFER bit_fn(and_all) ⇒ AND linear-sep (perceptron)')).
+% verified @ electro/electro_switch_transfer
+verified(fact(electro, electro_switch_transfer, 'transfer_and_to_series_switch_and_all', 'TRANSFER bit_fn(and_all) ⇒ series switches')).
+% finite fail / dead-end
+rejected('transfer_bitfn_xor_to_linear_perceptron', 'XOR not linearly separable (honest negative)').
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_conserv_chem_atoms_to_physics_conserv_mom', 'TRANSFER linear-Δ=0 (chem:atoms) ⇒ conserv_mom on physics')).
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_conserv_chem_atoms_to_electro_conserv_kcl', 'TRANSFER linear-Δ=0 (chem:atoms) ⇒ conserv_kcl on electro')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_conserv_physics_momentum_to_chem_conserv_chem', 'TRANSFER linear-Δ=0 (physics:momentum) ⇒ conserv_chem on chem')).
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_conserv_physics_momentum_to_electro_conserv_kcl', 'TRANSFER linear-Δ=0 (physics:momentum) ⇒ conserv_kcl on electro')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_conserv_electro_kcl_to_chem_conserv_chem', 'TRANSFER linear-Δ=0 (electro:kcl) ⇒ conserv_chem on chem')).
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_conserv_electro_kcl_to_physics_conserv_mom', 'TRANSFER linear-Δ=0 (electro:kcl) ⇒ conserv_mom on physics')).
+% verified @ astro/astro_transfer_form
+verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n5', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).
+% finite fail / dead-end
+rejected('transfer_kepler_bogus_power_n5', 'T²/a² not const: [39.47841760435743, 59.21762640653614, 78.95683520871486, 98.69604401089356, 118.43525281307228]').
+% verified @ sequences/bilinear_schema
+verified(fact(sequences, bilinear_schema, 'transfer_bilin_cassini_shape_on_fib', 'TRANSFER cassini-shape bilin ⇒ fib(n+1)fib(n-1)-fib(n)^2=(-1)^n')).
+% finite fail / dead-end
+rejected('transfer_bilin_cassini_shape_on_lucas', 'fail n=1 lhs≠(-1)^n').
+% finite fail / dead-end
+rejected('NEG_info_MI_always_0', 'MI=0.7421139952238672 ≠ 0').
+% verified @ nets/nets_grad_step
+verified(fact(nets, nets_grad_step, 'nets_grad_step_se_s0', 'Δw = -η x (yhat-y) on squared-error toy (note sign)')).
+% verified @ nets/nets_grad_step
+verified(fact(nets, nets_grad_step, 'nets_grad_step_se_s1', 'Δw = -η x (yhat-y) on squared-error toy (note sign)')).
+% finite fail / dead-end
+rejected('NEG_phys_momentum_not_conserved', '|Δp|=8.881784197001252e-16≈0 (conservation holds)').
+% finite fail / dead-end
+rejected('NEG_sym_product_mod2_conserved', 'flip0 [0, 1, 1]→[1, 1, 1] prod 0→1').
+% finite fail / dead-end
+rejected('NEG_alg_binom_no_cross', 'x=1,y=1: (x+y)^2=1 != x^2+y^2=2').
+% finite fail / dead-end
+rejected('NEG_astro_T_prop_a', 'T/a not const: [6.2832, 7.6953, 8.8858]').
+% finite fail / dead-end
+rejected('NEG_electro_current_not_conserved', 'sum=0.0≈0 so conservation holds (reject claim)').
+% verified @ nets/nets_chain_transfer
+verified(fact(nets, nets_chain_transfer, 'nets_discrete_chain_vs_product', 'Delta(f∘g) vs Delta(f)·Delta(g) — composition identity check')).
+% finite fail / dead-end
+rejected('NEG_calc_delta_always_zero', 'Delta[0]=1.0 != 0').
+% finite fail / dead-end
+rejected('NEG_nets_loss_decreases_any_eta', 'eta=10.0 overshoot L 1.0→361.0').
+% verified @ sequences/bilinear_schema_r4_g7
+verified(fact(sequences, bilinear_schema_r4_g7, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema_r4_g7
+verified(fact(sequences, bilinear_schema_r4_g7, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema_r4_g7
+verified(fact(sequences, bilinear_schema_r4_g7, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% verified @ sequences/bilinear_schema_r4_g7
+verified(fact(sequences, bilinear_schema_r4_g7, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% verified @ sequences/bilinear_schema_r4_g7
+verified(fact(sequences, bilinear_schema_r4_g7, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% verified @ electro/electro_switch_transfer
+verified(fact(electro, electro_switch_transfer, 'electro_parallel_OR_table', 'parallel switches ≡ OR on {0,1}^2')).
+% verified @ calculus/calc_transfer_rec
+verified(fact(calculus, calc_transfer_rec, 'transfer_rec_fib_to_delta_N4', 'TRANSFER rec(fib,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ calculus/calc_transfer_rec
+verified(fact(calculus, calc_transfer_rec, 'transfer_rec_lucas_to_delta_N4', 'TRANSFER rec(lucas,[1, 1]) ⇒ Delta structure matches recurrence')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_conserv_mom_shape_to_chem_atoms', 'TRANSFER linear-Δ=0 (momentum shape) ⇒ atom counts balanced')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_conserv_kcl_shape_to_chem_atoms', 'TRANSFER linear-Δ=0 (KCL shape) ⇒ atom counts balanced')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_chem_conserv_form_on_physics_mom', 'TRANSFER chem atom-Δ=0 form ⇒ try on physics momentum')).
+% verified @ chem/chem_transfer_form
+verified(fact(chem, chem_transfer_form, 'transfer_chem_conserv_form_on_electro_kcl', 'TRANSFER chem atom-Δ=0 form ⇒ try on electro KCL')).
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_conserv_atom_shape_to_physics_mom', 'TRANSFER linear-Δ=0 (atom-balance shape) ⇒ momentum conserved')).
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_conserv_kcl_shape_to_physics_mom', 'TRANSFER linear-Δ=0 (KCL shape) ⇒ momentum conserved')).
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_phys_conserv_form_on_chem_atoms', 'TRANSFER physics mom-Δ=0 form ⇒ try on chem atom balance')).
+% verified @ physics/phys_transfer_form
+verified(fact(physics, phys_transfer_form, 'transfer_phys_conserv_form_on_electro_kcl', 'TRANSFER physics mom-Δ=0 form ⇒ try on electro KCL')).
+% verified @ symmetry/sym_compare_transfer
+verified(fact(symmetry, sym_compare_transfer, 'transfer_parity_to_z2_parity_parity', 'TRANSFER bit_fn(parity=parity) ⇒ Z2/parity invariant')).
+% verified @ symmetry/sym_compare_transfer
+verified(fact(symmetry, sym_compare_transfer, 'transfer_xor2_to_z2_parity_xor2', 'TRANSFER bit_fn(xor2=xor2) ⇒ Z2/parity invariant')).

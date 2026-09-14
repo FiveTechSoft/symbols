@@ -1,0 +1,284 @@
+{
+  "forms": {
+    "recs": {
+      "fib": [
+        1,
+        1
+      ],
+      "lucas": [
+        1,
+        1
+      ],
+      "pell": [
+        2,
+        1
+      ]
+    },
+    "bit_fns": [
+      [
+        "bitfn_parity_is_parity",
+        "parity",
+        "parity"
+      ],
+      [
+        "bitfn_and_all_is_and_all",
+        "and_all",
+        "and_all"
+      ],
+      [
+        "bitfn_xor2_is_xor2",
+        "xor2",
+        "xor2"
+      ]
+    ],
+    "has_bilin_fib": true
+  },
+  "attempts": [
+    {
+      "pair": "rec fib\u2192lucas",
+      "src_form": "rec(fib,[1, 1])",
+      "dst_world": "sequences",
+      "expected": "hit",
+      "result": "hit",
+      "why": "shared law [1, 1]",
+      "name": "transfer_fib_to_lucas_1_1",
+      "ingested": false
+    },
+    {
+      "pair": "rec fib\u2192pell",
+      "src_form": "rec(fib,[1, 1])",
+      "dst_world": "sequences",
+      "expected": "miss",
+      "result": "miss",
+      "why": "n=2: pred=1 != obs=2",
+      "name": "transfer_fib_to_pell_1_1",
+      "ingested": false
+    },
+    {
+      "pair": "rec fib\u2192\u0394(fib)",
+      "src_form": "rec(fib,[1, 1])",
+      "dst_world": "calculus",
+      "expected": "hit",
+      "result": "hit",
+      "why": "TRANSFER rec(fib,[1,1])\u2192Delta=prev",
+      "name": "transfer_rec_fib_to_delta_N12",
+      "ingested": false
+    },
+    {
+      "pair": "bit_fn AND\u2192nets perceptron",
+      "src_form": "bit_fn(and_all)",
+      "dst_world": "nets",
+      "expected": "hit",
+      "result": "hit",
+      "why": "AND linear-sep under bit_fn(and_all) prior",
+      "name": "transfer_bitfn_and_to_perceptron_form",
+      "ingested": false
+    },
+    {
+      "pair": "bit_fn AND\u2192electro switch",
+      "src_form": "bit_fn(and_all)",
+      "dst_world": "electro",
+      "expected": "hit",
+      "result": "hit",
+      "why": "series\u2261AND",
+      "name": "transfer_and_to_series_switch_and_all",
+      "ingested": false
+    },
+    {
+      "pair": "bit_fn XOR\u2192linear perceptron",
+      "src_form": "bit_fn(xor2)",
+      "dst_world": "nets",
+      "expected": "miss",
+      "result": "miss",
+      "why": "XOR not linearly separable (honest negative)",
+      "name": "transfer_bitfn_xor_to_linear_perceptron",
+      "ingested": false
+    },
+    {
+      "pair": "chem atom-balance \u2192 physics momentum",
+      "src_form": "conserv(chem:atoms)",
+      "dst_world": "physics",
+      "expected": "hit",
+      "result": "hit",
+      "why": "momentum \u0394=0",
+      "name": "transfer_conserv_chem_atoms_to_physics_conserv_mom",
+      "ingested": false
+    },
+    {
+      "pair": "chem atom-balance \u2192 electro KCL",
+      "src_form": "conserv(chem:atoms)",
+      "dst_world": "electro",
+      "expected": "hit",
+      "result": "hit",
+      "why": "KCL \u03a3I=0",
+      "name": "transfer_conserv_chem_atoms_to_electro_conserv_kcl",
+      "ingested": false
+    },
+    {
+      "pair": "physics momentum \u2192 chem atoms",
+      "src_form": "conserv(physics:momentum)",
+      "dst_world": "chem",
+      "expected": "hit",
+      "result": "hit",
+      "why": "atom \u0394=0",
+      "name": "transfer_conserv_physics_momentum_to_chem_conserv_chem",
+      "ingested": false
+    },
+    {
+      "pair": "physics momentum \u2192 electro KCL",
+      "src_form": "conserv(physics:momentum)",
+      "dst_world": "electro",
+      "expected": "hit",
+      "result": "hit",
+      "why": "KCL \u03a3I=0",
+      "name": "transfer_conserv_physics_momentum_to_electro_conserv_kcl",
+      "ingested": false
+    },
+    {
+      "pair": "electro KCL \u2192 chem atoms",
+      "src_form": "conserv(electro:kcl)",
+      "dst_world": "chem",
+      "expected": "hit",
+      "result": "hit",
+      "why": "atom \u0394=0",
+      "name": "transfer_conserv_electro_kcl_to_chem_conserv_chem",
+      "ingested": false
+    },
+    {
+      "pair": "electro KCL \u2192 physics momentum",
+      "src_form": "conserv(electro:kcl)",
+      "dst_world": "physics",
+      "expected": "hit",
+      "result": "hit",
+      "why": "momentum \u0394=0",
+      "name": "transfer_conserv_electro_kcl_to_physics_conserv_mom",
+      "ingested": false
+    },
+    {
+      "pair": "Kepler T\u00b2\u221da\u00b3 \u2192 same table",
+      "src_form": "kepler T\u00b2/a\u00b3",
+      "dst_world": "astro",
+      "expected": "hit",
+      "result": "hit",
+      "why": "ratios\u224839.478418",
+      "name": "transfer_kepler3_form_n5",
+      "ingested": false
+    },
+    {
+      "pair": "Kepler \u2192 bogus T\u00b2\u221da\u00b2",
+      "src_form": "kepler T\u00b2/a\u00b3 (wrong exp)",
+      "dst_world": "astro",
+      "expected": "miss",
+      "result": "miss",
+      "why": "T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568, 98.696, 118.4353]",
+      "name": "transfer_kepler_bogus_power_n5",
+      "ingested": false
+    },
+    {
+      "pair": "bilinear cassini \u2192 fib",
+      "src_form": "bilinear offset_pm1",
+      "dst_world": "sequences",
+      "expected": "hit",
+      "result": "hit",
+      "why": "14 checks offset_pm1",
+      "name": "transfer_bilin_cassini_shape_on_fib",
+      "ingested": false
+    },
+    {
+      "pair": "bilinear cassini \u2192 lucas",
+      "src_form": "bilinear offset_pm1",
+      "dst_world": "sequences",
+      "expected": "miss",
+      "result": "miss",
+      "why": "fail n=1 lhs\u2260(-1)^n",
+      "name": "transfer_bilin_cassini_shape_on_lucas",
+      "ingested": false
+    }
+  ],
+  "n_attempts": 16,
+  "n_hit": 12,
+  "n_miss": 4,
+  "n_skip": 0,
+  "intelligence_metric": 0.75,
+  "definition": "positive_transfers / (positive+negative attempts); skips excluded",
+  "honest_positives": [
+    "rec fib\u2192lucas",
+    "rec fib\u2192\u0394(fib)",
+    "bit_fn AND\u2192nets perceptron",
+    "bit_fn AND\u2192electro switch",
+    "chem atom-balance \u2192 physics momentum",
+    "chem atom-balance \u2192 electro KCL",
+    "physics momentum \u2192 chem atoms",
+    "physics momentum \u2192 electro KCL",
+    "electro KCL \u2192 chem atoms",
+    "electro KCL \u2192 physics momentum",
+    "Kepler T\u00b2\u221da\u00b3 \u2192 same table",
+    "bilinear cassini \u2192 fib"
+  ],
+  "honest_negatives": [
+    "rec fib\u2192pell",
+    "bit_fn XOR\u2192linear perceptron",
+    "Kepler \u2192 bogus T\u00b2\u221da\u00b2",
+    "bilinear cassini \u2192 lucas"
+  ],
+  "unexpected": [],
+  "new_positives_besides_fib_lucas": [
+    "rec fib\u2192\u0394(fib)",
+    "bit_fn AND\u2192nets perceptron",
+    "bit_fn AND\u2192electro switch",
+    "chem atom-balance \u2192 physics momentum",
+    "chem atom-balance \u2192 electro KCL",
+    "physics momentum \u2192 chem atoms",
+    "physics momentum \u2192 electro KCL",
+    "electro KCL \u2192 chem atoms",
+    "electro KCL \u2192 physics momentum",
+    "Kepler T\u00b2\u221da\u00b3 \u2192 same table",
+    "bilinear cassini \u2192 fib"
+  ],
+  "required_negatives_still_failing": true,
+  "baseline_note": "legacy fib\u2192lucas/pell average was 0.5; this battery is the live intelligence metric",
+  "archived_transfer_clauses": [
+    "rejected('transfer_pell_to_fib_1_4_-1_-1', 'n=4: pred=5 != obs=3').",
+    "rejected('transfer_pell_to_fib_2_2_-2_-1', 'n=4: pred=4 != obs=3').",
+    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_4_-2_-3', 'TRANSFER rec(fib,[4, -2, -3]) \u21d2 try on lucas: (4)*lucas(n-1) + (-2)*lucas(n-2) + (-3)*lucas(n-3)')).",
+    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-3_5_4', 'TRANSFER rec(fib,[-3, 5, 4]) \u21d2 try on lucas: (-3)*lucas(n-1) + (5)*lucas(n-2) + (4)*lucas(n-3)')).",
+    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_2_-1_0_1', 'TRANSFER rec(fib,[2, -1, 0, 1]) \u21d2 try on lucas: (2)*lucas(n-1) + (-1)*lucas(n-2) + (0)*lucas(n-3) + (1)*lucas(n-4)')).",
+    "verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_0_0_3_2', 'TRANSFER rec(fib,[0, 0, 3, 2]) \u21d2 try on lucas: (0)*lucas(n-1) + (0)*lucas(n-2) + (3)*lucas(n-3) + (2)*lucas(n-4)')).",
+    "rejected('transfer_pell_to_lucas_1_4_-1_-1', 'n=4: pred=13 != obs=7').",
+    "rejected('transfer_pell_to_lucas_2_2_-2_-1', 'n=4: pred=10 != obs=7').",
+    "rejected('transfer_fib_to_pell_4_-2_-3', 'n=3: pred=6 != obs=5').",
+    "rejected('transfer_fib_to_pell_-3_5_4', 'n=3: pred=-1 != obs=5').",
+    "rejected('transfer_fib_to_pell_2_-1_0_1', 'n=4: pred=8 != obs=12').",
+    "rejected('transfer_fib_to_pell_0_0_3_2', 'n=4: pred=3 != obs=12').",
+    "rejected('transfer_lucas_to_pell_4_-2_-3', 'n=3: pred=6 != obs=5').",
+    "rejected('transfer_lucas_to_pell_-3_5_4', 'n=3: pred=-1 != obs=5').",
+    "rejected('transfer_lucas_to_pell_2_-1_0_1', 'n=4: pred=8 != obs=12').",
+    "rejected('transfer_lucas_to_pell_0_0_3_2', 'n=4: pred=3 != obs=12').",
+    "verified(fact(nets, nets_perceptron, 'transfer_bitfn_and_to_perceptron_and_all', 'TRANSFER bit_fn(and_all=and_all) \u21d2 AND linear-sep')).",
+    "verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_parity_parity_to_MI', 'TRANSFER bit_fn(parity=parity) \u21d2 MI>0 on xor-coupled joint')).",
+    "verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_and_all_and_all_to_MI', 'TRANSFER bit_fn(and_all=and_all) \u21d2 MI>0 on (X,X\u2227Y)')).",
+    "verified(fact(info, info_transfer_bitfn, 'transfer_bitfn_xor2_xor2_to_MI', 'TRANSFER bit_fn(xor2=xor2) \u21d2 MI>0 on xor-coupled joint')).",
+    "verified(fact(calculus, calc_transfer_form, 'transfer_rec_fib_to_delta_N12', 'TRANSFER rec(fib,[1, 1]) \u21d2 Delta structure matches recurrence')).",
+    "verified(fact(nets, nets_transfer_form, 'transfer_bitfn_and_to_perceptron_form', 'TRANSFER bit_fn(and_all) \u21d2 AND linear-sep (perceptron)')).",
+    "verified(fact(electro, electro_switch_transfer, 'transfer_and_to_series_switch_and_all', 'TRANSFER bit_fn(and_all) \u21d2 series switches')).",
+    "rejected('transfer_bitfn_xor_to_linear_perceptron', 'XOR not linearly separable (honest negative)').",
+    "verified(fact(physics, phys_transfer_form, 'transfer_conserv_chem_atoms_to_physics_conserv_mom', 'TRANSFER linear-\u0394=0 (chem:atoms) \u21d2 conserv_mom on physics')).",
+    "verified(fact(electro, electro_transfer_form, 'transfer_conserv_chem_atoms_to_electro_conserv_kcl', 'TRANSFER linear-\u0394=0 (chem:atoms) \u21d2 conserv_kcl on electro')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_conserv_physics_momentum_to_chem_conserv_chem', 'TRANSFER linear-\u0394=0 (physics:momentum) \u21d2 conserv_chem on chem')).",
+    "verified(fact(electro, electro_transfer_form, 'transfer_conserv_physics_momentum_to_electro_conserv_kcl', 'TRANSFER linear-\u0394=0 (physics:momentum) \u21d2 conserv_kcl on electro')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_conserv_electro_kcl_to_chem_conserv_chem', 'TRANSFER linear-\u0394=0 (electro:kcl) \u21d2 conserv_chem on chem')).",
+    "verified(fact(physics, phys_transfer_form, 'transfer_conserv_electro_kcl_to_physics_conserv_mom', 'TRANSFER linear-\u0394=0 (electro:kcl) \u21d2 conserv_mom on physics')).",
+    "verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n5', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).",
+    "rejected('transfer_kepler_bogus_power_n5', 'T\u00b2/a\u00b2 not const: [39.47841760435743, 59.21762640653614, 78.95683520871486, 98.69604401089356, 118.43525281307228]').",
+    "verified(fact(sequences, bilinear_schema, 'transfer_bilin_cassini_shape_on_fib', 'TRANSFER cassini-shape bilin \u21d2 fib(n+1)fib(n-1)-fib(n)^2=(-1)^n')).",
+    "rejected('transfer_bilin_cassini_shape_on_lucas', 'fail n=1 lhs\u2260(-1)^n').",
+    "verified(fact(calculus, calc_transfer_rec, 'transfer_rec_fib_to_delta_N4', 'TRANSFER rec(fib,[1, 1]) \u21d2 Delta structure matches recurrence')).",
+    "verified(fact(calculus, calc_transfer_rec, 'transfer_rec_lucas_to_delta_N4', 'TRANSFER rec(lucas,[1, 1]) \u21d2 Delta structure matches recurrence')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_conserv_mom_shape_to_chem_atoms', 'TRANSFER linear-\u0394=0 (momentum shape) \u21d2 atom counts balanced')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_conserv_kcl_shape_to_chem_atoms', 'TRANSFER linear-\u0394=0 (KCL shape) \u21d2 atom counts balanced')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_chem_conserv_form_on_physics_mom', 'TRANSFER chem atom-\u0394=0 form \u21d2 try on physics momentum')).",
+    "verified(fact(chem, chem_transfer_form, 'transfer_chem_conserv_form_on_electro_kcl', 'TRANSFER chem atom-\u0394=0 form \u21d2 try on electro KCL'))."
+  ],
+  "before_metric": 0.5,
+  "after_metric": 0.75
+}
