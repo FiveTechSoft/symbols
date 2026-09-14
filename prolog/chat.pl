@@ -318,6 +318,7 @@ chat_line_tokens(L, Toks, Changed) :-
     ; chat_greet(Toks) -> true
     ; chat_about(Toks) -> true
     ; book_other(Toks, B) -> about_entity(B, es)
+    ; book_recommends(Toks) -> true
     ; tell_me_bare(Toks) ->
         ( member(cuentame, Toks) -> chat_list_books(es)
         ; chat_list_books(en)
@@ -447,6 +448,23 @@ book_compare(Toks) :-
     member(W, Packed),
     other_word(W),
     \+ include(packed_has(Packed), Bs, [_|_]).
+
+% "cual me recomiendas?" / "which do you recommend?": book with most
+% outgoing facts (heuristic: richer KB = more interesting).
+book_recommends(Toks) :-
+    nl_tokens(Toks, Packed),
+    member(W, Packed),
+    recommend_word(W),
+    live_books(Bs), Bs = [_,_|_],
+    findall(N-B, (member(B, Bs),
+                  findall(1, memory_relation(B, _, _, _, _), Ms),
+                  length(Ms, N)), NBs),
+    keysort(NBs, Sorted),
+    reverse(Sorted, [_-Best|_]),
+    format('Te recomiendo ~w (tiene mas contenido).~n', [Best]).
+
+recommend_word(W) :-
+    member(W, [recomiendas, recomendar, recommend, recommends]).
 
 % "que X?" y X no vive en el mapa: pregunta por el propio KB.
 % Si el mapa tiene (Titulo, is, book), lista esos titulos (el grafo
@@ -1152,6 +1170,7 @@ chat_ask(Toks) :-
     ; book_compare(Toks) ->
         ask_lang(Toks, Lang),
         chat_compare_books(Lang)
+    ; book_recommends(Toks) -> true
     ; graph_ask(Toks, Kind, Ans) -> chat_remember_and_say(Toks, Kind, Ans)
     ; es_form(Toks, Kind, Ans) ->
         retractall(dialog_lastq(_)),
@@ -1164,6 +1183,7 @@ chat_ask(Toks) :-
         chat_why_bare
     ; length(Toks, 2),
       member(Wq, Toks), qlead(Wq),
+      \+ member(Wq, [who, what, where, when, how]),
       last_fact(_, _, _),
       \+ graph_pins(Toks, _, _) ->
         chat_why_bare
@@ -1900,7 +1920,10 @@ did_split(Mid, S, V, O) :-
 chat_form([who, V|Rest], say, answer(Xs, Facts)) :-
     qnorm(Rest, O),
     bb_rel_forms(V, Rs),
-    findall(S-(S, Vr, O), (member(Vr, Rs), memory_relation(S, Vr, O, _, _)), SF),
+    findall(X-(X, Vr, O), (member(Vr, Rs), memory_relation(X, Vr, O, _, _)), SF0),
+    findall(X-(O, Vr, X), (member(Vr, Rs), memory_relation(O, Vr, X, _, _)), SF1),
+    append(SF0, SF1, SF2),
+    sort(SF2, SF),
     SF \== [],
     findall(S, member(S-_, SF), Xs0),
     sort(Xs0, Xs),
@@ -1921,7 +1944,8 @@ chat_form([who, V], say, no) :-
 chat_form([who, V|Rest], say, no) :-
     qnorm(Rest, O),
     O \== [],
-    \+ (bb_rel_forms(V, Rs), member(Vr, Rs), memory_relation(_, Vr, O, _, _)).
+    \+ (bb_rel_forms(V, Rs), member(Vr, Rs),
+        ( memory_relation(_, Vr, O, _, _) ; memory_relation(O, Vr, _, _, _))).
 chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     append(Pre, [V], Mid),
     Pre \== [],
