@@ -1199,3 +1199,99 @@ verified(fact(physics, phys_collision, 'phys_energy_conserve_s6214', '½m1 u1²+
 verified(fact(physics, phys_collision, 'phys_mom_conserve_s6215', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
 % verified @ physics/phys_collision
 verified(fact(physics, phys_collision, 'phys_energy_conserve_s6215', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% finite fail / dead-end
+rejected('false_mom_as_energy_on_collision', 'form mismatch: linear-Δp=0 ≠ quadratic ½mv² (even if both hold on elastic)').
+% finite fail / dead-end
+rejected('false_series_and_as_parallel_or', 'series∧ vs parallel∨ mismatch at (0,1): series=0 parallel=1').
+% finite fail / dead-end
+rejected('false_fib_rec_on_trib', 'n=2: pred=0 != obs=1').
+% finite fail / dead-end
+rejected('false_fib_padded_on_trib', 'n=5: pred=3 != obs=4').
+% finite fail / dead-end
+rejected('false_kepler_as_ohm_on_resistor', 'T²/a³-shape on Ohm not const: [0.8267, 5.6582, 0.9737, 0.0142, 0.009]; Ohm itself holds=True').
+% finite fail / dead-end
+rejected('false_xor_as_and', 'XOR≠AND on (1,1): xor=0 and=1').
+% finite fail / dead-end
+rejected('false_and_as_xor', 'AND≠XOR').
+% finite fail / dead-end
+rejected('false_cassini_as_pell_law', 'form-family mismatch: bilin_cassini(bilinear_identity) ≠ pell_rec(linear_recurrence); identity_on_pell=True').
+% verified @ electro/electro_switch_transfer
+verified(fact(electro, electro_switch_transfer, 'transfer_parallel_switches_equiv_OR', 'TRANSFER OR-form ⇒ parallel switches ≡ OR on {0,1}^2')).
+% verified @ calculus/calc_transfer_rec
+verified(fact(calculus, calc_transfer_rec, 'transfer_rec_11_to_lucas_delta_N12', 'TRANSFER rec([1,1]) ⇒ Delta structure on lucas')).
+% verified @ algebra/alg_poly_zn
+verified(fact(algebra, alg_poly_zn, 'transfer_alg_distrib_mod5_to_mod7', 'TRANSFER poly distrib form (mod5 prior) ⇒ exhaustive distrib mod 7')).
+% verified @ algebra/alg_mat_assoc
+verified(fact(algebra, alg_mat_assoc, 'transfer_alg_mat_assoc_mod3_to_mod5', 'TRANSFER mat assoc form (mod3 prior) ⇒ sampled 2x2 assoc mod 5')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_5_-3_-4', 'TRANSFER rec(lucas,[5, -3, -4]) ⇒ try on fib: (5)*fib(n-1) + (-3)*fib(n-2) + (-4)*fib(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_2_-1_-1', 'TRANSFER rec(lucas,[1, 2, -1, -1]) ⇒ try on fib: (1)*fib(n-1) + (2)*fib(n-2) + (-1)*fib(n-3) + (-1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_-1_3_2_0', 'TRANSFER rec(lucas,[-1, 3, 2, 0]) ⇒ try on fib: (-1)*fib(n-1) + (3)*fib(n-2) + (2)*fib(n-3) + (0)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_3_-2_1_1', 'n=4: pred=5 != obs=3').
+% learned recurrence on fib
+rec(fib, [3,0,-3,-1]).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_pell_to_fib_3_0_-3_-1', 'TRANSFER rec(pell,[3, 0, -3, -1]) ⇒ try on fib: (3)*fib(n-1) + (0)*fib(n-2) + (-3)*fib(n-3) + (-1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_1_-1_2_2', 'TRANSFER rec(lucas,[1, -1, 2, 2]) ⇒ try on fib: (1)*fib(n-1) + (-1)*fib(n-2) + (2)*fib(n-3) + (2)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_2_1_-2_-1', 'TRANSFER rec(lucas,[2, 1, -2, -1]) ⇒ try on fib: (2)*fib(n-1) + (1)*fib(n-2) + (-2)*fib(n-3) + (-1)*fib(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_0_4_4_1', 'n=4: pred=8 != obs=3').
+% finite fail / dead-end
+rejected('transfer_pell_to_fib_1_1_5_2', 'n=4: pred=8 != obs=3').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_5_-3_-4', 'TRANSFER rec(fib,[5, -3, -4]) ⇒ try on lucas: (5)*lucas(n-1) + (-3)*lucas(n-2) + (-4)*lucas(n-3)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_2_-1_-1', 'TRANSFER rec(fib,[1, 2, -1, -1]) ⇒ try on lucas: (1)*lucas(n-1) + (2)*lucas(n-2) + (-1)*lucas(n-3) + (-1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_-1_3_2_0', 'TRANSFER rec(fib,[-1, 3, 2, 0]) ⇒ try on lucas: (-1)*lucas(n-1) + (3)*lucas(n-2) + (2)*lucas(n-3) + (0)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_3_-2_1_1', 'n=4: pred=9 != obs=7').
+% learned recurrence on lucas
+rec(lucas, [3,0,-3,-1]).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_pell_to_lucas_3_0_-3_-1', 'TRANSFER rec(pell,[3, 0, -3, -1]) ⇒ try on lucas: (3)*lucas(n-1) + (0)*lucas(n-2) + (-3)*lucas(n-3) + (-1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_1_-1_2_2', 'TRANSFER rec(fib,[1, -1, 2, 2]) ⇒ try on lucas: (1)*lucas(n-1) + (-1)*lucas(n-2) + (2)*lucas(n-3) + (2)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_2_1_-2_-1', 'TRANSFER rec(fib,[2, 1, -2, -1]) ⇒ try on lucas: (2)*lucas(n-1) + (1)*lucas(n-2) + (-2)*lucas(n-3) + (-1)*lucas(n-4)')).
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_0_4_4_1', 'n=4: pred=18 != obs=7').
+% finite fail / dead-end
+rejected('transfer_pell_to_lucas_1_1_5_2', 'n=4: pred=16 != obs=7').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_5_-3_-4', 'n=3: pred=7 != obs=5').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_2_-1_-1', 'n=4: pred=8 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_-1_3_2_0', 'n=4: pred=3 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_5_-3_-4', 'n=3: pred=7 != obs=5').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_1_2_-1_-1', 'n=4: pred=8 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_-1_3_2_0', 'n=4: pred=3 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_1_-1_2_2', 'n=4: pred=5 != obs=12').
+% finite fail / dead-end
+rejected('transfer_fib_to_pell_2_1_-2_-1', 'n=4: pred=10 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_1_-1_2_2', 'n=4: pred=5 != obs=12').
+% finite fail / dead-end
+rejected('transfer_lucas_to_pell_2_1_-2_-1', 'n=4: pred=10 != obs=12').
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_fib_3_0_-3_-1', 'TRANSFER rec(lucas,[3, 0, -3, -1]) ⇒ try on fib: (3)*fib(n-1) + (0)*fib(n-2) + (-3)*fib(n-3) + (-1)*fib(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_lucas_3_0_-3_-1', 'TRANSFER rec(fib,[3, 0, -3, -1]) ⇒ try on lucas: (3)*lucas(n-1) + (0)*lucas(n-2) + (-3)*lucas(n-3) + (-1)*lucas(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_fib_to_pell_3_0_-3_-1', 'TRANSFER rec(fib,[3, 0, -3, -1]) ⇒ try on pell: (3)*pell(n-1) + (0)*pell(n-2) + (-3)*pell(n-3) + (-1)*pell(n-4)')).
+% verified @ sequences/transfer_recurrence
+verified(fact(sequences, transfer_recurrence, 'transfer_lucas_to_pell_3_0_-3_-1', 'TRANSFER rec(lucas,[3, 0, -3, -1]) ⇒ try on pell: (3)*pell(n-1) + (0)*pell(n-2) + (-3)*pell(n-3) + (-1)*pell(n-4)')).
+% verified @ astro/astro_transfer_form
+verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n4', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).
+% finite fail / dead-end
+rejected('transfer_kepler_bogus_power_n4', 'T²/a² not const: [39.4784, 59.2176, 78.9568, 98.696]').

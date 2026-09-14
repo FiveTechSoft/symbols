@@ -1,4 +1,4 @@
-"""CLI: python -m motor tick|status|theory|live|vive|talk|molt"""
+"""CLI: python -m motor tick|status|theory|live|vive|talk|molt|snapshot"""
 
 from __future__ import annotations
 
@@ -38,6 +38,10 @@ def main(argv: list[str] | None = None) -> int:
     p_talk = sub.add_parser("talk", help="Natural-language mouth over theory.pl")
     p_talk.add_argument("-q", dest="question", help="One-shot question")
     p_talk.add_argument("--growth", action="store_true", help="Ask creciste")
+
+    p_snap = sub.add_parser("snapshot", help="Dump/verify recoverable binary of learned state")
+    p_snap.add_argument("action", nargs="?", default="dump", choices=["dump", "verify", "restore"])
+    p_snap.add_argument("--dest", help="restore destination motor dir")
 
     args = parser.parse_args(argv)
 
@@ -108,6 +112,22 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(k.archive.theory_text())
         return 0
+
+    if args.cmd == "snapshot":
+        from motor.snapshot import dump, restore, verify_roundtrip
+        if args.action == "dump":
+            print(json.dumps(dump(), indent=2))
+            return 0
+        if args.action == "verify":
+            r = verify_roundtrip()
+            print(json.dumps(r, indent=2))
+            return 0 if r["ok"] else 1
+        if args.action == "restore":
+            if not args.dest:
+                print("--dest required for restore", file=sys.stderr)
+                return 2
+            print(json.dumps(restore(Path(args.dest)), indent=2))
+            return 0
 
     return 1
 

@@ -98,6 +98,11 @@ class PrologArchive:
     def save(self) -> None:
         self._flush_theory()
         self.save_meta()
+        try:
+            from motor.snapshot import dump_quietly
+            dump_quietly(self.theory_path.parent)
+        except Exception:
+            pass
 
     def theory_text(self) -> str:
         return "\n".join(self._lines) + "\n"
