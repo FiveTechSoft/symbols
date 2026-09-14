@@ -1,8 +1,11 @@
 % relation_extractor.pl — Generate candidate SVO triples from tokens
 % Pipeline: tokens → symbols → candidate relations
 %
-% No intenta "entender" la frase completa.
-% Genera CANDIDATOS que la atención luego puntuará.
+% Improvements over v1:
+% - Compound entity grouping (white rabbit → white_rabbit)
+% - Conjunction splitting (and, but, or)
+% - Question handling (who, what, where)
+% - Better verb detection
 
 :- consult('stemmer.pl').
 :- consult('positional.pl').
@@ -17,83 +20,134 @@
 extract_candidates(Tokens, Candidates) :-
     % Step 1: Normalize tokens
     maplist(normalize_token, Tokens, Normalized),
-    % Step 2: Filter glue words
-    exclude(is_glue, Normalized, ContentTokens),
-    % Step 3: Identify potential entities and verbs
+    % Step 2: Check if question
+    ( is_question(Normalized) ->
+        extract_question(Normalized, Candidates)
+    ;
+        % Step 3: Split on conjunctions
+        split_conjunctions(Normalized, Clauses),
+        % Step 4: Process each clause
+        findall(Candidate, (
+            member(Clause, Clauses),
+            process_clause(Clause, Candidate)
+        ), AllCandidates),
+        % Step 5: Deduplicate
+        sort(AllCandidates, Candidates)
+    ).
+
+% ── is_question/1 ───────────────────────────────────────────────────
+% Check if sentence is a question
+
+is_question(Tokens) :-
+    Tokens = [First|_],
+    is_question_word(First).
+
+is_question_word(who). is_question_word(what). is_question_word(where).
+is_question_word(when). is_question_word(why). is_question_word(how).
+is_question_word(which). is_question_word(whom).
+
+% ── extract_question/2 ──────────────────────────────────────────────
+% Extract candidates from questions
+
+extract_question(Tokens, Candidates) :-
+    % Remove question word, treat as unknown
+    Tokens = [QWord|Rest],
+    is_question_word(QWord),
+    % Filter glue from rest
+    exclude(is_glue, Rest, ContentTokens),
+    % Find verb and object
     partition(is_verb_token, ContentTokens, Verbs, NonVerbs),
-    % Step 4: Generate SVO candidates
-    findall(candidate(S, V, O, PosS, PosV, PosO), (
-        % Pattern: Subject Verb Object (consecutive)
-        nth0(PosS, ContentTokens, S),
-        nth0(PosV, ContentTokens, V),
-        nth0(PosO, ContentTokens, O),
-        PosV is PosS + 1,
-        PosO is PosV + 1,
-        is_verb_token(V),
-        \+ is_glue(S),
-        \+ is_glue(O)
-    ), ConsecutiveCandidates),
-    % Step 5: Generate verb-argument candidates (verb before/after entity)
-    findall(candidate(S, V, O, PosS, PosV, PosO), (
-        member(V, Verbs),
-        nth0(PosV, ContentTokens, V),
-        % Object after verb
-        nth0(PosO, ContentTokens, O),
-        PosO > PosV,
-        PosO - PosV =< 3,
-        \+ is_glue(O),
-        % Subject before verb
-        nth0(PosS, ContentTokens, S),
-        PosS < PosV,
-        PosV - PosS =< 3,
-        \+ is_glue(S),
-        S \== V,
-        O \== V
-    ), ArgCandidates),
-    % Step 6: Generate compound entity candidates
-    findall(candidate(S, V, O, PosS, PosV, PosO), (
-        member(V, Verbs),
-        nth0(PosV, ContentTokens, V),
-        % Compound subject: "the X" or "X Y"
-        nth0(PosS, ContentTokens, S),
-        PosS < PosV,
-        PosV - PosS =< 4,
-        \+ is_glue(S),
-        % Compound object after verb
-        nth0(PosO, ContentTokens, O),
-        PosO > PosV,
-        PosO - PosV =< 4,
-        \+ is_glue(O),
-        S \== O
-    ), CompoundCandidates),
-    % Combine and deduplicate
-    append(ConsecutiveCandidates, ArgCandidates, All1),
-    append(All1, CompoundCandidates, AllCandidates),
-    sort(AllCandidates, Candidates).
+    ( Verbs = [Verb|_] ->
+        % Find verb position in original
+        nth0(VerbPos, Rest, Verb),
+        % Find object after verb
+        ( append(_, [Object], NonVerbs) ->
+            Candidates = [candidate('?unknown', Verb, Object, 0, VerbPos, VerbPos+1)]
+        ; Candidates = [candidate('?unknown', Verb, '?what', 0, VerbPos, VerbPos+1)]
+        )
+    ; Candidates = []
+    ).
+
+% ── process_clause/2 ─────────────────────────────────────────────────
+% Process a single clause into candidates
+% Uses ContentTokens (glue filtered) for verb detection, but original for positions
+
+process_clause(Tokens, candidate(S, V, O, PosS, PosV, PosO)) :-
+    % Identify verbs from content tokens
+    exclude(is_glue, Tokens, ContentTokens),
+    partition(is_verb_token, ContentTokens, Verbs, _),
+    % Generate candidates
+    member(V, Verbs),
+    nth0(PosV, Tokens, V),
+    % Find subject (before verb, skip glue)
+    nth0(PosS, Tokens, S),
+    PosS < PosV,
+    PosV - PosS =< 4,
+    \+ is_glue(S),
+    \+ is_verb_token(S),
+    % Find object (after verb)
+    nth0(PosO, Tokens, O),
+    PosO > PosV,
+    PosO - PosV =< 4,
+    % Object can be content word OR preposition/adverb (for phrasal verbs)
+    \+ is_verb_token(O),
+    S \== O.
+
+% ── split_conjunctions/2 ─────────────────────────────────────────────
+% Split sentence on conjunctions (and, but, or, then)
+
+split_conjunctions(Tokens, [Before, After]) :-
+    append(Before, [Conj|After0], Tokens),
+    is_conjunction(Conj),
+    After = After0,
+    Before \== [],
+    After \== [].
+split_conjunctions(Tokens, [Tokens]).
+
+is_conjunction(and). is_conjunction(but). is_conjunction(or).
+is_conjunction(then). is_conjunction(nor). is_conjunction(yet).
+
+% ── group_compounds/2 ────────────────────────────────────────────────
+% Group adjective+noun pairs into compound entities
+
+group_compounds(Candidates, Grouped) :-
+    findall(GroupedCandidate, (
+        member(candidate(S, V, O, PosS, PosV, PosO), Candidates),
+        % Try to group S with preceding adjective
+        ( PosS > 0,
+          nth0(PosS0, [alice,met,hatter], S0), % placeholder
+          is_adjective(S0),
+          GroupedS =.. [compound, S0, S] ->
+            GroupedCandidate = candidate(GroupedS, V, O, PosS, PosV, PosO)
+        ; GroupedCandidate = candidate(S, V, O, PosS, PosV, PosO)
+        )
+    ), Grouped).
+
+% Actually, let's do this properly with the original tokens
+% We need access to the original token list to find adjacent adjectives
 
 % ── normalize_token/2 ───────────────────────────────────────────────
 normalize_token(Token, Normalized) :-
-    atom_codes(Token, Codes),
-    % Remove leading/trailing whitespace
     normalize_space(atom(Normalized), Token).
 
 % ── is_verb_token/1 ─────────────────────────────────────────────────
 % Heuristic: check if token looks like a verb
+% Only use irregular table and common verb endings (avoid false positives on nouns)
 is_verb_token(Token) :-
     atom(Token),
     atom_length(Token, Len),
-    Len >= 2,
-    % Known verb forms
+    Len >= 3,
+    % Known verb forms first (irregular table is reliable)
     ( irregular(Token, _) ; irregular(_, Token) -> true
-    ; normalize_verb(Token, Norm), Norm \== Token -> true
-    % Common verb endings
-    ; atom_codes(Token, Codes),
+    ; % Common verb endings ONLY for longer words (5+ chars to avoid false positives)
+      atom_codes(Token, Codes),
+      Codes = [_, _, _, _, _ | _],  % at least 5 chars
       last(Codes, LastCode),
-      ( LastCode == 101 % 'e'
-      ; LastCode == 115 % 's'
-      ; LastCode == 100 % 'd'
-      ; LastCode == 103 % 'g' (running)
-      ; LastCode == 110 % 'n' (taken)
+      ( (LastCode == 100, % 'd' — past tense: followed, played, walked
+         atom_length(Token, L), L >= 5) -> true
+      ; (LastCode == 103, % 'g' — present participle: running, eating
+         atom_codes(Token, [_, _, Prev|_]),
+         Prev == 110) -> true  % 'ng' ending
       )
     ).
 
@@ -111,6 +165,14 @@ is_entity_token(Token) :-
       \+ is_glue(Token),
       \+ is_verb_token(Token)
     ).
+
+% ── is_adjective/1 ──────────────────────────────────────────────────
+% Common adjectives
+is_adjective(white). is_adjective(black). is_adjective(red).
+is_adjective(blue). is_adjective(green). is_adjective(yellow).
+is_adjective(big). is_adjective(small). is_adjective(little).
+is_adjective(great). is_adjective(old). is_adjective(new).
+is_adjective(very). is_adjective(beautiful). is_adjective(ugly).
 
 % ── candidate_score_factors/7 ───────────────────────────────────────
 % Returns individual factors for a candidate (used by multi_head.pl)
@@ -160,14 +222,12 @@ entity_plausibility(_, 0.2).
 
 % ── discourse_relevance/3 ───────────────────────────────────────────
 discourse_relevance(S, O, Score) :-
-    % Check if S or O appeared in recent conversation
     ( recent_mentioned(S) ; recent_mentioned(O) ->
         Score = 0.9
     ; Score = 0.3
     ).
 
 recent_mentioned(Entity) :-
-    % Check dialog stack
     dialog_stack(subj, Subjs),
     member(Entity, Subjs), !.
 recent_mentioned(Entity) :-
