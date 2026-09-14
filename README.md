@@ -82,6 +82,123 @@ INFERENCE        -> Backward chaining, materialization, compositional rules
 SHARD            -> Corpus splitting, binary model merge, parallel training
 INGEST           -> Streaming TSV parser with 64KB I/O buffers
 PRUNE            -> Zipf pruning: remove low-count noise relations
+ATTENTION        -> Symbolic attention: KB-driven token weighting (no matrices)
+```
+
+---
+
+## Symbolic Attention (Prolog)
+
+A **pure symbolic attention mechanism** that uses the knowledge graph directly to weight tokens in a sentence. No neural networks, no floating-point matrices, no backpropagation. Just Prolog relations and logical inference.
+
+### Concept
+
+In traditional Transformers, attention is computed as:
+
+```
+Attention(Q, K, V) = softmax(QK^T / √d) · V
+```
+
+In our system, attention is computed as:
+
+```
+Attention(token) = f(relations_in_KB, connection_strength, position, novelty)
+```
+
+Each factor is derived directly from `memory_relation/5`:
+
+| Factor | Source | Meaning |
+|---|---|---|
+| **Relations** | `findall(R, memory_relation(Token, R, _, _, _), L)` | How many actions does this token perform? |
+| **Connections** | `memory_relation(Token, _, Other, _, _)` | How many other tokens in the sentence is it related to? |
+| **Position** | `nth0(Pos, Tokens, Token)` | First/second tokens are more important (SVO structure) |
+| **Novelty** | `\+ memory_relation(Token, _, _, _, _)` | Is this token new to the KB? (potential knowledge) |
+
+### Architecture
+
+```
+SENTENCE TOKENS
+       │
+       ▼
+┌──────────────────────────────────────────┐
+│           SYMBOLIC ATTENTION              │
+│                                          │
+│  ┌─────────────┐  ┌──────────────────┐   │
+│  │ KB Lookup   │  │ Position Encoding │   │
+│  │             │  │                  │   │
+│  │ memory_     │  │ S=0, V=1, O=2   │   │
+│  │ relation/5  │  │ primacy/recency  │   │
+│  └──────┬──────┘  └────────┬─────────┘   │
+│         │                  │             │
+│         ▼                  ▼             │
+│  ┌─────────────────────────────────┐     │
+│  │     Weight Combination          │     │
+│  │                                 │     │
+│  │  score = w_r·relations          │     │
+│  │        + w_c·connections        │     │
+│  │        + w_p·position           │     │
+│  │        + w_n·novelty            │     │
+│  └─────────────────────────────────┘     │
+│                                          │
+└──────────────────┬───────────────────────┘
+                   │
+                   ▼
+          RANKED TOKENS
+          (by importance)
+                   │
+                   ▼
+          ANSWER / ANALYSIS
+```
+
+### Example
+
+```
+Sentence: "Alice followed the white rabbit down the hole"
+
+Token Analysis:
+  alice        → relations=6, connections=2, pos=0 → score=0.85  ← PROTAGONIST
+  followed     → relations=1, connections=2, pos=1 → score=0.72  ← ACTION
+  white_rabbit → relations=2, connections=2, pos=3 → score=0.68  ← OBJECT
+  hole         → relations=0, connections=0, pos=5 → score=0.15  ← LOCATION
+  down         → relations=0, connections=0, pos=4 → score=0.10  ← DIRECTION
+
+Key Insight: "alice" and "white_rabbit" are the most important tokens
+because they have the most relations in the knowledge base.
+```
+
+### Integration with Chat
+
+The symbolic attention integrates with the existing chat system:
+
+```prolog
+% 1. User asks: "Who followed the white rabbit?"
+% 2. Tokenize: [who, followed, white, rabbit]
+% 3. Analyze attention:
+%    - "followed" has high action score (verb)
+%    - "white_rabbit" has high object score (known entity)
+% 4. Query KB: memory_relation(who, followed, white_rabbit, _, _)
+% 5. Answer: "Alice followed the white rabbit"
+```
+
+### Key Advantages Over Neural Attention
+
+| Aspect | Neural Attention (Transformer) | Symbolic Attention (Prolog) |
+|---|---|---|
+| **Explainability** | Opaque weights | 100% auditable reasoning |
+| **Memory** | O(N²) attention matrix | O(1) KB lookups |
+| **Training** | Billions of parameters | Zero training, instant knowledge |
+| **Correction** | Requires retraining | Edit one fact, immediately effective |
+| **Hardware** | GPU required | Any CPU |
+| **Domain** | General (noisy) | Precise (no hallucination) |
+
+### Files
+
+```
+prolog/symbolic_attention.pl    — Core attention engine
+prolog/positional.pl            — Tokenization + SVO extraction
+prolog/stemmer.pl               — English verb normalization
+prolog/bookbrain.pl             — Text → knowledge pipeline
+prolog/chat.pl                  — Q&A system using attention
 ```
 
 ## Key Features

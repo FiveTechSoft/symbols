@@ -1,5 +1,6 @@
 % positional.pl — Simbolizador SVO mejorado (P2)
 :- use_module(library(lists)).
+:- consult('stemmer.pl').
 
 % ── Tokenización ──────────────────────────────────────────────────────
 
@@ -216,7 +217,8 @@ parse_svo_clean(Tokens, (S, V, O)) :-
     Tokens \== [],
     find_verb_pos_orig(Tokens, VerbPos),
     VerbPos > 0,
-    nth0(VerbPos, Tokens, V),
+    nth0(VerbPos, Tokens, VRaw),
+    normalize_verb(VRaw, V),
     verb_subject(Tokens, VerbPos, SubjTokens),
     SubjTokens \== [],
     VerbEnd is VerbPos + 1,
@@ -231,14 +233,15 @@ parse_svo_clean(Tokens, (S, V, O)) :-
     Tokens \== [],
     find_verb_pos_orig(Tokens, VerbPos),
     VerbPos > 0,
+    nth0(VerbPos, Tokens, VRaw),
+    normalize_verb(VRaw, V),
     verb_subject(Tokens, VerbPos, SubjTokens),
     SubjTokens \== [],
     VerbEnd is VerbPos + 1,
     verb_object_to_end(Tokens, VerbEnd, ObjTokens),
     ObjTokens \== [],
     atomic_list_concat(SubjTokens, '_', S),
-    atomic_list_concat(ObjTokens, '_', O),
-    nth0(VerbPos, Tokens, V).
+    atomic_list_concat(ObjTokens, '_', O).
 
 % Fallback: 3+ tokens sin verbo conocido
 parse_svo_clean(Tokens, (S, R, O)) :-

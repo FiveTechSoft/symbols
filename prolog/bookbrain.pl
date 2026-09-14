@@ -46,16 +46,28 @@ book_lines_loop(S) :-
 process_line(Line) :-
     % 1. Preprocesar: simplificar oración
     preprocess_sentence(Line, Simple),
+    string_length(Simple, Len),
+    Len > 10, Len < 500,
     % 2. Intentar learn_sentence (open_vocab)
     ( learn_sentence(Simple, Stored), Stored \= rejected(_) -> true
     % 3. Intentar SVO con glue stripping
-    ; symbolize_text(Simple, Triple), Triple = (A, V, O) ->
-        next_sentence_id(Src),
-        remember_tracked(A, V, O, Src, none)
+    ; symbolize_text(Simple, Triples) ->
+        ( is_list(Triples) ->
+            % Múltiples triples (conjunction split)
+            maplist([T]>>(
+                T = (A, V, O),
+                next_sentence_id(Src),
+                remember_tracked(A, V, O, Src, none)
+            ), Triples)
+        ; % Triple único
+          Triples = (A, V, O),
+          next_sentence_id(Src),
+          remember_tracked(A, V, O, Src, none)
+        )
     % 4. Intentar división de conjunciones
     ; try_conjunction_split(Simple)
-    % 5. Rechazar
-    ; true  % silencioso: no mostrar REJECTED para texto literario
+    % 5. Rechazar silenciosamente
+    ; true
     ).
 
 % ── Preprocesamiento de oraciones ────────────────────────────────────
@@ -66,13 +78,36 @@ preprocess_sentence(In, Out) :-
     strip_dialog(In, NoDialog),
     % Quitar paréntesis y corchetes
     strip_brackets(NoDialog, NoBrackets),
+    % Quitar posesivos ('s)
+    strip_possessives(NoBrackets, NoPoss),
+    % Quitar guiones entre palabras
+    strip_hyphens(NoPoss, NoHyph),
     % Normalizar espacios
-    normalize_spaces(NoBrackets, Out).
+    normalize_spaces(NoHyph, Out).
 
 % strip_dialog(+In, -Out) — quita texto entre comillas y diálogos
 strip_dialog(In, Out) :-
-    % "..." → quitar
     sub_string(In, Before, _, After, '"'),
+    Before >= 0,
+    !,
+    sub_string(In, 0, Before, _, BeforeStr),
+    AfterStart is Before + 1,
+    sub_string(In, AfterStart, _, 0, AfterStr),
+    strip_dialog(BeforeStr, B),
+    strip_dialog(AfterStr, A),
+    atomic_list_concat([B, A], ' ', Out).
+strip_dialog(In, Out) :-
+    sub_string(In, Before, _, After, '''),
+    Before >= 0,
+    !,
+    sub_string(In, 0, Before, _, BeforeStr),
+    AfterStart is Before + 1,
+    sub_string(In, AfterStart, _, 0, AfterStr),
+    strip_dialog(BeforeStr, B),
+    strip_dialog(AfterStr, A),
+    atomic_list_concat([B, A], ' ', Out).
+strip_dialog(In, Out) :-
+    sub_string(In, Before, _, After, '\x201C'),
     Before >= 0,
     !,
     sub_string(In, 0, Before, _, BeforeStr),
@@ -96,10 +131,45 @@ strip_brackets(In, Out) :-
     atomic_list_concat([B, A], ' ', Out).
 strip_brackets(In, In).
 
+% strip_possessives(+In, -Out) — quita 's
+strip_possessives(In, Out) :-
+    sub_string(In, Before, _, After, '''s'),
+    Before >= 0,
+    !,
+    sub_string(In, 0, Before, _, BeforeStr),
+    AfterStart is Before + 2,
+    sub_string(In, AfterStart, _, 0, AfterStr),
+    strip_possessives(BeforeStr, B),
+    strip_possessives(AfterStr, A),
+    atomic_list_concat([B, A], ' ', Out).
+strip_possessives(In, Out) :-
+    sub_string(In, Before, _, After, '\x2019s'),
+    Before >= 0,
+    !,
+    sub_string(In, 0, Before, _, BeforeStr),
+    AfterStart is Before + 2,
+    sub_string(In, AfterStart, _, 0, AfterStr),
+    strip_possessives(BeforeStr, B),
+    strip_possessives(AfterStr, A),
+    atomic_list_concat([B, A], ' ', Out).
+strip_possessives(In, In).
+
+% strip_hyphens(+In, -Out) — quita guiones entre palabras
+strip_hyphens(In, Out) :-
+    sub_string(In, Before, _, After, '-'),
+    Before >= 0,
+    After > 0,
+    !,
+    sub_string(In, 0, Before, _, BeforeStr),
+    AfterStart is Before + 1,
+    sub_string(In, AfterStart, _, 0, AfterStr),
+    atomic_list_concat([BeforeStr, AfterStr], ' ', Combined),
+    strip_hyphens(Combined, Out).
+strip_hyphens(In, In).
+
 % normalize_spaces(+In, -Out)
 normalize_spaces(In, Out) :-
     string_lower(In, Lower),
-    % Colapsar espacios múltiples
     re_replace(' +'/g, Lower, ' ', Out).
 
 % ── División de conjunciones ─────────────────────────────────────────
