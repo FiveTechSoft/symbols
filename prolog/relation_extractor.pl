@@ -176,21 +176,31 @@ is_adjective(very). is_adjective(beautiful). is_adjective(ugly).
 
 % ── candidate_score_factors/7 ───────────────────────────────────────
 % Returns individual factors for a candidate (used by multi_head.pl)
+% Each factor is 0.0-1.0
 
 candidate_score_factors(candidate(S, V, O, PosS, PosV, PosO),
                          RelationScore, EntityScore, PositionScore,
                          DiscourseScore, TemporalScore, NoveltyScore) :-
-    % Relation: verb quality
-    verb_quality(V, RelationScore),
+    % Relation: verb quality + KB presence
+    verb_quality(V, VQ),
+    ( known_relation(S, V, O) -> KBBonus = 0.3 ; KBBonus = 0.0 ),
+    RelationScore is min(1.0, VQ + KBBonus),
     % Entity: are S and O known or plausible entities
     entity_plausibility(S, SE),
     entity_plausibility(O, OE),
-    EntityScore is (SE + OE) / 2,
-    % Position: proximity and ordering
-    PositionScore is max(0.1, 1.0 - abs(PosV - PosS) * 0.1 - abs(PosO - PosV) * 0.1),
+    % Bonus if entity appears in KB
+    ( known_entity(S) -> SBonus = 0.2 ; SBonus = 0.0 ),
+    ( known_entity(O) -> OBonus = 0.2 ; OBonus = 0.0 ),
+    EntityScore is min(1.0, (SE + OE) / 2 + (SBonus + OBonus) / 2),
+    % Position: proximity and ordering (S before V before O is ideal)
+    ( PosS < PosV, PosV < PosO ->
+        OrderBonus = 0.2
+    ; OrderBonus = 0.0
+    ),
+    PositionScore is min(1.0, max(0.1, 1.0 - abs(PosV - PosS) * 0.15 - abs(PosO - PosV) * 0.15) + OrderBonus),
     % Discourse: connects to conversation context
     discourse_relevance(S, O, DiscourseScore),
-    % Temporal: time indicators
+    % Temporal: time indicators + action verbs
     temporal_relevance(V, TemporalScore),
     % Novelty: is this new information
     novelty_score_candidates(S, V, O, NoveltyScore).
