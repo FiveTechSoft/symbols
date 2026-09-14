@@ -7,7 +7,7 @@ Answers assemble from deduced clauses — no adult synonym dictionaries.
 Voice: fluent LLM paragraphs (2–4 sentences, sometimes a question) with
 scientist rigor — kind professor / careful colleague. Always distinguish
 verified vs rejected vs unknown. When refusing transfer: state the law in
-math AND the failing case. Never overclaim. No flirt, no pickup register.
+math AND the failing case. Never overclaim. Mild warmth ok; no hard flirt / pickup.
 """
 from __future__ import annotations
 
@@ -751,6 +751,86 @@ def _is_thanks(s: str) -> bool:
     return s in ("gracias", "gracias!", "thanks", "thank you", "mil gracias") or s.startswith("gracias ")
 
 
+def _is_laugh(s: str) -> bool:
+    """Bare laugh / chuckle — rapport, never UNKNOWN, never invent."""
+    s = (s or "").strip().rstrip("!.")
+    if not s:
+        return False
+    # pure laugh tokens: jaja, jajaja, jeje, haha, …
+    if re.fullmatch(r"(ja)+j?a?", s) or re.fullmatch(r"(je)+j?e?", s):
+        return True
+    if re.fullmatch(r"(ha){2,}", s) or s in ("jaja", "jajaja", "jajajaja", "jeje", "jejeje", "haha", "hahaha"):
+        return True
+    return False
+
+
+def _is_warm_like(s: str) -> bool:
+    """Mild liking — scientist-amiable ack; no invent, no law flattery."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "me caes bien", "me caes muy bien", "me caés bien", "me caés muy bien",
+        "me cae bien", "caés bien", "caes bien",
+        "me agradas", "me simpatizas",
+    )
+
+
+def _is_tease_heavy(s: str) -> bool:
+    """Friendly pushback («eres pesado») — warm shrug, not UNKNOWN."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "eres pesado", "sos pesado", "qué pesado", "que pesado",
+        "eres un plomo", "sos un plomo", "qué plomo", "que plomo",
+        "pesado", "muy pesado",
+    )
+
+
+def _is_hard_flirt(s: str) -> bool:
+    """Romance / pickup register — mild deflect only; never invent or flirt back hard."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "te quiero", "te amo", "me gustas", "me encantas",
+        "sos un amor", "eres un amor", "beso", "un beso",
+        "casate conmigo", "cásate conmigo", "te deseo",
+    ) or any(x in s for x in (
+        "te quiero", "te amo", "me gustas mucho", "quiero besarte",
+    ))
+
+
+def _answer_warmth(kind: str, st: dict) -> tuple[str, str, dict]:
+    """Scientist-amiable rapport. Never invent facts; never flatter false laws."""
+    pulse = int(st.get("pulse") or 0)
+    st["pulse"] = pulse + 1
+    if kind == "laugh":
+        lines = [
+            "Jaja. Bien — ¿seguimos con algo firmado?",
+            "Jajaja. Ok. Tirame lo siguiente cuando quieras.",
+            "Jaja. Sin inventar, igual se puede reír un poco.",
+        ]
+        tag = "warm"
+    elif kind == "like":
+        lines = [
+            "Igual — me gusta el ida y vuelta serio. ¿Seguimos con algo firmado?",
+            "Gracias. Yo también disfruto cuando no inventamos. ¿Por dónde tiramos?",
+            "Bien recibido. Sigo en modo colega: rigor, sin adorno falso.",
+        ]
+        tag = "warm"
+    elif kind == "tease":
+        lines = [
+            "Puede ser — prefiero cortar corto a inventar. Decime si aflojo o si seguimos.",
+            "Pesado de laboratorio, sí. Mejor eso que rellenar huecos. ¿Qué miramos?",
+            "Ok, me anoto el pesado. Igual no invento por quedar simpático.",
+        ]
+        tag = "warm"
+    else:  # mild flirt deflect
+        lines = [
+            "Gracias por el calor — yo me quedo en el laboratorio: rigor, sin inventar. ¿Qué miramos?",
+            "Aprecio el gesto. Yo no flirteo: demuestro, rechazo o callo. ¿Seguimos con algo firmado?",
+            "Amable. Yo mantengo tono de colega científico — sin inventar ni enrollarme.",
+        ]
+        tag = "warm"
+    return _pack(lines[pulse % len(lines)], tag, "", st, topic=st.get("topic"))
+
+
 def _is_ack(s: str) -> bool:
     """Bare affirmations after a turn — not new questions, never UNKNOWN."""
     s = (s or "").strip().rstrip("!.")
@@ -1397,6 +1477,15 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             "Dale. Aquí estoy.",
         ]
         return _pack(thanks[pulse % len(thanks)], "thanks", "", st, topic=st.get("topic"))
+    # Mild warmth / laugh / tease / hard-flirt deflect — never invent, never UNKNOWN
+    if _is_laugh(s):
+        return _answer_warmth("laugh", st)
+    if _is_warm_like(s):
+        return _answer_warmth("like", st)
+    if _is_tease_heavy(s):
+        return _answer_warmth("tease", st)
+    if _is_hard_flirt(s):
+        return _answer_warmth("flirt", st)
     if _is_hold(s):
         pulse = int(st.get("pulse") or 0)
         st["pulse"] = pulse + 1
