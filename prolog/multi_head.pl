@@ -108,12 +108,26 @@ status_verified(verified(_, _, _, known)).
 % ── verify_candidate/4 ──────────────────────────────────────────────
 % verify_candidate(+S, +V, +O, -Status)
 % Checks if candidate is known, contradicted, or new.
+% Uses reasoning layer for inference.
 
 verify_candidate(S, V, O, known) :-
     known_relation(S, V, O), !.
+verify_candidate(S, V, O, inferred) :-
+    % Check if can be inferred from known facts
+    ( % Transitive: S knows V1, V1 implies V2, V2 with O
+      known_relation(S, V1, _), known_relation(_, V2, O),
+      verb_implies(V1, V2) -> true
+    ; % Symmetric: if S loves O, then O loves S
+      symmetric_verb(V), known_relation(O, V, S) -> true
+    ), !.
 verify_candidate(S, V, O, contradicted) :-
     % Check for opposite relation
     ( known_relation(S, not_V, O) ; known_relation(O, V, S) ), !.
+verify_candidate(S, V, O, implausible) :-
+    % Entity type mismatch
+    ( person(S), inanimate_object(O), transitive_verb(V) -> true
+    ; inanimate_object(S), transitive_verb(V) -> true
+    ), !.
 verify_candidate(S, V, O, new) :-
     % Not known, not contradicted → new information
     atom(S), atom(V), atom(O),
@@ -122,6 +136,29 @@ verify_candidate(S, V, O, new) :-
     V \== S,
     V \== O, !.
 verify_candidate(_, _, _, rejected).
+
+% ── verb_implies/2 ──────────────────────────────────────────────────
+% Verb implication rules for inference
+verb_implies(know, love).
+verb_implies(know, like).
+verb_implies(love, like).
+
+% ── symmetric_verb/1 ────────────────────────────────────────────────
+% Symmetric verbs: if A V B, then B V A
+symmetric_verb(love). symmetric_verb(like). symmetric_verb(hate).
+symmetric_verb(know). symmetric_verb(meet). symmetric_verb(kiss).
+
+% ── transitive_verb/1 ───────────────────────────────────────────────
+% Transitive verbs that require animate subject
+transitive_verb(eat). transitive_verb(drink). transitive_verb(read).
+transitive_verb(write). transitive_verb(play). transitive_verb(carry).
+
+% ── person/1 ────────────────────────────────────────────────────────
+person(alice). person(hatter). person(queen). person(rabbit).
+
+% ── inanimate_object/1 ──────────────────────────────────────────────
+inanimate_object(tea). inanimate_object(coat). inanimate_object(hole).
+inanimate_object(mushroom). inanimate_object(croquet).
 
 % ── store_verified/2 ────────────────────────────────────────────────
 % store_verified(+Verified, -Stored)
