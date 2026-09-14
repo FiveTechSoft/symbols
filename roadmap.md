@@ -533,6 +533,114 @@ Hypotheses:
 - H4: honest unknowns (missing info → UNKNOWN, not fabrication)
 - H5: scalability (top-k keeps reasoning cost bounded as KB grows)
 
+## 7c. Symbolic Capability Distillation (2026-09-14)
+
+Instead of copying neural weights into Prolog, extract functional
+capabilities from large LLMs (e.g. MiMo-V2.5: 310B params, 15B active,
+48 layers, 256 experts, 64 heads, 1M context, MoE architecture) and
+rebuild them as symbolic operations.
+
+### Key distinction: migrate capabilities, not the model
+
+| Approach | Verdict | Why |
+|----------|---------|-----|
+| Weight migration | not viable | no 1:1 mapping weight → relation |
+| Classical distillation | partial | compresses neural net into rules, loses much |
+| Structured extraction | **best fit** | LLM → facts/rules/graph → Prolog |
+| Teacher mode | **best fit** | LLM proposes, symbolic system verifies |
+| Architecture migration | **best fit** | attention/MoE/KV → symbolic equivalents |
+
+### MiMo → Symbolic mapping
+
+| MiMo Component | Symbolic Equivalent |
+|----------------|-------------------|
+| Attention | Symbolic Attention |
+| Sliding Window | attention over relation window |
+| Global Attention | global graph search |
+| MoE (256 experts) | symbolic expert modules |
+| KV Cache | conversational context cache |
+| MTP (multi-token prediction) | multi-relation prediction |
+| Context window (1M) | contextual graph |
+| Routing | symbolic router |
+| State | persistent symbolic state |
+
+### Three levels of distillation
+
+**Level 1 — Extraction**: MiMo → facts/rules → Prolog
+No neural distillation. Extract structured knowledge.
+
+**Level 2 — Behavior distillation**: MiMo → 10M examples → Prolog learns patterns
+Knowledge/behavior transfer without weight copying.
+
+**Level 3 — Hybrid (most powerful)**:
+```
+USER
+  ↓
+SYMBOLIC ENGINE
+  ↓
+  ├── KNOWLEDGE → answer
+  └── UNKNOWN → MiMo → candidate answer → verifier → accepted/rejected
+```
+
+### Symbolic MoE (especially transferable)
+
+MiMo activates only some experts per token. We can do:
+
+```
+question
+  ↓
+SYMBOLIC ROUTER
+  ↓
+  ├── temporal_expert
+  ├── coreference_expert
+  ├── causal_expert
+  ├── spatial_expert
+  ├── arithmetic_expert
+  ├── ontology_expert
+  └── dialogue_expert
+  ↓
+answer
+```
+
+Experts are Prolog modules, not neural networks.
+Symbolic attention decides which experts to activate.
+
+### MiMo as teacher (not data source)
+
+Ask MiMo:
+- How would you solve this question?
+- What facts do you need?
+- What relations are involved?
+- What reasoning steps do you take?
+- What alternatives do you discard?
+- What information is missing?
+
+Convert answers to verifiable symbolic structures.
+
+**Name**: Symbolic Capability Distillation
+(not model distillation — we extract functional capabilities, not weights)
+
+### Paper extension
+
+"Can the functional principles of modern LLMs be transferred from
+neural computation to symbolic computation?"
+
+Demonstrate progressively:
+- Transformer attention → symbolic attention
+- Multi-head → symbolic multi-head
+- KV cache → symbolic context cache
+- MoE routing → symbolic expert routing
+- Mamba selective state → symbolic selective state
+- LLM knowledge acquisition → incremental symbolic learning
+
+### Next steps
+
+- [ ] SD1: MiMo as teacher for symbolic attention calibration
+  (feed MiMo reasoning traces, extract attention patterns)
+- [ ] SD2: Symbolic MoE prototype (temporal + coreference + reasoning)
+- [ ] SD3: Hybrid fallback (symbolic → MiMo → verifier pipeline)
+- [ ] SD4: Benchmark symbolic vs neural on capability transfer tasks
+
 ## 8. Measures and progress index (binding, 2026-09-12)
 
 One number to know where we stand, with every input re-measurable.
@@ -700,3 +808,13 @@ failures remaining (2026-09-14):
   chat_attention.pl. Gates PASS. Benchmark TIE with baseline (9/10).
   Next: multi-head, KV cache, selective state update, 1000-question
   benchmark for potential paper.
+- 2026-09-14: **symbolic capability distillation** — decision: do NOT
+  try to copy neural weights into Prolog. Instead, extract functional
+  capabilities from large LLMs (MiMo-V2.5: 310B, MoE, 256 experts)
+  and rebuild as symbolic operations. Three levels: extraction
+  (LLM→facts→Prolog), behavior distillation (LLM→examples→patterns),
+  hybrid (symbolic handles known, LLM proposes for unknown, verifier
+  decides). Symbolic MoE: Prolog modules as experts, symbolic attention
+  routes. MiMo as teacher, not data source. Paper thesis: "Can
+  functional principles of modern LLMs transfer from neural to symbolic
+  computation?"
