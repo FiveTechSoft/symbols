@@ -434,6 +434,105 @@ formalism) is adopted if it passes the gates (eval without regression,
 preflight clean, 50-gate for corpus), never on hype. If a gate itself
 proves wrong, change the gate in the open with the failure cited.
 
+## 7b. Symbolic Attention Engine (2026-09-14)
+
+Architecture: attention mechanisms from Transformers/Mamba reimplemented
+as symbolic operations on the knowledge graph. No matrices, no
+backpropagation, no gradient descent. Pure Prolog reasoning.
+
+### Implemented (2026-09-14)
+
+| Component | File | Status |
+|-----------|------|--------|
+| Token attention scoring | symbolic_attention.pl | done |
+| KB-based relation weighting | symbolic_attention.pl | done |
+| Positional encoding | symbolic_attention.pl | done |
+| Novelty detection | symbolic_attention.pl | done |
+| Score normalization (log scale) | symbolic_attention.pl | done |
+| Temperature scaling | chat_attention.pl | done |
+| Top-K + threshold selection | chat_attention.pl | done |
+| A/B toggle (attention on/off) | chat_attention.pl | done |
+| Adapter: chat.pl ↔ attention | chat_attention.pl | done |
+
+### Bugs fixed
+
+- weight/2 syntax: `weight relations(0.4)` → `weight(relations, 0.4)`
+- Sorting: `msort` sorted by token name → `keysort` by score desc
+- RelScore normalization: raw count → `log(1+raw)/log(31)` → [0,1]
+- ConnScore normalization: raw count → unique connections/context size → [0,1]
+- connection_score: eliminated duplicate conditions
+- validate_with_attention: removed (both branches identical)
+- take_top/3: `length+append` → accumulator (was failing silently)
+
+### Benchmark (curated KB, 10 questions)
+
+```
+chat_form:      9/10
+predict_answer: 9/10 (attention fallback)
+TIE — attention matches baseline
+```
+
+### Configurable parameters
+
+```prolog
+assertz(attention_temperature(0.3)).   % T < 1 concentrate, T > 1 disperse
+assertz(attention_top_k(3)).           % max candidates to reasoner
+assertz(attention_min_score(0.25)).    % threshold to discard noise
+assertz(attention_enabled).            % A/B toggle
+```
+
+### Conceptual mapping
+
+| Deep Learning | Symbolic Version |
+|---------------|-----------------|
+| Attention | Symbolic relevance (KB relations) |
+| Multi-head attention | Multiple criteria (semantic/temporal/discourse) |
+| Positional encoding | Position/structure in sentence |
+| Softmax/temperature | Score scaling by T |
+| Top-K | Candidate pruning |
+| Residual connection | Context accumulation |
+| KV cache | Context graph/cache |
+| Causal mask | Temporal/scope restrictions |
+| FFN | Transformation rules |
+| Mamba SSM | Symbolic state |
+| Selective scan | Selective state update |
+
+### Next steps (ordered)
+
+1. **SA1 — Multi-Head Symbolic Attention**: semantic + temporal +
+   discourse + novelty as separate heads, merged by normalization.
+   Gate: attention over same 10 questions must match or beat single-head.
+
+2. **SA2 — Symbolic KV Cache**: maintain conversation context as a
+   compact subgraph. "What does she like?" resolves "she" → entity
+   from cache without re-scanning full KB. Gate: multi-turn dialogue
+   where pronouns resolve correctly.
+
+3. **SA3 — Selective State Update (Mamba-style)**: decide what enters,
+   stays, modifies, or is forgotten in the conversation state.
+   Gate: 20-turn dialogue where old facts age and new facts override.
+
+4. **SA4 — Symbolic Chat Benchmark**: 1000 questions over progressive
+   conversation lengths. Measure: accuracy, unknown accuracy,
+   contradiction handling, coreference, temporal reasoning,
+   relations examined, latency, memory. Compare A/B with/without
+   attention. Gate: attention version ≥ baseline on all metrics.
+
+### Paper thesis (potential)
+
+"Symbolic Attention and Selective State: A Non-Gradient Architecture
+for Language Processing" — demonstrate that functional mechanisms of
+Transformers/Mamba can be reimplemented as symbolic operations on a
+knowledge graph with provable interpretability, no hallucination,
+and incremental learning.
+
+Hypotheses:
+- H1: efficiency (fewer relations examined, lower latency)
+- H2: interpretability (every answer has a proof)
+- H3: incremental learning (no retraining on new facts)
+- H4: honest unknowns (missing info → UNKNOWN, not fabrication)
+- H5: scalability (top-k keeps reasoning cost bounded as KB grows)
+
 ## 8. Measures and progress index (binding, 2026-09-12)
 
 One number to know where we stand, with every input re-measurable.
@@ -594,3 +693,10 @@ failures remaining (2026-09-14):
 - Entity inference is too broad: "who wrote alice?" returns ALL 25
   facts about alice instead of just author-related ones. Needs
   filtering by entity type (book→author) or verb-semantic matching.
+- 2026-09-14: **symbolic attention engine v2** — attention from
+  Transformers/Mamba reimplemented as symbolic operations on KB.
+  Temperature (concentrate/disperse), top-K (candidate pruning),
+  threshold (noise filtering), score normalization. A/B adapter in
+  chat_attention.pl. Gates PASS. Benchmark TIE with baseline (9/10).
+  Next: multi-head, KV cache, selective state update, 1000-question
+  benchmark for potential paper.
