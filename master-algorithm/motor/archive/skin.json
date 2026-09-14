@@ -1,5 +1,5 @@
 {
-  "generation": 15,
+  "generation": 16,
   "n_schema_classes": 18,
   "n_unlocked": 18,
   "unlocked": [
@@ -39,8 +39,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 13,
-      "total_reward": 56.04,
+      "n_visits": 14,
+      "total_reward": 55.339999999999996,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -391,7 +391,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 2,
+      "n_visits": 3,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -413,7 +413,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
+      "n_visits": 2,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -485,7 +485,9 @@
     "3,-3,0,2",
     "-2,4,3,0",
     "3,-4,5,3",
-    "5,-4,-5,-1"
+    "5,-4,-5,-1",
+    "-1,0,5,3",
+    "1,-2,3,3"
   ],
   "molt_history": [
     {
@@ -994,6 +996,55 @@
     {
       "generation": 15,
       "reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_skip: no new lever composition available"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "bit_circuit_compose",
+        "companion_rec",
+        "dead_prime",
+        "delta_conserv",
+        "form_gate",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "bit_circuit_compose",
+        "companion_rec",
+        "dead_prime",
+        "delta_conserv",
+        "form_gate",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 18
+    },
+    {
+      "generation": 16,
+      "reason": "schema linrec_scan saturated; schema form_gate saturated; schema companion_rec saturated; transfer plateau",
       "actions": [
         "novelty_bonus\u21922.0",
         "spawn_skip: no new lever composition available"

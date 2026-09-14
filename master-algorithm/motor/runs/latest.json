@@ -1,10 +1,10 @@
 {
   "ticks_this_run": 12,
-  "total_steps": 321,
+  "total_steps": 345,
   "backend": "swipl",
   "swipl": true,
-  "n_verified_facts": 619,
-  "n_rejected": 253,
+  "n_verified_facts": 658,
+  "n_rejected": 257,
   "n_lemmas": 21,
   "n_distinct_types": 60,
   "distinct_types": [
@@ -3279,6 +3279,246 @@
       "n_rejected": 253,
       "n_lemmas": 21,
       "tick": 321
+    },
+    {
+      "n_verified_facts": 619,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2901,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 322
+    },
+    {
+      "n_verified_facts": 619,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2901,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 323
+    },
+    {
+      "n_verified_facts": 619,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2901,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 324
+    },
+    {
+      "n_verified_facts": 619,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2901,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 325
+    },
+    {
+      "n_verified_facts": 622,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2891,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 326
+    },
+    {
+      "n_verified_facts": 625,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2882,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 327
+    },
+    {
+      "n_verified_facts": 628,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2872,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 328
+    },
+    {
+      "n_verified_facts": 632,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2859,
+      "n_rejected": 253,
+      "n_lemmas": 21,
+      "tick": 329
+    },
+    {
+      "n_verified_facts": 635,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2857,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 330
+    },
+    {
+      "n_verified_facts": 635,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2857,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 331
+    },
+    {
+      "n_verified_facts": 635,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2857,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 332
+    },
+    {
+      "n_verified_facts": 637,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2851,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 333
+    },
+    {
+      "n_verified_facts": 641,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2838,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 334
+    },
+    {
+      "n_verified_facts": 641,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2838,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 335
+    },
+    {
+      "n_verified_facts": 641,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2838,
+      "n_rejected": 254,
+      "n_lemmas": 21,
+      "tick": 336
+    },
+    {
+      "n_verified_facts": 642,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2843,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 337
+    },
+    {
+      "n_verified_facts": 644,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2836,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 338
+    },
+    {
+      "n_verified_facts": 649,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2821,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 339
+    },
+    {
+      "n_verified_facts": 651,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2815,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 340
+    },
+    {
+      "n_verified_facts": 651,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2815,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 341
+    },
+    {
+      "n_verified_facts": 651,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2815,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 342
+    },
+    {
+      "n_verified_facts": 656,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2799,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 343
+    },
+    {
+      "n_verified_facts": 656,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2799,
+      "n_rejected": 255,
+      "n_lemmas": 21,
+      "tick": 344
+    },
+    {
+      "n_verified_facts": 658,
+      "n_distinct_types": 60,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7,
+      "reject_rate": 0.2809,
+      "n_rejected": 257,
+      "n_lemmas": 21,
+      "tick": 345
     }
   ],
   "baselines": {
@@ -3321,10 +3561,10 @@
     "lucas": {
       "transfer_from": "fib",
       "transfer_coeffs": [
-        1,
+        4,
         -2,
-        3,
-        3
+        -3,
+        0
       ],
       "transfer_accuracy": 1.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0,
@@ -3340,10 +3580,10 @@
     "pell": {
       "transfer_from": "fib",
       "transfer_coeffs": [
-        1,
+        4,
         -2,
-        3,
-        3
+        -3,
+        0
       ],
       "transfer_accuracy": 0.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
@@ -3439,155 +3679,10 @@
   },
   "step_log_tail": [
     {
-      "tick": 310,
-      "world": "chance",
-      "family": "chance_entropy_scan",
-      "why": "UCB1 over 59 arms (world,family); picked chance::chance_entropy_scan because avg=7.070+1.4*sqrt(ln(309+1)/5)=1.500\u21928.570. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 7,
-      "outcomes": [
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true"
-      ],
-      "score_detail": {
-        "new_true": 7,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 7,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 7,
-        "form_families": [
-          "chance_entropy",
-          "chance_entropy",
-          "chance_entropy",
-          "chance_entropy",
-          "chance_entropy",
-          "chance_entropy",
-          "chance_entropy"
-        ],
-        "dead_ok": 0,
-        "cost": 0.47,
-        "score": -0.33,
-        "reward_raw": 0.14
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [
-        "chance_H_nonneg_k6_s6259",
-        "chance_H_le_logk_k6_s6259",
-        "chance_H_nonneg_k6_s6260",
-        "chance_H_le_logk_k6_s6260",
-        "chance_H_nonneg_k6_s6261",
-        "chance_H_le_logk_k6_s6261",
-        "chance_H_uni_max_k6_s6259"
-      ],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 311,
-      "world": "chance",
-      "family": "chance_bayes_scan",
-      "why": "UCB1 over 58 arms (world,family); picked chance::chance_bayes_scan because avg=6.590+1.4*sqrt(ln(310+1)/3)=1.936\u21928.526. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 7,
-      "outcomes": [
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_reject"
-      ],
-      "score_detail": {
-        "new_true": 6,
-        "new_reject": 1,
-        "n_new_form_family": 0,
-        "n_known_clone": 6,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 6,
-        "form_families": [
-          "logodds_add",
-          "logodds_add",
-          "logodds_add",
-          "logodds_add",
-          "logodds_add",
-          "logodds_add",
-          "logodds_add"
-        ],
-        "dead_ok": 0,
-        "cost": 0.43,
-        "score": -0.31,
-        "reward_raw": 0.12
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [
-        "chance_bayes_id_s6274",
-        "chance_logodds_add_s6274",
-        "chance_bayes_id_s6275",
-        "chance_logodds_add_s6275",
-        "chance_bayes_id_s6276",
-        "chance_logodds_add_s6276"
-      ],
-      "rejected": [
-        "chance_bayes_swap_s6274"
-      ],
-      "transfer": []
-    },
-    {
-      "tick": 312,
-      "world": "info",
-      "family": "info_mi_scan",
-      "why": "UCB1 over 57 arms (world,family); picked info::info_mi_scan because avg=4.740+1.4*sqrt(ln(311+1)/3)=1.937\u21926.677. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 4,
-      "outcomes": [
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true"
-      ],
-      "score_detail": {
-        "new_true": 4,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 4,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 4,
-        "form_families": [
-          "info_mi",
-          "info_mi",
-          "info_mi",
-          "info_mi"
-        ],
-        "dead_ok": 0,
-        "cost": 0.28,
-        "score": -0.2,
-        "reward_raw": 0.08
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [
-        "info_MI_indep_near0_s6047",
-        "info_MI_dep_pos_s6047",
-        "info_indep_factorization_s6047",
-        "info_MI_and_related_s6047"
-      ],
-      "rejected": [],
-      "transfer": []
-    },
-    {
-      "tick": 313,
+      "tick": 334,
       "world": "sequences",
       "family": "linear_recurrences",
-      "why": "UCB1 over 56 arms (world,family); picked sequences::linear_recurrences because avg=4.311+1.4*sqrt(ln(312+1)/13)=0.931\u21925.242. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "why": "UCB1 over 38 arms (world,family); picked sequences::linear_recurrences because avg=3.953+1.4*sqrt(ln(333+1)/14)=0.902\u21924.855. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
       "n_conjectures": 14,
       "outcomes": [
         "duplicate_reject",
@@ -3637,70 +3732,19 @@
       "growth": "param at max \u2192 saturate schema",
       "unlock": null,
       "accepted": [
-        "rec_fib_o4_-1_0_5_3",
-        "rec_fib_o4_1_-2_3_3",
-        "rec_lucas_o4_-1_0_5_3",
-        "rec_lucas_o4_1_-2_3_3"
+        "rec_fib_o4_2_2_-3_-2",
+        "rec_fib_o4_4_-2_-3_0",
+        "rec_lucas_o4_2_2_-3_-2",
+        "rec_lucas_o4_4_-2_-3_0"
       ],
       "rejected": [],
       "transfer": []
     },
     {
-      "tick": 314,
-      "world": "chem",
-      "family": "chem_atom_balance",
-      "why": "UCB1 over 55 arms (world,family); picked chem::chem_atom_balance because avg=1.805+1.4*sqrt(ln(313+1)/4)=1.678\u21923.483. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 7,
-      "outcomes": [
-        "duplicate_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_true",
-        "new_reject"
-      ],
-      "score_detail": {
-        "new_true": 5,
-        "new_reject": 1,
-        "n_new_form_family": 0,
-        "n_known_clone": 5,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 1,
-        "n_offpath": 0,
-        "form_families": [
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0"
-        ],
-        "dead_ok": 0,
-        "cost": 0.45,
-        "score": 1.3,
-        "reward_raw": 1.75
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [
-        "chem_atom_balance_synth_s7570",
-        "chem_atom_balance_synth_s7571",
-        "chem_atom_balance_synth_s7572",
-        "chem_atom_balance_synth_s7573",
-        "chem_atom_balance_synth_s7574"
-      ],
-      "rejected": [
-        "chem_unbalanced_broken_s7570"
-      ],
-      "transfer": []
-    },
-    {
-      "tick": 315,
+      "tick": 335,
       "world": "sequences",
       "family": "companion_rec",
-      "why": "UCB1 over 54 arms (world,family); picked sequences::companion_rec because avg=0.000+1.4*sqrt(ln(314+1)/1)=3.358\u21923.358. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "why": "UCB1 over 37 arms (world,family); picked sequences::companion_rec because avg=0.000+1.4*sqrt(ln(334+1)/2)=2.387\u21922.387. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
       "n_conjectures": 0,
       "outcomes": [],
       "score_detail": {
@@ -3724,14 +3768,12 @@
       "transfer": []
     },
     {
-      "tick": 316,
-      "world": "nets",
-      "family": "nets_perceptron",
-      "why": "UCB1 over 53 arms (world,family); picked nets::nets_perceptron because avg=1.373+1.4*sqrt(ln(315+1)/3)=1.939\u21923.313. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 3,
+      "tick": 336,
+      "world": "algebra",
+      "family": "alg_mat_assoc",
+      "why": "UCB1 over 36 arms (world,family); picked algebra::alg_mat_assoc because avg=0.363+1.4*sqrt(ln(335+1)/3)=1.949\u21922.313. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
       "outcomes": [
-        "duplicate_true",
-        "duplicate_true",
         "duplicate_true"
       ],
       "score_detail": {
@@ -3743,196 +3785,293 @@
         "n_carve_reject": 0,
         "n_offpath": 0,
         "form_families": [
-          "nets_dot",
-          "nets_dot",
-          "nets_dot"
+          "alg_mat_assoc"
         ],
         "dead_ok": 0,
-        "cost": 0.23,
-        "score": -0.23,
+        "cost": 0.19,
+        "score": -0.19,
         "reward_raw": 0.0
       },
       "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": [
-        "transfer_bitfn_and_to_perceptron_and_all"
-      ]
-    },
-    {
-      "tick": 317,
-      "world": "chem",
-      "family": "chem_transfer_form",
-      "why": "UCB1 over 52 arms (world,family); picked chem::chem_transfer_form because avg=1.605+1.4*sqrt(ln(316+1)/4)=1.680\u21923.285. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 4,
-      "outcomes": [
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 0,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 0,
-        "form_families": [
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0"
-        ],
-        "dead_ok": 0,
-        "cost": 0.3,
-        "score": -0.3,
-        "reward_raw": 0.0
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": [
-        "transfer_conserv_mom_shape_to_chem_atoms",
-        "transfer_conserv_kcl_shape_to_chem_atoms",
-        "transfer_chem_conserv_form_on_physics_mom",
-        "transfer_chem_conserv_form_on_electro_kcl"
-      ]
-    },
-    {
-      "tick": 318,
-      "world": "physics",
-      "family": "phys_transfer_form",
-      "why": "UCB1 over 51 arms (world,family); picked physics::phys_transfer_form because avg=1.605+1.4*sqrt(ln(317+1)/4)=1.680\u21923.285. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 4,
-      "outcomes": [
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 0,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 0,
-        "form_families": [
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0"
-        ],
-        "dead_ok": 0,
-        "cost": 0.3,
-        "score": -0.3,
-        "reward_raw": 0.0
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": [
-        "transfer_conserv_atom_shape_to_physics_mom",
-        "transfer_conserv_kcl_shape_to_physics_mom",
-        "transfer_phys_conserv_form_on_chem_atoms",
-        "transfer_phys_conserv_form_on_electro_kcl"
-      ]
-    },
-    {
-      "tick": 319,
-      "world": "electro",
-      "family": "electro_transfer_form",
-      "why": "UCB1 over 50 arms (world,family); picked electro::electro_transfer_form because avg=1.605+1.4*sqrt(ln(318+1)/4)=1.681\u21923.286. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 4,
-      "outcomes": [
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true",
-        "duplicate_true"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 0,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 0,
-        "form_families": [
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0",
-          "conserv_delta0"
-        ],
-        "dead_ok": 0,
-        "cost": 0.3,
-        "score": -0.3,
-        "reward_raw": 0.0
-      },
-      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
-      "unlock": null,
-      "accepted": [],
-      "rejected": [],
-      "transfer": [
-        "transfer_conserv_atom_shape_to_electro_kcl",
-        "transfer_conserv_mom_shape_to_electro_kcl",
-        "transfer_electro_conserv_form_on_chem_atoms",
-        "transfer_electro_conserv_form_on_physics_mom"
-      ]
-    },
-    {
-      "tick": 320,
-      "world": "logic",
-      "family": "boolean_from_examples",
-      "why": "UCB1 over 49 arms (world,family); picked logic::boolean_from_examples because avg=1.230+1.4*sqrt(ln(319+1)/3)=1.941\u21923.171. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 5,
-      "outcomes": [
-        "duplicate_reject",
-        "duplicate_reject",
-        "duplicate_true",
-        "duplicate_reject",
-        "duplicate_reject"
-      ],
-      "score_detail": {
-        "new_true": 0,
-        "new_reject": 0,
-        "n_new_form_family": 0,
-        "n_known_clone": 0,
-        "n_transfer_new_world": 0,
-        "n_carve_reject": 0,
-        "n_offpath": 0,
-        "form_families": [
-          "bit_circuit",
-          "bit_circuit",
-          "bit_circuit",
-          "bit_circuit",
-          "bit_circuit"
-        ],
-        "dead_ok": 0,
-        "cost": 0.29,
-        "score": -0.29,
-        "reward_raw": 0.0
-      },
-      "growth": "param at max \u2192 saturate",
       "unlock": null,
       "accepted": [],
       "rejected": [],
       "transfer": []
     },
     {
-      "tick": 321,
-      "world": "info",
-      "family": "info_transfer_bitfn",
-      "why": "UCB1 over 48 arms (world,family); picked info::info_transfer_bitfn because avg=1.237+1.4*sqrt(ln(320+1)/4)=1.682\u21922.919. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
-      "n_conjectures": 3,
+      "tick": 337,
+      "world": "astro",
+      "family": "astro_transfer_form",
+      "why": "UCB1 over 35 arms (world,family); picked astro::astro_transfer_form because avg=0.708+1.4*sqrt(ln(336+1)/5)=1.510\u21922.218. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "n_new_form_family": 0,
+        "n_known_clone": 1,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 1,
+        "form_families": [
+          "kepler_power",
+          "kepler_power"
+        ],
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.24,
+        "reward_raw": 0.02
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "transfer_kepler3_form_n8"
+      ],
+      "rejected": [
+        "transfer_kepler_bogus_power_n8"
+      ],
+      "transfer": [
+        "transfer_kepler3_form_n8"
+      ]
+    },
+    {
+      "tick": 338,
+      "world": "algebra",
+      "family": "alg_linear_2x2",
+      "why": "UCB1 over 34 arms (world,family); picked algebra::alg_linear_2x2 because avg=0.485+1.4*sqrt(ln(337+1)/4)=1.689\u21922.174. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "noise::algebra::alg_solve_2x2",
+          "noise::algebra::alg_solve_2x2"
+        ],
+        "dead_ok": 0,
+        "cost": 0.22,
+        "score": -0.18,
+        "reward_raw": 0.04
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "alg_solve_2x2_s6713",
+        "alg_solve_2x2_s6714"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 339,
+      "world": "calculus",
+      "family": "calc_power_diff",
+      "why": "UCB1 over 33 arms (world,family); picked calculus::calc_power_diff because avg=0.467+1.4*sqrt(ln(338+1)/4)=1.690\u21922.157. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 5,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 5,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 5,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta",
+          "rec_to_delta"
+        ],
+        "dead_ok": 0,
+        "cost": 0.37,
+        "score": -0.12,
+        "reward_raw": 0.25
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "calc_delta_x1_vs_n_x0_N6",
+        "calc_delta_x2_vs_n_x1_N6",
+        "calc_delta_x3_vs_n_x2_N6",
+        "calc_delta_x4_vs_n_x3_N6",
+        "calc_delta_x5_vs_n_x4_N6"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 340,
+      "world": "astro",
+      "family": "astro_period_scan",
+      "why": "UCB1 over 32 arms (world,family); picked astro::astro_period_scan because avg=0.465+1.4*sqrt(ln(339+1)/4)=1.690\u21922.155. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 2,
+        "form_families": [
+          "noise::astro::astro_T_increases_with_a",
+          "noise::astro::astro_T_pos"
+        ],
+        "dead_ok": 0,
+        "cost": 0.24,
+        "score": -0.2,
+        "reward_raw": 0.04
+      },
+      "growth": "extrapolate n_bodies 7\u21928",
+      "unlock": null,
+      "accepted": [
+        "astro_T_increases_with_a_n7",
+        "astro_T_pos_n7"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 341,
+      "world": "astro",
+      "family": "astro_angmom_scan",
+      "why": "UCB1 over 31 arms (world,family); picked astro::astro_angmom_scan because avg=0.465+1.4*sqrt(ln(340+1)/4)=1.690\u21922.155. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
       "outcomes": [
         "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "kepler_power",
+          "kepler_power"
+        ],
+        "dead_ok": 0,
+        "cost": 0.22,
+        "score": -0.22,
+        "reward_raw": 0.0
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 342,
+      "world": "nets",
+      "family": "nets_chain_transfer",
+      "why": "UCB1 over 30 arms (world,family); picked nets::nets_chain_transfer because avg=0.463+1.4*sqrt(ln(341+1)/4)=1.691\u21922.153. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 1,
+      "outcomes": [
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 0,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "nets_dot"
+        ],
+        "dead_ok": 0,
+        "cost": 0.13,
+        "score": -0.13,
+        "reward_raw": 0.0
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "nets_discrete_chain_vs_product"
+      ]
+    },
+    {
+      "tick": 343,
+      "world": "chem",
+      "family": "chem_equilibrium_K",
+      "why": "UCB1 over 29 arms (world,family); picked chem::chem_equilibrium_K because avg=0.440+1.4*sqrt(ln(342+1)/4)=1.691\u21922.131. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 5,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 5,
+        "new_reject": 0,
+        "n_new_form_family": 0,
+        "n_known_clone": 5,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 5,
+        "form_families": [
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def",
+          "noise::chem::chem_K_def"
+        ],
+        "dead_ok": 0,
+        "cost": 0.35,
+        "score": -0.25,
+        "reward_raw": 0.1
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "chem_K_def_s7715",
+        "chem_K_def_s7716",
+        "chem_K_def_s7717",
+        "chem_K_def_s7718",
+        "chem_K_def_s7719"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 344,
+      "world": "electro",
+      "family": "electro_switch_transfer",
+      "why": "UCB1 over 28 arms (world,family); picked electro::electro_switch_transfer because avg=0.412+1.4*sqrt(ln(343+1)/4)=1.692\u21922.104. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
         "duplicate_true",
         "duplicate_true"
       ],
@@ -3946,12 +4085,11 @@
         "n_offpath": 0,
         "form_families": [
           "bit_circuit",
-          "bit_circuit",
           "bit_circuit"
         ],
         "dead_ok": 0,
-        "cost": 0.23,
-        "score": -0.23,
+        "cost": 0.18,
+        "score": -0.18,
         "reward_raw": 0.0
       },
       "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
@@ -3959,16 +4097,58 @@
       "accepted": [],
       "rejected": [],
       "transfer": [
-        "transfer_bitfn_parity_parity_to_MI",
-        "transfer_bitfn_and_all_and_all_to_MI",
-        "transfer_bitfn_xor2_xor2_to_MI"
+        "transfer_and_to_series_switch_and_all",
+        "electro_parallel_OR_table"
       ]
+    },
+    {
+      "tick": 345,
+      "world": "loop",
+      "family": "loop_taxis_scan",
+      "why": "UCB1 over 27 arms (world,family); picked loop::loop_taxis_scan because avg=0.410+1.4*sqrt(ln(344+1)/4)=1.692\u21922.102. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_reject",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 2,
+        "new_reject": 2,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_transfer_new_world": 0,
+        "n_carve_reject": 0,
+        "n_offpath": 0,
+        "form_families": [
+          "loop_taxis",
+          "loop_taxis",
+          "loop_taxis",
+          "loop_taxis"
+        ],
+        "dead_ok": 0,
+        "cost": 0.32,
+        "score": -0.22,
+        "reward_raw": 0.1
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "loop_taxis_bangbang_s10790",
+        "loop_taxis_linear_gain_s10790"
+      ],
+      "rejected": [
+        "loop_taxis_always_right_s10790",
+        "loop_taxis_always_left_s10790"
+      ],
+      "transfer": []
     }
   ],
-  "elapsed_s": 1.779,
+  "elapsed_s": 1.481,
   "theory_path": "/workspace/master-algorithm/motor/archive/theory.pl",
   "meta_path": "/workspace/master-algorithm/motor/archive/meta.json",
   "transfer_accuracy": 0.5714,
-  "lemma_reuse_rate": 0.7143,
-  "reject_rate": 0.2901
+  "lemma_reuse_rate": 0.7,
+  "reject_rate": 0.2809
 }
