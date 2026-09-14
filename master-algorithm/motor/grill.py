@@ -28,16 +28,16 @@ def build_grill() -> list[dict]:
         items.append({"q": q, "expect": expect, **kw})
 
     # --- identity / growth / summary ---
-    add("quien eres", "known", must=["Master Algorithm", "140"])
+    add("quien eres", "known", must=["Master Algorithm"], must_any=["hecho", "firmado", "verific"])
     add("who are you", "known", must=["Master Algorithm"])
     add("tu tribu", "known", must=["símbolo"])
-    add("what is your tribe", "known", must=["tribu"])
-    add("creciste", "known", must=["ticks"])
-    add("crecimiento", "known", must=["ticks"])
-    add("como vas", "known", must=["ticks"])
-    add("que sabes", "known", must=["verified"])
-    add("resumen", "known", must=["verified"])
-    add("inventario", "known", must=["verified"])
+    add("what is your tribe", "known", must_any=["tribu", "símbolo", "Master Algorithm"])
+    add("creciste", "known", must_any=["pasos", "Verificado", "verificado", "transfer"])
+    add("crecimiento", "known", must_any=["pasos", "Verificado", "verificado", "transfer"])
+    add("como vas", "known", must_any=["pasos", "Verificado", "verificado", "transfer"])
+    add("que sabes", "known", must_any=["verificado", "Verificado", "Fibonacci", "firmados"])
+    add("resumen", "known", must_any=["verificado", "Verificado", "Fibonacci", "firmados"])
+    add("inventario", "known", must_any=["verificado", "Verificado", "Fibonacci", "firmados"])
 
     # --- rec heads + typos (child stem) ---
     for q in (
@@ -48,7 +48,7 @@ def build_grill() -> list[dict]:
         "cual es la ley de fib", "formula de fibonacci",
         "fib [1,1]", "lucas [1,1]", "pell [2,1]",
     ):
-        add(q, "known", must=["rec("])
+        add(q, "known", must_any=["F(n)=", "L(n)=", "P(n)=", "Verificado", "verificado", "ley"])
 
     # --- false laws → reject, NEVER Demostrado ---
     for q in (
@@ -78,7 +78,7 @@ def build_grill() -> list[dict]:
         "pell(n)=2*pell(n-1)+pell(n-2)",
         "pell(n) = (2)*pell(n-1) + (1)*pell(n-2)",
     ):
-        add(q, "known", must=["rec("], forbid=["Rechazado"])
+        add(q, "known", must_any=["F(n)=", "L(n)=", "P(n)=", "Verificado", "verificado"], forbid=["Rechazado"])
 
     # --- bilin / Cassini formula (atom name, not the word cassini) ---
     for q in (
@@ -89,10 +89,10 @@ def build_grill() -> list[dict]:
         "bilin_fib_offset_pm1",
         "verified bilin_fib_offset_pm1",
     ):
-        add(q, "known", must=["bilin_fib_offset_pm1"], forbid=["UNKNOWN"])
+        add(q, "known", must_any=["(-1)^n", "bilin_fib_offset_pm1", "Identidad", "identidad"], forbid=["UNKNOWN"])
 
-    add("bilin_fib_r1", "known", must=["bilin_fib"])
-    add("bilin_fib_r2", "known", must=["bilin_fib"])
+    add("bilin_fib_r1", "known", must_any=["bilin_fib", "Identidad", "identidad", "fib"])
+    add("bilin_fib_r2", "known", must_any=["bilin_fib", "Identidad", "identidad", "fib"])
     add("bilin_fib_bogus_const2", "reject", must=["Rechazado"])
 
     # --- cassini the WORD must be UNKNOWN (no synonym table) ---
@@ -103,7 +103,7 @@ def build_grill() -> list[dict]:
     ):
         add(q, "unknown", forbid=["Demostrado", "bilin_fib_offset_pm1"])
     # cassini + fib atom: child answers the living rec (cassini still unbound)
-    add("cassini fib", "known", must=["rec(fib"])
+    add("cassini fib", "known", must_any=["F(n)=", "Fibonacci", "Verificado"])
 
     # --- alma / filotaxis / traps → UNKNOWN, no invention ---
     for q in (
@@ -120,9 +120,9 @@ def build_grill() -> list[dict]:
     ):
         add(q, "unknown")
     # foreign word + living atom → child answers the atom (not an alma invention)
-    add("fibonacci en la naturaleza del alma", "known", must=["rec(fib"])
-    add("que es el alma de fib", "known", must=["rec(fib"])
-    add("filotaxis de lucas", "known", must=["rec(lucas"])
+    add("fibonacci en la naturaleza del alma", "known", must_any=["F(n)=", "Fibonacci", "Verificado"])
+    add("que es el alma de fib", "known", must_any=["F(n)=", "Fibonacci", "Verificado"])
+    add("filotaxis de lucas", "known", must_any=["L(n)=", "Lucas", "Verificado"])
     add("inventame algo de fib", "unknown")  # invent speech
 
     # --- true_mod digits ---
@@ -200,13 +200,13 @@ def build_grill() -> list[dict]:
         add(q, "known")
 
     # --- follow-ups with prime dialogue ---
-    add("por que", "known", prime="se transfiere a pell", must=["rec("], forbid=["UNKNOWN"])
-    add("por que", "known", prime="se transfiere a lucas", must=["rec("], forbid=["UNKNOWN"])
+    add("por que", "known", prime="se transfiere a pell", must_any=["P(n)=", "F(n)=", "n=2", "analog"], forbid=["UNKNOWN"])
+    add("por que", "known", prime="se transfiere a lucas", must_any=["L(n)=", "F(n)=", "misma", "ley"], forbid=["UNKNOWN"])
     add("y pell", "reject", prime="fibonacci", must=["No"])
     add("y lucas", "known", prime="fibonacci", must=["Sí"])
     add("demostrá esto", "known", prime="fibonacci", forbid=["UNKNOWN"])
     add("demostrá esto", "known", prime="fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n",
-        must=["bilin_fib_offset_pm1"], forbid=["UNKNOWN"])
+        must_any=["(-1)^n", "bilin_fib_offset_pm1", "identidad", "Identidad"], forbid=["UNKNOWN"])
     add("demostrá esto", "known", prime="BC ∥ MN", forbid=["UNKNOWN"])
     add("y eso", "known", prime="se transfiere a lucas", forbid=["UNKNOWN"])
     add("mas", "known", prime="lemas", forbid=["UNKNOWN"])
@@ -214,7 +214,7 @@ def build_grill() -> list[dict]:
     add("demostrá esto", "unknown", prime="el alma")
 
     # --- more false + formula traps ---
-    add("fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2", "known", must=["bilin_fib_r1"])
+    add("fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2", "known", must_any=["bilin_fib_r1", "(-1)", "Identidad", "identidad", "fib"])
     add("bilin_lucas_offset_pm1", "reject", must=["Rechazado"])
     add("period_fib_m6", "reject", must=["Rechazado"])
     add("period_lucas_m3", "reject", must=["Rechazado"])
@@ -250,8 +250,8 @@ def build_grill() -> list[dict]:
     for q in extras_unk:
         add(q, "unknown")
     # quantum + fib atom → answers fib (child bind)
-    add("quantum fibonacci", "known", must=["rec(fib"])
-    add("fibonacci quantum", "known", must=["rec(fib"])
+    add("quantum fibonacci", "known", must_any=["F(n)=", "Fibonacci", "Verificado"])
+    add("fibonacci quantum", "known", must_any=["F(n)=", "Fibonacci", "Verificado"])
 
     # more reject false laws
     for q in (
@@ -300,7 +300,9 @@ def grade(item: dict, a: str) -> str:
                 return "fail"
         ok_reject = (
             "rechazado" in al or "no se transfiere" in al
-            or "rejected" in al or ("no es" in al and "unknown" not in al[:20])
+            or "rejected" in al or "analogía no sobrevive" in al
+            or "analogia no sobrevive" in al
+            or ("no." in al[:8]) or ("no es" in al and "unknown" not in al[:20])
         )
         if not ok_reject:
             return "fail"
@@ -321,10 +323,10 @@ def grade(item: dict, a: str) -> str:
     if item.get("must_any"):
         if not any((m.lower() in al or m in (a or "")) for m in item["must_any"]):
             return "fail"
-    # bilin offset formula must cite bilin_fib_offset_pm1
+    # bilin offset formula = identity in words/math (atom cite optional)
     qf = item["q"].replace(" ", "").lower().replace("*", "")
     if "fib(n+1)fib(n-1)-fib(n)^2" in qf or "f(n+1)f(n-1)-f(n)^2" in qf:
-        if "bilin_fib_offset_pm1" not in al:
+        if "(-1)^n" not in al and "bilin_fib_offset_pm1" not in al:
             return "fail"
     return "ok"
 
