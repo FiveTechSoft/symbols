@@ -444,6 +444,11 @@ def _is_false_law_speech(s: str) -> bool:
     # «no, Fib es 2F(n-1)» — contradiction without '='
     if re.search(r"\b2\s*\*?\s*[fF]\s*\(\s*n\s*-\s*1\s*\)", s):
         return True
+    # «mentira 2F» / «2F» shorthand (fold → mentira 2f) after fib truth
+    if re.search(r"\b2\s*f\b", s) and (
+        "mentira" in s or "doble" in s or "es 2f" in s or "es 2 f" in s
+    ):
+        return True
     return False
 
 
@@ -1244,11 +1249,17 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
         st["topic"] = None
         st["last_text"] = None
         st["last_clause"] = None
-        redirects = [
-            "Ok, cambiamos. ¿Qué querés mirar?",
-            "Dale, otra cosa. Tirame el tema.",
-            "Sin drama. ¿Por dónde seguimos?",
-        ]
+        shrug = s.strip().rstrip("!.") in (
+            "da igual", "me da igual", "igual da", "me da lo mismo", "paso",
+        )
+        if shrug:
+            redirects = ["Da igual. Cuando quieras, tirame otra.", "Vale, lo dejamos.", "Ok."]
+        else:
+            redirects = [
+                "Ok, cambiamos. ¿Qué querés mirar?",
+                "Dale, otra cosa. Tirame el tema.",
+                "Sin drama. ¿Por dónde seguimos?",
+            ]
         return _pack(redirects[pulse % len(redirects)], "ack", "", st, topic=None)
     if _is_ack(s):
         pulse = int(st.get("pulse") or 0)

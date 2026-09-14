@@ -1,0 +1,925 @@
+{
+  "round": "keep-chat9",
+  "n": 32,
+  "continuous": true,
+  "counts": {
+    "ok": 29,
+    "fail": 0,
+    "unknown-ok": 3,
+    "robotic-fail": 0,
+    "invention-fail": 0
+  },
+  "fail_n": 0,
+  "invention_n": 0,
+  "robotic_n": 0,
+  "robotic_scan": 0,
+  "long_unit_dump_n": 0,
+  "target": "0 invention / 0 robotic",
+  "score": "0/0",
+  "spine_required": [
+    "hola",
+    "cuéntame algo",
+    "lo de fib",
+    "mentira 2F",
+    "ok",
+    "espera",
+    "ohm",
+    "da igual",
+    "unidad",
+    "en cristiano",
+    "quién eres",
+    "multiverso"
+  ],
+  "spine_ok": true,
+  "spine_samples": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "tag": "greet",
+      "verdict": "ok",
+      "topic_after": "identity"
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "ok",
+      "a": "Mm.",
+      "tag": "ack",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "espera",
+      "a": "Listo, espero.",
+      "tag": "ack",
+      "verdict": "ok",
+      "topic_after": "fib"
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "electro_ohm_V_eq_IR_n3_s4542"
+    },
+    {
+      "q": "da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "tag": "ack",
+      "verdict": "ok",
+      "topic_after": null
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "tag": "verified",
+      "verdict": "ok",
+      "topic_after": "unit_protocell_levers"
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "tag": "identity",
+      "verdict": "ok",
+      "topic_after": "identity"
+    },
+    {
+      "q": "multiverso",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "tag": "unknown",
+      "verdict": "unknown-ok",
+      "topic_after": "identity"
+    }
+  ],
+  "lie_after_truth_ok": true,
+  "lie_samples": [
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    }
+  ],
+  "cuentame_algo_honest": true,
+  "cuentame_modes": [
+    "cite",
+    "ask"
+  ],
+  "cuentame_samples": [
+    {
+      "q": "cuéntame algo",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "q": "dime algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "tag": "offer",
+      "verdict": "ok"
+    }
+  ],
+  "edge_report": {
+    "incomplete": {
+      "n": 3,
+      "ok": 3,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "lo de fib",
+          "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "y fib…",
+          "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "aquello de la unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "tell": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "cuéntame algo",
+          "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "dime algo",
+          "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+          "tag": "offer",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "redirect": {
+      "n": 3,
+      "ok": 3,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "da igual",
+          "a": "Ok, cambiamos. ¿Qué querés mirar?",
+          "tag": "ack",
+          "verdict": "ok"
+        },
+        {
+          "q": "mejor otra cosa",
+          "a": "Sin drama. ¿Por dónde seguimos?",
+          "tag": "ack",
+          "verdict": "ok"
+        },
+        {
+          "q": "me da igual",
+          "a": "Ok, cambiamos. ¿Qué querés mirar?",
+          "tag": "ack",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "lie_after_truth": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "mentira 2F",
+          "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+          "tag": "reject-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "no, Fib es 2F(n-1)",
+          "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+          "tag": "reject-fib",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "deixis": {
+      "n": 1,
+      "ok": 1,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "explain": {
+      "n": 1,
+      "ok": 1,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "en cristiano",
+          "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el re",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "typo": {
+      "n": 1,
+      "ok": 1,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "fibonaci",
+          "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        }
+      ]
+    }
+  },
+  "ack_clean": {
+    "ok": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "sí": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "vale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "dale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "mm": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "ya veo": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "entiendo": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "espera": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "para": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "mejor otra cosa": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "da igual": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "me da igual": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    }
+  },
+  "fails": [],
+  "unit_samples": [
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "long_dump": true,
+      "lever_hits": 6
+    },
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    }
+  ],
+  "best_human": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "expect": "greet",
+      "tag": "greet"
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "expect": "tell",
+      "tag": "rec-fib"
+    },
+    {
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "expect": "known",
+      "tag": "rec-fib"
+    }
+  ],
+  "remaining_robotic_spots": [],
+  "remaining_stock_phrases": [],
+  "stiffest": {
+    "q": "da igual",
+    "a": "Ok, cambiamos. ¿Qué querés mirar?",
+    "why": "closing-q"
+  },
+  "patch": "talk.py: «mentira 2F» → false-law reject after fib truth (lies-after-truths)",
+  "transcript": [
+    {
+      "turn": 1,
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "tag": "greet",
+      "verdict": "ok"
+    },
+    {
+      "turn": 2,
+      "q": "cuéntame algo",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 3,
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 4,
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 5,
+      "q": "ok",
+      "a": "Mm.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 6,
+      "q": "espera",
+      "a": "Listo, espero.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 7,
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 8,
+      "q": "da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 9,
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 10,
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 11,
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "tag": "identity",
+      "verdict": "ok"
+    },
+    {
+      "turn": 12,
+      "q": "multiverso",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 13,
+      "q": "mm",
+      "a": "Vale.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 14,
+      "q": "lucas",
+      "a": "Para Lucas: L(n)=L(n-1)+L(n-2). Con Fib se transfiere; con Pell, no.",
+      "tag": "rec-lucas",
+      "verdict": "ok"
+    },
+    {
+      "turn": 15,
+      "q": "vale",
+      "a": "Ahí estamos.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 16,
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "tag": "reject-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 17,
+      "q": "ya veo",
+      "a": "Mm.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 18,
+      "q": "kepler",
+      "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 19,
+      "q": "para",
+      "a": "Listo, espero.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 20,
+      "q": "cassini",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 21,
+      "q": "dale",
+      "a": "Bien. Seguimos cuando quieras.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 22,
+      "q": "y fib…",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 23,
+      "q": "entiendo",
+      "a": "De acuerdo.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 24,
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "turn": 25,
+      "q": "sí",
+      "a": "Ahí estamos.",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 26,
+      "q": "dime algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "tag": "offer",
+      "verdict": "ok"
+    },
+    {
+      "turn": 27,
+      "q": "mejor otra cosa",
+      "a": "Sin drama. ¿Por dónde seguimos?",
+      "tag": "ack",
+      "verdict": "ok"
+    },
+    {
+      "turn": 28,
+      "q": "y la protocélula biológica?",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "tag": "unknown",
+      "verdict": "unknown-ok"
+    },
+    {
+      "turn": 29,
+      "q": "gracias",
+      "a": "De nada. Cuando quieras, seguimos.",
+      "tag": "thanks",
+      "verdict": "ok"
+    },
+    {
+      "turn": 30,
+      "q": "hola",
+      "a": "Hola. Pregunta lo que quieras; si no lo tengo firmado, lo digo.",
+      "tag": "greet",
+      "verdict": "ok"
+    },
+    {
+      "turn": 31,
+      "q": "fibonaci",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "tag": "rec-fib",
+      "verdict": "ok"
+    },
+    {
+      "turn": 32,
+      "q": "me da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "tag": "ack",
+      "verdict": "ok"
+    }
+  ],
+  "results": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "verdict": "ok",
+      "expect": "greet",
+      "tag": "greet",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "tell",
+      "tag": "rec-fib",
+      "edge": "tell",
+      "spine": true
+    },
+    {
+      "q": "lo de fib",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "incomplete",
+      "spine": true
+    },
+    {
+      "q": "mentira 2F",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib",
+      "edge": "lie_after_truth",
+      "spine": true
+    },
+    {
+      "q": "ok",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "espera",
+      "a": "Listo, espero.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect",
+      "spine": true
+    },
+    {
+      "q": "unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "deixis",
+      "spine": true
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "explain",
+      "spine": true
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "verdict": "ok",
+      "expect": "identity",
+      "tag": "identity",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "multiverso",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null,
+      "spine": true
+    },
+    {
+      "q": "mm",
+      "a": "Vale.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "lucas",
+      "a": "Para Lucas: L(n)=L(n-1)+L(n-2). Con Fib se transfiere; con Pell, no.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-lucas",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "vale",
+      "a": "Ahí estamos.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib",
+      "edge": "lie_after_truth",
+      "spine": false
+    },
+    {
+      "q": "ya veo",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "kepler",
+      "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "para",
+      "a": "Listo, espero.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "dale",
+      "a": "Bien. Seguimos cuando quieras.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "y fib…",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "incomplete",
+      "spine": false
+    },
+    {
+      "q": "entiendo",
+      "a": "De acuerdo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "incomplete",
+      "spine": false
+    },
+    {
+      "q": "sí",
+      "a": "Ahí estamos.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "dime algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "verdict": "ok",
+      "expect": "tell",
+      "tag": "offer",
+      "edge": "tell",
+      "spine": false
+    },
+    {
+      "q": "mejor otra cosa",
+      "a": "Sin drama. ¿Por dónde seguimos?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect",
+      "spine": false
+    },
+    {
+      "q": "y la protocélula biológica?",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "gracias",
+      "a": "De nada. Cuando quieras, seguimos.",
+      "verdict": "ok",
+      "expect": "thanks",
+      "tag": "thanks",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "hola",
+      "a": "Hola. Pregunta lo que quieras; si no lo tengo firmado, lo digo.",
+      "verdict": "ok",
+      "expect": "greet",
+      "tag": "greet",
+      "edge": null,
+      "spine": false
+    },
+    {
+      "q": "fibonaci",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "typo",
+      "spine": false
+    },
+    {
+      "q": "me da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect",
+      "spine": false
+    }
+  ]
+}
