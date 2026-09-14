@@ -1,0 +1,91 @@
+{
+  "clone_score": -0.14,
+  "new_lever_score": 2.87,
+  "transfer_score": 4.87,
+  "carve_score": 1.37,
+  "detail_clone": {
+    "new_true": 2,
+    "new_reject": 0,
+    "n_new_form_family": 0,
+    "n_known_clone": 2,
+    "n_transfer_new_world": 0,
+    "n_carve_reject": 0,
+    "n_offpath": 2,
+    "form_families": [
+      "bilinear_schema",
+      "bilinear_schema"
+    ],
+    "dead_ok": 0,
+    "cost": 0.18,
+    "score": -0.14,
+    "reward_raw": 0.04
+  },
+  "detail_new": {
+    "new_true": 1,
+    "new_reject": 0,
+    "n_new_form_family": 1,
+    "n_known_clone": 0,
+    "n_transfer_new_world": 0,
+    "n_carve_reject": 0,
+    "n_offpath": 0,
+    "form_families": [
+      "bit_circuit"
+    ],
+    "dead_ok": 0,
+    "cost": 0.13,
+    "score": 2.87,
+    "reward_raw": 3.0
+  },
+  "detail_xfer": {
+    "new_true": 1,
+    "new_reject": 0,
+    "n_new_form_family": 1,
+    "n_known_clone": 0,
+    "n_transfer_new_world": 1,
+    "n_carve_reject": 0,
+    "n_offpath": 0,
+    "form_families": [
+      "conserv_delta0"
+    ],
+    "dead_ok": 0,
+    "cost": 0.13,
+    "score": 4.87,
+    "reward_raw": 5.0
+  },
+  "assertions": {
+    "clone_near_zero": true,
+    "new_lever_large": true,
+    "transfer_largest": true,
+    "carve_positive": true
+  },
+  "scratch_tick": {
+    "steps": 2,
+    "n_verified": 11,
+    "tail": [
+      {
+        "score": -0.16,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_offpath": 2,
+        "new_true": 2,
+        "form_families": [
+          "noise::algebra::alg_binom_expand_mod5",
+          "noise::algebra::alg_distrib_mod5"
+        ]
+      },
+      {
+        "score": -0.12,
+        "n_new_form_family": 0,
+        "n_known_clone": 2,
+        "n_offpath": 2,
+        "new_true": 2,
+        "form_families": [
+          "noise::astro::astro_T_increases_with_a",
+          "noise::astro::astro_T_pos"
+        ]
+      }
+    ]
+  },
+  "merge_clones": false,
+  "merge_new_levers_only": []
+}
