@@ -6,8 +6,12 @@
       normalize_text/2,
       sentence_relations/2,
       pattern/2,
+      query_type/2,
       query_weight/3,
-      head_weight/2
+      head_weight/2,
+      score_relation/3,
+      compatibility/3,
+      query_bonus/3
     ]).
 
 :- use_module(library(lists)).
@@ -271,12 +275,14 @@ p14([S,V,en,Place], relation(location, ubicado_en, [S,Place])) :-
 :- discontiguous query_weight/3.
 :- discontiguous query_weight_extra/3.
 
-query_type(what,    [que, _V|_]) :- !.
-query_type(where,   [donde|_]) :- !.
-query_type(when,    [cuando|_]) :- !.
-query_type(who,     [quien|_]) :- !.
-query_type(how,    [como|_]) :- !.
-query_type(negation, [no|_]) :- !.
+query_type(color_query, Tokens) :- ( member(color, Tokens) ; member(rojo, Tokens) ; member(roja, Tokens) ; member(azul, Tokens) ; member(negro, Tokens) ; member(negra, Tokens) ), !.
+query_type(size_query, Tokens) :- ( member(grande, Tokens) ; member(pequeno, Tokens) ; member(size, Tokens) ; member(tipo, Tokens) ), !.
+query_type(what,    Tokens) :- member(que, Tokens), !.
+query_type(where,   Tokens) :- ( member(donde, Tokens) ; member(ciudad, Tokens) ), !.
+query_type(when,    Tokens) :- ( member(cuando, Tokens) ; member(desde, Tokens) ; member(ano, Tokens) ), !.
+query_type(who,     Tokens) :- ( member(quien, Tokens) ; member(para, Tokens) ), !.
+query_type(how,    Tokens) :- member(como, Tokens), !.
+query_type(negation, Tokens) :- member(no, Tokens), !.
 query_type(unknown, _).
 
 
@@ -339,6 +345,20 @@ query_weight(negation, novelty,   0.10).
 % negation gets a flat boost
 query_weight_extra(negation, negation, 0.30).
 
+query_weight(color_query, relation,  0.20).
+query_weight(color_query, entity,    0.15).
+query_weight(color_query, position,  0.10).
+query_weight(color_query, discourse, 0.15).
+query_weight(color_query, temporal,  0.05).
+query_weight(color_query, novelty,   0.10).
+
+query_weight(size_query, relation,  0.20).
+query_weight(size_query, entity,    0.15).
+query_weight(size_query, position,  0.10).
+query_weight(size_query, discourse, 0.15).
+query_weight(size_query, temporal,  0.05).
+query_weight(size_query, novelty,   0.10).
+
 
 % ════════════════════════════════════════════════════════════════════
 %  SYMBOLIC ATTENTION — query-dependent
@@ -371,16 +391,103 @@ score_relation(QueryType, Relation, scored(Relation, Score, Heads)) :-
     get_weight(QueryType, discourse, D, WD),
     get_weight(QueryType, temporal,  T, WT),
     get_weight(QueryType, novelty,   N, WN),
-    ( query_weight_extra(QueryType, Typ, Extra) ->
-        Score is WR + WE + WP + WD + WT + WN + Extra
-    ; Score is WR + WE + WP + WD + WT + WN
-    ),
-    Heads = heads(relation-R, entity-E, position-P, discourse-D, temporal-T, novelty-N, type-Typ).
+    BaseScore is WR + WE + WP + WD + WT + WN,
+    compatibility(QueryType, Typ,Compat),
+    ( query_bonus(QueryType, Typ, Bonus) -> true ; Bonus = 0.0 ),
+    Score is BaseScore + Compat + Bonus,
+    Heads = heads(relation-R, entity-E, position-P, discourse-D, temporal-T, novelty-N, type-Typ, compat-Compat, bonus-Bonus).
 
 
 get_weight(QueryType, Head, Value, Weight) :-
     ( query_weight(QueryType, Head, Base) -> true ; head_weight(Head, Base) ),
     Weight is Base * Value.
+
+
+% ── COMPATIBILITY: how well does this relation type match this query? ──
+
+% compatibility(QueryType, RelationType, Score)
+% Range: 0.0 (incompatible) → 2.0 (perfect match with strong boost)
+
+compatibility(where,     location,    2.0).
+compatibility(where,     main,        0.6).
+compatibility(where,     temporal,    0.3).
+compatibility(where,     attribute,   0.2).
+compatibility(where,     negation,    0.4).
+compatibility(where,     indirect,    0.2).
+
+compatibility(when,      temporal,    2.0).
+compatibility(when,      main,        0.5).
+compatibility(when,      location,    0.3).
+compatibility(when,      attribute,   0.2).
+compatibility(when,      negation,    0.3).
+compatibility(when,      indirect,    0.2).
+
+compatibility(what,      main,        1.5).
+compatibility(what,      attribute,   0.8).
+compatibility(what,      location,    0.5).
+compatibility(what,      temporal,    0.4).
+compatibility(what,      indirect,    0.6).
+compatibility(what,      negation,    0.3).
+
+compatibility(who,       main,        0.8).
+compatibility(who,       indirect,    2.0).
+compatibility(who,       attribute,   0.5).
+compatibility(who,       location,    0.3).
+compatibility(who,       temporal,    0.2).
+compatibility(who,       negation,    0.2).
+
+compatibility(negation,  negation,    2.0).
+compatibility(negation,  main,        0.5).
+compatibility(negation,  location,    0.6).
+compatibility(negation,  temporal,    0.3).
+compatibility(negation,  attribute,   0.2).
+compatibility(negation,  indirect,    0.2).
+
+compatibility(color_query, attribute, 2.0).
+compatibility(color_query, main,      0.3).
+compatibility(color_query, location,  0.1).
+compatibility(color_query, temporal,  0.0).
+compatibility(color_query, negation,  0.0).
+compatibility(color_query, indirect,  0.1).
+
+compatibility(size_query, attribute, 2.0).
+compatibility(size_query, main,      0.4).
+compatibility(size_query, location,  0.2).
+compatibility(size_query, temporal,  0.0).
+compatibility(size_query, negation,  0.0).
+compatibility(size_query, indirect,  0.1).
+
+compatibility(unknown,   main,        0.7).
+compatibility(unknown,   _,           0.5).
+
+compatibility(color_query, attribute, 1.0).
+compatibility(color_query, main,      0.4).
+compatibility(color_query, location,  0.2).
+compatibility(color_query, temporal,  0.1).
+compatibility(color_query, negation,  0.1).
+compatibility(color_query, indirect,  0.1).
+
+compatibility(size_query, attribute, 1.0).
+compatibility(size_query, main,      0.5).
+compatibility(size_query, location,  0.3).
+compatibility(size_query, temporal,  0.1).
+compatibility(size_query, negation,  0.1).
+compatibility(size_query, indirect,  0.1).
+
+
+% ── QUERY BONUS: explicit boost for specific combinations ───────────
+
+% query_bonus(QueryType, RelationType, Bonus)
+% Used for edge cases where compatibility alone isn't enough
+
+% "para quien" → indirect gets a strong boost
+query_bonus(who, indirect, 0.25).
+
+% "donde" + negation → still relevant but shouldn't beat location
+query_bonus(where, negation, -0.10).
+
+% "cuando" + main verb → temporal context boost
+query_bonus(when, main, 0.10).
 
 
 % ── HEAD 0: TYPE ──────────────────────────────────────────────────
