@@ -1,62 +1,6 @@
 {
   "emerged": true,
   "before": {
-    "n_verified": 428,
-    "n_rejected": 188,
-    "n_types": 60,
-    "reject_rate": 0.3052,
-    "transfer_accuracy": 0.5714,
-    "lemma_reuse_rate": 0.7857,
-    "n_schema_classes": 13,
-    "unlocked_schemas": [
-      "bilinear_schema",
-      "bilinear_schema_r4_g4",
-      "bilinear_schema_r4_g5",
-      "bilinear_schema_r4_g6",
-      "bilinear_schema_r4_g7",
-      "bilinear_schema_r4_g8",
-      "dead_prime",
-      "delta_conserv",
-      "geo_invent",
-      "linrec_scan",
-      "modperiod_schema",
-      "ratio_scan",
-      "transfer_horn"
-    ],
-    "lucas_transfer": 1.0,
-    "pell_transfer": 0.0,
-    "transfer_honest": true,
-    "language_generation": 9
-  },
-  "after_tick": {
-    "n_verified": 445,
-    "n_rejected": 192,
-    "n_types": 60,
-    "reject_rate": 0.3014,
-    "transfer_accuracy": 0.5714,
-    "lemma_reuse_rate": 0.7857,
-    "n_schema_classes": 13,
-    "unlocked_schemas": [
-      "bilinear_schema",
-      "bilinear_schema_r4_g4",
-      "bilinear_schema_r4_g5",
-      "bilinear_schema_r4_g6",
-      "bilinear_schema_r4_g7",
-      "bilinear_schema_r4_g8",
-      "dead_prime",
-      "delta_conserv",
-      "geo_invent",
-      "linrec_scan",
-      "modperiod_schema",
-      "ratio_scan",
-      "transfer_horn"
-    ],
-    "lucas_transfer": 1.0,
-    "pell_transfer": 0.0,
-    "transfer_honest": true,
-    "language_generation": 9
-  },
-  "final": {
     "n_verified": 471,
     "n_rejected": 201,
     "n_types": 60,
@@ -85,44 +29,88 @@
     "transfer_honest": true,
     "language_generation": 10
   },
+  "after_tick": {
+    "n_verified": 478,
+    "n_rejected": 205,
+    "n_types": 60,
+    "reject_rate": 0.3001,
+    "transfer_accuracy": 0.5714,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 14,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
+      "dead_prime",
+      "delta_conserv",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "taxis_conserv",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 10
+  },
+  "final": {
+    "n_verified": 504,
+    "n_rejected": 215,
+    "n_types": 60,
+    "reject_rate": 0.299,
+    "transfer_accuracy": 0.5714,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 15,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
+      "dead_prime",
+      "delta_conserv",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "rec_to_delta",
+      "taxis_conserv",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 11
+  },
   "delta": {
-    "n_verified": 43,
+    "n_verified": 33,
     "n_types": 0,
     "n_schema_classes": 1,
-    "n_rejected": 13,
+    "n_rejected": 14,
     "new_unlocked": [
-      "taxis_conserv"
+      "rec_to_delta"
     ]
   },
   "tick_steps": 12,
   "saturated": true,
-  "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
+  "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; schema taxis_conserv saturated; transfer plateau",
   "molt": {
     "action": "keep_skin",
-    "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
+    "saturation_reason": "schema linrec_scan saturated; schema delta_conserv saturated; schema taxis_conserv saturated; transfer plateau",
     "molt_info": {
-      "generation": 10,
-      "reason": "schema linrec_scan saturated; schema delta_conserv saturated; transfer plateau",
+      "generation": 11,
+      "reason": "schema linrec_scan saturated; schema delta_conserv saturated; schema taxis_conserv saturated; transfer plateau",
       "actions": [
         "novelty_bonus\u21922.0",
-        "spawn_lever taxis_conserv"
+        "spawn_lever rec_to_delta"
       ],
       "unlocked_before": [
-        "bilinear_schema",
-        "bilinear_schema_r4_g4",
-        "bilinear_schema_r4_g5",
-        "bilinear_schema_r4_g6",
-        "bilinear_schema_r4_g7",
-        "bilinear_schema_r4_g8",
-        "dead_prime",
-        "delta_conserv",
-        "geo_invent",
-        "linrec_scan",
-        "modperiod_schema",
-        "ratio_scan",
-        "transfer_horn"
-      ],
-      "unlocked_after": [
         "bilinear_schema",
         "bilinear_schema_r4_g4",
         "bilinear_schema_r4_g5",
@@ -138,18 +126,7 @@
         "taxis_conserv",
         "transfer_horn"
       ],
-      "n_schema_classes": 14
-    },
-    "keep_reason": "n_verified 445\u2192471; n_schema_classes 13\u219214; unlocked ['taxis_conserv']",
-    "metrics_before": {
-      "n_verified": 445,
-      "n_rejected": 192,
-      "n_types": 60,
-      "reject_rate": 0.3014,
-      "transfer_accuracy": 0.5714,
-      "lemma_reuse_rate": 0.7857,
-      "n_schema_classes": 13,
-      "unlocked_schemas": [
+      "unlocked_after": [
         "bilinear_schema",
         "bilinear_schema_r4_g4",
         "bilinear_schema_r4_g5",
@@ -162,18 +139,18 @@
         "linrec_scan",
         "modperiod_schema",
         "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
         "transfer_horn"
       ],
-      "lucas_transfer": 1.0,
-      "pell_transfer": 0.0,
-      "transfer_honest": true,
-      "language_generation": 9
+      "n_schema_classes": 15
     },
-    "metrics_after": {
-      "n_verified": 471,
-      "n_rejected": 201,
+    "keep_reason": "n_verified 478\u2192504; n_schema_classes 14\u219215; unlocked ['rec_to_delta']",
+    "metrics_before": {
+      "n_verified": 478,
+      "n_rejected": 205,
       "n_types": 60,
-      "reject_rate": 0.2991,
+      "reject_rate": 0.3001,
       "transfer_accuracy": 0.5714,
       "lemma_reuse_rate": 0.7857,
       "n_schema_classes": 14,
@@ -197,21 +174,52 @@
       "pell_transfer": 0.0,
       "transfer_honest": true,
       "language_generation": 10
+    },
+    "metrics_after": {
+      "n_verified": 504,
+      "n_rejected": 215,
+      "n_types": 60,
+      "reject_rate": 0.299,
+      "transfer_accuracy": 0.5714,
+      "lemma_reuse_rate": 0.7857,
+      "n_schema_classes": 15,
+      "unlocked_schemas": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "lucas_transfer": 1.0,
+      "pell_transfer": 0.0,
+      "transfer_honest": true,
+      "language_generation": 11
     }
   },
   "recent_clauses": [
-    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7000', 'K = [B]/[A] on 2-species toy')).",
-    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7001', 'K = [B]/[A] on 2-species toy')).",
-    "verified(fact(chem, chem_equilibrium_K, 'chem_K_def_s7002', 'K = [B]/[A] on 2-species toy')).",
-    "verified(fact(astro, astro_period_scan, 'astro_T_increases_with_a_n5', 'T increases with a on generated circular table')).",
-    "verified(fact(astro, astro_period_scan, 'astro_T_pos_n5', 'T>0 and a>0 for all generated bodies')).",
-    "verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n5', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).",
-    "verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n5', 'h^2/a constant (=1) on circular 2-body table')).",
-    "verified(fact(calculus, calc_power_diff, 'calc_delta_x4_vs_n_x3_N4', 'Delta(x^4) / (power * x^3) \u2192 1 (eps on lattice)'))."
+    "verified(fact(symmetry, sym_invariant_scan, 'sym_involution_double_o5', 'f(f(x))=x for swap/negate')).",
+    "verified(fact(symmetry, sym_invariant_scan, 'sym_z2_assoc_o5', 'Z2 addition associative on full table')).",
+    "verified(fact(symmetry, sym_invariant_scan, 'sym_parity_mod2_sum_n_o5', 'parity conserved on 5-bit strings')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N7', 'Delta(sum x^0) = x^0 on prefix')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x1_N7', 'Delta(sum x^1) = x^1 on prefix')).",
+    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x2_N7', 'Delta(sum x^2) = x^2 on prefix')).",
+    "verified(fact(electro, electro_ohm, 'electro_ohm_V_eq_IR_n5_s5580', 'V=IR on generated triples (eps)')).",
+    "verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n5', 'T^2/a^3 constant within eps on circular table'))."
   ],
   "warm_summary": {
-    "total_steps": 191,
-    "n_verified_facts": 445,
+    "total_steps": 215,
+    "n_verified_facts": 478,
     "n_distinct_types": 60
-  }
+  },
+  "elapsed_s": 16.008
 }

@@ -1,7 +1,7 @@
 {
-  "generation": 10,
-  "n_schema_classes": 14,
-  "n_unlocked": 14,
+  "generation": 11,
+  "n_schema_classes": 15,
+  "n_unlocked": 15,
   "unlocked": [
     "bilinear_schema",
     "bilinear_schema_r4_g4",
@@ -15,6 +15,7 @@
     "linrec_scan",
     "modperiod_schema",
     "ratio_scan",
+    "rec_to_delta",
     "taxis_conserv",
     "transfer_horn"
   ],
@@ -35,8 +36,8 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 8,
-      "total_reward": 59.59,
+      "n_visits": 9,
+      "total_reward": 58.88,
       "saturated": false,
       "ticks_no_new_type": 0,
       "novelty_bonus": 2.0
@@ -299,7 +300,7 @@
       "r_cap": 4,
       "mut_depth": 1,
       "mut_cap": 4,
-      "n_visits": 1,
+      "n_visits": 2,
       "total_reward": 0.0,
       "saturated": false,
       "ticks_no_new_type": 0,
@@ -311,6 +312,28 @@
       "unlocked": true,
       "dead_end": false,
       "origin": "mutation:lever_spawn_gen10",
+      "order": 1,
+      "order_max": 4,
+      "coeff_lo": -3,
+      "coeff_hi": 3,
+      "m_max": 4,
+      "m_cap": 12,
+      "r_max": 1,
+      "r_cap": 4,
+      "mut_depth": 1,
+      "mut_cap": 4,
+      "n_visits": 1,
+      "total_reward": 0.0,
+      "saturated": false,
+      "ticks_no_new_type": 0,
+      "novelty_bonus": 0.0
+    },
+    "rec_to_delta": {
+      "id": "rec_to_delta",
+      "description": "rec\u2192\u0394: lift additive recurrence into discrete calculus \u0394",
+      "unlocked": true,
+      "dead_end": false,
+      "origin": "mutation:lever_spawn_gen11",
       "order": 1,
       "order_max": 4,
       "coeff_lo": -3,
@@ -373,7 +396,11 @@
     "3,-1,-2,0",
     "-1,2,3,1",
     "2,-1,4,2",
-    "4,-4,0,1"
+    "4,-4,0,1",
+    "-1,4,1,-1",
+    "0,4,-1,-2",
+    "4,-3,-2,0",
+    "1,5,-3,-2"
   ],
   "molt_history": [
     {
@@ -698,6 +725,48 @@
         "transfer_horn"
       ],
       "n_schema_classes": 14
+    },
+    {
+      "generation": 11,
+      "reason": "schema linrec_scan saturated; schema delta_conserv saturated; schema taxis_conserv saturated; transfer plateau",
+      "actions": [
+        "novelty_bonus\u21922.0",
+        "spawn_lever rec_to_delta"
+      ],
+      "unlocked_before": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "unlocked_after": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "delta_conserv",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "rec_to_delta",
+        "taxis_conserv",
+        "transfer_horn"
+      ],
+      "n_schema_classes": 15
     }
   ]
 }

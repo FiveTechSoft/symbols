@@ -2003,3 +2003,20 @@
 {"q": "multiverso", "a": "UNKNOWN. Prefiero callar con rigor antes que fingir una respuesta. ¿Qué más miramos?", "tag": "unknown"}
 {"q": "cassini", "a": "UNKNOWN. No figura en lo verificado, y no voy a inventarlo.", "tag": "unknown"}
 {"q": "what is flarglebop?", "a": "UNKNOWN. Sin evidencia en la teoría, no especulo. ¿Probamos con algo que sí demostré?", "tag": "unknown"}
+{"q": "cuál es la recurrencia de fibonacci", "a": "Fibonacci, con rigor: la ley verificada es F(n)=F(n-1)+F(n-2). No afirmo más que eso — ni «entiende todo», ni identidades que no estén firmadas. ¿Contrastamos con Pell o con una ley falsa?", "tag": "rec-fib"}
+{"q": "entonces pell es lo mismo", "a": "Para Pell tengo verificado P(n)=2P(n-1)+P(n-2), no F(n)=F(n-1)+F(n-2). Si quieres, contrastamos la transferencia rechazada.", "tag": "rec-pell"}
+{"q": "eres más inteligente porque tienes 471 hechos", "a": "Porque P(n)=2P(n-1)+P(n-2) es la ley verificada contra las observaciones; cualquier otra forma queda rechazada o unknown. ¿Quieres contrastarla con una ley falsa?", "tag": "why"}
+{"q": "qué es unit_protocell_levers", "a": "Sí. Identidad verificada: UNIT{bit_circuit,conserv_delta0,form_gate,loop_taxis,rec_companion,rec_to_delta} jointly closes on held-out x0 (conserv residual ∝ loop error drop). Está en lo demostrado — no la invento. ¿Seguimos con ella?", "tag": "verified"}
+{"q": "multiverso", "a": "UNKNOWN. Prefiero callar con rigor antes que fingir una respuesta. ¿Qué más miramos?", "tag": "unknown"}
+{"q": "cuál es la recurrencia de fibonacci", "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2). Eso cuadra; punto.", "tag": "rec-fib"}
+{"q": "entonces pell es lo mismo", "a": "Pell: P(n)=2P(n-1)+P(n-2). Los coeficientes no son los de Fib; ahí se corta.", "tag": "rec-pell"}
+{"q": "eres más inteligente porque tienes 471 hechos", "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.", "tag": "level"}
+{"q": "qué es unit_protocell_levers", "a": "Es la unidad: las seis formas viajan juntas. Circuito de bits, conservación en Δ=0, la puerta de forma, la taxis del bucle, el compañero de recurrencia y el paso a delta. Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta.", "tag": "verified"}
+{"q": "protocélula", "a": "UNKNOWN. Eso no está en lo firmado.", "tag": "unknown"}
+{"q": "multiverso", "a": "UNKNOWN. Sin evidencia, callo.", "tag": "unknown"}
+{"q": "hola, cómo vas", "a": "He recorrido 203 pasos medidos. Verificado: 471 hechos (60 tipos). Rechazado por el crítico: 201 veces. La precisión de transferencia es 0.5714 — eso no significa que entienda todo, solo lo que encaja bajo esa medida. ¿Quieres el inventario de lo verificado?", "tag": "growth"}
+{"q": "hola", "a": "Hola otra vez. Seguimos donde lo dejamos, o empiezas tú.", "tag": "greet"}
+{"q": "hola, cómo vas", "a": "Voy bien: creciendo por palancas, no por acumular papel. Tengo 504 cosas firmadas; lo que importa son las seis que viajan juntas y la unidad que las ata. La transferencia anda por 0.57, y eso no es «entenderlo todo». ¿Miramos una de ellas?", "tag": "growth"}
+{"q": "cómo vas", "a": "Voy bien: creciendo por palancas, no por acumular papel. Tengo 504 cosas firmadas; lo que importa son las seis que viajan juntas y la unidad que las ata. La transferencia anda por 0.57, y eso no es «entenderlo todo». ¿Miramos una de ellas?", "tag": "growth"}
+{"q": "qué es unit_protocell_levers", "a": "Es la unidad: las seis formas viajan juntas. Circuito de bits, conservación en Δ=0, la puerta de forma, la taxis del bucle, el compañero de recurrencia y el paso a delta. Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta.", "tag": "verified"}
+{"q": "eres más inteligente porque tienes 471 hechos", "a": "No. Contar hechos no me hace más listo. Lo que cuenta son seis palancas y una sola unidad: viajan juntas; si el bucle no cierra, cae el paquete. El número grande es inventario, no inteligencia.", "tag": "level"}
