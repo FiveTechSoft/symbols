@@ -1940,6 +1940,9 @@ chat_form([who, V], say, answer(Xs, Facts)) :-
 chat_form([who, V], say, no) :-
     bb_rel_forms(V, Rs),
     \+ (member(Vr, Rs), memory_relation(_, Vr, _, _, _)).
+% who V? verb unknown: "No one" (honest).
+chat_form([who, V], say, no_one) :-
+    \+ (bb_rel_forms(V, Rs), Rs \== []).
 % who V E? but no one V's E: honest "no" (prevents graph fallback to outgoing).
 chat_form([who, V|Rest], say, no) :-
     qnorm(Rest, O),
@@ -1981,6 +1984,19 @@ chat_form([how, many|Mid], say, count(N)) :-
     sort(Os0, Os),
     Os \== [],
     length(Os, N).
+% is X (a) Y? — check memory_relation(X, is, Y) or reverse.
+chat_form([is|Rest], say, YesNo) :-
+    exclude(is_determiner, Rest, Clean),
+    Clean = [A, B],
+    qnorm([A], AN), qnorm([B], BN),
+    ( memory_relation(AN, is, BN, _, _) -> YesNo = yes((AN, is, BN))
+    ; memory_relation(BN, is, AN, _, _) -> YesNo = yes((BN, is, AN))
+    ; YesNo = no
+    ).
+chat_form([is|Rest], say, no) :-
+    exclude(is_determiner, Rest, Clean),
+    Clean = [A],
+    \+ memory_relation(A, _, _, _, _).
 chat_form([did|Mid], say, YesNo) :-
     did_split(Mid, S, V, O),
     ( memory_relation(S, V, O, _, _) -> YesNo = yes((S, V, O))
@@ -2019,6 +2035,12 @@ chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
     findall(Tm, member(Tm-_, LF), Xs0),
     sort(Xs0, Xs),
     findall((E, time, Tm), member(_-(E, time, Tm), LF), Facts).
+% when did S V O? — SVO fallback: show the fact, no time available.
+chat_form([when, did|Mid], say, answer(Xs, Facts)) :-
+    did_split(Mid, S, V, O),
+    memory_relation(S, V, O, _, _),
+    Xs = [O],
+    Facts = [(S, V, O)].
 
 % qnorm (nombre publico): por token, alias ensenado gana; si no,
 % contenido propio; si nada resuelve, fallback difuso (Levenshtein
@@ -2100,7 +2122,10 @@ bb_rel_forms(V, Rs) :-
                 bb_rel_forms_direct(C, RC), member(R, RC)), Rs1),
     findall(R, (irregular_form(V, Base),
                 bb_rel_forms_direct(Base, RB), member(R, RB)), Rs2),
-    append([Rs0, Rs1, Rs2], Rall),
+    % Reverse irregular: "find" finds "found" via irregular_form(found, find).
+    findall(R, (irregular_form(Past, V),
+                bb_rel_forms_direct(Past, RP), member(R, RP)), Rs3),
+    append([Rs0, Rs1, Rs2, Rs3], Rall),
     sort(Rall, Rs),
     Rs \== [].
 
@@ -2176,7 +2201,9 @@ bb_rel_forms_direct(V, Rs) :-
       findall(R, (memory_relation(_, R, _, _, _),
                   ( R == V ; (bb_stem(R, RSt0), bb_ddouble(RSt0, RStE),
                               RStE == StE, R \== V) )), R1),
-      sort(R1, Rs)
+      ( R1 \== [] -> sort(R1, Rs)
+      ; ( fuzzy_rel(V, Rf) -> Rs = [Rf] ; Rs = [] )
+      )
     ).
 
 % bb_ddouble: una de dos letras finales iguales fuera (ingles: la
@@ -2386,6 +2413,8 @@ chat_say(say, yes_bare) :-
     writeln('Yes.').
 chat_say(say, nobody) :-
     writeln('No one else.').
+chat_say(say, no_one) :-
+    writeln('No one.').
 chat_say(say, explanation(S, Vr, O, Proof)) :-
     surface_sent((S, Vr, O), Line),
     writeln(Line),
