@@ -459,6 +459,16 @@ def _is_thanks(s: str) -> bool:
     return s in ("gracias", "gracias!", "thanks", "thank you", "mil gracias") or s.startswith("gracias ")
 
 
+def _is_ack(s: str) -> bool:
+    """Bare affirmations after a turn — not new questions, never UNKNOWN."""
+    s = (s or "").strip().rstrip("!.")
+    return s in (
+        "ok", "okay", "vale", "bien", "dale", "de acuerdo", "perfecto",
+        "si", "sí", "sip", "sep", "aja", "ajá", "claro", "entendido",
+        "ya", "listo", "bueno",
+    )
+
+
 def _is_confused(s: str) -> bool:
     return any(x in s for x in (
         "no entiendo", "no te entiendo", "no comprendo", "no entendi",
@@ -1080,6 +1090,16 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             "Dale. Aquí estoy.",
         ]
         return _pack(thanks[pulse % len(thanks)], "thanks", "", st, topic=st.get("topic"))
+    if _is_ack(s):
+        pulse = int(st.get("pulse") or 0)
+        st["pulse"] = pulse + 1
+        acks = [
+            "Bien. Seguimos cuando quieras.",
+            "Vale.",
+            "De acuerdo.",
+            "Ahí estamos.",
+        ]
+        return _pack(acks[pulse % len(acks)], "ack", "", st, topic=st.get("topic"))
     if _is_confused(s):
         # Always route through explain — it skips fluff and uses last_clause/topic
         if last.get("last_text") or last.get("last_clause") or last.get("topic"):
