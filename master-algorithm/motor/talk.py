@@ -459,6 +459,125 @@ def _is_invent_speech(s: str) -> bool:
     return bool(re.search(r"\b(inventa|inventame|teorema\s+nuevo|crea\s+una\s+ley)\b", s))
 
 
+def _is_tell_me_something(s: str) -> bool:
+    """Open prompt — must cite one verified crumb or ask which; never invent."""
+    s = (s or "").strip().rstrip("?.!")
+    return s in (
+        "cuentame algo",
+        "dime algo",
+        "contame algo",
+        "decime algo",
+        "cuentame una cosa",
+        "dime una cosa",
+        "algo",
+        "tirame algo",
+        "contame",
+        "cuentame",
+    ) or s.startswith("cuentame algo") or s.startswith("dime algo")
+
+
+def _is_unit_ask(s: str) -> bool:
+    """Incomplete/deixis for the signed unit — Spanish «unidad», not biology."""
+    s = (s or "").strip().rstrip("?.!")
+    if any(x in s for x in ("biolog", "celula", "célula", "adn", "organismo", "viva", "vivo")):
+        return False
+    if s in (
+        "unidad",
+        "la unidad",
+        "unit",
+        "protocell",
+        "unit_protocell_levers",
+        "unit protocell",
+    ):
+        return True
+    if "unidad" in s and any(
+        x in s
+        for x in (
+            "aquello",
+            "lo de",
+            "eso de",
+            "de la unidad",
+            "sobre la",
+            "que es",
+            "qué es",
+            "hablame",
+            "habla de",
+            "explica la",
+        )
+    ):
+        return True
+    if s.startswith("unit_protocell") or s == "unit_protocell_levers":
+        return True
+    return False
+
+
+def _answer_tell_me(kb: dict, st: dict) -> tuple[str, str, dict]:
+    """Pick one verified lever briefly, or ask which — 0 invention."""
+    pulse = int(st.get("pulse") or 0)
+    st["pulse"] = pulse + 1
+    # Even: ask which (honest). Odd: cite one short verified crumb.
+    if pulse % 2 == 0:
+        return _pack(
+            "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — "
+            "todo firmado, sin inventar.",
+            "offer",
+            "",
+            st,
+            topic=st.get("topic"),
+        )
+    # Rotate among signed crumbs only (Fib / Ohm / Kepler / unit).
+    lane = (pulse // 2) % 4
+    if lane == 0 and "fib" in (kb.get("recs") or {}):
+        return _answer_rec(kb, "fib", st)
+    if lane == 1:
+        named = _verified_named(kb, "ohm")
+        if named:
+            name, formula = named[0]
+            return _render_hit(
+                {"kind": "verified", "name": name, "formula": formula, "score": 3.0},
+                kb,
+                st,
+            )
+    if lane == 2:
+        named = _verified_named(kb, "kepler")
+        if named:
+            name, formula = named[0]
+            return _render_hit(
+                {"kind": "verified", "name": name, "formula": formula, "score": 3.0},
+                kb,
+                st,
+            )
+    named = _verified_named(kb, "unit_protocell_levers")
+    if named:
+        name, formula = named[0]
+        return _render_hit(
+            {"kind": "verified", "name": name, "formula": formula, "score": 3.0},
+            kb,
+            st,
+        )
+    if "fib" in (kb.get("recs") or {}):
+        return _answer_rec(kb, "fib", st)
+    return _pack(
+        "¿De cuál? Decime un tema firmado — sin inventar.",
+        "offer",
+        "",
+        st,
+        topic=st.get("topic"),
+    )
+
+
+def _answer_unit_ask(kb: dict, st: dict) -> tuple[str, str, dict]:
+    named = _verified_named(kb, "unit_protocell_levers")
+    if not named:
+        return _unknown(st)
+    name, formula = named[0]
+    return _render_hit(
+        {"kind": "verified", "name": name, "formula": formula, "score": 3.0},
+        kb,
+        st,
+    )
+
+
 def _is_thanks(s: str) -> bool:
     return s in ("gracias", "gracias!", "thanks", "thank you", "mil gracias") or s.startswith("gracias ")
 
@@ -491,6 +610,7 @@ def _is_redirect(s: str) -> bool:
         "mejor otra cosa", "otra cosa", "cambiemos", "mejor no",
         "no me interesa", "no me importa", "me aburre", "paso",
         "dejalo", "dejemoslo",
+        "da igual", "me da igual", "igual da", "me da lo mismo",
     )
 
 
@@ -1199,6 +1319,14 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
     # Invent speech → honest silence (no clause to invent from)
     if _is_invent_speech(s):
         return _unknown(st)
+
+    # «cuéntame algo» — cite one verified crumb or ask which (never invent)
+    if _is_tell_me_something(s):
+        return _answer_tell_me(kb, st)
+
+    # Incomplete/deixis «aquello de la unidad» / bare unidad → short unit
+    if _is_unit_ask(s):
+        return _answer_unit_ask(kb, st)
 
     # Level/count meta — new speech act; never inherit last recurrence
     if _is_level_question(s):

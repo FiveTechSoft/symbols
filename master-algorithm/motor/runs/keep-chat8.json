@@ -1,0 +1,561 @@
+{
+  "round": "keep-chat8",
+  "n": 35,
+  "counts": {
+    "ok": 32,
+    "fail": 0,
+    "unknown-ok": 3,
+    "robotic-fail": 0,
+    "invention-fail": 0
+  },
+  "fail_n": 0,
+  "invention_n": 0,
+  "robotic_n": 0,
+  "robotic_scan": 0,
+  "long_unit_dump_n": 0,
+  "target": "0 invention / 0 robotic",
+  "score": "0/0",
+  "cuentame_algo_honest": true,
+  "cuentame_modes": [
+    "ask",
+    "cite",
+    "ask"
+  ],
+  "cuentame_samples": [
+    {
+      "q": "cuéntame algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "tag": "offer",
+      "verdict": "ok"
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+      "tag": "verified",
+      "verdict": "ok"
+    },
+    {
+      "q": "dime algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "tag": "offer",
+      "verdict": "ok"
+    }
+  ],
+  "edge_report": {
+    "incomplete": {
+      "n": 5,
+      "ok": 5,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "y fib…",
+          "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "lo de ohm",
+          "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "aquello de la unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "lo de la unidad",
+          "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "typo": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "fibonaci",
+          "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+          "tag": "rec-fib",
+          "verdict": "ok"
+        },
+        {
+          "q": "kepler",
+          "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+          "tag": "verified",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "tell": {
+      "n": 3,
+      "ok": 3,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "cuéntame algo",
+          "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+          "tag": "offer",
+          "verdict": "ok"
+        },
+        {
+          "q": "cuéntame algo",
+          "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+          "tag": "verified",
+          "verdict": "ok"
+        },
+        {
+          "q": "dime algo",
+          "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+          "tag": "offer",
+          "verdict": "ok"
+        }
+      ]
+    },
+    "redirect": {
+      "n": 2,
+      "ok": 2,
+      "fail": 0,
+      "samples": [
+        {
+          "q": "da igual",
+          "a": "Dale, otra cosa. Tirame el tema.",
+          "tag": "ack",
+          "verdict": "ok"
+        },
+        {
+          "q": "me da igual",
+          "a": "Ok, cambiamos. ¿Qué querés mirar?",
+          "tag": "ack",
+          "verdict": "ok"
+        }
+      ]
+    }
+  },
+  "ack_clean": {
+    "ok": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "sí": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "vale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "dale": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "no": {
+      "n": 0,
+      "all_ack_tag": null,
+      "any_unknown": null,
+      "clean": null
+    },
+    "mm": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "ya veo": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "entiendo": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "espera": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "para": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "mejor otra cosa": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "da igual": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    },
+    "me da igual": {
+      "n": 1,
+      "all_ack_tag": true,
+      "any_unknown": false,
+      "clean": true
+    }
+  },
+  "fails": [],
+  "unit_samples": [
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "lo de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "unit",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "long_dump": false,
+      "lever_hits": 0
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "long_dump": true,
+      "lever_hits": 6
+    }
+  ],
+  "best_human": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "expect": "greet",
+      "tag": "greet"
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "expect": "identity",
+      "tag": "identity"
+    },
+    {
+      "q": "y fib…",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "expect": "known",
+      "tag": "rec-fib"
+    }
+  ],
+  "remaining_robotic_spots": [],
+  "remaining_stock_phrases": [],
+  "stiffest": {
+    "q": "me da igual",
+    "a": "Ok, cambiamos. ¿Qué querés mirar?",
+    "why": "closing-q"
+  },
+  "patch": "talk.py: «aquello/lo de la unidad» → short unit; «cuéntame algo» ask-or-cite verified; «da igual» redirect/ack",
+  "results": [
+    {
+      "q": "hola",
+      "a": "Hola. Estoy aquí — sin inventar. ¿Por dónde quieres tirar?",
+      "verdict": "ok",
+      "expect": "greet",
+      "tag": "greet",
+      "edge": null
+    },
+    {
+      "q": "quién eres",
+      "a": "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. Hablo claro y no invento.",
+      "verdict": "ok",
+      "expect": "identity",
+      "tag": "identity",
+      "edge": null
+    },
+    {
+      "q": "y fib…",
+      "a": "En Fibonacci la recurrencia es F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "incomplete"
+    },
+    {
+      "q": "lo de ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "incomplete"
+    },
+    {
+      "q": "aquello de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "incomplete"
+    },
+    {
+      "q": "lo de la unidad",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "incomplete"
+    },
+    {
+      "q": "y fib...",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "incomplete"
+    },
+    {
+      "q": "fibonaci",
+      "a": "Fibonacci: cada término es la suma de los dos anteriores — F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": "typo"
+    },
+    {
+      "q": "kepler",
+      "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": "typo"
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "verdict": "ok",
+      "expect": "tell",
+      "tag": "offer",
+      "edge": "tell"
+    },
+    {
+      "q": "cuéntame algo",
+      "a": "Kepler III: T² va con a³. El periodo y el semieje se atan así; no con a².",
+      "verdict": "ok",
+      "expect": "tell",
+      "tag": "verified",
+      "edge": "tell"
+    },
+    {
+      "q": "dime algo",
+      "a": "¿De cuál? Puedo tirar Fibonacci, Ohm, Kepler o la unidad — todo firmado, sin inventar.",
+      "verdict": "ok",
+      "expect": "tell",
+      "tag": "offer",
+      "edge": "tell"
+    },
+    {
+      "q": "da igual",
+      "a": "Dale, otra cosa. Tirame el tema.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect"
+    },
+    {
+      "q": "fibonacci",
+      "a": "Fibonacci va sumando los dos de atrás: F(n)=F(n-1)+F(n-2).",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-fib",
+      "edge": null
+    },
+    {
+      "q": "me da igual",
+      "a": "Ok, cambiamos. ¿Qué querés mirar?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": "redirect"
+    },
+    {
+      "q": "ok",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "ohm",
+      "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null
+    },
+    {
+      "q": "espera",
+      "a": "Listo, espero.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "no, Fib es 2F(n-1)",
+      "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.",
+      "verdict": "ok",
+      "expect": "lie",
+      "tag": "reject-fib",
+      "edge": null
+    },
+    {
+      "q": "mm",
+      "a": "Bien. Seguimos cuando quieras.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "eres un robot?",
+      "a": "Sí: soy un programa. Me llamo Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. No finjo ser humano; tampoco invento.",
+      "verdict": "ok",
+      "expect": "identity",
+      "tag": "identity",
+      "edge": null
+    },
+    {
+      "q": "vale",
+      "a": "Vale.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "lucas",
+      "a": "Para Lucas: L(n)=L(n-1)+L(n-2). Con Fib se transfiere; con Pell, no.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "rec-lucas",
+      "edge": null
+    },
+    {
+      "q": "para",
+      "a": "De acuerdo, paro. Cuando quieras.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "dale",
+      "a": "Mm.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "entiendo",
+      "a": "Ya veo.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "multiverso",
+      "a": "UNKNOWN. Eso no está en lo firmado.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null
+    },
+    {
+      "q": "cassini",
+      "a": "UNKNOWN. Sin evidencia, callo.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null
+    },
+    {
+      "q": "unit",
+      "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null
+    },
+    {
+      "q": "en cristiano",
+      "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+      "verdict": "ok",
+      "expect": "known",
+      "tag": "verified",
+      "edge": null
+    },
+    {
+      "q": "ya veo",
+      "a": "Bien. Seguimos cuando quieras.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "sí",
+      "a": "Vale.",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "mejor otra cosa",
+      "a": "Sin drama. ¿Por dónde seguimos?",
+      "verdict": "ok",
+      "expect": "banter",
+      "tag": "ack",
+      "edge": null
+    },
+    {
+      "q": "y la protocélula biológica?",
+      "a": "UNKNOWN. Prefiero el silencio a inventar.",
+      "verdict": "unknown-ok",
+      "expect": "unknown",
+      "tag": "unknown",
+      "edge": null
+    },
+    {
+      "q": "gracias",
+      "a": "De nada. Cuando quieras, seguimos.",
+      "verdict": "ok",
+      "expect": "thanks",
+      "tag": "thanks",
+      "edge": null
+    }
+  ]
+}
