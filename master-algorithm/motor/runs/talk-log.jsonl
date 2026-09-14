@@ -2048,3 +2048,5 @@
 {"q": "ohm", "a": "Ohm: V=IR. Tensión, corriente, resistencia — así de corto, y cuadra.", "tag": "verified"}
 {"q": "no, Fib es 2F(n-1)", "a": "Rechazado: esa no es la ley de Fibonacci. La que cuadra es F(n)=F(n-1)+F(n-2); el doble del anterior no.", "tag": "reject-fib"}
 {"q": "mm", "a": "Ahí estamos.", "tag": "ack"}
+{"q": "qué es unit_protocell_levers", "a": "Es la unidad: seis formas que solo valen juntas. Si el bucle no cierra, cae el paquete entero.", "tag": "verified"}
+{"q": "en cristiano", "a": "En cristiano: imagina seis piezas que solo valen juntas. Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana y el salto a delta. Si una falla, no salvás el resto — cae el paquete.", "tag": "verified"}
