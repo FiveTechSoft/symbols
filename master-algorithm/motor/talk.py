@@ -405,9 +405,173 @@ def _is_energy_because_mom(s: str) -> bool:
     return has_e and has_m and has_cause
 
 
+
+def _is_shorter(s: str) -> bool:
+    """Impatient brevity — collapse last answer; never expand unit/lemmas."""
+    s = (s or "").strip().rstrip("?.!")
+    if s in (
+        "mas corto", "más corto", "corto", "en corto", "mas breve", "más breve",
+        "sin rollo", "no me des rollo", "menos rollo", "basta de rollo",
+        "no tan largo", "abreviado", "resumi", "resume", "acorta", "acortalo",
+        "más corto por favor", "mas corto por favor",
+    ):
+        return True
+    if "rollo" in s and any(x in s for x in ("no me des", "sin ", "basta", "menos")):
+        return True
+    if ("corto" in s or "breve" in s) and any(
+        x in s for x in ("mas ", "más ", "ponelo", "dale", "por favor", "pf")
+    ):
+        return True
+    return False
+
+
+def _is_already_said(s: str) -> bool:
+    """Impatient 'you already said that' — discourse ack, never UNKNOWN."""
+    s = (s or "").strip().rstrip("?.!")
+    if s in (
+        "ya lo dijiste", "ya me lo dijiste", "eso ya lo dijiste",
+        "ya lo dijiste antes", "me lo dijiste", "ya lo se", "ya lo sé",
+        "eso ya", "repetis", "te repetis", "te estás repetiendo", "te estas repetiendo",
+    ):
+        return True
+    return "ya lo dijiste" in s or "ya me lo dijiste" in s
+
+
+def _is_prove_no_invent(s: str) -> bool:
+    """Skeptical 'prove you invent nothing' — not geo_invent hitchhike."""
+    s = (s or "").strip().rstrip("?.!")
+    if "invent" in s and any(
+        x in s for x in ("prueba", "prove", "demostra", "mostrá", "mostra", "mostrame", "demuestra")
+    ):
+        return True
+    if s in ("no inventes", "sin inventar", "no inventes nada", "no inventás", "no inventas"):
+        return True
+    return False
+
+
+def _answer_shorter(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
+    """Collapse to a short human crumb — unit never lists six levers."""
+    topic = last.get("topic") or st.get("topic")
+    tag = last.get("tag") or st.get("tag") or "verified"
+    prev = (last.get("last_text") or "").split("\n[")[0].strip()
+    pulse = int(st.get("pulse") or 0)
+    st["pulse"] = pulse + 1
+
+    if topic and "unit_protocell" in str(topic).lower():
+        return _answer_unit_ask(kb, st)
+
+    if prev and (
+        prev.lower().startswith("en cristiano")
+        or ("bits" in prev.lower() and "taxis" in prev.lower())
+    ):
+        # Long unit explain → short unit
+        if topic and "unit" in str(topic).lower():
+            return _answer_unit_ask(kb, st)
+
+    if topic in (kb.get("recs") or {}):
+        return _answer_rec(kb, topic, st)
+
+    if topic and str(topic) not in ("identity", "growth", "summary", "reject", None, ""):
+        named = _verified_named(kb, str(topic))
+        if named:
+            name, formula = named[0]
+            return _render_hit(
+                {"kind": "verified", "name": name, "formula": formula, "score": 3.0},
+                kb,
+                st,
+            )
+
+    if prev and not prev.startswith("UNKNOWN"):
+        # First sentence only
+        first = prev.split(".")[0].strip()
+        if first and not first.endswith("."):
+            first = first + "."
+        if len(first) > 120:
+            first = first[:110].rstrip() + "…"
+        variants = [
+            f"Corto: {first}",
+            f"Ok, breve: {first}",
+            first,
+        ]
+        return _pack(variants[pulse % len(variants)], tag, "", st, topic=topic)
+
+    variants = [
+        "Ok, más corto. Tirame el tema.",
+        "Breve: decime de qué.",
+        "Sin rollo. ¿Qué miramos?",
+    ]
+    return _pack(variants[pulse % len(variants)], "ack", "", st, topic=topic)
+
+
+def _answer_already_said(last: dict, st: dict) -> tuple[str, str, dict]:
+    pulse = int(st.get("pulse") or 0)
+    st["pulse"] = pulse + 1
+    variants = [
+        "Sí, ya lo dije. No te lo repito entero.",
+        "Mm, ya está dicho.",
+        "De acuerdo — no te lo vuelvo a largar.",
+    ]
+    return _pack(
+        variants[pulse % len(variants)],
+        "ack",
+        "",
+        st,
+        topic=st.get("topic") or last.get("topic"),
+    )
+
+
+def _answer_prove_no_invent(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
+    """Cite last signed crumb as proof; never invent; never UNKNOWN if last is signed."""
+    topic = last.get("topic") or st.get("topic")
+    tag = last.get("tag") or ""
+    prev = (last.get("last_text") or "").split("\n[")[0].strip()
+    pulse = int(st.get("pulse") or 0)
+    st["pulse"] = pulse + 1
+
+    if prev and tag and tag != "unknown" and not prev.startswith("UNKNOWN"):
+        # Prefer a short re-cite of living topic over parroting a long explain
+        if topic and "unit_protocell" in str(topic).lower():
+            crumb = (
+                "Es la unidad: seis formas que solo valen juntas. "
+                "Si el bucle no cierra, cae el paquete entero."
+            )
+        elif topic in (kb.get("recs") or {}):
+            can = _canonical_rec(kb["recs"].get(topic, []))
+            crumb = _formula(topic, can)
+        else:
+            crumb = prev.split(".")[0].strip()
+            if crumb and not crumb.endswith("."):
+                crumb = crumb + "."
+            if len(crumb) > 110:
+                crumb = crumb[:100].rstrip() + "…"
+        variants = [
+            f"Prueba: solo cito lo firmado. {crumb} Si no está, callo.",
+            f"No invento. Firmado: {crumb}",
+            f"Mirá — sin inventar: {crumb}",
+        ]
+        return _pack(
+            variants[pulse % len(variants)],
+            tag if tag not in ("ack", "greet", "thanks") else "verified",
+            "",
+            st,
+            topic=topic,
+        )
+
+    return _pack(
+        "Prueba: sin cláusula firmada digo UNKNOWN. No invento.",
+        "identity",
+        "",
+        st,
+        topic=topic or "identity",
+    )
+
+
 def _is_more(s: str) -> bool:
     # Do not treat "más listo/inteligente" level speech as "dame más del topic"
     if _is_level_question(s):
+        return False
+    # «más corto» / «no me des rollo» are SHORTEN, not expand
+    if _is_shorter(s):
         return False
     return bool(re.search(r"\b(mas|more|otro|otros|sigue|continua)\b", s))
 
@@ -1273,6 +1437,14 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             "Ya veo.",
         ]
         return _pack(acks[pulse % len(acks)], "ack", "", st, topic=st.get("topic"))
+    # Impatient / skeptical discourse — never UNKNOWN, never long unit dump
+    if _is_shorter(s):
+        return _answer_shorter(kb, last, st)
+    if _is_already_said(s):
+        return _answer_already_said(last, st)
+    if _is_prove_no_invent(s):
+        return _answer_prove_no_invent(kb, last, st)
+
     if _is_confused(s):
         # Always route through explain — it skips fluff and uses last_clause/topic
         if last.get("last_text") or last.get("last_clause") or last.get("topic"):
