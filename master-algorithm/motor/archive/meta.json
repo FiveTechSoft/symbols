@@ -1,5 +1,5 @@
 {
-  "total_steps": 111,
+  "total_steps": 135,
   "arms": {
     "sequences::linear_recurrences": {
       "id": "linear_recurrences",
@@ -9,9 +9,9 @@
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 0,
-      "saturated": false,
-      "n_visits": 5,
-      "total_reward": 46.96
+      "saturated": true,
+      "n_visits": 7,
+      "total_reward": 60.300000000000004
     },
     "sequences::transfer_recurrence": {
       "id": "transfer_recurrence",
@@ -117,7 +117,7 @@
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 10,
-      "saturated": true,
+      "saturated": false,
       "n_visits": 1,
       "total_reward": -0.68
     },
@@ -245,25 +245,25 @@
       "id": "chance_bayes_scan",
       "description": "Tiny Bayes / log-odds identities on generated 2x2 tables",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 0,
-      "saturated": false,
-      "n_visits": 1,
-      "total_reward": 6.61
+      "saturated": true,
+      "n_visits": 3,
+      "total_reward": 19.77
     },
     "chance::chance_entropy_scan": {
       "id": "chance_entropy_scan",
       "description": "Entropy inequalities on generated 2..k outcome dists",
       "dead_end": false,
-      "param": 3,
+      "param": 6,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 1,
-      "saturated": false,
-      "n_visits": 1,
-      "total_reward": 7.11
+      "saturated": true,
+      "n_visits": 5,
+      "total_reward": 35.35
     },
     "chance::chance_dead_negH": {
       "id": "chance_dead_negH",
@@ -281,37 +281,37 @@
       "id": "chance_extrapolate",
       "description": "EXTRAPOLATE: re-test accepted identities on larger tables",
       "dead_end": false,
-      "param": 3,
+      "param": 5,
       "param_max": 8,
-      "unlocked": false,
+      "unlocked": true,
       "unlock_order": 3,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 2,
+      "total_reward": 5.21
     },
     "info::info_mi_scan": {
       "id": "info_mi_scan",
       "description": "Mutual information / independence on tiny joint tables",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 4.76
+      "n_visits": 2,
+      "total_reward": 9.5
     },
     "info::info_transfer_bitfn": {
       "id": "info_transfer_bitfn",
       "description": "COMPARE: transfer archived bit_fn prior into MI structure",
       "dead_end": false,
-      "param": 2,
+      "param": 3,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 1,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 5.58
+      "n_visits": 2,
+      "total_reward": 5.39
     },
     "info::info_dead_mi0": {
       "id": "info_dead_mi0",
@@ -377,13 +377,13 @@
       "id": "astro_transfer_form",
       "description": "TRANSFER_FORM: Kepler T\u00b2\u221da\u00b3 vs bogus other power on same table",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 8,
       "unlocked": true,
       "unlock_order": 4,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 1,
+      "total_reward": 2.09
     },
     "algebra::alg_poly_zn": {
       "id": "alg_poly_zn",
@@ -497,25 +497,25 @@
       "id": "calc_transfer_form",
       "description": "TRANSFER_FORM: rec/2 prior \u2192 discrete \u0394 structure (alias of calc_transfer_rec)",
       "dead_end": false,
-      "param": 4,
+      "param": 5,
       "param_max": 12,
       "unlocked": true,
       "unlock_order": 5,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 1,
+      "total_reward": -1.7800000000000002
     },
     "nets::nets_perceptron": {
       "id": "nets_perceptron",
       "description": "Tiny linear threshold on AND/OR tables",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 4.56
+      "n_visits": 2,
+      "total_reward": 4.35
     },
     "nets::nets_xor_depth": {
       "id": "nets_xor_depth",
@@ -569,13 +569,13 @@
       "id": "nets_transfer_form",
       "description": "TRANSFER_FORM: bit_fn AND/XOR \u2192 perceptron / linear-threshold critic",
       "dead_end": false,
-      "param": 2,
+      "param": 3,
       "param_max": 4,
       "unlocked": true,
       "unlock_order": 5,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 1,
+      "total_reward": 2.06
     },
     "electro::electro_ohm": {
       "id": "electro_ohm",
@@ -629,25 +629,25 @@
       "id": "electro_transfer_form",
       "description": "TRANSFER_FORM: reuse linear \u0394=0 conservation prior (atom/mom \u2192 KCL)",
       "dead_end": false,
-      "param": 2,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 4,
       "saturated": false,
-      "n_visits": 0,
-      "total_reward": 0.0
+      "n_visits": 2,
+      "total_reward": 7.0
     },
     "physics::phys_collision": {
       "id": "phys_collision",
       "description": "1D elastic collision: momentum+energy on generated m,v",
       "dead_end": false,
-      "param": 3,
+      "param": 6,
       "param_max": 6,
       "unlocked": true,
       "unlock_order": 0,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 4.26
+      "n_visits": 4,
+      "total_reward": 28.32
     },
     "physics::phys_action_reaction": {
       "id": "phys_action_reaction",
@@ -677,13 +677,13 @@
       "id": "phys_transfer_form",
       "description": "TRANSFER_FORM: reuse linear \u0394=0 conservation prior (atom/KCL \u2192 momentum)",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 3,
       "saturated": false,
-      "n_visits": 1,
-      "total_reward": 7.26
+      "n_visits": 2,
+      "total_reward": 7.0
     },
     "chem::chem_atom_balance": {
       "id": "chem_atom_balance",
@@ -725,13 +725,25 @@
       "id": "chem_transfer_form",
       "description": "TRANSFER_FORM: reuse linear \u0394=0 conservation prior (mom/KCL \u2192 atom balance)",
       "dead_end": false,
-      "param": 3,
+      "param": 4,
       "param_max": 5,
       "unlocked": true,
       "unlock_order": 3,
       "saturated": false,
+      "n_visits": 2,
+      "total_reward": 7.0
+    },
+    "sequences::bilinear_schema_r4_g8": {
+      "id": "bilinear_schema_r4_g8",
+      "description": "Mutant bilinear schema r_max=4",
+      "dead_end": false,
+      "param": 4,
+      "param_max": 4,
+      "unlocked": true,
+      "unlock_order": 11,
+      "saturated": true,
       "n_visits": 1,
-      "total_reward": 7.26
+      "total_reward": -0.68
     }
   },
   "step_log": [
@@ -4904,6 +4916,928 @@
         "transfer_parity_to_z2_parity_parity",
         "transfer_xor2_to_z2_parity_xor2"
       ]
+    },
+    {
+      "tick": 112,
+      "world": "astro",
+      "family": "astro_transfer_form",
+      "why": "UCB1 over 47 arms (world,family); picked astro::astro_transfer_form because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 2,
+      "outcomes": [
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 1,
+        "new_types": 1,
+        "transfer_hits": 1,
+        "dead_ok": 0,
+        "cost": 0.16,
+        "score": 2.09
+      },
+      "growth": "extrapolate n_bodies 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "transfer_kepler3_form_n3"
+      ],
+      "rejected": [
+        "transfer_kepler_bogus_power_n3"
+      ],
+      "transfer": [
+        "transfer_kepler3_form_n3"
+      ]
+    },
+    {
+      "tick": 113,
+      "world": "electro",
+      "family": "electro_transfer_form",
+      "why": "UCB1 over 47 arms (world,family); picked electro::electro_transfer_form because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 4,
+        "dead_ok": 0,
+        "cost": 0.24,
+        "score": 7.26
+      },
+      "growth": "extrapolate 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "transfer_conserv_atom_shape_to_electro_kcl",
+        "transfer_conserv_mom_shape_to_electro_kcl",
+        "transfer_electro_conserv_form_on_chem_atoms",
+        "transfer_electro_conserv_form_on_physics_mom"
+      ],
+      "rejected": [],
+      "transfer": [
+        "transfer_conserv_atom_shape_to_electro_kcl",
+        "transfer_conserv_mom_shape_to_electro_kcl",
+        "transfer_electro_conserv_form_on_chem_atoms",
+        "transfer_electro_conserv_form_on_physics_mom"
+      ]
+    },
+    {
+      "tick": 114,
+      "world": "calculus",
+      "family": "calc_transfer_form",
+      "why": "UCB1 over 47 arms (world,family); picked calculus::calc_transfer_form because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 34,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 1.78,
+        "score": -1.78
+      },
+      "growth": "extrapolate N 4\u21925",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_fib_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4",
+        "transfer_rec_lucas_to_delta_N4"
+      ]
+    },
+    {
+      "tick": 115,
+      "world": "nets",
+      "family": "nets_transfer_form",
+      "why": "UCB1 over 47 arms (world,family); picked nets::nets_transfer_form because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_reject",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 1,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 1,
+        "dead_ok": 0,
+        "cost": 0.19,
+        "score": 2.06
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [
+        "transfer_bitfn_and_to_switch_shape"
+      ],
+      "rejected": [],
+      "transfer": [
+        "transfer_bitfn_and_to_perceptron_form",
+        "transfer_bitfn_and_to_switch_shape"
+      ]
+    },
+    {
+      "tick": 116,
+      "world": "sequences",
+      "family": "linear_recurrences",
+      "why": "UCB1 over 47 arms (world,family); picked sequences::linear_recurrences because avg=9.392+1.4*sqrt(ln(115+1)/5)=1.365\u219210.757. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 15,
+      "outcomes": [
+        "duplicate_reject",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 8,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.83,
+        "score": 7.67
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [
+        "rec_fib_o3_5_-3_-4",
+        "rec_fib_o4_1_2_-1_-1",
+        "rec_fib_o4_-1_3_2_0",
+        "rec_lucas_o3_5_-3_-4",
+        "rec_lucas_o4_1_2_-1_-1",
+        "rec_lucas_o4_-1_3_2_0",
+        "rec_pell_o4_3_-2_1_1",
+        "rec_pell_o4_3_0_-3_-1"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 117,
+      "world": "chem",
+      "family": "chem_transfer_form",
+      "why": "UCB1 over 46 arms (world,family); picked chem::chem_transfer_form because avg=7.260+1.4*sqrt(ln(116+1)/1)=3.055\u219210.315. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.26
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_conserv_mom_shape_to_chem_atoms",
+        "transfer_conserv_kcl_shape_to_chem_atoms",
+        "transfer_chem_conserv_form_on_physics_mom",
+        "transfer_chem_conserv_form_on_electro_kcl"
+      ]
+    },
+    {
+      "tick": 118,
+      "world": "physics",
+      "family": "phys_transfer_form",
+      "why": "UCB1 over 46 arms (world,family); picked physics::phys_transfer_form because avg=7.260+1.4*sqrt(ln(117+1)/1)=3.058\u219210.318. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.26
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_conserv_atom_shape_to_physics_mom",
+        "transfer_conserv_kcl_shape_to_physics_mom",
+        "transfer_phys_conserv_form_on_chem_atoms",
+        "transfer_phys_conserv_form_on_electro_kcl"
+      ]
+    },
+    {
+      "tick": 119,
+      "world": "electro",
+      "family": "electro_transfer_form",
+      "why": "UCB1 over 46 arms (world,family); picked electro::electro_transfer_form because avg=7.260+1.4*sqrt(ln(118+1)/1)=3.061\u219210.321. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": -0.26
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_conserv_atom_shape_to_electro_kcl",
+        "transfer_conserv_mom_shape_to_electro_kcl",
+        "transfer_electro_conserv_form_on_chem_atoms",
+        "transfer_electro_conserv_form_on_physics_mom"
+      ]
+    },
+    {
+      "tick": 120,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.110+1.4*sqrt(ln(119+1)/1)=3.063\u219210.173. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.41,
+        "score": 7.09
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k3_s3026",
+        "chance_H_le_logk_k3_s3026",
+        "chance_H_nonneg_k3_s3027",
+        "chance_H_le_logk_k3_s3027",
+        "chance_H_nonneg_k3_s3028",
+        "chance_H_le_logk_k3_s3028",
+        "chance_H_uni_max_k3_s3026"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 121,
+      "world": "chance",
+      "family": "chance_bayes_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_bayes_scan because avg=6.610+1.4*sqrt(ln(120+1)/1)=3.066\u21929.676. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 1,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.41,
+        "score": 6.59
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chance_bayes_id_s3043",
+        "chance_logodds_add_s3043",
+        "chance_bayes_id_s3044",
+        "chance_logodds_add_s3044",
+        "chance_bayes_id_s3045",
+        "chance_logodds_add_s3045"
+      ],
+      "rejected": [
+        "chance_bayes_swap_s3043"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 122,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.100+1.4*sqrt(ln(121+1)/2)=2.170\u21929.270. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.43,
+        "score": 7.07
+      },
+      "growth": "extrapolate k 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k4_s3061",
+        "chance_H_le_logk_k4_s3061",
+        "chance_H_nonneg_k4_s3062",
+        "chance_H_le_logk_k4_s3062",
+        "chance_H_nonneg_k4_s3063",
+        "chance_H_le_logk_k4_s3063",
+        "chance_H_uni_max_k4_s3061"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 123,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.090+1.4*sqrt(ln(122+1)/3)=1.773\u21928.863. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.45,
+        "score": 7.05
+      },
+      "growth": "extrapolate k 5\u21926",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k5_s3079",
+        "chance_H_le_logk_k5_s3079",
+        "chance_H_nonneg_k5_s3080",
+        "chance_H_le_logk_k5_s3080",
+        "chance_H_nonneg_k5_s3081",
+        "chance_H_le_logk_k5_s3081",
+        "chance_H_uni_max_k5_s3079"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 124,
+      "world": "sequences",
+      "family": "bilinear_schema_r4_g8",
+      "why": "UCB1 over 49 arms (world,family); picked sequences::bilinear_schema_r4_g8 because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 12,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject",
+        "duplicate_reject"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.68,
+        "score": -0.68
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 125,
+      "world": "sequences",
+      "family": "linear_recurrences",
+      "why": "UCB1 over 48 arms (world,family); picked sequences::linear_recurrences because avg=9.105+1.4*sqrt(ln(124+1)/6)=1.256\u219210.361. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 15,
+      "outcomes": [
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true",
+        "duplicate_reject",
+        "duplicate_true",
+        "duplicate_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.83,
+        "score": 5.67
+      },
+      "growth": "param at max \u2192 saturate schema",
+      "unlock": null,
+      "accepted": [
+        "rec_fib_o4_1_-1_2_2",
+        "rec_fib_o4_2_1_-2_-1",
+        "rec_lucas_o4_1_-1_2_2",
+        "rec_lucas_o4_2_1_-2_-1",
+        "rec_pell_o4_0_4_4_1",
+        "rec_pell_o4_1_1_5_2"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 126,
+      "world": "chance",
+      "family": "chance_bayes_scan",
+      "why": "UCB1 over 47 arms (world,family); picked chance::chance_bayes_scan because avg=6.600+1.4*sqrt(ln(125+1)/2)=2.177\u21928.777. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 1,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.43,
+        "score": 6.57
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": null,
+      "accepted": [
+        "chance_bayes_id_s3129",
+        "chance_logodds_add_s3129",
+        "chance_bayes_id_s3130",
+        "chance_logodds_add_s3130",
+        "chance_bayes_id_s3131",
+        "chance_logodds_add_s3131"
+      ],
+      "rejected": [
+        "chance_bayes_swap_s3129"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 127,
+      "world": "info",
+      "family": "info_transfer_bitfn",
+      "why": "UCB1 over 46 arms (world,family); picked info::info_transfer_bitfn because avg=5.580+1.4*sqrt(ln(126+1)/1)=3.081\u21928.661. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.19,
+        "score": -0.19
+      },
+      "growth": "extrapolate order 2\u21923",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_bitfn_parity_parity_to_MI",
+        "transfer_bitfn_and_all_and_all_to_MI",
+        "transfer_bitfn_xor2_xor2_to_MI"
+      ]
+    },
+    {
+      "tick": 128,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.080+1.4*sqrt(ln(127+1)/4)=1.542\u21928.622. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.47,
+        "score": 7.03
+      },
+      "growth": "param at max \u2192 saturate (molt/spawn \u2014 no done)",
+      "unlock": "chance_extrapolate",
+      "accepted": [
+        "chance_H_nonneg_k6_s3165",
+        "chance_H_le_logk_k6_s3165",
+        "chance_H_nonneg_k6_s3166",
+        "chance_H_le_logk_k6_s3166",
+        "chance_H_nonneg_k6_s3167",
+        "chance_H_le_logk_k6_s3167",
+        "chance_H_uni_max_k6_s3165"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 129,
+      "world": "chance",
+      "family": "chance_extrapolate",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_extrapolate because never-tried \u2192 UCB=+\u221e. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "duplicate_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 3,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 3,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 5.49
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "extrap_H_le_logk_k7",
+        "extrap_H_nonneg_k7",
+        "extrap_H_uni_ge_peaked_k7"
+      ],
+      "rejected": [],
+      "transfer": [
+        "extrap_H_le_logk_k7",
+        "extrap_H_nonneg_k7",
+        "extrap_H_le_logk_k7",
+        "extrap_H_uni_ge_peaked_k7"
+      ]
+    },
+    {
+      "tick": 130,
+      "world": "chance",
+      "family": "chance_extrapolate",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_extrapolate because avg=5.490+1.4*sqrt(ln(129+1)/1)=3.089\u21928.579. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.28,
+        "score": -0.28
+      },
+      "growth": "extrapolate k 4\u21925",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "extrap_H_le_logk_k7",
+        "extrap_H_nonneg_k7",
+        "extrap_H_le_logk_k7",
+        "extrap_H_uni_ge_peaked_k7"
+      ]
+    },
+    {
+      "tick": 131,
+      "world": "info",
+      "family": "info_mi_scan",
+      "why": "UCB1 over 46 arms (world,family); picked info::info_mi_scan because avg=4.760+1.4*sqrt(ln(130+1)/1)=3.091\u21927.851. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 4,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 4,
+        "new_reject": 0,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.26,
+        "score": 4.74
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "info_MI_indep_near0_s3693",
+        "info_MI_dep_pos_s3693",
+        "info_indep_factorization_s3693",
+        "info_MI_and_related_s3693"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 132,
+      "world": "nets",
+      "family": "nets_perceptron",
+      "why": "UCB1 over 46 arms (world,family); picked nets::nets_perceptron because avg=4.560+1.4*sqrt(ln(131+1)/1)=3.094\u21927.654. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 3,
+      "outcomes": [
+        "duplicate_true",
+        "duplicate_true",
+        "duplicate_true"
+      ],
+      "score_detail": {
+        "new_true": 0,
+        "new_reject": 0,
+        "new_types": 0,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.21,
+        "score": -0.21
+      },
+      "growth": "extrapolate order 3\u21924",
+      "unlock": null,
+      "accepted": [],
+      "rejected": [],
+      "transfer": [
+        "transfer_bitfn_and_to_perceptron_and_all"
+      ]
+    },
+    {
+      "tick": 133,
+      "world": "physics",
+      "family": "phys_collision",
+      "why": "UCB1 over 46 arms (world,family); picked physics::phys_collision because avg=4.260+1.4*sqrt(ln(132+1)/1)=3.096\u21927.356. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 6,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.36,
+        "score": 6.14
+      },
+      "growth": "extrapolate 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "phys_mom_conserve_s6191",
+        "phys_energy_conserve_s6191",
+        "phys_mom_conserve_s6192",
+        "phys_energy_conserve_s6192",
+        "phys_mom_conserve_s6193",
+        "phys_energy_conserve_s6193"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 134,
+      "world": "physics",
+      "family": "phys_collision",
+      "why": "UCB1 over 46 arms (world,family); picked physics::phys_collision because avg=5.200+1.4*sqrt(ln(133+1)/2)=2.191\u21927.391. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 8,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 8,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.48,
+        "score": 8.02
+      },
+      "growth": "extrapolate 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "phys_mom_conserve_s6201",
+        "phys_energy_conserve_s6201",
+        "phys_mom_conserve_s6202",
+        "phys_energy_conserve_s6202",
+        "phys_mom_conserve_s6203",
+        "phys_energy_conserve_s6203",
+        "phys_mom_conserve_s6204",
+        "phys_energy_conserve_s6204"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 135,
+      "world": "physics",
+      "family": "phys_collision",
+      "why": "UCB1 over 46 arms (world,family); picked physics::phys_collision because avg=6.140+1.4*sqrt(ln(134+1)/3)=1.790\u21927.930. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 10,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 10,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.6,
+        "score": 9.9
+      },
+      "growth": "extrapolate 5\u21926",
+      "unlock": null,
+      "accepted": [
+        "phys_mom_conserve_s6211",
+        "phys_energy_conserve_s6211",
+        "phys_mom_conserve_s6212",
+        "phys_energy_conserve_s6212",
+        "phys_mom_conserve_s6213",
+        "phys_energy_conserve_s6213",
+        "phys_mom_conserve_s6214",
+        "phys_energy_conserve_s6214",
+        "phys_mom_conserve_s6215",
+        "phys_energy_conserve_s6215"
+      ],
+      "rejected": [],
+      "transfer": []
     }
   ],
   "curves": [
@@ -6016,6 +6950,246 @@
       "n_rejected": 127,
       "n_lemmas": 14,
       "tick": 111
+    },
+    {
+      "n_verified_facts": 236,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3516,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 112
+    },
+    {
+      "n_verified_facts": 240,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3478,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 113
+    },
+    {
+      "n_verified_facts": 240,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3478,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 114
+    },
+    {
+      "n_verified_facts": 241,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3469,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 115
+    },
+    {
+      "n_verified_facts": 249,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3395,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 116
+    },
+    {
+      "n_verified_facts": 249,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3395,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 117
+    },
+    {
+      "n_verified_facts": 249,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3395,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 118
+    },
+    {
+      "n_verified_facts": 249,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3395,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 119
+    },
+    {
+      "n_verified_facts": 256,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3333,
+      "n_rejected": 128,
+      "n_lemmas": 14,
+      "tick": 120
+    },
+    {
+      "n_verified_facts": 262,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3299,
+      "n_rejected": 129,
+      "n_lemmas": 14,
+      "tick": 121
+    },
+    {
+      "n_verified_facts": 269,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3241,
+      "n_rejected": 129,
+      "n_lemmas": 14,
+      "tick": 122
+    },
+    {
+      "n_verified_facts": 276,
+      "n_distinct_types": 54,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3185,
+      "n_rejected": 129,
+      "n_lemmas": 14,
+      "tick": 123
+    },
+    {
+      "n_verified_facts": 281,
+      "n_distinct_types": 55,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3146,
+      "n_rejected": 129,
+      "n_lemmas": 14,
+      "tick": 124
+    },
+    {
+      "n_verified_facts": 287,
+      "n_distinct_types": 55,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3101,
+      "n_rejected": 129,
+      "n_lemmas": 14,
+      "tick": 125
+    },
+    {
+      "n_verified_facts": 293,
+      "n_distinct_types": 55,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3073,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 126
+    },
+    {
+      "n_verified_facts": 293,
+      "n_distinct_types": 55,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3073,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 127
+    },
+    {
+      "n_verified_facts": 300,
+      "n_distinct_types": 55,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3023,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 128
+    },
+    {
+      "n_verified_facts": 303,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3002,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 129
+    },
+    {
+      "n_verified_facts": 303,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.3002,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 130
+    },
+    {
+      "n_verified_facts": 307,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2975,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 131
+    },
+    {
+      "n_verified_facts": 307,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2975,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 132
+    },
+    {
+      "n_verified_facts": 313,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2935,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 133
+    },
+    {
+      "n_verified_facts": 321,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.2882,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 134
+    },
+    {
+      "n_verified_facts": 331,
+      "n_distinct_types": 56,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "reject_rate": 0.282,
+      "n_rejected": 130,
+      "n_lemmas": 14,
+      "tick": 135
     }
   ],
   "baselines": {
@@ -6056,15 +7230,16 @@
   },
   "backend": "swipl",
   "hypothesis_skin": {
-    "generation": 7,
-    "n_schema_classes": 11,
-    "n_unlocked": 11,
+    "generation": 8,
+    "n_schema_classes": 12,
+    "n_unlocked": 12,
     "unlocked": [
       "bilinear_schema",
       "bilinear_schema_r4_g4",
       "bilinear_schema_r4_g5",
       "bilinear_schema_r4_g6",
       "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
       "dead_prime",
       "geo_invent",
       "linrec_scan",
@@ -6089,9 +7264,9 @@
         "r_cap": 4,
         "mut_depth": 1,
         "mut_cap": 4,
-        "n_visits": 5,
-        "total_reward": 46.96,
-        "saturated": false,
+        "n_visits": 7,
+        "total_reward": 60.300000000000004,
+        "saturated": true,
         "ticks_no_new_type": 0,
         "novelty_bonus": 2.0
       },
@@ -6311,6 +7486,28 @@
         "mut_cap": 4,
         "n_visits": 1,
         "total_reward": -0.68,
+        "saturated": false,
+        "ticks_no_new_type": 0,
+        "novelty_bonus": 0.0
+      },
+      "bilinear_schema_r4_g8": {
+        "id": "bilinear_schema_r4_g8",
+        "description": "Mutant bilinear schema r_max=4",
+        "unlocked": true,
+        "dead_end": false,
+        "origin": "mutation:spawn_gen8",
+        "order": 1,
+        "order_max": 4,
+        "coeff_lo": -3,
+        "coeff_hi": 3,
+        "m_max": 4,
+        "m_cap": 12,
+        "r_max": 4,
+        "r_cap": 4,
+        "mut_depth": 1,
+        "mut_cap": 4,
+        "n_visits": 1,
+        "total_reward": -0.68,
         "saturated": true,
         "ticks_no_new_type": 0,
         "novelty_bonus": 0.0
@@ -6348,7 +7545,16 @@
       "2,-1,0,1",
       "0,0,3,2",
       "1,4,-1,-1",
-      "2,2,-2,-1"
+      "2,2,-2,-1",
+      "5,-3,-4",
+      "1,2,-1,-1",
+      "-1,3,2,0",
+      "3,-2,1,1",
+      "3,0,-3,-1",
+      "1,-1,2,2",
+      "2,1,-2,-1",
+      "0,4,4,1",
+      "1,1,5,2"
     ],
     "molt_history": [
       {
@@ -6559,6 +7765,42 @@
           "transfer_horn"
         ],
         "n_schema_classes": 11
+      },
+      {
+        "generation": 8,
+        "reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g7 saturated; transfer plateau",
+        "actions": [
+          "novelty_bonus\u21922.0",
+          "spawn_schema bilinear_schema_r4_g8"
+        ],
+        "unlocked_before": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "bilinear_schema_r4_g7",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "unlocked_after": [
+          "bilinear_schema",
+          "bilinear_schema_r4_g4",
+          "bilinear_schema_r4_g5",
+          "bilinear_schema_r4_g6",
+          "bilinear_schema_r4_g7",
+          "bilinear_schema_r4_g8",
+          "dead_prime",
+          "geo_invent",
+          "linrec_scan",
+          "modperiod_schema",
+          "ratio_scan",
+          "transfer_horn"
+        ],
+        "n_schema_classes": 12
       }
     ]
   },
@@ -6617,6 +7859,11 @@
       "id": "bilinear_schema_r4_g7",
       "unlocked": true,
       "origin": "mutation:spawn_gen7"
+    },
+    {
+      "id": "bilinear_schema_r4_g8",
+      "unlocked": true,
+      "origin": "mutation:spawn_gen8"
     }
   ],
   "geometry_schemas": [
@@ -6631,10 +7878,10 @@
     "lucas": {
       "transfer_from": "fib",
       "transfer_coeffs": [
-        0,
-        0,
-        3,
-        2
+        2,
+        1,
+        -2,
+        -1
       ],
       "transfer_accuracy": 1.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0,
@@ -6650,10 +7897,10 @@
     "pell": {
       "transfer_from": "fib",
       "transfer_coeffs": [
-        0,
-        0,
-        3,
-        2
+        2,
+        1,
+        -2,
+        -1
       ],
       "transfer_accuracy": 0.0,
       "baseline_no_archive_wrong_prior_[2,0]": 0.0435,
@@ -6745,7 +7992,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -6757,7 +8004,7 @@
           "mut_cap": 4,
           "n_visits": 0,
           "total_reward": 0.0,
-          "saturated": false,
+          "saturated": true,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
         },
@@ -6767,7 +8014,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 6,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -6779,7 +8026,7 @@
           "mut_cap": 4,
           "n_visits": 0,
           "total_reward": 0.0,
-          "saturated": false,
+          "saturated": true,
           "ticks_no_new_type": 0,
           "novelty_bonus": 0.25
         },
@@ -6811,7 +8058,7 @@
           "unlocked": false,
           "dead_end": false,
           "origin": "seed_locked",
-          "order": 3,
+          "order": 5,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -6824,7 +8071,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         }
       },
@@ -6848,7 +8095,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -6870,7 +8117,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 2,
+          "order": 3,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -6883,7 +8130,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         },
         "info_dead_mi0": {
@@ -7227,7 +8474,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 8,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7377,7 +8624,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 4,
+          "order": 5,
           "order_max": 12,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7390,7 +8637,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         }
       },
@@ -7481,7 +8728,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7608,7 +8855,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 2,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7648,7 +8895,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7661,7 +8908,7 @@
           "n_visits": 0,
           "total_reward": 0.0,
           "saturated": false,
-          "ticks_no_new_type": 0,
+          "ticks_no_new_type": 1,
           "novelty_bonus": 0.25
         },
         "nets_xor_depth": {
@@ -7758,7 +9005,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 2,
+          "order": 3,
           "order_max": 4,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7796,7 +9043,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 6,
           "order_max": 6,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7862,7 +9109,7 @@
           "unlocked": true,
           "dead_end": false,
           "origin": "seed",
-          "order": 3,
+          "order": 4,
           "order_max": 5,
           "coeff_lo": -3,
           "coeff_hi": 3,
@@ -7884,18 +9131,6 @@
     }
   },
   "chance_accepted": [
-    {
-      "kind": "bayes_id",
-      "order": 2
-    },
-    {
-      "kind": "logodds_add",
-      "order": 2
-    },
-    {
-      "kind": "bayes_id",
-      "order": 2
-    },
     {
       "kind": "logodds_add",
       "order": 2
@@ -7935,6 +9170,166 @@
     {
       "kind": "H_uni_ge_peaked",
       "order": 2
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 3
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 3
+    },
+    {
+      "kind": "H_uni_ge_peaked",
+      "order": 3
+    },
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "bayes_id",
+      "order": 3
+    },
+    {
+      "kind": "logodds_add",
+      "order": 3
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 4
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 4
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 4
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 4
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 4
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 4
+    },
+    {
+      "kind": "H_uni_ge_peaked",
+      "order": 4
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 5
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 5
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 5
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 5
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 5
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 5
+    },
+    {
+      "kind": "H_uni_ge_peaked",
+      "order": 5
+    },
+    {
+      "kind": "bayes_id",
+      "order": 4
+    },
+    {
+      "kind": "logodds_add",
+      "order": 4
+    },
+    {
+      "kind": "bayes_id",
+      "order": 4
+    },
+    {
+      "kind": "logodds_add",
+      "order": 4
+    },
+    {
+      "kind": "bayes_id",
+      "order": 4
+    },
+    {
+      "kind": "logodds_add",
+      "order": 4
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 6
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 6
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 6
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 6
+    },
+    {
+      "kind": "H_nonneg",
+      "order": 6
+    },
+    {
+      "kind": "H_le_logk",
+      "order": 6
+    },
+    {
+      "kind": "H_uni_ge_peaked",
+      "order": 6
     }
   ],
   "xfer_battery": {

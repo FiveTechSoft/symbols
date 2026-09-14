@@ -1,36 +1,11 @@
 {
   "emerged": true,
   "before": {
-    "n_verified": 163,
-    "n_rejected": 108,
-    "n_types": 26,
-    "reject_rate": 0.3985,
-    "transfer_accuracy": 0.5,
-    "lemma_reuse_rate": 0.7857,
-    "n_schema_classes": 10,
-    "unlocked_schemas": [
-      "bilinear_schema",
-      "bilinear_schema_r4_g4",
-      "bilinear_schema_r4_g5",
-      "bilinear_schema_r4_g6",
-      "dead_prime",
-      "geo_invent",
-      "linrec_scan",
-      "modperiod_schema",
-      "ratio_scan",
-      "transfer_horn"
-    ],
-    "lucas_transfer": 1.0,
-    "pell_transfer": 0.0,
-    "transfer_honest": true,
-    "language_generation": 6
-  },
-  "final": {
-    "n_verified": 203,
-    "n_rejected": 116,
-    "n_types": 42,
-    "reject_rate": 0.3636,
-    "transfer_accuracy": 0.5,
+    "n_verified": 235,
+    "n_rejected": 127,
+    "n_types": 54,
+    "reject_rate": 0.3508,
+    "transfer_accuracy": 0.75,
     "lemma_reuse_rate": 0.7857,
     "n_schema_classes": 11,
     "unlocked_schemas": [
@@ -51,30 +26,61 @@
     "transfer_honest": true,
     "language_generation": 7
   },
+  "final": {
+    "n_verified": 331,
+    "n_rejected": 130,
+    "n_types": 56,
+    "reject_rate": 0.282,
+    "transfer_accuracy": 0.75,
+    "lemma_reuse_rate": 0.7857,
+    "n_schema_classes": 12,
+    "unlocked_schemas": [
+      "bilinear_schema",
+      "bilinear_schema_r4_g4",
+      "bilinear_schema_r4_g5",
+      "bilinear_schema_r4_g6",
+      "bilinear_schema_r4_g7",
+      "bilinear_schema_r4_g8",
+      "dead_prime",
+      "geo_invent",
+      "linrec_scan",
+      "modperiod_schema",
+      "ratio_scan",
+      "transfer_horn"
+    ],
+    "lucas_transfer": 1.0,
+    "pell_transfer": 0.0,
+    "transfer_honest": true,
+    "language_generation": 8
+  },
   "delta": {
-    "n_verified": 40,
-    "n_types": 16,
+    "n_verified": 96,
+    "n_types": 2,
     "n_schema_classes": 1,
-    "n_rejected": 8,
+    "n_rejected": 3,
     "new_unlocked": [
-      "bilinear_schema_r4_g7"
+      "bilinear_schema_r4_g8"
     ]
   },
+  "tick_steps": 12,
+  "saturated": true,
+  "saturation_reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g7 saturated; transfer plateau",
   "molt": {
     "action": "keep_skin",
-    "saturation_reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+    "saturation_reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g7 saturated; transfer plateau",
     "molt_info": {
-      "generation": 7,
-      "reason": "schema linrec_scan saturated; schema transfer_horn saturated; schema ratio_scan saturated; schema modperiod_schema saturated",
+      "generation": 8,
+      "reason": "schema linrec_scan saturated; schema bilinear_schema_r4_g7 saturated; transfer plateau",
       "actions": [
         "novelty_bonus\u21922.0",
-        "spawn_schema bilinear_schema_r4_g7"
+        "spawn_schema bilinear_schema_r4_g8"
       ],
       "unlocked_before": [
         "bilinear_schema",
         "bilinear_schema_r4_g4",
         "bilinear_schema_r4_g5",
         "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
         "dead_prime",
         "geo_invent",
         "linrec_scan",
@@ -88,6 +94,7 @@
         "bilinear_schema_r4_g5",
         "bilinear_schema_r4_g6",
         "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
         "dead_prime",
         "geo_invent",
         "linrec_scan",
@@ -95,40 +102,15 @@
         "ratio_scan",
         "transfer_horn"
       ],
-      "n_schema_classes": 11
+      "n_schema_classes": 12
     },
-    "keep_reason": "n_verified 196\u2192203; n_types 38\u219242; n_schema_classes 10\u219211; unlocked ['bilinear_schema_r4_g7']",
+    "keep_reason": "n_verified 276\u2192331; n_types 54\u219256; n_schema_classes 11\u219212; unlocked ['bilinear_schema_r4_g8']",
     "before": {
-      "n_verified": 196,
-      "n_rejected": 112,
-      "n_types": 38,
-      "reject_rate": 0.3636,
-      "transfer_accuracy": 0.5,
-      "lemma_reuse_rate": 0.7857,
-      "n_schema_classes": 10,
-      "unlocked_schemas": [
-        "bilinear_schema",
-        "bilinear_schema_r4_g4",
-        "bilinear_schema_r4_g5",
-        "bilinear_schema_r4_g6",
-        "dead_prime",
-        "geo_invent",
-        "linrec_scan",
-        "modperiod_schema",
-        "ratio_scan",
-        "transfer_horn"
-      ],
-      "lucas_transfer": 1.0,
-      "pell_transfer": 0.0,
-      "transfer_honest": true,
-      "language_generation": 6
-    },
-    "after": {
-      "n_verified": 203,
-      "n_rejected": 116,
-      "n_types": 42,
-      "reject_rate": 0.3636,
-      "transfer_accuracy": 0.5,
+      "n_verified": 276,
+      "n_rejected": 129,
+      "n_types": 54,
+      "reject_rate": 0.3185,
+      "transfer_accuracy": 0.75,
       "lemma_reuse_rate": 0.7857,
       "n_schema_classes": 11,
       "unlocked_schemas": [
@@ -148,29 +130,178 @@
       "pell_transfer": 0.0,
       "transfer_honest": true,
       "language_generation": 7
+    },
+    "after": {
+      "n_verified": 331,
+      "n_rejected": 130,
+      "n_types": 56,
+      "reject_rate": 0.282,
+      "transfer_accuracy": 0.75,
+      "lemma_reuse_rate": 0.7857,
+      "n_schema_classes": 12,
+      "unlocked_schemas": [
+        "bilinear_schema",
+        "bilinear_schema_r4_g4",
+        "bilinear_schema_r4_g5",
+        "bilinear_schema_r4_g6",
+        "bilinear_schema_r4_g7",
+        "bilinear_schema_r4_g8",
+        "dead_prime",
+        "geo_invent",
+        "linrec_scan",
+        "modperiod_schema",
+        "ratio_scan",
+        "transfer_horn"
+      ],
+      "lucas_transfer": 1.0,
+      "pell_transfer": 0.0,
+      "transfer_honest": true,
+      "language_generation": 8
     }
   },
   "new_clauses_sample": [
-    "rejected('NEG_chance_H_negative', 'H=0.9442524549486193 not < 0').",
-    "rejected('NEG_chance_mix_decreases_H', 'H(mix)=0.9861995129233668 >= min=0.9442524549486193').",
-    "rejected('NEG_chem_atoms_not_conserved', 'counts match \u2014 conservation holds (reject claim)').",
-    "rejected('NEG_nets_XOR_linear_threshold', 'no linear threshold for XOR').",
-    "rejected('astro_kepler_wrong_exp_n3', 'T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568]').",
-    "rejected('electro_ohm_broken_add_s4542', 'V\u2260I+R (as required)').",
-    "rejected('phys_action_same_sign_broken_s5794', 'F12=4.68605264438847 F21=4.68605264438847 not opposite').",
-    "rejected('sym_z2_claim_mult_o2', '1+1=0 != 1*1=1').",
-    "schema(bilinear_schema_r4_g7, unlocked(true)).",
-    "verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3883', '2x2 Cramer exact on generated integer system')).",
-    "verified(fact(algebra, alg_linear_2x2, 'alg_solve_2x2_s3884', '2x2 Cramer exact on generated integer system')).",
-    "verified(fact(algebra, alg_mat_assoc, 'alg_mat2_assoc_mod3', '(AB)C = A(BC) for all 2x2 matrices mod 3')).",
-    "verified(fact(astro, astro_angmom_scan, 'astro_h2_over_a_const_n3', 'h^2/a constant (=1) on circular 2-body table')).",
-    "verified(fact(astro, astro_angmom_scan, 'astro_h_eq_sqrt_a_n3', 'circular specific ang-mom h = sqrt(a) (GM=1) within eps')).",
-    "verified(fact(astro, astro_kepler_scan, 'astro_kepler3_const_n3', 'T^2/a^3 constant within eps on circular table')).",
-    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x0_N4', 'Delta(sum x^0) = x^0 on prefix')).",
-    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x1_N4', 'Delta(sum x^1) = x^1 on prefix')).",
-    "verified(fact(calculus, calc_ft_discrete, 'calc_ft_x2_N4', 'Delta(sum x^2) = x^2 on prefix')).",
-    "verified(fact(calculus, calc_power_diff, 'calc_delta_x1_vs_n_x0_N4', 'Delta(x^1) / (power * x^0) \u2192 1 (eps on lattice)')).",
-    "verified(fact(calculus, calc_power_diff, 'calc_delta_x2_vs_n_x1_N4', 'Delta(x^2) / (power * x^1) \u2192 1 (eps on lattice)'))."
+    "verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n3', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).",
+    "rejected('transfer_kepler_bogus_power_n3', 'T\u00b2/a\u00b2 not const: [39.4784, 59.2176, 78.9568]').",
+    "verified(fact(electro, electro_transfer_form, 'transfer_conserv_atom_shape_to_electro_kcl', 'TRANSFER linear-\u0394=0 (atom-balance shape) \u21d2 KCL \u03a3I=0')).",
+    "verified(fact(electro, electro_transfer_form, 'transfer_conserv_mom_shape_to_electro_kcl', 'TRANSFER linear-\u0394=0 (momentum shape) \u21d2 KCL \u03a3I=0')).",
+    "verified(fact(electro, electro_transfer_form, 'transfer_electro_conserv_form_on_chem_atoms', 'TRANSFER electro KCL-\u03a3=0 form \u21d2 try on chem atom balance')).",
+    "verified(fact(electro, electro_transfer_form, 'transfer_electro_conserv_form_on_physics_mom', 'TRANSFER electro KCL-\u03a3=0 form \u21d2 try on physics momentum')).",
+    "verified(fact(nets, nets_transfer_form, 'transfer_bitfn_and_to_switch_shape', 'TRANSFER bit_fn(and_all) \u21d2 series-switch \u2261 AND table')).",
+    "rec(fib, [5,-3,-4]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_fib_o3_5_-3_-4', 'fib(n) = (5)*fib(n-1) + (-3)*fib(n-2) + (-4)*fib(n-3)')).",
+    "rec(fib, [1,2,-1,-1]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_2_-1_-1', 'fib(n) = (1)*fib(n-1) + (2)*fib(n-2) + (-1)*fib(n-3) + (-1)*fib(n-4)')).",
+    "rec(fib, [-1,3,2,0]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_3_2_0', 'fib(n) = (-1)*fib(n-1) + (3)*fib(n-2) + (2)*fib(n-3) + (0)*fib(n-4)')).",
+    "rec(lucas, [5,-3,-4]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_5_-3_-4', 'lucas(n) = (5)*lucas(n-1) + (-3)*lucas(n-2) + (-4)*lucas(n-3)')).",
+    "rec(lucas, [1,2,-1,-1]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_2_-1_-1', 'lucas(n) = (1)*lucas(n-1) + (2)*lucas(n-2) + (-1)*lucas(n-3) + (-1)*lucas(n-4)')).",
+    "rec(lucas, [-1,3,2,0]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_3_2_0', 'lucas(n) = (-1)*lucas(n-1) + (3)*lucas(n-2) + (2)*lucas(n-3) + (0)*lucas(n-4)')).",
+    "rec(pell, [3,-2,1,1]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_-2_1_1', 'pell(n) = (3)*pell(n-1) + (-2)*pell(n-2) + (1)*pell(n-3) + (1)*pell(n-4)')).",
+    "rec(pell, [3,0,-3,-1]).",
+    "verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_0_-3_-1', 'pell(n) = (3)*pell(n-1) + (0)*pell(n-2) + (-3)*pell(n-3) + (-1)*pell(n-4)')).",
+    "verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k3_s3026', 'H(p)\u22650 on generated 3-outcome dist')).",
+    "verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k3_s3026', 'H(p)\u2264log2(k) on generated 3-outcome dist'))."
   ],
-  "n_new_clauses": 49
+  "n_new_clauses": 123,
+  "warm_tail": [
+    {
+      "tick": 121,
+      "world": "chance",
+      "family": "chance_bayes_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_bayes_scan because avg=6.610+1.4*sqrt(ln(120+1)/1)=3.066\u21929.676. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_reject"
+      ],
+      "score_detail": {
+        "new_true": 6,
+        "new_reject": 1,
+        "new_types": 2,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.41,
+        "score": 6.59
+      },
+      "growth": "extrapolate k 3\u21924",
+      "unlock": null,
+      "accepted": [
+        "chance_bayes_id_s3043",
+        "chance_logodds_add_s3043",
+        "chance_bayes_id_s3044",
+        "chance_logodds_add_s3044",
+        "chance_bayes_id_s3045",
+        "chance_logodds_add_s3045"
+      ],
+      "rejected": [
+        "chance_bayes_swap_s3043"
+      ],
+      "transfer": []
+    },
+    {
+      "tick": 122,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.100+1.4*sqrt(ln(121+1)/2)=2.170\u21929.270. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.43,
+        "score": 7.07
+      },
+      "growth": "extrapolate k 4\u21925",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k4_s3061",
+        "chance_H_le_logk_k4_s3061",
+        "chance_H_nonneg_k4_s3062",
+        "chance_H_le_logk_k4_s3062",
+        "chance_H_nonneg_k4_s3063",
+        "chance_H_le_logk_k4_s3063",
+        "chance_H_uni_max_k4_s3061"
+      ],
+      "rejected": [],
+      "transfer": []
+    },
+    {
+      "tick": 123,
+      "world": "chance",
+      "family": "chance_entropy_scan",
+      "why": "UCB1 over 46 arms (world,family); picked chance::chance_entropy_scan because avg=7.090+1.4*sqrt(ln(122+1)/3)=1.773\u21928.863. Rule: argmax[avg + 1.4*sqrt(ln(T+1)/n)]; never-tried=+\u221e; saturated excluded.",
+      "n_conjectures": 7,
+      "outcomes": [
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true",
+        "new_true"
+      ],
+      "score_detail": {
+        "new_true": 7,
+        "new_reject": 0,
+        "new_types": 1,
+        "transfer_hits": 0,
+        "dead_ok": 0,
+        "cost": 0.45,
+        "score": 7.05
+      },
+      "growth": "extrapolate k 5\u21926",
+      "unlock": null,
+      "accepted": [
+        "chance_H_nonneg_k5_s3079",
+        "chance_H_le_logk_k5_s3079",
+        "chance_H_nonneg_k5_s3080",
+        "chance_H_le_logk_k5_s3080",
+        "chance_H_nonneg_k5_s3081",
+        "chance_H_le_logk_k5_s3081",
+        "chance_H_uni_max_k5_s3079"
+      ],
+      "rejected": [],
+      "transfer": []
+    }
+  ]
 }

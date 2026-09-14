@@ -971,3 +971,231 @@ verified(fact(physics, phys_transfer_form, 'transfer_phys_conserv_form_on_electr
 verified(fact(symmetry, sym_compare_transfer, 'transfer_parity_to_z2_parity_parity', 'TRANSFER bit_fn(parity=parity) ⇒ Z2/parity invariant')).
 % verified @ symmetry/sym_compare_transfer
 verified(fact(symmetry, sym_compare_transfer, 'transfer_xor2_to_z2_parity_xor2', 'TRANSFER bit_fn(xor2=xor2) ⇒ Z2/parity invariant')).
+% verified @ astro/astro_transfer_form
+verified(fact(astro, astro_transfer_form, 'transfer_kepler3_form_n3', 'TRANSFER Kepler form T^2/a^3 constancy on circular table')).
+% finite fail / dead-end
+rejected('transfer_kepler_bogus_power_n3', 'T²/a² not const: [39.4784, 59.2176, 78.9568]').
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_conserv_atom_shape_to_electro_kcl', 'TRANSFER linear-Δ=0 (atom-balance shape) ⇒ KCL ΣI=0')).
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_conserv_mom_shape_to_electro_kcl', 'TRANSFER linear-Δ=0 (momentum shape) ⇒ KCL ΣI=0')).
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_electro_conserv_form_on_chem_atoms', 'TRANSFER electro KCL-Σ=0 form ⇒ try on chem atom balance')).
+% verified @ electro/electro_transfer_form
+verified(fact(electro, electro_transfer_form, 'transfer_electro_conserv_form_on_physics_mom', 'TRANSFER electro KCL-Σ=0 form ⇒ try on physics momentum')).
+% verified @ nets/nets_transfer_form
+verified(fact(nets, nets_transfer_form, 'transfer_bitfn_and_to_switch_shape', 'TRANSFER bit_fn(and_all) ⇒ series-switch ≡ AND table')).
+% learned recurrence on fib
+rec(fib, [5,-3,-4]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o3_5_-3_-4', 'fib(n) = (5)*fib(n-1) + (-3)*fib(n-2) + (-4)*fib(n-3)')).
+% learned recurrence on fib
+rec(fib, [1,2,-1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_2_-1_-1', 'fib(n) = (1)*fib(n-1) + (2)*fib(n-2) + (-1)*fib(n-3) + (-1)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [-1,3,2,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_-1_3_2_0', 'fib(n) = (-1)*fib(n-1) + (3)*fib(n-2) + (2)*fib(n-3) + (0)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [5,-3,-4]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o3_5_-3_-4', 'lucas(n) = (5)*lucas(n-1) + (-3)*lucas(n-2) + (-4)*lucas(n-3)')).
+% learned recurrence on lucas
+rec(lucas, [1,2,-1,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_2_-1_-1', 'lucas(n) = (1)*lucas(n-1) + (2)*lucas(n-2) + (-1)*lucas(n-3) + (-1)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [-1,3,2,0]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_-1_3_2_0', 'lucas(n) = (-1)*lucas(n-1) + (3)*lucas(n-2) + (2)*lucas(n-3) + (0)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,-2,1,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_-2_1_1', 'pell(n) = (3)*pell(n-1) + (-2)*pell(n-2) + (1)*pell(n-3) + (1)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [3,0,-3,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_3_0_-3_-1', 'pell(n) = (3)*pell(n-1) + (0)*pell(n-2) + (-3)*pell(n-3) + (-1)*pell(n-4)')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k3_s3026', 'H(p)≥0 on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k3_s3026', 'H(p)≤log2(k) on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k3_s3027', 'H(p)≥0 on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k3_s3027', 'H(p)≤log2(k) on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k3_s3028', 'H(p)≥0 on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k3_s3028', 'H(p)≤log2(k) on generated 3-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k3_s3026', 'H(uniform)≥H(peaked) for k=3')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3043', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3043', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3044', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3044', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3045', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3045', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% finite fail / dead-end
+rejected('chance_bayes_swap_s3043', 'P(H|E)=0.6740533229104554 != P(H|¬E)=0.2043078977310901').
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k4_s3061', 'H(p)≥0 on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k4_s3061', 'H(p)≤log2(k) on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k4_s3062', 'H(p)≥0 on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k4_s3062', 'H(p)≤log2(k) on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k4_s3063', 'H(p)≥0 on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k4_s3063', 'H(p)≤log2(k) on generated 4-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k4_s3061', 'H(uniform)≥H(peaked) for k=4')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k5_s3079', 'H(p)≥0 on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k5_s3079', 'H(p)≤log2(k) on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k5_s3080', 'H(p)≥0 on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k5_s3080', 'H(p)≤log2(k) on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k5_s3081', 'H(p)≥0 on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k5_s3081', 'H(p)≤log2(k) on generated 5-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k5_s3079', 'H(uniform)≥H(peaked) for k=5')).
+% hypothesis-language skin gen=8
+schema(bilinear_schema_r4_g8, unlocked(true)).
+% verified @ sequences/bilinear_schema_r4_g8
+verified(fact(sequences, bilinear_schema_r4_g8, 'bilin_fib_offset_pm1', 'fib(n+1)fib(n-1)-fib(n)^2 = (-1)^n')).
+% verified @ sequences/bilinear_schema_r4_g8
+verified(fact(sequences, bilinear_schema_r4_g8, 'bilin_fib_r1', 'fib(n)^2 - fib(n+1)fib(n-1) = (-1)^(n-1) fib(1)^2')).
+% verified @ sequences/bilinear_schema_r4_g8
+verified(fact(sequences, bilinear_schema_r4_g8, 'bilin_fib_r2', 'fib(n)^2 - fib(n+2)fib(n-2) = (-1)^(n-2) fib(2)^2')).
+% verified @ sequences/bilinear_schema_r4_g8
+verified(fact(sequences, bilinear_schema_r4_g8, 'bilin_fib_r3', 'fib(n)^2 - fib(n+3)fib(n-3) = (-1)^(n-3) fib(3)^2')).
+% verified @ sequences/bilinear_schema_r4_g8
+verified(fact(sequences, bilinear_schema_r4_g8, 'bilin_fib_r4', 'fib(n)^2 - fib(n+4)fib(n-4) = (-1)^(n-4) fib(4)^2')).
+% learned recurrence on fib
+rec(fib, [1,-1,2,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_1_-1_2_2', 'fib(n) = (1)*fib(n-1) + (-1)*fib(n-2) + (2)*fib(n-3) + (2)*fib(n-4)')).
+% learned recurrence on fib
+rec(fib, [2,1,-2,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_fib_o4_2_1_-2_-1', 'fib(n) = (2)*fib(n-1) + (1)*fib(n-2) + (-2)*fib(n-3) + (-1)*fib(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [1,-1,2,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_1_-1_2_2', 'lucas(n) = (1)*lucas(n-1) + (-1)*lucas(n-2) + (2)*lucas(n-3) + (2)*lucas(n-4)')).
+% learned recurrence on lucas
+rec(lucas, [2,1,-2,-1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_lucas_o4_2_1_-2_-1', 'lucas(n) = (2)*lucas(n-1) + (1)*lucas(n-2) + (-2)*lucas(n-3) + (-1)*lucas(n-4)')).
+% learned recurrence on pell
+rec(pell, [0,4,4,1]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_0_4_4_1', 'pell(n) = (0)*pell(n-1) + (4)*pell(n-2) + (4)*pell(n-3) + (1)*pell(n-4)')).
+% learned recurrence on pell
+rec(pell, [1,1,5,2]).
+% verified @ sequences/linear_recurrences
+verified(fact(sequences, linear_recurrences, 'rec_pell_o4_1_1_5_2', 'pell(n) = (1)*pell(n-1) + (1)*pell(n-2) + (5)*pell(n-3) + (2)*pell(n-4)')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3129', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3129', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3130', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3130', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_bayes_id_s3131', 'P(H|E)=P(E|H)P(H)/P(E) on generated 2x2')).
+% verified @ chance/chance_bayes_scan
+verified(fact(chance, chance_bayes_scan, 'chance_logodds_add_s3131', 'logit(post)=logit(prior)+log(LR) on generated table')).
+% finite fail / dead-end
+rejected('chance_bayes_swap_s3129', 'P(H|E)=0.17743158399745776 != P(H|¬E)=0.18086853681061626').
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s3165', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s3165', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s3166', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s3166', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_nonneg_k6_s3167', 'H(p)≥0 on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_le_logk_k6_s3167', 'H(p)≤log2(k) on generated 6-outcome dist')).
+% verified @ chance/chance_entropy_scan
+verified(fact(chance, chance_entropy_scan, 'chance_H_uni_max_k6_s3165', 'H(uniform)≥H(peaked) for k=6')).
+% verified @ chance/chance_extrapolate
+verified(fact(chance, chance_extrapolate, 'extrap_H_le_logk_k7', 'EXTRAPOLATE H_le_logk to k=7')).
+% verified @ chance/chance_extrapolate
+verified(fact(chance, chance_extrapolate, 'extrap_H_nonneg_k7', 'EXTRAPOLATE H_nonneg to k=7')).
+% verified @ chance/chance_extrapolate
+verified(fact(chance, chance_extrapolate, 'extrap_H_uni_ge_peaked_k7', 'EXTRAPOLATE H_uni_ge_peaked to k=7')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_indep_near0_s3693', 'MI(X;Y)≈0 on generated independent joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_dep_pos_s3693', 'MI(X;Y)>0 on xor-coupled joint')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_indep_factorization_s3693', 'P(x,y)=P(x)P(y) on independent joint (eps)')).
+% verified @ info/info_mi_scan
+verified(fact(info, info_mi_scan, 'info_MI_and_related_s3693', 'MI>0 on (X, X∧Y) joint from full 2-bit table')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6191', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6191', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6192', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6192', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6193', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6193', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6201', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6201', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6202', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6202', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6203', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6203', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6204', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6204', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6211', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6211', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6212', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6212', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6213', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6213', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6214', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6214', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_mom_conserve_s6215', 'm1*u1+m2*u2 = m1*v1+m2*v2 (1D elastic)')).
+% verified @ physics/phys_collision
+verified(fact(physics, phys_collision, 'phys_energy_conserve_s6215', '½m1 u1²+½m2 u2² = ½m1 v1²+½m2 v2²')).
