@@ -12,6 +12,9 @@
 :- consult('positional.pl').
 :- consult('dialog_ref.pl').
 :- consult('gaps.pl').
+:- consult('stemmer.pl').
+:- consult('symbolic_attention.pl').
+:- consult('chat_attention.pl').
 
 % Interfaz de datos: la aporta el .knowledge.pl que bb_load/1 consulta en
 % runtime (memfact/5 hechos, provfact/6 provenance). Declarada, no definida.
@@ -1206,6 +1209,15 @@ chat_ask(Toks) :-
       live_books([_|_]) ->
         ask_lang(Toks, Lang),
         chat_list_books(Lang)
+    ; % ATTENTION LAYER: usar atención simbólica como pre-filtro
+      attention_enabled,
+      chat_attention_focus(Toks, Focus),
+      focus_answer(Focus, Toks, Answer) ->
+        chat_remember_and_say(Toks, say, Answer)
+    ; % ATTENTION FALLBACK: predict_answer directo
+      predict_answer(Toks, Pred, Conf),
+      Conf >= 0.5 ->
+        chat_remember_and_say(Toks, say, answer([Pred], []))
     ; chat_ask_qp(Toks)
     ).
 
