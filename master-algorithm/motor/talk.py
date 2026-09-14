@@ -234,16 +234,27 @@ def _growth() -> str:
         return "Aún no he medido una corrida. Si quieres, damos un paso."
     d = json.loads(LATEST.read_text())
     nv = d.get("n_verified_facts", "?")
-    tr = d.get("transfer_accuracy")
-    # Human first; numbers only if asked later — never a dashboard dump.
-    tip = ""
-    if isinstance(tr, (int, float)):
-        tip = f" La transferencia anda por {tr:.2f}, y eso no es «entenderlo todo»."
-    return (
-        f"Voy bien: creciendo por palancas, no por acumular papel. "
-        f"Tengo {nv} cosas firmadas; lo que importa son las seis que viajan juntas "
-        f"y la unidad que las ata.{tip} ¿Miramos una de ellas?"
-    )
+    # Human first — never dump transfer_accuracy / dashboard unprompted.
+    variants = [
+        (
+            f"Voy bien: creciendo por palancas, no por acumular papel. "
+            f"Tengo {nv} cosas firmadas; lo que importa son las seis que viajan juntas "
+            f"y la unidad que las ata."
+        ),
+        (
+            f"Aquí sigo. {nv} firmados, pero el peso está en las palancas que viajan juntas, "
+            f"no en el tamaño del inventario."
+        ),
+        (
+            f"Creciendo con cuidado: {nv} cosas firmadas. Si el bucle no cierra, no invento el resto."
+        ),
+    ]
+    # rotate lightly by n_verified parity
+    try:
+        i = int(nv) % len(variants)
+    except Exception:
+        i = 0
+    return variants[i]
 
 
 def _load_state() -> dict:
@@ -329,6 +340,8 @@ def _is_identity(s: str) -> bool:
     if any(x in s for x in (
         "quien eres", "que eres", "who are you", "what are you",
         "tu tribu", "de que tribu", "your tribe", "what is your tribe",
+        "eres un robot", "eres robot", "are you a robot", "sos un robot",
+        "sos robot", "are you robot",
     )):
         return True
     # bare self-name only — not "identidad de <foreign word>"
@@ -440,6 +453,24 @@ def _is_prime_claim(s: str) -> bool:
 
 def _is_invent_speech(s: str) -> bool:
     return bool(re.search(r"\b(inventa|inventame|teorema\s+nuevo|crea\s+una\s+ley)\b", s))
+
+
+def _is_thanks(s: str) -> bool:
+    return s in ("gracias", "gracias!", "thanks", "thank you", "mil gracias") or s.startswith("gracias ")
+
+
+def _is_confused(s: str) -> bool:
+    return any(x in s for x in (
+        "no entiendo", "no te entiendo", "no comprendo", "no entendi",
+        "huh", "what do you mean",
+    ))
+
+
+def _is_why_matters(s: str) -> bool:
+    return any(x in s for x in (
+        "que importa", "y eso que importa", "para que sirve",
+        "so what", "why does it matter", "y eso importa",
+    ))
 
 
 def _is_soft_unknown(s: str) -> bool:
@@ -747,6 +778,30 @@ def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
     """Restate last fact in plainer Spanish — SAME facts, no new theorems."""
     tag = (last.get("tag") or "")
     topic = last.get("topic")
+    fluff_tags = ("thanks", "greet", "clarify", "identity")
+    fluff_topics = ("identity", "growth", None, "")
+    # Skip greet/thanks/identity fluff — prefer last_clause, else keep substantive topic
+    if tag in fluff_tags or topic in ("identity",):
+        clause = last.get("last_clause")
+        if clause:
+            topic = clause
+            tag = "verified"
+            last = {**last, "tag": tag, "topic": topic}
+        elif topic not in fluff_topics and topic is not None:
+            # topic still points at substance (e.g. unit after gracias)
+            tag = "verified" if not str(tag).startswith(("rec-", "transfer-", "reject-")) else tag
+            # if topic is a rec name, treat as rec
+            if topic in (kb.get("recs") or {}):
+                tag = f"rec-{topic}" if not str(last.get("tag") or "").startswith("rec-") else last.get("tag")
+            last = {**last, "tag": tag, "topic": topic}
+        else:
+            return _pack(
+                "No hay un hecho encima para traducir. Preguntá algo firmado y lo digo en cristiano.",
+                "clarify",
+                "",
+                st,
+                topic=None,
+            )
     src = last.get("transfer_src") or last.get("last_src")
     dst = last.get("transfer_dst")
 
@@ -801,9 +856,20 @@ def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
         can = _canonical_rec(kb["recs"].get(topic, []))
         return _pack(
             f"En claro: cada término sale de los dos anteriores — "
-            f"{_formula(topic, can)}. Eso está verificado; nada más. "
-            f"Nada más.",
+            f"{_formula(topic, can)}. Eso está verificado; nada más.",
             tag or f"rec-{topic}",
+            "",
+            st,
+            topic=topic,
+        )
+
+    topic_l = str(topic or "").lower()
+    if "unit_protocell" in topic_l:
+        return _pack(
+            "En cristiano: imagina seis piezas que solo valen juntas. "
+            "Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana "
+            "y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+            tag or "verified",
             "",
             st,
             topic=topic,
@@ -811,8 +877,19 @@ def _answer_explain(kb: dict, last: dict, st: dict) -> tuple[str, str, dict]:
 
     prev = (last.get("last_text") or "").split("\n[")[0].strip()
     if prev:
+        # Avoid parroting the same sentence; light lead-in only.
+        if prev.lower().startswith("es la unidad"):
+            return _pack(
+                "En cristiano: imagina seis piezas que solo valen juntas. "
+                "Bits, Δ=0, la puerta de forma, la taxis del bucle, la recurrencia hermana "
+                "y el salto a delta. Si una falla, no salvás el resto — cae el paquete.",
+                tag or "verified",
+                "",
+                st,
+                topic=topic,
+            )
         return _pack(
-            f"Te lo reformulo sin añadir nada: {prev}",
+            f"En cristiano, sin añadir hechos: {prev}",
             tag or "verified",
             "",
             st,
@@ -969,17 +1046,23 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             topic="identity",
         )
     if _is_identity(s):
-        want_tribe = any(x in s for x in ("tribu", "tribe", "quien eres", "que eres", "who are you"))
-        body = (
-            "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. "
-            f"Hablo como colega cuidadoso: no invento. {kb['n']} hechos firmados. "
-            f"¿Qué quieres saber de mí?"
-        )
-        if want_tribe:
+        want_tribe = any(x in s for x in ("tribu", "tribe"))
+        robot_ask = any(x in s for x in ("robot",))
+        if robot_ask:
+            body = (
+                "Sí: soy un programa. Me llamo Master Algorithm. "
+                "Demuestro, transfiero, rechazo… o callo si no hay cláusula. "
+                "No finjo ser humano; tampoco invento."
+            )
+        elif want_tribe:
             body = (
                 "Soy Master Algorithm. El símbolo demuestra, la analogía transfiere, "
-                "el crítico rechaza, y sin cláusula callo — con rigor y sin inventar. "
-                f"{kb['n']} hechos firmados. ¿Quieres que te enseñe algo que sí sé?"
+                "el crítico rechaza, y sin cláusula callo — con rigor y sin inventar."
+            )
+        else:
+            body = (
+                "Soy Master Algorithm. Demuestro, transfiero, rechazo… o callo si no hay cláusula. "
+                "Hablo claro y no invento."
             )
         return _pack(
             body,
@@ -987,6 +1070,63 @@ def answer(q: str, kb: dict, last: dict | None) -> tuple[str, str, dict]:
             _tribes("símbolo", "analogía", "crítico", "duda", "curiosidad") if want_tribe else "",
             st,
             topic="identity",
+        )
+    if _is_thanks(s):
+        pulse = int(st.get("pulse") or 0)
+        st["pulse"] = pulse + 1
+        thanks = [
+            "De nada. Cuando quieras, seguimos.",
+            "Un gusto. Si algo quedó raro, pedímelo otra vez.",
+            "Dale. Aquí estoy.",
+        ]
+        return _pack(thanks[pulse % len(thanks)], "thanks", "", st, topic=st.get("topic"))
+    if _is_confused(s):
+        # Always route through explain — it skips fluff and uses last_clause/topic
+        if last.get("last_text") or last.get("last_clause") or last.get("topic"):
+            return _answer_explain(kb, last, st)
+        return _pack(
+            "Decime qué parte se trabó y lo digo más despacio — sin inventar.",
+            "clarify",
+            "",
+            st,
+            topic=st.get("topic"),
+        )
+    if _is_why_matters(s):
+        topic = last.get("topic") or st.get("topic")
+        if topic and "unit_protocell" in str(topic).lower():
+            return _pack(
+                "Importa porque sin la unidad las piezas sueltas no cierran el bucle. "
+                "No es poesía: si una palanca falla, cae el paquete.",
+                "why",
+                "",
+                st,
+                topic=topic,
+            )
+        if topic in (kb.get("recs") or {}):
+            can = _canonical_rec(kb["recs"].get(topic, []))
+            return _pack(
+                f"Importa porque {_formula(topic, can)} es la forma que cuadra; "
+                f"sin eso, cualquier historia bonita es invención.",
+                "why",
+                "",
+                st,
+                topic=topic,
+            )
+        if last.get("last_text") and (last.get("tag") or "") != "unknown":
+            return _pack(
+                "Importa porque ya quedó firmado o rechazado — no porque suene bien. "
+                "Si no cierra, no sirve.",
+                "why",
+                "",
+                st,
+                topic=topic,
+            )
+        return _pack(
+            "Sin un tema encima de la mesa, no te invento porqués. Preguntá algo firmado.",
+            "why",
+            "",
+            st,
+            topic=topic,
         )
     if _is_growth(s) and not _is_greet(s):
         return _pack(_growth(), "growth", "", st, topic="growth")
