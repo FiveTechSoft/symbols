@@ -1500,13 +1500,15 @@ pin_ent(W, E) :-
     ).
 
 :- discontiguous graph_fill/4.
-graph_fill(_, Rels, [E], answer(Xs, Facts)) :-
+graph_fill(Toks, Rels, [E], answer(Xs, Facts)) :-
     Rels \== [],
+    \+ stray_unknown(Toks, Rels),
     findall(S-(S, R, E), (member(R, Rels), memory_relation(S, R, E, _, _)), SF),
     SF \== [],
     pack_pins(SF, Xs, Facts).
-graph_fill(_, Rels, [E], answer(Xs, Facts)) :-
+graph_fill(Toks, Rels, [E], answer(Xs, Facts)) :-
     Rels \== [],
+    \+ stray_unknown(Toks, Rels),
     findall(O-(E, R, O), (member(R, Rels), memory_relation(E, R, O, _, _)), OF),
     OF \== [],
     pack_pins(OF, Xs, Facts).
