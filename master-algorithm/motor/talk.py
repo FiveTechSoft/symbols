@@ -161,11 +161,10 @@ def _math_from_verified_formula(formula: str) -> str:
 
 def _human_unit_prose(formula: str) -> str:
     """Warm Spanish for unit_protocell_levers — no UNIT{}, no lab English."""
+    # Short by default; "en cristiano" expands via explain path.
     return (
-        "Es la unidad: las seis formas viajan juntas. "
-        "Circuito de bits, conservación en Δ=0, la puerta de forma, "
-        "la taxis del bucle, el compañero de recurrencia y el paso a delta. "
-        "Si el bucle no cierra, muere el paquete entero — no sobra una pieza suelta."
+        "Es la unidad: seis formas que solo valen juntas. "
+        "Si el bucle no cierra, cae el paquete entero."
     )
 
 
@@ -180,7 +179,7 @@ def _human_verified_prose(name: str, formula: str) -> str:
 
     # Ohm / V=IR
     if "ohm" in nm or "v=ir" in f.lower().replace(" ", ""):
-        return "Ohm: V=IR. Tensión, corriente, resistencia — así de corto, y cuadra."
+        return "Ohm: V=IR. Tensión, corriente, resistencia — así de corto."
 
     # KCL
     if "kcl" in nm or "sum i" in f.lower():
