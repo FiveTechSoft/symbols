@@ -1,8 +1,11 @@
 % symbolic_attention.pl — Attention simbólica pura en Prolog
 % Usa la KB (memory_relation/5) para pesar tokens en una frase.
 % Sin vectores numéricos, sin torch, sin tensorflow.
+%
+% v3: Question-conditioned attention, real temperature, top-k by score.
 :- use_module(library(lists)).
 :- use_module(library(apply)).
+:- use_module(library(pairs)).
 
 % ── Configuración ────────────────────────────────────────────────────
 
@@ -48,10 +51,8 @@ token_attention(Token, Context, Position, Attention) :-
     connection_score(Token, Context, ConnScore),
     position_score(Position, PosScore),
     novelty_score(Token, NovelScore),
-    % Normalizar cada factor a rango [0, 1]
     normalize_relscore(RelScore, RelNorm),
     normalize_connscore(ConnScore, Context, ConnNorm),
-    % Combinar con pesos
     weight(relations, WR),
     weight(connections, WC),
     weight(position, WP),
@@ -60,14 +61,9 @@ token_attention(Token, Context, Position, Attention) :-
 
 % ── Normalization ────────────────────────────────────────────────────
 
-% normalize_relscore(+Raw, -Normalized)
-% Log scale: log(1 + raw) / log(1 + max_expected)
-% Para KBs de ~50-100 facts, max_expected ~ 30
 normalize_relscore(Raw, Normalized) :-
     Normalized is min(1.0, log(1 + Raw) / log(31)).
 
-% normalize_connscore(+Raw, +Context, -Normalized)
-% Conexiones únicas / posibles conexiones
 normalize_connscore(Raw, Context, Normalized) :-
     length(Context, CtxLen),
     ( CtxLen > 1 ->
@@ -78,28 +74,22 @@ normalize_connscore(Raw, Context, Normalized) :-
 
 % ── connection_score/3 ──────────────────────────────────────────────
 
-% connection_score(+Token, +Context, -Score)
-% Cuenta conexiones ÚNICAS (no duplicadas) con otros tokens en Context
 connection_score(Token, Context, Score) :-
     findall(C, (
         member(C, Context),
         C \== Token,
         ( memory_relation(Token, _, C, _, _) ;
           memory_relation(C, _, Token, _, _) ;
-          % Shared object: Token-->X<--C
           memory_relation(Token, _, X, _, _), memory_relation(C, _, X, _, _) ;
-          % Shared subject: Token<--X-->C (inverted)
           memory_relation(_, _, Token, _, _), memory_relation(_, _, C, _, _),
           memory_relation(_, Token, _, _, _), memory_relation(_, C, _, _, _)
         )
     ), Connections),
-    sort(Connections, Unique),  % eliminar duplicados
+    sort(Connections, Unique),
     length(Unique, Score).
 
 % ── position_score/2 ────────────────────────────────────────────────
 
-% position_score(+Position, -Score)
-% Verbo (pos 1) es más importante; sujeto (0) y objeto (2) también
 position_score(0, 0.7).
 position_score(1, 0.9).
 position_score(2, 0.8).
@@ -110,40 +100,32 @@ position_score(Pos, 0.3) :- Pos > 5.
 
 % ── novelty_score/2 ─────────────────────────────────────────────────
 
-% novelty_score(+Token, -Score)
-% Tokens no en KB = alta novedad (candidato a aprender)
 novelty_score(Token, 1.0) :-
     \+ memory_relation(Token, _, _, _, _),
     \+ memory_relation(_, _, Token, _, _), !.
 novelty_score(Token, 0.2) :-
     symbol_importance(Token, Score),
-    Score > 1.5, !.  % ~5+ relaciones en KB
+    Score > 1.5, !.
 novelty_score(_, 0.5).
 
 % ── analyze_sentence/3 ──────────────────────────────────────────────
 
-% analyze_sentence(+Tokens, -Ranked, -Summary)
-% Analiza una frase y rankea tokens por attention (descendente por score)
 analyze_sentence(Tokens, Ranked, Summary) :-
     findall(attention(Token, Pos, Score), (
         nth0(Pos, Tokens, Token),
         token_attention(Token, Tokens, Pos, Score)
     ), AttentionList),
-    % Ordenar por score descendente usando keysort
     map_list_to_pairs(score_pair, AttentionList, Pairs),
     keysort(Pairs, SortedPairs),
     reverse(SortedPairs, RevPairs),
     pairs_values(RevPairs, Ranked),
-    % Generar resumen
     Ranked = [attention(Top1, _, Score1)|_],
     Summary = top(Top1, Score1).
 
-% score_pair(+Attention, -Score-Attention) — extrae score para keysort
 score_pair(attention(_, _, Score), Score-Attention) :- Attention = attention(_, _, Score).
 
 % ── question_focus/3 ────────────────────────────────────────────────
 
-% question_focus(+QuestionTokens, -Focus, -ExpectedAnswer)
 question_focus(Tokens, Focus, ExpectedType) :-
     Tokens = [Who, is|Rest], !,
     Focus = Rest,
@@ -162,7 +144,90 @@ question_focus(Tokens, Focus, ExpectedType) :-
     ExpectedType = property.
 question_focus(Tokens, Tokens, unknown).
 
+% ── question_relation_match/3 ───────────────────────────────────────
+% Score how well a KB relation matches the question's intent.
+
+% question_relation_match(+QuestionTokens, +Relation, -Score)
+% Relation = relation(S, V, O, BaseWeight)
+% Score combines base weight with verb/object overlap with question.
+question_relation_match(QTokens, relation(S, V, O, BaseWeight), Score) :-
+    % Extract verb stem from question
+    ( member(QVerb, QTokens), normalize_verb(QVerb, QVerbNorm) -> true ; QVerbNorm = none ),
+    % Extract content objects from question (excluding glue)
+    exclude(is_glue, QTokens, QContent),
+    % Verb match bonus
+    ( V == QVerbNorm -> VerbBonus = 0.3
+    ; V == QVerb -> VerbBonus = 0.25
+    ; irregular_form(QVerb, QVerbNorm), V == QVerbNorm -> VerbBonus = 0.2
+    ; VerbBonus = 0
+    ),
+    % Object overlap bonus
+    ( member(O, QContent) -> ObjBonus = 0.2
+    ; compound_match(O, QContent) -> ObjBonus = 0.15
+    ; ObjBonus = 0
+    ),
+    % Subject in question bonus
+    ( member(S, QContent) -> SubjBonus = 0.1
+    ; SubjBonus = 0
+    ),
+    Score is BaseWeight + VerbBonus + ObjBonus + SubjBonus.
+
+% compound_match(+KBObj, +QContent)
+% KBObj = white_rabbit, QContent = [white, rabbit]
+compound_match(KBObj, QContent) :-
+    atom_codes(KBObj, Codes),
+    phrase(compound_words(Words), Codes),
+    subset(Words, QContent).
+
+compound_words([W]) --> word(W), !.
+compound_words([W|Ws]) --> word(W), [_], compound_words(Ws).
+
+word(W) --> codes(WCodes), { atom_codes(W, WCodes) }.
+codes([]) --> [].
+codes([C|Cs]) --> [C], codes(Cs).
+
+% ── question_conditioned_attention/3 ────────────────────────────────
+% question_conditioned_attention(+QuestionTokens, +KBEntities, -RankedRelations)
+% Scores ALL relations in KB conditioned on the question, not just entity-popular ones.
+
+question_conditioned_attention(QTokens, KBEntities, RankedRelations) :-
+    % Collect all relations touching the question's entities
+    findall(Rel, (
+        member(Ent, KBEntities),
+        ( memory_relation(Ent, V, O, W, U) -> Rel = relation(Ent, V, O, W)
+        ; memory_relation(O, V, Ent, W, U) -> Rel = relation(O, V, Ent, W)
+        )
+    ), Rels0),
+    sort(Rels0, Rels),  % deduplicate
+    % Score each relation conditioned on question
+    findall(Score-Rel, (
+        member(Rel, Rels),
+        question_relation_match(QTokens, Rel, Score)
+    ), ScoredRels),
+    keysort(ScoredRels, Sorted),
+    reverse(Sorted, RankedRelations).
+
 % ── predict_answer/3 ────────────────────────────────────────────────
+
+% Pronoun resolution: resolve subject pronouns before answering
+predict_answer(Tokens, Prediction, Confidence) :-
+    Tokens = [Subj|Rest],
+    dialog_pronoun(Subj), !,
+    dialog_resolve(Subj, Resolved),
+    predict_answer([Resolved|Rest], Prediction, Confidence).
+
+% Simple SVO: [Subject, Verb, Object] -> verify subject does verb to object
+predict_answer(Tokens, Prediction, Confidence) :-
+    Tokens = [Subject, Verb, Object], !,
+    normalize_verb(Verb, NormV),
+    ( memory_relation(Subject, Verb, Object, _, _) ->
+        Prediction = Subject, Confidence = 1.0
+    ; memory_relation(Subject, NormV, Object, _, _) ->
+        Prediction = Subject, Confidence = 0.95
+    ; memory_relation(Subject, _, Object, _, _) ->
+        Prediction = Subject, Confidence = 0.8
+    ; Prediction = unknown, Confidence = 0
+    ).
 
 % predict_answer(+Tokens, -Prediction, -Confidence)
 predict_answer(Tokens, Prediction, Confidence) :-
@@ -256,7 +321,6 @@ is_glue(or).
 
 % ── explain_attention/2 ─────────────────────────────────────────────
 
-% explain_attention(+Tokens, -Explanation)
 explain_attention(Tokens, Explanation) :-
     findall(Score-Token-Pos, (
         nth0(Pos, Tokens, Token),
