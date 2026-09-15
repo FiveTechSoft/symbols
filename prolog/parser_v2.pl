@@ -272,7 +272,7 @@ r5b([S, V], relation(main, V, [S, unknown])) :-
     r5_verb(V).
 
 fallback_relations(Tokens, Relations) :-
-    findall(R, ( r5a(Tokens, R) ; r5b(Tokens, R) ), Rs0),
+    findall(R, ( r5a(Tokens, R) ; r5b(Tokens, R) ; r5_of(Tokens, R) ), Rs0),
     Rs0 \== [], !,
     sort(Rs0, Relations).
 fallback_relations(Tokens, Relations) :-
@@ -280,6 +280,33 @@ fallback_relations(Tokens, Relations) :-
     Rs0 \== [], !,
     sort(Rs0, Relations).
 fallback_relations(_, []).
+
+% ── R6: of-PP-attached subject ──────────────────────────────────────
+% "the word of the lord came unto jonah" -> came(word, jonah).
+% Fires ONLY in the same no-base-pattern regime as R5 (via
+% fallback_relations below). Subject zone = [Art, Head, of ... of-chain
+% closed greedily]; verb = first r5_verb after the chain closes.
+% Pre is restricted to [Art] so the head must sit right after the
+% article: kills garbage hits like "belly(out)" (18_1) and
+% "cried(belly,i)" (19_2) where the head is not the grammatical
+% subject. Chain closure consumes of [Art] N / N / of N greedily.
+r5_of([Art, S, of|Rest], relation(main, V, [S, O])) :-
+    article_en(Art),
+    content_word(S),
+    \+ r5_function(S),
+    r6_close_of_chain(Rest, Pre1),
+    append(Pre1, [V|VRest], Rest),
+    r5_verb(V), !,
+    ( r5_first_object(V, VRest, O) -> true ; O = unknown ).
+
+r6_close_of_chain(Rest, Pre) :-
+    ( Rest = [A|T], article_en(A) ->
+        ( T = [X|T2], \+ r5_function(X) ->
+            ( T2 = [of|_] -> r6_close_of_chain(T2, P2), Pre = [A, X, of|P2] ; Pre = [A, X] )
+        ; Pre = [A] )
+    ; Rest = [X|T2], content_word(X), \+ r5_function(X) ->
+        ( T2 = [of|_] -> r6_close_of_chain(T2, P2), Pre = [X, of|P2] ; Pre = [X] )
+    ; Pre = [] ).
 
 % ── P1: S V Art O Adj Prep Place Time (Spanish: art noun adj) ──────
 % Position AFTER article and BEFORE preposition = attribute (deduced)
