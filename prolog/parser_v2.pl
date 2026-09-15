@@ -177,38 +177,38 @@ pattern(Tokens, Relation) :- p14(Tokens, Relation).
 % Position AFTER article and BEFORE preposition = attribute (deduced)
 p1([S,V,Art,O,Adj,Prep,Place,Time], relation(main, comprar, [S,O])) :-
     content_word(S), content_word(V), article_es(Art), content_word(O),
-    content_word(Adj), content_word(Place), content_word(Time),
+    content_word(Adj), content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1([S,V,Art,O,Adj,Prep,Place,Time], relation(attribute, attribute, [O,Adj])) :-
     content_word(S), content_word(V), article_es(Art), content_word(O),
-    content_word(Adj), content_word(Place), content_word(Time),
+    content_word(Adj), content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1([S,V,Art,O,Adj,Prep,Place,Time], relation(location, ubicado_en, [O,Place])) :-
     content_word(S), content_word(V), article_es(Art), content_word(O),
-    content_word(Adj), content_word(Place), content_word(Time),
+    content_word(Adj), content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1([S,V,Art,O,Adj,Prep,Place,Time], relation(temporal, tiempo, [comprar(S,O),Time])) :-
     content_word(S), content_word(V), article_es(Art), content_word(O),
-    content_word(Adj), content_word(Place), content_word(Time),
+    content_word(Adj), content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 
 
 % ── P1e: S V Art Adj O Prep Place Time (English: art adj noun) ─────
 p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(main, comprar, [S,O])) :-
     content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
-    content_word(Place), content_word(Time),
+    content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(attribute, attribute, [O,Adj])) :-
     content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
-    content_word(Place), content_word(Time),
+    content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(location, ubicado_en, [O,Place])) :-
     content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
-    content_word(Place), content_word(Time),
+    content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 p1e([S,V,Art,Adj,O,Prep,Place,Time], relation(temporal, tiempo, [comprar(S,O),Time])) :-
     content_word(S), content_word(V), article_en(Art), content_word(Adj), content_word(O),
-    content_word(Place), content_word(Time),
+    content_word(Place), ( number(Time) ; content_word(Time) ),
     location_prep(Prep), Adj \== O.
 
 

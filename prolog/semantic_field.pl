@@ -116,11 +116,11 @@ detect_noun_from_article(Tokens, MainTargets, Noun) :-
 
 extract_nodes_edges([], [], []).
 extract_nodes_edges([rel(Type, Pred, [A,B])|Rest], Nodes, [edge(A, Pred, B, Type)|Edges]) :-
-    atom(A), atom(B), !,
+    atom(A), (atom(B);number(B)), !,
     extract_nodes_edges(Rest, NodesRest, Edges),
     sort([A,B|NodesRest], Nodes).
 extract_nodes_edges([rel(Type, Pred, [Compound,B])|Rest], Nodes, [edge(Compound, Pred, B, Type)|Edges]) :-
-    compound(Compound), atom(B), !,
+    compound(Compound), (atom(B);number(B)), !,
     extract_nodes_edges(Rest, NodesRest, Edges),
     sort([B|NodesRest], Nodes1),
     add_compound_parts(Compound, Nodes1, Nodes).
