@@ -49,11 +49,15 @@ bb0(In, Out) :-
             ( L0 == end_of_file -> !, true
             ; ( split_string(L0, "\t", "", [_, Text]) -> true ; Text = L0 ),
               ( parser_v4:parse_v4(Text, Rs) -> true ; Rs = [] ),
-              forall(member(relation(main, V, [S, O]), Rs),
-                     ( O == unknown -> true
-                     ; \+ bb0_ok(S, V, O) -> assertz(bb0_dropped(S, V, O))
-                     ; assertz(memfact(S, V, O, 1.0, bb0)) )),
-              fail )
+               forall(member(relation(main, V, [S, O]), Rs),
+                      ( O == unknown -> true
+                      ; \+ bb0_ok(S, V, O) -> assertz(bb0_dropped(S, V, O))
+                      ; ( memfact(S, V, O, W0, _)
+                          -> retract(memfact(S, V, O, W0, _)),
+                             NewW is (W0 * 1 + 1.0) / 2,
+                             assertz(memfact(S, V, O, NewW, 2))
+                          ; assertz(memfact(S, V, O, 1.0, 1)) ) )),
+               fail )
         ),
         close(S1)),
     setup_call_cleanup(open(Out, write, S2),
