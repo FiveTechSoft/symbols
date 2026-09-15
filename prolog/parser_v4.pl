@@ -1,13 +1,22 @@
-% parser_v4.pl — Robustez sintactica, incremento 1: adjuntos.
+% parser_v4.pl — Robustez sintactica (CONGELADO 2026-09-15).
 %
 % parser_v2.pl CONGELADO (baseline fc64115): este modulo solo lo LEE
 % (normalize_text, clases de token, parse_sentence), nunca lo modifica.
+%
+% Metricas finales (medidas por ejecucion, doble metodo en conteos):
+%   corpus_huge 6024: coverage 46.4 -> 71.4%, recall 35.1 -> 74.2%,
+%     main precision 62.7 -> 90.8%, adverb-FP 48 -> 0
+%   KJV 31102 versos: coverage 6.6 -> 13.5%, 2037 versos con roles
+%   Baselines intactos: holdout 1000, core 25, comp 7, 14/14, 19/19,
+%   23/23, 50/50, bateria 120/120, m0 0.
 %
 % Principio: no asumir que el primer token es el sujeto. Los adjuntos
 % temporales/locativos en los bordes se separan ANTES del parse SVO y se
 % re-adjuntan como relaciones temporales/location (misma forma que los
 % patrones p6/p7 de parser_v2). Si el nucleo no produce evento principal,
 % se conserva el parse V3 intacto (sin regresion posible por diseno).
+% inc2: pasiva explicita -> EVENT/agent/patient + proyeccion main;
+% imperativos sin agente; inc3: mediales + dedup estructural.
 %
 % Clases cerradas de abajo (adverbios temporales, preposiciones via
 % parser_v2) son vocabulario funcional, mismo estatus que article/2.
@@ -27,43 +36,49 @@ temporal_adverb(tomorrow). temporal_adverb(tonight).
 temporal_adverb(now). temporal_adverb(then).
 temporal_adverb(hoy). temporal_adverb(ayer).
 temporal_adverb(manana). temporal_adverb(ahora).
+temporal_adverb(later). temporal_adverb(soon). temporal_adverb(already).
 
-% Adverb-like object guard: bare manner adverbs in object position are
-% adjuncts, never patients (morphological -ly rule + closed deictic set).
+% Closed frequency adverb class (function words; event properties, not
+% participants). Negative-polarity adverbs (never/hardly/...) are
+% deliberately EXCLUDED: stripping them would flip truth value.
+v4_freq_adv(often). v4_freq_adv(always). v4_freq_adv(usually).
+v4_freq_adv(sometimes). v4_freq_adv(frequently).
+v4_freq_adv(rarely). v4_freq_adv(seldom). v4_freq_adv(daily).
+
+% Adverb-like object guard: bare manner/temporal adverbs in object
+% position are adjuncts, never patients (morphological -ly rule, the
+% temporal class, plus closed deictic set).
 % Same guard drops mains whose subject is a stripped temporal token.
 adverb_object(W) :-
     atom_chars(W, Cs),
     ( append(_, [l, y], Cs)
-    ; member(W, [today, yesterday, tomorrow, tonight, now, then,
-                 here, there, outside, away, again, home,
-                 hoy, ayer, manana, ahora])
+    ; temporal_adverb(W)
+    ; member(W, [here, there, outside, away, again, home,
+                 early, late])
     ), !.
 
-% parse_v4(+Text, -Relations) : V3 parse, else stripped-core parse with
-% re-attached adjuncts when it yields a main event the full parse lacks
-% or when every full-parse main has a stripped token as subject.
-% parse_v4(+Text, -Relations) : V3 parse, else stripped-core parse with
-% re-attached adjuncts when it yields a main event the full parse lacks
-% or when every full-parse main has a stripped token as subject.
-% Passive voice goes through the same conservative gate: canonical
-% active projection + EVENT/agent/patient roles, only when the full
-% parse has no main event of its own.
+% parse_v4(+Text, -Relations) : stripped-core parse wins whenever
+% stripping occurred and the core yields a main event (adjuncts only
+% add noise to argument identification); otherwise V3 behavior with
+% the adverb guard. Passive/imperative go through their own gates.
+% Output passes structural event dedup (inc3.0).
 parse_v4(Text, Relations) :-
     parser_v2:normalize_text(Text, Tokens),
     parser_v2:parse_sentence(Text, RFull),
     ( passive_event(Tokens, RFull, RPass) ->
-        Relations = RPass
+        Rels0 = RPass
     ; imperative_event(Tokens, RFull, RImp) ->
-        Relations = RImp
-    ; strip_adjuncts(Tokens, Core, Adjs, Stripped),
+        Rels0 = RImp
+    ; strip_adjuncts(Tokens, Core, Adjs, _Stripped),
       Core \== [],
       core_string(Core, CoreStr),
       parser_v2:parse_sentence(CoreStr, CoreRels),
       drop_adverb_mains(CoreRels, CoreClean),
-      prefer_core(CoreClean, RFull, Stripped) ->
-        attach_adjuncts(CoreClean, Adjs, Relations)
-    ; drop_adverb_mains(RFull, Relations)
-    ).
+      has_main(CoreClean),
+      attach_adjuncts(CoreClean, Adjs, Rels0)
+    ; drop_adverb_mains(RFull, Rels0)
+    ),
+    dedup_events(Rels0, Relations).
 
 % passive_event(+Tokens, +FullRels, -Relations) : explicit passive
 % "X was VERBed by Y" -> EVENT/agent/patient roles plus a canonical
@@ -171,6 +186,25 @@ agent_head(Post, Y) :-
     \+ v4_modal(Y),
     \+ v4_relpro(Y), !.
 
+% same_event(+R1, +R2) : structurally identical event claim — same
+% predicate, same agent, same patient for mains; identical term
+% otherwise. Different predicates (buy vs repair) never unify here,
+% even over the same (S,O): distinct surface events stay distinct.
+same_event(relation(main, P, [S, O]), relation(main, P, [S, O])) :- !.
+same_event(R, R).
+
+% dedup_events(+Rels, -Clean) : drop structurally identical event
+% claims, keep first occurrence (defensive invariant: sort/2 already
+% removes exact duplicates from single parses; this guards assembly).
+dedup_events(Rels, Clean) :-
+    dedup_events(Rels, [], Clean).
+dedup_events([], _, []).
+dedup_events([R|Rs], Seen, Out) :-
+    ( member(S, Seen), same_event(R, S) ->
+        dedup_events(Rs, Seen, Out)
+    ; Out = [R|More],
+      dedup_events(Rs, [R|Seen], More) ).
+
 % drop_adverb_mains(+Rels, -Clean) : a main edge whose object is a bare
 % adverb, or whose subject is a stripped temporal token, is a false
 % event (unknown rather than guess). Other relation types untouched.
@@ -181,32 +215,26 @@ drop_adverb_mains(Rels, Clean) :-
                  ; true ) ),
             Clean).
 
-% prefer_core(+CoreRels, +FullRels, +Stripped) : core wins iff it has a
-% main event and the full parse has none, or all its mains sit on
-% stripped (adjunct) subjects.
-prefer_core(CoreRels, RFull, Stripped) :-
-    has_main(CoreRels),
-    ( \+ has_main(RFull)
-    ; forall(member(relation(main, _, [S|_]), RFull),
-             member(S, Stripped))
-    ).
-
 has_main(Rels) :-
     member(relation(main, _, _), Rels).
 
 % strip_adjuncts(+Tokens, -Core, -Adjuncts, -Stripped) : leading temporal
-% adverb / leading locative PP / trailing temporal, in that order.
+% adverb / compound / locative PP, medial temporal/frequency adverbs
+% (never first position), trailing temporal, in that order.
 strip_adjuncts(Tokens, Core, Adjs, Stripped) :-
     strip_leading(Tokens, T1, A1, S1),
-    strip_trailing(T1, Core, A2, S2),
-    append(A1, A2, Adjs),
-    append(S1, S2, Stripped),
+    strip_medial(T1, T2, A2, S2),
+    strip_trailing(T2, Core, A3, S3),
+    append([A1, A2, A3], Adjs),
+    append([S1, S2, S3], Stripped),
     Adjs \== [].
 
-% Leading: single temporal adverb, compound last|next + token, or
-% Prep (+Art) + content (locative).
+% Leading: single temporal/frequency adverb, compound last|next + token,
+% or Prep (+Art) + content (locative).
 strip_leading([W|R], R, [t(temporal, W)], [W]) :-
     temporal_adverb(W), !.
+strip_leading([W|R], R, [t(frequency, W)], [W]) :-
+    v4_freq_adv(W), !.
 strip_leading([M, W|R], R, [t(temporal, TW)], [M, W]) :-
     ( M == last ; M == next ),
     parser_v2:content_word(W), !,
@@ -221,12 +249,33 @@ strip_leading([P, X|R], R, [t(location, X)], [P, X]) :-
     parser_v2:content_word(X), !.
 strip_leading(T, T, [], []).
 
-% Trailing: temporal adverb, or last/next + single token compound.
-strip_trailing(T, Core, [t(temporal, T)], S) :-
+% Medial: temporal/frequency adverbs and early/late anywhere except
+% first position (modifiers of the event, never participants).
+strip_medial([F|R], [F|Core], Adjs, Stripped) :-
+    strip_medial_rest(R, Core, Adjs, Stripped).
+strip_medial_rest([], [], [], []).
+strip_medial_rest([W|Rs], Core, Adjs, Stripped) :-
+    ( medial_adjunct(W, T) ->
+        Core = CoreRest, Adjs = [t(T, W)|AdjsRest], Stripped = [W|StrRest],
+        strip_medial_rest(Rs, CoreRest, AdjsRest, StrRest)
+    ; Core = [W|CoreRest], Adjs = AdjsRest, Stripped = StrRest,
+      strip_medial_rest(Rs, CoreRest, AdjsRest, StrRest)
+    ).
+
+medial_adjunct(W, temporal) :- temporal_adverb(W).
+medial_adjunct(W, frequency) :- v4_freq_adv(W).
+medial_adjunct(early, temporal).
+medial_adjunct(late, temporal).
+
+% Trailing: temporal/frequency adverb, or last/next + single token.
+strip_trailing(T, Core, [t(temporal, W)], [W]) :-
     append(Core, [W], T),
     temporal_adverb(W),
-    Core \== [], !,
-    S = [W].
+    Core \== [], !.
+strip_trailing(T, Core, [t(frequency, W)], [W]) :-
+    append(Core, [W], T),
+    v4_freq_adv(W),
+    Core \== [], !.
 strip_trailing(T, Core, [t(temporal, TW)], [M, W]) :-
     append(Core, [M, W], T),
     ( M == last ; M == next ),
@@ -240,14 +289,19 @@ core_string(Core, Str) :-
     atom_string(A, Str).
 
 % attach_adjuncts(+CoreRels, +Adjuncts, -Relations) : temporal wraps the
-% event term (p6 shape), location anchors on the object (p7/p8 shape).
+% event term (p6 shape), frequency likewise, location anchors on the
+% object (p7/p8 shape).
 attach_adjuncts(CoreRels, Adjs, Relations) :-
     findall(R, ( member(relation(main, P, [S, O]), CoreRels),
                  member(t(temporal, T), Adjs),
                  R = relation(temporal, tiempo, [P2, T]),
                  P2 =.. [P, S, O] ), TRels),
+    findall(R, ( member(relation(main, P, [S, O]), CoreRels),
+                 member(t(frequency, F), Adjs),
+                 R = relation(frequency, frecuencia, [P2, F]),
+                 P2 =.. [P, S, O] ), FRels),
     findall(relation(location, llevar_destino, [O, Pl]),
             ( member(relation(main, _, [_, O]), CoreRels),
               member(t(location, Pl), Adjs) ), LRels),
-    append([CoreRels, TRels, LRels], All),
+    append([CoreRels, TRels, FRels, LRels], All),
     sort(All, Relations).
