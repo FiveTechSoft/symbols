@@ -77,7 +77,7 @@ parse_v4(Text, Relations) :-
       has_main(CoreClean),
       attach_adjuncts(CoreClean, Adjs, Rels0)
     ; drop_adverb_mains(RFull, Rels0)
-    ),
+    ), !,
     dedup_events(Rels0, Relations).
 
 % passive_event(+Tokens, +FullRels, -Relations) : explicit passive
@@ -111,12 +111,17 @@ imperative_event(Tokens, RFull, Relations) :-
     parser_v2:content_word(V),
     \+ v4_nonverb_head(V),
     \+ v4_prep_unlisted(V),
+    \+ temporal_adverb(V),
     ( parser_v2:article(X) ; parser_v2:preposition(X) ),
     ( \+ has_main(RFull)
     ; forall(member(relation(main, _, [S|_]), RFull), S == V) ),
     ( parser_v2:article(X) ->
         first_content(Rest, O),
         Relations = [event(V, e1), patient(e1, O)]
+    ; ( X == with ; X == unto ) ->
+        % R4: with/unto phrases are instrument/comitative, not place —
+        % keep the event, never invent a location.
+        Relations = [event(V, e1)]
     ; first_content(Rest, P),
       Relations = [event(V, e1), location(e1, P)]
     ).
@@ -131,6 +136,7 @@ v4_prep_unlisted(by). v4_prep_unlisted(of). v4_prep_unlisted(with).
 v4_prep_unlisted(unto). v4_prep_unlisted(upon). v4_prep_unlisted(within).
 v4_prep_unlisted(without). v4_prep_unlisted(among). v4_prep_unlisted(between).
 v4_prep_unlisted(through). v4_prep_unlisted(during). v4_prep_unlisted(under).
+v4_prep_unlisted(after). v4_prep_unlisted(before).
 
 % Closed discourse-marker / deictic / determiner class (function words
 % that can never head an event): determiners, deictics, connectives,
@@ -142,10 +148,17 @@ v4_nonverb_head(therefore). v4_nonverb_head(moreover).
 v4_nonverb_head(furthermore).
 v4_nonverb_head(also). v4_nonverb_head(even). v4_nonverb_head(only).
 v4_nonverb_head(just). v4_nonverb_head(still). v4_nonverb_head(yet).
+v4_nonverb_head(so).
 v4_nonverb_head(howbeit). v4_nonverb_head(wherefore).
 v4_nonverb_head(whereas). v4_nonverb_head(whereby).
 v4_nonverb_head(wherein). v4_nonverb_head(whereupon).
 v4_nonverb_head(let).
+% R3: degree/intensifier adverbs are not event heads.
+v4_nonverb_head(quite). v4_nonverb_head(such). v4_nonverb_head(rather).
+
+% Closed temporal-preposition class (function words): after/before
+% phrases are temporal adjuncts, never verbal arguments.
+v4_temp_prep(after). v4_temp_prep(before).
 
 % Closed relative-pronoun class (function words): in patient position
 % they mark a clause boundary (no matrix event); after "by" they are
@@ -240,6 +253,12 @@ strip_leading([M, W|R], R, [t(temporal, TW)], [M, W]) :-
     parser_v2:content_word(W), !,
     atom_concat(M, '_', T1),
     atom_concat(T1, W, TW).
+strip_leading([P, A, X|R], R, [t(temporal, X)], [P, A, X]) :-
+    v4_temp_prep(P),
+    parser_v2:article(A),
+    parser_v2:content_word(X), !.
+% NOTE: no bare [after|before, X] leading form — without an article X
+% is typically a subordinate-clause subject, not a temporal noun.
 strip_leading([P, A, X|R], R, [t(location, X)], [P, A, X]) :-
     parser_v2:preposition(P),
     parser_v2:article(A),
@@ -267,7 +286,8 @@ medial_adjunct(W, frequency) :- v4_freq_adv(W).
 medial_adjunct(early, temporal).
 medial_adjunct(late, temporal).
 
-% Trailing: temporal/frequency adverb, or last/next + single token.
+% Trailing: temporal/frequency adverb, temporal-PP tail, or
+% last/next + single token.
 strip_trailing(T, Core, [t(temporal, W)], [W]) :-
     append(Core, [W], T),
     temporal_adverb(W),
@@ -275,6 +295,17 @@ strip_trailing(T, Core, [t(temporal, W)], [W]) :-
 strip_trailing(T, Core, [t(frequency, W)], [W]) :-
     append(Core, [W], T),
     v4_freq_adv(W),
+    Core \== [], !.
+strip_trailing(T, Core, [t(temporal, X)], [P, A, X]) :-
+    append(Core, [P, A, X], T),
+    v4_temp_prep(P),
+    parser_v2:article(A),
+    parser_v2:content_word(X),
+    Core \== [], !.
+strip_trailing(T, Core, [t(temporal, X)], [P, X]) :-
+    append(Core, [P, X], T),
+    v4_temp_prep(P),
+    parser_v2:content_word(X),
     Core \== [], !.
 strip_trailing(T, Core, [t(temporal, TW)], [M, W]) :-
     append(Core, [M, W], T),

@@ -130,6 +130,9 @@ sentence_relations(Tokens, Relations) :-
     FullRels \== [], !,
     sort(FullRels, Relations).
 sentence_relations(Tokens, Relations) :-
+    fallback_relations(Tokens, Relations),
+    Relations \== [], !.
+sentence_relations(Tokens, Relations) :-
     split_conjunctions(Tokens, Clauses),
     findall(R, (
         member(Clause, Clauses),
@@ -172,6 +175,111 @@ pattern(Tokens, Relation) :- p12(Tokens, Relation).
 pattern(Tokens, Relation) :- p13(Tokens, Relation).
 pattern(Tokens, Relation) :- p14(Tokens, Relation).
 
+
+% ── R5: minimal grammar extension (fallback prefix patterns) ───────
+% Fires ONLY when no base pattern (p1-p14) matched the clause.
+% R5-A: Art S V -> main(S,V) with first acceptable later token as
+% object; R5-B: S V -> main(S,V) with NO object (patient unknown,
+% never invented). r5_function = closed classes: then/so/after/behold/
+% quite... can never be subject, verb or object.
+
+r5_temporal(now). r5_temporal(then). r5_temporal(today).
+r5_temporal(yesterday). r5_temporal(tomorrow). r5_temporal(tonight).
+r5_temporal(later). r5_temporal(soon). r5_temporal(already).
+r5_temporal(ago). r5_temporal(henceforth).
+
+r5_modal(has). r5_modal(have). r5_modal(had).
+r5_modal(will). r5_modal(shall). r5_modal(would).
+r5_modal(can). r5_modal(could). r5_modal(may).
+r5_modal(might). r5_modal(must). r5_modal(should).
+
+r5_discourse(behold).
+r5_discourse(yea). r5_discourse(nay). r5_discourse(verily).
+r5_discourse(hath). r5_discourse(doth). r5_discourse(hadst).
+r5_discourse(shalt). r5_discourse(wilt). r5_discourse(hast).
+r5_discourse(art). r5_discourse(didst). r5_discourse(wast).
+r5_discourse(thou). r5_discourse(thee). r5_discourse(thy).
+r5_discourse(thine). r5_discourse(ye). r5_discourse(thyself).
+r5_discourse(themselves). r5_discourse(myself).
+r5_discourse(ourselves). r5_discourse(yourselves). r5_discourse(itself).
+r5_discourse(i). r5_discourse(we). r5_discourse(us).
+r5_discourse(me). r5_discourse(myself).
+r5_discourse(them). r5_discourse(you). r5_discourse(or). r5_discourse(nor).
+r5_discourse(who). r5_discourse(whom). r5_discourse(whose).
+r5_discourse(which). r5_discourse(what).
+r5_discourse(where). r5_discourse(when). r5_discourse(why).
+r5_discourse(how). r5_discourse(whence). r5_discourse(wherein).
+r5_discourse(whereby). r5_discourse(wherefore). r5_discourse(whether).
+r5_discourse(that). r5_discourse(this). r5_discourse(these). r5_discourse(those).
+r5_discourse(by). r5_discourse(of). r5_discourse(with).
+r5_discourse(unto). r5_discourse(upon). r5_discourse(within).
+r5_discourse(without). r5_discourse(among). r5_discourse(between).
+r5_discourse(through). r5_discourse(during). r5_discourse(under).
+r5_discourse(after). r5_discourse(before).
+
+% Possessive determiners: never subject, verb or object.
+r5_possessive(my). r5_possessive(our). r5_possessive(your).
+r5_possessive(their). r5_possessive(its). r5_possessive(his).
+r5_possessive(theirs). r5_possessive(ours). r5_possessive(yours).
+
+% Spelled-out numbers: never R5 arguments (digit tokens are number/1).
+r5_number(one). r5_number(two). r5_number(three). r5_number(four).
+r5_number(five). r5_number(six). r5_number(seven). r5_number(eight).
+r5_number(nine). r5_number(ten). r5_number(eleven). r5_number(twelve).
+r5_number(twenty). r5_number(thirty). r5_number(forty). r5_number(fifty).
+r5_number(hundred). r5_number(thousand).
+
+% Ordinals: same family (order words, never R5 arguments).
+r5_number(first). r5_number(second). r5_number(third). r5_number(fourth).
+r5_number(fifth). r5_number(sixth). r5_number(seventh). r5_number(eighth).
+r5_number(ninth). r5_number(tenth). r5_number(eleventh). r5_number(twelfth).
+
+r5_nonverb(all). r5_nonverb(here). r5_nonverb(there).
+r5_nonverb(thus). r5_nonverb(so). r5_nonverb(therefore).
+r5_nonverb(however). r5_nonverb(nevertheless). r5_nonverb(again).
+r5_nonverb(also). r5_nonverb(even). r5_nonverb(only).
+r5_nonverb(just). r5_nonverb(still). r5_nonverb(yet).
+r5_nonverb(quite). r5_nonverb(such). r5_nonverb(rather).
+
+r5_function(W) :-
+    ( article(W) ; preposition(W) ; conjunction(W) ; pronoun(W) ;
+      negation(W) ; auxiliary(W) ; r5_temporal(W) ; r5_modal(W) ;
+      r5_discourse(W) ; r5_possessive(W) ; r5_number(W) ;
+      r5_nonverb(W) ), !.
+
+r5_verb(W) :-
+    content_word(W),
+    \+ preposition(W),
+    \+ conjunction(W),
+    \+ r5_function(W).
+
+r5a([Art, S, V|Rest], relation(main, V, [S, O])) :-
+    article_en(Art),
+    content_word(S),
+    \+ r5_function(S),
+    r5_verb(V),
+    ( r5_first_object(V, Rest, O) -> true ; O = unknown ).
+
+r5_first_object(V, Rest, O) :-
+    member(O, Rest),
+    content_word(O),
+    \+ r5_function(O),
+    O \== V, !.
+
+r5b([S, V], relation(main, V, [S, unknown])) :-
+    content_word(S),
+    \+ r5_function(S),
+    r5_verb(V).
+
+fallback_relations(Tokens, Relations) :-
+    findall(R, ( r5a(Tokens, R) ; r5b(Tokens, R) ), Rs0),
+    Rs0 \== [], !,
+    sort(Rs0, Relations).
+fallback_relations(Tokens, Relations) :-
+    findall(R, r5b(Tokens, R), Rs0),
+    Rs0 \== [], !,
+    sort(Rs0, Relations).
+fallback_relations(_, []).
 
 % ── P1: S V Art O Adj Prep Place Time (Spanish: art noun adj) ──────
 % Position AFTER article and BEFORE preposition = attribute (deduced)
