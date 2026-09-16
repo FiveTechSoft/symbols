@@ -78,7 +78,35 @@ parse_v4(Text, Relations) :-
       attach_adjuncts(CoreClean, Adjs, Rels0)
     ; drop_adverb_mains(RFull, Rels0)
     ), !,
-    dedup_events(Rels0, Relations).
+    dedup_events(Rels0, RelsD),
+    drop_rel_fragments(Tokens, RelsD, Relations).
+
+% drop_rel_fragments(+Tokens, +Rels, -Clean) : R12-B. A relative
+% pronoun (which/who/whom/whose; "that" excluded: it is a legitimate
+% complementizer, e.g. "the lord said that jonah should go") marks a
+% clause boundary the frozen parser cannot represent. Any main or
+% attribute relation whose subject OR object comes from the post-relpro
+% span is a fragment invented by NP-recycling (e.g. "the dry land" ->
+% main(land,[dry,unknown]) and its KB leak memfact(dry,land,sky));
+% unknown rather than a false event. Applied over the final parse_v4
+% output (post-dedup). Other relation types untouched.
+drop_rel_fragments(Tokens, Rels, Clean) :-
+    ( nth1(P, Tokens, W), v4_relpro(W), ! ->
+        length(Tokens, N),
+        PostLen is N - P,
+        length(PostTail, PostLen),
+        append(_, PostTail, Tokens),
+        findall(R, ( member(R, Rels),
+                     keep_rel(R, PostTail) ), Clean)
+    ; Clean = Rels ).
+
+keep_rel(relation(main, _V, [S, O]), PostTail) :-
+    ( member(S, PostTail) ; member(O, PostTail) ) -> fail
+    ; true.  % at least one argument from the PRE-span: keep
+keep_rel(relation(attribute, attribute, [S, ADJ]), PostTail) :-
+    ( member(S, PostTail) ; member(ADJ, PostTail) ) -> fail
+    ; true.
+keep_rel(R, _) :- R \= relation(main, _, _), R \= relation(attribute, _, _).
 
 % passive_event(+Tokens, +FullRels, -Relations) : explicit passive
 % "X was VERBed by Y" -> EVENT/agent/patient roles plus a canonical
