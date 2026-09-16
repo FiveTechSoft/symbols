@@ -2053,6 +2053,48 @@ chat_form([what, V|Rest], say, answer(Xs, Facts)) :-
     findall(A, member(A-_, AF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, AF), Facts).
+% D7 open-world R5: what <nonrel> is <ente-phrase>? — un solo ente pineado
+% por pins del packed completo (qnorm multi-palabra no resuelve) y
+% exactamente un is-fact: la respuesta es ese tipo (sky is blue).
+chat_form([what, N, is|Rest], say, answer([Type], [(E, is, Type)])) :-
+    Rest \== [],
+    \+ qlead(N),
+    \+ pin_rel(N, _),
+    \+ bb_content(N),
+    append([what, N, is], Rest, Toks),
+    nl_tokens(Toks, Packed),
+    pins_of(Packed, _, Ents),
+    Ents = [E],
+    findall(T, memory_relation(E, is, T, _, _), [Type]).
+% D7 open-world R6: what <ente> <rel> <ente>? — dos entes + una rel
+% pineada, sin hecho directo en ninguna direccion, puente is + clase:
+% (S,is,A)+(S,R,O) con O==B o hecho O-B en cualquier direccion;
+% exactamente un (S,O) (cow is animal + cow says moo -> says moo).
+chat_form([what, A, Vw|Rest], say, answer([O], [(S, R, O)])) :-
+    Rest \== [],
+    Vw \== is,
+    \+ qlead(A), \+ qlead(Vw),
+    \+ pin_rel(A, _),
+    append([what, A, Vw], Rest, Toks),
+    nl_tokens(Toks, Packed),
+    pins_of(Packed, Rels, Ents),
+    Rels = [R],
+    Ents = [A, B],
+    \+ memory_relation(A, R, B, _, _),
+    \+ memory_relation(B, R, A, _, _),
+    findall((S, O),
+            ( memory_relation(S, is, A, _, _),
+              memory_relation(S, R, O, _, _),
+              ( O == B
+              ; memory_relation(O, _, B, _, _)
+              ; memory_relation(B, _, O, _, _) )
+            ; memory_relation(S, is, B, _, _),
+              memory_relation(S, R, O, _, _),
+              ( O == A
+              ; memory_relation(O, _, A, _, _)
+              ; memory_relation(A, _, O, _, _) ) ),
+            SOs),
+    SOs = [(S, O)].
 % D7 how-many (M2 en dialogo): cuenta objetos distintos de (S, V).
 % El resto nominal ("books") lo filtra qnorm; el sujeto manda.
 chat_form([how, many|Mid], say, count(N)) :-
@@ -2069,6 +2111,17 @@ chat_form([how, many|Mid], say, count(N)) :-
     book_type(T),
     inflect_same(W, T),
     length(Bs, N).
+% D7 open-world: how many <Mid> con un unico ente y exactamente un hecho
+% saliente (E,_,O) — la respuesta es O (week has seven -> 7 = seven no;
+% el hecho (week,has,seven) sin Rels pineables responde por su unico O).
+chat_form([how, many|Mid], say, count(N)) :-
+    nl_tokens(Mid, Packed),
+    pins_of(Packed, Rels, Ents),
+    Rels == [],
+    Ents = [E],
+    findall(O, memory_relation(E, _, O, _, _), Os0),
+    sort(Os0, Os),
+    Os = [N].
 chat_form([how, many|Mid], say, count(N)) :-
     append(Pre, [V], Mid),
     Pre \== [],
