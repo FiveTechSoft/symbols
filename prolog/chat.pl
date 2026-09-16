@@ -2035,6 +2035,24 @@ chat_form([what, did|Mid], say, answer(Xs, Facts)) :-
     findall(O, member(O-_, OF), Xs0),
     sort(Xs0, Xs),
     findall(F, member(_-F, OF), Facts).
+% "what V E" sin did (espejo de FIX-A de atencion): hueco libre llenado
+% desde KB; S en pregunta -> responde O; O en pregunta -> responde S.
+chat_form([what, V|Rest], say, answer(Xs, Facts)) :-
+    Rest \= [did|_],
+    exclude(is_glue_token, Rest, Content),
+    Content \== [],
+    bb_rel_forms(V, Rs),
+    findall(Ans-((S, Vr, O)), (member(Vr, Rs), memory_relation(S, Vr, O, _, _),
+                               ( memberchk(S, Content) -> Ans = O
+                               ; memberchk(O, Content) -> Ans = S
+                               ; fail
+                               )),
+             AF0),
+    sort(AF0, AF),
+    AF \== [],
+    findall(A, member(A-_, AF), Xs0),
+    sort(Xs0, Xs),
+    findall(F, member(_-F, AF), Facts).
 % D7 how-many (M2 en dialogo): cuenta objetos distintos de (S, V).
 % El resto nominal ("books") lo filtra qnorm; el sujeto manda.
 chat_form([how, many|Mid], say, count(N)) :-
