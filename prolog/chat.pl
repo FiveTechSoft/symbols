@@ -2250,6 +2250,9 @@ fuzzy_one(W, C) :-
     findall(D-S, (memory_symbol(S),
                   atom_chars(S, [F|_]),
                   atom_length(S, LS),
+                  % R13/FIX-B: el candidato nunca acorta el token
+                  % (world->word era la unica via fuzzy medida = FP).
+                  LS >= L,
                   abs(LS - L) =< 2,
                   symbol_dist(W, S, D),
                   D =< MaxD), DS),

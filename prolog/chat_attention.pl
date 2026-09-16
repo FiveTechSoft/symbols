@@ -178,6 +178,22 @@ focus_answer(focus(Entities, Relations, context(_ExpectedType, Kind)), Tokens, A
       member(entity(Entity, _, _, _, _), Entities),
       memory_relation(Entity, is, Value, _, _) ->
         Answer = answer([Value], [(Entity, is, Value)])
+    ; % FIX-A: "what V E" — fill the empty slot from attention relations.
+      % S in question -> answer O; O in question -> answer S; neither -> fail.
+      Kind = what,
+      Tokens = [what|Rest],
+      Rest \= [is|_],
+      exclude(is_glue_token, Rest, Content),
+      Content \= [],
+      member(relation(S, V, O, Score), Relations),
+      Score > 0.3,
+      verb_in_tokens(V, Content),
+      ( memberchk(S, Content) ->
+          Answer = answer([O], [(S, V, O)])
+      ; memberchk(O, Content) ->
+          Answer = answer([S], [(S, V, O)])
+      ; fail
+      )
     ; Entities = [entity(Name, _, Score, _, _)|_],
       Score > 0.3,
       memory_relation(Name, V, O, _, _) ->
@@ -186,3 +202,12 @@ focus_answer(focus(Entities, Relations, context(_ExpectedType, Kind)), Tokens, A
     ).
 
 is_glue_token(X) :- is_glue(X).
+
+verb_in_tokens(V, Content) :-
+    downcase_atom(V, VL),
+    ( memberchk(VL, Content)
+    ; atom_length(VL, L), L > 4,
+      sub_atom(VL, B, 2, 0, ed),   % ends with 'ed': feared -> fear
+      sub_atom(VL, 0, B, _, Stem),
+      memberchk(Stem, Content)
+    ).
