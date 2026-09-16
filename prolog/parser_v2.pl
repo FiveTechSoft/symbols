@@ -127,11 +127,13 @@ content_word(X) :- atom(X),
 
 sentence_relations(Tokens, Relations) :-
     all_clause_relations(Tokens, FullRels),
-    FullRels \== [], !,
+    FullRels \== [],
+    \+ compound_steal(Tokens, FullRels), !,
     sort(FullRels, Relations).
 sentence_relations(Tokens, Relations) :-
     fallback_relations(Tokens, Relations),
-    Relations \== [], !.
+    Relations \== [],
+    \+ compound_steal(Tokens, Relations), !.
 sentence_relations(Tokens, Relations) :-
     split_conjunctions(Tokens, Clauses),
     findall(R, (
@@ -139,7 +141,20 @@ sentence_relations(Tokens, Relations) :-
         all_clause_relations(Clause, Rels),
         member(R, Rels)
     ), AllRels),
-    sort(AllRels, Relations), !.
+    ( Clauses = [Before, After] ->
+        findall(R, r7_shared_subject(Before, After, R), Shared)
+    ; Shared = [] ),
+    append(AllRels, Shared, All0),
+    All0 \== [], !,
+    sort(All0, Relations).
+sentence_relations(Tokens, Relations) :-
+    split_conjunctions(Tokens, Clauses),
+    findall(R, (
+        member(Clause, Clauses),
+        fallback_relations(Clause, Rels),
+        member(R, Rels)
+    ), AllRels2),
+    sort(AllRels2, Relations), !.
 
 sentence_relations(_, []).
 
@@ -151,6 +166,39 @@ split_conjunctions(Tokens, [Before, After]) :-
     After0 \== [],
     After = After0, !.
 split_conjunctions(Tokens, [Tokens]).
+
+
+% Cross-conjunction steal guard: reject a relation from the unsplit path
+% whose first argument equals the pre-conjunction subject while another
+% argument was taken from the post-conjunction tail (r5a object steal,
+% e.g. "the sea wrought, and was tempestuous" -> main(wrought,[sea,tempestuous])).
+compound_steal(Tokens, Relations) :-
+    append(Pre, [Conj|Post], Tokens),
+    conjunction(Conj),
+    Pre \== [], Post \== [],
+    Relations \== [],
+    member(relation(_, _, Args), Relations),
+    ( Pre = [Art, S|_], article_en(Art) ; Pre = [S|_] ),
+    r7_subject(S),
+    Args = [S|_],
+    member(O, Args),
+    member(O, Post),
+    content_word(O), !.
+compound_steal(_, _).
+
+subject_head([S], S) :- !.
+subject_head([_, S|_], S).
+
+% Elliptical shared subject: "[NP] ..., and [Aux ADJ]" -> attribute(NP, ADJ)
+% e.g. "the sea wrought, and was tempestuous".
+r7_shared_subject(Before, [Aux, ADJ], relation(attribute, attribute, [S, ADJ])) :-
+    auxiliary(Aux),
+    content_word(ADJ),
+    \+ r5_function(ADJ),
+    \+ r7_intensifier(ADJ),
+    \+ r7_participle(ADJ),
+    subject_head(Before, S),
+    r7_subject(S).
 
 
 all_clause_relations(Tokens, Relations) :-
@@ -272,7 +320,8 @@ r5b([S, V], relation(main, V, [S, unknown])) :-
     r5_verb(V).
 
 fallback_relations(Tokens, Relations) :-
-    findall(R, ( r5a(Tokens, R) ; r5b(Tokens, R) ; r5_of(Tokens, R) ), Rs0),
+    findall(R, ( r5a(Tokens, R) ; r5b(Tokens, R) ; r5_of(Tokens, R) ;
+                 r7_copula(Tokens, R) ), Rs0),
     Rs0 \== [], !,
     sort(Rs0, Relations).
 fallback_relations(Tokens, Relations) :-
@@ -307,6 +356,66 @@ r6_close_of_chain(Rest, Pre) :-
     ; Rest = [X|T2], content_word(X), \+ r5_function(X) ->
         ( T2 = [of|_] -> r6_close_of_chain(T2, P2), Pre = [X, of|P2] ; Pre = [X] )
     ; Pre = [] ).
+
+% ── R7: copular attribute ───────────────────────────────────────────
+% "the mariners were afraid" -> attribute(mariners, afraid).
+% Fires ONLY in the no-base-pattern regime (via fallback_relations).
+% Shape: leading skip-tokens (nonverb/temporal/preposition — never
+% discourse/possessive/pronoun), optional article, S, be-form, ADJ
+% (+ optional closed intensifier before ADJ). Excluded on purpose:
+% pronoun subjects, "there was", NP-predicatives (X was a Y — that is
+% type, not attribute), participles (-ed len>=5) and infinitive /
+% directional continuations (is come up, was like to be broken).
+r7_skip(W) :- r5_nonverb(W).
+r7_skip(W) :- r5_temporal(W).
+r7_skip(W) :- preposition(W).
+
+r7_leading([H|T], T) :- r7_skip(H), !, r7_leading(T, T).
+r7_leading(T, T).
+
+r7_intensifier(very). r7_intensifier(exceeding). r7_intensifier(exceedingly).
+
+r7_participle(W) :-
+    atom_chars(W, Cs), append(_, [e, d], Cs),
+    atom_length(W, L), L >= 5.
+
+r7_infinitive_rest([to|_]).
+r7_infinitive_rest([up|_]).
+r7_infinitive_rest([down|_]).
+r7_infinitive_rest([out|_]).
+r7_infinitive_rest([forth|_]).
+r7_infinitive_rest([away|_]).
+
+r7_subject(S) :-
+    content_word(S),
+    \+ r5_function(S),
+    \+ pronoun(S),
+    \+ r5_possessive(S).
+
+r7_copula(Tokens, relation(attribute, attribute, [S, ADJ])) :-
+    r7_leading(Tokens, T1),
+    ( T1 = [Art, S, Aux, ADJ|Rest], article_en(Art)
+    ; T1 = [S, Aux, ADJ|Rest]
+    ),
+    r7_subject(S),
+    auxiliary(Aux),
+    content_word(ADJ),
+    \+ r5_function(ADJ),
+    \+ r7_intensifier(ADJ),
+    \+ r7_participle(ADJ),
+    \+ r7_infinitive_rest(Rest).
+r7_copula(Tokens, relation(attribute, attribute, [S, ADJ])) :-
+    r7_leading(Tokens, T1),
+    ( T1 = [Art, S, Aux, Adv, ADJ|Rest], article_en(Art)
+    ; T1 = [S, Aux, Adv, ADJ|Rest]
+    ),
+    r7_subject(S),
+    auxiliary(Aux),
+    r7_intensifier(Adv),
+    content_word(ADJ),
+    \+ r5_function(ADJ),
+    \+ r7_participle(ADJ),
+    \+ r7_infinitive_rest(Rest).
 
 % ── P1: S V Art O Adj Prep Place Time (Spanish: art noun adj) ──────
 % Position AFTER article and BEFORE preposition = attribute (deduced)

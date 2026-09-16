@@ -48,7 +48,7 @@ bb0(In, Out) :-
             read_line_to_string(S1, L0),
             ( L0 == end_of_file -> !, true
             ; ( split_string(L0, "\t", "", [_, Text]) -> true ; Text = L0 ),
-              ( parser_v4:parse_v4(Text, Rs) -> true ; Rs = [] ),
+               ( parser_v4:parse_v4(Text, Rs) -> true ; Rs = [] ),
                forall(member(relation(main, V, [S, O]), Rs),
                       ( O == unknown -> true
                       ; \+ bb0_ok(S, V, O) -> assertz(bb0_dropped(S, V, O))
@@ -57,6 +57,13 @@ bb0(In, Out) :-
                              NewW is (W0 * 1 + 1.0) / 2,
                              assertz(memfact(S, V, O, NewW, 2))
                           ; assertz(memfact(S, V, O, 1.0, 1)) ) )),
+               forall(member(relation(attribute, attribute, [S, ADJ]), Rs),
+                      ( \+ bb0_ok(S, x, ADJ) -> assertz(bb0_dropped(S, attribute, ADJ))
+                      ; ( memfact(S, attribute, ADJ, W0, _)
+                          -> retract(memfact(S, attribute, ADJ, W0, _)),
+                             NewW is (W0 * 1 + 1.0) / 2,
+                             assertz(memfact(S, attribute, ADJ, NewW, 2))
+                          ; assertz(memfact(S, attribute, ADJ, 1.0, 1)) ) )),
                fail )
         ),
         close(S1)),
