@@ -306,13 +306,76 @@ r5a([Art, S, V|Rest], relation(main, V, [S, O])) :-
     content_word(S),
     \+ r5_function(S),
     r5_verb(V),
+    Rest \== [],
     ( r5_first_object(V, Rest, O) -> true ; O = unknown ).
 
+% r5_first_object(+Verb, +Rest, -Object) : R12-C. Object = head noun of
+% the first NP chain in Rest. G-C2: particle-like tokens (out/up/down/
+% forth/off/away) are adverbial, never the object — skip and retry.
+% G-C3: only an ARTICLE-OPENED chain ("a great fish") has its head at
+% the END of the contiguous content run; a bare head after a
+% complementizer/preposition ("that jonah should go") keeps the
+% first-candidate behavior (baseline invariant).
+r5_particle(out). r5_particle(up). r5_particle(down).
+r5_particle(forth). r5_particle(off). r5_particle(away).
+r5_particle(into). r5_particle(against). r5_particle(over).
+r5_particle(about). r5_particle(around). r5_particle(unto).
+r5_particle(upon). r5_particle(within). r5_particle(without).
+r5_particle(among). r5_particle(between). r5_particle(under).
+r5_particle(through). r5_particle(during). r5_particle(after).
+r5_particle(before). r5_particle(ahead). r5_particle(aboard).
+r5_particle(along). r5_particle(beside). r5_particle(besides).
+r5_particle(beyond). r5_particle(inside). r5_particle(outside).
+r5_particle(toward). r5_particle(towards). r5_particle(near).
+r5_particle(behind). r5_particle(beneath). r5_particle(hence).
+r5_particle(hither). r5_particle(thither). r5_particle(aside).
+r5_particle(apart). r5_particle(astray). r5_particle(afore).
+
+% Degree adverbs modify the verb, never participants (r7 shares this
+% closed class as intensifier).
+r5_particle(very). r5_particle(exceeding). r5_particle(exceedingly).
+
 r5_first_object(V, Rest, O) :-
+    Rest = [Art|_],
+    article_en(Art),
+    r5_content_run_head(Rest, Head),
+    Head \== V, !,
+    O = Head.
+r5_first_object(V, Rest, O) :-
+    r5_object_candidate(Rest, C),
+    r5_particle(C), !,
+    append(_, [C|After], Rest),
+    After \== [],
+    r5_first_object(V, After, O).
+r5_first_object(V, Rest, O) :-
+    r5_object_candidate(Rest, C),
+    \+ r5_particle(C),
+    C \== V, !,
+    O = C.
+
+% Head of the run of contiguous content tokens that follows the article.
+% A particle/preposition token closes the run (it is not object-material).
+r5_content_run_head([_|T], O) :-
+    r5_content_run(T, O).
+
+r5_content_run([W|T], O) :-
+    r5_object_token(W),
+    \+ r5_particle(W),
+    ( T = [W2|_], r5_object_token(W2), \+ r5_particle(W2) ->
+        r5_content_run(T, O)
+    ; O = W ).
+r5_content_run([W|T], O) :-
+    r5_object_token(W),
+    r5_particle(W),
+    r5_content_run(T, O).
+
+r5_object_token(W) :-
+    content_word(W),
+    \+ r5_function(W).
+
+r5_object_candidate(Rest, O) :-
     member(O, Rest),
-    content_word(O),
-    \+ r5_function(O),
-    O \== V, !.
+    r5_object_token(O), !.
 
 r5b([S, V], relation(main, V, [S, unknown])) :-
     content_word(S),
