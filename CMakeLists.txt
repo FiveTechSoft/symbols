@@ -93,6 +93,7 @@ sllm_test(test_schema        tests/test_schema.c)
 sllm_test(test_metaschema    tests/test_metaschema.c)
 sllm_test(test_family2        tests/test_family2.c)
 sllm_test(test_bible_kinship  tests/test_bible_kinship.c)
+sllm_test(test_bible_conclusions tests/test_bible_conclusions.c)
 
 # symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)
