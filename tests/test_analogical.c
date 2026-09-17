@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "model.h"
-#include "transfer.h"
+#include "transfer_legacy.h"
 
 void query_subject(GRAPH *g, const char *name)
 {

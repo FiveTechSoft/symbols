@@ -33,7 +33,17 @@ int MetaObserve(META_KB *mk, const char *family, const char *subject,
     if (mk == NULL || family == NULL || subject == NULL || object == NULL ||
         obs_id == NULL)
         return 0;
-    if (mk->num_obs >= META_MAX * 4)
+    /* idempotent: the same (family,S,O) repetition is one observation;
+       obs_id (provenance) stays that of the FIRST sighting */
+    for (uint32_t i = 0; i < mk->num_obs; i++)
+    {
+        const META_OBS *p = &mk->obs[i];
+        if (strcmp(p->family, family) == 0 &&
+            strcmp(p->subject, subject) == 0 &&
+            strcmp(p->object, object) == 0)
+            return 1;
+    }
+    if (mk->num_obs >= META_OBS_MAX)
         return 0;
     META_OBS *o = &mk->obs[mk->num_obs];
     strncpy(o->family, family, SCHEMA_TOKEN_MAX - 1);
@@ -125,34 +135,53 @@ uint32_t MetaDiscover(META_KB *mk)
     if (mk == NULL)
         return 0;
     uint32_t found = 0;
-    for (uint32_t i = 0; i < mk->num_obs; i++)
+    /* one classification pass per distinct family: a family can
+       hold several structural properties (real corpora show
+       symmetric AND transitive evidence in the same links), so
+       the already-classified guard is per (family, property),
+       not per family. */
+    for (int pass = 0; pass < 2; pass++)
     {
-        const char *family = mk->obs[i].family;
-        if (MetaFind(mk, family) != NULL)
-            continue; /* already has a discovered property */
+        uint32_t pass_found = 0;
+        for (uint32_t i = 0; i < mk->num_obs; i++)
+        {
+            const char *family = mk->obs[i].family;
+            META_PROPERTY wanted = (pass == 0) ? META_PROP_SYMMETRIC
+                                               : META_PROP_TRANSITIVE;
+            if (MetaHasProperty(mk, family, wanted))
+                continue; /* this property already classified */
 
-        const char *p1 = NULL, *p2 = NULL;
-        META_PROPERTY prop = META_PROP_NONE;
-        if (FamilySymmetricEvidence(mk, family, &p1, &p2))
-            prop = META_PROP_SYMMETRIC;
-        else if (FamilyTransitiveEvidence(mk, family, &p1, &p2))
-            prop = META_PROP_TRANSITIVE;
-        else
-            continue; /* absence of evidence: no hypothesis */
+            const char *p1 = NULL, *p2 = NULL;
+            META_PROPERTY prop = META_PROP_NONE;
+            if (wanted == META_PROP_SYMMETRIC)
+            {
+                if (FamilySymmetricEvidence(mk, family, &p1, &p2))
+                    prop = META_PROP_SYMMETRIC;
+            }
+            else if (FamilyTransitiveEvidence(mk, family, &p1, &p2))
+            {
+                prop = META_PROP_TRANSITIVE;
+            }
+            if (prop == META_PROP_NONE)
+                continue; /* absence of evidence: no hypothesis */
 
-        if (mk->num_metas >= META_MAX)
-            break;
-        META_SCHEMA *m = &mk->metas[mk->num_metas++];
-        memset(m, 0, sizeof(*m));
-        strncpy(m->family, family, SCHEMA_TOKEN_MAX - 1);
-        m->family[SCHEMA_TOKEN_MAX - 1] = '\0';
-        m->property = prop;
-        m->num_prov = 2;
-        strncpy(m->prov[0], p1, SCHEMA_TOKEN_MAX - 1);
-        m->prov[0][SCHEMA_TOKEN_MAX - 1] = '\0';
-        strncpy(m->prov[1], p2, SCHEMA_TOKEN_MAX - 1);
-        m->prov[1][SCHEMA_TOKEN_MAX - 1] = '\0';
-        found++;
+            if (mk->num_metas >= META_MAX)
+                break;
+            META_SCHEMA *m = &mk->metas[mk->num_metas++];
+            memset(m, 0, sizeof(*m));
+            strncpy(m->family, family, SCHEMA_TOKEN_MAX - 1);
+            m->family[SCHEMA_TOKEN_MAX - 1] = '\0';
+            m->property = prop;
+            m->num_prov = 2;
+            strncpy(m->prov[0], p1, SCHEMA_TOKEN_MAX - 1);
+            m->prov[0][SCHEMA_TOKEN_MAX - 1] = '\0';
+            strncpy(m->prov[1], p2, SCHEMA_TOKEN_MAX - 1);
+            m->prov[1][SCHEMA_TOKEN_MAX - 1] = '\0';
+            found++;
+            pass_found++;
+        }
+        if (pass_found == 0)
+            break; /* both passes exhausted or nothing new */
     }
     return found;
 }

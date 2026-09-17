@@ -28,6 +28,7 @@ typedef enum
 } META_PROPERTY;
 
 #define META_MAX 16
+#define META_OBS_MAX 1024
 
 typedef struct
 {
@@ -52,7 +53,7 @@ typedef struct
     uint32_t     num_metas;
     /* observation store: realized sentences fed back as evidence
        (family, subject, object, direction as given) */
-    META_OBS     obs[META_MAX * 4];
+    META_OBS     obs[META_OBS_MAX];
     uint32_t     num_obs;
 } META_KB;
 

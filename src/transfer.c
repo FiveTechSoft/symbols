@@ -113,8 +113,12 @@ int TransferDeriveChain(const SCHEMA_KB *kb, const META_KB *mk,
         return 0;
     /* the transitive conclusion (S,O) needs the links (S,M)+(M,O)
        re-presented as input (pair evidence); it must NOT be
-       derivable directly (that is the plain path) */
+       derivable directly (that is the plain path). Self-loops
+       and cycles stay UNKNOWN: a conclusion whose ends coincide
+       or repeats the middle says nothing new. */
     if (PairEvidence(kb, family, subject, object))
+        return 0;
+    if (strcmp(subject, object) == 0)
         return 0;
     for (uint32_t i = 0; i < kb->num_pairs; i++)
     {

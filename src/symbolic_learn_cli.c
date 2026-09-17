@@ -96,6 +96,52 @@ static void CmdLearn(LEARNER *lr, const char *line)
         printf("REJECTED: %s\n", line);
 }
 
+/* ingest: "S<TAB>REL<TAB>O" (bible TSV line) -> one learn call.
+   REL tokens are Spanish bible relation names; the connective
+   layer is the ONLY lexical knowledge, so the REL token is
+   translated by the same consultable-table principle: this
+   table is ingestion vocabulary, never asserted. */
+static const char *BibleRelToConn(const char *rel)
+{
+    if (strcmp(rel, "HIJO_DE") == 0)
+        return "isa";
+    if (strcmp(rel, "REY_DE") == 0)
+        return "reigns";
+    if (strcmp(rel, "HERMANO_DE") == 0)
+        return "sibling_of";
+    return NULL;
+}
+
+static void CmdIngest(LEARNER *lr, const char *line)
+{
+    char s[64], rel[64], o[64];
+    if (sscanf(line, "%63s %63s %63s", s, rel, o) != 3)
+    {
+        printf("INGEST-REJECTED: %s\n", line);
+        return;
+    }
+    const char *conn = BibleRelToConn(rel);
+    if (conn == NULL)
+    {
+        printf("INGEST-SKIP: %s (relation not mappable)\n", rel);
+        return;
+    }
+    if (strcmp(s, o) == 0)
+    {
+        printf("INGEST-SKIP: %s %s %s (self-loop)\n", s, rel, o);
+        return;
+    }
+    char sent[LEARN_MAX_LINE];
+    snprintf(sent, sizeof(sent), "%s %s %s", s, conn, o);
+    if (LearnerLearnLine(lr, sent))
+    {
+        if (lr->last_was_exemplar)
+            printf("ingested: %s %s %s\n", s, conn, o);
+    }
+    else
+        printf("INGEST-REJECTED: %s %s %s\n", s, conn, o);
+}
+
 static void CmdDiscover(LEARNER *lr)
 {
     printf("discovered %u new meta properties\n", LearnerDiscoverMeta(lr));
@@ -197,6 +243,8 @@ int main(int argc, char **argv)
             break;
         else if (strcmp(verb, "learn") == 0)
             CmdLearn(&lr, args);
+        else if (strcmp(verb, "ingest") == 0)
+            CmdIngest(&lr, args);
         else if (strcmp(verb, "discover") == 0)
             CmdDiscover(&lr);
         else if (strcmp(verb, "present") == 0)

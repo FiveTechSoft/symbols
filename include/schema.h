@@ -68,9 +68,9 @@ typedef struct
     int  is_patient;
 } SCHEMA_ROLE;
 
-#define SCHEMA_VOCAB_MAX 256
-#define SCHEMA_ROLE_MAX 64
-#define SCHEMA_PAIR_MAX 64
+#define SCHEMA_VOCAB_MAX 1024
+#define SCHEMA_ROLE_MAX 1024
+#define SCHEMA_PAIR_MAX 1024
 
 typedef struct
 {

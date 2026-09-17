@@ -131,6 +131,9 @@ int SchemaVocabKnown(const SCHEMA_KB *kb, const char *token)
     return VocabKnown(kb, token);
 }
 
+static int PairEvidence(const SCHEMA_KB *kb, const char *family,
+                        const char *s, const char *o);
+
 int SchemaBuildSentence(const SCHEMA_KB *kb, const char *family,
                         const char *subject, const char *object,
                         char *out, size_t out_size)
@@ -279,6 +282,9 @@ int SchemaPresentPair(SCHEMA_KB *kb, const char *family,
         return 0;
     if (SchemaFind(kb, family) == NULL)
         return 0; /* no schema: nothing to present against */
+    /* idempotent: the same observed pair is one piece of evidence */
+    if (PairEvidence(kb, family, subject, object))
+        return 1;
     if (kb->num_pairs >= SCHEMA_PAIR_MAX)
         return 0;
     PAIR_EVID *p = &kb->pairs[kb->num_pairs++];

@@ -21,7 +21,6 @@ add_library(symbolic STATIC
     src/prune.c
     src/shard.c
     src/stats.c
-    src/transfer.c
     src/neuro_prolog.c
     src/export.c
     src/stem.c
@@ -31,6 +30,7 @@ add_library(symbolic STATIC
     src/schema.c
     src/metaschema.c
     src/transfer.c
+    src/transfer_legacy.c
     src/learn.c
 )
 
@@ -91,7 +91,8 @@ sllm_test(test_qa_debug        test_qa_debug.c)
 sllm_test(test_tagged_term   tests/test_tagged_term.c)
 sllm_test(test_schema        tests/test_schema.c)
 sllm_test(test_metaschema    tests/test_metaschema.c)
-sllm_test(test_family2       tests/test_family2.c)
+sllm_test(test_family2        tests/test_family2.c)
+sllm_test(test_bible_kinship  tests/test_bible_kinship.c)
 
 # symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)
@@ -129,3 +130,4 @@ target_link_libraries(bible_import symbolic)
 # bible_query: CLI de consulta/medicion sobre bible_graph.dat
 add_executable(bible_query src/bible_query.c)
 target_link_libraries(bible_query symbolic)
+

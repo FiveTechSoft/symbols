@@ -13,7 +13,7 @@
 #include "dialog.h"
 #include "model.h"
 #include "stats.h"
-#include "transfer.h"
+#include "transfer_legacy.h"
 #include "parser.h"
 #include "stem.h"
 #include "export.h"
