@@ -113,7 +113,7 @@ uint32_t PruneOrphanSymbols(GRAPH *graph)
         }
         else
         {
-            free(graph->symbols->items[i].name);
+            /* Name memory is owned by the symbol table arena; do not free */
             removed++;
         }
     }

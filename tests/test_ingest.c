@@ -122,6 +122,7 @@ int main(void)
     /* 5. Save and reload */
     printf("\n5. Guardando modelo podado...\n");
     MODEL *model = (MODEL *)malloc(sizeof(MODEL));
+    memset(model, 0, sizeof(*model));
     model->graph = graph;
     model->embeddings = EmbeddingTableCreate(64);
     model->config = LearningConfigDefault();

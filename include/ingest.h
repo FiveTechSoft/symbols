@@ -2,6 +2,7 @@
 #define INGEST_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include "graph.h"
 
 typedef struct

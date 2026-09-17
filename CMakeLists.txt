@@ -27,6 +27,7 @@ add_library(symbolic STATIC
     src/stem.c
     src/i18n.c
     src/neuro_rules.c
+    src/tagged_term.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -83,6 +84,8 @@ sllm_test(test_attention       test_attention.c)
 sllm_test(test_concepts        test_concepts.c)
 sllm_test(test_qa_debug        test_qa_debug.c)
 
+sllm_test(test_tagged_term   tests/test_tagged_term.c)
+
 # Read-only queries against the tracked golden wiki_model.bin
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
@@ -107,3 +110,11 @@ add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_mod
 # wiki_model.bin, so the golden model is never clobbered by a test.
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
+
+# bible_import: CLI de ingest del corpus biblico (no es test)
+add_executable(bible_import src/bible_import.c)
+target_link_libraries(bible_import symbolic)
+
+# bible_query: CLI de consulta/medicion sobre bible_graph.dat
+add_executable(bible_query src/bible_query.c)
+target_link_libraries(bible_query symbolic)

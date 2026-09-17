@@ -26,6 +26,11 @@ typedef struct
     uint32_t  *norm_buckets;
     uint32_t   norm_capacity;
     uint32_t   norm_mask;
+    uint32_t   norm_count;
+    /* String arena: every symbol name lives here, freed in one block */
+    char      *arena;
+    size_t     arena_used;
+    size_t     arena_cap;
 } SYMBOL_TABLE;
 
 SYMBOL_TABLE *SymbolTableCreate(uint32_t capacity);

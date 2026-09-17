@@ -8,6 +8,50 @@
 #define HASH_LOAD_FACTOR_DEN 10
 #define EMPTY_BUCKET 0xFFFFFFFF
 
+/* ============================================================
+   String arena: names are appended to one growable buffer.
+   Growth reallocs the arena and fixes every name pointer in
+   items[] (offsets are relative, so O(N) per growth, amortized
+   O(1) per intern). Individual names are never freed.
+   ============================================================ */
+
+static char *ArenaIntern(SYMBOL_TABLE *table, const char *name)
+{
+    size_t len = strlen(name);
+    size_t need = len + 1;
+
+    if (table->arena_cap == 0)
+    {
+        table->arena_cap = 4096;
+        table->arena = (char *)malloc(table->arena_cap);
+        if (table->arena == NULL)
+            return NULL;
+    }
+
+    if (table->arena_used + need > table->arena_cap)
+    {
+        size_t new_cap = table->arena_cap;
+        while (table->arena_used + need > new_cap)
+            new_cap *= 2;
+        char *new_arena = (char *)realloc(table->arena, new_cap);
+        if (new_arena == NULL)
+            return NULL;
+        ptrdiff_t delta = (ptrdiff_t)(new_arena - table->arena);
+        for (uint32_t i = 0; i < table->count; i++)
+        {
+            if (table->items[i].name != NULL)
+                table->items[i].name += delta;
+        }
+        table->arena = new_arena;
+        table->arena_cap = new_cap;
+    }
+
+    char *dest = table->arena + table->arena_used;
+    memcpy(dest, name, need);
+    table->arena_used += need;
+    return dest;
+}
+
 static uint32_t NextPowerOfTwo(uint32_t n)
 {
     if (n < 16) n = 16;
@@ -93,6 +137,7 @@ static void RehashNormBuckets(SYMBOL_TABLE *table, uint32_t new_cap)
     table->norm_buckets = new_nb;
     table->norm_capacity = new_cap;
     table->norm_mask = mask;
+    table->norm_count = table->count;
 }
 
 static void NormIndexInsert(SYMBOL_TABLE *table, const char *normalized, SYMBOL_ID id)
@@ -101,14 +146,7 @@ static void NormIndexInsert(SYMBOL_TABLE *table, const char *normalized, SYMBOL_
         return;
 
     /* Rehash at 70% load */
-    /* Count entries: we approximate by checking how many non-empty */
-    uint32_t used = 0;
-    for (uint32_t i = 0; i < table->norm_capacity; i++)
-        if (table->norm_buckets[i] != EMPTY_BUCKET)
-            used++;
-    if (used >= table->norm_capacity)
-        return;
-    if (used * HASH_LOAD_FACTOR_DEN >= table->norm_capacity * HASH_LOAD_FACTOR_NUM)
+    if (table->norm_count * HASH_LOAD_FACTOR_DEN >= table->norm_capacity * HASH_LOAD_FACTOR_NUM)
         RehashNormBuckets(table, table->norm_capacity * 2);
 
     uint32_t mask = table->norm_mask;
@@ -116,6 +154,7 @@ static void NormIndexInsert(SYMBOL_TABLE *table, const char *normalized, SYMBOL_
     while (table->norm_buckets[h] != EMPTY_BUCKET)
         h = (h + 1) & mask;
     table->norm_buckets[h] = id;
+    table->norm_count++;
 }
 
 SYMBOL_TABLE *SymbolTableCreate(uint32_t capacity)
@@ -170,6 +209,11 @@ void SymbolTableInit(SYMBOL_TABLE *table, uint32_t capacity)
     }
     for (uint32_t i = 0; i < capacity; i++)
         table->norm_buckets[i] = EMPTY_BUCKET;
+
+    table->norm_count = 0;
+    table->arena = NULL;
+    table->arena_used = 0;
+    table->arena_cap = 0;
 }
 
 void SymbolTableDestroy(SYMBOL_TABLE *table)
@@ -177,11 +221,7 @@ void SymbolTableDestroy(SYMBOL_TABLE *table)
     if (table == NULL)
         return;
 
-    for (uint32_t i = 0; i < table->count; i++)
-    {
-        if (table->items[i].name)
-            free(table->items[i].name);
-    }
+    free(table->arena);
     free(table->items);
     free(table->buckets);
     free(table->norm_buckets);
@@ -212,7 +252,7 @@ SYMBOL_ID SymbolAdd(SYMBOL_TABLE *table, const char *name)
     uint32_t idx = table->count;
     SYMBOL *sym = &table->items[idx];
     sym->id = idx + 1;
-    sym->name = strdup(name);
+    sym->name = ArenaIntern(table, name);
     if (sym->name == NULL)
         return SYMBOL_INVALID;
     sym->frequency = 1;
