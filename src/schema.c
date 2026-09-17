@@ -43,6 +43,15 @@ static int TemplateLookup(const char *conn, SCHEMA_ORDER *order)
         *order = SCHEMA_ORDER_CHAIN;
         return 1;
     }
+    /* relational bible families: direction is carried by pair
+       evidence only (MODE 1); cold MODE 2 stays fail-closed
+       (CHAIN) so no family hallucinates a direction from roles. */
+    if (strcmp(conn, "sibling_of") == 0 || strcmp(conn, "father_of") == 0 ||
+        strcmp(conn, "reigns") == 0 || strcmp(conn, "wife_of") == 0)
+    {
+        *order = SCHEMA_ORDER_CHAIN;
+        return 1;
+    }
     return 0;
 }
 

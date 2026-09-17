@@ -96,6 +96,7 @@ sllm_test(test_family2        tests/test_family2.c)
 sllm_test(test_bible_kinship  tests/test_bible_kinship.c)
 sllm_test(test_bible_conclusions tests/test_bible_conclusions.c)
 sllm_test(test_bible_chat     tests/test_bible_chat.c)
+sllm_test(test_bible_relfam   tests/test_bible_relfam.c)
 
 # bible_chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)

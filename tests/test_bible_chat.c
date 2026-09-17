@@ -44,7 +44,7 @@ static void WriteScratch(void)
     fputs("gilead\tHIJO_DE\tmachir\n", f);
     fputs("machir\tHIJO_DE\tmanasseh\n", f);
     fputs("james\tHIJO_DE\tzebedee\n", f);
-    fputs("james\tREY_DE\tisrael\n", f); /* unmappable: skipped */
+    fputs("james\tREY_DE\tisrael\n", f); /* now learned (5 rels) */
     fputs("zebedee\tHIJO_DE\tzebedee\n", f); /* self-loop: skipped */
     fclose(f);
 }
@@ -57,10 +57,13 @@ int main(void)
     remove(g_scratch);
 
     /* ---- 1. ingest contract ----
-       4 taxonomy pairs learned; REY_DE skipped; self-loop filtered */
-    check("pairs 4 (5 rows - self-loop - REY_DE)",
-          (int)ch.kb.num_pairs, 4);
-    check("vocab 6 (4 pairs, gilead/machir shared)", (int)ch.kb.num_vocab, 6);
+       5 pairs learned (REY_DE maps to reigns); self-loop filtered */
+    check("pairs 5 (6 rows - self-loop)",
+          (int)ch.kb.num_pairs, 5);
+    check("vocab 7 (5 pairs, israel shared)",
+          (int)ch.kb.num_vocab, 7);
+    check("deduced kw index (hijo+rey stems)",
+          (int)ch.num_kws, 2);
     check("meta transitive licensed",
           (int)MetaHasProperty(&ch.mk, "taxonomy", META_PROP_TRANSITIVE),
           1);
@@ -135,13 +138,15 @@ int main(void)
     }
 
     /* ---- 5. WHY / ambiguity data shape ----
-       james has 1 parent here (zebedee); in the real corpus james
-       has 2 (alphaeus+zebedee) -> ambiguity branch. Simulated by
-       direct-pair count over the object slot. */
+       james has 1 taxonomy parent here (zebedee); in the real
+       corpus james has 2 (alphaeus+zebedee) -> ambiguity branch.
+       Family-scoped: james also holds a reigns pair (israel),
+       which must NOT count as parent evidence. */
     {
         uint32_t np = 0;
         for (uint32_t i = 0; i < ch.kb.num_pairs; i++)
-            if (strcmp(ch.kb.pairs[i].subject, "james") == 0)
+            if (strcmp(ch.kb.pairs[i].subject, "james") == 0 &&
+                strcmp(ch.kb.pairs[i].family, "taxonomy") == 0)
                 np++;
         check("parents(james) == 1 (unambiguous in scratch)", (int)np, 1);
     }
