@@ -31,6 +31,7 @@ add_library(symbolic STATIC
     src/schema.c
     src/metaschema.c
     src/transfer.c
+    src/learn.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -90,6 +91,10 @@ sllm_test(test_qa_debug        test_qa_debug.c)
 sllm_test(test_tagged_term   tests/test_tagged_term.c)
 sllm_test(test_schema        tests/test_schema.c)
 sllm_test(test_metaschema    tests/test_metaschema.c)
+
+# symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
+add_executable(symbolic-learn src/symbolic_learn_cli.c)
+target_link_libraries(symbolic-learn symbolic)
 
 # Read-only queries against the tracked golden wiki_model.bin
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
