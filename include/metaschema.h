@@ -23,7 +23,8 @@
 typedef enum
 {
     META_PROP_NONE = 0,
-    META_PROP_SYMMETRIC = 1
+    META_PROP_SYMMETRIC = 1,
+    META_PROP_TRANSITIVE = 2
 } META_PROPERTY;
 
 #define META_MAX 16
@@ -66,8 +67,9 @@ int MetaObserve(META_KB *mk, const char *family, const char *subject,
 
 /* ---- discovery ----
    Scan observations: family F with BOTH (A,B) and (B,A) observed,
-   where A != B, grants F the SYMMETRIC property. Anything else
-   grants nothing. Idempotent: re-discovery only appends prov.
+   where A != B, grants F the SYMMETRIC property. Family F with
+   (A,B) AND (B,C) observed, A != C, grants TRANSITIVE. Anything
+   else grants nothing. Idempotent: re-discovery only appends prov.
    Returns number of NEW properties discovered. */
 uint32_t MetaDiscover(META_KB *mk);
 

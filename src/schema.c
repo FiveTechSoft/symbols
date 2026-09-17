@@ -38,6 +38,11 @@ static int TemplateLookup(const char *conn, SCHEMA_ORDER *order)
         *order = SCHEMA_ORDER_OPER_FIRST;
         return 1;
     }
+    if (strcmp(conn, "isa") == 0)
+    {
+        *order = SCHEMA_ORDER_CHAIN;
+        return 1;
+    }
     return 0;
 }
 

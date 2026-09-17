@@ -95,6 +95,50 @@ static int VocabBoth(const SCHEMA_KB *kb, const char *a, const char *b)
     return SchemaVocabKnown(kb, a) && SchemaVocabKnown(kb, b);
 }
 
+/* TRANSITIVE derivation: family F with property transitive and
+   observed links (A,B),(B,C) admits (A,C) — but only from PAIR
+   EVIDENCE in this KB (the links are working state: after a wipe
+   the middle must be re-presented as input). Returns 1 and fills
+   out with the derived chain sentence. */
+int TransferDeriveChain(const SCHEMA_KB *kb, const META_KB *mk,
+                        const char *family, const char *subject,
+                        const char *object, char *out, size_t out_size)
+{
+    if (kb == NULL || mk == NULL || out == NULL || out_size < 4)
+        return 0;
+    if (!MetaHasProperty(mk, family, META_PROP_TRANSITIVE))
+        return 0;
+    const RELATIONAL_SCHEMA *s = SchemaFindFamily(kb, family);
+    if (s == NULL || s->num_connectives == 0)
+        return 0;
+    /* the transitive conclusion (S,O) needs the links (S,M)+(M,O)
+       re-presented as input (pair evidence); it must NOT be
+       derivable directly (that is the plain path) */
+    if (PairEvidence(kb, family, subject, object))
+        return 0;
+    for (uint32_t i = 0; i < kb->num_pairs; i++)
+    {
+        const PAIR_EVID *p1 = &kb->pairs[i];
+        if (strcmp(p1->family, family) != 0 ||
+            strcmp(p1->subject, subject) != 0)
+            continue;
+        for (uint32_t j = 0; j < kb->num_pairs; j++)
+        {
+            const PAIR_EVID *p2 = &kb->pairs[j];
+            if (strcmp(p2->family, family) != 0 ||
+                strcmp(p2->object, object) != 0)
+                continue;
+            if (strcmp(p1->object, p2->subject) != 0)
+                continue;
+            if (!VocabBoth(kb, subject, object))
+                return 0;
+            return SchemaBuildSentence(kb, family, subject, object,
+                                       out, out_size);
+        }
+    }
+    return 0;
+}
+
 int TransferDerive(const SCHEMA_KB *kb, const META_KB *mk,
                    const char *family, const char *subject,
                    const char *object, char *out, size_t out_size)

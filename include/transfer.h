@@ -37,4 +37,12 @@ int TransferDeriveSwapped(const SCHEMA_KB *kb, const META_KB *mk,
                           const char *family, const char *subject,
                           const char *object, char *out, size_t out_size);
 
+/* TRANSITIVE meta-licensed derivation: family F observed as
+   links (S,M) AND (M,O) (re-presented pair evidence) derives
+   the conclusion (S,O). Fail-closed: no property, no links, or
+   already-direct pair -> 0. */
+int TransferDeriveChain(const SCHEMA_KB *kb, const META_KB *mk,
+                        const char *family, const char *subject,
+                        const char *object, char *out, size_t out_size);
+
 #endif

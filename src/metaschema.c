@@ -50,11 +50,16 @@ int MetaObserve(META_KB *mk, const char *family, const char *subject,
 
 /* ---- discovery: structural only ---- */
 
+/* ObsEqual on subject+object with object wildcard support for
+   the transitive scan (matches any object) */
 static int ObsEqual(const META_OBS *o, const char *family,
                     const char *s, const char *ob)
 {
-    return strcmp(o->family, family) == 0 && strcmp(o->subject, s) == 0 &&
-           strcmp(o->object, ob) == 0;
+    if (strcmp(o->family, family) != 0 || strcmp(o->subject, s) != 0)
+        return 0;
+    if (strcmp(ob, "*") == 0)
+        return 1;
+    return strcmp(o->object, ob) == 0;
 }
 
 /* family F observed as (A,B) and (B,A) with A!=B -> symmetric */
@@ -84,6 +89,37 @@ static int FamilySymmetricEvidence(const META_KB *mk, const char *family,
     return 0;
 }
 
+/* family F observed as (A,B) AND (B,C) with A!=C -> transitive.
+   Both links must be distinct observations; B never A or C. */
+static int FamilyTransitiveEvidence(const META_KB *mk, const char *family,
+                                    const char **prov1, const char **prov2)
+{
+    for (uint32_t i = 0; i < mk->num_obs; i++)
+    {
+        const META_OBS *link1 = &mk->obs[i];
+        if (strcmp(link1->family, family) != 0)
+            continue;
+        if (strcmp(link1->subject, link1->object) == 0)
+            continue; /* (A,A) is a degenerate link */
+        for (uint32_t j = 0; j < mk->num_obs; j++)
+        {
+            const META_OBS *link2 = &mk->obs[j];
+            if (j == i)
+                continue;
+            if (!ObsEqual(link2, family, link1->object, "*"))
+                continue; /* link2 = (B,C): middle must match link1.object */
+            if (strcmp(link2->object, link2->subject) == 0)
+                continue; /* (B,B) degenerate */
+            if (strcmp(link2->object, link1->subject) == 0)
+                continue; /* (A,B)+(B,A) is symmetry evidence, not a chain */
+            *prov1 = link1->obs_id;
+            *prov2 = link2->obs_id;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 uint32_t MetaDiscover(META_KB *mk)
 {
     if (mk == NULL)
@@ -96,7 +132,12 @@ uint32_t MetaDiscover(META_KB *mk)
             continue; /* already has a discovered property */
 
         const char *p1 = NULL, *p2 = NULL;
-        if (!FamilySymmetricEvidence(mk, family, &p1, &p2))
+        META_PROPERTY prop = META_PROP_NONE;
+        if (FamilySymmetricEvidence(mk, family, &p1, &p2))
+            prop = META_PROP_SYMMETRIC;
+        else if (FamilyTransitiveEvidence(mk, family, &p1, &p2))
+            prop = META_PROP_TRANSITIVE;
+        else
             continue; /* absence of evidence: no hypothesis */
 
         if (mk->num_metas >= META_MAX)
@@ -105,7 +146,7 @@ uint32_t MetaDiscover(META_KB *mk)
         memset(m, 0, sizeof(*m));
         strncpy(m->family, family, SCHEMA_TOKEN_MAX - 1);
         m->family[SCHEMA_TOKEN_MAX - 1] = '\0';
-        m->property = META_PROP_SYMMETRIC;
+        m->property = prop;
         m->num_prov = 2;
         strncpy(m->prov[0], p1, SCHEMA_TOKEN_MAX - 1);
         m->prov[0][SCHEMA_TOKEN_MAX - 1] = '\0';
@@ -136,13 +177,19 @@ int MetaHasProperty(const META_KB *mk, const char *family,
 
 static const char *PropName(META_PROPERTY p)
 {
-    return p == META_PROP_SYMMETRIC ? "symmetric" : "none";
+    if (p == META_PROP_SYMMETRIC)
+        return "symmetric";
+    if (p == META_PROP_TRANSITIVE)
+        return "transitive";
+    return "none";
 }
 
 static META_PROPERTY PropParse(const char *tok)
 {
     if (strcmp(tok, "symmetric") == 0)
         return META_PROP_SYMMETRIC;
+    if (strcmp(tok, "transitive") == 0)
+        return META_PROP_TRANSITIVE;
     return META_PROP_NONE;
 }
 

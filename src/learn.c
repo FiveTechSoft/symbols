@@ -16,7 +16,7 @@ static int IsConnectiveTok(const char *tok)
 {
     return strcmp(tok, "cong") == 0 || strcmp(tok, "proportional") == 0 ||
            strcmp(tok, "after") == 0 || strcmp(tok, "acting_on") == 0 ||
-           strcmp(tok, "acting") == 0;
+           strcmp(tok, "acting") == 0 || strcmp(tok, "isa") == 0;
 }
 
 static const char *FamilyOfConnective(const char *conn)
@@ -29,6 +29,8 @@ static const char *FamilyOfConnective(const char *conn)
         return "succession";
     if (strcmp(conn, "acting_on") == 0 || strcmp(conn, "acting") == 0)
         return "application";
+    if (strcmp(conn, "isa") == 0)
+        return "taxonomy";
     return NULL;
 }
 

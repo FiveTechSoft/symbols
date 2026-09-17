@@ -50,6 +50,8 @@ static const char *ConnToFamily(const char *conn)
         return "succession";
     if (strcmp(conn, "acting_on") == 0 || strcmp(conn, "acting") == 0)
         return "application";
+    if (strcmp(conn, "isa") == 0)
+        return "taxonomy";
     return NULL;
 }
 
@@ -149,7 +151,8 @@ static void CmdQuery(const SCHEMA_KB *kb, const META_KB *mk, char *args)
     }
     char out[128];
     if (TransferDerive(kb, mk, family, subj, obj, out, sizeof(out)) ||
-        TransferDeriveSwapped(kb, mk, family, subj, obj, out, sizeof(out)))
+        TransferDeriveSwapped(kb, mk, family, subj, obj, out, sizeof(out)) ||
+        TransferDeriveChain(kb, mk, family, subj, obj, out, sizeof(out)))
         printf("OK: %s\n", out);
     else
         printf("UNKNOWN\n");
