@@ -110,6 +110,29 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
     return n;
 }
 
+/* vocabulary index of a token, -1 when absent (the KB keeps one
+   canonical copy per token, so the index is stable) */
+static int VocabIdx(const CHAT *ch, const char *tok)
+{
+    if (tok == NULL)
+        return -1;
+    for (uint32_t i = 0; i < ch->kb.num_vocab; i++)
+        if (strcmp(ch->kb.vocab[i], tok) == 0)
+            return (int)i;
+    return -1;
+}
+
+/* deduced surface stem for a family, from the corpus-derived
+   relation index (never a literal). NULL when the family has no
+   deduced word: templates that need the word fail closed. */
+static const char *ChatFamStem(const CHAT *ch, const char *family)
+{
+    for (uint32_t i = 0; i < ch->num_kws; i++)
+        if (strcmp(ch->kws[i].family, family) == 0)
+            return ch->kws[i].es_stem;
+    return NULL;
+}
+
 /* display form: capitalize first letter (KB stores lowercase) */
 static void Cap(const char *tok, char *out, size_t out_size)
 {
@@ -577,6 +600,199 @@ static int ChatDescendant(const CHAT *ch, const char *ancestor,
         }
     }
     return 0;
+}
+
+/* ---- Fase 2: BFS >= 3-hop over taxonomy (fail-closed) ----
+
+    The 2-hop conclusion stays owned by the TRANSFER meta path
+    (TransferExplainChain / ChatChainFam). This layer answers
+    conclusions whose shortest proof needs MORE edges: BFS over
+    taxonomy pair evidence, min distance >= 2, policy-gated to
+    the transitive family. Static memory only (frontier/parents/
+    visited sized over the KB vocabulary), cycles can never enter
+    (a node is enqueued at most once), and the goal must sit in
+    the presented vocabulary or the answer stays UNKNOWN. */
+
+#define CHAT_BFS_VISIT_MAX SCHEMA_VOCAB_MAX
+
+typedef struct
+{
+    int      idx;  /* index into ch->kb.vocab */
+    uint32_t hops; /* edges from start */
+} BFS_SLOT;
+
+/* adjacency scan: every taxonomy parent of `node` (pairs whose
+   SUBJECT is `node`, i.e. "node isa P": the ancestry direction,
+   child -> parent; self-loops excluded) */
+static uint32_t BfsParents(const CHAT *ch, const char *node,
+                           const int *exclude, int nexclude,
+                           uint32_t out_idx[], uint32_t max_out)
+{
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < ch->kb.num_pairs && n < max_out; i++)
+    {
+        const PAIR_EVID *p = &ch->kb.pairs[i];
+        if (strcmp(p->family, "taxonomy") != 0)
+            continue;
+        if (strcmp(p->subject, node) != 0)
+            continue;
+        if (strcmp(p->subject, p->object) == 0)
+            continue;
+        int vi = VocabIdx(ch, p->object);
+        if (vi < 0)
+            continue;
+        int dup = 0;
+        for (int e = 0; e < nexclude; e++)
+            if (exclude[e] == vi)
+            {
+                dup = 1;
+                break;
+            }
+        if (dup)
+            continue;
+        int seen = 0;
+        for (uint32_t k = 0; k < n; k++)
+            if (out_idx[k] == (uint32_t)vi)
+            {
+                seen = 1;
+                break;
+            }
+        if (!seen)
+            out_idx[n++] = (uint32_t)vi;
+    }
+    return n;
+}
+
+/* one BFS run; fills visit order + parents. Returns 1 if `goal`
+    was reached (dist >= 2 guaranteed by the direct-pair veto).
+    goal_idx < 0 means "explore everything" (reach census): no
+    early return, the queue drains completely. */
+static int BfsRun(const CHAT *ch, int start_idx, int goal_idx,
+                  uint32_t hops[], int parent[], int *visited,
+                  BFS_SLOT *frontier)
+{
+    uint32_t nvisit = 0, head = 0, tail = 0;
+    hops[start_idx] = 0;
+    parent[start_idx] = -1;
+    visited[nvisit++] = start_idx;
+    frontier[tail].idx = start_idx;
+    frontier[tail].hops = 0;
+    tail++;
+    int found = 0;
+    while (head < tail)
+    {
+        BFS_SLOT cur = frontier[head++];
+        if (goal_idx >= 0 && cur.idx == goal_idx)
+        {
+            found = 1;
+            break;
+        }
+        uint32_t kids[CHAT_BFS_VISIT_MAX];
+        uint32_t nk = BfsParents(ch, ch->kb.vocab[cur.idx],
+                                 visited, (int)nvisit, kids,
+                                 CHAT_BFS_VISIT_MAX);
+        for (uint32_t k = 0; k < nk; k++)
+        {
+            uint32_t vi = kids[k];
+            hops[vi] = cur.hops + 1;
+            parent[vi] = cur.idx;
+            visited[nvisit++] = vi;
+            frontier[tail].idx = (int)vi;
+            frontier[tail].hops = cur.hops + 1;
+            tail++;
+        }
+    }
+    return found;
+}
+
+int ChatBfsPath(const CHAT *ch, const char *start, const char *goal,
+                char path[][CHAT_TOKEN_MAX])
+{
+    if (ch == NULL || start == NULL || goal == NULL || path == NULL)
+        return 0;
+    if (!ChatFamilyChainAllowed("taxonomy"))
+        return 0;
+    if (!MetaHasProperty(&ch->mk, "taxonomy", META_PROP_TRANSITIVE))
+        return 0;
+    if (start[0] == '\0' || goal[0] == '\0')
+        return 0;
+    if (strcmp(start, goal) == 0)
+        return 0;
+    int si = VocabIdx(ch, start), gi = VocabIdx(ch, goal);
+    if (si < 0 || gi < 0)
+        return 0;
+    /* the plain path owns 1-hop: a direct pair is not ours */
+    for (uint32_t i = 0; i < ch->kb.num_pairs; i++)
+    {
+        const PAIR_EVID *p = &ch->kb.pairs[i];
+        if (strcmp(p->family, "taxonomy") == 0 &&
+            strcmp(p->subject, start) == 0 &&
+            strcmp(p->object, goal) == 0)
+            return 0;
+    }
+    /* static work arrays over the vocabulary bound */
+    static uint32_t hops[CHAT_BFS_VISIT_MAX];
+    static int parent[CHAT_BFS_VISIT_MAX];
+    static int visited[CHAT_BFS_VISIT_MAX];
+    static BFS_SLOT frontier[CHAT_BFS_VISIT_MAX];
+    memset(hops, 0, sizeof(hops));
+    for (uint32_t i = 0; i < ch->kb.num_vocab; i++)
+        parent[i] = -2; /* unvisited marker */
+    if (!BfsRun(ch, si, gi, hops, parent, visited, frontier))
+        return 0;
+    if (hops[gi] < 2)
+        return 0;
+    uint32_t want = hops[gi] + 1; /* nodes incl. both ends */
+    if (want > CHAT_BFS_PATH_MAX)
+        return 0; /* trace longer than the report buffer */
+    /* walk parents backwards, then reverse in place */
+    int walk[CHAT_BFS_PATH_MAX];
+    int at = gi;
+    for (uint32_t k = 0; k < want; k++)
+    {
+        walk[k] = at;
+        at = parent[at];
+    }
+    for (uint32_t k = 0; k < want; k++)
+    {
+        strncpy(path[k], ch->kb.vocab[walk[want - 1 - k]],
+                CHAT_TOKEN_MAX - 1);
+        path[k][CHAT_TOKEN_MAX - 1] = '\0';
+    }
+    return (int)hops[gi];
+}
+
+uint32_t ChatBfsReach(const CHAT *ch, const char *start,
+                      char names[][CHAT_TOKEN_MAX], uint32_t *depths,
+                      uint32_t max_out)
+{
+    if (ch == NULL || start == NULL || start[0] == '\0')
+        return 0;
+    int si = VocabIdx(ch, start);
+    if (si < 0)
+        return 0;
+    static uint32_t hops[CHAT_BFS_VISIT_MAX];
+    static int parent[CHAT_BFS_VISIT_MAX];
+    static int visited[CHAT_BFS_VISIT_MAX];
+    static BFS_SLOT frontier[CHAT_BFS_VISIT_MAX];
+    memset(hops, 0, sizeof(hops));
+    for (uint32_t i = 0; i < ch->kb.num_vocab; i++)
+        parent[i] = -2;
+    /* goal < 0: explore the whole reachable set (reach census) */
+    BfsRun(ch, si, -1, hops, parent, visited, frontier);
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < ch->kb.num_vocab && n < max_out; i++)
+    {
+        if (i == (uint32_t)si || parent[i] == -2)
+            continue;
+        if (hops[i] < 2)
+            continue;
+        strncpy(names[n], ch->kb.vocab[i], CHAT_TOKEN_MAX - 1);
+        names[n][CHAT_TOKEN_MAX - 1] = '\0';
+        depths[n] = hops[i];
+        n++;
+    }
+    return n;
 }
 
 /* ---- intents ---- */
@@ -1119,29 +1335,44 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
     case INT_IS_PARENT:
     {
         RememberFocus(ch, p->a);
+        const char *stem = ChatFamStem(ch, "taxonomy");
+        if (stem == NULL)
+        {
+            printf("No entendi la pregunta.\n");
+            break;
+        }
         int yes = ChatDirect(ch, p->a, p->b);
         char mid[CHAT_TOKEN_MAX];
         if (!yes)
             yes = ChatChain(ch, p->a, p->b, mid, sizeof(mid));
+        char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
+        if (!yes)
+            yes = ChatBfsPath(ch, p->a, p->b, path) > 0;
         if (yes)
-            printf("Si, %s es hijo de %s.\n", capA, capB);
+            printf("Si, %s es %s de %s.\n", capA, stem, capB);
         else
-            printf("No tengo constancia de que %s sea hijo de %s.\n", capA,
-                   capB);
+            printf("No tengo constancia de que %s sea %s de %s.\n", capA,
+                   stem, capB);
         break;
     }
     case INT_GRANDPARENT:
     {
         RememberFocus(ch, p->a);
+        const char *stem = ChatFamStem(ch, "taxonomy");
+        if (stem == NULL)
+        {
+            printf("No entendi la pregunta.\n");
+            break;
+        }
         char gp[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
         if (ChatGrandparent(ch, p->a, gp, sizeof(gp), mid, sizeof(mid)))
         {
             char capG[CHAT_TOKEN_MAX];
             Cap(gp, capG, sizeof(capG));
             Cap(mid, capM, sizeof(capM));
-            printf("El abuelo de %s es %s: %s es hijo de %s, y %s es hijo "
+            printf("El abuelo de %s es %s: %s es %s de %s, y %s es %s "
                    "de %s.\n",
-                   capA, capG, capA, capM, capM, capG);
+                   capA, capG, capA, stem, capM, capM, stem, capG);
         }
         else
         {
@@ -1152,15 +1383,21 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
     case INT_DESCENDANT:
     {
         RememberFocus(ch, p->a);
+        const char *stem = ChatFamStem(ch, "taxonomy");
+        if (stem == NULL)
+        {
+            printf("No entendi la pregunta.\n");
+            break;
+        }
         char gd[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
         if (ChatDescendant(ch, p->a, gd, sizeof(gd), mid, sizeof(mid)))
         {
             char capD[CHAT_TOKEN_MAX];
             Cap(gd, capD, sizeof(capD));
             Cap(mid, capM, sizeof(capM));
-            printf("Un descendiente de %s es %s: %s es hijo de %s, y %s "
-                   "es hijo de %s.\n",
-                   capA, capD, capD, capM, capM, capA);
+            printf("Un descendiente de %s es %s: %s es %s de %s, y %s "
+                   "es %s de %s.\n",
+                   capA, capD, capD, stem, capM, capM, stem, capA);
         }
         else
         {
@@ -1172,22 +1409,57 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
     {
         RememberFocus(ch, p->a);
         char mid[CHAT_TOKEN_MAX];
+        const char *stem = ChatFamStem(ch, "taxonomy");
+        if (stem == NULL)
+        {
+            printf("No entendi la pregunta.\n");
+            break;
+        }
         if (ChatDirect(ch, p->a, p->b))
         {
-            printf("%s es hijo de %s segun constancia directa.\n", capA,
-                   capB);
+            printf("%s es %s de %s segun constancia directa.\n", capA,
+                   stem, capB);
         }
         else if (ChatChain(ch, p->a, p->b, mid, sizeof(mid)))
         {
             char capM2[CHAT_TOKEN_MAX];
             Cap(mid, capM2, sizeof(capM2));
-            printf("Lo se porque %s es hijo de %s, y %s es hijo de %s.\n",
-                   capA, capM2, capM2, capB);
+            printf("Lo se porque %s es %s de %s, y %s es %s de %s.\n",
+                   capA, stem, capM2, capM2, stem, capB);
         }
         else
         {
-            printf("No tengo constancia de una relacion entre %s y %s.\n",
-                   capA, capB);
+            char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
+            int steps = ChatBfsPath(ch, p->a, p->b, path);
+            if (steps > 0)
+            {
+                /* deep proof: explicit step-by-step genealogy with
+                   the deduced stem. Pair (X, Y) = "X isa Y", so
+                   step k reads path[k-1] <stem> path[k] (child ->
+                   parent); the conclusion re-affirms the question
+                   (A <stem> B) with the same deduced word. */
+                char capC[CHAT_TOKEN_MAX], capP[CHAT_TOKEN_MAX];
+                printf("Lo se porque");
+                for (int k = 1; k <= steps; k++)
+                {
+                    Cap(path[k - 1], capC, sizeof(capC));
+                    Cap(path[k], capP, sizeof(capP));
+                    if (k == 1)
+                        printf(" %s es %s de %s", capC, stem, capP);
+                    else if (k == steps)
+                        printf(" y %s es %s de %s", capC, stem, capP);
+                    else
+                        printf(", %s es %s de %s", capC, stem, capP);
+                }
+                printf(". Por tanto %s es %s de %s.\n", capA, stem,
+                       capB);
+            }
+            else
+            {
+                printf("No tengo constancia de una relacion entre %s y "
+                       "%s.\n",
+                       capA, capB);
+            }
         }
         break;
     }
@@ -1200,8 +1472,10 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         if (strcmp(fam, "taxonomy") == 0)
         {
             char mid[CHAT_TOKEN_MAX];
+            char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
             yes = ChatDirect(ch, p->a, p->b) ||
-                  ChatChainFam(ch, fam, p->a, p->b, mid, sizeof(mid));
+                  ChatChainFam(ch, fam, p->a, p->b, mid, sizeof(mid)) ||
+                  ChatBfsPath(ch, p->a, p->b, path) > 0;
         }
         else if (strcmp(fam, "father") == 0)
         {
