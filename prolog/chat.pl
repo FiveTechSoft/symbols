@@ -81,6 +81,19 @@ chat_quit_token(T) :- member(T, [quit, exit, bye]).
 :- dynamic told_rel/1.
 :- dynamic dialog_last_input/1.
 
+% EXP-GEN-META v3 / Integration Hook v1: chat.pl es SOLO consumidor de
+% relational_schema/3 (persistida por gen_meta.pl via schema_kb.pl, que
+% llega por consult desde fuera de chat.pl). Sin schemas el hook es
+% inerte: ninguna alternativa nueva se dispara. No aprende, no aserta
+% nada, sin superficies de ejemplos GEN: vocabulario cerrado what/is/to
+% + el conector declarado en el schema. Fill (pregunta nombra el sujeto
+% almacenado) admitido por evidencia del par; inversion admitida SOLO
+% para familias sym; ord(_): la direccion declarada es la unica lectura
+% (constraint del schema, v1 MODE-2). Sin hecho aplicable -> fail, el
+% ask-chain sigue y termina en UNKNOWN honesto (chat_unknown).
+:- dynamic relational_schema/3.
+:- dynamic relational_schema_prov/2.
+
 chat(File) :-
     atom(File), !,
     bb_load(File),
@@ -1218,8 +1231,52 @@ chat_ask(Toks) :-
       predict_answer(Toks, Pred, Conf),
       Conf >= 0.5 ->
         chat_remember_and_say(Toks, say, answer([Pred], []))
+    ; % GEN-META v3 hook: consulta de estructura relacional (consumidor
+      % de relational_schema/3). Ultima alternativa antes de chat_ask_qp:
+      % solo preguntas que llegan al final del chain. Sin schema aplicable
+      % o sin hecho -> fail -> chat_ask_qp/chat_unknown (UNKNOWN honesto).
+      chat_schema_ask(Toks, Kind, Ans) ->
+        chat_remember_and_say(Toks, Kind, Ans)
     ; chat_ask_qp(Toks)
     ).
+
+% Hook GEN-META v3: Form A "what is S <conn> to?", Form B "what is
+% <conn> S?" / "what is S <conn>?". El conector debe estar declarado en
+% algun relational_schema (consumidor estricto). Fill: la pregunta
+% nombra el sujeto almacenado, responde el objeto (evidencia del par).
+% Inversion: pregunta nombra el objeto almacenado; admitida SOLO si la
+% familia del conector es sym. ord(_): solo la direccion declarada
+% (sin lexico de roles; el schema mismo porta la constraint).
+chat_schema_ask(Toks, Kind, Ans) :-
+    relational_schema(_, _, _),
+    schema_conn(Conn),
+    (   append([what, is, S | Mid], [to], Toks),
+        Mid == [Conn],
+        atom(S),
+        \+ qlead(S),
+        bb_content(S)
+    ;   Toks == [what, is, Conn, S],
+        atom(S),
+        \+ qlead(S),
+        bb_content(S)
+    ;   append([what, is, S], [Conn], Toks),
+        atom(S),
+        \+ qlead(S),
+        bb_content(S)
+    ),
+    (   memory_relation(S, Conn, O, _, _) ->
+        Ans = answer([O], [(S, Conn, O)]),
+        Kind = say
+    ;   relational_schema(_, sym, ConnL),
+        memberchk(Conn, ConnL),
+        memory_relation(O, Conn, S, _, _) ->
+        Ans = answer([O], [(O, Conn, S)]),
+        Kind = say
+    ).
+
+schema_conn(Conn) :-
+    relational_schema(_, _, Conns),
+    memberchk(Conn, Conns).
 
 ask_lang(Toks, es) :-
     member(W, Toks),
