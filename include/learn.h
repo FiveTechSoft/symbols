@@ -33,6 +33,17 @@ typedef struct
 
 void LearnerInit(LEARNER *lr, SCHEMA_KB *kb, META_KB *mk);
 
+/* ---- consultable lexical tables (HARDCODING=0 contract) ----
+   The ONLY lexical knowledge in the pipeline: a connective ->
+   family mapping consulted at ingest, same status as the
+   template registry in schema.c (a derivation table, never
+   asserted). Callers (CLI, chat, tests) must use these instead
+   of keeping private duplicates. LearnerIsConnective returns
+   1 when the token is a known connective; LearnerConnFamily
+   maps a connective to its family (NULL when unknown). */
+int LearnerIsConnective(const char *tok);
+const char *LearnerConnFamily(const char *conn);
+
 /* Learn one input line. Returns 1 if it produced evidence
    (exemplar and/or observation), 0 if rejected (no known
    connective). Role lexicon entries are declared separately

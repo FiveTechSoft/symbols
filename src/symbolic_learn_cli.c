@@ -17,14 +17,17 @@
    Working state (exemplars, observations, vocab, pairs, roles)
    is NEVER saved: it dies at every wipe/exit. Verbs:
 
-     learn <sentence>        observe a sentence as evidence
-     query <s> <conn> <o>    derive or UNKNOWN
-     discover                meta-discovery over observations
-     present <fam> <s> <o>   present a pair into the target world
-     roles <tok> <role>      declare a role (world re-presentation)
-     save / load / wipe      persistence + wipe-proof cycle
-     counts                  working counters
-     exit                    quit
+      learn <sentence>        observe a sentence as evidence
+      file <path>             ingest "S<TAB>REL<TAB>O" lines from a file
+      query <s> <conn> <o>    derive or UNKNOWN (plain, swapped, chain,
+                              then every licensed composition rule)
+      discover                meta + composition discovery over observations
+      rules                   list licensed compose rules
+      present <fam> <s> <o>   present a pair into the target world
+      roles <tok> <role>      declare a role (world re-presentation)
+      save / load / wipe      persistence + wipe-proof cycle
+      counts                  working counters
+      exit                    quit
 
    The WIPE-PROOF sequence (each line = one stdin line):
      learn speed proportional distance
@@ -42,17 +45,7 @@
 
 static const char *ConnToFamily(const char *conn)
 {
-    if (strcmp(conn, "proportional") == 0)
-        return "proportionality";
-    if (strcmp(conn, "cong") == 0)
-        return "equivalence";
-    if (strcmp(conn, "after") == 0)
-        return "succession";
-    if (strcmp(conn, "acting_on") == 0 || strcmp(conn, "acting") == 0)
-        return "application";
-    if (strcmp(conn, "isa") == 0)
-        return "taxonomy";
-    return NULL;
+    return LearnerConnFamily(conn);
 }
 
 static void PrintCounts(const SCHEMA_KB *kb, const META_KB *mk)
@@ -109,6 +102,10 @@ static const char *BibleRelToConn(const char *rel)
         return "reigns";
     if (strcmp(rel, "HERMANO_DE") == 0)
         return "sibling_of";
+    if (strcmp(rel, "PADRE_DE") == 0)
+        return "father_of";
+    if (strcmp(rel, "ESPOSA_DE") == 0)
+        return "wife_of";
     return NULL;
 }
 
@@ -144,7 +141,76 @@ static void CmdIngest(LEARNER *lr, const char *line)
 
 static void CmdDiscover(LEARNER *lr)
 {
-    printf("discovered %u new meta properties\n", LearnerDiscoverMeta(lr));
+    uint32_t metas = LearnerDiscoverMeta(lr);
+    uint32_t rules = MetaRuleDiscover(lr->mk);
+    printf("discovered %u new meta properties, %u new compose rules\n",
+           metas, rules);
+}
+
+static void CmdRules(META_KB *mk)
+{
+    if (mk->num_rules == 0)
+    {
+        printf("rules: 0 licensed\n");
+        return;
+    }
+    printf("rules:\n");
+    for (uint32_t i = 0; i < mk->num_rules; i++)
+        printf("  %s o %s => %s (support %u)\n", mk->rules[i].r1,
+               mk->rules[i].r2, mk->rules[i].r3, mk->rules[i].support);
+}
+
+/* ingest "S<TAB>REL<TAB>O" lines from a file (learn file <path>) */
+static void CmdFile(LEARNER *lr, const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+    {
+        printf("cannot open '%s'\n", path);
+        return;
+    }
+    char line[LEARN_MAX_LINE];
+    uint32_t learned = 0, skipped = 0;
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        size_t len = strlen(line);
+        while (len && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+            line[--len] = '\0';
+        if (len == 0)
+            continue;
+        char buf[LEARN_MAX_LINE];
+        strncpy(buf, line, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        char *t1 = strchr(buf, '\t');
+        char *t2 = t1 ? strchr(t1 + 1, '\t') : NULL;
+        if (t1 == NULL || t2 == NULL)
+        {
+            skipped++;
+            continue;
+        }
+        *t1 = '\0';
+        *t2 = '\0';
+        const char *rel = t1 + 1;
+        const char *obj = t2 + 1;
+        const char *conn = BibleRelToConn(rel);
+        if (conn == NULL && LearnerConnFamily(rel) != NULL)
+            conn = rel; /* already a connective; validated by the
+                           consultable table, never hardcoded here */
+        if (conn == NULL || strcmp(buf, obj) == 0)
+        {
+            skipped++;
+            continue;
+        }
+        char sent[LEARN_MAX_LINE];
+        snprintf(sent, sizeof(sent), "%s %s %s", buf, conn, obj);
+        if (LearnerLearnLine(lr, sent))
+            learned++;
+        else
+            skipped++;
+    }
+    fclose(f);
+    printf("file: %u learned, %u skipped from '%s'\n", learned, skipped,
+           path);
 }
 
 static void CmdPresent(LEARNER *lr, char *args)
@@ -199,17 +265,35 @@ static void CmdQuery(const SCHEMA_KB *kb, const META_KB *mk, char *args)
     if (TransferDerive(kb, mk, family, subj, obj, out, sizeof(out)) ||
         TransferDeriveSwapped(kb, mk, family, subj, obj, out, sizeof(out)) ||
         TransferDeriveChain(kb, mk, family, subj, obj, out, sizeof(out)))
+    {
         printf("OK: %s\n", out);
-    else
-        printf("UNKNOWN\n");
+        return;
+    }
+    /* heterogeneous composition: every licensed rule with r3 == this
+       family is a derivation path whose premises must be observed
+       pair evidence (ComposeGate fails closed) */
+    for (uint32_t i = 0; i < mk->num_rules; i++)
+    {
+        const META_RULE *r = &mk->rules[i];
+        if (strcmp(r->r3, family) != 0)
+            continue;
+        if (TransferCompose(kb, mk, r->r1, r->r2, subj, obj, obj, out,
+                            sizeof(out)))
+        {
+            printf("OK: %s\n", out);
+            return;
+        }
+    }
+    printf("UNKNOWN\n");
 }
 
 int main(int argc, char **argv)
 {
     if (argc > 1)
     {
-        printf("usage: symbolic-learn  (verbs on stdin: learn|query|discover|"
-               "present|roles|save|load|wipe|counts|exit)\n");
+        printf("usage: symbolic-learn  (verbs on stdin: learn|file|ingest|"
+               "query|discover|rules|present|roles|save|load|wipe|counts|"
+               "exit)\n");
         return 2;
     }
 
@@ -245,8 +329,12 @@ int main(int argc, char **argv)
             CmdLearn(&lr, args);
         else if (strcmp(verb, "ingest") == 0)
             CmdIngest(&lr, args);
+        else if (strcmp(verb, "file") == 0)
+            CmdFile(&lr, args);
         else if (strcmp(verb, "discover") == 0)
             CmdDiscover(&lr);
+        else if (strcmp(verb, "rules") == 0)
+            CmdRules(&mk);
         else if (strcmp(verb, "present") == 0)
             CmdPresent(&lr, args);
         else if (strcmp(verb, "roles") == 0)

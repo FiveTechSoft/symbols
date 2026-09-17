@@ -21,6 +21,11 @@ static int IsConnectiveTok(const char *tok)
            strcmp(tok, "reigns") == 0 || strcmp(tok, "wife_of") == 0;
 }
 
+int LearnerIsConnective(const char *tok)
+{
+    return IsConnectiveTok(tok);
+}
+
 static const char *FamilyOfConnective(const char *conn)
 {
     if (strcmp(conn, "cong") == 0)
@@ -42,6 +47,11 @@ static const char *FamilyOfConnective(const char *conn)
     if (strcmp(conn, "wife_of") == 0)
         return "wife";
     return NULL;
+}
+
+const char *LearnerConnFamily(const char *conn)
+{
+    return FamilyOfConnective(conn);
 }
 
 void LearnerInit(LEARNER *lr, SCHEMA_KB *kb, META_KB *mk)

@@ -100,6 +100,7 @@ sllm_test(test_bible_relfam   tests/test_bible_relfam.c)
 sllm_test(test_bible_chat_lex tests/test_bible_chat_lex.c)
 sllm_test(test_bible_bfs      tests/test_bible_bfs.c)
 sllm_test(test_compose        tests/test_compose.c)
+sllm_test(test_learn          tests/test_learn.c)
 
 # bible_chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
