@@ -163,6 +163,7 @@ int main(void)
 
         /* Build MODEL manually to preserve the populated embedding table */
         MODEL model;
+        memset(&model, 0, sizeof(model));
         model.graph = graph;
         model.embeddings = embeddings;
         model.config = LearningConfigDefault();
