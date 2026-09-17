@@ -602,7 +602,7 @@ static int ChatDescendant(const CHAT *ch, const char *ancestor,
     return 0;
 }
 
-/* ---- Fase 2: BFS >= 3-hop over taxonomy (fail-closed) ----
+/* ---- Phase 2: BFS >= 3-hop over taxonomy (fail-closed) ----
 
     The 2-hop conclusion stays owned by the TRANSFER meta path
     (TransferExplainChain / ChatChainFam). This layer answers
@@ -807,7 +807,8 @@ typedef enum
     INT_DESCENDANT,   /* descendiente ... (de X) */
     INT_WHY,          /* por que A hijo de B */
     INT_REL_QUERY,    /* generic deduced frame: <kw> question */
-    INT_REL_BOOL      /* generic deduced frame: es A <kw> de B */
+    INT_REL_BOOL,     /* generic deduced frame: es A <kw> de B */
+    INT_COMPOSE_WHY   /* why is A <kw1> of B, given B <kw2> of C */
 } INTENT;
 
 typedef struct
@@ -815,8 +816,10 @@ typedef struct
     INTENT intent;
     char   a[CHAT_TOKEN_MAX]; /* slot A */
     char   b[CHAT_TOKEN_MAX]; /* slot B (boolean/why) */
+    char   cc[CHAT_TOKEN_MAX]; /* slot C (compose why) */
     int    has_b;
     int    kw;                /* deduced relation index (generic) */
+    int    kw2;               /* second relation index (compose why) */
 } PARSED;
 
 /* token right after the first "de"/"of" following position from */
@@ -1001,6 +1004,76 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
                 break;
             }
         }
+    }
+
+    /* second deduced keyword (compose frame): the LAST relation
+       word that is NOT the primary one (primary = first match at
+       kwpos). Returns -1 when absent. */
+    int kw2 = -1;
+    int kw2pos = -1;
+    for (int i = n - 1; i >= 0; i--)
+    {
+        if (i == kwpos)
+            continue;
+        char cand[4][CHAT_TOKEN_MAX];
+        uint32_t ncand = 0;
+        MorphFold(toks[i], cand, &ncand);
+        for (uint32_t k = 0; k < ch->num_kws; k++)
+        {
+            if ((int)k == kwx)
+                continue;
+            int hit = strcmp(toks[i], ch->kws[k].es_stem) == 0 ||
+                      strcmp(toks[i], ch->kws[k].en_stem) == 0;
+            if (!hit)
+                for (uint32_t c = 1; c < ncand && !hit; c++)
+                    if (strcmp(cand[c], ch->kws[k].es_stem) == 0 ||
+                        strcmp(cand[c], ch->kws[k].en_stem) == 0)
+                        hit = 1;
+            if (hit)
+            {
+                kw2 = (int)k;
+                kw2pos = i;
+                break;
+            }
+        }
+        if (kw2 >= 0)
+            break;
+    }
+    (void)kw2pos;
+
+    /* COMPOSE WHY (Spanish frame "por que A es <kw1> de B siendo B
+       <kw2> de C"): justification of a heterogeneous composition
+       conclusion via the bridging entity B. Slots: A = after the
+       why marker (skipping "que"/copula), B = after kwpos+"de",
+       C = after kw2pos+"de". Frozen frames above keep priority. */
+    if (kw_why >= 0 && kw2 >= 0 && kwpos >= 0 && kw2pos > kwpos)
+    {
+        int ia = kw_why + 1;
+        if (ia < (int)n && (strcmp(toks[ia], "que") == 0 ||
+                            strcmp(toks[ia], "es") == 0 ||
+                            strcmp(toks[ia], "is") == 0 ||
+                            strcmp(toks[ia], "was") == 0))
+            ia++;
+        char slotB[CHAT_TOKEN_MAX], slotC[CHAT_TOKEN_MAX];
+        if (ia < (int)n && ia < kwpos &&
+            TokAfterDe(toks, n, (uint32_t)kwpos + 1, slotB,
+                       CHAT_TOKEN_MAX) &&
+            TokAfterDe(toks, n, (uint32_t)kw2pos + 1, slotC,
+                       CHAT_TOKEN_MAX))
+        {
+            strncpy(p->a, toks[ia], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            strncpy(p->b, slotB, CHAT_TOKEN_MAX - 1);
+            p->b[CHAT_TOKEN_MAX - 1] = '\0';
+            strncpy(p->cc, slotC, CHAT_TOKEN_MAX - 1);
+            p->cc[CHAT_TOKEN_MAX - 1] = '\0';
+            p->has_b = 1;
+            p->kw = kwx;
+            p->kw2 = kw2;
+            p->intent = INT_COMPOSE_WHY;
+            return 1;
+        }
+        return 0;
     }
 
     /* WHY: "por que A es hijo de B" / "why is A the child of B" */
@@ -1463,6 +1536,49 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         }
         break;
     }
+    case INT_COMPOSE_WHY:
+    {
+        RememberFocus(ch, p->a);
+        const REL_KW *k1 = &ch->kws[p->kw];
+        const REL_KW *k2 = &ch->kws[p->kw2];
+        /* the rule must be licensed in the meta layer and the
+           conclusion must be observed fact (justification, not
+           derivation) */
+        char out[128];
+        if (TransferExplainCompose(&ch->kb, &ch->mk, k1->family,
+                                   k2->family, p->a, p->b, p->cc, out,
+                                   sizeof(out)))
+        {
+            /* conclusion stem = the rule's r3 family, deduced from
+               the corpus lexicon (never the question's own word) */
+            META_RULE rule;
+            const char *stem3 = NULL;
+            if (MetaFindRule(&ch->mk, k1->family, k2->family, &rule))
+                stem3 = ChatFamStem(ch, rule.r3);
+            if (stem3 != NULL)
+            {
+                char capC[CHAT_TOKEN_MAX];
+                Cap(p->cc, capC, sizeof(capC));
+                printf("Lo se porque %s es %s de %s, y %s es %s de %s. "
+                       "Por tanto %s es %s de %s.\n",
+                       capA, k1->es_stem, capB, capB, k2->es_stem, capC,
+                       capA, stem3, capC);
+            }
+            else
+            {
+                printf("No tengo constancia de una relacion entre %s y %s "
+                       "por ahi.\n",
+                       capA, capB);
+            }
+        }
+        else
+        {
+            printf("No tengo constancia de una relacion entre %s y %s "
+                   "por ahi.\n",
+                   capA, capB);
+        }
+        break;
+    }
     case INT_REL_BOOL:
     {
         RememberFocus(ch, p->a);
@@ -1614,8 +1730,9 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);
     uint32_t n = ChatIngestCorpus(ch, corpus_path);
     MetaDiscover(&ch->mk);
-    printf("[chat] corpus: %u hechos, %u vocab, metas=%u\n", n,
-           ch->kb.num_vocab, MetaCount(&ch->mk));
+    MetaRuleDiscover(&ch->mk);
+    printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", n,
+           ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
 }
 
 void ChatHandle(CHAT *ch, const char *line)

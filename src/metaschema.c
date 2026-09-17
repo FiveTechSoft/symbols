@@ -17,6 +17,11 @@ uint32_t MetaCount(const META_KB *mk)
     return mk == NULL ? 0 : mk->num_metas;
 }
 
+uint32_t MetaRuleCount(const META_KB *mk)
+{
+    return mk == NULL ? 0 : mk->num_rules;
+}
+
 /* ---- observation ---- */
 
 static META_SCHEMA *MetaFind(META_KB *mk, const char *family)
@@ -202,7 +207,140 @@ int MetaHasProperty(const META_KB *mk, const char *family,
     return 0;
 }
 
-/* ---- persistence ---- */
+/* ---- composition discovery (Phase 3) ---- */
+
+static int MetaFindRuleIdx(const META_KB *mk, const char *r1,
+                           const char *r2)
+{
+    for (uint32_t i = 0; i < mk->num_rules; i++)
+        if (strcmp(mk->rules[i].r1, r1) == 0 &&
+            strcmp(mk->rules[i].r2, r2) == 0)
+            return (int)i;
+    return -1;
+}
+
+int MetaFindRule(const META_KB *mk, const char *r1, const char *r2,
+                 META_RULE *rule)
+{
+    if (mk == NULL || r1 == NULL || r2 == NULL || rule == NULL)
+        return 0;
+    int i = MetaFindRuleIdx(mk, r1, r2);
+    if (i < 0)
+        return 0;
+    *rule = mk->rules[i];
+    return 1;
+}
+
+/* premise instance enumeration: (R1(A,B), R2(B,C)) observed with
+   A != C. Observations are deduped per (family,S,O), so each
+   (i,j) index pair with matching middle IS one distinct premise
+   instance — no consumption/mutation needed, links may serve
+   several instances (census-faithful: premise count counts
+   distinct (A,B,C) triples). */
+static uint32_t ComposeTally(const META_KB *mk, const char *r1,
+                             const char *r2, const char *r3,
+                             uint32_t *confirm)
+{
+    *confirm = 0;
+    uint32_t prem = 0;
+    for (uint32_t i = 0; i < mk->num_obs; i++)
+    {
+        const META_OBS *o1 = &mk->obs[i];
+        if (strcmp(o1->family, r1) != 0)
+            continue;
+        if (strcmp(o1->subject, o1->object) == 0)
+            continue; /* (A,A) degenerate */
+        for (uint32_t j = 0; j < mk->num_obs; j++)
+        {
+            const META_OBS *o2 = &mk->obs[j];
+            if (strcmp(o2->family, r2) != 0)
+                continue;
+            if (strcmp(o2->subject, o1->object) != 0)
+                continue; /* middle B must match */
+            if (strcmp(o2->subject, o2->object) == 0)
+                continue; /* (B,B) degenerate */
+            if (strcmp(o2->object, o1->subject) == 0)
+                continue; /* A == C: cycle, says nothing new */
+            prem++;
+            int confirmed = 0;
+            for (uint32_t k = 0; k < mk->num_obs; k++)
+            {
+                const META_OBS *o3 = &mk->obs[k];
+                if (strcmp(o3->family, r3) != 0)
+                    continue;
+                if (strcmp(o3->subject, o1->subject) == 0 &&
+                    strcmp(o3->object, o2->object) == 0)
+                {
+                    confirmed = 1;
+                    break;
+                }
+            }
+            if (!confirmed)
+                return prem; /* gate already failed: rate < 1.0 */
+            (*confirm)++;
+        }
+    }
+    return prem;
+}
+
+uint32_t MetaRuleDiscover(META_KB *mk)
+{
+    if (mk == NULL)
+        return 0;
+    uint32_t found = 0;
+    /* candidate premise families: distinct observed families */
+    char fams[META_OBS_MAX][SCHEMA_TOKEN_MAX];
+    uint32_t nfam = 0;
+    for (uint32_t i = 0; i < mk->num_obs; i++)
+    {
+        int dup = 0;
+        for (uint32_t f = 0; f < nfam; f++)
+            if (strcmp(fams[f], mk->obs[i].family) == 0)
+                dup = 1;
+        if (!dup && nfam < META_OBS_MAX)
+            strcpy(fams[nfam++], mk->obs[i].family);
+    }
+    for (uint32_t a = 0; a < nfam; a++)
+    {
+        for (uint32_t b = 0; b < nfam; b++)
+        {
+            const char *r1 = fams[a];
+            const char *r2 = fams[b];
+            if (strcmp(r1, r2) == 0)
+                continue; /* homogeneous: TRANSITIVE's territory */
+            if (MetaFindRuleIdx(mk, r1, r2) >= 0)
+                continue; /* idempotent */
+            /* candidate r3 = every other observed family (copied:
+               ComposeTally mutates obs while scanning) */
+            for (uint32_t c = 0; c < nfam; c++)
+            {
+                char r3[SCHEMA_TOKEN_MAX];
+                strcpy(r3, fams[c]);
+                if (strcmp(r3, r1) == 0 || strcmp(r3, r2) == 0)
+                    continue;
+                if (MetaFindRuleIdx(mk, r1, r2) >= 0)
+                    break; /* a sibling r3 already licensed */
+                uint32_t confirm;
+                uint32_t prem = ComposeTally(mk, r1, r2, r3, &confirm);
+                if (prem < 2 || confirm != prem)
+                    continue; /* gate: rate 1.0 AND support >= 2 */
+                if (mk->num_rules >= META_RULE_MAX)
+                    return found;
+                META_RULE *r = &mk->rules[mk->num_rules++];
+                memset(r, 0, sizeof(*r));
+                strncpy(r->r1, r1, SCHEMA_TOKEN_MAX - 1);
+                r->r1[SCHEMA_TOKEN_MAX - 1] = '\0';
+                strncpy(r->r2, r2, SCHEMA_TOKEN_MAX - 1);
+                r->r2[SCHEMA_TOKEN_MAX - 1] = '\0';
+                strncpy(r->r3, r3, SCHEMA_TOKEN_MAX - 1);
+                r->r3[SCHEMA_TOKEN_MAX - 1] = '\0';
+                r->support = confirm;
+                found++;
+            }
+        }
+    }
+    return found;
+}
 
 static const char *PropName(META_PROPERTY p)
 {
@@ -238,6 +376,13 @@ uint32_t MetaKBSave(const META_KB *mk, const char *filepath)
         for (uint32_t p = 0; p < m->num_prov; p++)
             fprintf(f, "%s%s", p ? "," : "", m->prov[p]);
         fprintf(f, "]).\n");
+        written++;
+    }
+    for (uint32_t i = 0; i < mk->num_rules; i++)
+    {
+        const META_RULE *r = &mk->rules[i];
+        fprintf(f, "compose(%s,%s,%s,%u).\n", r->r1, r->r2, r->r3,
+                r->support);
         written++;
     }
     fclose(f);
@@ -323,6 +468,34 @@ uint32_t MetaKBLoad(META_KB *mk, const char *filepath)
             }
             have_pending = 0;
             pending_family[0] = '\0';
+        }
+        else if (strncmp(line, "compose(", 8) == 0)
+        {
+            char *open = strchr(line, '(');
+            char *close = strrchr(line, ')');
+            if (open == NULL || close == NULL || close < open)
+                continue;
+            *close = '\0';
+            char *c1 = strchr(open + 1, ',');
+            char *c2 = c1 ? strchr(c1 + 1, ',') : NULL;
+            char *c3 = c2 ? strchr(c2 + 1, ',') : NULL;
+            if (c1 == NULL || c2 == NULL || c3 == NULL)
+                continue;
+            *c1 = '\0';
+            *c2 = '\0';
+            *c3 = '\0';
+            if (mk->num_rules >= META_RULE_MAX)
+                continue;
+            META_RULE *r = &mk->rules[mk->num_rules++];
+            memset(r, 0, sizeof(*r));
+            strncpy(r->r1, open + 1, SCHEMA_TOKEN_MAX - 1);
+            r->r1[SCHEMA_TOKEN_MAX - 1] = '\0';
+            strncpy(r->r2, c1 + 1, SCHEMA_TOKEN_MAX - 1);
+            r->r2[SCHEMA_TOKEN_MAX - 1] = '\0';
+            strncpy(r->r3, c2 + 1, SCHEMA_TOKEN_MAX - 1);
+            r->r3[SCHEMA_TOKEN_MAX - 1] = '\0';
+            r->support = (uint32_t)strtoul(c3 + 1, NULL, 10);
+            loaded++;
         }
     }
     fclose(f);

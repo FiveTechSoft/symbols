@@ -54,4 +54,31 @@ int TransferExplainChain(const SCHEMA_KB *kb, const META_KB *mk,
                          const char *object, char *out, size_t out_size,
                          char *middle, size_t middle_size);
 
+/* ---- heterogeneous composition (Phase 3) ---- */
+
+/* Compose two licensed families R1 o R2 => R3: given an observed
+    pair (A,B) in family r1 and an observed pair (B,C) in family
+    r2, with a meta-licensed rule rule(r1,r2 => r3), derives
+    "A <r3> C". Fail-closed: no rule, no pair evidence for the
+    premise links, direct evidence (r3,A,C) already present, or
+    missing vocabulary -> 0 (UNKNOWN, never a hypothesis).
+    NOTE: when the conclusion is already direct evidence the
+    plain path owns it; this derives only NOVEL conclusions. */
+int TransferCompose(const SCHEMA_KB *kb, const META_KB *mk,
+                    const char *r1, const char *r2, const char *a,
+                    const char *b, const char *c, char *out,
+                    size_t out_size);
+
+/* Justification of a composition CONCLUSION that is already
+    observed fact (pair evidence in r3): the rule must be
+    licensed and both premise links (A,B) in r1 and (B,C) in r2
+    observed; B is given by the caller (the parsed bridging
+    entity). Unlike TransferCompose this does NOT veto direct
+    evidence (it explains known facts). Returns 1 + fills out,
+    0 otherwise. */
+int TransferExplainCompose(const SCHEMA_KB *kb, const META_KB *mk,
+                           const char *r1, const char *r2,
+                           const char *a, const char *b, const char *c,
+                           char *out, size_t out_size);
+
 #endif

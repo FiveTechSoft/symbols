@@ -46,7 +46,7 @@ int ChatFamilyChainAllowed(const char *family);
 uint32_t ChatSiblings(const CHAT *ch, const char *who,
                       char out[][CHAT_TOKEN_MAX], uint32_t max_out);
 
-/* ---- Fase 2: BFS >= 3-hop over taxonomy (fail-closed) ---- */
+/* ---- Phase 2: BFS >= 3-hop over taxonomy (fail-closed) ---- */
 
 #define CHAT_BFS_PATH_MAX 16 /* path nodes incl. both ends */
 #define CHAT_BFS_ROW_MAX 128 /* reachable novel entities per source */

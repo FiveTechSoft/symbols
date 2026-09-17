@@ -225,3 +225,63 @@ int TransferDeriveSwapped(const SCHEMA_KB *kb, const META_KB *mk,
         return 0;
     return SchemaBuildSentence(kb, family, subject, object, out, out_size);
 }
+
+/* ---- heterogeneous composition (Phase 3) ---- */
+
+/* premise gate shared by both entry points: rule licensed by the
+   meta layer, both premise pairs observed as pair evidence, the
+   ends differ, and the end tokens are presented vocabulary. The
+   rule's r3 must exist as a schema family (to build sentences). */
+static int ComposeGate(const SCHEMA_KB *kb, const META_KB *mk,
+                       const char *r1, const char *r2, const char *a,
+                       const char *b, const char *c, META_RULE *rule)
+{
+    if (!MetaFindRule(mk, r1, r2, rule))
+        return 0; /* no licensed rule: fail-closed */
+    if (strcmp(a, c) == 0)
+        return 0; /* cycle: says nothing new */
+    const RELATIONAL_SCHEMA *s3 = SchemaFindFamily(kb, rule->r3);
+    if (s3 == NULL || s3->num_connectives == 0)
+        return 0;
+    /* premise links must be OBSERVED pair evidence (the links are
+       working state; after a wipe the premises must be re-presented) */
+    if (!PairEvidence(kb, r1, a, b) || !PairEvidence(kb, r2, b, c))
+        return 0;
+    if (!VocabBoth(kb, a, c))
+        return 0;
+    return 1;
+}
+
+int TransferCompose(const SCHEMA_KB *kb, const META_KB *mk,
+                    const char *r1, const char *r2, const char *a,
+                    const char *b, const char *c, char *out,
+                    size_t out_size)
+{
+    if (kb == NULL || mk == NULL || out == NULL || out_size < 4)
+        return 0;
+    META_RULE rule;
+    if (!ComposeGate(kb, mk, r1, r2, a, b, c, &rule))
+        return 0;
+    /* novel conclusions only: a conclusion that is already pair
+       evidence in r3 belongs to the plain path */
+    if (PairEvidence(kb, rule.r3, a, c))
+        return 0;
+    return SchemaBuildSentence(kb, rule.r3, a, c, out, out_size);
+}
+
+int TransferExplainCompose(const SCHEMA_KB *kb, const META_KB *mk,
+                           const char *r1, const char *r2,
+                           const char *a, const char *b, const char *c,
+                           char *out, size_t out_size)
+{
+    if (kb == NULL || mk == NULL || out == NULL || out_size < 4)
+        return 0;
+    META_RULE rule;
+    if (!ComposeGate(kb, mk, r1, r2, a, b, c, &rule))
+        return 0;
+    /* explains known facts: the conclusion must BE observed r3
+       evidence (otherwise it is TransferCompose's territory) */
+    if (!PairEvidence(kb, rule.r3, a, c))
+        return 0;
+    return SchemaBuildSentence(kb, rule.r3, a, c, out, out_size);
+}
