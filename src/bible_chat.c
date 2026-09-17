@@ -32,7 +32,53 @@
 
 /* struct CHAT_ is defined in bible_chat.h (shared with tests) */
 
-/* split on whitespace, lowercase (mirrors learn.c contract) */
+/* ASCII-fold one character in place: Latin-1 accents and UTF-8
+   two-byte encodings collapse to the bare letter (the corpus
+   lexicon is accent-free, so surface noise must fold before
+   matching). Returns bytes consumed (1 or 2) and writes 1 byte. */
+static int FoldChar(const char *s, char *out)
+{
+    unsigned char c = (unsigned char)s[0];
+    /* UTF-8 two-byte lead 0xC3: the second byte selects the letter
+       (A1 a, A9 e, AD i, B1 n, B3 o, BA u, BC u; same letters +0x20
+       shifted for the uppercase forms 81..9F) */
+    if (c == 0xC3 && (unsigned char)s[1] >= 0x80)
+    {
+        switch ((unsigned char)s[1])
+        {
+        case 0x81: case 0xA1: *out = 'a'; break;
+        case 0x89: case 0xA9: *out = 'e'; break;
+        case 0x8D: case 0xAD: *out = 'i'; break;
+        case 0x91: case 0xB1: *out = 'n'; break;
+        case 0x93: case 0xB3: *out = 'o'; break;
+        case 0x9A: case 0xBA: *out = 'u'; break;
+        case 0x9C: case 0xBC: *out = 'u'; break;
+        default:
+            *out = '?';
+            break;
+        }
+        return 2;
+    }
+    switch (c)
+    {
+    case 0xE1: case 0xC1: *out = 'a'; break; /* a-acute */
+    case 0xE9: case 0xC9: *out = 'e'; break; /* e-acute */
+    case 0xED: case 0xCD: *out = 'i'; break; /* i-acute */
+    case 0xF3: case 0xD3: *out = 'o'; break; /* o-acute */
+    case 0xFA: case 0xDA: *out = 'u'; break; /* u-acute */
+    case 0xFC: case 0xDC: *out = 'u'; break; /* u-diaeresis */
+    case 0xF1: case 0xD1: *out = 'n'; break; /* n-tilde */
+    default:
+        *out = (char)tolower(c);
+        if (c >= 0x80)
+            *out = '?'; /* any other high byte: not corpus vocab */
+        break;
+    }
+    return 1;
+}
+
+/* split on whitespace, lowercase + accent-folded (mirrors learn.c
+   contract; surface noise like "reinó"/"reyó" folds to corpus form) */
 static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
                       uint32_t max_toks)
 {
@@ -50,9 +96,15 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
         size_t len = (size_t)(p - start);
         if (len >= CHAT_TOKEN_MAX)
             len = CHAT_TOKEN_MAX - 1;
-        for (size_t i = 0; i < len; i++)
-            toks[n][i] = (char)tolower((unsigned char)start[i]);
-        toks[n][len] = '\0';
+        size_t o = 0;
+        for (size_t i = 0; i < len;)
+        {
+            if (o >= CHAT_TOKEN_MAX - 1)
+                break;
+            i += FoldChar(start + i, &toks[n][o]);
+            o++;
+        }
+        toks[n][o] = '\0';
         n++;
     }
     return n;
@@ -568,6 +620,46 @@ static int TokAfterDe(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
     return 0;
 }
 
+/* morphological fold: produce the raw word plus one candidate per
+   productive rule (ES plural 's'/'es', ES gender swap o<->a,
+   chained plural->gender: esposos -> esposo -> esposa). Rules,
+   not word lists; callers decide what a candidate may match. */
+static void MorphFold(const char *tok, char cand[][CHAT_TOKEN_MAX],
+                      uint32_t *ncand)
+{
+    uint32_t nc = 0;
+    snprintf(cand[nc++], CHAT_TOKEN_MAX, "%s", tok);
+    size_t tl = strlen(tok);
+    if (tl >= 2 && tok[tl - 1] == 's')
+    { /* plural: strip 's'; ES o-stems pluralize as -es */
+        memcpy(cand[nc], tok, tl - 1);
+        cand[nc][tl - 1] = '\0';
+        nc++;
+        if (tl >= 3 && tok[tl - 2] == 'e')
+        {
+            memcpy(cand[nc], tok, tl - 2);
+            cand[nc][tl - 2] = '\0';
+            nc++;
+        }
+    }
+    for (uint32_t c = 0; c < nc && nc < 4; c++)
+    {
+        size_t cl = strlen(cand[c]);
+        if (cl < 2)
+            continue;
+        char flip = cand[c][cl - 1] == 'o'
+                        ? 'a'
+                        : (cand[c][cl - 1] == 'a' ? 'o' : '\0');
+        if (flip == '\0')
+            continue; /* ES gender swap: productive o<->a rule */
+        memcpy(cand[nc], cand[c], cl - 1);
+        cand[nc][cl - 1] = flip;
+        cand[nc][cl] = '\0';
+        nc++;
+    }
+    *ncand = nc;
+}
+
 static int HasTok(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
                   const char *w)
 {
@@ -649,10 +741,8 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
         const char *en_word;
         const char *es_stem;
     } EN_SURFACE[] = {
-        {"brother", "hermano"}, {"brothers", "hermano"},
-        {"king", "rey"},        {"kings", "rey"},
-        {"husband", "esposa"},  {"husbands", "esposa"},
-        {"wife", "esposa"},     {"wives", "esposa"},
+        {"brother", "hermano"}, {"king", "rey"},
+        {"husband", "esposa"},  {"wife", "esposa"},
     };
 
     /* generic deduced-relation match: scan the tokens against the
@@ -661,42 +751,38 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
     int kwpos = -1; /* token position of that keyword */
     for (uint32_t i = 0; i < n && kwx < 0; i++)
     {
+        /* morphological fold of the raw token (rules, not word
+           lists); a candidate only survives if it equals a DEDUCED
+           stem, so folds of ordinary words are inert unless the KB
+           deduced it */
+        char cand[4][CHAT_TOKEN_MAX];
+        uint32_t ncand = 0;
+        MorphFold(toks[i], cand, &ncand);
+
         for (uint32_t k = 0; k < ch->num_kws; k++)
         {
             const REL_KW *kw = &ch->kws[k];
-            const char *es_hit = NULL;
-            if (strcmp(toks[i], kw->es_stem) == 0)
-                es_hit = kw->es_stem;
-            else
+            int hit = strcmp(toks[i], kw->es_stem) == 0 ||
+                      strcmp(toks[i], kw->en_stem) == 0;
+            if (!hit)
                 for (size_t e = 0;
                      e < sizeof(EN_SURFACE) / sizeof(EN_SURFACE[0]); e++)
                     if (strcmp(toks[i], EN_SURFACE[e].en_word) == 0 &&
                         strcmp(EN_SURFACE[e].es_stem, kw->es_stem) == 0)
                     {
-                        es_hit = kw->es_stem;
+                        hit = 1;
                         break;
                     }
-            if (es_hit != NULL)
+            if (!hit)
+                for (uint32_t c = 1; c < ncand && !hit; c++)
+                    if (strcmp(cand[c], kw->es_stem) == 0 ||
+                        strcmp(cand[c], kw->en_stem) == 0)
+                        hit = 1;
+            if (hit)
             {
                 kwx = (int)k;
                 kwpos = (int)i;
                 break;
-            }
-            /* plural fallback: strip a trailing 's' (match rule,
-               not a word list) */
-            size_t tl = strlen(toks[i]);
-            if (tl >= 2 && toks[i][tl - 1] == 's')
-            {
-                char stem[CHAT_TOKEN_MAX];
-                memcpy(stem, toks[i], tl - 1);
-                stem[tl - 1] = '\0';
-                if (strcmp(stem, kw->es_stem) == 0 ||
-                    strcmp(stem, kw->en_stem) == 0)
-                {
-                    kwx = (int)k;
-                    kwpos = (int)i;
-                    break;
-                }
             }
         }
     }
@@ -785,33 +871,62 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
         }
     }
 
-    /* GENERIC BOOL: "es A <kw> de B" / "is A the <kw> of B" for any
-       deduced relation; frozen frames above keep priority (their
-       keywords disable this path). The candidate right after the
-       copula must not be an article nor the relation word itself
-       (that would be a wh-question like "quien fue el padre de X"). */
+    /* GENERIC BOOL: "es A <kw> de B" / "A es <kw> de B" / "is A the
+       <kw> of B" for any deduced relation; frozen frames above keep
+       priority (their keywords disable this path). The candidate
+       right after the copula must not be an article nor the
+       relation word itself in any folded form — UNLESS the subject
+       sits BEFORE the copula ("nabal es esposo de abigail"), in
+       which case the candidate is the relation word and slot A is
+       the pre-copula token (never a wh-word). */
     if (kwx >= 0 && kw_is >= 0 && kw_child < 0 && kw_grand < 0 &&
         kw_desc < 0 && (uint32_t)kw_is + 1 < n)
     {
         const char *cand = toks[kw_is + 1];
+        int prev_is_name =
+            kw_is > 0 && strcmp(toks[kw_is - 1], "quien") != 0 &&
+            strcmp(toks[kw_is - 1], "quienes") != 0 &&
+            strcmp(toks[kw_is - 1], "who") != 0 &&
+            strcmp(toks[kw_is - 1], "el") != 0 &&
+            strcmp(toks[kw_is - 1], "la") != 0 &&
+            strcmp(toks[kw_is - 1], "the") != 0;
         if (strcmp(cand, "el") != 0 && strcmp(cand, "la") != 0 &&
             strcmp(cand, "los") != 0 && strcmp(cand, "las") != 0 &&
-            strcmp(cand, "the") != 0 &&
-            strcmp(cand, ch->kws[kwx].es_stem) != 0 &&
-            strcmp(cand, ch->kws[kwx].en_stem) != 0)
+            strcmp(cand, "the") != 0 && (int)kw_is != kwpos)
         {
-            char bslot[CHAT_TOKEN_MAX];
-            if (TokAfterDe(toks, n, (uint32_t)kwpos + 1, bslot,
-                           CHAT_TOKEN_MAX))
+            /* reject the relation word itself in any folded form */
+            char rcand[4][CHAT_TOKEN_MAX];
+            uint32_t nrc = 0;
+            MorphFold(cand, rcand, &nrc);
+            int is_kw_variant = 0;
+            for (uint32_t c = 0; c < nrc; c++)
+                if (strcmp(rcand[c], ch->kws[kwx].es_stem) == 0 ||
+                    strcmp(rcand[c], ch->kws[kwx].en_stem) == 0)
+                {
+                    is_kw_variant = 1;
+                    break;
+                }
+            /* A-copula-kw-de-B: candidate being a kw variant is
+               expected (it IS the relation word) */
+            if (!is_kw_variant || prev_is_name)
             {
-                strncpy(p->a, cand, CHAT_TOKEN_MAX - 1);
-                p->a[CHAT_TOKEN_MAX - 1] = '\0';
-                strncpy(p->b, bslot, CHAT_TOKEN_MAX - 1);
-                p->b[CHAT_TOKEN_MAX - 1] = '\0';
-                p->has_b = 1;
-                p->kw = kwx;
-                p->intent = INT_REL_BOOL;
-                return 1;
+                char bslot[CHAT_TOKEN_MAX];
+                if (TokAfterDe(toks, n, (uint32_t)kwpos + 1, bslot,
+                               CHAT_TOKEN_MAX))
+                {
+                    if (prev_is_name)
+                        strncpy(p->a, toks[kw_is - 1],
+                                CHAT_TOKEN_MAX - 1);
+                    else
+                        strncpy(p->a, cand, CHAT_TOKEN_MAX - 1);
+                    p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                    strncpy(p->b, bslot, CHAT_TOKEN_MAX - 1);
+                    p->b[CHAT_TOKEN_MAX - 1] = '\0';
+                    p->has_b = 1;
+                    p->kw = kwx;
+                    p->intent = INT_REL_BOOL;
+                    return 1;
+                }
             }
         }
     }
@@ -888,20 +1003,31 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
         kw_why < 0)
     {
         const REL_KW *kw = &ch->kws[kwx];
+        /* copula candidate matches the relation word? exact or any
+           morphological variant counts (esposo/esposa for esposa) */
+        int cop_is_kw = 0;
+        if (kw_is >= 0 && (uint32_t)kw_is + 1 < n)
+        {
+            char cc[4][CHAT_TOKEN_MAX];
+            uint32_t ncc = 0;
+            MorphFold(toks[kw_is + 1], cc, &ncc);
+            for (uint32_t c = 0; c < ncc; c++)
+                if (strcmp(cc[c], kw->es_stem) == 0 ||
+                    strcmp(cc[c], kw->en_stem) == 0)
+                {
+                    cop_is_kw = 1;
+                    break;
+                }
+        }
         /* the father wh-question with kw_parent would fall through
            the frozen PARENT frame only if TokAfterDe fails; here it
            is claimed when the copula candidate is the stem */
-        if (kw_parent >= 0 &&
-            !(kw_is >= 0 && (uint32_t)kw_is + 1 < n &&
-              (strcmp(toks[kw_is + 1], kw->es_stem) == 0 ||
-               strcmp(toks[kw_is + 1], kw->en_stem) == 0)))
+        if (kw_parent >= 0 && !cop_is_kw)
             goto generic_query_done;
         /* EN query "who is the brother of X": a copula directly
            after the wh-word means the slot follows the keyword */
         uint32_t from = (uint32_t)kwpos + 1;
-        if (kw_is >= 0 && (uint32_t)kw_is + 1 < n &&
-            (strcmp(toks[kw_is + 1], kw->es_stem) == 0 ||
-             strcmp(toks[kw_is + 1], kw->en_stem) == 0))
+        if (cop_is_kw)
             from = (uint32_t)kw_is + 2;
         if (TokAfterDe(toks, n, from, p->a, CHAT_TOKEN_MAX))
         {
