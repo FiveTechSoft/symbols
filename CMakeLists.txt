@@ -29,6 +29,8 @@ add_library(symbolic STATIC
     src/neuro_rules.c
     src/tagged_term.c
     src/schema.c
+    src/metaschema.c
+    src/transfer.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -87,6 +89,7 @@ sllm_test(test_qa_debug        test_qa_debug.c)
 
 sllm_test(test_tagged_term   tests/test_tagged_term.c)
 sllm_test(test_schema        tests/test_schema.c)
+sllm_test(test_metaschema    tests/test_metaschema.c)
 
 # Read-only queries against the tracked golden wiki_model.bin
 add_executable(test_wiki_inference tests/test_wiki_inference.c)

@@ -3,167 +3,134 @@
 #include "transfer.h"
 
 /* ============================================================
-   Helper: check if entity has a specific relation-object relation
+   Structural licensing.
+
+   A schema with order dependent_first carries a DIRECTIONALITY
+   constraint between two role axes: subject must be dependent,
+   object independent. The SYMMETRIC meta-property licenses
+   swapping those roles. The swap is admitted ONLY when both
+   tokens hold exactly opposite roles on the same axis: the
+   property then preserves the constraint's structure (one of
+   each) under exchange. No word knowledge anywhere: roles are
+   consulted in the KB's role lexicon, tokens are not matched
+   by name.
    ============================================================ */
-static int has_relation(GRAPH *g, SYMBOL_ID subj, SYMBOL_ID rel, SYMBOL_ID obj)
+
+static int RoleIs(const SCHEMA_KB *kb, const char *token, int which)
 {
-    RELATION *results[4];
-    uint32_t n = GraphQuerySubjectRelation(g, subj, rel, results, 4);
-    for (uint32_t i = 0; i < n; i++)
+    for (uint32_t i = 0; i < kb->num_roles; i++)
     {
-        if (obj == SYMBOL_INVALID || results[i]->object == obj)
+        const SCHEMA_ROLE *r = &kb->roles[i];
+        if (strcmp(r->name, token) == 0)
+        {
+            switch (which)
+            {
+            case 0: return r->is_dependent;
+            case 1: return r->is_independent;
+            case 2: return r->is_operator;
+            default: return r->is_patient;
+            }
+        }
+    }
+    return 0;
+}
+
+static int PairEvidence(const SCHEMA_KB *kb, const char *family,
+                        const char *s, const char *o)
+{
+    for (uint32_t i = 0; i < kb->num_pairs; i++)
+    {
+        const PAIR_EVID *p = &kb->pairs[i];
+        if (strcmp(p->family, family) == 0 &&
+            strcmp(p->subject, s) == 0 && strcmp(p->object, o) == 0)
             return 1;
     }
     return 0;
 }
 
-/* ============================================================
-   Helper: get all objects for a given subject+relation
-   ============================================================ */
-static uint32_t get_objects(GRAPH *g, SYMBOL_ID subj, SYMBOL_ID rel,
-                            SYMBOL_ID *out, uint32_t max)
+/* direction admission WITHOUT meta: mirrors schema.c OrderAdmits
+   minus the meta layer (kept local to avoid widening schema.h) */
+static int OrderAdmitsPlain(const SCHEMA_KB *kb, const RELATIONAL_SCHEMA *s,
+                            const char *subj, const char *obj)
 {
-    RELATION *results[32];
-    uint32_t n = GraphQuerySubjectRelation(g, subj, rel, results, 32 > max ? max : 32);
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < n && count < max; i++)
-        out[count++] = results[i]->object;
-    return count;
+    if (PairEvidence(kb, s->family, subj, obj))
+        return 1;
+    switch (s->order)
+    {
+    case SCHEMA_ORDER_SYM:
+        return 1;
+    case SCHEMA_ORDER_DEP_FIRST:
+        return RoleIs(kb, subj, 0) && RoleIs(kb, obj, 1);
+    case SCHEMA_ORDER_OPER_FIRST:
+        return RoleIs(kb, subj, 2) && RoleIs(kb, obj, 3);
+    case SCHEMA_ORDER_CHAIN:
+    default:
+        return 0;
+    }
 }
 
-/* ============================================================
-   Helper: get all relations for a subject
-   ============================================================ */
-static uint32_t get_relations(GRAPH *g, SYMBOL_ID subj,
-                               SYMBOL_ID *out, uint32_t max)
+/* swapped-direction admission under SYMMETRIC: both tokens must
+   hold exactly opposite roles on one axis, so exchanging them
+   preserves the structural constraint (one dependent + one
+   independent / one operator + one patient stays true). */
+static int SwapLicensed(const SCHEMA_KB *kb, const RELATIONAL_SCHEMA *s,
+                        const char *subj, const char *obj)
 {
-    RELATION *results[32];
-    uint32_t n = GraphQuerySubject(g, subj, results, 32 > max ? max : 32);
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < n && count < max; i++)
+    switch (s->order)
     {
-        /* Deduplicate relations */
-        int found = 0;
-        for (uint32_t j = 0; j < count; j++)
-        {
-            if (out[j] == results[i]->relation) { found = 1; break; }
-        }
-        if (!found) out[count++] = results[i]->relation;
+    case SCHEMA_ORDER_DEP_FIRST:
+        /* requested: subj=independent role, obj=dependent role */
+        return RoleIs(kb, subj, 1) && RoleIs(kb, obj, 0);
+    case SCHEMA_ORDER_OPER_FIRST:
+        return RoleIs(kb, subj, 3) && RoleIs(kb, obj, 2);
+    case SCHEMA_ORDER_SYM:
+    case SCHEMA_ORDER_CHAIN:
+    default:
+        return 0; /* sym already admits both; chain stays fail-closed */
     }
-    return count;
 }
 
-/* ============================================================
-   TransferSimilarity: structural similarity between two entities
-   ============================================================ */
-float TransferSimilarity(GRAPH *graph, SYMBOL_ID a, SYMBOL_ID b)
+static int VocabBoth(const SCHEMA_KB *kb, const char *a, const char *b)
 {
-    if (!graph || a == SYMBOL_INVALID || b == SYMBOL_INVALID)
-        return 0.0f;
-
-    /* Get relations for both */
-    SYMBOL_ID rels_a[32], rels_b[32];
-    uint32_t na = get_relations(graph, a, rels_a, 32);
-    uint32_t nb = get_relations(graph, b, rels_b, 32);
-
-    if (na == 0 || nb == 0) return 0.0f;
-
-    /* Count shared relations */
-    uint32_t shared = 0;
-    for (uint32_t i = 0; i < na; i++)
-    {
-        for (uint32_t j = 0; j < nb; j++)
-        {
-            if (rels_a[i] == rels_b[j]) { shared++; break; }
-        }
-    }
-
-    /* Jaccard similarity */
-    uint32_t total = na + nb - shared;
-    return total > 0 ? (float)shared / (float)total : 0.0f;
+    return SchemaVocabKnown(kb, a) && SchemaVocabKnown(kb, b);
 }
 
-/* ============================================================
-   TransferAnalogy: what A knows that B could learn by pattern
-   ============================================================ */
-uint32_t TransferAnalogy(GRAPH *graph, SYMBOL_ID source, SYMBOL_ID target,
-                         TRANSFER_RESULT *results, uint32_t max_results)
+int TransferDerive(const SCHEMA_KB *kb, const META_KB *mk,
+                   const char *family, const char *subject,
+                   const char *object, char *out, size_t out_size)
 {
-    if (!graph) return 0;
-
-    uint32_t found = 0;
-
-    /* Find shared relations between source and target */
-    SYMBOL_ID rels_s[32], rels_t[32];
-    uint32_t ns = get_relations(graph, source, rels_s, 32);
-    uint32_t nt = get_relations(graph, target, rels_t, 32);
-
-    /* For each shared relation, compare objects */
-    for (uint32_t i = 0; i < ns && found < max_results; i++)
-    {
-        for (uint32_t j = 0; j < nt; j++)
-        {
-            if (rels_s[i] != rels_t[j]) continue;
-
-            /* Same relation — compare objects */
-            SYMBOL_ID objs_s[8], objs_t[8];
-            uint32_t os = get_objects(graph, source, rels_s[i], objs_s, 8);
-            uint32_t ot = get_objects(graph, target, rels_t[j], objs_t, 8);
-
-            /* Find objects that source has but target doesn't */
-            for (uint32_t a = 0; a < os && found < max_results; a++)
-            {
-                int has = 0;
-                for (uint32_t b = 0; b < ot; b++)
-                {
-                    if (objs_s[a] == objs_t[b]) { has = 1; break; }
-                }
-
-                if (!has)
-                {
-                    const SYMBOL *ps = SymbolGet(graph->symbols, rels_s[i]);
-                    const SYMBOL *osym = SymbolGet(graph->symbols, objs_s[a]);
-                    if (!ps || !osym) continue;
-
-                    strncpy(results[found].rule_name, "ANALOGY_TRANSFER", 63);
-                    results[found].source_entity = source;
-                    results[found].target_entity = target;
-                    results[found].inferred_rel = rels_s[i];
-                    results[found].inferred_obj = objs_s[a];
-                    results[found].confidence = 0.60f;
-                    found++;
-                }
-            }
-        }
-    }
-
-    return found;
+    if (kb == NULL || out == NULL || out_size < 4)
+        return 0;
+    const RELATIONAL_SCHEMA *s = SchemaFindFamily(kb, family);
+    if (s == NULL)
+        return 0;
+    if (!OrderAdmitsPlain(kb, s, subject, object))
+        return 0;
+    if (!VocabBoth(kb, subject, object))
+        return 0;
+    return SchemaBuildSentence(kb, family, subject, object, out, out_size);
 }
 
-/* ============================================================
-   TransferPrintResults
-   ============================================================ */
-void TransferPrintResults(const GRAPH *graph, const TRANSFER_RESULT *results, uint32_t count)
+int TransferDeriveSwapped(const SCHEMA_KB *kb, const META_KB *mk,
+                          const char *family, const char *subject,
+                          const char *object, char *out, size_t out_size)
 {
-    if (count == 0)
-    {
-        printf("  No new relations inferred.\n");
-        return;
-    }
-
-    printf("  Inferred %u new relations:\n\n", count);
-    for (uint32_t i = 0; i < count; i++)
-    {
-        const SYMBOL *src = SymbolGet(graph->symbols, results[i].source_entity);
-        const SYMBOL *tgt = SymbolGet(graph->symbols, results[i].target_entity);
-        const SYMBOL *rel = SymbolGet(graph->symbols, results[i].inferred_rel);
-        const SYMBOL *obj = SymbolGet(graph->symbols, results[i].inferred_obj);
-
-        printf("  [%s] (conf=%.0f%%)\n", results[i].rule_name, results[i].confidence * 100);
-        if (src && rel && obj)
-            printf("    %s --%s--> %s\n", src->name, rel->name, obj->name);
-        if (tgt && tgt != src && rel && obj)
-            printf("    (applied to: %s)\n", tgt->name);
-        printf("\n");
-    }
+    if (kb == NULL || mk == NULL || out == NULL || out_size < 4)
+        return 0;
+    const RELATIONAL_SCHEMA *s = SchemaFindFamily(kb, family);
+    if (s == NULL)
+        return 0;
+    /* the swap must NOT already be admitted by the plain order check
+       (otherwise TransferDerive is the right path, and calling this
+       would double-license without meta evidence) */
+    if (OrderAdmitsPlain(kb, s, subject, object))
+        return 0;
+    /* structural property must exist and license the exchange */
+    if (!MetaHasProperty(mk, family, META_PROP_SYMMETRIC))
+        return 0;
+    if (!SwapLicensed(kb, s, subject, object))
+        return 0;
+    if (!VocabBoth(kb, subject, object))
+        return 0;
+    return SchemaBuildSentence(kb, family, subject, object, out, out_size);
 }

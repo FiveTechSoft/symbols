@@ -124,6 +124,19 @@ int SchemaRealize(const SCHEMA_KB *kb, const char *family,
 uint32_t SchemaCount(const SCHEMA_KB *kb);
 const RELATIONAL_SCHEMA *SchemaGet(const SCHEMA_KB *kb, uint32_t i);
 
+/* Lookup by family name (NULL if absent). */
+const RELATIONAL_SCHEMA *SchemaFindFamily(const SCHEMA_KB *kb,
+                                          const char *family);
+
+/* Vocabulary gate: 1 if the token was presented into this KB. */
+int SchemaVocabKnown(const SCHEMA_KB *kb, const char *token);
+
+/* Sentence builder shared with the meta layer: "Subj conn Obj."
+   with capitalized first letter. No order/vocab checks here. */
+int SchemaBuildSentence(const SCHEMA_KB *kb, const char *family,
+                        const char *subject, const char *object,
+                        char *out, size_t out_size);
+
 /* ---- persistence (explicit schema facts only, like schema_kb.pl) ----
    Format: text, one line per schema:
    schema(<family>,<order>,[conns]). prov(<family>,[ids]).

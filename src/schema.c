@@ -111,6 +111,44 @@ const RELATIONAL_SCHEMA *SchemaGet(const SCHEMA_KB *kb, uint32_t i)
     return &kb->schemas[i];
 }
 
+const RELATIONAL_SCHEMA *SchemaFindFamily(const SCHEMA_KB *kb,
+                                          const char *family)
+{
+    if (kb == NULL || family == NULL)
+        return NULL;
+    return SchemaFind((SCHEMA_KB *)kb, family);
+}
+
+int SchemaVocabKnown(const SCHEMA_KB *kb, const char *token)
+{
+    if (kb == NULL || token == NULL)
+        return 0;
+    return VocabKnown(kb, token);
+}
+
+int SchemaBuildSentence(const SCHEMA_KB *kb, const char *family,
+                        const char *subject, const char *object,
+                        char *out, size_t out_size)
+{
+    if (kb == NULL || out == NULL || out_size < 4)
+        return 0;
+    RELATIONAL_SCHEMA *s = SchemaFind((SCHEMA_KB *)kb, family);
+    if (s == NULL || s->num_connectives == 0)
+        return 0;
+    char body[3 * SCHEMA_TOKEN_MAX + 2];
+    snprintf(body, sizeof(body), "%s %s %s", subject, s->connectives[0],
+             object);
+    size_t blen = strlen(body);
+    if (blen + 2 > out_size)
+        return 0;
+    memcpy(out, body, blen);
+    if (out[0] >= 'a' && out[0] <= 'z')
+        out[0] = (char)(out[0] - 32);
+    out[blen] = '.';
+    out[blen + 1] = '\0';
+    return 1;
+}
+
 /* ---- roles ---- */
 
 void SchemaDeclareRole(SCHEMA_KB *kb, const char *token,

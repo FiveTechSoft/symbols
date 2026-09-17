@@ -2,49 +2,39 @@
 #define TRANSFER_H
 
 #include <stdint.h>
-#include "graph.h"
+#include <stddef.h>
+#include "schema.h"
+#include "metaschema.h"
 
-#define MAX_TRANSFER_RULES 64
-#define MAX_STRUCTURAL_FEATURES 16
+/* ============================================================
+   Transfer: derivation of novel sentences in a target domain,
+   driven by schema (order/connective) + metaschema (structural
+   properties) + presented vocabulary. The learned structure
+   must survive the disappearance of the exemplars that taught
+   it; the vocabulary gate keeps honest UNKNOWN otherwise.
 
-/* Structural feature of an entity (what it does, what it needs) */
-typedef struct
-{
-    SYMBOL_ID relation;   /* e.g., ESCRIBE_MEMORIA, USA_PUNTERO */
-    SYMBOL_ID object;      /* e.g., DESTINO, PUNTERO */
-} STRUCTURAL_FEATURE;
+   Authorization path for (S, conn, O):
+     1. schema order admits the direction (two-mode check), OR
+        a META property licenses the reversed direction
+        (SYMMETRIC flips a dependent_first/dependent-role denial
+         only when roles are declared: the swap is between tokens
+         holding opposite roles, so the structural constraint is
+         preserved under negation of directionality).
+     2. both tokens presented into the KB vocabulary.
+   Anything else -> 0 (UNKNOWN, never a hypothesis).
+   ============================================================ */
 
-/* A transfer rule: if entity has features A+B, infer it also has C */
-typedef struct
-{
-    char     name[64];            /* Rule name for explanation */
-    SYMBOL_ID required_rel[MAX_STRUCTURAL_FEATURES];  /* Must have these relations */
-    SYMBOL_ID required_obj[MAX_STRUCTURAL_FEATURES];   /* With these objects (or ANY) */
-    uint32_t required_count;      /* How many required features must match */
-    SYMBOL_ID inferred_rel;      /* Then it probably has this relation */
-    SYMBOL_ID inferred_obj;       /* With this object (or SAME as matched) */
-    float    confidence;          /* How confident in this inference */
-} TRANSFER_RULE;
+/* Derive "S conn O." for a family. Returns 1 and fills out. */
+int TransferDerive(const SCHEMA_KB *kb, const META_KB *mk,
+                   const char *family, const char *subject,
+                   const char *object, char *out, size_t out_size);
 
-/* Result of analogical transfer */
-typedef struct
-{
-    char     rule_name[64];
-    SYMBOL_ID source_entity;
-    SYMBOL_ID target_entity;
-    SYMBOL_ID inferred_rel;
-    SYMBOL_ID inferred_obj;
-    float    confidence;
-} TRANSFER_RESULT;
-
-/* Structural similarity between two entities (0.0 to 1.0) */
-float TransferSimilarity(GRAPH *graph, SYMBOL_ID a, SYMBOL_ID b);
-
-/* Apply analogical transfer: what A knows that B doesn't, inferred by pattern */
-uint32_t TransferAnalogy(GRAPH *graph, SYMBOL_ID source, SYMBOL_ID target,
-                         TRANSFER_RESULT *results, uint32_t max_results);
-
-/* Print transfer results */
-void TransferPrintResults(const GRAPH *graph, const TRANSFER_RESULT *results, uint32_t count);
+/* Meta-licensed derivation used when the plain schema order
+   check fails but a structural property (e.g. SYMMETRIC with
+   declared opposite roles) licenses the swap. Returns 1 + fills
+   out, 0 otherwise. */
+int TransferDeriveSwapped(const SCHEMA_KB *kb, const META_KB *mk,
+                          const char *family, const char *subject,
+                          const char *object, char *out, size_t out_size);
 
 #endif
