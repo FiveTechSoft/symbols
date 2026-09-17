@@ -32,6 +32,7 @@ add_library(symbolic STATIC
     src/transfer.c
     src/transfer_legacy.c
     src/learn.c
+    src/bible_chat.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -94,6 +95,11 @@ sllm_test(test_metaschema    tests/test_metaschema.c)
 sllm_test(test_family2        tests/test_family2.c)
 sllm_test(test_bible_kinship  tests/test_bible_kinship.c)
 sllm_test(test_bible_conclusions tests/test_bible_conclusions.c)
+sllm_test(test_bible_chat     tests/test_bible_chat.c)
+
+# bible_chat REPL: CLI conversacional (no es test)
+add_executable(chat_main src/chat_main.c)
+target_link_libraries(chat_main symbolic)
 
 # symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)

@@ -142,7 +142,6 @@ uint32_t MetaDiscover(META_KB *mk)
        not per family. */
     for (int pass = 0; pass < 2; pass++)
     {
-        uint32_t pass_found = 0;
         for (uint32_t i = 0; i < mk->num_obs; i++)
         {
             const char *family = mk->obs[i].family;
@@ -178,10 +177,11 @@ uint32_t MetaDiscover(META_KB *mk)
             strncpy(m->prov[1], p2, SCHEMA_TOKEN_MAX - 1);
             m->prov[1][SCHEMA_TOKEN_MAX - 1] = '\0';
             found++;
-            pass_found++;
         }
-        if (pass_found == 0)
-            break; /* both passes exhausted or nothing new */
+        /* NO early break: pass 0 (SYMMETRIC) may find nothing while
+            pass 1 (TRANSITIVE) still has work (a pure chain corpus
+            has no 2-cycles). Idempotency comes from the per
+            (family, property) guard above, not from the break. */
     }
     return found;
 }

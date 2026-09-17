@@ -143,6 +143,49 @@ int TransferDeriveChain(const SCHEMA_KB *kb, const META_KB *mk,
     return 0;
 }
 
+int TransferExplainChain(const SCHEMA_KB *kb, const META_KB *mk,
+                         const char *family, const char *subject,
+                         const char *object, char *out, size_t out_size,
+                         char *middle, size_t middle_size)
+{
+    if (kb == NULL || mk == NULL || out == NULL || middle == NULL ||
+        out_size < 4 || middle_size < 2)
+        return 0;
+    if (!MetaHasProperty(mk, family, META_PROP_TRANSITIVE))
+        return 0;
+    const RELATIONAL_SCHEMA *s = SchemaFindFamily(kb, family);
+    if (s == NULL || s->num_connectives == 0)
+        return 0;
+    if (PairEvidence(kb, family, subject, object))
+        return 0;
+    if (strcmp(subject, object) == 0)
+        return 0;
+    for (uint32_t i = 0; i < kb->num_pairs; i++)
+    {
+        const PAIR_EVID *p1 = &kb->pairs[i];
+        if (strcmp(p1->family, family) != 0 ||
+            strcmp(p1->subject, subject) != 0)
+            continue;
+        for (uint32_t j = 0; j < kb->num_pairs; j++)
+        {
+            const PAIR_EVID *p2 = &kb->pairs[j];
+            if (strcmp(p2->family, family) != 0 ||
+                strcmp(p2->object, object) != 0)
+                continue;
+            if (strcmp(p1->object, p2->subject) != 0)
+                continue;
+            if (!VocabBoth(kb, subject, object))
+                return 0;
+            if (middle_size < strlen(p1->object) + 1)
+                return 0;
+            strcpy(middle, p1->object);
+            return SchemaBuildSentence(kb, family, subject, object,
+                                       out, out_size);
+        }
+    }
+    return 0;
+}
+
 int TransferDerive(const SCHEMA_KB *kb, const META_KB *mk,
                    const char *family, const char *subject,
                    const char *object, char *out, size_t out_size)

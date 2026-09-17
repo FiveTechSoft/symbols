@@ -45,4 +45,13 @@ int TransferDeriveChain(const SCHEMA_KB *kb, const META_KB *mk,
                         const char *family, const char *subject,
                         const char *object, char *out, size_t out_size);
 
+/* Same authorization logic as TransferDeriveChain but fills
+    middle with the proving intermediate token M (the pair
+    (S,M) + (M,O) that licensed the conclusion). Useful for
+    explanations; returns 0 without touching middle on refusal. */
+int TransferExplainChain(const SCHEMA_KB *kb, const META_KB *mk,
+                         const char *family, const char *subject,
+                         const char *object, char *out, size_t out_size,
+                         char *middle, size_t middle_size);
+
 #endif
