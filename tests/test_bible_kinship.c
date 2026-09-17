@@ -246,6 +246,10 @@ int main(void)
     check("no equivalence schema leaked",
           SchemaFindFamily(&kb, "equivalence") == NULL ? 1 : 0, 1);
 
+    /* no generated artifacts left in the tree */
+    remove("kb_bible_schema.txt");
+    remove("kb_bible_meta.txt");
+
     printf("bible kinship e2e: %d/%d\n", g_pass, g_pass + g_fail);
     return g_fail == 0 ? 0 : 1;
 }
