@@ -406,6 +406,13 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
+### 5.4 Standalone Client-Side Web Agent & Edge Deployment
+
+Symbolic LLM provides a zero-install, browser-native implementation executing entirely within client-side memory:
+- **Interactive Web Interface**: Hosted directly on GitHub Pages at [fivetechsoft.github.io/symbols](https://fivetechsoft.github.io/symbols/).
+- **Dual-Mode Architecture**: Executes associative retrieval, concept concentration ($\kappa$), and deductive tracing directly in-browser, while optionally serving as a visual front-end for a native C11 `symbols_server` instance running on `localhost:8080`.
+- **Episodic Persistence & Export**: Dialogue turns and learned assertions synchronize to browser `localStorage`, enabling instant session resumption and full-state export (`.json`) with zero knowledge loss.
+
 ---
 
 ## 6. Comparison with State-of-the-Art Approaches
