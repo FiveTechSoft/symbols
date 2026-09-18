@@ -38,6 +38,8 @@ bench_out.txt
 bench_err.txt
 wiki_model_ingest_test.bin
 wikidata_model_test.bin
+tools/battery_fase4_out.tsv
+*.dat
 
 # Python tooling
 __pycache__/
