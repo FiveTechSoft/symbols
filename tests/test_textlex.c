@@ -62,8 +62,17 @@ int main(void)
     printf("dropped_distinct=%u\n", s1.dropped_distinct);
     for (i = 0; i < s1.dropped_distinct && i < 16; i++)
         printf("  drop[%u]=%.31s\n", i, s1.dropped_sample[i]);
-
-    check("full byte read", s1.bytes_read == 1153219);
+    {
+        FILE *fc = fopen(CORPUS, "rb");
+        size_t fsz = 0;
+        if (fc != NULL)
+        {
+            fseek(fc, 0, SEEK_END);
+            fsz = (size_t)ftell(fc);
+            fclose(fc);
+        }
+        check("full byte read", fsz > 0 && s1.bytes_read == fsz);
+    }
     check("every content line covered",
           s1.lines_content > 0 && s1.lines_content == s1.lines_covered);
     check("sentences stored", TextLexSentCount(tl) == s1.nsent_new &&

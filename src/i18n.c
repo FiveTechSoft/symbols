@@ -1,5 +1,4 @@
 #include <string.h>
-#include <strings.h>
 #include "i18n.h"
 
 static LANG_ID s_lang = LANG_EN;
