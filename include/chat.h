@@ -5,12 +5,16 @@
    layers (schema+meta+transfer). No tensors, no backprop. */
 
 #define CHAT_TOKEN_MAX 32
-#define CHAT_KW_MAX 16
+#define CHAT_KW_MAX 64
+#define CHAT_TEXT_FILES_MAX 64
+#define CHAT_TEXT_SHOWN_MAX 1024
+#define CHAT_TEXT_WORDS_MAX 32
 
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
 #include "text_lex.h"
+#include "meta_graph.h"
 
 /* Relation keyword, DEDUCED from the corpus at ingest (never
    hardcoded): for each distinct TSV relation REL the stem is
@@ -54,24 +58,31 @@ typedef struct CHAT_
     uint32_t  num_kws;
     char      focus[CHAT_TOKEN_MAX]; /* last entity talked about */
     int       focus_valid;
+    char      focus_secondary[CHAT_TOKEN_MAX]; /* secondary focus (antecedent entity) */
+    int       focus_secondary_valid;
     ExecCtx   exec; /* per-query execution memory (never the KB) */
     /* session text graphs (dynamic corpus loads; never SchemaKB,
        never metas: unload rebuilds these exactly) */
     GRAPH           *tgraph;
     EMBEDDING_TABLE *temb;
-    TEXTLEX         tlex[8];
-    char            tfiles[8][64];
+    TEXTLEX         tlex[CHAT_TEXT_FILES_MAX];
+    char            tfiles[CHAT_TEXT_FILES_MAX][128];
     uint32_t        ntfiles;
     /* KV-cache: last successful TEXTQ topic (words), plus shown
        sentence indices so follow-ups advance instead of repeat */
-    char            twords[8][CHAT_TOKEN_MAX];
+    char            twords[CHAT_TEXT_WORDS_MAX][CHAT_TOKEN_MAX];
     uint32_t        tnw;
-    uint32_t        tshown[64];
+    uint32_t        tshown[CHAT_TEXT_SHOWN_MAX];
     uint32_t        ntshown;
+    /* interpretation layer (use-learned emphasis; truth stores
+       above stay immutable; memset-zero is a valid empty) */
+    METAGRAPH       mg;
 } CHAT;
 
 void ChatInit(CHAT *ch, const char *corpus_path);
+uint32_t ChatLoadCorpus(CHAT *ch, const char *path);
 void ChatHandle(CHAT *ch, const char *line);
+int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size);
 /* TEXT fast path for serving dispatchers (whole-line trial parse;
    TEXT intents bypass the plan splitter). Returns 1 when handled
    with out[] set (answer or honest abstain). */

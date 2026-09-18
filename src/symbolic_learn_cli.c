@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "learn.h"
 #include "metaschema.h"
 #include "transfer.h"
@@ -94,8 +95,10 @@ static void CmdLearn(LEARNER *lr, const char *line)
    layer is the ONLY lexical knowledge, so the REL token is
    translated by the same consultable-table principle: this
    table is ingestion vocabulary, never asserted. */
-static const char *BibleRelToConn(const char *rel)
+static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
 {
+    if (rel == NULL || rel[0] == '\0')
+        return NULL;
     if (strcmp(rel, "HIJO_DE") == 0)
         return "isa";
     if (strcmp(rel, "REY_DE") == 0)
@@ -106,6 +109,30 @@ static const char *BibleRelToConn(const char *rel)
         return "father_of";
     if (strcmp(rel, "ESPOSA_DE") == 0)
         return "wife_of";
+
+    size_t len = strlen(rel);
+    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+    {
+        size_t stem_len = len - 3;
+        if (stem_len + 4 < bsize)
+        {
+            for (size_t i = 0; i < stem_len; i++)
+                buf[i] = (char)tolower((unsigned char)rel[i]);
+            strcpy(buf + stem_len, "_of");
+            return buf;
+        }
+    }
+    if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
+    {
+        size_t stem_len = len - 3;
+        if (stem_len + 4 < bsize)
+        {
+            for (size_t i = 0; i < stem_len; i++)
+                buf[i] = (char)tolower((unsigned char)rel[i]);
+            strcpy(buf + stem_len, "_of");
+            return buf;
+        }
+    }
     return NULL;
 }
 
@@ -117,7 +144,10 @@ static void CmdIngest(LEARNER *lr, const char *line)
         printf("INGEST-REJECTED: %s\n", line);
         return;
     }
-    const char *conn = BibleRelToConn(rel);
+    char conn_buf[64];
+    const char *conn = GenericRelToConn(rel, conn_buf, sizeof(conn_buf));
+    if (conn == NULL && LearnerConnFamily(rel) != NULL)
+        conn = rel;
     if (conn == NULL)
     {
         printf("INGEST-SKIP: %s (relation not mappable)\n", rel);
@@ -192,7 +222,8 @@ static void CmdFile(LEARNER *lr, const char *path)
         *t2 = '\0';
         const char *rel = t1 + 1;
         const char *obj = t2 + 1;
-        const char *conn = BibleRelToConn(rel);
+        char conn_buf[64];
+        const char *conn = GenericRelToConn(rel, conn_buf, sizeof(conn_buf));
         if (conn == NULL && LearnerConnFamily(rel) != NULL)
             conn = rel; /* already a connective; validated by the
                            consultable table, never hardcoded here */

@@ -7,11 +7,15 @@
    (harness). */
 
 #include <stddef.h>
-#include "bible_chat.h"
+#include "chat.h"
 
 /* Last {"role":"user","content":"..."} in a chat-completions body.
    Returns 1 on success (unescaped UTF-8 in out). */
 int ServerExtractQuery(const char *body, char *out, size_t size);
+
+/* Extract optional session identifier ("user" or "session_id" field)
+   from chat-completions body. Returns 1 if found, 0 if absent. */
+int ServerExtractSession(const char *body, char *out, size_t size);
 
 /* Full chat.completion JSON for content (already mapped). */
 int ServerBuildResponse(const char *model, long created,
@@ -50,5 +54,14 @@ int ServerBuildObservation(const char *ts, const char *model, int nmsg,
 
 /* Minimal JSON string escaper for log fields. */
 int ServerJsonEscape(const char *in, char *out, size_t size);
+
+/* 1 when the request asks for SSE streaming ("stream": true at top
+   level; strings don't count). */
+int ServerWantsStream(const char *body);
+
+/* Full SSE payload: content chunk + finish chunk + [DONE]. */
+int ServerBuildStreamResponse(const char *model, long created,
+                              unsigned long seq, const char *content,
+                              char *out, size_t size);
 
 #endif

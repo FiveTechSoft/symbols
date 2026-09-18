@@ -5,13 +5,13 @@ Incorporadas 10730 frases y 19505 simbolos de jung.txt.
 Tengo cargado: jung.txt (10730 frases). Simbolos en sesion: 19505.
 
 > what does the sun mean
-Segun el texto: This does not mean that men loved the visible God ; they love him , not as he is , for he is merely a man , and when the pious wished to love humanity they could go to their neighbors and their enemies to love them .
+Segun el texto: Naturally this does not mean that the function of reality owes its existence to the differentiation in procreative instincts exclusively .
 
 > que significa sol
 Segun el texto: Vel quod dicant Solis esse natalem , ipse est sol iustitiæ , de quo Malachias propheta dixit : ‘Dominus lucis ac noctis conditor et discretor qui a propheta Sol iustitiæ cognominatus est .
 
 > what is the mother
-Segun el texto: And the boy looks up familiarly To his Father , Helios , And , tasting the sweet grapes , He picked the sacred vine for his nurse , And soon he is grown ; the beasts Fear him , for he is different from them : This man ; he is not like thee , the father , For the lofty soul of the father , Is in him boldly united with thy pleasures , And thy sadness , O Earth , He may resemble the eternal Nature , The mother of Gods , the terrible Mother .
+Segun el texto: Thus the poet paints most beautifully the gradual gathering of external nature into the compass of the subjective , [ 643 ] and the intimate connection of the primary object to which the first lisping words were applied , and from which the first sounds were derived , with the secondary object , the wider nature which usurps imperceptibly the mother’s place , and takes possession of those sounds heard first from the mother , and also of those feelings which we all discover later in ourselves in all the warm love of Mother Nature .
 
 > what is libido
 Segun el texto: Briefly , we may designate this amount of libido as “Mother Libido .
@@ -20,22 +20,22 @@ Segun el texto: Briefly , we may designate this amount of libido as “Mother Li
 Segun el texto: What this signifies we already know—the libido sinks into its “own depths” ( a well-known comparison of Nietzsche’s ) and finds there below , in the shadows of the unconscious , the substitute for the upper world , which it has abandoned : _ the world of memories _ ( “’mid a hundred memories” ) , the strongest and most influential of which are the early infantile memory pictures .
 
 > explicamelo
-Segun el texto: This confirmation is parallel to the postulate asserted above , according to which reality is deprived , not merely of an immediate ( individual ) amount of libido , but also of an already differentiated or desexualized quantity of libido , which , among normal people , has belonged to the function of reality ever since prehistoric times . _ A dropping away of the last acquisition of the function of reality ( or adaptation ) must of necessity be replaced by an earlier mode of adaptation . _ We find this principle already in the doctrines of the neuroses , that is , that a repression resulting from the failure of the recent transference is replaced by an old way of transference , namely , through a regressive revival of the parent imago .
+Segun el texto: We have learned in the course of this investigation that the part of the libido which erects religious structures is in the last analysis fixed in the mother , and really represents that tie through which we are permanently connected with our origin .
 
 > tell me about sacrifice
 Segun el texto: Miss Miller’s observations about suggestibility inform us , therefore , of the fact that the author is pleased to tell us in her following phantasies something of the history of her love .
 
 > sacrifice
-Segun el texto: — THE SACRIFICE 428
+Segun el texto: CHAPTER VIII THE SACRIFICE
 
 > what is rebirth
-Segun el texto: Rebirth , 240 , 251 , 272 , 351 battle for , 364
+Segun el texto: — SYMBOLISM OF THE MOTHER AND OF REBIRTH 233
 
 > who is the hero
 Segun el texto: — THE UNCONSCIOUS ORIGIN OF THE HERO 191
 
 > what does the tree mean
-Segun el texto: This does not mean that men loved the visible God ; they love him , not as he is , for he is merely a man , and when the pious wished to love humanity they could go to their neighbors and their enemies to love them .
+Segun el texto: Naturally this does not mean that the function of reality owes its existence to the differentiation in procreative instincts exclusively .
 
 > hero
 Segun el texto: — THE UNCONSCIOUS ORIGIN OF THE HERO 191
@@ -44,7 +44,7 @@ Segun el texto: — THE UNCONSCIOUS ORIGIN OF THE HERO 191
 Segun el texto: CHAPTER IV THE UNCONSCIOUS ORIGIN OF THE HERO
 
 > where does the libido go
-Segun el texto: The development of the sun symbol in Faust does not go as far as an anthropomorphic vision .
+Segun el texto: Just as Wotan obtained advice from the wise woman ( compare the quotation from Julius Cæsar about the German matron ) , so does Odin go to the brook of Mîmir in which wisdom and judgment lie hidden , to the spiritual mother ( mother-imago ) .
 
 > what are dreams
 Segun el texto: It is a special inconvenience that no dream can be recounted without being obliged to add to it half a life’s history which affords the individual foundations of the dream , but there are some few typical dreams which can be told without too great a ballast .
@@ -53,7 +53,7 @@ Segun el texto: It is a special inconvenience that no dream can be recounted wit
 Segun el texto: “Often I have that strange and poignant dream Of some unknown who meets my flame with flame— Who , with each time , is never quite the same , Yet never wholly different does she seem .
 
 > what is water
-Segun el texto: —The water must be blessed , and was blessed by him .
+Segun el texto: That wine becomes blood—the water is mingled with ‘childishness’ because God says , ‘become like little children .
 
 > tell me about fire
 Segun el texto: After all has been said about the genesis of the preparation of fire , it is no longer difficult to guess what is the forbidden thing ; _ it is onanism _ .
@@ -62,10 +62,10 @@ Segun el texto: After all has been said about the genesis of the preparation of 
 Segun el texto: I saw a young shepherd , writhing , choking , twitching with a convulsed face , from whose mouth hung a black , heavy serpent .
 
 > what is incest
-Segun el texto: Incest barrier , 72 , 100 , 266 , 458 , 461 phantasy , 3 , 63 , 404 problem , 171 , 195 , 230 , 250 , 289 , 364 , 454 , 463
+Segun el texto: In religious symbols , for example , we come across incest .
 
 > what is a symbol
-Segun el texto: What can I do , what can I begin ?
+Segun el texto: What are you blowing towards me , Winds , what do you bring again ?
 
 > who is christ
 Segun el texto: [ Illustration : CHRIST ON THE TREE OF LIFE ]

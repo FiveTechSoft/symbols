@@ -13,7 +13,6 @@
 #define TOOLCFG_PATH "data/agentic/tools.tsv"
 #define FIXTURE_PATH "data/agentic/fixtures.tsv"
 #define SELF_PATH "data/agentic/self.tsv"
-#define SELF_PATH "data/agentic/self.tsv"
 
 static const ShellAllowRow COMPILED_SHELL[] = {
     {"echo", "cmd", ""},
@@ -61,7 +60,9 @@ static uint32_t g_nrel = 0;
 static FixturePersonRow g_person[TOOLCFG_PERSON_MAX];
 static uint32_t g_nperson = 0;
 static char g_self_scope[SELF_SCOPE_MAX];
+static char g_self_greet[SELF_GREET_MAX];
 static char g_self_trig[TOOLCFG_SELF_TRIG_MAX][64];
+static char g_self_reply[TOOLCFG_SELF_TRIG_MAX][16];
 static uint32_t g_ntrig = 0;
 static int g_tool_init_done = 0;
 
@@ -562,10 +563,12 @@ void SelfInitFrom(const char *path)
     char line[TOOLCFG_LINE_MAX];
     unsigned long lineno = 0;
     char scope[SELF_SCOPE_MAX];
+    char greet[SELF_GREET_MAX];
     char trig[TOOLCFG_SELF_TRIG_MAX][64];
+    char treply[TOOLCFG_SELF_TRIG_MAX][16];
     uint32_t ntrig = 0;
-    int have_scope = 0;
     scope[0] = '\0';
+    greet[0] = '\0';
     if (path == NULL)
         return;
     f = fopen(path, "r");
@@ -597,25 +600,29 @@ void SelfInitFrom(const char *path)
         nf = SplitTabs(s, fld, 8);
         if (nf == 0 || fld[0][0] == '\0')
             continue;
-        if (strcmp(fld[0], "scope") == 0)
+        if (strcmp(fld[0], "scope") == 0 ||
+            strcmp(fld[0], "greeting") == 0)
         {
+            int is_greet = strcmp(fld[0], "greeting") == 0;
+            char *dst = is_greet ? greet : scope;
+            size_t cap = is_greet ? sizeof(greet) : sizeof(scope);
             if (nf != 3 || fld[1][0] == '\0' || fld[2][0] == '\0')
             {
-                fprintf(stderr, "self.tsv:%lu: bad scope row\n",
+                fprintf(stderr, "self.tsv:%lu: bad reply row\n",
                         lineno);
                 continue;
             }
-            if (have_scope)
+            if (dst[0] != '\0')
                 continue;
-            strncpy(scope, fld[2], sizeof(scope) - 1);
-            scope[sizeof(scope) - 1] = '\0';
-            have_scope = 1;
+            strncpy(dst, fld[2], cap - 1);
+            dst[cap - 1] = '\0';
         }
         else if (strcmp(fld[0], "trigger") == 0)
         {
             char norm[64];
             if (nf != 3 || fld[1][0] == '\0' ||
-                strcmp(fld[2], "scope") != 0)
+                (strcmp(fld[2], "scope") != 0 &&
+                 strcmp(fld[2], "greeting") != 0))
             {
                 fprintf(stderr, "self.tsv:%lu: bad trigger row\n",
                         lineno);
@@ -636,6 +643,8 @@ void SelfInitFrom(const char *path)
             }
             strncpy(trig[ntrig], norm, sizeof(trig[0]) - 1);
             trig[ntrig][sizeof(trig[0]) - 1] = '\0';
+            strncpy(treply[ntrig], fld[2], sizeof(treply[0]) - 1);
+            treply[ntrig][sizeof(treply[0]) - 1] = '\0';
             ntrig++;
         }
         else
@@ -645,18 +654,23 @@ void SelfInitFrom(const char *path)
         }
     }
     fclose(f);
-    if (have_scope)
-    {
-        strncpy(g_self_scope, scope, sizeof(g_self_scope) - 1);
-        g_self_scope[sizeof(g_self_scope) - 1] = '\0';
-        memcpy(g_self_trig, trig, ntrig * sizeof(trig[0]));
-        g_ntrig = ntrig;
-    }
+    strncpy(g_self_scope, scope, sizeof(g_self_scope) - 1);
+    g_self_scope[sizeof(g_self_scope) - 1] = '\0';
+    strncpy(g_self_greet, greet, sizeof(g_self_greet) - 1);
+    g_self_greet[sizeof(g_self_greet) - 1] = '\0';
+    memcpy(g_self_trig, trig, ntrig * sizeof(trig[0]));
+    memcpy(g_self_reply, treply, ntrig * sizeof(treply[0]));
+    g_ntrig = ntrig;
 }
 
 const char *SelfScopeText(void)
 {
     return g_self_scope;
+}
+
+const char *SelfGreetText(void)
+{
+    return g_self_greet;
 }
 
 uint32_t SelfTriggerCount(void)
@@ -669,4 +683,11 @@ const char *SelfTriggerAt(uint32_t i)
     if (i >= g_ntrig)
         return NULL;
     return g_self_trig[i];
+}
+
+const char *SelfTriggerReplyAt(uint32_t i)
+{
+    if (i >= g_ntrig)
+        return NULL;
+    return g_self_reply[i];
 }

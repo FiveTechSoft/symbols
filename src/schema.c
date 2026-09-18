@@ -52,6 +52,15 @@ static int TemplateLookup(const char *conn, SCHEMA_ORDER *order)
         *order = SCHEMA_ORDER_CHAIN;
         return 1;
     }
+    /* Generic relational connectives (any domain) */
+    {
+        size_t clen = strlen(conn);
+        if (clen > 3 && strcmp(conn + clen - 3, "_of") == 0)
+        {
+            *order = SCHEMA_ORDER_CHAIN;
+            return 1;
+        }
+    }
     return 0;
 }
 

@@ -51,6 +51,7 @@ typedef struct
     uint32_t cap;
     uint32_t sig[8];  /* top-m signature (finalized post-ingest) */
     int sig_ready;
+    float density;    /* lexical ratio: tokens with 3+ alpha bytes */
 } TL_SENT;
 
 typedef struct
@@ -68,6 +69,8 @@ TEXTLEX *TextLexCreate(void);
 void TextLexFree(TEXTLEX *tl);
 /* release contents, keep usable (for unload-by-rebuild) */
 void TextLexClear(TEXTLEX *tl);
+/* reset positional accumulators (unload rebuilds from zero) */
+void TextLexPosReset(void);
 /* Whole file (first_line=1, last_line=0 means all). Deterministic. */
 TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
                             const char *path,
@@ -102,5 +105,20 @@ uint32_t TextLexRetrieveV(const TEXTLEX *tl, const GRAPH *graph,
                           const char **words, uint32_t nwords,
                           uint32_t *out_idx, float *out_score,
                           uint32_t max, unsigned flags);
+
+/* Concept concentration entry: key topics discovered from the embedding topology */
+typedef struct
+{
+    SYMBOL_ID   id;
+    const char *name;
+    float       conc;
+    uint64_t    freq;
+} TL_CONCEPT;
+
+/* Discover top thematic concepts from graph and embedding table by concentration
+   (max bucket share of the count vector; peaked = focused topic, flat = glue).
+   Returns count stored in out (up to max_out). */
+uint32_t TextLexTopConcepts(const GRAPH *graph, const EMBEDDING_TABLE *emb,
+                            TL_CONCEPT *out, uint32_t max_out);
 
 #endif /* TEXT_LEX_H */

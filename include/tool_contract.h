@@ -6,7 +6,7 @@
    contract can formally satisfy the goal exists. Decision depends
    on failure cause + applicable contract, never on UNKNOWN text. */
 
-#include "bible_chat.h"
+#include "chat.h"
 
 typedef enum
 {
@@ -45,6 +45,7 @@ typedef struct
 #define TOOLCFG_PERSON_MAX 64
 #define TOOLCFG_SELF_TRIG_MAX 32
 #define SELF_SCOPE_MAX 512
+#define SELF_GREET_MAX 256
 
 typedef struct
 {
@@ -95,8 +96,10 @@ uint32_t FixturePersonCount(void);
 const FixturePersonRow *FixturePersonAt(uint32_t i);
 void SelfInitFrom(const char *path);
 const char *SelfScopeText(void);
+const char *SelfGreetText(void);
 uint32_t SelfTriggerCount(void);
 const char *SelfTriggerAt(uint32_t i);
+const char *SelfTriggerReplyAt(uint32_t i);
 
 /* Classify one resolved goal. status/cause/slot/family come from
    ChatResolveLine; line is needed only for PARSE_FAIL shape
@@ -132,6 +135,7 @@ void ToolExecute(const ToolRequest *req, ToolResult *res);
    (ignored by position). */
 int ShellLookup(const char *tok, char *backend, size_t bs, char *dflt,
                 size_t ds);
+int FsNameOk(const char *name);
 
 /* Sandbox directory for shell side effects (system temp +
    fixed subdir, created on demand). */

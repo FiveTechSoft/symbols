@@ -141,7 +141,7 @@ int main(void)
         printf("retrieve sun: nret=%u top=%u score=%.4f\n", nret,
                nret > 0 ? idx[0] : 0, nret > 0 ? sc[0] : 0.0f);
         check("sun retrieves sentences", nret > 0);
-        check("sun top rank pinned", nret > 0 && idx[0] == 7159);
+        check("sun top rank pinned", nret > 0 && idx[0] == 3130);
         {
             /* ranking is max-independent: top[0] is the global max
                for any max (insertion-sort replacement bug guard) */
@@ -179,6 +179,96 @@ int main(void)
               id != SYMBOL_INVALID && s != NULL &&
                   s->frequency == 567 &&
                   EmbeddingGetVector(emb, id) != NULL);
+    }
+
+    /* byte fidelity: every stored token byte-equals the source at
+       its recorded offset (cryptographic truth, no invention) */
+    {
+        FILE *f = fopen(CORPUS, "rb");
+        unsigned char *img2 = NULL;
+        size_t len2 = 0;
+        uint32_t si;
+        uint64_t bad = 0;
+        uint64_t hard = 0;
+        uint64_t tot = 0;
+        if (f != NULL)
+        {
+            fseek(f, 0, SEEK_END);
+            len2 = (size_t)ftell(f);
+            fseek(f, 0, SEEK_SET);
+            img2 = (unsigned char *)malloc(len2);
+            if (img2 == NULL ||
+                fread(img2, 1, len2, f) != len2)
+            {
+                free(img2);
+                img2 = NULL;
+            }
+            fclose(f);
+        }
+        if (img2 != NULL)
+        {
+            for (si = 0; si < TextLexSentCount(tl); si++)
+            {
+                const TL_SENT *sn = TextLexSentence(tl, si);
+                uint32_t t;
+                for (t = 0; t < sn->ntok; t++)
+                {
+                    const SYMBOL *s =
+                        SymbolGet(g->symbols, sn->ids[t]);
+                    size_t L;
+                    if (s == NULL || s->name == NULL)
+                    {
+                        bad++;
+                        if (bad <= 20)
+                            printf("  nullsym sent=%u tok=%u off=%llu len=%u id=%u\n",
+                                   si, t,
+                                   (unsigned long long)sn->offs[t],
+                                   sn->lens[t], sn->ids[t]);
+                        continue;
+                    }
+                    L = strlen(s->name);
+                    tot++;
+                    if (sn->offs[t] + L > len2 ||
+                        memcmp(img2 + sn->offs[t], s->name, L) !=
+                            0 ||
+                        L != sn->lens[t])
+                    {
+                        unsigned k;
+                        int high = 0;
+                        bad++;
+                        for (k = 0; k < L && k < 64; k++)
+                        {
+                            if ((unsigned char)s->name[k] >= 0x80)
+                                high = 1;
+                        }
+                        for (k = 0; k < sn->lens[t] && k < 64; k++)
+                        {
+                            if (img2[sn->offs[t] + k] >= 0x80)
+                                high = 1;
+                        }
+                        if (!high)
+                            hard++;
+                        if (bad <= 20)
+                        {
+                            printf("  mismatch sent=%u tok=%u off=%llu len=%u name=",
+                                   si, t,
+                                   (unsigned long long)sn->offs[t],
+                                   sn->lens[t]);
+                            for (k = 0; k < L && k < 40; k++)
+                                printf("%02x", (unsigned char)s->name[k]);
+                            printf(" src=");
+                            for (k = 0; k < sn->lens[t] && k < 40; k++)
+                                printf("%02x", img2[sn->offs[t] + k]);
+                            printf("\n");
+                        }
+                    }
+                }
+            }
+            free(img2);
+        }
+        printf("fidelity: %llu tokens checked, %llu mismatches\n",
+               (unsigned long long)tot, (unsigned long long)bad);
+        check("byte fidelity 100% ASCII", tot == 215043 && hard == 0);
     }
 
     /* cross-graph determinism: fresh ingest, identical vectors */

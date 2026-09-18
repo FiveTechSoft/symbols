@@ -8,7 +8,7 @@
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
-#include "bible_chat.h"
+#include "chat.h"
 #include "tool_contract.h"
 
 static int g_pass = 0, g_fail = 0;
@@ -29,10 +29,9 @@ static void check(const char *name, int cond)
 
 static const char *g_tmp = "test_self_tmp.tsv";
 
-static const char *SCOPE =
-    "Soy Symbols, un motor de consultas sobre genealogía bíblica: "
-    "respondo sobre padre, hijo, reyes, esposa y hermano según los "
-    "registros cargados. De lo demás no tengo constancia.\n";
+static const char *SCOPE = "Soy Symbols, un motor simbólico de IA\n";
+
+static const char *GREET = "Hola, ¿en qué puedo ayudarte hoy?\n";
 
 static void WriteTmp(void)
 {
@@ -44,8 +43,11 @@ static void WriteTmp(void)
     }
     fputs("# temp self (exercises every parser branch)\n", f);
     fputs("scope\tes\tSU AMBITO\n", f);
+    fputs("greeting\tes\tSU SALUDO\n", f);
     fputs("trigger\thola friend\tscope\n", f);
+    fputs("trigger\tey\tgreeting\n", f);
     fputs("trigger\tbad\n", f);
+    fputs("trigger\tzz\tbogus\n", f);
     fputs("bogus\ta\tb\n", f);
     fputs("trigger\t\t scope\n", f);
     fclose(f);
@@ -67,17 +69,22 @@ int main(void)
 
     /* ---- 1. missing file -> no scope, legacy abstain ---- */
     SelfInitFrom("test_self_no_such_file.tsv");
-    check("missing scope empty", SelfScopeText()[0] == '\0');
+    check("missing scope empty", SelfScopeText()[0] == '\0' &&
+                                             SelfGreetText()[0] == '\0');
     check("missing triggers zero", SelfTriggerCount() == 0);
 
     /* ---- 2. temp file: scope + 1 trigger, bad rows die ---- */
     WriteTmp();
     SelfInitFrom(g_tmp);
     check("file scope text", strcmp(SelfScopeText(), "SU AMBITO") == 0);
-    check("file trigger count", SelfTriggerCount() == 1);
+    check("file greet text", strcmp(SelfGreetText(), "SU SALUDO") == 0);
+    check("file trigger count", SelfTriggerCount() == 2);
     check("file trigger content",
           SelfTriggerAt(0) != NULL &&
-              strcmp(SelfTriggerAt(0), "hola friend") == 0);
+              strcmp(SelfTriggerAt(0), "hola friend") == 0 &&
+              strcmp(SelfTriggerReplyAt(0), "scope") == 0 &&
+              SelfTriggerAt(1) != NULL &&
+              strcmp(SelfTriggerReplyAt(1), "greeting") == 0);
     check("trigger oob guard", SelfTriggerAt(99) == NULL);
     remove(g_tmp);
 
@@ -87,8 +94,8 @@ int main(void)
     check("quien eres", Resolve(&ch, "quien eres?", out,
                                 sizeof(out)) == GOAL_ANSWER &&
                            strcmp(out, SCOPE) == 0);
-    check("hola", Resolve(&ch, "hola", out, sizeof(out)) == GOAL_ANSWER &&
-                      strcmp(out, SCOPE) == 0);
+    check("hola greets", Resolve(&ch, "hola", out, sizeof(out)) == GOAL_ANSWER &&
+                      strcmp(out, GREET) == 0);
     check("caps+accent fold",
           Resolve(&ch, "QUIÉN ERES?", out, sizeof(out)) ==
                   GOAL_ANSWER &&
@@ -105,10 +112,17 @@ int main(void)
     /* ---- 4. shipped file + idempotence ---- */
     SelfInitFrom("data/agentic/self.tsv");
     SelfInitFrom("data/agentic/self.tsv");
-    check("shipped triggers", SelfTriggerCount() == 6);
+    check("shipped triggers", SelfTriggerCount() == 8);
     check("shipped scope live", SelfScopeText()[0] != '\0');
     check("shipped reply",
-          Resolve(&ch, "hello", out, sizeof(out)) == GOAL_ANSWER);
+          Resolve(&ch, "hello", out, sizeof(out)) == GOAL_ANSWER &&
+              strcmp(out, SCOPE) == 0);
+    check("capability variants",
+          Resolve(&ch, "que sabes?", out, sizeof(out)) == GOAL_ANSWER &&
+              strcmp(out, SCOPE) == 0 &&
+              Resolve(&ch, "que puedo preguntarte?", out,
+                      sizeof(out)) == GOAL_ANSWER &&
+              strcmp(out, SCOPE) == 0);
 
     printf("test_self: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

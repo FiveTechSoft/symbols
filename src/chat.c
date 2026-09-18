@@ -109,12 +109,13 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
         size_t len = (size_t)(p - start);
         if (len == 0)
             continue;
-        /* leading inverted question marks (UTF-8 C2 BF, possibly
-           repeated): interrogative force, never token content */
+        /* leading inverted question marks (UTF-8 C2 BF) and inverted
+           exclamation marks (UTF-8 C2 A1, possibly repeated):
+           interrogative/exclamative force, never token content */
         while (len >= 2 && (unsigned char)start[0] == 0xC2 &&
-               (unsigned char)start[1] == 0xBF)
+               ((unsigned char)start[1] == 0xBF || (unsigned char)start[1] == 0xA1))
         {
-            if (sf)
+            if ((unsigned char)start[1] == 0xBF && sf)
                 sf->question = 1;
             start += 2;
             len -= 2;
@@ -442,31 +443,129 @@ void ChatAnswerParentSingle(const CHAT *ch, const char *child,
 
 /* ---- corpus ingest (same contract as test_bible_kinship) ---- */
 
-static const char *BibleRelToConn(const char *rel)
+typedef struct
 {
-    if (strcmp(rel, "HIJO_DE") == 0)
-        return "isa";
-    if (strcmp(rel, "HERMANO_DE") == 0)
-        return "sibling_of";
-    if (strcmp(rel, "PADRE_DE") == 0)
-        return "father_of";
-    if (strcmp(rel, "REY_DE") == 0)
-        return "reigns";
-    if (strcmp(rel, "ESPOSA_DE") == 0)
-        return "wife_of";
+    char tag[32];
+    char conn[32];
+} RelMapRow;
+
+#define RELMAP_MAX 64
+
+static const RelMapRow COMPILED_RELMAP[] = {
+    {"HIJO_DE", "isa"},
+    {"HERMANO_DE", "sibling_of"},
+    {"PADRE_DE", "father_of"},
+    {"REY_DE", "reigns"},
+    {"ESPOSA_DE", "wife_of"},
+    {"CAPITAL", "capital_of"},
+    {"MONEDA", "currency_of"},
+    {"GOBIERNO", "government_of"},
+    {"AUTOR", "author_of"},
+    {"DIRECTOR", "director_of"},
+    {"PREMIO", "award_of"},
+    {"PAIS", "country_of"},
+    {"IDIOMA", "language_of"},
+    {"IDIOMA_OFICIAL", "language_of"},
+    {"MIEMBRO_DE", "member_of"},
+};
+
+static RelMapRow g_relmap[RELMAP_MAX];
+static uint32_t g_nrelmap = 0;
+static int g_relmap_loaded = 0;
+
+static void RelMapInit(void)
+{
+    if (g_relmap_loaded)
+        return;
+    g_relmap_loaded = 1;
+    g_nrelmap = 0;
+    FILE *f = fopen("data/agentic/relations.tsv", "r");
+    if (f != NULL)
+    {
+        char line[256];
+        while (fgets(line, sizeof(line), f) != NULL && g_nrelmap < RELMAP_MAX)
+        {
+            char *p = line;
+            while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')
+                p++;
+            if (*p == '\0' || *p == '#')
+                continue;
+            char tag[32], conn[32];
+            if (sscanf(p, "%31s %31s", tag, conn) == 2)
+            {
+                strncpy(g_relmap[g_nrelmap].tag, tag, 31);
+                g_relmap[g_nrelmap].tag[31] = '\0';
+                strncpy(g_relmap[g_nrelmap].conn, conn, 31);
+                g_relmap[g_nrelmap].conn[31] = '\0';
+                g_nrelmap++;
+            }
+        }
+        fclose(f);
+    }
+    if (g_nrelmap == 0)
+    {
+        size_t n = sizeof(COMPILED_RELMAP) / sizeof(COMPILED_RELMAP[0]);
+        for (size_t i = 0; i < n && g_nrelmap < RELMAP_MAX; i++)
+            g_relmap[g_nrelmap++] = COMPILED_RELMAP[i];
+    }
+}
+
+static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
+{
+    if (rel == NULL || rel[0] == '\0')
+        return NULL;
+    RelMapInit();
+
+    /* 1. Consult table */
+    for (uint32_t i = 0; i < g_nrelmap; i++)
+    {
+        if (strcmp(rel, g_relmap[i].tag) == 0)
+            return g_relmap[i].conn;
+    }
+
+    /* 2. Already a valid connective */
+    if (LearnerIsConnective(rel))
+        return rel;
+
+    /* 3. Suffix rule for _DE / _de or _OF / _of */
+    size_t len = strlen(rel);
+    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+    {
+        size_t stem_len = len - 3;
+        if (stem_len + 4 < bsize)
+        {
+            for (size_t i = 0; i < stem_len; i++)
+                buf[i] = (char)tolower((unsigned char)rel[i]);
+            strcpy(buf + stem_len, "_of");
+            return buf;
+        }
+    }
+    if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
+    {
+        size_t stem_len = len - 3;
+        if (stem_len + 4 < bsize)
+        {
+            for (size_t i = 0; i < stem_len; i++)
+                buf[i] = (char)tolower((unsigned char)rel[i]);
+            strcpy(buf + stem_len, "_of");
+            return buf;
+        }
+    }
     return NULL;
 }
 
 /* Ingest the TSV into the working KB. Returns rows learned.
    The relation index (kw index) is DEDUCED here: the Spanish stem
-   of REL (REL minus the "_DE" suffix), the English stem = the
+   of REL (REL minus the "_DE" / "_OF" suffix), the English stem = the
    surface connective it was learned with, and the family where
    the pairs landed. No relation word is hardcoded. */
 static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
 {
     char es[CHAT_TOKEN_MAX];
     size_t len = strlen(rel);
-    if (len > 3 && strcmp(rel + len - 3, "_DE") == 0)
+    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+        len -= 3;
+    else if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
         len -= 3;
     if (len == 0 || len >= sizeof(es))
         return;
@@ -479,7 +578,7 @@ static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
     char en[CHAT_TOKEN_MAX];
     snprintf(en, sizeof(en), "%s", conn);
     size_t elen = strlen(en);
-    if (elen > 3 && strcmp(en + elen - 3, "_of") == 0)
+    if (elen > 3 && (strcmp(en + elen - 3, "_of") == 0 || strcmp(en + elen - 3, "_OF") == 0))
         en[elen - 3] = '\0';
 
     uint32_t i;
@@ -538,13 +637,17 @@ static uint32_t ChatIngestCorpus(CHAT *ch, const char *path,
         char *eol = strpbrk(obj, "\t\r\n");
         if (eol != NULL)
             *eol = '\0';
-        if (strcmp(buf, obj) == 0)
+        char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
+        ChatNormTok(buf, norm_s, sizeof(norm_s));
+        ChatNormTok(obj, norm_o, sizeof(norm_o));
+        if (strcmp(norm_s, norm_o) == 0)
             continue; /* self-loop: never admitted */
-        const char *conn = BibleRelToConn(rel);
+        char conn_buf[LEARN_MAX_LINE];
+        const char *conn = GenericRelToConn(rel, conn_buf, sizeof(conn_buf));
         if (conn == NULL)
             continue;
         char sent[LEARN_MAX_LINE];
-        snprintf(sent, sizeof(sent), "%s %s %s", buf, conn, obj);
+        snprintf(sent, sizeof(sent), "%s %s %s", norm_s, conn, norm_o);
         if (LearnerLearnLine(&ch->lr, sent))
         {
             /* the kw index is deduced AFTER the row is learned:
@@ -568,10 +671,10 @@ static int TextSessionEnsure(CHAT *ch)
     EMBEDDING_TABLE *e;
     if (ch->tgraph != NULL && ch->temb != NULL)
         return 1;
-    g = GraphCreate(65536, 256);
+    g = GraphCreate(262144, 512);
     if (g == NULL)
         return 0;
-    e = EmbeddingTableCreate(65536);
+    e = EmbeddingTableCreate(262144);
     if (e == NULL)
     {
         GraphDestroy(g);
@@ -590,10 +693,10 @@ static void TextSessionRemember(CHAT *ch, const char *name)
     for (i = 0; i < ch->ntfiles; i++)
         if (strcmp(ch->tfiles[i], name) == 0)
             return;
-    if (ch->ntfiles >= 8)
+    if (ch->ntfiles >= CHAT_TEXT_FILES_MAX)
         return;
-    strncpy(ch->tfiles[ch->ntfiles], name, 63);
-    ch->tfiles[ch->ntfiles][63] = '\0';
+    strncpy(ch->tfiles[ch->ntfiles], name, sizeof(ch->tfiles[0]) - 1);
+    ch->tfiles[ch->ntfiles][sizeof(ch->tfiles[0]) - 1] = '\0';
     ch->ntfiles++;
 }
 
@@ -1157,7 +1260,10 @@ typedef enum
     INT_INGIERE,      /* load <file.tsv> (hot knowledge triples) */
     INT_TEXTLOAD,     /* load <file.txt> (intact corpus to graph) */
     INT_TEXTQ,        /* content question over session texts */
-    INT_TEXTSTATUS    /* estado: session inventory (counts from stores) */
+    INT_TEXTSTATUS,   /* estado: session inventory (counts from stores) */
+    INT_TEXT_TOPICS,  /* dime las areas que conoces / de que temas podemos hablar */
+    INT_TEXT_START,   /* inicia una conversacion / hablemos */
+    INT_UNLOAD        /* unload <file.txt>: drop + exact rebuild */
 } INTENT;
 
 typedef struct
@@ -1169,7 +1275,7 @@ typedef struct
     int    has_b;
     int    kw;                /* deduced relation index (generic) */
     int    kw2;               /* second relation index (compose why) */
-    char   toks[8][CHAT_TOKEN_MAX]; /* TEXTQ query words (as asked) */
+    char   toks[CHAT_TEXT_WORDS_MAX][CHAT_TOKEN_MAX]; /* TEXTQ query words (as asked) */
     uint32_t ntoks;
     int    t_following;      /* TEXTQ follow-up: reuse cached topic */
     char   t_sub[CHAT_TOKEN_MAX]; /* geometric substitute (marked) */
@@ -1591,9 +1697,9 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
     if (n == 0)
         return 0;
 
-    /* ASK-load: verb + bare .tsv name, exactly two tokens. The verb
+    /* ASK-load: verb + bare .tsv or .txt name, exactly two tokens. The verb
        is a frame keyword (frozen precedent: PARENT_W et al); the
-       .tsv suffix rule is structural. Sandbox + existence probed
+       suffix rule is structural. Sandbox + existence probed
        here (read-only); the load itself happens at answer time. */
     if (n == 2 && strcmp(toks[0], "carga") == 0)
     {
@@ -1605,6 +1711,14 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_LOAD;
+            return 1;
+        }
+        if (L > 4 && strcmp(toks[1] + L - 4, ".txt") == 0 &&
+            CRulesResolvePath(toks[1], path, sizeof(path)))
+        {
+            strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXTLOAD;
             return 1;
         }
         return 0;
@@ -1638,6 +1752,24 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         return 0;
     }
 
+    /* ASK-unload: verb + bare .txt name. Resolve probes shape;
+       the answer requires the file loaded (tfiles) and rebuilds
+       the session stores exactly. */
+    if (n == 2 && strcmp(toks[0], "unload") == 0)
+    {
+        char path[512];
+        size_t L = strlen(toks[1]);
+        if (L > 4 && strcmp(toks[1] + L - 4, ".txt") == 0 &&
+            CRulesResolvePath(toks[1], path, sizeof(path)))
+        {
+            strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_UNLOAD;
+            return 1;
+        }
+        return 0;
+    }
+
     /* session inventory: what texts are loaded (counts live in
        the stores, so replays report honest totals). Slot carries
        the verb so focus/anaphora guards pass it through. */
@@ -1648,6 +1780,61 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         p->a[CHAT_TOKEN_MAX - 1] = '\0';
         p->intent = INT_TEXTSTATUS;
         return 1;
+    }
+
+    /* TEXT_TOPICS: thematic introspection over loaded corpus */
+    {
+        int has_topic = 0;
+        int has_question = 0;
+        for (uint32_t i = 0; i < n; i++)
+        {
+            if (strcmp(toks[i], "temas") == 0 || strcmp(toks[i], "areas") == 0 ||
+                strcmp(toks[i], "topics") == 0 || strcmp(toks[i], "materias") == 0 ||
+                strcmp(toks[i], "ambitos") == 0)
+                has_topic = 1;
+            if (strcmp(toks[i], "conoces") == 0 || strcmp(toks[i], "hablar") == 0 ||
+                strcmp(toks[i], "dime") == 0 || strcmp(toks[i], "sabes") == 0 ||
+                strcmp(toks[i], "hay") == 0 || strcmp(toks[i], "trata") == 0 ||
+                strcmp(toks[i], "tell") == 0 || strcmp(toks[i], "know") == 0 ||
+                strcmp(toks[i], "talk") == 0 || strcmp(toks[i], "podemos") == 0)
+                has_question = 1;
+        }
+        if ((has_topic && (has_question || n <= 2 || q_force)) ||
+            (has_question && n >= 2 &&
+             ((strcmp(toks[0], "hablar") == 0 || strcmp(toks[n - 1], "hablar") == 0) ||
+              (strcmp(toks[0], "talk") == 0 || strcmp(toks[n - 1], "talk") == 0))))
+        {
+            strncpy(p->a, "temas", CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXT_TOPICS;
+            return 1;
+        }
+    }
+
+    /* TEXT_START: initiate dialogue over loaded corpus */
+    {
+        int has_start = 0;
+        int has_conv = 0;
+        for (uint32_t i = 0; i < n; i++)
+        {
+            if (strcmp(toks[i], "inicia") == 0 || strcmp(toks[i], "iniciar") == 0 ||
+                strcmp(toks[i], "start") == 0 || strcmp(toks[i], "empezar") == 0 ||
+                strcmp(toks[i], "comienza") == 0 || strcmp(toks[i], "comencemos") == 0)
+                has_start = 1;
+            if (strcmp(toks[i], "conversacion") == 0 || strcmp(toks[i], "conversation") == 0 ||
+                strcmp(toks[i], "charla") == 0 || strcmp(toks[i], "dialogo") == 0)
+                has_conv = 1;
+        }
+        if ((has_start && has_conv) ||
+            (n <= 2 && (strcmp(toks[0], "hablemos") == 0 ||
+                        strcmp(toks[0], "comencemos") == 0 ||
+                        strcmp(toks[0], "comienza") == 0)))
+        {
+            strncpy(p->a, "start", CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXT_START;
+            return 1;
+        }
     }
 
     int kw_parent = -1, kw_child = -1, kw_grand = -1, kw_desc = -1;
@@ -1985,6 +2172,16 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             p->intent = INT_CHILDREN_OF;
             return 1;
         }
+        if (kw_child > 1 && TokAfterDe(toks, (uint32_t)kw_child, 0, slot, CHAT_TOKEN_MAX))
+        {
+            if (SlotOk(slot))
+            {
+                strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+                p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                p->intent = INT_CHILDREN_OF;
+                return 1;
+            }
+        }
         return 0;
     }
 
@@ -2032,6 +2229,16 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_PARENT_OF;
             return 1;
+        }
+        if (kw_parent > 1 && TokAfterDe(toks, (uint32_t)kw_parent, 0, slot, CHAT_TOKEN_MAX))
+        {
+            if (SlotOk(slot))
+            {
+                strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+                p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                p->intent = INT_PARENT_OF;
+                return 1;
+            }
         }
         return 0;
     }
@@ -2106,6 +2313,15 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             p->kw = kwx;
             p->intent = INT_REL_QUERY;
             return 1;
+        }
+        if (kwpos > 1 && TokAfterDe(toks, (uint32_t)kwpos, 0, p->a, CHAT_TOKEN_MAX))
+        {
+            if (SlotOk(p->a))
+            {
+                p->kw = kwx;
+                p->intent = INT_REL_QUERY;
+                return 1;
+            }
         }
         return 0;
     }
@@ -2220,9 +2436,26 @@ static void RememberFocus(CHAT *ch, const char *tok)
 {
     if (tok == NULL || tok[0] == '\0')
         return; /* FASE 4 G3: never store the empty string as focus */
+    if (ch->focus_valid && ch->focus[0] != '\0' && strcmp(ch->focus, tok) != 0)
+    {
+        strncpy(ch->focus_secondary, ch->focus, sizeof(ch->focus_secondary) - 1);
+        ch->focus_secondary[sizeof(ch->focus_secondary) - 1] = '\0';
+        ch->focus_secondary_valid = 1;
+    }
     strncpy(ch->focus, tok, sizeof(ch->focus) - 1);
     ch->focus[sizeof(ch->focus) - 1] = '\0';
     ch->focus_valid = 1;
+}
+
+static void RememberFocus2(CHAT *ch, const char *subj, const char *obj)
+{
+    RememberFocus(ch, subj);
+    if (obj != NULL && obj[0] != '\0')
+    {
+        strncpy(ch->focus_secondary, obj, sizeof(ch->focus_secondary) - 1);
+        ch->focus_secondary[sizeof(ch->focus_secondary) - 1] = '\0';
+        ch->focus_secondary_valid = 1;
+    }
 }
 
 /* goal outcomes live in chat.h (wrapper-visible) */
@@ -2251,6 +2484,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         uint32_t found = ChatParents(ch, p->a, parents, 8);
         if (found == 1)
         {
+            RememberFocus2(ch, p->a, parents[0]);
             st = GOAL_ANSWER;
             char capP[CHAT_TOKEN_MAX];
             Cap(parents[0], capP, sizeof(capP));
@@ -2298,7 +2532,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
     }
     case INT_IS_PARENT:
     {
-        RememberFocus(ch, p->a);
+        RememberFocus2(ch, p->a, p->b);
         const char *stem = ChatFamStem(ch, "taxonomy");
         if (stem == NULL)
         {
@@ -2331,6 +2565,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         char gp[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
         if (ChatGrandparent(ch, p->a, gp, sizeof(gp), mid, sizeof(mid)))
         {
+            RememberFocus2(ch, p->a, gp);
             char capG[CHAT_TOKEN_MAX];
             Cap(gp, capG, sizeof(capG));
             Cap(mid, capM, sizeof(capM));
@@ -2357,6 +2592,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         char gd[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
         if (ChatDescendant(ch, p->a, gd, sizeof(gd), mid, sizeof(mid)))
         {
+            RememberFocus2(ch, p->a, gd);
             char capD[CHAT_TOKEN_MAX];
             Cap(gd, capD, sizeof(capD));
             Cap(mid, capM, sizeof(capM));
@@ -2521,7 +2757,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
            exact). File list remembered for unload-by-rebuild. */
         char path[512];
         if (CRulesResolvePath(p->a, path, sizeof(path)) &&
-            TextSessionEnsure(ch) && ch->ntfiles < 8)
+            TextSessionEnsure(ch) && ch->ntfiles < CHAT_TEXT_FILES_MAX)
         {
             TEXTLEX_STATS tls;
             uint32_t slot;
@@ -2628,6 +2864,21 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             for (i = 0; i < p->ntoks && nw < 8; i++)
                 words[nw++] = p->toks[i];
         }
+        /* interpretation layer: topic key (cached words on
+           follow-up so the topic stays put across paraphrase),
+           ranking with bounded boosts, record on success. */
+        {
+            uint64_t qkey;
+            const char *tw[CHAT_TEXT_WORDS_MAX];
+            uint32_t qi;
+            if (p->t_following && ch->tnw > 0)
+            {
+                for (qi = 0; qi < ch->tnw && qi < CHAT_TEXT_WORDS_MAX; qi++)
+                    tw[qi] = ch->twords[qi];
+                qkey = MGKeyWords(tw, qi);
+            }
+            else
+                qkey = MGKeyWords(words, nw);
         for (f = 0; f < ch->ntfiles; f++)
         {
             uint32_t idx[16];
@@ -2650,12 +2901,17 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 }
                 if (seen)
                     continue;
-                if (!have || sc[r] > bestsc)
                 {
-                    have = 1;
-                    best = idx[r];
-                    bestsc = sc[r];
-                    bestf = f;
+                    float tot = sc[r] + (float)MGBoost(
+                        &ch->mg, qkey, f, idx[r], ch->tshown,
+                        ch->ntshown);
+                    if (!have || tot > bestsc)
+                    {
+                        have = 1;
+                        best = idx[r];
+                        bestsc = tot;
+                        bestf = f;
+                    }
                 }
             }
         }
@@ -2681,7 +2937,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                     {
                         ch->ntshown = 0;
                         ch->tnw = 0;
-                        for (k = 0; k < nw; k++)
+                        for (k = 0; k < nw && k < CHAT_TEXT_WORDS_MAX; k++)
                         {
                             strncpy(ch->twords[k], words[k],
                                     CHAT_TOKEN_MAX - 1);
@@ -2691,8 +2947,20 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                     }
                 }
                 key = (bestf << 24) | (best & 0xFFFFFFu);
-                if (ch->ntshown < 64)
+                if (ch->ntshown < CHAT_TEXT_SHOWN_MAX)
                     ch->tshown[ch->ntshown++] = key;
+                MGObserve(&ch->mg, qkey, bestf, best);
+                if (p->t_following && ch->ntshown >= 2)
+                {
+                    /* engagement + attraction on advance: the
+                       continued sentence earned weight, and the
+                       step prev->best becomes navigable */
+                    uint32_t pk = ch->tshown[ch->ntshown - 2];
+                    uint32_t pf = pk >> 24;
+                    uint32_t pi = pk & 0xFFFFFFu;
+                    MGEngage(&ch->mg, qkey, pf, pi);
+                    MGAttract(&ch->mg, pf, pi, bestf, best);
+                }
                 if (p->t_sub[0] != '\0')
                     EMIT_OK("Segun el texto [%s]: %s\n", p->t_sub,
                             sent);
@@ -2704,6 +2972,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         else
             EMIT("No entendi la pregunta.\n");
+        }
         break;
     }
     case INT_TEXTSTATUS:
@@ -2735,6 +3004,207 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                     list,
                     (unsigned)SymbolCount(ch->tgraph->symbols));
         }
+        break;
+    }
+    case INT_TEXT_TOPICS:
+    {
+        if (ch->ntfiles > 0 && ch->tgraph != NULL && ch->temb != NULL)
+        {
+            TL_CONCEPT concepts[8];
+            uint32_t nconcs = TextLexTopConcepts(ch->tgraph, ch->temb, concepts, 8);
+            if (nconcs > 0)
+            {
+                uint32_t total_sents = 0;
+                for (uint32_t f = 0; f < ch->ntfiles; f++)
+                    total_sents += TextLexSentCount(&ch->tlex[f]);
+                st = GOAL_ANSWER;
+                EMIT_OK("Los textos cargados abarcan temas como:");
+                for (uint32_t i = 0; i < nconcs; i++)
+                {
+                    char capC[CHAT_TOKEN_MAX];
+                    Cap(concepts[i].name, capC, sizeof(capC));
+                    EMIT(" %s%s", capC, (i + 1 < nconcs) ? "," : "");
+                }
+                EMIT(" (con %u frases y %u simbolos en %s). Puedes preguntarme sobre cualquiera de ellos.\n",
+                     total_sents, SymbolCount(ch->tgraph->symbols), ch->tfiles[0]);
+            }
+            else
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("Los textos estan cargados pero aun no se han concentrado conceptos suficientes.\n");
+            }
+        }
+        else if (ch->kb.num_pairs > 0)
+        {
+            st = GOAL_ANSWER;
+            EMIT_OK("La base de conocimiento contiene %u afirmaciones estructuradas sobre relaciones y entidades.\n",
+                    ch->kb.num_pairs);
+        }
+        else
+        {
+            EMIT("No hay textos ni datos cargados en la sesion actual. Puedes cargar uno con 'carga <archivo.txt>'.\n");
+        }
+        break;
+    }
+    case INT_TEXT_START:
+    {
+        if (ch->ntfiles > 0 && ch->tgraph != NULL && ch->temb != NULL)
+        {
+            TL_CONCEPT concepts[6];
+            uint32_t nconcs = TextLexTopConcepts(ch->tgraph, ch->temb, concepts, 6);
+            if (nconcs > 0)
+            {
+                /* Try each top concept until a substantial sentence (>= 35 chars) is found */
+                for (uint32_t c = 0; c < nconcs; c++)
+                {
+                    const char *words[1];
+                    words[0] = concepts[c].name;
+                    uint32_t best = 0, bestf = 0;
+                    float bestsc = 0.0f;
+                    int have = 0;
+                    for (uint32_t f = 0; f < ch->ntfiles; f++)
+                    {
+                        uint32_t idx[8];
+                        float sc[8];
+                        uint32_t nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                                        ch->temb, words, 1,
+                                                        idx, sc, 8);
+                        for (uint32_t r = 0; r < nret; r++)
+                        {
+                            char sent_probe[2048];
+                            if (TextLexSentenceText(&ch->tlex[f], idx[r],
+                                                    ch->tlex[f].image,
+                                                    ch->tlex[f].imagelen,
+                                                    sent_probe, sizeof(sent_probe)) > 0)
+                            {
+                                if (strlen(sent_probe) >= 35 && (!have || sc[r] > bestsc))
+                                {
+                                    have = 1;
+                                    best = idx[r];
+                                    bestf = f;
+                                    bestsc = sc[r];
+                                }
+                            }
+                        }
+                    }
+                    if (have && ch->tlex[bestf].image != NULL)
+                    {
+                        char sent[2048];
+                        if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                                ch->tlex[bestf].image,
+                                                ch->tlex[bestf].imagelen, sent,
+                                                sizeof(sent)) > 0)
+                        {
+                            char capC[CHAT_TOKEN_MAX];
+                            Cap(concepts[c].name, capC, sizeof(capC));
+                            RememberFocus(ch, concepts[c].name);
+                            /* Seed KV-cache topic so follow-ups advance immediately */
+                            ch->ntshown = 0;
+                            ch->tnw = 0;
+                            strncpy(ch->twords[0], concepts[c].name, CHAT_TOKEN_MAX - 1);
+                            ch->twords[0][CHAT_TOKEN_MAX - 1] = '\0';
+                            ch->tnw = 1;
+                            uint32_t key = (bestf << 24) | (best & 0xFFFFFFu);
+                            if (ch->ntshown < CHAT_TEXT_SHOWN_MAX)
+                                ch->tshown[ch->ntshown++] = key;
+                            uint64_t qkey = MGKeyWords(words, 1);
+                            MGObserve(&ch->mg, qkey, bestf, best);
+                            MGEngage(&ch->mg, qkey, bestf, best);
+
+                            st = GOAL_ANSWER;
+                            EMIT_OK("Podemos hablar sobre %s. Segun el texto: \"%s\". Que aspecto te gustaria explorar?\n",
+                                    capC, sent);
+                            break;
+                        }
+                    }
+                }
+                if (st == GOAL_ANSWER)
+                    break;
+            }
+            EMIT("Podemos hablar sobre el texto cargado (%s). Hazme cualquier pregunta.\n",
+                 ch->tfiles[0]);
+        }
+        else
+        {
+            EMIT("No hay textos cargados para iniciar una conversacion. Puedes cargar uno con 'carga <archivo.txt>'.\n");
+        }
+        break;
+    }
+    case INT_UNLOAD:
+    {
+        /* unload by exact rebuild: drop the file, destroy stores,
+           recreate, re-ingest survivors in original order. No
+           metas involved (text path), so restoration is exact by
+           construction. Topic cache reset (shown indices die with
+           the rebuild). */
+        char path[512];
+        uint32_t f;
+        uint32_t slot = CHAT_TEXT_FILES_MAX;
+        if (!CRulesResolvePath(p->a, path, sizeof(path)))
+        {
+            EMIT("No entendi la pregunta.\n");
+            break;
+        }
+        for (f = 0; f < ch->ntfiles; f++)
+        {
+            if (strcmp(ch->tfiles[f], p->a) == 0)
+            {
+                slot = f;
+                break;
+            }
+        }
+        if (slot >= ch->ntfiles)
+        {
+            EMIT("No entendi la pregunta.\n");
+            break;
+        }
+        for (f = 0; f < ch->ntfiles; f++)
+        {
+            if (CRulesResolvePath(ch->tfiles[f], path,
+                                  sizeof(path)) == 0)
+            {
+                EMIT("No entendi la pregunta.\n");
+                break;
+            }
+        }
+        if (f < ch->ntfiles)
+            break;
+        for (f = 0; f < CHAT_TEXT_FILES_MAX; f++)
+            TextLexClear(&ch->tlex[f]);
+        if (ch->temb != NULL)
+        {
+            EmbeddingTableDestroy(ch->temb);
+            ch->temb = NULL;
+        }
+        if (ch->tgraph != NULL)
+        {
+            GraphDestroy(ch->tgraph);
+            ch->tgraph = NULL;
+        }
+        ch->tnw = 0;
+        ch->ntshown = 0;
+        for (f = slot; f + 1 < ch->ntfiles; f++)
+        {
+            strncpy(ch->tfiles[f], ch->tfiles[f + 1],
+                    sizeof(ch->tfiles[f]) - 1);
+            ch->tfiles[f][sizeof(ch->tfiles[f]) - 1] = '\0';
+        }
+        ch->ntfiles--;
+        TextLexPosReset();
+        if (!TextSessionEnsure(ch))
+        {
+            EMIT("No entendi la pregunta.\n");
+            break;
+        }
+        for (f = 0; f < ch->ntfiles; f++)
+        {
+            if (CRulesResolvePath(ch->tfiles[f], path,
+                                  sizeof(path)))
+                TextLexIngest(ch->tgraph, &ch->tlex[f], path, 1,
+                              0);
+        }
+        EMIT_OK("Descargado %s. Textos en sesion: %u.\n", p->a,
+                (unsigned)ch->ntfiles);
         break;
     }
     case INT_REL_BOOL:
@@ -2782,6 +3252,16 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             char out[128];
             yes = TransferDerive(&ch->kb, &ch->mk, fam, p->a, p->b, out,
                                  sizeof(out));
+        }
+        else
+        {
+            /* generic relation: direct lookup or TransferDerive in either polarity */
+            char out[128], mid[CHAT_TOKEN_MAX];
+            yes = TransferDerive(&ch->kb, &ch->mk, fam, p->a, p->b, out,
+                                 sizeof(out)) ||
+                  TransferDerive(&ch->kb, &ch->mk, fam, p->b, p->a, out,
+                                 sizeof(out)) ||
+                  ChatChainFam(ch, fam, p->a, p->b, mid, sizeof(mid));
         }
         if (yes)
             EMIT_OK("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
@@ -2845,12 +3325,99 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             else if (as_wife > 0)
                 found = ChatSpouses(ch, p->a, 1, hits, 16);
         }
+        else
+        {
+            /* Generic relation family: scan KB pairs for (X, p->a) or (p->a, Y) */
+            uint32_t as_obj = 0, as_subj = 0;
+            for (uint32_t i = 0; i < ch->kb.num_pairs; i++)
+            {
+                const PAIR_EVID *q = &ch->kb.pairs[i];
+                if (strcmp(q->family, fam) != 0)
+                    continue;
+                if (strcmp(q->object, p->a) == 0)
+                    as_obj++;
+                if (strcmp(q->subject, p->a) == 0)
+                    as_subj++;
+            }
+            for (uint32_t i = 0; i < ch->kb.num_pairs && found < 16; i++)
+            {
+                const PAIR_EVID *q = &ch->kb.pairs[i];
+                if (strcmp(q->family, fam) != 0)
+                    continue;
+                const char *hit = NULL;
+                if (as_obj >= as_subj && strcmp(q->object, p->a) == 0)
+                    hit = q->subject;
+                else if (as_subj > as_obj && strcmp(q->subject, p->a) == 0)
+                    hit = q->object;
+                if (hit != NULL)
+                {
+                    int dup = 0;
+                    for (uint32_t d = 0; d < found; d++)
+                    {
+                        if (strcmp(hits[d], hit) == 0)
+                        {
+                            dup = 1;
+                            break;
+                        }
+                    }
+                    if (!dup)
+                    {
+                        strncpy(hits[found], hit, CHAT_TOKEN_MAX - 1);
+                        hits[found][CHAT_TOKEN_MAX - 1] = '\0';
+                        found++;
+                    }
+                }
+            }
+        }
         if (found == 0)
         {
+            if (ch->ntfiles > 0 && ch->tgraph != NULL)
+            {
+                const char *words[4];
+                uint32_t nw = 0;
+                words[nw++] = kw->es_stem;
+                if (p->a[0] != '\0')
+                    words[nw++] = p->a;
+                uint32_t best = 0, bestf = 0;
+                float bestsc = 0.0f;
+                int have = 0;
+                for (uint32_t f = 0; f < ch->ntfiles; f++)
+                {
+                    uint32_t idx[16];
+                    float sc[16];
+                    uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                                 ch->temb, words, nw,
+                                                 idx, sc, 16);
+                    for (uint32_t j = 0; j < r; j++)
+                    {
+                        if (!have || sc[j] > bestsc)
+                        {
+                            best = idx[j];
+                            bestf = f;
+                            bestsc = sc[j];
+                            have = 1;
+                        }
+                    }
+                }
+                if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+                {
+                    char sent[2048];
+                    if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                            ch->tlex[bestf].image,
+                                            ch->tlex[bestf].imagelen, sent,
+                                            sizeof(sent)) > 0)
+                    {
+                        st = GOAL_ANSWER;
+                        EMIT_OK("Segun el texto: %s\n", sent);
+                        break;
+                    }
+                }
+            }
             EMIT("No tengo constancia de %s de %s.\n", kw->es_stem, capA);
         }
         else
         {
+            RememberFocus2(ch, p->a, hits[0]);
             st = GOAL_ANSWER;
             EMIT("%s de %s:", kw->es_stem, capA);
             for (uint32_t i = 0; i < found; i++)
@@ -3000,9 +3567,10 @@ static void ChainSubstitute(CHAT *ch, char gtoks[][CHAT_TOKEN_MAX],
    Anti-silent-loss: every goal figures, as ANSWER/constancia, tool
    answer, or explicit span-echo UNKNOWN. Provenance per goal lands
    in ch->exec (never in the KB). */
-static void ChatHandleMulti(CHAT *ch, const QueryPlan *plan,
-                            const char toks[][CHAT_TOKEN_MAX],
-                            int force_q, int force_gen)
+static int ChatHandleMultiBuf(CHAT *ch, const QueryPlan *plan,
+                              const char toks[][CHAT_TOKEN_MAX],
+                              int force_q, int force_gen,
+                              char *buf, size_t bsize)
 {
     char out[COMPOSITE_MAX];
     size_t pos = 0;
@@ -3192,11 +3760,21 @@ static void ChatHandleMulti(CHAT *ch, const QueryPlan *plan,
         }
         if (!any)
         {
-            printf("No entendi la pregunta.\n");
-            return;
+            snprintf(buf, bsize, "No entendi la pregunta.\n");
+            return 1;
         }
-        printf("%s\n", out);
+        snprintf(buf, bsize, "%s\n", out);
+        return 1;
     }
+}
+
+static void ChatHandleMulti(CHAT *ch, const QueryPlan *plan,
+                            const char toks[][CHAT_TOKEN_MAX],
+                            int force_q, int force_gen)
+{
+    char buf[COMPOSITE_MAX + 16];
+    if (ChatHandleMultiBuf(ch, plan, toks, force_q, force_gen, buf, sizeof(buf)))
+        printf("%s", buf);
 }
 
 /* anaphora: empty slot A -> focus */
@@ -3209,7 +3787,64 @@ static void ApplyFocus(CHAT *ch, PARSED *p)
     }
 }
 
-/* ---- public API ---- */
+static int IsTextFile(const char *path)
+{
+    if (path == NULL || path[0] == '\0')
+        return 0;
+    size_t L = strlen(path);
+    if (L > 4 && (strcmp(path + L - 4, ".txt") == 0 || strcmp(path + L - 4, ".TXT") == 0))
+        return 1;
+    if (L > 4 && (strcmp(path + L - 4, ".tsv") == 0 || strcmp(path + L - 4, ".TSV") == 0))
+        return 0;
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+        return 0;
+    char first[256];
+    int is_txt = 1;
+    if (fgets(first, sizeof(first), f) != NULL)
+    {
+        if (strchr(first, '\t') != NULL)
+            is_txt = 0;
+    }
+    fclose(f);
+    return is_txt;
+}
+
+uint32_t ChatLoadCorpus(CHAT *ch, const char *path)
+{
+    if (ch == NULL || path == NULL || path[0] == '\0')
+        return 0;
+    if (IsTextFile(path))
+    {
+        if (TextSessionEnsure(ch) && ch->ntfiles < CHAT_TEXT_FILES_MAX)
+        {
+            uint32_t slot = ch->ntfiles;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                if (strcmp(ch->tfiles[f], path) == 0)
+                {
+                    slot = f;
+                    break;
+                }
+            }
+            TEXTLEX_STATS tls = TextLexIngest(ch->tgraph, &ch->tlex[slot], path, 1, 0);
+            if (tls.bytes_read > 0)
+            {
+                TextSessionRemember(ch, path);
+                return tls.nsent_new;
+            }
+        }
+        return 0;
+    }
+    uint32_t scanned = 0;
+    uint32_t n = ChatIngestCorpus(ch, path, &scanned);
+    if (n > 0)
+    {
+        MetaDiscover(&ch->mk);
+        MetaRuleDiscover(&ch->mk);
+    }
+    return n;
+}
 
 void ChatInit(CHAT *ch, const char *corpus_path)
 {
@@ -3218,11 +3853,70 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     MetaKBInit(&ch->mk);
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);
     ToolInit();
-    uint32_t n = ChatIngestCorpus(ch, corpus_path, NULL);
+    uint32_t total_facts = 0;
+    uint32_t total_sents = 0;
+    uint32_t total_syms = 0;
+    if (corpus_path != NULL && corpus_path[0] != '\0')
+    {
+        char paths[1024];
+        strncpy(paths, corpus_path, sizeof(paths) - 1);
+        paths[sizeof(paths) - 1] = '\0';
+        char *p = paths;
+        while (*p)
+        {
+            char *next = strpbrk(p, ";,");
+            if (next != NULL)
+                *next = '\0';
+            while (*p && isspace((unsigned char)*p))
+                p++;
+            char *end = p + strlen(p);
+            while (end > p && isspace((unsigned char)*(end - 1)))
+                *(--end) = '\0';
+            if (*p)
+            {
+                if (IsTextFile(p))
+                {
+                    if (TextSessionEnsure(ch) && ch->ntfiles < CHAT_TEXT_FILES_MAX)
+                    {
+                        uint32_t slot = ch->ntfiles;
+                        for (uint32_t f = 0; f < ch->ntfiles; f++)
+                        {
+                            if (strcmp(ch->tfiles[f], p) == 0)
+                            {
+                                slot = f;
+                                break;
+                            }
+                        }
+                        TEXTLEX_STATS tls = TextLexIngest(ch->tgraph, &ch->tlex[slot], p, 1, 0);
+                        if (tls.bytes_read > 0)
+                        {
+                            TextSessionRemember(ch, p);
+                            total_sents += tls.nsent_new;
+                            total_syms += tls.syms_new;
+                        }
+                    }
+                }
+                else
+                {
+                    uint32_t scanned = 0;
+                    total_facts += ChatIngestCorpus(ch, p, &scanned);
+                }
+            }
+            if (next == NULL)
+                break;
+            p = next + 1;
+        }
+    }
     MetaDiscover(&ch->mk);
     MetaRuleDiscover(&ch->mk);
-    printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", n,
-           ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
+    if (total_sents > 0 && total_facts == 0)
+        printf("[chat] text corpus: %u sentences, %u symbols\n", total_sents, total_syms);
+    else if (total_sents > 0 && total_facts > 0)
+        printf("[chat] hybrid corpus: %u facts, %u text sentences, %u symbols, metas=%u, rules=%u\n",
+               total_facts, total_sents, ch->kb.num_vocab + total_syms, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
+    else
+        printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", total_facts,
+               ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
 }
 
 /* frame family label for the tool planner (deduced families pass
@@ -3252,6 +3946,12 @@ static const char *FamLabel(const CHAT *ch, const PARSED *p)
         return "textqa";
     case INT_TEXTSTATUS:
         return "textstatus";
+    case INT_TEXT_TOPICS:
+        return "texttopics";
+    case INT_TEXT_START:
+        return "textstart";
+    case INT_UNLOAD:
+        return "textunload";
     default:
         break;
     }
@@ -3292,6 +3992,12 @@ static const char *IntentName(int intent)
         return "TEXTQ";
     case INT_TEXTSTATUS:
         return "TEXTSTATUS";
+    case INT_TEXT_TOPICS:
+        return "TEXT_TOPICS";
+    case INT_TEXT_START:
+        return "TEXT_START";
+    case INT_UNLOAD:
+        return "UNLOAD";
     default:
         return "NONE";
     }
@@ -3390,7 +4096,8 @@ int ChatTryTextLine(CHAT *ch, const char *line, char *out,
                          sf.genitive, 0, &tp))
         return 0;
     if (tp.intent != INT_TEXTLOAD && tp.intent != INT_TEXTQ &&
-        tp.intent != INT_TEXTSTATUS)
+        tp.intent != INT_TEXTSTATUS && tp.intent != INT_UNLOAD &&
+        tp.intent != INT_TEXT_TOPICS && tp.intent != INT_TEXT_START)
         return 0;
     st = ChatResolveLine(ch, line, out, size, NULL, 0, NULL, 0,
                          NULL);
@@ -3453,10 +4160,11 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
     return st;
 }
 
-void ChatHandle(CHAT *ch, const char *line)
+int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
 {
-    /* Fase A: multi-goal lines take the composite dispatcher; single
-       goals keep the legacy single-intent path byte-identical. */
+    if (ch == NULL || line == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
     char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
     QueryPlan plan;
     uint32_t ntok = 0;
@@ -3469,15 +4177,16 @@ void ChatHandle(CHAT *ch, const char *line)
         char tbuf[CHAT_ANSWER_MAX];
         if (ChatTryTextLine(ch, line, tbuf, sizeof(tbuf)))
         {
-            printf("%s", tbuf);
-            return;
+            strncpy(out, tbuf, size - 1);
+            out[size - 1] = '\0';
+            return 1;
         }
     }
     if (ChatBuildPlan(ch, line, &plan, toks, &ntok, &sf) >= 2)
     {
-        ChatHandleMulti(ch, &plan, toks,
-                        sf.question || HasWh(toks, ntok), sf.genitive);
-        return;
+        return ChatHandleMultiBuf(ch, &plan, toks,
+                                 sf.question || HasWh(toks, ntok), sf.genitive,
+                                 out, size);
     }
     char ans[CHAT_ANSWER_MAX];
     char slot[CHAT_TOKEN_MAX];
@@ -3490,13 +4199,24 @@ void ChatHandle(CHAT *ch, const char *line)
         char self[1024];
         if (SelfAnswer(line, self, sizeof(self)))
         {
-            printf("%s", self);
-            return;
+            strncpy(out, self, size - 1);
+            out[size - 1] = '\0';
+            return 1;
         }
-        printf("No entendi la pregunta.\n");
-        return;
+        strncpy(out, "No entendi la pregunta.\n", size - 1);
+        out[size - 1] = '\0';
+        return 1;
     }
-    printf("%s", ans);
+    strncpy(out, ans, size - 1);
+    out[size - 1] = '\0';
+    return 1;
+}
+
+void ChatHandle(CHAT *ch, const char *line)
+{
+    char buf[CHAT_ANSWER_MAX];
+    if (ChatHandleToBuf(ch, line, buf, sizeof(buf)))
+        printf("%s", buf);
 }
 
 /* ---- Agent Core: ToolContract (diagnostic, no execution) ----

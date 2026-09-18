@@ -9,9 +9,21 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#ifdef _WIN32
 #include <direct.h>
 #include <io.h>
 #include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <poll.h>
+#include <errno.h>
+#endif
+#include "compat.h"
 #include "chat.h"
 #include "tool_contract.h"
 
@@ -104,6 +116,7 @@ static void ShellFlatten(char *text)
     text[w] = '\0';
 }
 
+#ifdef _WIN32
 /* Execute through CreateProcess with anonymous pipes: stdout and
    stderr merged into one bounded buffer, strict timeout (kills on
    expiry, never hangs the REPL), NULL stdin (no input waits), fixed
@@ -208,6 +221,128 @@ static int ShellRun(const char *backend, const char *argv, char *out,
     ShellFlatten(out);
     return 1;
 }
+#else
+/* POSIX execution using pipe, fork, exec, poll with strict timeout. */
+static int ShellRun(const char *backend, const char *argv, char *out,
+                    size_t size, int *exit_code, int *timed_out)
+{
+    char cmd[768];
+    char dir[512];
+    int pipefd[2];
+    pid_t pid;
+    size_t pos = 0;
+    int status = 0;
+    int timed = 0;
+    struct pollfd pfd;
+
+    if (out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    if (exit_code != NULL)
+        *exit_code = -2;
+    if (timed_out != NULL)
+        *timed_out = 0;
+    ShellSandboxPath(dir, sizeof(dir));
+    _mkdir(dir);
+
+    if (strcmp(backend, "powershell") == 0)
+        snprintf(cmd, sizeof(cmd), "pwsh -NoProfile -NonInteractive -Command %s", argv);
+    else
+        snprintf(cmd, sizeof(cmd), "%s", argv);
+
+    if (pipe(pipefd) < 0)
+        return 0;
+
+    pid = fork();
+    if (pid < 0)
+    {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return 0;
+    }
+
+    if (pid == 0)
+    {
+        int devnull;
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[1]);
+
+        devnull = open("/dev/null", O_RDONLY);
+        if (devnull >= 0)
+        {
+            dup2(devnull, STDIN_FILENO);
+            close(devnull);
+        }
+
+        if (chdir(dir) != 0)
+        {
+            /* Sandbox chdir fallback */
+        }
+
+        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        _exit(127);
+    }
+
+    close(pipefd[1]);
+
+    pfd.fd = pipefd[0];
+    pfd.events = POLLIN;
+
+    while (pos + 1 < size && pos + 1 < (size_t)SHELL_OUT_MAX)
+    {
+        int ret = poll(&pfd, 1, SHELL_TIMEOUT_MS);
+        if (ret < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            break;
+        }
+        if (ret == 0)
+        {
+            timed = 1;
+            break;
+        }
+        if (pfd.revents & POLLIN)
+        {
+            size_t want = size - pos - 1;
+            if (want > (size_t)(SHELL_OUT_MAX - 1 - pos))
+                want = (size_t)(SHELL_OUT_MAX - 1 - pos);
+            ssize_t rd = read(pipefd[0], out + pos, want);
+            if (rd <= 0)
+                break;
+            pos += (size_t)rd;
+        }
+        else if (pfd.revents & (POLLHUP | POLLERR))
+        {
+            break;
+        }
+    }
+    close(pipefd[0]);
+
+    if (timed)
+    {
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
+        if (timed_out != NULL)
+            *timed_out = 1;
+        if (exit_code != NULL)
+            *exit_code = -1;
+    }
+    else
+    {
+        if (waitpid(pid, &status, 0) > 0)
+        {
+            if (exit_code != NULL)
+                *exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        }
+    }
+    out[pos] = '\0';
+    ShellFlatten(out);
+    return 1;
+}
+#endif
 
 ShellResult ShellExec(const char *cmd_line)
 {

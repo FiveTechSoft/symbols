@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <io.h>
+#include "compat.h"
 #include "c_rules.h"
 #include "schema.h"
 #include "metaschema.h"

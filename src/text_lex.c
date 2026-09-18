@@ -45,8 +45,7 @@ static void SentFree(TL_SENT *s)
     s->cap = 0;
 }
 
-void TextLexClear(TEXTLEX *tl)
-{
+void TextLexClear(TEXTLEX *tl){
     uint32_t i;
     if (tl == NULL)
         return;
@@ -133,6 +132,11 @@ uint32_t TextLexSentenceText(const TEXTLEX *tl, uint32_t idx,
 static float g_posvec[TL_POS_MAX][EMBEDDING_DIM];
 
 #define POSBUCKET(k) (0x80000000u | ((uint32_t)(k) % TL_POS_MAX))
+
+void TextLexPosReset(void)
+{
+    memset(g_posvec, 0, sizeof(g_posvec));
+}
 
 /* matmul-free compatibility: top-m active-dimension overlap.
    Signature = indices of the m largest centroid dims (partial
@@ -402,7 +406,11 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
     }
     if (pairs > 0)
         total += (float)conc / (float)pairs;
-    }
+    /* lexical density: grammatical sentences outrank
+       number/punctuation-heavy index lines. Bounded [0,1]. */
+    total += s->density;
+    return total;
+}
     return total;
 }
 
@@ -958,7 +966,7 @@ static int SentDup(const TEXTLEX *tl, uint64_t first_off,
 }
 
 static int SentStore(TEXTLEX *tl, const TL_RAWTOK *toks, uint32_t ntok,
-                     const SYMBOL_ID *ids)
+                     const SYMBOL_ID *ids, const unsigned char *img)
 {
     TL_SENT *s;
     uint32_t i;
@@ -993,6 +1001,29 @@ static int SentStore(TEXTLEX *tl, const TL_RAWTOK *toks, uint32_t ntok,
     }
     s->ntok = ntok;
     s->cap = ntok;
+    /* lexical density: tokens carrying 3+ alpha bytes over total.
+       Grammatical sentences score near 1; index/TOC lines full
+       of numbers and punctuation score low. Structural only. */
+    {
+        uint32_t k;
+        uint32_t lex = 0;
+        for (k = 0; k < ntok; k++)
+        {
+            const unsigned char *tp = img + toks[k].off;
+            uint32_t m;
+            uint32_t na = 0;
+            for (m = 0; m < toks[k].len; m++)
+            {
+                unsigned char c = tp[m];
+                if ((c >= 'A' && c <= 'Z') ||
+                    (c >= 'a' && c <= 'z') || c >= 0x80)
+                    na++;
+            }
+            if (na >= 3)
+                lex++;
+        }
+        s->density = ntok > 0 ? (float)lex / (float)ntok : 0.0f;
+    }
     tl->nsent++;
     return 1;
 }
@@ -1035,7 +1066,7 @@ static void IngestSentence(GRAPH *graph, EMBEDDING_TABLE *emb,
         free(ids);
         return;
     }
-    if (!SentStore(tl, toks, n, ids))
+    if (!SentStore(tl, toks, n, ids, img))
     {
         free(ids);
         return;
@@ -1353,4 +1384,112 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
     free(img);
     FinalizeSigs(tl, graph, emb);
     return st;
+}
+
+static int IsAllUpperStr(const char *s)
+{
+    if (s == NULL || s[0] == '\0')
+        return 0;
+    for (size_t i = 0; s[i] != '\0'; i++)
+    {
+        if (s[i] >= 'a' && s[i] <= 'z')
+            return 0;
+    }
+    return 1;
+}
+
+/* Concept concentration discovery: key topics discovered from the embedding topology.
+   Peaked count vectors = focused topic; flat count vectors = glue / scaffolding.
+   Reads the relation vectors directly; deterministic and structural. */
+uint32_t TextLexTopConcepts(const GRAPH *graph, const EMBEDDING_TABLE *emb,
+                            TL_CONCEPT *out, uint32_t max_out)
+{
+    if (graph == NULL || graph->symbols == NULL || emb == NULL || out == NULL || max_out == 0)
+        return 0;
+
+    uint32_t nsyms = SymbolCount(graph->symbols);
+    uint32_t ncs = 0, ccap = 0;
+    TL_CONCEPT *cs = NULL;
+
+    for (uint32_t i = 1; i <= nsyms; i++)
+    {
+        const SYMBOL *ss = SymbolGet(graph->symbols, i);
+        if (ss == NULL || ss->frequency < 5 || ss->name == NULL)
+            continue;
+
+        /* Lexical filter: genuine words only (letter start, length >= 3).
+           Reference marks, digits and initials stay in storage, out of concept ranking. */
+        unsigned char c0 = (unsigned char)ss->name[0];
+        if (!((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z')))
+            continue;
+        if (strlen(ss->name) < 3)
+            continue;
+        /* Ignore all-uppercase section markers / roman numerals (PART, CHAPTER, XII) */
+        if (IsAllUpperStr(ss->name))
+            continue;
+
+        const float *v = EmbeddingGetVector(emb, i);
+        if (v == NULL)
+            continue;
+
+        float tot = 0.0f, mx = 0.0f;
+        for (uint32_t d = 0; d < EMBEDDING_DIM; d++)
+        {
+            tot += v[d];
+            if (v[d] > mx)
+                mx = v[d];
+        }
+        if (tot <= 0.0f)
+            continue;
+
+        float conc = mx / tot;
+        /* Skip fixed formatting/template artifacts with extreme single-bucket dominance */
+        if (conc >= 0.95f)
+            continue;
+
+        if (ncs >= ccap)
+        {
+            uint32_t nc = ccap == 0 ? 1024 : ccap * 2;
+            TL_CONCEPT *nn = (TL_CONCEPT *)realloc(cs, nc * sizeof(TL_CONCEPT));
+            if (nn == NULL)
+                break;
+            cs = nn;
+            ccap = nc;
+        }
+
+        cs[ncs].id = i;
+        cs[ncs].name = ss->name;
+        cs[ncs].conc = conc;
+        cs[ncs].freq = ss->frequency;
+        ncs++;
+    }
+
+    if (ncs == 0)
+    {
+        free(cs);
+        return 0;
+    }
+
+    /* Rank top max_out by concentration (selection sort) */
+    uint32_t limit = ncs < max_out ? ncs : max_out;
+    for (uint32_t k = 0; k < limit; k++)
+    {
+        uint32_t m = k;
+        for (uint32_t j = k + 1; j < ncs; j++)
+        {
+            if (cs[j].conc > cs[m].conc ||
+                (cs[j].conc == cs[m].conc && cs[j].freq > cs[m].freq))
+                m = j;
+        }
+        if (m != k)
+        {
+            TL_CONCEPT t = cs[k];
+            cs[k] = cs[m];
+            cs[m] = t;
+        }
+        out[k] = cs[k];
+    }
+
+    free(cs);
+    return limit;
 }

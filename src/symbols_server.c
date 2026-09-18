@@ -9,12 +9,12 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "compat.h"
+#include "compat_net.h"
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
-#include "bible_chat.h"
+#include "chat.h"
 #include "server_proto.h"
 
 #define SERVER_PORT_DEFAULT 8099
@@ -23,7 +23,7 @@
 #define SERVER_OBS_FILE "observations.jsonl"
 #define SERVER_MODEL_ID "symbols"
 
-static int SendAll(SOCKET s, const char *buf, size_t len)
+static int SendAll(socket_t s, const char *buf, size_t len)
 {
     while (len > 0)
     {
@@ -36,15 +36,15 @@ static int SendAll(SOCKET s, const char *buf, size_t len)
     return 1;
 }
 
-static int SendJson(SOCKET s, int code, const char *status,
-                    const char *body)
+static int SendRaw(socket_t s, int code, const char *status,
+                   const char *ctype, const char *body)
 {
     char hdr[512];
     int w = snprintf(hdr, sizeof(hdr),
                      "HTTP/1.1 %d %s\r\nContent-Type: "
-                     "application/json\r\nContent-Length: %u\r\n"
+                     "%s\r\nContent-Length: %u\r\n"
                      "Connection: close\r\n\r\n",
-                     code, status, (unsigned)strlen(body));
+                     code, status, ctype, (unsigned)strlen(body));
     if (w <= 0)
         return 0;
     if (!SendAll(s, hdr, strlen(hdr)))
@@ -52,7 +52,13 @@ static int SendJson(SOCKET s, int code, const char *status,
     return SendAll(s, body, strlen(body));
 }
 
-static int SendError(SOCKET s, int code, const char *status,
+static int SendJson(socket_t s, int code, const char *status,
+                    const char *body)
+{
+    return SendRaw(s, code, status, "application/json", body);
+}
+
+static int SendError(socket_t s, int code, const char *status,
                      const char *msg)
 {
     char body[512], esc[256];
@@ -161,12 +167,79 @@ static void BuildProvArray(CHAT *ch, char *out, size_t size)
 
 static unsigned long g_seq = 0;
 
-static void HandleCompletions(SOCKET s, const char *body,
+/* session state: master CHAT for the process lifetime (the accept
+   loop is single-threaded). Dynamic corpus loads (load X.txt)
+   persist across requests; the bible corpus ingests once. */
+static CHAT g_session;
+static int g_session_ready = 0;
+
+#define SERVER_MAX_SESSIONS 32
+
+typedef struct
+{
+    char session_id[64];
+    char focus[CHAT_TOKEN_MAX];
+    int focus_valid;
+    char focus_secondary[CHAT_TOKEN_MAX];
+    int focus_secondary_valid;
+    ExecCtx exec;
+    time_t last_active;
+} ServerSession;
+
+static ServerSession g_sessions[SERVER_MAX_SESSIONS];
+static uint32_t g_num_sessions = 0;
+
+static ServerSession *GetOrCreateSession(const char *session_id)
+{
+    uint32_t i;
+    time_t oldest_time;
+    uint32_t oldest_idx;
+    if (session_id == NULL || session_id[0] == '\0')
+        session_id = "default";
+
+    for (i = 0; i < g_num_sessions; i++)
+    {
+        if (strcmp(g_sessions[i].session_id, session_id) == 0)
+        {
+            g_sessions[i].last_active = time(NULL);
+            return &g_sessions[i];
+        }
+    }
+
+    if (g_num_sessions < SERVER_MAX_SESSIONS)
+    {
+        ServerSession *s = &g_sessions[g_num_sessions++];
+        memset(s, 0, sizeof(*s));
+        strncpy(s->session_id, session_id, sizeof(s->session_id) - 1);
+        s->last_active = time(NULL);
+        return s;
+    }
+
+    /* Evict oldest session (LRU) */
+    oldest_time = g_sessions[0].last_active;
+    oldest_idx = 0;
+    for (i = 1; i < SERVER_MAX_SESSIONS; i++)
+    {
+        if (g_sessions[i].last_active < oldest_time)
+        {
+            oldest_time = g_sessions[i].last_active;
+            oldest_idx = i;
+        }
+    }
+    memset(&g_sessions[oldest_idx], 0, sizeof(ServerSession));
+    strncpy(g_sessions[oldest_idx].session_id, session_id,
+            sizeof(g_sessions[oldest_idx].session_id) - 1);
+    g_sessions[oldest_idx].last_active = time(NULL);
+    return &g_sessions[oldest_idx];
+}
+
+static void HandleCompletions(socket_t s, const char *body,
                               const char *corpus)
 {
     char query[4096], raw[4096], content[4096], resp[12288];
     char obs[16384], ts[32], ent_json[2048], prov_json[4096];
-    CHAT ch;
+    char session_id[64] = "default";
+    ServerSession *sess = NULL;
     ChatParse parsed;
     int nmsg = 0, has_system = 0;
     const char *status;
@@ -178,31 +251,71 @@ static void HandleCompletions(SOCKET s, const char *body,
         SendError(s, 400, "Bad Request", "no user message found");
         return;
     }
+    ServerExtractSession(body, session_id, sizeof(session_id));
+    sess = GetOrCreateSession(session_id);
     ScanRoles(body, &nmsg, &has_system);
-    ChatInit(&ch, corpus);
+    if (!g_session_ready)
+    {
+        ChatInit(&g_session, corpus);
+        g_session_ready = 1;
+    }
+
+    /* Restore session dialogue state */
+    strncpy(g_session.focus, sess->focus, sizeof(g_session.focus) - 1);
+    g_session.focus[sizeof(g_session.focus) - 1] = '\0';
+    g_session.focus_valid = sess->focus_valid;
+    strncpy(g_session.focus_secondary, sess->focus_secondary, sizeof(g_session.focus_secondary) - 1);
+    g_session.focus_secondary[sizeof(g_session.focus_secondary) - 1] = '\0';
+    g_session.focus_secondary_valid = sess->focus_secondary_valid;
+    g_session.exec = sess->exec;
+
     memset(&parsed, 0, sizeof(parsed));
-    ChatParseLine(&ch, query, &parsed);
+    ChatParseLine(&g_session, query, &parsed);
     t0 = clock();
-    if (!ServerAnswerQuery(&ch, query, raw, sizeof(raw)))
+    if (!ServerAnswerQuery(&g_session, query, raw, sizeof(raw)))
         strncpy(raw, "No entendi la pregunta.", sizeof(raw) - 1);
     latency_ms = (long)((clock() - t0) * 1000 / CLOCKS_PER_SEC);
+
+    /* Persist updated session dialogue state */
+    strncpy(sess->focus, g_session.focus, sizeof(sess->focus) - 1);
+    sess->focus[sizeof(sess->focus) - 1] = '\0';
+    sess->focus_valid = g_session.focus_valid;
+    strncpy(sess->focus_secondary, g_session.focus_secondary, sizeof(sess->focus_secondary) - 1);
+    sess->focus_secondary[sizeof(sess->focus_secondary) - 1] = '\0';
+    sess->focus_secondary_valid = g_session.focus_secondary_valid;
+    sess->exec = g_session.exec;
+    sess->last_active = time(NULL);
+
     ServerMapContent(raw, content, sizeof(content));
     status = ServerStatusOf(raw);
-    if (!ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL),
-                             ++g_seq, content, query, resp,
-                             sizeof(resp)))
+    if (ServerWantsStream(body))
+    {
+        char sse[16384];
+        if (!ServerBuildStreamResponse(SERVER_MODEL_ID,
+                                       (long)time(NULL), ++g_seq,
+                                       content, sse, sizeof(sse)))
+        {
+            SendError(s, 500, "Internal Error", "response too large");
+            return;
+        }
+        SendRaw(s, 200, "OK", "text/event-stream", sse);
+    }
+    else if (!ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL),
+                                  ++g_seq, content, query, resp,
+                                  sizeof(resp)))
     {
         SendError(s, 500, "Internal Error", "response too large");
         return;
     }
-    SendJson(s, 200, "OK", resp);
-    BuildStrArray(ch.exec.entities, ch.exec.nent, ent_json,
+    else
+        SendJson(s, 200, "OK", resp);
+    BuildStrArray(g_session.exec.entities, g_session.exec.nent, ent_json,
                   sizeof(ent_json));
-    BuildProvArray(&ch, prov_json, sizeof(prov_json));
+    BuildProvArray(&g_session, prov_json, sizeof(prov_json));
     IsoUtc(ts, sizeof(ts));
     if (ServerBuildObservation(ts, SERVER_MODEL_ID, nmsg, has_system,
-                               query, &parsed, ch.focus_valid ?
-                               ch.focus : "", ent_json, prov_json,
+                               query, &parsed, g_session.focus_valid ?
+                               g_session.focus : "", ent_json, prov_json,
                                content, status, latency_ms, obs,
                                sizeof(obs)))
     {
@@ -211,7 +324,9 @@ static void HandleCompletions(SOCKET s, const char *body,
         log = fopen(SERVER_OBS_FILE, "a");
         if (log == NULL)
         {
-            char tmp[512], alt[640];
+            char alt[640];
+#ifdef _WIN32
+            char tmp[512];
             DWORD tn = GetTempPathA(sizeof(tmp), tmp);
             if (tn > 0 && tn < sizeof(tmp))
             {
@@ -219,6 +334,17 @@ static void HandleCompletions(SOCKET s, const char *body,
                          SERVER_OBS_FILE);
                 log = fopen(alt, "a");
             }
+#else
+            const char *tmp = getenv("TMPDIR");
+            if (tmp == NULL || tmp[0] == '\0')
+                tmp = getenv("TMP");
+            if (tmp == NULL || tmp[0] == '\0')
+                tmp = getenv("TEMP");
+            if (tmp == NULL || tmp[0] == '\0')
+                tmp = "/tmp";
+            snprintf(alt, sizeof(alt), "%s/%s", tmp, SERVER_OBS_FILE);
+            log = fopen(alt, "a");
+#endif
         }
         if (log != NULL)
         {
@@ -231,7 +357,7 @@ static void HandleCompletions(SOCKET s, const char *body,
             status, latency_ms);
 }
 
-static void HandleClient(SOCKET s, const char *corpus)
+static void HandleClient(socket_t s, const char *corpus)
 {
     char hdr[SERVER_HDR_MAX + 1];
     size_t hlen = 0;
@@ -303,8 +429,7 @@ static void HandleClient(SOCKET s, const char *corpus)
 
 int main(int argc, char **argv)
 {
-    WSADATA ws;
-    SOCKET ls;
+    socket_t ls;
     struct sockaddr_in addr;
     int port = SERVER_PORT_DEFAULT;
     char corpus[1024];
@@ -313,35 +438,49 @@ int main(int argc, char **argv)
         port = atoi(argv[1]);
     if (port <= 0 || port > 65535)
         port = SERVER_PORT_DEFAULT;
-    if (argc > 2)
+    const char *env_corpus = getenv("SYMBOLS_CORPUS");
+    if (env_corpus != NULL && env_corpus[0] != '\0')
     {
-        /* explicit path: must exist, else fail-closed */
-        FILE *probe = fopen(argv[2], "r");
-        if (probe == NULL)
-        {
-            fprintf(stderr, "corpus not found: %s\n", argv[2]);
-            return 1;
-        }
-        fclose(probe);
+        strncpy(corpus, env_corpus, sizeof(corpus) - 1);
+        corpus[sizeof(corpus) - 1] = '\0';
+    }
+    else if (argc > 2)
+    {
         strncpy(corpus, argv[2], sizeof(corpus) - 1);
+        corpus[sizeof(corpus) - 1] = '\0';
     }
     else
     {
         /* CWD layout first, then exe-relative (build-* / dirs) */
-        static const char *rel =
-            "../data/bible/bible_relations.tsv";
+        static const char *cand_paths[] = {
+            "data/texts/bible.txt",
+            "data/texts/jung.txt",
+            "data/texts/corpus.txt",
+            "data/corpus.txt",
+            "data/corpus.tsv",
+            "data/bible/bible_relations.tsv"
+        };
         char exedir[768];
-        FILE *probe;
-        DWORD elen = GetModuleFileNameA(NULL, exedir, sizeof(exedir));
+        FILE *probe = NULL;
+        size_t elen = 0;
+#ifdef _WIN32
+        elen = (size_t)GetModuleFileNameA(NULL, exedir, sizeof(exedir));
+#elif defined(__linux__)
+        ssize_t r = readlink("/proc/self/exe", exedir, sizeof(exedir) - 1);
+        if (r > 0) { exedir[r] = '\0'; elen = (size_t)r; }
+#endif
         corpus[0] = '\0';
-        probe = fopen("data/bible/bible_relations.tsv", "r");
-        if (probe != NULL)
+        for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)
         {
-            fclose(probe);
-            strncpy(corpus, "data/bible/bible_relations.tsv",
-                    sizeof(corpus) - 1);
+            probe = fopen(cand_paths[i], "r");
+            if (probe != NULL)
+            {
+                fclose(probe);
+                strncpy(corpus, cand_paths[i], sizeof(corpus) - 1);
+                break;
+            }
         }
-        else if (elen > 0 && elen < sizeof(exedir))
+        if (corpus[0] == '\0' && elen > 0 && elen < sizeof(exedir))
         {
             char *sep = strrchr(exedir, '\\');
             if (sep == NULL)
@@ -349,35 +488,34 @@ int main(int argc, char **argv)
             if (sep != NULL)
             {
                 *sep = '\0';
-                snprintf(corpus, sizeof(corpus), "%s/%s", exedir,
-                         rel);
-                probe = fopen(corpus, "r");
-                if (probe != NULL)
-                    fclose(probe);
-                else
+                for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)
+                {
+                    snprintf(corpus, sizeof(corpus), "%s/../%s", exedir, cand_paths[i]);
+                    probe = fopen(corpus, "r");
+                    if (probe != NULL)
+                    {
+                        fclose(probe);
+                        break;
+                    }
                     corpus[0] = '\0';
+                }
             }
         }
         if (corpus[0] == '\0')
         {
             fprintf(stderr,
-                    "corpus not found (tried CWD "
-                    "data/bible/bible_relations.tsv and exe-"
-                    "relative %s); refusing to serve an empty "
-                    "model\n",
-                    rel);
+                    "corpus not found (tried data/corpus.tsv and "
+                    "data/bible/bible_relations.tsv); refusing to serve an empty "
+                    "model\n");
             return 1;
         }
     }
-    if (WSAStartup(MAKEWORD(2, 2), &ws) != 0)
-    {
-        fprintf(stderr, "WSAStartup failed\n");
-        return 1;
-    }
+    SOCKET_INIT();
     ls = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (ls == INVALID_SOCKET)
+    if (!IS_VALID_SOCKET(ls))
     {
         fprintf(stderr, "socket failed\n");
+        SOCKET_CLEANUP();
         return 1;
     }
     memset(&addr, 0, sizeof(addr));
@@ -388,6 +526,8 @@ int main(int argc, char **argv)
         listen(ls, 4) != 0)
     {
         fprintf(stderr, "bind/listen on 127.0.0.1:%d failed\n", port);
+        CLOSESOCKET(ls);
+        SOCKET_CLEANUP();
         return 1;
     }
     fprintf(stderr, "symbols-server on 127.0.0.1:%d (model %s)\n",
@@ -395,11 +535,13 @@ int main(int argc, char **argv)
     fprintf(stderr, "symbols-server corpus: %s\n", corpus);
     for (;;)
     {
-        SOCKET c = accept(ls, NULL, NULL);
-        if (c == INVALID_SOCKET)
+        socket_t c = accept(ls, NULL, NULL);
+        if (!IS_VALID_SOCKET(c))
             continue;
         HandleClient(c, corpus);
-        closesocket(c);
+        CLOSESOCKET(c);
     }
+    CLOSESOCKET(ls);
+    SOCKET_CLEANUP();
     return 0;
 }

@@ -5,25 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <fcntl.h>
-#include <io.h>
-#include <windows.h> /* GetTempPathA (capture sink location only) */
-#include "bible_chat.h"
+#include "compat.h"
+#include "chat.h"
 #include "server_proto.h"
-
-#define SERVER_CAP_FILE "server_proto_cap.tmp"
-
-/* capture sink lives in the system temp dir: the server must answer
-   identically no matter which CWD it was started from (C:\ root is
-   not writable, which used to yield empty replies). */
-static void CapPath(char *out, size_t size)
-{
-    char tmp[512];
-    DWORD n = GetTempPathA(sizeof(tmp), tmp);
-    if (n == 0 || n >= sizeof(tmp))
-        strncpy(tmp, ".", sizeof(tmp) - 1);
-    snprintf(out, size, "%s%s", tmp, SERVER_CAP_FILE);
-}
 
 int ServerJsonEscape(const char *in, char *out, size_t size)
 {
@@ -305,6 +289,51 @@ int ServerExtractQuery(const char *body, char *out, size_t size)
     return 1;
 }
 
+int ServerExtractSession(const char *body, char *out, size_t size)
+{
+    const char *p;
+    if (body == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    p = body;
+    while (*p != '\0')
+    {
+        if (*p == '"')
+        {
+            if (strncmp(p, "\"user\"", 6) == 0)
+            {
+                const char *q = p + 6;
+                while (IsWs(*q))
+                    q++;
+                if (*q == ':')
+                {
+                    q++;
+                    while (IsWs(*q))
+                        q++;
+                    if (*q == '"')
+                        return TakeJsonString(&q, out, size);
+                }
+            }
+            else if (strncmp(p, "\"session_id\"", 12) == 0)
+            {
+                const char *q = p + 12;
+                while (IsWs(*q))
+                    q++;
+                if (*q == ':')
+                {
+                    q++;
+                    while (IsWs(*q))
+                        q++;
+                    if (*q == '"')
+                        return TakeJsonString(&q, out, size);
+                }
+            }
+        }
+        p++;
+    }
+    return 0;
+}
+
 static uint32_t WordCount(const char *s)
 {
     uint32_t n = 0;
@@ -362,6 +391,92 @@ int ServerBuildModels(const char *out_model, char *out, size_t size)
     return (w > 0 && (size_t)w < size) ? 1 : 0;
 }
 
+int ServerWantsStream(const char *body)
+{
+    /* top-level "stream" key only: track depth, skip strings */
+    int depth = 0;
+    const char *p;
+    if (body == NULL)
+        return 0;
+    p = body;
+    while (*p != '\0')
+    {
+        if (*p == '"')
+        {
+            const char *q = p + 1;
+            while (*q != '\0' && *q != '"')
+            {
+                if (*q == '\\' && *(q + 1) != '\0')
+                    q += 2;
+                else
+                    q++;
+            }
+            if (*q != '"')
+                return 0;
+            if (depth == 1 && (size_t)(q - p - 1) == 6 &&
+                strncmp(p + 1, "stream", 6) == 0)
+            {
+                const char *v = q + 1;
+                while (*v == ' ' || *v == '\t' || *v == '\n' ||
+                       *v == '\r')
+                    v++;
+                if (*v != ':')
+                {
+                    p = q + 1;
+                    continue;
+                }
+                v++;
+                while (*v == ' ' || *v == '\t' || *v == '\n' ||
+                       *v == '\r')
+                    v++;
+                return strncmp(v, "true", 4) == 0 ? 1 : 0;
+            }
+            p = q + 1;
+            continue;
+        }
+        if (*p == '{' || *p == '[')
+            depth++;
+        else if (*p == '}' || *p == ']')
+            depth--;
+        p++;
+    }
+    return 0;
+}
+
+int ServerBuildStreamResponse(const char *model, long created,
+                              unsigned long seq, const char *content,
+                              char *out, size_t size)
+{
+    char esc[8192];
+    size_t pos = 0;
+    int w;
+    if (model == NULL || content == NULL || out == NULL || size == 0)
+        return 0;
+    if (!ServerJsonEscape(content, esc, sizeof(esc)))
+        return 0;
+    out[0] = '\0';
+    w = snprintf(out + pos, size - pos,
+                 "data: {\"id\":\"chatcmpl-symbols-%lu\",\"object\":"
+                 "\"chat.completion.chunk\",\"created\":%ld,\"model\":"
+                 "\"%s\",\"choices\":[{\"index\":0,\"delta\":{\"role\":"
+                 "\"assistant\",\"content\":\"%s\"},\"finish_reason\":"
+                 "null}]}\n\n",
+                 seq, created, model, esc);
+    if (w <= 0)
+        return 0;
+    pos += (size_t)w;
+    w = snprintf(out + pos, size - pos,
+                 "data: {\"id\":\"chatcmpl-symbols-%lu\",\"object\":"
+                 "\"chat.completion.chunk\",\"created\":%ld,\"model\":"
+                 "\"%s\",\"choices\":[{\"index\":0,\"delta\":{},"
+                 "\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
+                 seq, created, model);
+    if (w <= 0)
+        return 0;
+    pos += (size_t)w;
+    return pos < size ? 1 : 0;
+}
+
 int ServerIsUnknown(const char *text)
 {
     if (text == NULL || text[0] == '\0')
@@ -393,38 +508,13 @@ const char *ServerStatusOf(const char *text)
 int ServerAnswerQuery(CHAT *ch, const char *query, char *out,
                       size_t size)
 {
-    int saved;
-    FILE *cap;
-    FILE *in;
-    size_t n = 0;
-    int c;
+    size_t n;
     if (ch == NULL || query == NULL || out == NULL || size == 0)
         return 0;
     out[0] = '\0';
-    fflush(stdout);
-    saved = _dup(1);
-    {
-        char cappath[640];
-        CapPath(cappath, sizeof(cappath));
-        cap = fopen(cappath, "w");
-        if (saved < 0 || cap == NULL)
-            return 0;
-        fflush(cap);
-        _dup2(_fileno(cap), 1);
-        ChatHandle(ch, query);
-        fflush(stdout);
-        _dup2(saved, 1);
-        _close(saved);
-        fclose(cap);
-        in = fopen(cappath, "r");
-        if (in == NULL)
-            return 0;
-        while ((c = fgetc(in)) != EOF && n + 1 < size)
-            out[n++] = (char)c;
-        fclose(in);
-        remove(cappath);
-    }
-    out[n] = '\0';
+    if (!ChatHandleToBuf(ch, query, out, size))
+        return 0;
+    n = strlen(out);
     while (n > 0 && (out[n - 1] == '\n' || out[n - 1] == '\r' ||
                      out[n - 1] == ' '))
         out[--n] = '\0';

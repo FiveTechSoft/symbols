@@ -6,10 +6,13 @@
 # Loaded once with tools.tsv; unknown TYPEs and malformed rows warn
 # + discard (fail-closed). Missing file -> no scope replies (legacy
 # abstain). Read-only; fixed path; file order is priority.
-scope	es	Soy Symbols, un motor de consultas sobre genealogía bíblica: respondo sobre padre, hijo, reyes, esposa y hermano según los registros cargados. De lo demás no tengo constancia.
+scope	es	Soy Symbols, un motor simbólico de IA
+greeting	es	Hola, ¿en qué puedo ayudarte hoy?
 trigger	quien eres	scope
 trigger	quien eres tu	scope
-trigger	hola	scope
+trigger	hola	greeting
 trigger	hello	scope
 trigger	que sabes hacer	scope
+trigger	que sabes	scope
+trigger	que puedo preguntarte	scope
 trigger	what can you do	scope

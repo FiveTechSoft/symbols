@@ -40,6 +40,7 @@ add_library(symbolic STATIC
     src/c_rules.c
     src/server_proto.c
     src/text_lex.c
+    src/meta_graph.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -129,7 +130,11 @@ target_link_libraries(chat_main symbolic)
 
 # symbols-server: OpenAI-compatible model endpoint (harness, no es test)
 add_executable(symbols-server src/symbols_server.c)
-target_link_libraries(symbols-server symbolic ws2_32)
+if(WIN32)
+    target_link_libraries(symbols-server symbolic ws2_32)
+else()
+    target_link_libraries(symbols-server symbolic)
+endif()
 
 # relprobe: graph relation inspector (diagnostic CLI, no es test)
 add_executable(relprobe tools/relprobe.c)

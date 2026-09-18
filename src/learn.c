@@ -14,11 +14,18 @@
 
 static int IsConnectiveTok(const char *tok)
 {
-    return strcmp(tok, "cong") == 0 || strcmp(tok, "proportional") == 0 ||
-           strcmp(tok, "after") == 0 || strcmp(tok, "acting_on") == 0 ||
-           strcmp(tok, "acting") == 0 || strcmp(tok, "isa") == 0 ||
-           strcmp(tok, "sibling_of") == 0 || strcmp(tok, "father_of") == 0 ||
-           strcmp(tok, "reigns") == 0 || strcmp(tok, "wife_of") == 0;
+    if (tok == NULL || tok[0] == '\0')
+        return 0;
+    if (strcmp(tok, "cong") == 0 || strcmp(tok, "proportional") == 0 ||
+        strcmp(tok, "after") == 0 || strcmp(tok, "acting_on") == 0 ||
+        strcmp(tok, "acting") == 0 || strcmp(tok, "isa") == 0 ||
+        strcmp(tok, "sibling_of") == 0 || strcmp(tok, "father_of") == 0 ||
+        strcmp(tok, "reigns") == 0 || strcmp(tok, "wife_of") == 0)
+        return 1;
+    size_t len = strlen(tok);
+    if (len > 3 && strcmp(tok + len - 3, "_of") == 0)
+        return 1;
+    return 0;
 }
 
 int LearnerIsConnective(const char *tok)
@@ -28,6 +35,8 @@ int LearnerIsConnective(const char *tok)
 
 static const char *FamilyOfConnective(const char *conn)
 {
+    if (conn == NULL)
+        return NULL;
     if (strcmp(conn, "cong") == 0)
         return "equivalence";
     if (strcmp(conn, "proportional") == 0)
@@ -46,6 +55,18 @@ static const char *FamilyOfConnective(const char *conn)
         return "reigns";
     if (strcmp(conn, "wife_of") == 0)
         return "wife";
+    /* Generic connective ending in _of: family is the stem */
+    size_t len = strlen(conn);
+    if (len > 3 && strcmp(conn + len - 3, "_of") == 0)
+    {
+        static char s_fam[SCHEMA_TOKEN_MAX];
+        size_t flen = len - 3;
+        if (flen >= sizeof(s_fam))
+            flen = sizeof(s_fam) - 1;
+        strncpy(s_fam, conn, flen);
+        s_fam[flen] = '\0';
+        return s_fam;
+    }
     return NULL;
 }
 

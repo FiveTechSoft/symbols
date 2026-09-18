@@ -8,7 +8,7 @@
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
-#include "bible_chat.h"
+#include "chat.h"
 #include "server_proto.h"
 
 static int g_pass = 0, g_fail = 0;
@@ -79,6 +79,19 @@ int main(void)
                              buf, sizeof(buf)) == 0);
     check("garbage",
           ServerExtractQuery("not json", buf, sizeof(buf)) == 0);
+
+    /* ---- session extraction ---- */
+    check("session user field",
+          ServerExtractSession("{\"user\":\"session-abc\",\"messages\":[]}",
+                               buf, sizeof(buf)) == 1);
+    check_str("session user value", buf, "session-abc");
+    check("session_id field",
+          ServerExtractSession("{\"session_id\":\"sess-42\",\"messages\":[]}",
+                               buf, sizeof(buf)) == 1);
+    check_str("session_id value", buf, "sess-42");
+    check("session absent returns 0",
+          ServerExtractSession("{\"messages\":[]}",
+                               buf, sizeof(buf)) == 0);
 
     /* ---- response shape ---- */
     check("build response",
@@ -181,6 +194,36 @@ int main(void)
               strstr(obs, "\"status\":\"ANSWER\"") != NULL);
         check("obs has latency",
               strstr(obs, "\"latency_ms\":3") != NULL);
+    }
+
+    /* ---- streaming ---- */
+    check("stream true detected",
+          ServerWantsStream("{\"model\":\"symbols\",\"stream\":true,"
+                            "\"messages\":[]}") == 1);
+    check("stream false",
+          ServerWantsStream("{\"model\":\"symbols\",\"stream\":false,"
+                            "\"messages\":[]}") == 0);
+    check("stream absent",
+          ServerWantsStream("{\"model\":\"symbols\"}") == 0);
+    check("stream in content string ignored",
+          ServerWantsStream("{\"messages\":[{\"role\":\"user\","
+                            "\"content\":\"say \\\"stream\\\": true "
+                            "loud\"}]}") == 0);
+    {
+        char sse[8192];
+        check("build sse",
+              ServerBuildStreamResponse("symbols", 1726000000L, 9,
+                                        "El padre de David es Jesse.",
+                                        sse, sizeof(sse)) == 1);
+        check("sse has delta",
+              strstr(sse, "\"delta\":{\"role\":\"assistant\"") != NULL);
+        check("sse has chunk",
+              strstr(sse, "\"object\":\"chat.completion.chunk\"") !=
+                  NULL);
+        check("sse finish stop",
+              strstr(sse, "\"finish_reason\":\"stop\"") != NULL);
+        check("sse done marker",
+              strstr(sse, "data: [DONE]") != NULL);
     }
 
     printf("test_server_proto: %d passed, %d failed\n", g_pass,

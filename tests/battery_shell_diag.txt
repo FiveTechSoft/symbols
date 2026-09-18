@@ -1,0 +1,8 @@
+ejecuta echo hola mundo
+compila con gcc --version
+lista el directorio actual
+corre ls -la en linux
+abre powershell y dime la fecha
+ejecuta rm -rf /
+que sabes hacer con la terminal
+compila prog.c con gcc -o prog

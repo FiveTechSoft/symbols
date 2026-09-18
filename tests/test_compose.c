@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <io.h>
+#include "compat.h"
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
