@@ -1,6 +1,6 @@
 # Symbolic LLM: A Deterministic, Non-Parametric Language Engine in Native C11 with Zero Hallucination and Microsecond Latency
 
-**Antonio (FiveTech Software)**  
+**Antonio Linares (FiveTech Software)**  
 *Project Repository: [FiveTechSoft/symbols](https://github.com/FiveTechSoft/symbols)*  
 *Version: 1.0-RC (March 2026)*
 
@@ -8,33 +8,33 @@
 
 ### Abstract
 
-Large Language Models (LLMs) built on the Transformer architecture rely on dense, non-transparent floating-point parameter matrices trained via gradient descent. While effective at general linguistic mimicry, they suffer from fundamental systemic limitations: stochastic hallucination, catastrophic forgetting, lack of auditable causal provenance, and massive computational and memory footprints. 
+Large Language Models (LLMs) built upon the Transformer architecture rely on dense, non-transparent floating-point parameter matrices trained via gradient descent. While remarkably capable at syntactic mimicry and generalized text continuation, they suffer from fundamental systemic shortcomings: stochastic hallucination, catastrophic forgetting, lack of auditable causal provenance, and massive computational and memory footprints.
 
-We present **Symbolic LLM**, an alternative language engine engineered entirely in **pure ISO C11** without external dependencies, neural weights, or GPU acceleration. Symbolic LLM decouples factual knowledge, semantic associations, and conversational inference into discrete, auditable mathematical structures:
-1. An open-addressing **Symbolic Knowledge Graph** operating with $O(1)$ query time (MurmurMix64 dispersion) requiring strictly **32 bytes per relation** in RAM.
-2. An ultra-lightweight **32-dimensional Distributional Semantic Space** (Hebbian co-occurrence) providing nanosecond-scale fuzzy synonymy and cross-concept generalization.
-3. A **First-Order Literal Sentence Store** indexed directly from raw free-form text (`.txt`) with exact byte-level offset provenance, enforcing a **fail-closed truth contract** ($P(\text{hallucination}) = 0$).
-4. A **Second-Order Dynamic Meta-Graph** ($\mathcal{M}$) that models reflexive associative learning—recording structural relationships formed through dialogue and knowledge traversal.
-5. An unsupervised **Concept Concentration Metric** ($\kappa = \frac{\max_d v[d]}{\sum_d v[d]} \cdot \log(1 + f)$) that discovers thematic pillars and conversation entry points from raw text in linear time without hand-crafted stopword dictionaries.
+We introduce **Symbolic LLM**, an alternative language engine engineered entirely in **pure ISO C11** without external dependencies, neural weights, backpropagation, or GPU acceleration. Symbolic LLM decouples factual memory, distributional semantics, and conversational inference into discrete, inspectable, native mathematical structures:
+1. An open-addressing **Symbolic Knowledge Graph** operating with strictly $O(1)$ lookup time (MurmurMix64 dispersion) and requiring strictly **32 bytes per relation** in RAM.
+2. An ultra-lightweight **32-dimensional Distributional Semantic Vector Substrate** constructed via Hebbian co-occurrence windows, enabling nanosecond-scale fuzzy synonymy and cross-concept generalization.
+3. A **First-Order Literal Sentence Store** indexed directly from raw free-form text streams (`.txt`) with exact byte-level offset provenance, enforcing a **fail-closed truth contract** ($P(\text{hallucination}) = 0$).
+4. A **Second-Order Reflexive Meta-Graph** ($\mathcal{M}$) modeling meta-knowledge—dynamically capturing structural associations formed through dialogue, query navigation, and active discourse.
+5. An unsupervised **Concept Concentration Metric** ($\kappa = \frac{\max_d v[d]}{\sum_d v[d]} \cdot \log(1 + f)$) that extracts the fundamental thematic pillars and conversational entry points from raw text in linear time without hand-crafted stopword dictionaries.
 
-Empirical evaluation demonstrates an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.18 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single consumer CPU core, maintaining 100% precision and verifiable citations across arbitrary multilingual text corpora.
+Empirical evaluations demonstrate an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.185 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single commodity CPU core, maintaining 100% precision and verifiable citations across arbitrary multilingual text corpora.
 
 ---
 
 ## 1. Introduction and Theoretical Foundations
 
-### 1.1 The Transformer Bottleneck
+### 1.1 The Transformer Dilemma
 
-Contemporary Natural Language Processing is dominated by deep autoregressive Transformers ($p(w_t \mid w_{<t})$). Knowledge in these architectures is implicitly distributed across billions of parameters $\theta \in \mathbb{R}^N$. This design imposes severe structural drawbacks:
+Contemporary Natural Language Processing is predominantly anchored on autoregressive Transformer decoders ($p(w_t \mid w_{<t})$). Knowledge in these architectures is implicitly and diffusely distributed across billions of parameters $\theta \in \mathbb{R}^N$. This architectural paradigm imposes severe structural limitations:
 
-- **Epistemic Indeterminacy and Hallucination**: Output tokens are sampled stochastically from a probability distribution over the vocabulary. The network cannot verify whether a generated sequence corresponds to factual ground truth or a confabulated pattern.
-- **Catastrophic Forgetting & Opaque Editing**: Incorporating a new fact or correcting a false one requires expensive fine-tuning (LoRA, full retraining) or fragile prompt-context injection. Unlearning a specific fact while preserving general capabilities remains an open research dilemma.
-- **Extreme Resource Footprint**: Running a 7B–70B parameter model requires 8 GB to 140+ GB of high-bandwidth GPU VRAM, high electrical power, and gigabyte-scale runtime runtimes (PyTorch, CUDA, Triton).
-- **Zero Proof Trace**: Attention weights over self-attention heads $\text{softmax}(QK^T / \sqrt{d_k})$ reflect statistical correlations, not logical deduction or legal provenance.
+- **Epistemic Indeterminacy and Hallucination**: Output tokens are sampled stochastically from a probability distribution over the vocabulary. The network cannot verify whether a generated sequence corresponds to factual ground truth or a statistically probable confabulation.
+- **Catastrophic Forgetting & Opaque Editing**: Incorporating a new fact or deleting an erroneous one requires expensive fine-tuning (LoRA, full retraining) or fragile prompt-context injection. True machine unlearning remains an unsolved research dilemma.
+- **Extreme Computational Footprint**: Serving a modern 7B–70B parameter model requires 8 GB to 140+ GB of high-bandwidth GPU VRAM, high electrical power, and massive runtime dependencies (PyTorch, CUDA, Triton, BLAS).
+- **Zero Proof Trace**: Attention weights over self-attention heads $\text{softmax}(QK^T / \sqrt{d_k})$ represent correlation patterns across positional tokens, not deductive validity or verifiable provenance.
 
-### 1.2 The Symbolic LLM Hypothesis
+### 1.2 The Symbolic LLM Proposition
 
-Symbolic LLM investigates whether a core subset of linguistic comprehension, question answering, contextual reasoning, and topical introspection can be achieved **without dense matrix multiplications**. 
+Symbolic LLM investigates whether linguistic comprehension, question answering, deductive reasoning, and topical introspection can be achieved **without dense matrix multiplications**. 
 
 ```
                                ┌─────────────────────────────────────────┐
@@ -78,9 +78,9 @@ Symbolic LLM investigates whether a core subset of linguistic comprehension, que
 
 The system is founded on three axiomatic design principles:
 
-1. **Fail-Closed Truth Preservation**: If an assertion cannot be proved by direct retrieval or a verified deduction chain over explicit relations, the model outputs an honest `UNKNOWN`. It never fabricates facts.
-2. **Deterministic $O(1)$ Mechanics**: All core operations—symbol resolution, relation verification, anaphoric focus shift, and vector comparison—are bounded in constant time.
-3. **Hardware Sovereignty**: The entire system is implemented in standard C11 using POSIX/Win32 primitives, compiling into an executable of a few hundred kilobytes with zero dynamic dependencies.
+1. **Fail-Closed Truth Preservation**: If an assertion cannot be proven by direct retrieval or a verified deduction chain over explicit relations, the model outputs an honest `UNKNOWN`. It never fabricates facts.
+2. **Deterministic $O(1)$ Mechanics**: Core operations—symbol resolution, relation verification, anaphoric focus shift, and vector comparison—are strictly bounded in constant time.
+3. **Hardware Sovereignty**: The entire system is implemented in standard C11 using standard POSIX/Win32 primitives, compiling into an executable of a few hundred kilobytes with zero external runtime requirements.
 
 ---
 
@@ -88,10 +88,10 @@ The system is founded on three axiomatic design principles:
 
 ### 2.1 The Symbolic Knowledge Graph: $O(1)$ Hash Table Architecture
 
-The backbone of factual memory is divided into two dual-indexed hash structures: the `SYMBOL_TABLE` and the `RELATION_TABLE`.
+The backbone of factual memory is partitioned into two dual-indexed hash structures: the `SYMBOL_TABLE` and the `RELATION_TABLE`.
 
 #### Symbol Representation
-Symbols are unique lexical tokens canonicalized into integer identifiers:
+Symbols are canonicalized lexical tokens mapped to unique integer identifiers:
 ```c
 typedef struct {
     uint32_t id;
@@ -104,7 +104,7 @@ Hashing is governed by the modified DJB2a algorithm with XOR dispersion:
 $$h(s) = \left( \prod_{i=1}^{|s|} 33 \oplus s_i \right) \ \& \ (2^k - 1)$$
 
 #### Relational Triples
-Facts are stored as discrete relational triples $\langle \text{Subject}, \text{Predicate}, \text{Object} \rangle$:
+Knowledge is stored as discrete relational triples $\langle \text{Subject}, \text{Predicate}, \text{Object} \rangle$:
 ```c
 typedef struct {
     uint32_t subject;     // Symbol ID
@@ -120,18 +120,18 @@ $$k \leftarrow (k \oplus (k \gg 33)) \cdot \text{0xff51afd7ed558ccd}$$
 $$k \leftarrow (k \oplus (k \gg 33)) \cdot \text{0xc4ceb9fe1a85ec53}$$
 $$h_{\text{rel}} = (k \oplus (k \gg 33)) \ \& \ (\text{capacity} - 1)$$
 
-Using power-of-two table capacities, bitwise masking replaces costly modulo division, and open addressing with linear probing ensures cache locality. Rehash occurs when the load factor exceeds 70%.
+Using power-of-two table capacities, bitwise masking replaces costly modulo division, and open addressing with linear probing ensures cache locality. Automatic rehashing occurs when the load factor exceeds 70%.
 
 ### 2.2 32-Dimensional Distributional Semantic Substrate
 
-To overcome the rigid discrete brittleness of classical symbolic systems (e.g., failing to equate *feline* with *cat*), Symbolic LLM embeds every symbol into a compact **32-dimensional continuous vector space** $\mathbf{v} \in \mathbb{R}^{32}$.
+To overcome the brittle discreteness of classical symbolic systems (e.g., failing to equate *feline* with *cat*), Symbolic LLM embeds every symbol into a compact **32-dimensional continuous vector space** $\mathbf{v} \in \mathbb{R}^{32}$.
 
 #### Vector Construction (Hebbian Co-occurrence)
-Instead of backpropagation through dense layers, vectors are updated online via streaming Random Indexing and Hebbian co-occurrence windows:
+Instead of gradient descent over large corpora, vectors are updated online via streaming Random Indexing and Hebbian co-occurrence windows:
 1. Each symbol is initially assigned an ultra-sparse ternary signature $\mathbf{r}_w \in \{-1, 0, 1\}^{32}$.
 2. When word $w$ appears within context window $\mathcal{W}$ of word $u$, vector accumulation occurs:
 $$\mathbf{v}_w^{(t+1)} = \mathbf{v}_w^{(t)} + \frac{1}{\text{dist}(w, u)} \mathbf{r}_u$$
-3. Vectors are normalized to unit length: $\hat{\mathbf{v}} = \frac{\mathbf{v}}{\|\mathbf{v}\|_2}$.
+3. Vectors are normalized to unit Euclidean length: $\hat{\mathbf{v}} = \frac{\mathbf{v}}{\|\mathbf{v}\|_2}$.
 
 Semantic similarity is evaluated via cosine similarity:
 $$\text{Sim}(u, w) = \sum_{d=0}^{31} \hat{\mathbf{v}}_u[d] \cdot \hat{\mathbf{v}}_w[d]$$
@@ -139,7 +139,7 @@ On modern x86/ARM hardware, this 32-dimensional dot product executes in **~2 nan
 
 ### 2.3 First-Order Literal Sentence Store and Exact Provenance
 
-When ingesting unstructured natural language (e.g., `.txt` files), the engine constructs a memory-mapped literal sentence store:
+When ingesting unstructured natural language (e.g., `.txt` files), the engine constructs an in-memory literal sentence store:
 - **Streaming Parser**: Tokenizes text into sentences and normalized symbols on-the-fly with 64 KB buffering.
 - **Provenance Inverted Index**: For each extracted symbol, a compact posting list registers the literal sentence offsets:
 $$\text{Posting}(w) = \{ \text{sent\_id}_1, \text{sent\_id}_2, \dots, \text{sent\_id}_m \}$$
@@ -147,13 +147,13 @@ $$\text{Posting}(w) = \{ \text{sent\_id}_1, \text{sent\_id}_2, \dots, \text{sent
 
 ### 2.4 Second-Order Reflexive Meta-Graph ($\mathcal{M}$)
 
-Beyond first-order textual facts, the engine builds a dynamic meta-graph $\mathcal{M} = (V_{\mathcal{M}}, E_{\mathcal{M}})$ representing **knowledge acquired about the knowledge**:
-- **Dialogue-Driven Associations**: If concepts $A$ and $B$ are repeatedly queried, co-activated in reasoning chains, or linked by user feedback, an edge $e(A, B)$ is materialized in $\mathcal{M}$.
+Beyond first-order textual facts, the engine constructs a dynamic meta-graph $\mathcal{M} = (V_{\mathcal{M}}, E_{\mathcal{M}})$ representing **knowledge acquired about the knowledge**:
+- **Dialogue-Driven Associations**: If concepts $A$ and $B$ are repeatedly queried together, co-activated in reasoning chains, or linked through discourse, an edge $e(A, B)$ is materialized in $\mathcal{M}$ with an interaction weight $w_{AB}$.
 - **Associative Memory Traversal**: When an entity is queried, the engine consults $\mathcal{M}$ to present adjacent topics that contextualize the response.
 
 ### 2.5 Concept Concentration Metric ($\kappa$) and Thematic Introspection
 
-A central challenge in unsupervised language understanding is identifying what a text is about without relying on hand-crafted stopword lists or pre-trained neural tokenizers.
+A central challenge in unsupervised language understanding is discovering what a text is about without relying on hand-crafted stopword lists or pre-trained neural tokenizers.
 
 We introduce the **Concept Concentration Metric** $\kappa(w)$:
 $$\kappa(w) = \frac{\max_{d \in [0, 31]} \mathbf{v}_w[d]}{\sum_{d=0}^{31} \mathbf{v}_w[d]} \cdot \log(1 + f_w)$$
@@ -165,8 +165,8 @@ $$\max_d \mathbf{v}_w[d] \approx \frac{1}{32} \sum_d \mathbf{v}_w[d] \implies \k
 - **Semantic Anchor Concepts** (*socrates, soul, algorithm, oxygen*): Appear in highly specific relational contexts. Their co-occurrence concentrates along specific semantic axes, producing high $\kappa(w)$.
 
 Sorting symbols by $\kappa(w)$ reveals the fundamental thematic pillars of any corpus immediately after ingestion, enabling autonomous conversational introspection:
-- `"dime las areas que conoces"` $\to$ outputs top-$\kappa$ conceptual centroids.
-- `"inicia una conversacion"` $\to$ autonomously selects the top thematic concept, retrieves its seminal sentence, and seeds the conversational state machine.
+- `"what areas do you know?"` $\to$ outputs top-$\kappa$ conceptual centroids.
+- `"start a conversation"` $\to$ autonomously selects the top thematic concept, retrieves its seminal sentence, and seeds the conversational state machine.
 
 ---
 
@@ -225,8 +225,8 @@ This symbolic attention formulation computes token salience in **$O(N)$ linear t
 ### 3.3 Conversational State & Anaphora Working Memory
 
 The conversational engine maintains a lightweight working memory register:
-- **Anaphoric Focus ($O(1)$)**: Tracks the active discourse entity, resolving pronouns (*él, ella, it, he, they*) and elliptical clauses to the current focus symbol.
-- **Dialogue Continuity Cache**: Retains recent keywords (`twords`) and already displayed sentences (`tshown`) to support natural sequential interactions (*"explícamelo"*, *"continúa"*, *"dime más"*) without repeating identical facts.
+- **Anaphoric Focus ($O(1)$)**: Tracks the active discourse entity, resolving pronouns (*he, she, it, they, him, her*) and elliptical clauses to the current focus symbol.
+- **Dialogue Continuity Cache**: Retains recent keywords (`twords`) and already displayed sentences (`tshown`) to support natural sequential interactions (*"explain it to me"*, *"continue"*, *"tell me more"*) without repeating identical facts.
 
 ---
 
@@ -294,7 +294,7 @@ Unlike TSV-bound tools, Symbolic LLM streams arbitrary free text directly into R
 
 The project adheres to strict fail-closed regression gates enforced via CMake CTest:
 - **62 / 62 CTest Unit & Integration Tests PASS (100%)**: Validating symbol hashing, 32D embeddings, backward chaining, BFS transitive closure, anaphora resolution, schema transfer, and server protocols.
-- **Fase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
+- **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
 - **Conversational Topic Tests**: Unsupervised topic discovery validated on disparate literary styles (theological, psychological, historical) with zero hardcoded lexicons.
 
 ---
@@ -333,31 +333,31 @@ Symbolic LLM includes an interactive conversational shell supporting live learni
 
 ```
 [chat] text corpus: 10730 sentences, 19505 symbols
-Listo. Escribe una pregunta (o 'salir').
+Ready. Enter a question (or 'exit').
 
-Tu > dime las areas que conoces
-IA > Los textos cargados abarcan temas como: Altertumskunde, Bough, Mephistopheles, 
-     Negelein, Fulfilment, Mead, Fathers, White (con 10730 frases y 19505 simbolos 
-     en data/texts/jung.txt). Puedes preguntarme sobre cualquiera de ellos.
+User > what areas do you know?
+AI   > The ingested texts cover topics such as: Altertumskunde, Bough, Mephistopheles, 
+       Negelein, Fulfilment, Mead, Fathers, White (with 10,730 sentences and 19,505 symbols 
+       in data/texts/jung.txt). You can ask me about any of these subjects.
 
-Tu > inicia una conversacion
-IA > Podemos hablar sobre Bough. Segun el texto: "(Quoted from Frazer: 'Golden Bough', 
-     Part IV, p. ...". Que aspecto te gustaria explorar?
+User > start a conversation
+AI   > We can talk about Bough. According to the text: "(Quoted from Frazer: 'Golden Bough', 
+       Part IV, p. ...". Which aspect would you like to explore?
 
-Tu > explicamelo
-IA > Segun el texto [continue]: This especial tree seems simply to continue the 
-     category of the mother symbols.
+User > explain it to me
+AI   > According to the text [continue]: This especial tree seems simply to continue the 
+       category of the mother symbols.
 
-Tu > carga data/texts/bible.txt
-IA > [chat] cargado texto 'data/texts/bible.txt': 28746 frases, 14027 simbolos añadidos.
+User > load data/texts/bible.txt
+AI   > [chat] loaded text 'data/texts/bible.txt': 28,746 sentences, 14,027 symbols added.
 
-Tu > ¿Quien es el padre de Jacob?
-IA > Isaac. [Demostracion: JACOB --HIJO_DE--> ISAAC]
+User > Who is the father of David?
+AI   > Jesse. [Proof trace: DAVID --SON_OF--> JESSE]
 ```
 
 ### 5.3 High-Performance OpenAI-Compatible HTTP Server (`symbols_server`)
 
-The engine provides an embedded HTTP REST server compliant with the OpenAI `/v1/chat/completions` specification, allowing drop-in integration with standard web interfaces, desktop applications, and agentic workflows:
+The engine provides an embedded HTTP REST server compliant with the OpenAI `/v1/chat/completions` specification, allowing drop-in integration with standard web interfaces, desktop applications, and agentic workflows (such as OpenCode):
 
 ```bash
 # Start server on port 8080 loading multiple free-text corpora
@@ -370,7 +370,7 @@ curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "symbolic-llm-c11",
-    "messages": [{"role": "user", "content": "dime las areas que conoces"}]
+    "messages": [{"role": "user", "content": "what areas do you know?"}]
   }'
 ```
 
@@ -410,7 +410,7 @@ Current research directions include:
 5. Knuth, D. E. (1998). *The Art of Computer Programming, Volume 3: Sorting and Searching* (2nd ed.). Addison-Wesley. (Open addressing and collision resolution).
 6. Marcus, G. (2020). *The Next Decades in AI: Four Steps Towards Robust Artificial Intelligence*. arXiv:2002.06177.
 7. Russell, S., & Norvig, P. (2020). *Artificial Intelligence: A Modern Approach* (4th ed.). Pearson. (Backward chaining and propositional representations).
-8. FiveTech Software Research. (2026). *Symbolic LLM Technical Reports (EXP-22 through EXP-25.1)*. `FiveTechSoft/symbols`.
+8. FiveTech Software Research. (2026). *Symbolic LLM Technical Reports (Phase 1 through Phase 4)*. `FiveTechSoft/symbols`.
 
 ---
 
