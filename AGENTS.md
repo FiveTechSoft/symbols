@@ -35,3 +35,7 @@ Regla arquitectónica:
 - G1/topic y G2/stop-set usan únicamente clases funcionales.
 - Nunca utilizan vocabulario concreto para decidir si un término es topic o stop-word.
 - Esto mantiene la lógica inmune a variantes EN/ES y a nombres concretos como Jonás/Jonah.
+
+## Tablas agénticas externas (Paso 1)
+
+- Las tablas agénticas declarativas (`allow`/`contract` en `data/agentic/tools.tsv`) se cargan una vez en `ToolInit()`. Cada tabla usa las filas válidas aportadas por el fichero cuando existe al menos una; en caso contrario conserva su fallback compilado. El parser es fail-closed: filas malformadas, `TYPE` desconocido o overflow se descartan con warning y nunca abortan la inicialización. La ruta del fichero es fija y el motor solo lo lee. El orden del fichero determina la prioridad. Esta separación de datos agénticos e implementación debe mantener la semántica existente; el contrato queda validado por `ctest 57/57`, seis baterías byte-idénticas, ejecución sin TSV idéntica y comprobación de idempotencia, 2026-09-18.

@@ -2648,6 +2648,7 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     SchemaKBInit(&ch->kb);
     MetaKBInit(&ch->mk);
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);
+    ToolInit();
     uint32_t n = ChatIngestCorpus(ch, corpus_path);
     MetaDiscover(&ch->mk);
     MetaRuleDiscover(&ch->mk);
@@ -2768,22 +2769,8 @@ void ChatHandle(CHAT *ch, const char *line)
    The planner never resolves and executes nothing. */
 #include "tool_contract.h"
 
-static const struct
-{
-    const char *family;
-    ToolId      tool;
-    int         needs_known;
-} TOOL_CONTRACT[] = {
-    {"reigns", TOOL_LOOKUP_RELATION, 0},
-    {"taxonomy", TOOL_LOOKUP_RELATION, 1},
-    {"father", TOOL_LOOKUP_RELATION, 1},
-    {"sibling", TOOL_LOOKUP_RELATION, 1},
-    {"wife", TOOL_LOOKUP_RELATION, 1},
-    {"parent", TOOL_LOOKUP_RELATION, 1},
-    {"children", TOOL_LOOKUP_RELATION, 1},
-    {"grandparent", TOOL_LOOKUP_RELATION, 1},
-    {"descendant", TOOL_LOOKUP_RELATION, 1},
-};
+/* contract rows live in tool_config.c (file rows win, frozen
+   compiled fallback): consulted here read-only. */
 
 static int IsDigitTok(const char *tok)
 {
@@ -2848,24 +2835,31 @@ ToolDecision ToolClassify(const CHAT *ch, const char *line,
     {
         int known = (slot != NULL && slot[0] != '\0' &&
                      VocabIdx(ch, slot) >= 0);
-        for (size_t i = 0;
-             i < sizeof(TOOL_CONTRACT) / sizeof(TOOL_CONTRACT[0]); i++)
-            if (family != NULL &&
-                strcmp(family, TOOL_CONTRACT[i].family) == 0 &&
-                (!TOOL_CONTRACT[i].needs_known || known))
+        {
+            uint32_t i, nrows = ToolContractCount();
+            for (i = 0; i < nrows; i++)
             {
-                if (req != NULL)
+                const ToolContractRow *row = ToolContractRowAt(i);
+                if (row == NULL)
+                    continue;
+                if (family != NULL &&
+                    strcmp(family, row->family) == 0 &&
+                    (!row->needs_known || known))
                 {
-                    req->tool = TOOL_CONTRACT[i].tool;
-                    strncpy(req->subject, slot == NULL ? "" : slot,
-                            sizeof(req->subject) - 1);
-                    req->subject[sizeof(req->subject) - 1] = '\0';
-                    strncpy(req->relation, FamDisplay(ch, family),
-                            sizeof(req->relation) - 1);
-                    req->relation[sizeof(req->relation) - 1] = '\0';
+                    if (req != NULL)
+                    {
+                        req->tool = row->tool;
+                        strncpy(req->subject, slot == NULL ? "" : slot,
+                                sizeof(req->subject) - 1);
+                        req->subject[sizeof(req->subject) - 1] = '\0';
+                        strncpy(req->relation, FamDisplay(ch, family),
+                                sizeof(req->relation) - 1);
+                        req->relation[sizeof(req->relation) - 1] = '\0';
+                    }
+                    return DEC_NEEDS_TOOL;
                 }
-                return DEC_NEEDS_TOOL;
             }
+        }
         return DEC_UNKNOWN;
     }
     if (cause == CAUSE_PARSE_FAIL)
