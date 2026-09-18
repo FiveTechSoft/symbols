@@ -16,3 +16,22 @@
 - Toda evaluación de replay debe excluir toda información posterior al punto de decisión (LOO estricto) y comprobar explícitamente ausencia de leakage con tests que se ejecutan ANTES de medir (`loo_no_ve_actual` + `loo_no_descendientes`, 2/2 PASS en v1). Motivó: sin gate anti-leakage el replay puede puntuar viendo el futuro (2026-09-16).
 - Openworld MVP: el corpus v1 queda congelado en `3d7b60d`. La secuencia base→v0→v1 produjo 0/14→6/14→9/14 correctas, con WRONG=0 en todas las condiciones y sin pérdida de UNKNOWN honesto. v1 cambió únicamente la ingesta; chat.pl permaneció intacto, por lo que su delta es atribuible a cobertura de conocimiento. v2 se limita a las rutas de dispatch de OW4/OW5/OW6 en chat.pl y no debe modificar el corpus v1. Toda modificación de v2 debe comenzar con probes aislados de dispatch y una medición reproducible antes de modificar chat.pl. Los runners de openworld deben permanecer idempotentes ×2. Motivó: separar cobertura de ingesta de routing demostró que el delta v1 es atribuible solo a ingesta (2026-09-16).
 - En el motor C (`src/`), los comentarios del código se escriben en inglés y el léxico (keywords, conectivos, mapeos REL→connective) va en tablas consultables o se deduce del corpus en ingest; nunca listas de palabras hardcodeadas en la lógica. Motivó: frames de chat con SIB_W/KING_W/WIFE_W hardcodeados violaron el principio HARDCODING=0 y fueron rechazados (2026-09-17).
+
+## Fase 4 — Canonicalización de consultas
+
+Fase 4 cerrada en `src/bible_chat.c`.
+
+`CanonicalizeQuery` normaliza puntuación y flags, `del` → `de + el`, y `'s` detach, aplicando G1/G2/G3/G5.
+
+Verificación:
+- batería Fase 4: 26 queries
+- 10 gains
+- 2 flips intencionales
+- 0 alucinaciones
+- ctest build-gcc: 48/48 PASS
+- runner idempotente: MD5 idéntico ×2
+
+Regla arquitectónica:
+- G1/topic y G2/stop-set usan únicamente clases funcionales.
+- Nunca utilizan vocabulario concreto para decidir si un término es topic o stop-word.
+- Esto mantiene la lógica inmune a variantes EN/ES y a nombres concretos como Jonás/Jonah.

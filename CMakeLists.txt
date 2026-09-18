@@ -33,6 +33,8 @@ add_library(symbolic STATIC
     src/transfer_legacy.c
     src/learn.c
     src/bible_chat.c
+    src/chat_clarify.c
+    src/tool_executor.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -98,6 +100,12 @@ sllm_test(test_bible_conclusions tests/test_bible_conclusions.c)
 sllm_test(test_bible_chat     tests/test_bible_chat.c)
 sllm_test(test_bible_relfam   tests/test_bible_relfam.c)
 sllm_test(test_bible_chat_lex tests/test_bible_chat_lex.c)
+sllm_test(test_queryplan     tests/test_queryplan.c)
+sllm_test(test_composite      tests/test_composite.c)
+sllm_test(test_clarify        tests/test_clarify.c)
+sllm_test(test_toolplan       tests/test_toolplan.c)
+sllm_test(test_toolexec        tests/test_toolexec.c)
+sllm_test(test_chain          tests/test_chain.c)
 sllm_test(test_bible_bfs      tests/test_bible_bfs.c)
 sllm_test(test_compose        tests/test_compose.c)
 sllm_test(test_learn          tests/test_learn.c)

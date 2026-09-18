@@ -27,6 +27,7 @@
 #include "learn.h"
 #include "transfer.h"
 #include "bible_chat.h"
+#include "tool_contract.h"
 
 #define CHAT_MAX_TOKS 16
 
@@ -77,13 +78,24 @@ static int FoldChar(const char *s, char *out)
     return 1;
 }
 
+/* ---- FASE 4 CanonicalizeQuery: surface flags (SURFACE_FLAGS lives
+   in bible_chat.h) + canonical tokens. Punctuation is signal, not
+   content: trailing ASCII punctuation is peeled off each raw token
+   and recorded as flags (question/comma/period); a leading inverted
+   question mark (UTF-8 C2 BF) marks interrogative force and is
+   dropped; "del" expands to "de"+"el"; a trailing "'s" detaches
+   into its own token and marks the genitive flag. FoldChar itself
+   is untouched. */
+
 /* split on whitespace, lowercase + accent-folded (mirrors learn.c
    contract; surface noise like "reinó"/"reyó" folds to corpus form) */
 static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
-                      uint32_t max_toks)
+                      uint32_t max_toks, SURFACE_FLAGS *sf)
 {
     uint32_t n = 0;
     const char *p = line;
+    if (sf)
+        memset(sf, 0, sizeof(*sf));
     while (*p && n < max_toks)
     {
         while (*p && isspace((unsigned char)*p))
@@ -94,20 +106,161 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
         while (*p && !isspace((unsigned char)*p))
             p++;
         size_t len = (size_t)(p - start);
-        if (len >= CHAT_TOKEN_MAX)
-            len = CHAT_TOKEN_MAX - 1;
+        if (len == 0)
+            continue;
+        /* leading inverted question marks (UTF-8 C2 BF, possibly
+           repeated): interrogative force, never token content */
+        while (len >= 2 && (unsigned char)start[0] == 0xC2 &&
+               (unsigned char)start[1] == 0xBF)
+        {
+            if (sf)
+                sf->question = 1;
+            start += 2;
+            len -= 2;
+        }
+        /* trailing ASCII punctuation run: peel it, keep the signal */
+        while (len > 0)
+        {
+            char c = start[len - 1];
+            if (c == '?')
+            {
+                if (sf)
+                    sf->question = 1;
+                len--;
+            }
+            else if (c == ',')
+            {
+                if (sf)
+                    sf->comma = 1;
+                len--;
+            }
+            else if (c == '.' || c == ';' || c == ':' || c == '!')
+            {
+                if (sf)
+                    sf->period = 1;
+                len--;
+            }
+            else
+                break;
+        }
+        if (len == 0)
+            continue; /* punctuation-only token: flags kept, no token */
+        /* trailing possessive 's detaches into its own token; the
+           genitive flag survives even when the table is full */
+        int detach_s = 0;
+        if (len > 2 && start[len - 2] == '\'' &&
+            (start[len - 1] == 's' || start[len - 1] == 'S'))
+        {
+            if (sf)
+                sf->genitive = 1;
+            detach_s = 1;
+            len -= 2;
+        }
+        size_t flen = len;
+        if (flen >= CHAT_TOKEN_MAX)
+            flen = CHAT_TOKEN_MAX - 1;
         size_t o = 0;
         for (size_t i = 0; i < len;)
         {
-            if (o >= CHAT_TOKEN_MAX - 1)
+            if (o >= flen)
                 break;
             i += FoldChar(start + i, &toks[n][o]);
             o++;
         }
         toks[n][o] = '\0';
-        n++;
+        if (strcmp(toks[n], "'s") == 0)
+        {
+            /* spaced genitive marker ("David 's son"): force, kept */
+            if (sf)
+                sf->genitive = 1;
+            n++;
+        }
+        else if (strcmp(toks[n], "del") == 0)
+        {
+            /* the only ES possession contraction: canonical split */
+            strncpy(toks[n], "de", CHAT_TOKEN_MAX - 1);
+            toks[n][CHAT_TOKEN_MAX - 1] = '\0';
+            n++;
+            if (n < max_toks)
+            {
+                strncpy(toks[n], "el", CHAT_TOKEN_MAX - 1);
+                toks[n][CHAT_TOKEN_MAX - 1] = '\0';
+                n++;
+            }
+        }
+        else
+            n++;
+        if (detach_s && n < max_toks)
+        {
+            strncpy(toks[n], "'s", CHAT_TOKEN_MAX - 1);
+            toks[n][CHAT_TOKEN_MAX - 1] = '\0';
+            n++;
+        }
     }
     return n;
+}
+
+/* FASE 4: closed-class structural particles (functional vocabulary
+   already present as literals across the parser; never content).
+   Shared by the G1 topic test (inverse) and the G2 orphan-slot veto. */
+static int IsStopTok(const char *tok)
+{
+    static const char *STOP[] = {
+        "de", "of", "del", "'s", "el", "la", "los", "las", "the",
+        "un", "una", "unos", "unas", "a", "an", "en", "y", "e",
+        "o", "u", "que", "quien", "quienes", "cual", "cuales",
+        "su", "sus", "his", "her", "mi", "my", "tu", "your",
+        "es", "era", "fue", "is", "was", "son", "por", "why",
+        "no", "si",
+    };
+    for (size_t i = 0; i < sizeof(STOP) / sizeof(STOP[0]); i++)
+        if (strcmp(tok, STOP[i]) == 0)
+            return 1;
+    return 0;
+}
+
+/* G2: a captured slot is structurally orphaned when empty or a
+   particle (the delimiter itself, an article, a possessive...). */
+static int SlotOk(const char *slot)
+{
+    return slot != NULL && slot[0] != '\0' && !IsStopTok(slot);
+}
+
+/* possessive pronoun right before the relation keyword: "su padre"
+/   "his father" read as "father of [focus]" (anaphora resolved by
+   the context layer; G3 abstains when no valid focus exists). */
+static int PrevIsPoss(const char toks[][CHAT_TOKEN_MAX], int kwpos)
+{
+    if (kwpos <= 0)
+        return 0;
+    const char *prev = toks[kwpos - 1];
+    return strcmp(prev, "su") == 0 || strcmp(prev, "sus") == 0 ||
+           strcmp(prev, "his") == 0 || strcmp(prev, "her") == 0;
+}
+
+/* EN genitive: [X 's REL] claims X as the argument
+   ("David's father" asks for the father of David). */
+static int GenitiveArg(const char toks[][CHAT_TOKEN_MAX], int kwpos,
+                       char *out)
+{
+    if (kwpos < 2 || strcmp(toks[kwpos - 1], "'s") != 0)
+        return 0;
+    strncpy(out, toks[kwpos - 2], CHAT_TOKEN_MAX - 1);
+    out[CHAT_TOKEN_MAX - 1] = '\0';
+    return 1;
+}
+
+/* G1 topic: a content-word-shaped token before the keyword (an
+   elliptical "David, padre?" carries its own force; a bare
+   "[det] REL of ARG" fragment does not). Closed-class-proof: the
+   stop set is functional particles, and ES/EN name variants
+   ("Jonas"/"Jonah") never need to match the KB vocabulary. */
+static int HasTopicBefore(const char toks[][CHAT_TOKEN_MAX], int kwpos)
+{
+    for (int i = 0; i < kwpos; i++)
+        if (!IsStopTok(toks[i]))
+            return 1;
+    return 0;
 }
 
 /* vocabulary index of a token, -1 when absent (the KB keeps one
@@ -145,6 +298,40 @@ static void Cap(const char *tok, char *out, size_t out_size)
     snprintf(out, out_size, "%s", tok);
     if (out[0] >= 'a' && out[0] <= 'z')
         out[0] = (char)(out[0] - 32);
+}
+
+void ChatCapStr(const char *tok, char *out, size_t size)
+{
+    Cap(tok, out, size);
+}
+
+void ChatNormTok(const char *in, char *out, size_t size)
+{
+    size_t o = 0;
+    if (size == 0)
+        return;
+    for (size_t i = 0; in[i] != '\0' && o + 1 < size;)
+    {
+        char c = '\0';
+        i += (size_t)FoldChar(in + i, &c);
+        out[o++] = c;
+    }
+    out[o] = '\0';
+}
+
+void ChatAnswerParentSingle(const CHAT *ch, const char *child,
+                            const char *parent, char *out, size_t size)
+{
+    char capC[CHAT_TOKEN_MAX], capP[CHAT_TOKEN_MAX];
+    (void)ch;
+    Cap(child, capC, sizeof(capC));
+    Cap(parent, capP, sizeof(capP));
+    if (size == 0)
+        return;
+    snprintf(out, size,
+             "El padre de %s es %s, segun consta en los registros "
+             "directos.\n",
+             capC, capP);
 }
 
 /* ---- corpus ingest (same contract as test_bible_kinship) ---- */
@@ -394,6 +581,14 @@ static uint32_t ChatParents(const CHAT *ch, const char *child,
         }
     }
     return n;
+}
+
+/* Parent candidates for the wrapper (Fase B): same scan, ingest
+   order, deduped. */
+uint32_t ChatParentsList(const CHAT *ch, const char *child,
+                         char out[][CHAT_TOKEN_MAX], uint32_t max_out)
+{
+    return ChatParents(ch, child, out, max_out);
 }
 
 /* sibling scan: SYMMETRIC family, but the swap path in transfer
@@ -888,10 +1083,352 @@ static int HasTok(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
     return -1;
 }
 
-static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
+/* EN surface forms: the connective-derived en_stem (sibling,
+   reigns, wife_of...) is not the English noun people use
+   (brother, king...). Like BibleRelToConn, this is a
+   consultable ingestion-vocabulary table at the chat layer,
+   not logic; unknown words match nothing. Shared by the matcher
+   and the BOOL guard so both know the same words. */
+static const struct
 {
-    char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
-    uint32_t n = Split(line, toks, CHAT_MAX_TOKS);
+    const char *en_word;
+    const char *es_stem;
+} CHAT_EN_SURFACE[] = {
+    {"brother", "hermano"}, {"king", "rey"},
+    {"husband", "esposa"},  {"wife", "esposa"},
+};
+#define CHAT_EN_SURFACE_N \
+    (sizeof(CHAT_EN_SURFACE) / sizeof(CHAT_EN_SURFACE[0]))
+
+/* span-restricted deduced-relation match (Fase A): the ParseIntent
+   scan over absolute token indices in [start,end) — shared table,
+   MorphFold rules and the son/sons wh-guard intact. */
+static void MatchKwSpan(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                        uint32_t start, uint32_t end,
+                        int *kwx_out, int *kwpos_out)
+{
+
+    /* generic deduced-relation match: scan the tokens against the
+       ingest-time index (kws) — no relation word lives in code */
+    int kwx = -1; /* index of the matched deduced keyword */
+    int kwpos = -1; /* token position of that keyword */
+    for (uint32_t i = start; i < end && kwx < 0; i++)
+    {
+        /* morphological fold of the raw token (rules, not word
+           lists); a candidate only survives if it equals a DEDUCED
+           stem, so folds of ordinary words are inert unless the KB
+           deduced it */
+        char cand[4][CHAT_TOKEN_MAX];
+        uint32_t ncand = 0;
+        MorphFold(toks[i], cand, &ncand);
+
+        for (uint32_t k = 0; k < ch->num_kws; k++)
+        {
+            const REL_KW *kw = &ch->kws[k];
+            int hit = strcmp(toks[i], kw->es_stem) == 0 ||
+                      strcmp(toks[i], kw->en_stem) == 0;
+            if (!hit)
+                for (size_t e = 0; e < CHAT_EN_SURFACE_N; e++)
+                    if (strcmp(toks[i], CHAT_EN_SURFACE[e].en_word) == 0 &&
+                        strcmp(CHAT_EN_SURFACE[e].es_stem,
+                               kw->es_stem) == 0)
+                    {
+                        hit = 1;
+                        break;
+                    }
+            if (!hit)
+                for (uint32_t c = 1; c < ncand && !hit; c++)
+                    if (strcmp(cand[c], kw->es_stem) == 0 ||
+                        strcmp(cand[c], kw->en_stem) == 0)
+                        hit = 1;
+            if (hit)
+            {
+                kwx = (int)k;
+                kwpos = (int)i;
+                break;
+            }
+        }
+    }
+    *kwx_out = kwx;
+    *kwpos_out = kwpos;
+}
+
+/* Fase A deduced split points: no coordinator is ever named. A
+   droppable token is outside the ingested vocabulary, not a deduced
+   keyword, and not a frozen delimiter (de/of/'s). Stop-tokens,
+   copulas, wh-words and prepositions are all tried as split points:
+   left-span trial parse plus right-span viability reject every false
+   split (ES-2 composed NPs, R7 adjuncts, R9 bare fragments and
+   relative-like tails collapse back to a single goal). */
+static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                           uint32_t n, int q_force, int gen_force,
+                           int comma_veto, PARSED *p);
+static int IsDigitTok(const char *tok);
+static int HasWh(const char toks[][CHAT_TOKEN_MAX], uint32_t n);
+static void SpanText(const char toks[][CHAT_TOKEN_MAX], uint32_t s,
+                     uint32_t e, char *out, size_t size);
+/* single-token deduced-keyword hit via MatchKwSpan (no tables, no
+   word lists: everything comes from the ingest-time index). */
+static int KwHitTok(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                    uint32_t i)
+{
+    int kwx = -1, kwpos = -1;
+    MatchKwSpan(ch, toks, i, i + 1, &kwx, &kwpos);
+    return kwx >= 0;
+}
+/* Fase A deduced split points: no coordinator is ever named. A
+   droppable token is outside the ingested vocabulary, not a deduced
+   keyword, and not a frozen delimiter (de/of/'s). Everything else is
+   tried: left-span trial-parse (or tool-route) with a content-closed
+   left end, plus a valid right opening (below), reject every false
+   split (ES-2 composed NPs, R7 adjuncts, R9 bare fragments,
+   appositions and relative-like tails collapse to a single goal). */
+static int IsDroppable(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                       uint32_t n, uint32_t i)
+{
+    (void)n;
+    if (VocabIdx(ch, toks[i]) >= 0)
+        return 0; /* content word, never dropped */
+    if (KwHitTok(ch, toks, i))
+        return 0; /* relation word keeps its span */
+    if (strcmp(toks[i], "de") == 0 || strcmp(toks[i], "of") == 0 ||
+        strcmp(toks[i], "'s") == 0)
+        return 0; /* frozen delimiters are structure, not glue */
+    return 1;
+}
+
+/* frozen copula set (defined near the dispatcher; same literals
+   as the kw_is scan, no new words). */
+static int IsCopulaTok(const char *tok);
+
+/* a right span opens validly when it starts with a frozen delimiter
+   or wh-word, is a bare single content token (elliptical "and
+   Solomon"), or holds an anaphoric token whose referent arrives via
+   execution memory ("he" after was, "eso" after es). Appositions
+   ([the king...]) and bare kw-led spans fail here without naming
+   any article. */
+static int HasAnaphoricTok(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                           uint32_t s, uint32_t e)
+{
+    uint32_t j;
+    for (j = s + 1; j < e; j++)
+    {
+        if (!IsCopulaTok(toks[j - 1]))
+            continue;
+        if (VocabIdx(ch, toks[j]) >= 0 || KwHitTok(ch, toks, j) ||
+            IsStopTok(toks[j]) || IsDigitTok(toks[j]))
+            continue;
+        return 1;
+    }
+    return 0;
+}
+
+static int RightOpens(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                      uint32_t r, uint32_t e)
+{
+    if (IsCopulaTok(toks[r]))
+    {
+        /* copula-led span: only when it binds its own relation
+           ("es el padre de..." parses whole); bare "was he..."
+           tails never open a goal. Checked first so the anaphoric
+           rule below cannot rescue a fragment. */
+        int kwx = -1, kwpos = -1;
+        MatchKwSpan(ch, toks, r, e, &kwx, &kwpos);
+        return kwx >= 0;
+    }
+    if (strcmp(toks[r], "de") == 0 || strcmp(toks[r], "of") == 0)
+        return 1;
+    if (HasWh(toks + r, 1))
+        return 1;
+    if (e == r + 1 && !IsStopTok(toks[r]) && !IsDigitTok(toks[r]))
+        return 1;
+    if (HasAnaphoricTok(ch, toks, r, e))
+        return 1;
+    return 0;
+}
+
+/* standalone trial parse of a left span (Fase A selection): pure
+   ParseIntentToks, no focus or NLG side effects. With inherited kw
+   text the elliptical span is rehydrated first ("padre"+"de
+   salomon"), exactly as the evaluator will see it. */
+static int TrialParseGoal(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                          uint32_t s, uint32_t e, int inh_kwpos,
+                          int force_q, int force_gen, PARSED *out)
+{
+    char ltoks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    uint32_t ln = 0;
+    if (inh_kwpos >= 0)
+    {
+        strncpy(ltoks[0], toks[inh_kwpos], CHAT_TOKEN_MAX - 1);
+        ltoks[0][CHAT_TOKEN_MAX - 1] = '\0';
+        ln = 1;
+    }
+    for (uint32_t i = s; i < e && ln < CHAT_MAX_TOKS; i++)
+    {
+        strncpy(ltoks[ln], toks[i], CHAT_TOKEN_MAX - 1);
+        ltoks[ln][CHAT_TOKEN_MAX - 1] = '\0';
+        ln++;
+    }
+    PARSED tmp;
+    int ok = ParseIntentToks(ch, ltoks, ln, force_q, force_gen, 0,
+                             &tmp);
+    if (out != NULL)
+        *out = tmp;
+    return ok;
+}
+
+static int EmitGoal(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                    uint32_t s, uint32_t e, int inh_kwpos,
+                    QueryPlan *plan)
+{
+    if (plan->count >= QP_MAX_GOALS)
+        return -1;
+    QueryGoal *g = &plan->goals[plan->count];
+    g->start = s;
+    g->end = e;
+    g->connector = (plan->count == 0) ? 0 : 1;
+    g->kwx = -1;
+    g->kwpos = -1;
+    g->inherit = 0;
+    MatchKwSpan(ch, toks, s, e, &g->kwx, &g->kwpos);
+    if (g->kwx < 0 && inh_kwpos >= 0)
+    {
+        g->inherit = 1;
+        MatchKwSpan(ch, toks, (uint32_t)inh_kwpos,
+                    (uint32_t)inh_kwpos + 1, &g->kwx, &g->kwpos);
+    }
+    plan->count++;
+    return 0;
+}
+
+/* tool-routed span (Agent Core selection): a left span that fails
+   frames but classifies NEEDS_TOOL still opens a split (calculator
+   and unframed person/relation shapes have no trial-parse). The
+   rehydrated text is classified exactly as the evaluator will see
+   it; vetoed shapes (bare fragments) stay GENUINE and never split. */
+static int SpanRoutesTool(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                          uint32_t s, uint32_t e, int inh_kwpos)
+{
+    char ltoks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    uint32_t ln = 0;
+    char line[512];
+    ToolRequest treq;
+    uint32_t i;
+    if (inh_kwpos >= 0)
+    {
+        strncpy(ltoks[0], toks[inh_kwpos], CHAT_TOKEN_MAX - 1);
+        ltoks[0][CHAT_TOKEN_MAX - 1] = '\0';
+        ln = 1;
+    }
+    for (i = s; i < e && ln < CHAT_MAX_TOKS; i++)
+    {
+        strncpy(ltoks[ln], toks[i], CHAT_TOKEN_MAX - 1);
+        ltoks[ln][CHAT_TOKEN_MAX - 1] = '\0';
+        ln++;
+    }
+    SpanText(ltoks, 0, ln, line, sizeof(line));
+    memset(&treq, 0, sizeof(treq));
+    return ToolClassify(ch, line, GOAL_UNKNOWN, CAUSE_PARSE_FAIL, "",
+                        "", &treq) == DEC_NEEDS_TOOL;
+}
+
+/* recursive splitter: leftmost drop point whose left span
+   trial-parses (or tool-routes) and whose right span stays viable;
+   the right span recurses with the inherited kw text. No valid
+   split: the whole range is one goal (legacy single-intent path
+   decides). */
+static int PlanRange(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                     uint32_t s, uint32_t e, int inh_kwpos,
+                     int force_q, int force_gen, QueryPlan *plan)
+{
+    for (uint32_t i = s; i < e; i++)
+    {
+        uint32_t r = i + 1;
+        if (i == s || r >= e)
+            continue;
+        if (!IsDroppable(ch, toks, e, i))
+            continue;
+        if (IsStopTok(toks[i - 1]))
+            continue; /* dangling functional end (R7 adjuncts...) */
+        if (!TrialParseGoal(ch, toks, s, i, inh_kwpos, force_q,
+                            force_gen, NULL) &&
+            !SpanRoutesTool(ch, toks, s, i, inh_kwpos))
+            continue;
+        if (!RightOpens(ch, toks, r, e))
+            continue;
+        if (EmitGoal(ch, toks, s, i, inh_kwpos, plan) < 0)
+            return -1;
+        {
+            const QueryGoal *lg = &plan->goals[plan->count - 1];
+            int nkw = (lg->kwx >= 0) ? lg->kwpos : inh_kwpos;
+            return PlanRange(ch, toks, r, e, nkw, force_q, force_gen,
+                             plan);
+        }
+    }
+    return EmitGoal(ch, toks, s, e, inh_kwpos, plan);
+}
+
+/* Fase A Paso 1 (representation only): segment the canonical token
+   stream at deduced split points into isolated QueryGoals.
+   - leftmost drop point whose left span trial-parses wins;
+   - the right span recurses with the inherited kw text;
+   - no valid split: single goal, legacy path decides;
+   - over-coordination or empty input refuses (count = 0).
+   No vetoes here (G1/G2/G5 run per goal in step 3). */
+static int HasWh(const char toks[][CHAT_TOKEN_MAX], uint32_t n);
+uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
+                       char toks[][CHAT_TOKEN_MAX], uint32_t *ntok,
+                       SURFACE_FLAGS *sfout)
+{
+    SURFACE_FLAGS sf;
+    uint32_t n = Split(line, toks, CHAT_MAX_TOKS, &sf);
+    memset(plan, 0, sizeof(*plan));
+    if (ntok != NULL)
+        *ntok = n;
+    if (sfout != NULL)
+        *sfout = sf;
+    if (n == 0)
+        return 0;
+    {
+        /* cross-clausal frames (WHY/COMPOSE) are single discourse
+           units spanning both sides: a line that parses as one is
+           never split, intent-detected not word-detected. */
+        PARSED whole;
+        int force_q = sf.question || HasWh(toks, n);
+        if (TrialParseGoal(ch, toks, 0, n, -1, force_q, sf.genitive,
+                           &whole) &&
+            (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY))
+            return EmitGoal(ch, toks, 0, n, -1, plan);
+    }
+    if (PlanRange(ch, toks, 0, n, -1,
+                  sf.question || HasWh(toks, n), sf.genitive,
+                  plan) < 0)
+    {
+        memset(plan, 0, sizeof(*plan));
+        return 0;
+    }
+    return plan->count;
+}
+
+/* fallback capture guard (positional, frozen copulas only): the
+   slot at cappos is taken only if a token exists there and the one
+   after it is not a copula (a slot directly followed by a copula is
+   the subject of a clause, never an argument). */
+static int FallbackOpen(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
+                        uint32_t cappos)
+{
+    return cappos < n &&
+           (cappos + 1 >= n || !IsCopulaTok(toks[cappos + 1]));
+}
+
+/* token-based intent core (Fase A): the former ParseIntent body
+   over caller-provided canonical tokens. q_force/gen_force/comma_veto
+   are the plan-level surface signals; single-intent callers pass the
+   line-level ones (behavior identical). */
+static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                           uint32_t n, int q_force, int gen_force,
+                           int comma_veto, PARSED *p)
+{
     memset(p, 0, sizeof(*p));
     if (n == 0)
         return 0;
@@ -949,62 +1486,15 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
             kw_is = (int)i;
     }
     (void)kw_who;
+    /* FASE 4 interrogative force: surface question flag or a wh-word
+       anywhere in the line (wh-optional elliptical queries keep
+       working through the topic/genitive exemptions below). */
+    int flag_q = q_force || kw_who >= 0;
 
-    /* EN surface forms: the connective-derived en_stem (sibling,
-       reigns, wife_of...) is not the English noun people use
-       (brother, king...). Like BibleRelToConn, this is a
-       consultable ingestion-vocabulary table at the chat layer,
-       not logic; unknown words match nothing. */
-    static const struct
-    {
-        const char *en_word;
-        const char *es_stem;
-    } EN_SURFACE[] = {
-        {"brother", "hermano"}, {"king", "rey"},
-        {"husband", "esposa"},  {"wife", "esposa"},
-    };
-
-    /* generic deduced-relation match: scan the tokens against the
-       ingest-time index (kws) — no relation word lives in code */
-    int kwx = -1; /* index of the matched deduced keyword */
-    int kwpos = -1; /* token position of that keyword */
-    for (uint32_t i = 0; i < n && kwx < 0; i++)
-    {
-        /* morphological fold of the raw token (rules, not word
-           lists); a candidate only survives if it equals a DEDUCED
-           stem, so folds of ordinary words are inert unless the KB
-           deduced it */
-        char cand[4][CHAT_TOKEN_MAX];
-        uint32_t ncand = 0;
-        MorphFold(toks[i], cand, &ncand);
-
-        for (uint32_t k = 0; k < ch->num_kws; k++)
-        {
-            const REL_KW *kw = &ch->kws[k];
-            int hit = strcmp(toks[i], kw->es_stem) == 0 ||
-                      strcmp(toks[i], kw->en_stem) == 0;
-            if (!hit)
-                for (size_t e = 0;
-                     e < sizeof(EN_SURFACE) / sizeof(EN_SURFACE[0]); e++)
-                    if (strcmp(toks[i], EN_SURFACE[e].en_word) == 0 &&
-                        strcmp(EN_SURFACE[e].es_stem, kw->es_stem) == 0)
-                    {
-                        hit = 1;
-                        break;
-                    }
-            if (!hit)
-                for (uint32_t c = 1; c < ncand && !hit; c++)
-                    if (strcmp(cand[c], kw->es_stem) == 0 ||
-                        strcmp(cand[c], kw->en_stem) == 0)
-                        hit = 1;
-            if (hit)
-            {
-                kwx = (int)k;
-                kwpos = (int)i;
-                break;
-            }
-        }
-    }
+    /* generic deduced-relation match over the whole line */
+    int kwx = -1;
+    int kwpos = -1;
+    MatchKwSpan(ch, toks, 0, n, &kwx, &kwpos);
 
     /* second deduced keyword (compose frame): the LAST relation
        word that is NOT the primary one (primary = first match at
@@ -1109,14 +1599,13 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
     {
         if (TokAfterDe(toks, n, (uint32_t)kw_grand + 1, p->a,
                        CHAT_TOKEN_MAX) ||
-            (uint32_t)kw_grand + 1 < n)
+            FallbackOpen(toks, n, (uint32_t)kw_grand + 1))
         {
             if (p->a[0] == '\0')
                 strncpy(p->a, toks[kw_grand + 1], CHAT_TOKEN_MAX - 1),
                     p->a[CHAT_TOKEN_MAX - 1] = '\0';
-            /* strip article if captured ("el padre" style) */
-            if (strcmp(p->a, "el") == 0 || strcmp(p->a, "la") == 0 ||
-                strcmp(p->a, "los") == 0 || strcmp(p->a, "las") == 0)
+            /* FASE 4 G2: orphan slot (article, delimiter...) vetoes */
+            if (!SlotOk(p->a))
                 return 0;
             p->intent = INT_GRANDPARENT;
             return 1;
@@ -1129,11 +1618,14 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
     {
         if (TokAfterDe(toks, n, (uint32_t)kw_desc + 1, p->a,
                        CHAT_TOKEN_MAX) ||
-            (uint32_t)kw_desc + 1 < n)
+            FallbackOpen(toks, n, (uint32_t)kw_desc + 1))
         {
             if (p->a[0] == '\0')
                 strncpy(p->a, toks[kw_desc + 1], CHAT_TOKEN_MAX - 1),
                     p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            /* FASE 4 G2: orphan slot (article, delimiter...) vetoes */
+            if (!SlotOk(p->a))
+                return 0;
             p->intent = INT_DESCENDANT;
             return 1;
         }
@@ -1183,18 +1675,24 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
             strcmp(cand, "los") != 0 && strcmp(cand, "las") != 0 &&
             strcmp(cand, "the") != 0 && (int)kw_is != kwpos)
         {
-            /* reject the relation word itself in any folded form */
+            /* reject the relation word itself in any folded form,
+               including the shared EN surface table (the matcher
+               knows "king" is rey, so the guard must too: otherwise
+               "who was king of X" misreads King as a person) */
             char rcand[4][CHAT_TOKEN_MAX];
             uint32_t nrc = 0;
             MorphFold(cand, rcand, &nrc);
             int is_kw_variant = 0;
-            for (uint32_t c = 0; c < nrc; c++)
+            for (uint32_t c = 0; c < nrc && !is_kw_variant; c++)
                 if (strcmp(rcand[c], ch->kws[kwx].es_stem) == 0 ||
                     strcmp(rcand[c], ch->kws[kwx].en_stem) == 0)
-                {
                     is_kw_variant = 1;
-                    break;
-                }
+            for (size_t e = 0; e < CHAT_EN_SURFACE_N && !is_kw_variant;
+                 e++)
+                if (strcmp(cand, CHAT_EN_SURFACE[e].en_word) == 0 &&
+                    strcmp(CHAT_EN_SURFACE[e].es_stem,
+                           ch->kws[kwx].es_stem) == 0)
+                    is_kw_variant = 1;
             /* A-copula-kw-de-B: candidate being a kw variant is
                expected (it IS the relation word) */
             if (!is_kw_variant || prev_is_name)
@@ -1220,25 +1718,51 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
         }
     }
 
-    /* CHILDREN: "quienes son los hijos de X"; anaphora "sus" */
+    /* CHILDREN: "quienes son los hijos de X"; anaphora "sus"
+       (or "su/his/her + hijo" = child of [focus]). FASE 4: G1 vetoes
+       bare "[det] hijo of ARG" fragments (topic/force required), G2
+       vetoes orphan slots, G5 defers comma appositions, and the
+       's-genitive claims X. */
     if (kw_child >= 0 && kw_parent < 0)
     {
-        int sus = HasTok(toks, n, "sus");
-        sus = sus < 0 ? HasTok(toks, n, "su") : sus;
-        if (TokAfterDe(toks, n, (uint32_t)kw_child + 1, p->a,
+        char slot[CHAT_TOKEN_MAX];
+        if (comma_veto)
+            return 0; /* G5: apposition out of scope for F4 */
+        if (TokAfterDe(toks, n, (uint32_t)kw_child + 1, slot,
                        CHAT_TOKEN_MAX))
         {
+            if (!SlotOk(slot))
+                return 0; /* G2: delimiter/article/possessive as arg */
+            if (!flag_q && !gen_force && !HasTopicBefore(toks, kw_child))
+                return 0; /* G1: declarative fragment, no force */
+            strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_CHILDREN_OF;
             return 1;
         }
-        if (sus >= 0)
+        if (GenitiveArg(toks, kw_child, slot))
         {
-            p->a[0] = '\0'; /* focus fills it */
+            if (!SlotOk(slot))
+                return 0;
+            strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_CHILDREN_OF;
             return 1;
         }
-        if ((uint32_t)kw_child + 1 < n)
+        int sus = HasTok(toks, n, "sus");
+        sus = sus < 0 ? HasTok(toks, n, "su") : sus;
+        if (sus >= 0 || PrevIsPoss(toks, kw_child))
         {
+            p->a[0] = '\0'; /* focus fills it (G3 abstains when absent) */
+            p->intent = INT_CHILDREN_OF;
+            return 1;
+        }
+        if (FallbackOpen(toks, n, (uint32_t)kw_child + 1))
+        {
+            if (!SlotOk(toks[kw_child + 1]))
+                return 0; /* G2 */
+            if (!flag_q && !gen_force && !HasTopicBefore(toks, kw_child))
+                return 0; /* G1 */
             strncpy(p->a, toks[kw_child + 1], CHAT_TOKEN_MAX - 1);
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_CHILDREN_OF;
@@ -1247,17 +1771,46 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
         return 0;
     }
 
-    /* PARENT: "quien fue el padre de X" */
+    /* PARENT: "quien fue el padre de X" (or "su padre" / "his
+       father" = father of [focus]). FASE 4 guards as in CHILDREN. */
     if (kw_parent >= 0)
     {
-        if (TokAfterDe(toks, n, (uint32_t)kw_parent + 1, p->a,
+        char slot[CHAT_TOKEN_MAX];
+        if (comma_veto)
+            return 0; /* G5: apposition out of scope for F4 */
+        if (TokAfterDe(toks, n, (uint32_t)kw_parent + 1, slot,
                        CHAT_TOKEN_MAX))
         {
+            if (!SlotOk(slot))
+                return 0; /* G2 */
+            if (!flag_q && !gen_force && !HasTopicBefore(toks, kw_parent))
+                return 0; /* G1 */
+            strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_PARENT_OF;
             return 1;
         }
-        if ((uint32_t)kw_parent + 1 < n)
+        if (GenitiveArg(toks, kw_parent, slot))
         {
+            if (!SlotOk(slot))
+                return 0;
+            strncpy(p->a, slot, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_PARENT_OF;
+            return 1;
+        }
+        if (PrevIsPoss(toks, kw_parent))
+        {
+            p->a[0] = '\0'; /* focus fills it (G3 abstains when absent) */
+            p->intent = INT_PARENT_OF;
+            return 1;
+        }
+        if (FallbackOpen(toks, n, (uint32_t)kw_parent + 1))
+        {
+            if (!SlotOk(toks[kw_parent + 1]))
+                return 0; /* G2 */
+            if (!flag_q && !gen_force && !HasTopicBefore(toks, kw_parent))
+                return 0; /* G1 */
             strncpy(p->a, toks[kw_parent + 1], CHAT_TOKEN_MAX - 1);
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->intent = INT_PARENT_OF;
@@ -1320,12 +1873,17 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
             from = (uint32_t)kw_is + 2;
         if (TokAfterDe(toks, n, from, p->a, CHAT_TOKEN_MAX))
         {
+            if (!SlotOk(p->a))
+                return 0; /* FASE 4 G2 (no G1 here: wh-optional
+                             bare fragments stay valid, Fase 1 pin) */
             p->kw = kwx;
             p->intent = INT_REL_QUERY;
             return 1;
         }
-        if (from < n)
+        if (FallbackOpen(toks, n, from))
         {
+            if (!SlotOk(toks[from]))
+                return 0; /* FASE 4 G2 */
             strncpy(p->a, toks[from], CHAT_TOKEN_MAX - 1);
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->kw = kwx;
@@ -1339,17 +1897,39 @@ generic_query_done:
     return 0;
 }
 
+static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
+{
+    char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    SURFACE_FLAGS sf;
+    uint32_t n = Split(line, toks, CHAT_MAX_TOKS, &sf);
+    return ParseIntentToks(ch, toks, n, sf.question, sf.genitive,
+                           sf.comma, p);
+}
+
 /* ---- NLG (ES) ---- */
 
 static void RememberFocus(CHAT *ch, const char *tok)
 {
+    if (tok == NULL || tok[0] == '\0')
+        return; /* FASE 4 G3: never store the empty string as focus */
     strncpy(ch->focus, tok, sizeof(ch->focus) - 1);
     ch->focus[sizeof(ch->focus) - 1] = '\0';
     ch->focus_valid = 1;
 }
 
-static void ChatAnswer(CHAT *ch, const PARSED *p)
+/* goal outcomes live in bible_chat.h (wrapper-visible) */
+
+#define CHAT_ANSWER_MAX 4096
+
+/* buffered answer: byte-identical text to the former ChatAnswer,
+   plus the per-goal status for the composite dispatcher. */
+static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
+                            size_t size, int *status)
 {
+    size_t pos = 0;
+    int st = GOAL_UNKNOWN;
+#define EMIT(...) do { int w_ = snprintf(out + pos, (pos < size) ? size - pos : 0, __VA_ARGS__); if (w_ > 0) pos += (size_t)w_; } while (0)
+#define EMIT_OK(...) do { st = GOAL_ANSWER; EMIT(__VA_ARGS__); } while (0)
     char capA[CHAT_TOKEN_MAX], capB[CHAT_TOKEN_MAX], capM[CHAT_TOKEN_MAX];
     Cap(p->a, capA, sizeof(capA));
     Cap(p->b, capB, sizeof(capB));
@@ -1363,21 +1943,23 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         uint32_t found = ChatParents(ch, p->a, parents, 8);
         if (found == 1)
         {
+            st = GOAL_ANSWER;
             char capP[CHAT_TOKEN_MAX];
             Cap(parents[0], capP, sizeof(capP));
-            printf("El padre de %s es %s, segun consta en los registros "
+            EMIT("El padre de %s es %s, segun consta en los registros "
                    "directos.\n",
                    capA, capP);
         }
         else if (found == 0)
         {
-            printf("No tengo constancia del padre de %s en los textos "
+            EMIT("No tengo constancia del padre de %s en los textos "
                    "cargados.\n",
                    capA);
         }
         else
         {
-            printf("Hay %u constancias del padre de %s: ambiguo, necesito "
+            st = GOAL_AMBIGUOUS;
+            EMIT("Hay %u constancias del padre de %s: ambiguo, necesito "
                    "desambiguar.\n",
                    found, capA);
         }
@@ -1390,18 +1972,19 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         uint32_t n = ChatChildren(ch, p->a, kids, 32);
         if (n == 0)
         {
-            printf("No tengo constancia de hijos de %s.\n", capA);
+            EMIT("No tengo constancia de hijos de %s.\n", capA);
         }
         else
         {
-            printf("Los hijos de %s son:", capA);
+            st = GOAL_ANSWER;
+            EMIT("Los hijos de %s son:", capA);
             for (uint32_t i = 0; i < n; i++)
             {
                 char capK[CHAT_TOKEN_MAX];
                 Cap(kids[i], capK, sizeof(capK));
-                printf("%s %s", i ? "," : "", capK);
+                EMIT("%s %s", i ? "," : "", capK);
             }
-            printf(".\n");
+            EMIT(".\n");
         }
         break;
     }
@@ -1411,7 +1994,7 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         const char *stem = ChatFamStem(ch, "taxonomy");
         if (stem == NULL)
         {
-            printf("No entendi la pregunta.\n");
+            EMIT("No entendi la pregunta.\n");
             break;
         }
         int yes = ChatDirect(ch, p->a, p->b);
@@ -1422,9 +2005,9 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         if (!yes)
             yes = ChatBfsPath(ch, p->a, p->b, path) > 0;
         if (yes)
-            printf("Si, %s es %s de %s.\n", capA, stem, capB);
+            EMIT_OK("Si, %s es %s de %s.\n", capA, stem, capB);
         else
-            printf("No tengo constancia de que %s sea %s de %s.\n", capA,
+            EMIT("No tengo constancia de que %s sea %s de %s.\n", capA,
                    stem, capB);
         break;
     }
@@ -1434,7 +2017,7 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         const char *stem = ChatFamStem(ch, "taxonomy");
         if (stem == NULL)
         {
-            printf("No entendi la pregunta.\n");
+            EMIT("No entendi la pregunta.\n");
             break;
         }
         char gp[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
@@ -1443,13 +2026,14 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
             char capG[CHAT_TOKEN_MAX];
             Cap(gp, capG, sizeof(capG));
             Cap(mid, capM, sizeof(capM));
-            printf("El abuelo de %s es %s: %s es %s de %s, y %s es %s "
+            st = GOAL_ANSWER;
+            EMIT("El abuelo de %s es %s: %s es %s de %s, y %s es %s "
                    "de %s.\n",
                    capA, capG, capA, stem, capM, capM, stem, capG);
         }
         else
         {
-            printf("No tengo constancia del abuelo de %s.\n", capA);
+            EMIT("No tengo constancia del abuelo de %s.\n", capA);
         }
         break;
     }
@@ -1459,7 +2043,7 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         const char *stem = ChatFamStem(ch, "taxonomy");
         if (stem == NULL)
         {
-            printf("No entendi la pregunta.\n");
+            EMIT("No entendi la pregunta.\n");
             break;
         }
         char gd[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
@@ -1468,13 +2052,14 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
             char capD[CHAT_TOKEN_MAX];
             Cap(gd, capD, sizeof(capD));
             Cap(mid, capM, sizeof(capM));
-            printf("Un descendiente de %s es %s: %s es %s de %s, y %s "
+            st = GOAL_ANSWER;
+            EMIT("Un descendiente de %s es %s: %s es %s de %s, y %s "
                    "es %s de %s.\n",
                    capA, capD, capD, stem, capM, capM, stem, capA);
         }
         else
         {
-            printf("No tengo constancia de descendientes de %s.\n", capA);
+            EMIT("No tengo constancia de descendientes de %s.\n", capA);
         }
         break;
     }
@@ -1485,19 +2070,21 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         const char *stem = ChatFamStem(ch, "taxonomy");
         if (stem == NULL)
         {
-            printf("No entendi la pregunta.\n");
+            EMIT("No entendi la pregunta.\n");
             break;
         }
         if (ChatDirect(ch, p->a, p->b))
         {
-            printf("%s es %s de %s segun constancia directa.\n", capA,
+            st = GOAL_ANSWER;
+            EMIT("%s es %s de %s segun constancia directa.\n", capA,
                    stem, capB);
         }
         else if (ChatChain(ch, p->a, p->b, mid, sizeof(mid)))
         {
             char capM2[CHAT_TOKEN_MAX];
             Cap(mid, capM2, sizeof(capM2));
-            printf("Lo se porque %s es %s de %s, y %s es %s de %s.\n",
+            st = GOAL_ANSWER;
+            EMIT("Lo se porque %s es %s de %s, y %s es %s de %s.\n",
                    capA, stem, capM2, capM2, stem, capB);
         }
         else
@@ -1512,24 +2099,25 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
                    parent); the conclusion re-affirms the question
                    (A <stem> B) with the same deduced word. */
                 char capC[CHAT_TOKEN_MAX], capP[CHAT_TOKEN_MAX];
-                printf("Lo se porque");
+                EMIT("Lo se porque");
                 for (int k = 1; k <= steps; k++)
                 {
                     Cap(path[k - 1], capC, sizeof(capC));
                     Cap(path[k], capP, sizeof(capP));
                     if (k == 1)
-                        printf(" %s es %s de %s", capC, stem, capP);
+                        EMIT(" %s es %s de %s", capC, stem, capP);
                     else if (k == steps)
-                        printf(" y %s es %s de %s", capC, stem, capP);
+                        EMIT(" y %s es %s de %s", capC, stem, capP);
                     else
-                        printf(", %s es %s de %s", capC, stem, capP);
+                        EMIT(", %s es %s de %s", capC, stem, capP);
                 }
-                printf(". Por tanto %s es %s de %s.\n", capA, stem,
+                st = GOAL_ANSWER;
+                EMIT(". Por tanto %s es %s de %s.\n", capA, stem,
                        capB);
             }
             else
             {
-                printf("No tengo constancia de una relacion entre %s y "
+                EMIT("No tengo constancia de una relacion entre %s y "
                        "%s.\n",
                        capA, capB);
             }
@@ -1544,10 +2132,10 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         /* the rule must be licensed in the meta layer and the
            conclusion must be observed fact (justification, not
            derivation) */
-        char out[128];
+        char proof[128];
         if (TransferExplainCompose(&ch->kb, &ch->mk, k1->family,
-                                   k2->family, p->a, p->b, p->cc, out,
-                                   sizeof(out)))
+                                   k2->family, p->a, p->b, p->cc, proof,
+                                   sizeof(proof)))
         {
             /* conclusion stem = the rule's r3 family, deduced from
                the corpus lexicon (never the question's own word) */
@@ -1559,21 +2147,22 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
             {
                 char capC[CHAT_TOKEN_MAX];
                 Cap(p->cc, capC, sizeof(capC));
-                printf("Lo se porque %s es %s de %s, y %s es %s de %s. "
-                       "Por tanto %s es %s de %s.\n",
+                st = GOAL_ANSWER;
+                EMIT("Lo se porque %s es %s de %s, y %s es %s de %s. "
+                        "Por tanto %s es %s de %s.\n",
                        capA, k1->es_stem, capB, capB, k2->es_stem, capC,
                        capA, stem3, capC);
             }
             else
             {
-                printf("No tengo constancia de una relacion entre %s y %s "
+                EMIT("No tengo constancia de una relacion entre %s y %s "
                        "por ahi.\n",
                        capA, capB);
             }
         }
         else
         {
-            printf("No tengo constancia de una relacion entre %s y %s "
+            EMIT("No tengo constancia de una relacion entre %s y %s "
                    "por ahi.\n",
                    capA, capB);
         }
@@ -1626,9 +2215,9 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
                                  sizeof(out));
         }
         if (yes)
-            printf("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
+            EMIT_OK("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
         else
-            printf("No tengo constancia de que %s %s de %s.\n", capA,
+            EMIT("No tengo constancia de que %s %s de %s.\n", capA,
                    kw->es_stem, capB);
         break;
     }
@@ -1689,24 +2278,355 @@ static void ChatAnswer(CHAT *ch, const PARSED *p)
         }
         if (found == 0)
         {
-            printf("No tengo constancia de %s de %s.\n", kw->es_stem, capA);
+            EMIT("No tengo constancia de %s de %s.\n", kw->es_stem, capA);
         }
         else
         {
-            printf("%s de %s:", kw->es_stem, capA);
+            st = GOAL_ANSWER;
+            EMIT("%s de %s:", kw->es_stem, capA);
             for (uint32_t i = 0; i < found; i++)
             {
                 char capH[CHAT_TOKEN_MAX];
                 Cap(hits[i], capH, sizeof(capH));
-                printf("%s %s", i ? "," : "", capH);
+                EMIT("%s %s", i ? "," : "", capH);
             }
-            printf(".\n");
+            EMIT(".\n");
         }
         break;
     }
     default:
-        printf("No entendi la pregunta.\n");
+        EMIT("No entendi la pregunta.\n");
         break;
+    }
+#undef EMIT
+    if (size > 0)
+        out[(pos < size) ? pos : size - 1] = '\0';
+    if (status != NULL)
+        *status = st;
+}
+/* frozen wh set (same literals as the kw_who scan; reused, no new
+   words): plan-level interrogative force for the dispatcher. */
+static int HasWh(const char toks[][CHAT_TOKEN_MAX], uint32_t n)
+{
+    for (uint32_t i = 0; i < n; i++)
+        if (strcmp(toks[i], "quien") == 0 || strcmp(toks[i], "quienes") == 0 ||
+            strcmp(toks[i], "who") == 0 || strcmp(toks[i], "whom") == 0)
+            return 1;
+    return 0;
+}
+
+/* detokenize a goal span (Fase A Paso 3): the span's own words name
+   the unanswered goal, so no ordinal vocabulary is needed. */
+static void SpanText(const char toks[][CHAT_TOKEN_MAX], uint32_t s,
+                     uint32_t e, char *out, size_t size)
+{
+    size_t pos = 0;
+    out[0] = '\0';
+    for (uint32_t i = s; i < e && pos + 1 < size; i++)
+    {
+        if (i > s && pos + 1 < size)
+            out[pos++] = ' ';
+        size_t L = strlen(toks[i]);
+        if (pos + L >= size)
+            L = size - pos - 1;
+        memcpy(out + pos, toks[i], L);
+        pos += L;
+    }
+    out[pos] = '\0';
+}
+
+#define GOAL_BUF_MAX 4096
+#define COMPOSITE_MAX 8192
+
+static void ApplyFocus(CHAT *ch, PARSED *p);
+static int IsDigitTok(const char *tok);
+static const char *FamLabel(const CHAT *ch, const PARSED *p);
+
+/* frozen copula set (same literals as the kw_is scan; reused for
+   subject-position detection, no new words). */
+static int IsCopulaTok(const char *tok)
+{
+    return strcmp(tok, "es") == 0 || strcmp(tok, "era") == 0 ||
+           strcmp(tok, "fue") == 0 || strcmp(tok, "is") == 0 ||
+           strcmp(tok, "was") == 0;
+}
+
+static void ExecFeed(CHAT *ch, const char *e)
+{
+    if (e == NULL || e[0] == '\0' || ch->exec.nent >= EXEC_ENT_MAX)
+        return;
+    strncpy(ch->exec.entities[ch->exec.nent], e, CHAT_TOKEN_MAX - 1);
+    ch->exec.entities[ch->exec.nent][CHAT_TOKEN_MAX - 1] = '\0';
+    ch->exec.nent++;
+}
+
+static void ExecProv(CHAT *ch, const char *text)
+{
+    if (ch->exec.nprov >= EXEC_PROV_MAX)
+        return;
+    strncpy(ch->exec.prov[ch->exec.nprov], text, 159);
+    ch->exec.prov[ch->exec.nprov][159] = '\0';
+    ch->exec.nprov++;
+}
+
+static const char *ToolIdName(ToolId t)
+{
+    switch (t)
+    {
+    case TOOL_LOOKUP_PERSON:
+        return "lookup_person";
+    case TOOL_LOOKUP_RELATION:
+        return "lookup_relation";
+    case TOOL_CALCULATOR:
+        return "calculator";
+    default:
+        return "none";
+    }
+}
+
+/* chain anaphora (positional, word-free): a subject-position token
+   (right after a copula) outside vocab/kw/stop/digits resolves via
+   execution memory: number context when the goal mentions digits,
+   else the most recent entity. Missing context: untouched. */
+static void ChainSubstitute(CHAT *ch, char gtoks[][CHAT_TOKEN_MAX],
+                            uint32_t gn)
+{
+    uint32_t i;
+    int has_digit = 0;
+    for (i = 0; i < gn; i++)
+        if (IsDigitTok(gtoks[i]))
+        {
+            has_digit = 1;
+            break;
+        }
+    for (i = 1; i < gn; i++)
+    {
+        if (!IsCopulaTok(gtoks[i - 1]))
+            continue;
+        if (VocabIdx(ch, gtoks[i]) >= 0 || KwHitTok(ch, gtoks, i) ||
+            IsStopTok(gtoks[i]) || IsDigitTok(gtoks[i]))
+            continue;
+        if (has_digit)
+        {
+            if (!ch->exec.has_number)
+                continue;
+            strncpy(gtoks[i], ch->exec.number, CHAT_TOKEN_MAX - 1);
+        }
+        else
+        {
+            if (ch->exec.nent == 0)
+                continue;
+            strncpy(gtoks[i], ch->exec.entities[ch->exec.nent - 1],
+                    CHAT_TOKEN_MAX - 1);
+        }
+        gtoks[i][CHAT_TOKEN_MAX - 1] = '\0';
+    }
+}
+
+/* Fase A Pasos 2+3 + Agent Core chaining: evaluate each QueryGoal in
+   order over the shared dialogue state (focus flows forward) and an
+   execution memory (entities/numbers flow forward), routing failures
+   through the tool planner. Guards run per goal with plan-level
+   force; a fully vetoed plan falls back to the legacy abstain line.
+   Anti-silent-loss: every goal figures, as ANSWER/constancia, tool
+   answer, or explicit span-echo UNKNOWN. Provenance per goal lands
+   in ch->exec (never in the KB). */
+static void ChatHandleMulti(CHAT *ch, const QueryPlan *plan,
+                            const char toks[][CHAT_TOKEN_MAX],
+                            int force_q, int force_gen)
+{
+    char out[COMPOSITE_MAX];
+    size_t pos = 0;
+    uint32_t g;
+    char rec[160];
+    out[0] = '\0';
+    memset(&ch->exec, 0, sizeof(ch->exec));
+    {
+        int any = 0;
+        for (g = 0; g < plan->count; g++)
+        {            const QueryGoal *goal = &plan->goals[g];
+            char gtoks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+            uint32_t gn = 0;
+            uint32_t i;
+            PARSED p;
+            char gbuf[GOAL_BUF_MAX];
+            char gline[512];
+            char famslot[64];
+            int st = GOAL_UNKNOWN;
+            GoalCause cause = CAUSE_NONE;
+            int no_rehyd = 0;
+            int tooled = 0;
+            int ok;
+            if (goal->inherit)
+            {
+                /* elliptical span: rehydrate [kw, span...] so the
+                   frames see the relation they evaluate */
+                if (plan->goals[0].kwpos < 0)
+                    no_rehyd = 1; /* falls through to echo below */
+                else
+                {
+                    strncpy(gtoks[0], toks[plan->goals[0].kwpos],
+                            CHAT_TOKEN_MAX - 1);
+                    gtoks[0][CHAT_TOKEN_MAX - 1] = '\0';
+                    gn = 1;
+                }
+            }
+            for (i = goal->start;
+                 i < goal->end && gn < CHAT_MAX_TOKS; i++)
+            {
+                strncpy(gtoks[gn], toks[i], CHAT_TOKEN_MAX - 1);
+                gtoks[gn][CHAT_TOKEN_MAX - 1] = '\0';
+                gn++;
+            }
+            ChainSubstitute(ch, gtoks, gn);
+            ok = !no_rehyd && ParseIntentToks(ch, gtoks, gn, force_q,
+                                             force_gen, 0, &p);
+            if (!ok && cause == CAUSE_NONE)
+                cause = CAUSE_PARSE_FAIL;
+            if (ok)
+            {
+                ApplyFocus(ch, &p);
+                if (p.a[0] == '\0')
+                {
+                    ok = 0;
+                    cause = CAUSE_ANAPHORA;
+                }
+                else
+                {
+                    ChatAnswerToBuf(ch, &p, gbuf, sizeof(gbuf), &st);
+                    any = 1;
+                    if (st == GOAL_UNKNOWN)
+                        cause = VocabIdx(ch, p.a) < 0
+                                    ? CAUSE_NO_VOCAB
+                                    : CAUSE_NO_DERIVATION;
+                }
+            }
+            else
+                cause = CAUSE_PARSE_FAIL;
+            if ((!ok || st == GOAL_UNKNOWN) && cause != CAUSE_ANAPHORA)
+            {
+                /* tool routing: same planner as single goals, over
+                   the substituted goal text */
+                ToolRequest treq;
+                ToolResult tres;
+                ToolDecision dec;
+                SpanText(gtoks, (goal->inherit && gn > 0) ? 1 : 0, gn,
+                         gline, sizeof(gline));
+                memset(&treq, 0, sizeof(treq));
+                memset(&tres, 0, sizeof(tres));
+                dec = ToolClassify(ch, gline, GOAL_UNKNOWN, cause,
+                                   ok ? p.a : "",
+                                   ok ? FamLabel(ch, &p) : "", &treq);
+                if (dec == DEC_NEEDS_TOOL)
+                {
+                    ToolExecute(&treq, &tres);
+                    if (ToolAnswerGoal(&treq, &tres, gbuf,
+                                       sizeof(gbuf)))
+                    {
+                        st = GOAL_ANSWER;
+                        any = 1;
+                        tooled = 1;
+                        snprintf(rec, sizeof(rec),
+                                 "G%u TOOL %s(%s)", g + 1,
+                                 ToolIdName(treq.tool),
+                                 treq.subject);
+                        ExecProv(ch, rec);
+                        if (treq.tool == TOOL_CALCULATOR)
+                        {
+                            strncpy(ch->exec.number, tres.number,
+                                    sizeof(ch->exec.number) - 1);
+                            ch->exec.number[sizeof(ch->exec.number) -
+                                            1] = '\0';
+                            ch->exec.has_number = 1;
+                        }
+                        else
+                        {
+                            uint32_t k;
+                            ExecFeed(ch, treq.subject);
+                            for (k = 0; k < tres.nitems; k++)
+                                ExecFeed(ch, tres.items[k]);
+                        }
+                    }
+                    else
+                    {
+                        snprintf(rec, sizeof(rec),
+                                 "G%u MISS %s(%s)", g + 1,
+                                 ToolIdName(treq.tool),
+                                 treq.subject);
+                        ExecProv(ch, rec);
+                    }
+                }
+            }
+            if (!ok && !tooled)
+            {
+                char span[256];
+                SpanText(toks, goal->start, goal->end, span,
+                         sizeof(span));
+                snprintf(gbuf, sizeof(gbuf),
+                         "No tengo constancia suficiente para responder "
+                         "a \"%s\".",
+                         span);
+                snprintf(rec, sizeof(rec), "G%u ECHO", g + 1);
+                ExecProv(ch, rec);
+            }
+            else if (tooled)
+            {
+                /* tool answer kept; provenance and feeds above */
+            }
+            else if (st == GOAL_UNKNOWN)
+            {
+                snprintf(rec, sizeof(rec), "G%u KB UNKNOWN slot=%s",
+                         g + 1, p.a);
+                ExecProv(ch, rec);
+                ExecFeed(ch, p.a);
+            }
+            else if (st == GOAL_AMBIGUOUS)
+            {
+                snprintf(rec, sizeof(rec), "G%u KB AMBIGUOUS slot=%s",
+                         g + 1, p.a);
+                ExecProv(ch, rec);
+                ExecFeed(ch, p.a);
+            }
+            else
+            {
+                snprintf(famslot, sizeof(famslot), "%.20s",
+                         FamLabel(ch, &p));
+                snprintf(rec, sizeof(rec), "G%u KB ANSWER %s slot=%s",
+                         g + 1, famslot, p.a);
+                ExecProv(ch, rec);
+                ExecFeed(ch, p.a);
+                if (p.intent == INT_PARENT_OF)
+                {
+                    char pars[8][CHAT_TOKEN_MAX];
+                    if (ChatParentsList(ch, p.a, pars, 8) == 1)
+                        ExecFeed(ch, pars[0]);
+                }
+            }
+            /* per-goal answers carry their own trailing newline:
+               strip it so the composite stays one line per query */
+            {
+                size_t L = strlen(gbuf);
+                while (L > 0 &&
+                       (gbuf[L - 1] == '\n' || gbuf[L - 1] == '\r'))
+                    gbuf[--L] = '\0';
+            }
+            {
+                size_t L = strlen(gbuf);
+                if (pos + L + 1 < sizeof(out))
+                {
+                    if (pos > 0)
+                        out[pos++] = ' ';
+                    memcpy(out + pos, gbuf, L + 1);
+                    pos += L;
+                }
+            }
+        }
+        if (!any)
+        {
+            printf("No entendi la pregunta.\n");
+            return;
+        }
+        printf("%s\n", out);
     }
 }
 
@@ -1735,14 +2655,321 @@ void ChatInit(CHAT *ch, const char *corpus_path)
            ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
 }
 
-void ChatHandle(CHAT *ch, const char *line)
+/* frame family label for the tool planner (deduced families pass
+   through; frozen literal frames report their role). */
+static const char *FamLabel(const CHAT *ch, const PARSED *p)
+{
+    switch (p->intent)
+    {
+    case INT_PARENT_OF:
+        return "parent";
+    case INT_CHILDREN_OF:
+        return "children";
+    case INT_GRANDPARENT:
+        return "grandparent";
+    case INT_DESCENDANT:
+        return "descendant";
+    case INT_WHY:
+    case INT_IS_PARENT:
+        return "taxonomy";
+    default:
+        break;
+    }
+    if (p->kw >= 0 && (uint32_t)p->kw < ch->num_kws)
+        return ch->kws[p->kw].family;
+    return "";
+}
+
+int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
+                    char *slot, size_t slot_size,
+                    char *family, size_t family_size,
+                    GoalCause *cause)
 {
     PARSED p;
+    if (size > 0)
+        out[0] = '\0';
+    if (slot != NULL && slot_size > 0)
+        slot[0] = '\0';
+    if (family != NULL && family_size > 0)
+        family[0] = '\0';
+    if (cause != NULL)
+        *cause = CAUSE_NONE;
     if (!ParseIntent(ch, line, &p))
+    {
+        if (cause != NULL)
+            *cause = CAUSE_PARSE_FAIL;
+        return -1;
+    }
+    ApplyFocus(ch, &p);
+    if (p.a[0] == '\0')
+    {
+        if (size > 0)
+            snprintf(out, size,
+                     "No tengo constancia de a quien te refieres en los "
+                     "textos cargados.\n");
+        if (cause != NULL)
+            *cause = CAUSE_ANAPHORA;
+        return GOAL_UNKNOWN;
+    }
+    if (slot != NULL && slot_size > 0)
+    {
+        strncpy(slot, p.a, slot_size - 1);
+        slot[slot_size - 1] = '\0';
+    }
+    if (family != NULL && family_size > 0)
+    {
+        strncpy(family, FamLabel(ch, &p), family_size - 1);
+        family[family_size - 1] = '\0';
+    }
+    int st = GOAL_UNKNOWN;
+    ChatAnswerToBuf(ch, &p, out, size, &st);
+    if (st == GOAL_UNKNOWN && cause != NULL)
+        *cause = VocabIdx(ch, p.a) < 0 ? CAUSE_NO_VOCAB
+                                       : CAUSE_NO_DERIVATION;
+    return st;
+}
+
+void ChatHandle(CHAT *ch, const char *line)
+{
+    /* Fase A: multi-goal lines take the composite dispatcher; single
+       goals keep the legacy single-intent path byte-identical. */
+    char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    QueryPlan plan;
+    uint32_t ntok = 0;
+    SURFACE_FLAGS sf;
+    memset(&sf, 0, sizeof(sf));
+    if (ChatBuildPlan(ch, line, &plan, toks, &ntok, &sf) >= 2)
+    {
+        ChatHandleMulti(ch, &plan, toks,
+                        sf.question || HasWh(toks, ntok), sf.genitive);
+        return;
+    }
+    char ans[CHAT_ANSWER_MAX];
+    char slot[CHAT_TOKEN_MAX];
+    int st = ChatResolveLine(ch, line, ans, sizeof(ans), slot,
+                             sizeof(slot), NULL, 0, NULL);
+    (void)slot;
+    (void)st;
+    if (st < 0)
     {
         printf("No entendi la pregunta.\n");
         return;
     }
-    ApplyFocus(ch, &p);
-    ChatAnswer(ch, &p);
+    printf("%s", ans);
+}
+
+/* ---- Agent Core: ToolContract (diagnostic, no execution) ----
+   Declarative table: which tool may satisfy which goal shape.
+   Policy v1 (documented, not derived): kinship tools require known
+   slots (unknown strings stay UNKNOWN so tools cannot launder
+   arbitrary names into relatives); reigns is open-world either way
+   (who-rules-where changes outside the corpus charter); parse-fail
+   shapes route by structure (numbers, W-de/of-ARG, person mention).
+   The planner never resolves and executes nothing. */
+#include "tool_contract.h"
+
+static const struct
+{
+    const char *family;
+    ToolId      tool;
+    int         needs_known;
+} TOOL_CONTRACT[] = {
+    {"reigns", TOOL_LOOKUP_RELATION, 0},
+    {"taxonomy", TOOL_LOOKUP_RELATION, 1},
+    {"father", TOOL_LOOKUP_RELATION, 1},
+    {"sibling", TOOL_LOOKUP_RELATION, 1},
+    {"wife", TOOL_LOOKUP_RELATION, 1},
+    {"parent", TOOL_LOOKUP_RELATION, 1},
+    {"children", TOOL_LOOKUP_RELATION, 1},
+    {"grandparent", TOOL_LOOKUP_RELATION, 1},
+    {"descendant", TOOL_LOOKUP_RELATION, 1},
+};
+
+static int IsDigitTok(const char *tok)
+{
+    if (tok == NULL || tok[0] == '\0')
+        return 0;
+    for (size_t i = 0; tok[i] != '\0'; i++)
+        if (!isdigit((unsigned char)tok[i]))
+            return 0;
+    return 1;
+}
+
+/* person-candidate token (structural, word-free): not a particle,
+   keyword or number, and carrying at least one letter (operators
+   like "*" or "+" are never person mentions). */
+static int IsPersonTok(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
+                       uint32_t i)
+{
+    int alpha = 0;
+    size_t k;
+    if (IsStopTok(toks[i]) || IsDigitTok(toks[i]))
+        return 0;
+    if (KwHitTok(ch, toks, i))
+        return 0;
+    for (k = 0; toks[i][k] != '\0'; k++)
+        if (isalpha((unsigned char)toks[i][k]))
+        {
+            alpha = 1;
+            break;
+        }
+    return alpha;
+}
+
+/* display token for a family: the deduced Spanish stem when the
+   corpus deduced one, else the family label itself. Data, not
+   words: the executor echoes it, never decides with it. */
+static const char *FamDisplay(const CHAT *ch, const char *family)
+{
+    for (uint32_t k = 0; k < ch->num_kws; k++)
+        if (strcmp(ch->kws[k].family, family) == 0)
+            return ch->kws[k].es_stem;
+    return family;
+}
+
+ToolDecision ToolClassify(const CHAT *ch, const char *line,
+                          GOAL_STATUS status, GoalCause cause,
+                          const char *slot, const char *family,
+                          ToolRequest *req)
+{
+    if (req != NULL)
+    {
+        req->tool = TOOL_NONE;
+        req->subject[0] = '\0';
+        req->relation[0] = '\0';
+    }
+    if (status == GOAL_AMBIGUOUS)
+        return DEC_AMBIGUOUS;
+    if (status == GOAL_ANSWER)
+        return DEC_IS_ANSWER;
+    if (cause == CAUSE_ANAPHORA)
+        return DEC_UNKNOWN;
+    if (cause == CAUSE_NO_VOCAB || cause == CAUSE_NO_DERIVATION)
+    {
+        int known = (slot != NULL && slot[0] != '\0' &&
+                     VocabIdx(ch, slot) >= 0);
+        for (size_t i = 0;
+             i < sizeof(TOOL_CONTRACT) / sizeof(TOOL_CONTRACT[0]); i++)
+            if (family != NULL &&
+                strcmp(family, TOOL_CONTRACT[i].family) == 0 &&
+                (!TOOL_CONTRACT[i].needs_known || known))
+            {
+                if (req != NULL)
+                {
+                    req->tool = TOOL_CONTRACT[i].tool;
+                    strncpy(req->subject, slot == NULL ? "" : slot,
+                            sizeof(req->subject) - 1);
+                    req->subject[sizeof(req->subject) - 1] = '\0';
+                    strncpy(req->relation, FamDisplay(ch, family),
+                            sizeof(req->relation) - 1);
+                    req->relation[sizeof(req->relation) - 1] = '\0';
+                }
+                return DEC_NEEDS_TOOL;
+            }
+        return DEC_UNKNOWN;
+    }
+    if (cause == CAUSE_PARSE_FAIL)
+    {
+        char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+        SURFACE_FLAGS sf;
+        uint32_t n = Split(line, toks, CHAT_MAX_TOKS, &sf);
+        (void)sf;
+        uint32_t nums = 0, first = 0, last = 0;
+        for (uint32_t i = 0; i < n; i++)
+            if (IsDigitTok(toks[i]))
+            {
+                if (nums == 0)
+                    first = i;
+                last = i;
+                nums++;
+            }
+        if (nums >= 2)
+        {
+            if (req != NULL)
+            {
+                size_t pos = 0;
+                req->tool = TOOL_CALCULATOR;
+                req->subject[0] = '\0';
+                for (uint32_t i = first;
+                     i <= last && pos + 1 < sizeof(req->subject); i++)
+                {
+                    size_t L = strlen(toks[i]);
+                    if (i > first && pos + 1 < sizeof(req->subject))
+                        req->subject[pos++] = ' ';
+                    if (pos + L >= sizeof(req->subject))
+                        L = sizeof(req->subject) - pos - 1;
+                    memcpy(req->subject + pos, toks[i], L);
+                    pos += L;
+                }
+                req->subject[pos < sizeof(req->subject)
+                                 ? pos
+                                 : sizeof(req->subject) - 1] = '\0';
+                strncpy(req->relation, "expression",
+                        sizeof(req->relation) - 1);
+                req->relation[sizeof(req->relation) - 1] = '\0';
+            }
+            return DEC_NEEDS_TOOL;
+        }
+        {
+            /* framed spans fail closed here: the frames owned the
+               relation word and refused it, so no tool second-guesses
+               them (orphan kingship stays echo, not person-routed). */
+            int kwx = -1, kwpos = -1;
+            MatchKwSpan(ch, toks, 0, n, &kwx, &kwpos);
+            if (kwx >= 0)
+                return DEC_UNKNOWN;
+        }
+        for (uint32_t i = 1; i + 1 < n; i++)
+        {
+            if (strcmp(toks[i], "de") != 0 &&
+                strcmp(toks[i], "of") != 0)
+                continue;
+            if (IsStopTok(toks[i - 1]) || KwHitTok(ch, toks, i - 1) ||
+                IsDigitTok(toks[i - 1]) || IsStopTok(toks[i + 1]) ||
+                IsDigitTok(toks[i + 1]))
+                continue;
+            if (req != NULL)
+            {
+                req->tool = TOOL_LOOKUP_RELATION;
+                strncpy(req->subject, toks[i + 1],
+                        sizeof(req->subject) - 1);
+                req->subject[sizeof(req->subject) - 1] = '\0';
+                strncpy(req->relation, toks[i - 1],
+                        sizeof(req->relation) - 1);
+                req->relation[sizeof(req->relation) - 1] = '\0';
+            }
+            return DEC_NEEDS_TOOL;
+        }
+        {
+            /* person mention: last ingested-vocabulary member when
+               present (substituted "jesse"), else last content token
+               ("jonas"); needs verb + name (>= 2) so bare "el
+               primero" stays GENUINE. Data-driven, no names. */
+            uint32_t content = 0;
+            int pick = -1, vpick = -1;
+            for (uint32_t i = 0; i < n; i++)
+                if (IsPersonTok(ch, toks, i))
+                {
+                    content++;
+                    if (VocabIdx(ch, toks[i]) >= 0)
+                        vpick = (int)i;
+                    else
+                        pick = (int)i;
+                }
+            if (content >= 2 && (vpick >= 0 || pick >= 0))
+            {
+                int bp = (vpick >= 0) ? vpick : pick;
+                if (req != NULL)
+                {
+                    req->tool = TOOL_LOOKUP_PERSON;
+                    strncpy(req->subject, toks[bp],
+                            sizeof(req->subject) - 1);
+                    req->subject[sizeof(req->subject) - 1] = '\0';
+                }
+                return DEC_NEEDS_TOOL;
+            }
+        }
+        return DEC_UNKNOWN;
+    }
+    return DEC_UNKNOWN;
 }
