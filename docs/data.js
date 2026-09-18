@@ -47,7 +47,11 @@ const PRESET_CORPORA = {
       "Los libros del Nuevo Testamento son Mateo, Marcos, Lucas, Juan, Hechos, Romanos, 1 Corintios, 2 Corintios, Galatas, Efesios, Filipenses, Colosenses, 1 Tesalonicenses, 2 Tesalonicenses, 1 Timoteo, 2 Timoteo, Tito, Filemon, Hebreos, Santiago, 1 Pedro, 2 Pedro, 1 Juan, 2 Juan, 3 Juan, Judas y Apocalipsis.",
       "The Bible contains 66 canonical books divided into the Old Testament (39 books) and the New Testament (27 books).",
       "The books of the Old Testament are Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Joshua, Judges, Ruth, 1 Samuel, 2 Samuel, 1 Kings, 2 Kings, 1 Chronicles, 2 Chronicles, Ezra, Nehemiah, Esther, Job, Psalms, Proverbs, Ecclesiastes, Song of Solomon, Isaiah, Jeremiah, Lamentations, Ezekiel, Daniel, Hosea, Joel, Amos, Obadiah, Jonah, Micah, Nahum, Habakkuk, Zephaniah, Haggai, Zechariah, and Malachi.",
-      "The books of the New Testament are Matthew, Mark, Luke, John, Acts, Romans, 1 Corinthians, 2 Corinthians, Galatians, Ephesians, Philippians, Colossians, 1 Thessalonians, 2 Thessalonians, 1 Timothy, 2 Timothy, Titus, Philemon, Hebrews, James, 1 Peter, 2 Peter, 1 John, 2 John, 3 John, Jude, and Revelation."
+      "The books of the New Testament are Matthew, Mark, Luke, John, Acts, Romans, 1 Corinthians, 2 Corinthians, Galatians, Ephesians, Philippians, Colossians, 1 Thessalonians, 2 Thessalonians, 1 Timothy, 2 Timothy, Titus, Philemon, Hebrews, James, 1 Peter, 2 Peter, 1 John, 2 John, 3 John, Jude, and Revelation.",
+      "La tradicion biblica atribuye al rey Salomon la autoria de los libros que escribio: Proverbios, Eclesiastes y Cantares.",
+      "The biblical tradition attributes the authorship of the books written by King Solomon to include Proverbs, Ecclesiastes, and Song of Solomon.",
+      "El libro de Proverbios es un libro sapiencial del Antiguo Testamento que contiene proverbios, aforismos morales e instrucciones practicas de sabiduria para la vida.",
+      "The Book of Proverbs is a wisdom book of the Old Testament containing proverbs, moral maxims, and practical teachings on wisdom."
     ],
     triples: [
       { s: "DAVID", p: "SON_OF", o: "JESSE" },
@@ -68,7 +72,12 @@ const PRESET_CORPORA = {
       { s: "BIBLE", p: "CONTAINS", o: "66_BOOKS" },
       { s: "OLD_TESTAMENT", p: "CONTAINS", o: "39_BOOKS" },
       { s: "NEW_TESTAMENT", p: "CONTAINS", o: "27_BOOKS" },
-      { s: "LIBROS_DE_LA_BIBLIA", p: "TOTAL", o: "66_LIBROS" }
+      { s: "LIBROS_DE_LA_BIBLIA", p: "TOTAL", o: "66_LIBROS" },
+      { s: "SALOMON", p: "ESCRIBIO", o: "PROVERBIOS" },
+      { s: "SALOMON", p: "ESCRIBIO", o: "ECLESIASTES" },
+      { s: "SALOMON", p: "ESCRIBIO", o: "CANTARES" },
+      { s: "SOLOMON", p: "WROTE", o: "PROVERBS" },
+      { s: "PROVERBIOS", p: "TRATA_DE", o: "SABIDURIA_Y_MORAL" }
     ]
   },
   quantum: {

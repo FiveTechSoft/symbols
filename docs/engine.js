@@ -27,7 +27,11 @@ class SymbolicEngine {
       "hasta", "es", "son", "era", "eran", "fue", "fueron", "ser", "estar",
       "ha", "han", "que", "cual", "cuales", "quien", "quienes", "este", "esta",
       "estos", "estas", "ese", "esa", "esos", "esas", "su", "sus", "como",
-      "dame", "cuantos", "cuantas", "tiene", "contiene", "hay"
+      "dame", "cuantos", "cuantas", "tiene", "contiene", "hay",
+      "trata", "tratar", "hablame", "habla", "dime", "cuentame", "explicame",
+      "refiero", "acerca", "mas", "dicho", "mismo", "misma",
+      "hizo", "hacer", "hace",
+      "me", "te", "se", "nos", "os", "yo", "tu", "mi", "mis", "ti"
     ]);
   }
 
@@ -43,11 +47,14 @@ class SymbolicEngine {
 
   // Canonicalize token (lowercase, diacritic-normalized, alpha-numeric)
   canonicalize(token) {
-    return token
+    let t = token
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9_]/g, "");
+    if (t === "solomon") return "salomon";
+    if (t === "jonah") return "jonas";
+    return t;
   }
 
   // Get or register symbol with 32D Random Indexing vector
@@ -313,12 +320,48 @@ class SymbolicEngine {
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
     else {
-      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas");
       // Extract target words filtered by stopwords
-      const words = cleanNorm
+      let words = cleanNorm
         .replace(/[^a-z0-9\s]/g, " ")
         .split(/\s+/)
         .filter(w => !this.stopwords.has(w) && w.length > 1);
+
+      const META_WORDS = new Set([
+        "libro", "libros", "capitulo", "capitulos", "versiculo", "versiculos",
+        "autor", "autoria", "lista", "texto", "parte", "partes", "nombre", "nombres",
+        "historia", "tema", "origen", "significado", "book", "books", "chapter", "chapters",
+        "escribio", "escribir", "escribe", "hizo", "hacer", "trata", "habla"
+      ]);
+
+      const isAnaphoric = 
+        cleanNorm.includes("de que trata") ||
+        cleanNorm.includes("de que habla") ||
+        cleanNorm.includes("de que va") ||
+        cleanNorm.includes("hablame de") ||
+        cleanNorm.includes("cuentame de") ||
+        cleanNorm.includes("dime mas") ||
+        cleanNorm.includes("continua") ||
+        cleanNorm.includes("que mas") ||
+        cleanNorm.includes("sobre el") ||
+        cleanNorm.includes("sobre ella") ||
+        cleanNorm.includes("de el") ||
+        cleanNorm.includes("de ella") ||
+        cleanNorm.includes("su autor") ||
+        cleanNorm.includes("sus libros") ||
+        cleanNorm.includes("que libros") ||
+        cleanNorm.includes("lista los") ||
+        cleanNorm.includes("cuales son los") ||
+        cleanNorm.includes("tell me about") ||
+        cleanNorm.includes("what is it about") ||
+        cleanNorm.includes("tell me more");
+
+      // Anaphora resolution: inherit activeFocus if query is conversational/elliptical
+      if ((isAnaphoric || words.length === 0 || words.every(w => META_WORDS.has(w))) && this.episodic.activeFocus) {
+        if (!words.includes(this.episodic.activeFocus)) {
+          words.unshift(this.episodic.activeFocus);
+        }
+      }
 
       // 4A. Check kinship: "father of X", "padre de X", "son of X", "hijo de X"
       let targetEntity = null;
@@ -356,11 +399,17 @@ class SymbolicEngine {
         let maxScore = 0;
         const queryPhrase = cleanNorm.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
         for (const sent of this.sentences) {
-          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
+          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/[^a-z0-9\s]/g, " ");
           let score = words.filter(w => sLower.includes(w)).length;
           // Substring phrase bonus for exact multi-word alignment
           if (queryPhrase.length > 5 && sLower.includes(queryPhrase)) {
             score += 5;
+          }
+          // Definitional focus bonus: prioritize sentences defining the substantive entity
+          for (const w of words) {
+            if (!META_WORDS.has(w) && (sLower.startsWith(w) || sLower.includes("libro de " + w) || sLower.includes(w + " es") || sLower.includes("atribuye al rey " + w) || sLower.includes("rey " + w))) {
+              score += 3;
+            }
           }
           if (score > maxScore) {
             maxScore = score;
@@ -372,7 +421,14 @@ class SymbolicEngine {
           response = `According to verified source records: "${bestSent.text}"`;
           citation = `Sentence #${bestSent.id + 1} (${bestSent.source})`;
           status = "VERBATIM_CITATION";
-          if (words[0]) this.episodic.activeFocus = words[0];
+          
+          // Set activeFocus to the non-meta entity keyword
+          const entityCandidate = words.find(w => !META_WORDS.has(w));
+          if (entityCandidate) {
+            this.episodic.activeFocus = entityCandidate;
+          } else if (words[0]) {
+            this.episodic.activeFocus = words[0];
+          }
 
           // Check if any direct relation matches to provide proofTrace
           for (const w of words) {

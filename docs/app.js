@@ -251,13 +251,22 @@ async function executeInBrowserEngine(query) {
 async function fetchWebKnowledge(query) {
   try {
     const cleanQuery = query.replace(/[?¿!¡]/g, "").trim();
-    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia)\b)/i.test(query);
+    const focus = engine?.episodic?.activeFocus;
+    let targetTerm = cleanQuery;
+
+    // Check if query is anaphoric or generic without named entity
+    const isAnaphoric = /^(de que|hablame|cuentame|que|quien|lista|dime|sobre|cuales|como)\b/i.test(cleanQuery);
+    if (focus && isAnaphoric && !cleanQuery.toLowerCase().includes(focus)) {
+      targetTerm = `${cleanQuery} ${focus}`;
+    }
+
+    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia|proverbios|salomon)\b)/i.test(targetTerm);
     const primaryLang = isSpanish ? "es" : "en";
     const fallbackLang = isSpanish ? "en" : "es";
 
-    let result = await searchWiki(cleanQuery, primaryLang);
+    let result = await searchWiki(targetTerm, primaryLang);
     if (!result) {
-      result = await searchWiki(cleanQuery, fallbackLang);
+      result = await searchWiki(targetTerm, fallbackLang);
     }
     return result;
   } catch (e) {
@@ -268,21 +277,45 @@ async function fetchWebKnowledge(query) {
 
 async function searchWiki(term, lang) {
   try {
-    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&format=json&origin=*`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.query && data.query.search && data.query.search.length > 0) {
-      const topTitle = data.query.search[0].title;
-      const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topTitle.replace(/\s+/g, "_"))}`;
+    let candidateTitle = null;
+
+    // 1. Try opensearch first (exact title prefix matching)
+    try {
+      const openUrl = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(term)}&limit=5&format=json&origin=*`;
+      const openRes = await fetch(openUrl);
+      if (openRes.ok) {
+        const openData = await openRes.json();
+        const titles = openData[1] || [];
+        if (titles.length > 0) {
+          candidateTitle = titles[0];
+        }
+      }
+    } catch (e) {
+      // ignore opensearch error, proceed to fallback
+    }
+
+    // 2. Fallback to list=search if opensearch gave nothing
+    if (!candidateTitle) {
+      const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&format=json&origin=*`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.query && data.query.search && data.query.search.length > 0) {
+          candidateTitle = data.query.search[0].title;
+        }
+      }
+    }
+
+    if (candidateTitle) {
+      const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(candidateTitle.replace(/\s+/g, "_"))}`;
       const sumRes = await fetch(sumUrl);
       if (sumRes.ok) {
         const sumData = await sumRes.json();
         if (sumData.extract) {
           return {
-            title: sumData.title || topTitle,
+            title: sumData.title || candidateTitle,
             text: sumData.extract,
-            url: sumData.content_urls ? sumData.content_urls.desktop.page : `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(topTitle)}`,
+            url: sumData.content_urls ? sumData.content_urls.desktop.page : `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(candidateTitle)}`,
             lang
           };
         }
