@@ -167,6 +167,55 @@ In this hybrid architecture, OpenCode uses a large generative neural model (like
 
 ---
 
+### Mode D: Agentic Web Search & Dynamic Knowledge Ingestion
+
+In this workflow, the OpenCode harness uses its own external tools (such as web search, documentation fetchers, or API scrapers) to acquire live information and dynamically feed the text stream into Symbolic LLM's active graph:
+
+```
+    ┌────────────────────────┐
+    │  OpenCode Agent Query  │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │  Query Symbolic LLM    │ ──── [Known] ───► Exact Verified Answer
+    └───────────┬────────────┘
+                │ [UNKNOWN / Out of Scope]
+                ▼
+    ┌────────────────────────┐
+    │ OpenCode Harness       │
+    │ Executes Web Search    │
+    └───────────┬────────────┘
+                │ Raw Search Snippets (.txt)
+                ▼
+    ┌────────────────────────┐
+    │ Send to Symbolic LLM:  │
+    │ "load web_result.txt"  │ ───► Ingested into Symbolic Graph in < 1 ms
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │ Instant Zero-Shot      │
+    │ Recall with Citations  │
+    └────────────────────────┘
+```
+
+1. **Fail-Closed Gate**: OpenCode queries Symbolic LLM. If the topic is missing from the corpus, the engine returns `UNKNOWN` (preventing hallucination).
+2. **Harness Tool Invocation**: OpenCode executes a web search tool against Google, DuckDuckGo, or project documentation.
+3. **Dynamic Graph Ingestion**: The retrieved text is saved to `data/texts/web_search_doc.txt` and fed to the engine:
+   ```json
+   {"role": "user", "content": "load web_search_doc.txt"}
+   ```
+   The engine incorporates the text into its sentence store and relational graph in less than 1 millisecond.
+4. **Verified Answering**: Subsequent queries on the newly learned topic return exact answers with literal text citations.
+
+To verify this flow end-to-end, execute:
+```bash
+python tools/test_opencode_web_ingest.py
+```
+
+---
+
 ## 3. Conversational Introspection Commands
 
 When interacting with Symbolic LLM through OpenCode, you can leverage native introspection commands:

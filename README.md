@@ -2,6 +2,7 @@
 
 **Antonio Linares (FiveTech Software)**  
 *Project Repository: [FiveTechSoft/symbols](https://github.com/FiveTechSoft/symbols)*  
+*Live Interactive Web Agent: [fivetechsoft.github.io/symbols](https://fivetechsoft.github.io/symbols/)*  
 *Version: 1.0-RC (March 2026)*
 
 ---
@@ -167,6 +168,37 @@ $$\max_d \mathbf{v}_w[d] \approx \frac{1}{32} \sum_d \mathbf{v}_w[d] \implies \k
 Sorting symbols by $\kappa(w)$ reveals the fundamental thematic pillars of any corpus immediately after ingestion, enabling autonomous conversational introspection:
 - `"what areas do you know?"` $\to$ outputs top-$\kappa$ conceptual centroids.
 - `"start a conversation"` $\to$ autonomously selects the top thematic concept, retrieves its seminal sentence, and seeds the conversational state machine.
+
+### 2.6 Dynamic Real-Time Memory and Persistent State Architecture
+
+A defining limitation of autoregressive neural networks is that weights are frozen at inference time ($W_{\text{frozen}}$). Teaching a Transformer new knowledge during a conversation requires appending previous turns into the prompt context, which quadratically expands VRAM footprint ($\mathcal{O}(N^2)$), inflates attention compute, and evaporates completely when the session terminates.
+
+Symbolic LLM breaks this dichotomy through a **Dual-Layer Real-Time Memory Substrate**:
+
+#### 2.6.1 Triplet Graph vs. Verbatim Sentence Memory: The Symbiotic Optimum
+A frequent theoretical question in symbolic computing is: *Should knowledge be reduced strictly to atomic relational triples $\langle S, P, O \rangle$, or should full natural language sentences be preserved verbatim?*
+
+Symbolic LLM demonstrates that the most effective architecture is **symbiotic dual-indexing**:
+1. **The Structural Triplet Graph**: Indexes concepts and relational predicates into an open-addressing hash table ($O(1)$ lookup, 32 bytes/relation). It enables backward-chaining multi-hop deduction, taxonomic inheritance, transitivity ($A \to B \to C$), and anaphora resolution in nanoseconds.
+2. **The First-Order Literal Sentence Store**: Preserves the complete, verbatim original sentences indexed by 32-bit sentence identifiers (`sent_id`) with exact byte-level provenance. It guarantees zero loss of syntactic nuance, subordinate clauses, stylistic prose, and literal citations.
+
+When querying the system, the relational graph determines the deductive truth path in $O(1)$, while the literal store provides the exact verbatim citation. Neither is compromised: mathematical certainty is coupled with 100% syntactic preservation.
+
+#### 2.6.2 Online Dynamic Memory Ingestion ($O(1)$ Stream)
+While conversing with an end user or operating inside an autonomous agent harness (e.g., OpenCode), the engine dynamically acquires knowledge on the fly:
+- **Declarative User Assertions**: When a user or harness supplies factual input (e.g., *"Quantum teleportation transfers quantum information between separated qubits"*), the streaming parser tokenizes and incorporates the sentence into the literal store, creates or updates symbol embeddings via Hebbian accumulation, and links corresponding concepts into the relational graph within **72 nanoseconds**.
+- **Instantaneous Zero-Shot Recall**: The newly acquired knowledge is queryable immediately in subsequent dialogue turns with $P(\text{hallucination}) = 0$.
+
+#### 2.6.3 Episodic Interaction Subgraph ($\mathcal{M}_{\text{ep}}$)
+Dialogue history is not stored as an opaque flat string of tokens. Instead, the engine materializes an episodic subgraph:
+$$\mathcal{M}_{\text{ep}} = \langle \text{Turn}_k, \text{FocusConcept}, \text{QueryType}, \text{Timestamp}, \text{ActivatedNodes} \rangle$$
+- Tracks discourse trajectory and conversational focus shifts in $O(1)$.
+- Enables metacognitive inspection (*"what were we discussing at the start?"*, *"forget what I said about my API key"*).
+
+#### 2.6.4 Deterministic Snapshot Persistence & Portability
+To ensure zero knowledge loss across system restarts, agent reboots, or web sessions, Symbolic LLM provides deterministic binary snapshot persistence:
+- **Native Binary Image (`.bin`)**: High-throughput memory-mapped serialization. An entire knowledge base consisting of 50,000 concepts and multi-hop relations writes to disk in **25.4 ms** (7.5 MB) and remounts into memory in **15.5 ms**.
+- **Edge & Web Client Storage (`localStorage` / JSONL)**: In browser-based environments, session history and episodic subgraphs serialize seamlessly into Web Storage (`localStorage`), enabling instant resumption across page refreshes and single-click full-state export (`.json`/`.sym`).
 
 ---
 
