@@ -38,6 +38,7 @@ add_library(symbolic STATIC
     src/tool_config.c
     src/agent_action.c
     src/c_rules.c
+    src/server_proto.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -111,7 +112,9 @@ sllm_test(test_toolexec        tests/test_toolexec.c)
 sllm_test(test_action          tests/test_action.c)
 sllm_test(test_toolconfig      tests/test_toolconfig.c)
 sllm_test(test_fixtures        tests/test_fixtures.c)
+sllm_test(test_self            tests/test_self.c)
 sllm_test(test_crules          tests/test_crules.c)
+sllm_test(test_server_proto    tests/test_server_proto.c)
 sllm_test(test_chain          tests/test_chain.c)
 sllm_test(test_bible_bfs      tests/test_bible_bfs.c)
 sllm_test(test_compose        tests/test_compose.c)
@@ -120,6 +123,10 @@ sllm_test(test_learn          tests/test_learn.c)
 # bible_chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
 target_link_libraries(chat_main symbolic)
+
+# symbols-server: OpenAI-compatible model endpoint (harness, no es test)
+add_executable(symbols-server src/symbols_server.c)
+target_link_libraries(symbols-server symbolic ws2_32)
 
 # symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)

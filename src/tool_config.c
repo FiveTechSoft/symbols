@@ -12,6 +12,8 @@
 #define TOOLCFG_LINE_MAX 1024
 #define TOOLCFG_PATH "data/agentic/tools.tsv"
 #define FIXTURE_PATH "data/agentic/fixtures.tsv"
+#define SELF_PATH "data/agentic/self.tsv"
+#define SELF_PATH "data/agentic/self.tsv"
 
 static const ShellAllowRow COMPILED_SHELL[] = {
     {"echo", "cmd", ""},
@@ -58,6 +60,9 @@ static FixtureRelRow g_rel[TOOLCFG_REL_MAX];
 static uint32_t g_nrel = 0;
 static FixturePersonRow g_person[TOOLCFG_PERSON_MAX];
 static uint32_t g_nperson = 0;
+static char g_self_scope[SELF_SCOPE_MAX];
+static char g_self_trig[TOOLCFG_SELF_TRIG_MAX][64];
+static uint32_t g_ntrig = 0;
 static int g_tool_init_done = 0;
 
 static int ToolIdFromName(const char *s, ToolId *out)
@@ -442,6 +447,7 @@ void ToolInit(void)
     {
         ToolInitFrom(TOOLCFG_PATH);
         FixtureInitFrom(FIXTURE_PATH);
+        SelfInitFrom(SELF_PATH);
         CRulesInit();
         g_tool_init_done = 1;
     }
@@ -505,4 +511,162 @@ const FixturePersonRow *FixturePersonAt(uint32_t i)
     if (i >= g_nperson)
         return NULL;
     return &g_person[i];
+}
+
+/* normalize a trigger line the same way queries normalize
+   (fold + lowercase per token, single spaces): matching is then an
+   exact string compare, no word lists anywhere. */
+static void NormLine(const char *in, char *out, size_t size)
+{
+    size_t pos = 0;
+    const char *p = in;
+    out[0] = '\0';
+    if (size == 0 || in == NULL)
+        return;
+    while (*p != '\0')
+    {
+        char tok[CHAT_TOKEN_MAX];
+        char norm[CHAT_TOKEN_MAX];
+        size_t L = 0;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '\0')
+            break;
+        while (p[L] != '\0' && p[L] != ' ' && p[L] != '\t' &&
+               L + 1 < sizeof(tok))
+            L++;
+        if (L >= sizeof(tok) - 1)
+            break;
+        memcpy(tok, p, L);
+        tok[L] = '\0';
+        p += L;
+        while (*p != '\0' && *p != ' ' && *p != '\t')
+            p++;
+        ChatNormTok(tok, norm, sizeof(norm));
+        if (norm[0] == '\0')
+            continue;
+        L = strlen(norm);
+        if (pos > 0 && pos + 1 < size)
+            out[pos++] = ' ';
+        if (pos + L >= size)
+            break;
+        memcpy(out + pos, norm, L);
+        pos += L;
+    }
+    out[pos < size ? pos : size - 1] = '\0';
+}
+
+void SelfInitFrom(const char *path)
+{
+    FILE *f;
+    char line[TOOLCFG_LINE_MAX];
+    unsigned long lineno = 0;
+    char scope[SELF_SCOPE_MAX];
+    char trig[TOOLCFG_SELF_TRIG_MAX][64];
+    uint32_t ntrig = 0;
+    int have_scope = 0;
+    scope[0] = '\0';
+    if (path == NULL)
+        return;
+    f = fopen(path, "r");
+    if (f == NULL)
+        return;
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        char *fld[8];
+        uint32_t nf;
+        char *s = line;
+        lineno++;
+        if (strchr(line, '\n') == NULL && !feof(f))
+        {
+            int c;
+            fprintf(stderr, "self.tsv:%lu: line too long\n", lineno);
+            while ((c = fgetc(f)) != EOF && c != '\n')
+                ;
+            continue;
+        }
+        while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
+            s++;
+        if (*s == '\0' || *s == '#')
+            continue;
+        {
+            size_t L = strlen(s);
+            while (L > 0 && (s[L - 1] == '\r' || s[L - 1] == '\n'))
+                s[--L] = '\0';
+        }
+        nf = SplitTabs(s, fld, 8);
+        if (nf == 0 || fld[0][0] == '\0')
+            continue;
+        if (strcmp(fld[0], "scope") == 0)
+        {
+            if (nf != 3 || fld[1][0] == '\0' || fld[2][0] == '\0')
+            {
+                fprintf(stderr, "self.tsv:%lu: bad scope row\n",
+                        lineno);
+                continue;
+            }
+            if (have_scope)
+                continue;
+            strncpy(scope, fld[2], sizeof(scope) - 1);
+            scope[sizeof(scope) - 1] = '\0';
+            have_scope = 1;
+        }
+        else if (strcmp(fld[0], "trigger") == 0)
+        {
+            char norm[64];
+            if (nf != 3 || fld[1][0] == '\0' ||
+                strcmp(fld[2], "scope") != 0)
+            {
+                fprintf(stderr, "self.tsv:%lu: bad trigger row\n",
+                        lineno);
+                continue;
+            }
+            NormLine(fld[1], norm, sizeof(norm));
+            if (norm[0] == '\0')
+            {
+                fprintf(stderr, "self.tsv:%lu: empty trigger\n",
+                        lineno);
+                continue;
+            }
+            if (ntrig >= TOOLCFG_SELF_TRIG_MAX)
+            {
+                fprintf(stderr, "self.tsv:%lu: trigger table full\n",
+                        lineno);
+                continue;
+            }
+            strncpy(trig[ntrig], norm, sizeof(trig[0]) - 1);
+            trig[ntrig][sizeof(trig[0]) - 1] = '\0';
+            ntrig++;
+        }
+        else
+        {
+            fprintf(stderr, "self.tsv:%lu: unknown TYPE\n", lineno);
+            continue;
+        }
+    }
+    fclose(f);
+    if (have_scope)
+    {
+        strncpy(g_self_scope, scope, sizeof(g_self_scope) - 1);
+        g_self_scope[sizeof(g_self_scope) - 1] = '\0';
+        memcpy(g_self_trig, trig, ntrig * sizeof(trig[0]));
+        g_ntrig = ntrig;
+    }
+}
+
+const char *SelfScopeText(void)
+{
+    return g_self_scope;
+}
+
+uint32_t SelfTriggerCount(void)
+{
+    return g_ntrig;
+}
+
+const char *SelfTriggerAt(uint32_t i)
+{
+    if (i >= g_ntrig)
+        return NULL;
+    return g_self_trig[i];
 }

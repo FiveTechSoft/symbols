@@ -1,0 +1,15 @@
+# self.tsv — scope data (never invented biography).
+# scope: KEY=lang, VALUE=reply text (single scope row wins).
+# trigger: normalized input line -> "scope" (other values rejected).
+# Triggers seeded from observed real traffic (observations.jsonl):
+# identity questions and greetings the engine cannot parse.
+# Loaded once with tools.tsv; unknown TYPEs and malformed rows warn
+# + discard (fail-closed). Missing file -> no scope replies (legacy
+# abstain). Read-only; fixed path; file order is priority.
+scope	es	Soy Symbols, un motor de consultas sobre genealogía bíblica: respondo sobre padre, hijo, reyes, esposa y hermano según los registros cargados. De lo demás no tengo constancia.
+trigger	quien eres	scope
+trigger	quien eres tu	scope
+trigger	hola	scope
+trigger	hello	scope
+trigger	que sabes hacer	scope
+trigger	what can you do	scope

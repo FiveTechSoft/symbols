@@ -43,6 +43,8 @@ typedef struct
 #define TOOLCFG_INFO_MAX 16
 #define TOOLCFG_REL_MAX 64
 #define TOOLCFG_PERSON_MAX 64
+#define TOOLCFG_SELF_TRIG_MAX 32
+#define SELF_SCOPE_MAX 512
 
 typedef struct
 {
@@ -91,6 +93,10 @@ uint32_t FixtureRelCount(void);
 const FixtureRelRow *FixtureRelAt(uint32_t i);
 uint32_t FixturePersonCount(void);
 const FixturePersonRow *FixturePersonAt(uint32_t i);
+void SelfInitFrom(const char *path);
+const char *SelfScopeText(void);
+uint32_t SelfTriggerCount(void);
+const char *SelfTriggerAt(uint32_t i);
 
 /* Classify one resolved goal. status/cause/slot/family come from
    ChatResolveLine; line is needed only for PARSE_FAIL shape

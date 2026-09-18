@@ -103,6 +103,20 @@ void ChatNormTok(const char *in, char *out, size_t size);
 /* Capitalize for display (same rule as answer templates). */
 void ChatCapStr(const char *tok, char *out, size_t size);
 
+/* Read-only parse inspection for observation logging (server): runs
+   the frozen frames with zero side effects (no focus, no NLG) and
+   reports intent name + slots + family. New code reusing ParseIntent;
+   existing behavior untouched. */
+typedef struct
+{
+    char intent[32];
+    char slot_a[CHAT_TOKEN_MAX];
+    char slot_b[CHAT_TOKEN_MAX];
+    char family[64];
+} ChatParse;
+
+int ChatParseLine(CHAT *ch, const char *line, ChatParse *out);
+
 /* ---- Fase 4 surface flags: punctuation is signal, not content.
    Split peels trailing ASCII punctuation (? ! . , ; :), drops
    leading inverted question marks, expands del and detaches 's,

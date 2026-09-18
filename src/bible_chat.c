@@ -2681,6 +2681,96 @@ static const char *FamLabel(const CHAT *ch, const PARSED *p)
     return "";
 }
 
+static const char *IntentName(int intent)
+{
+    switch (intent)
+    {
+    case INT_PARENT_OF:
+        return "PARENT_OF";
+    case INT_CHILDREN_OF:
+        return "CHILDREN_OF";
+    case INT_IS_PARENT:
+        return "IS_PARENT";
+    case INT_GRANDPARENT:
+        return "GRANDPARENT";
+    case INT_DESCENDANT:
+        return "DESCENDANT";
+    case INT_WHY:
+        return "WHY";
+    case INT_REL_QUERY:
+        return "REL_QUERY";
+    case INT_REL_BOOL:
+        return "REL_BOOL";
+    case INT_COMPOSE_WHY:
+        return "COMPOSE_WHY";
+    default:
+        return "NONE";
+    }
+}
+
+int ChatParseLine(CHAT *ch, const char *line, ChatParse *out)
+{
+    PARSED p;
+    const char *fam;
+    if (out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    if (!ParseIntent(ch, line, &p))
+    {
+        strncpy(out->intent, "NONE", sizeof(out->intent) - 1);
+        return 0;
+    }
+    strncpy(out->intent, IntentName(p.intent), sizeof(out->intent) - 1);
+    strncpy(out->slot_a, p.a, sizeof(out->slot_a) - 1);
+    strncpy(out->slot_b, p.b, sizeof(out->slot_b) - 1);
+    fam = FamLabel(ch, &p);
+    strncpy(out->family, fam == NULL ? "" : fam,
+            sizeof(out->family) - 1);
+    return 1;
+}
+
+/* self-scope reply (data-driven, no biography invented): on parse
+   fail, an exact normalized-line match against self.tsv triggers
+   answers with the scope text (no trailing newline in file; the
+   caller adds it). Otherwise parse-fail stands. */
+static int SelfAnswer(const char *line, char *out, size_t size)
+{
+    char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    SURFACE_FLAGS sf;
+    uint32_t n = Split(line, toks, CHAT_MAX_TOKS, &sf);
+    char norm[256];
+    size_t pos = 0;
+    uint32_t i, nt;
+    (void)sf;
+    if (out == NULL || size == 0 || SelfScopeText()[0] == '\0')
+        return 0;
+    norm[0] = '\0';
+    for (i = 0; i < n && pos + 1 < sizeof(norm); i++)
+    {
+        size_t L = strlen(toks[i]);
+        if (i > 0 && pos + 1 < sizeof(norm))
+            norm[pos++] = ' ';
+        if (pos + L >= sizeof(norm))
+            return 0;
+        memcpy(norm + pos, toks[i], L);
+        pos += L;
+    }
+    norm[pos] = '\0';
+    nt = SelfTriggerCount();
+    for (i = 0; i < nt; i++)
+    {
+        const char *t = SelfTriggerAt(i);
+        if (t != NULL && strcmp(norm, t) == 0)
+        {
+            /* trailing newline included: all NLG consumers print
+               raw buffers (ChatHandle, wrapper). */
+            snprintf(out, size, "%s\n", SelfScopeText());
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
                     char *slot, size_t slot_size,
                     char *family, size_t family_size,
@@ -2699,6 +2789,8 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
     {
         if (cause != NULL)
             *cause = CAUSE_PARSE_FAIL;
+        if (SelfAnswer(line, out, size))
+            return GOAL_ANSWER;
         return -1;
     }
     ApplyFocus(ch, &p);
@@ -2753,6 +2845,12 @@ void ChatHandle(CHAT *ch, const char *line)
     (void)st;
     if (st < 0)
     {
+        char self[1024];
+        if (SelfAnswer(line, self, sizeof(self)))
+        {
+            printf("%s", self);
+            return;
+        }
         printf("No entendi la pregunta.\n");
         return;
     }
