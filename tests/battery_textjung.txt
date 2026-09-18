@@ -1,0 +1,26 @@
+load jung.txt
+estado
+what does the sun mean
+que significa sol
+what is the mother
+what is libido
+explicamelo
+explicamelo
+tell me about sacrifice
+sacrifice
+what is rebirth
+who is the hero
+what does the tree mean
+hero
+what is the unconscious
+where does the libido go
+what are dreams
+who is god
+what is water
+tell me about fire
+what is the serpent
+what is incest
+what is a symbol
+who is christ
+load bible.txt
+estado

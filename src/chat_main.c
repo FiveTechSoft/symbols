@@ -1,5 +1,5 @@
 /* chat_main: REPL conversacional sobre el wrapper de clarificacion
-   (Fase B), que a su vez usa el motor puro bible_chat.
+   (Fase B), que a su vez usa el motor puro chat.
    Uso: chat_main [corpus.tsv]
    Sin argumentos usa data/bible/bible_relations.tsv */
 #include <stdio.h>

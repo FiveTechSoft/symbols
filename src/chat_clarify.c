@@ -200,6 +200,11 @@ void ClarifyHandle(CLARIFY *w, const char *line)
         w->pending = 0;
         w->attempts = 0;
     }
+    if (ChatTryTextLine(&w->ch, line, out, sizeof(out)))
+    {
+        printf("%s", out);
+        return;
+    }
     if (ChatBuildPlan(&w->ch, line, &plan, toks, &ntok, &sf) >= 2)
     {
         ChatHandle(&w->ch, line);

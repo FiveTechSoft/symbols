@@ -1,5 +1,5 @@
 /* ============================================================
-   bible_chat: symbolic conversational engine (no tensors, no
+   chat: symbolic conversational engine (no tensors, no
    backprop, no external LLM). Three stages over the C motor:
 
      1. INTENT PARSER  (slot-frames EN + ES)
@@ -26,13 +26,13 @@
 #include "metaschema.h"
 #include "learn.h"
 #include "transfer.h"
-#include "bible_chat.h"
+#include "chat.h"
 #include "tool_contract.h"
 #include "c_rules.h"
 
 #define CHAT_MAX_TOKS 16
 
-/* struct CHAT_ is defined in bible_chat.h (shared with tests) */
+/* struct CHAT_ is defined in chat.h (shared with tests) */
 
 /* ASCII-fold one character in place: Latin-1 accents and UTF-8
    two-byte encodings collapse to the bare letter (the corpus
@@ -80,7 +80,7 @@ static int FoldChar(const char *s, char *out)
 }
 
 /* ---- FASE 4 CanonicalizeQuery: surface flags (SURFACE_FLAGS lives
-   in bible_chat.h) + canonical tokens. Punctuation is signal, not
+   in chat.h) + canonical tokens. Punctuation is signal, not
    content: trailing ASCII punctuation is peeled off each raw token
    and recorded as flags (question/comma/period); a leading inverted
    question mark (UTF-8 C2 BF) marks interrogative force and is
@@ -218,6 +218,111 @@ static int IsStopTok(const char *tok)
         if (strcmp(tok, STOP[i]) == 0)
             return 1;
     return 0;
+}
+
+/* Spanish verb+clitic shape (explicamelo, dime, hazlo): a stem
+   of 2+ chars plus a clitic ending. Closed functional material
+   (like STOP), productive morphology, never topic words. Bare
+   unknown singles without it stay UNKNOWN. */
+static int HasCliticEnding(const char *tok)
+{
+    static const char *CL[] = {
+        "me", "te", "se", "nos", "lo", "la", "los", "las",
+        "le", "les",
+    };
+    size_t L;
+    size_t i;
+    if (tok == NULL)
+        return 0;
+    L = strlen(tok);
+    if (L < 4)
+        return 0;
+    for (i = 0; i < sizeof(CL) / sizeof(CL[0]); i++)
+    {
+        size_t c = strlen(CL[i]);
+        if (L > c + 1 && strcmp(tok + L - c, CL[i]) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+/* bounded edit distance over bytes (early exit past bound).
+   Geometric fallback proposer for unknown query tokens:
+   pure algorithm, never a vocabulary list. */
+static uint32_t LevBounded(const char *a, const char *b,
+                           uint32_t bound)
+{
+    size_t la;
+    size_t lb;
+    size_t i;
+    size_t j;
+    uint32_t prev[128];
+    uint32_t cur[128];
+    if (a == NULL || b == NULL)
+        return bound + 1;
+    la = strlen(a);
+    lb = strlen(b);
+    if (la >= 128 || lb >= 128)
+        return bound + 1;
+    if (la > lb + bound || lb > la + bound)
+        return bound + 1;
+    for (j = 0; j <= lb; j++)
+        prev[j] = (uint32_t)j;
+    for (i = 1; i <= la; i++)
+    {
+        uint32_t rowmin;
+        cur[0] = (uint32_t)i;
+        rowmin = cur[0];
+        for (j = 1; j <= lb; j++)
+        {
+            uint32_t cost = (a[i - 1] == b[j - 1]) ? 0 : 1;
+            uint32_t v = prev[j] + 1;
+            if (cur[j - 1] + 1 < v)
+                v = cur[j - 1] + 1;
+            if (prev[j - 1] + cost < v)
+                v = prev[j - 1] + cost;
+            cur[j] = v;
+            if (v < rowmin)
+                rowmin = v;
+        }
+        if (rowmin > bound)
+            return bound + 1;
+        for (j = 0; j <= lb; j++)
+            prev[j] = cur[j];
+    }
+    return prev[lb] <= bound ? prev[lb] : bound + 1;
+}
+
+/* nearest graph symbol within bound (deterministic: lowest id
+   wins ties). 0 = none. */
+static SYMBOL_ID LevNearest(const GRAPH *graph, const char *tok,
+                           uint32_t bound, uint32_t *out_dist)
+{
+    uint32_t n;
+    uint32_t i;
+    SYMBOL_ID best = SYMBOL_INVALID;
+    uint32_t bestd = bound + 1;
+    if (graph == NULL || tok == NULL)
+        return SYMBOL_INVALID;
+    n = SymbolCount(graph->symbols);
+    for (i = 1; i <= n; i++)
+    {
+        const SYMBOL *s = SymbolGet(graph->symbols, i);
+        uint32_t d;
+        if (s == NULL || s->name == NULL)
+            continue;
+        d = LevBounded(tok, s->name, bound);
+        if (d < bestd)
+        {
+            bestd = d;
+            best = i;
+            if (d == 0)
+                break;
+        }
+    }
+    if (out_dist != NULL)
+        *out_dist = bestd;
+    return bestd <= bound ? best : SYMBOL_INVALID;
 }
 
 /* G2: a captured slot is structurally orphaned when empty or a
@@ -452,6 +557,44 @@ static uint32_t ChatIngestCorpus(CHAT *ch, const char *path,
     }
     fclose(f);
     return learned;
+}
+
+/* session text graph (lazy): shared symbol space for dynamic
+   corpus loads. SchemaKB/metas never involved, so unload is
+   exact (rebuild these from the file list). */
+static int TextSessionEnsure(CHAT *ch)
+{
+    GRAPH *g;
+    EMBEDDING_TABLE *e;
+    if (ch->tgraph != NULL && ch->temb != NULL)
+        return 1;
+    g = GraphCreate(65536, 256);
+    if (g == NULL)
+        return 0;
+    e = EmbeddingTableCreate(65536);
+    if (e == NULL)
+    {
+        GraphDestroy(g);
+        return 0;
+    }
+    GraphSetEmbeddingTable(g, e);
+    ch->tgraph = g;
+    ch->temb = e;
+    return 1;
+}
+
+/* file list for future unload-by-rebuild (dedup, bounded) */
+static void TextSessionRemember(CHAT *ch, const char *name)
+{
+    uint32_t i;
+    for (i = 0; i < ch->ntfiles; i++)
+        if (strcmp(ch->tfiles[i], name) == 0)
+            return;
+    if (ch->ntfiles >= 8)
+        return;
+    strncpy(ch->tfiles[ch->ntfiles], name, 63);
+    ch->tfiles[ch->ntfiles][63] = '\0';
+    ch->ntfiles++;
 }
 
 /* ---- queries against the frozen layers ----
@@ -1011,7 +1154,10 @@ typedef enum
     INT_REL_BOOL,     /* generic deduced frame: es A <kw> de B */
     INT_COMPOSE_WHY,  /* why is A <kw1> of B, given B <kw2> of C */
     INT_LOAD,          /* carga <file.tsv> (sandboxed dataset load) */
-    INT_INGIERE       /* load <file.tsv> (hot knowledge triples) */
+    INT_INGIERE,      /* load <file.tsv> (hot knowledge triples) */
+    INT_TEXTLOAD,     /* load <file.txt> (intact corpus to graph) */
+    INT_TEXTQ,        /* content question over session texts */
+    INT_TEXTSTATUS    /* estado: session inventory (counts from stores) */
 } INTENT;
 
 typedef struct
@@ -1023,6 +1169,10 @@ typedef struct
     int    has_b;
     int    kw;                /* deduced relation index (generic) */
     int    kw2;               /* second relation index (compose why) */
+    char   toks[8][CHAT_TOKEN_MAX]; /* TEXTQ query words (as asked) */
+    uint32_t ntoks;
+    int    t_following;      /* TEXTQ follow-up: reuse cached topic */
+    char   t_sub[CHAT_TOKEN_MAX]; /* geometric substitute (marked) */
 } PARSED;
 
 /* token right after the first "de"/"of" following position from */
@@ -1462,7 +1612,9 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
 
     /* ASK-ingest: load <file.tsv> hot knowledge triples (same
        shape/probe rules as carga; the answer counts admitted rows,
-       never silent). */
+       never silent). load <file.txt> transfers intact running
+       text to the session graph (converter counts sentences and
+       symbols; zero training, SchemaKB untouched). */
     if (n == 2 && strcmp(toks[0], "load") == 0)
     {
         char path[512];
@@ -1475,7 +1627,27 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             p->intent = INT_INGIERE;
             return 1;
         }
+        if (L > 4 && strcmp(toks[1] + L - 4, ".txt") == 0 &&
+            CRulesResolvePath(toks[1], path, sizeof(path)))
+        {
+            strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXTLOAD;
+            return 1;
+        }
         return 0;
+    }
+
+    /* session inventory: what texts are loaded (counts live in
+       the stores, so replays report honest totals). Slot carries
+       the verb so focus/anaphora guards pass it through. */
+    if (n == 1 && (strcmp(toks[0], "estado") == 0 ||
+                   strcmp(toks[0], "status") == 0))
+    {
+        strncpy(p->a, toks[0], CHAT_TOKEN_MAX - 1);
+        p->a[CHAT_TOKEN_MAX - 1] = '\0';
+        p->intent = INT_TEXTSTATUS;
+        return 1;
     }
 
     int kw_parent = -1, kw_child = -1, kw_grand = -1, kw_desc = -1;
@@ -1938,6 +2110,97 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         return 0;
     }
 
+    /* TEXTQ fallback: content line over session text graphs.
+       No family claimed the line (deduced kw and frozen keywords
+       all absent); at least one query token hits a text symbol
+       (case variants probed). No question-word lists: shape comes
+       from the failure of every family frame, identity from the
+       data. The answer ranks by QKV attention. */
+    if (kwx < 0 && kw_parent < 0 && kw_child < 0 && kw_grand < 0 &&
+        kw_desc < 0 && kw_why < 0 && ch->ntfiles > 0 &&
+        ch->tgraph != NULL)
+    {
+        int hit = -1;
+        uint32_t i;
+        for (i = 0; i < n; i++)
+        {
+            if (IsStopTok(toks[i]))
+                continue;
+            if (p->ntoks < 8)
+            {
+                strncpy(p->toks[p->ntoks], toks[i], CHAT_TOKEN_MAX - 1);
+                p->toks[p->ntoks][CHAT_TOKEN_MAX - 1] = '\0';
+                p->ntoks++;
+            }
+            if (hit < 0 &&
+                TextLexFindSymbol(ch->tgraph, toks[i]) !=
+                    SYMBOL_INVALID)
+                hit = (int)i;
+        }
+        if (hit >= 0)
+        {
+            strncpy(p->a, toks[hit], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXTQ;
+            p->t_following = 0;
+            return 1;
+        }
+        /* follow-up: single verb+clitic token, no hits, live topic
+           cache (KV). Advances through ranked sentences instead of
+           repeating or abstaining. Bare-? with zero content tokens
+           (por que?) joins the same path: pure continuation shape. */
+        if (hit < 0 && ch->tnw > 0 &&
+            ((n == 1 && HasCliticEnding(toks[0])) ||
+             (q_force && p->ntoks == 0)))
+        {
+            strncpy(p->a, toks[0], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_TEXTQ;
+            p->t_following = 1;
+            return 1;
+        }
+        /* geometric fallback: unknown token nearest symbol within
+           bound 3 (psique~psyche). Runs after exact hits (exact
+           wins) and clitics (follow-ups win). Orientation uses
+           the substitute; NLG marks it. Names longer than a slot
+           cannot route (truncation would unground them). */
+        if (hit < 0 && ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            uint32_t i;
+            for (i = 0; i < n; i++)
+            {
+                SYMBOL_ID sub;
+                const SYMBOL *ss;
+                uint32_t dd = 99;
+                uint32_t k;
+                if (IsStopTok(toks[i]))
+                    continue;
+                sub = LevNearest(ch->tgraph, toks[i], 3, &dd);
+                if (sub == SYMBOL_INVALID)
+                    continue;
+                ss = SymbolGet(ch->tgraph->symbols, sub);
+                if (ss == NULL || ss->name == NULL ||
+                    strlen(ss->name) >= CHAT_TOKEN_MAX)
+                    continue;
+                for (k = 0; k < p->ntoks; k++)
+                {
+                    if (strcmp(p->toks[k], toks[i]) == 0)
+                    {
+                        strncpy(p->toks[k], ss->name,
+                                CHAT_TOKEN_MAX - 1);
+                        p->toks[k][CHAT_TOKEN_MAX - 1] = '\0';
+                    }
+                }
+                strncpy(p->a, ss->name, CHAT_TOKEN_MAX - 1);
+                p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                strncpy(p->t_sub, ss->name, CHAT_TOKEN_MAX - 1);
+                p->t_sub[CHAT_TOKEN_MAX - 1] = '\0';
+                p->intent = INT_TEXTQ;
+                return 1;
+            }
+        }
+    }
+
 generic_query_done:
     return 0;
 }
@@ -1962,7 +2225,7 @@ static void RememberFocus(CHAT *ch, const char *tok)
     ch->focus_valid = 1;
 }
 
-/* goal outcomes live in bible_chat.h (wrapper-visible) */
+/* goal outcomes live in chat.h (wrapper-visible) */
 
 #define CHAT_ANSWER_MAX 4096
 
@@ -2248,6 +2511,230 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         else
             EMIT("No entendi la pregunta.\n");
+        break;
+    }
+    case INT_TEXTLOAD:
+    {
+        /* dynamic corpus text: whole intact file transferred to
+           the session graph (converter counts sentences/symbols;
+           zero training, SchemaKB/metas untouched, so unload is
+           exact). File list remembered for unload-by-rebuild. */
+        char path[512];
+        if (CRulesResolvePath(p->a, path, sizeof(path)) &&
+            TextSessionEnsure(ch) && ch->ntfiles < 8)
+        {
+            TEXTLEX_STATS tls;
+            uint32_t slot;
+            uint32_t f;
+            slot = ch->ntfiles;
+            for (f = 0; f < ch->ntfiles; f++)
+            {
+                if (strcmp(ch->tfiles[f], p->a) == 0)
+                {
+                    slot = f;
+                    break;
+                }
+            }
+            tls = TextLexIngest(ch->tgraph, &ch->tlex[slot], path,
+                                1, 0);
+            if (tls.bytes_read > 0)
+            {
+                TextSessionRemember(ch, p->a);
+                EMIT_OK("Incorporadas %u frases y %u simbolos de %s.\n",
+                        (unsigned)tls.nsent_new,
+                        (unsigned)tls.syms_new, p->a);
+            }
+            else
+                EMIT("No entendi la pregunta.\n");
+        }
+        else
+            EMIT("No entendi la pregunta.\n");
+        break;
+    }
+    case INT_TEXTQ:
+    {
+        /* QKV over session texts: best literal sentence wins.
+           Follow-ups (KV-cache) reuse the cached topic and skip
+           shown sentences: advance, never repeat. Fresh topics
+           reset the shown list. */
+        const char *words[8];
+        uint32_t nw = 0;
+        uint32_t i;
+        uint32_t f;
+        uint32_t best = 0;
+        uint32_t bestf = 0;
+        float bestsc = 0.0f;
+        int have = 0;
+        uint32_t k;
+        if (!p->t_following)
+            RememberFocus(ch, p->a);
+        if (p->t_following)
+        {
+            for (k = 0; k < ch->tnw && nw < 8; k++)
+                words[nw++] = ch->twords[k];
+            /* autoregressive state: shown sentences join the
+               query (content symbols only, deterministic order).
+               Q' orients from where the dialogue stands. */
+            for (k = 0; k < ch->ntshown && nw < 8; k++)
+            {
+                uint32_t f2 = ch->tshown[k] >> 24;
+                uint32_t sx = ch->tshown[k] & 0xFFFFFFu;
+                const TL_SENT *sn;
+                uint32_t t;
+                if (f2 >= ch->ntfiles)
+                    continue;
+                sn = TextLexSentence(&ch->tlex[f2], sx);
+                if (sn == NULL)
+                    continue;
+                for (t = 0; t < sn->ntok && nw < 8; t++)
+                {
+                    const SYMBOL *sm;
+                    char low[CHAT_TOKEN_MAX];
+                    size_t li;
+                    size_t ln;
+                    uint32_t w2;
+                    int dup = 0;
+                    sm = SymbolGet(ch->tgraph->symbols, sn->ids[t]);
+                    if (sm == NULL || sm->name == NULL)
+                        continue;
+                    ln = strlen(sm->name);
+                    if (ln == 0 || ln >= CHAT_TOKEN_MAX)
+                        continue;
+                    for (li = 0; li < ln; li++)
+                    {
+                        char c = sm->name[li];
+                        low[li] = (c >= 'A' && c <= 'Z')
+                                      ? (char)(c + 32)
+                                      : c;
+                    }
+                    low[ln] = '\0';
+                    if (IsStopTok(low))
+                        continue;
+                    for (w2 = 0; w2 < nw; w2++)
+                    {
+                        if (strcmp(words[w2], sm->name) == 0)
+                        {
+                            dup = 1;
+                            break;
+                        }
+                    }
+                    if (!dup)
+                        words[nw++] = sm->name;
+                }
+            }
+        }
+        else
+        {
+            for (i = 0; i < p->ntoks && nw < 8; i++)
+                words[nw++] = p->toks[i];
+        }
+        for (f = 0; f < ch->ntfiles; f++)
+        {
+            uint32_t idx[16];
+            float sc[16];
+            uint32_t nret;
+            uint32_t r;
+            nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                   ch->temb, words, nw, idx, sc, 16);
+            for (r = 0; r < nret; r++)
+            {
+                uint32_t key = (f << 24) | (idx[r] & 0xFFFFFFu);
+                int seen = 0;
+                for (k = 0; k < ch->ntshown; k++)
+                {
+                    if (ch->tshown[k] == key)
+                    {
+                        seen = 1;
+                        break;
+                    }
+                }
+                if (seen)
+                    continue;
+                if (!have || sc[r] > bestsc)
+                {
+                    have = 1;
+                    best = idx[r];
+                    bestsc = sc[r];
+                    bestf = f;
+                }
+            }
+        }
+        if (have && ch->tlex[bestf].image != NULL)
+        {
+            char sent[2048];
+            if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                    ch->tlex[bestf].image,
+                                    ch->tlex[bestf].imagelen, sent,
+                                    sizeof(sent)) > 0)
+            {
+                uint32_t key;
+                if (!p->t_following)
+                {
+                    /* new topic? reset shown + cache words */
+                    int same = (nw == ch->tnw);
+                    for (k = 0; same && k < nw; k++)
+                    {
+                        if (strcmp(words[k], ch->twords[k]) != 0)
+                            same = 0;
+                    }
+                    if (!same)
+                    {
+                        ch->ntshown = 0;
+                        ch->tnw = 0;
+                        for (k = 0; k < nw; k++)
+                        {
+                            strncpy(ch->twords[k], words[k],
+                                    CHAT_TOKEN_MAX - 1);
+                            ch->twords[k][CHAT_TOKEN_MAX - 1] = '\0';
+                            ch->tnw++;
+                        }
+                    }
+                }
+                key = (bestf << 24) | (best & 0xFFFFFFu);
+                if (ch->ntshown < 64)
+                    ch->tshown[ch->ntshown++] = key;
+                if (p->t_sub[0] != '\0')
+                    EMIT_OK("Segun el texto [%s]: %s\n", p->t_sub,
+                            sent);
+                else
+                    EMIT_OK("Segun el texto: %s\n", sent);
+            }
+            else
+                EMIT("No entendi la pregunta.\n");
+        }
+        else
+            EMIT("No entendi la pregunta.\n");
+        break;
+    }
+    case INT_TEXTSTATUS:
+    {
+        /* session inventory: per-file sentences from the stores
+           plus shared session symbols. Replay-safe totals. */
+        uint32_t f;
+        if (ch->ntfiles == 0 || ch->tgraph == NULL)
+        {
+            EMIT_OK("No tengo ningun texto cargado.\n");
+        }
+        else
+        {
+            char list[2048];
+            size_t lp = 0;
+            list[0] = '\0';
+            for (f = 0; f < ch->ntfiles; f++)
+            {
+                int w = snprintf(list + lp, sizeof(list) - lp,
+                                 "%s%s (%u frases)",
+                                 f > 0 ? "; " : "", ch->tfiles[f],
+                                 (unsigned)ch->tlex[f].nsent);
+                if (w > 0)
+                    lp += (size_t)w;
+                if (lp >= sizeof(list) - 1)
+                    break;
+            }
+            EMIT_OK("Tengo cargado: %s. Simbolos en sesion: %u.\n",
+                    list,
+                    (unsigned)SymbolCount(ch->tgraph->symbols));
+        }
         break;
     }
     case INT_REL_BOOL:
@@ -2759,6 +3246,12 @@ static const char *FamLabel(const CHAT *ch, const PARSED *p)
         return "load";
     case INT_INGIERE:
         return "ingest";
+    case INT_TEXTLOAD:
+        return "textload";
+    case INT_TEXTQ:
+        return "textqa";
+    case INT_TEXTSTATUS:
+        return "textstatus";
     default:
         break;
     }
@@ -2793,6 +3286,12 @@ static const char *IntentName(int intent)
         return "LOAD";
     case INT_INGIERE:
         return "INGEST";
+    case INT_TEXTLOAD:
+        return "TEXTLOAD";
+    case INT_TEXTQ:
+        return "TEXTQ";
+    case INT_TEXTSTATUS:
+        return "TEXTSTATUS";
     default:
         return "NONE";
     }
@@ -2872,6 +3371,37 @@ static int SelfAnswer(const char *line, char *out, size_t size)
     return 0;
 }
 
+int ChatTryTextLine(CHAT *ch, const char *line, char *out,
+                      size_t size)
+{
+    char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
+    SURFACE_FLAGS sf;
+    uint32_t n;
+    PARSED tp;
+    int st;
+    if (ch == NULL || line == NULL || out == NULL || size == 0)
+        return 0;
+    memset(&sf, 0, sizeof(sf));
+    n = Split(line, toks, CHAT_MAX_TOKS, &sf);
+    if (n == 0)
+        return 0;
+    memset(&tp, 0, sizeof(tp));
+    if (!ParseIntentToks(ch, toks, n, sf.question || HasWh(toks, n),
+                         sf.genitive, 0, &tp))
+        return 0;
+    if (tp.intent != INT_TEXTLOAD && tp.intent != INT_TEXTQ &&
+        tp.intent != INT_TEXTSTATUS)
+        return 0;
+    st = ChatResolveLine(ch, line, out, size, NULL, 0, NULL, 0,
+                         NULL);
+    if (st < 0)
+    {
+        snprintf(out, size, "No entendi la pregunta.\n");
+        return 1;
+    }
+    return 1;
+}
+
 int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
                     char *slot, size_t slot_size,
                     char *family, size_t family_size,
@@ -2932,6 +3462,17 @@ void ChatHandle(CHAT *ch, const char *line)
     uint32_t ntok = 0;
     SURFACE_FLAGS sf;
     memset(&sf, 0, sizeof(sf));
+    {
+        /* TEXT fast path first: dynamic-corpus lines bypass the
+           plan splitter (fragments re-parse into vetoed goals,
+           gluing answers or abstaining whole plans). */
+        char tbuf[CHAT_ANSWER_MAX];
+        if (ChatTryTextLine(ch, line, tbuf, sizeof(tbuf)))
+        {
+            printf("%s", tbuf);
+            return;
+        }
+    }
     if (ChatBuildPlan(ch, line, &plan, toks, &ntok, &sf) >= 2)
     {
         ChatHandleMulti(ch, &plan, toks,

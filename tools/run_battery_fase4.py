@@ -44,10 +44,15 @@ def main(argv):
         sys.stderr.write(text[:2000])
         return 1
     answers = answers[:len(queries)]
-    with open(out_path, "w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f, delimiter="\t", lineterminator="\n")
-        for q, a in zip(queries, answers):
-            w.writerow([q, a])
+    if out_path.endswith(".txt"):
+        with open(out_path, "w", encoding="utf-8", newline="") as f:
+            for q, a in zip(queries, answers):
+                f.write("> %s\n%s\n\n" % (q, a))
+    else:
+        with open(out_path, "w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f, delimiter="\t", lineterminator="\n")
+            for q, a in zip(queries, answers):
+                w.writerow([q, a])
     print("wrote %s (%d rows)" % (out_path, len(queries)))
     return 0
 

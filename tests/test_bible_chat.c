@@ -1,5 +1,5 @@
 /* test_bible_chat: end-to-end tests for the symbolic conversational
-   engine (src/bible_chat.c). The parser and NLG print to stdout; the
+   engine (src/chat.c). The parser and NLG print to stdout; the
    testable core is: ingest contract, direct/2-hop frozen-layer
    queries the chat uses, and the helpers' directionality (pair
    (S,O) = "S isa O" = S is child of O). Tiny scratch corpus, never
@@ -11,7 +11,7 @@
 #include "metaschema.h"
 #include "learn.h"
 #include "transfer.h"
-#include "bible_chat.h"
+#include "chat.h"
 
 static int g_pass = 0, g_fail = 0;
 
@@ -110,7 +110,7 @@ int main(void)
     }
 
     /* ---- 4. helper directionality (the (S,O)=S-child-of-O bug) ---- */
-    /* The helpers are static in bible_chat.c; we replicate their
+    /* The helpers are static in chat.c; we replicate their
        contract over the same KB to pin the semantics. */
     {
         /* ChatParents(child): parents of X = objects of pairs (X,*) */

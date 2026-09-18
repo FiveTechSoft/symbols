@@ -97,7 +97,7 @@ strip_dialog(In, Out) :-
     strip_dialog(AfterStr, A),
     atomic_list_concat([B, A], ' ', Out).
 strip_dialog(In, Out) :-
-    sub_string(In, Before, _, After, '''),
+    sub_string(In, Before, _, After, '\''),
     Before >= 0,
     !,
     sub_string(In, 0, Before, _, BeforeStr),

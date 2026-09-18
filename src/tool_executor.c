@@ -12,7 +12,7 @@
 #include <direct.h>
 #include <io.h>
 #include <windows.h>
-#include "bible_chat.h"
+#include "chat.h"
 #include "tool_contract.h"
 
 static int ToolEvalExpr(const char *expr, double *out);

@@ -213,25 +213,33 @@ int CRulesLoadGlobal(const char *path)
     return CRulesLoad(path, &g_crules);
 }
 
-static int HasTSVSuffix(const char *s)
+static int HasDatasetSuffix(const char *s)
 {
     size_t n = strlen(s);
-    return n > 4 && s[n - 4] == '.' && s[n - 3] == 't' &&
-           s[n - 2] == 's' && s[n - 1] == 'v';
+    if (n > 4 && s[n - 4] == '.' && s[n - 3] == 't' &&
+        s[n - 2] == 's' && s[n - 1] == 'v')
+        return 1;
+    /* intact running text for the corpus-to-graph converter */
+    if (n > 4 && s[n - 4] == '.' && s[n - 3] == 't' &&
+        s[n - 2] == 'x' && s[n - 1] == 't')
+        return 1;
+    return 0;
 }
 
 int CRulesResolvePath(const char *name, char *out, size_t size)
 {
     /* data/samples/ admits hot knowledge loads (load); rule
-       loads stay fail-closed there (triples carry unknown TYPEs). */
+       loads stay fail-closed there (triples carry unknown TYPEs).
+       data/texts/ admits intact running text (load X.txt). */
     static const char *DIRS[] = {"data/", "data/c_lang/",
-                                 "data/agentic/", "data/samples/"};
+                                 "data/agentic/", "data/samples/",
+                                 "data/texts/"};
     size_t i;
     FILE *probe;
     if (name == NULL || out == NULL || size == 0)
         return 0;
     out[0] = '\0';
-    if (!HasTSVSuffix(name))
+    if (!HasDatasetSuffix(name))
         return 0;
     for (i = 0; name[i] != '\0'; i++)
         if (name[i] == '.' && name[i + 1] == '.' || name[i] == '/' ||

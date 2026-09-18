@@ -32,13 +32,14 @@ add_library(symbolic STATIC
     src/transfer.c
     src/transfer_legacy.c
     src/learn.c
-    src/bible_chat.c
+    src/chat.c
     src/chat_clarify.c
     src/tool_executor.c
     src/tool_config.c
     src/agent_action.c
     src/c_rules.c
     src/server_proto.c
+    src/text_lex.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -115,19 +116,24 @@ sllm_test(test_fixtures        tests/test_fixtures.c)
 sllm_test(test_self            tests/test_self.c)
 sllm_test(test_crules          tests/test_crules.c)
 sllm_test(test_ingiere         tests/test_ingiere.c)
+sllm_test(test_textlex         tests/test_textlex.c)
 sllm_test(test_server_proto    tests/test_server_proto.c)
 sllm_test(test_chain          tests/test_chain.c)
 sllm_test(test_bible_bfs      tests/test_bible_bfs.c)
 sllm_test(test_compose        tests/test_compose.c)
 sllm_test(test_learn          tests/test_learn.c)
 
-# bible_chat REPL: CLI conversacional (no es test)
+# chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
 target_link_libraries(chat_main symbolic)
 
 # symbols-server: OpenAI-compatible model endpoint (harness, no es test)
 add_executable(symbols-server src/symbols_server.c)
 target_link_libraries(symbols-server symbolic ws2_32)
+
+# relprobe: graph relation inspector (diagnostic CLI, no es test)
+add_executable(relprobe tools/relprobe.c)
+target_link_libraries(relprobe symbolic)
 
 # symbolic-learn: primer bucle de aprendizaje simbolico end-to-end (no es test)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)

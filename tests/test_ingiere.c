@@ -8,14 +8,45 @@
 #include <string.h>
 #include <fcntl.h>
 #include <io.h>
-#include "bible_chat.h"
+#include "chat.h"
 
 static int g_pass = 0, g_fail = 0;
 
-static void check_str(const char *name, const char *got,
-                      const char *want)
+static void check(const char *name, int cond)
+{
+    if (cond)
+    {
+        printf("  PASS %s\n", name);
+        g_pass++;
+    }
+    else
+    {
+        printf("  FAIL %s\n", name);
+        g_fail++;
+    }
+}
+
+static void check_str(const char *name, const char *got,                      const char *want)
 {
     if (got != NULL && strcmp(got, want) == 0)
+    {
+        printf("  PASS %s\n", name);
+        g_pass++;
+    }
+    else
+    {
+        printf("  FAIL %s\n    got  %.120s\n    want %.120s\n", name,
+               got ? got : "(null)", want);
+        g_fail++;
+    }
+}
+
+/* prefix pin for long literal answers (heads are ASCII-stable) */
+static void check_prefix(const char *name, const char *got,
+                         const char *want)
+{
+    size_t L = strlen(want);
+    if (got != NULL && strncmp(got, want, L) == 0)
     {
         printf("  PASS %s\n", name);
         g_pass++;
@@ -97,6 +128,84 @@ int main(void)
     Ask(&ch, "load ../../x.tsv");
     check_str("load traversal abstains",
               g_out, "No entendi la pregunta.");
+    /* ---- dynamic text loads: census never hardcoded. Receipt
+       numbers must agree with the estado inventory; replays add
+       zero; shared symbols add up. ---- */
+    {
+        unsigned N1 = 0, M1 = 0, N2 = 0, T = 0, N3 = 0, M3 = 0;
+        unsigned N3b = 0, T2 = 0;
+        char nm[64];
+        char exp[256];
+        Ask(&ch, "estado");
+        check_str("estado empty session",
+                  g_out, "No tengo ningun texto cargado.");
+        Ask(&ch, "load jung.txt");
+        check("load jung receipt parses",
+              sscanf(g_out,
+                     "Incorporadas %u frases y %u simbolos de jung.txt.",
+                     &N1, &M1) == 2 && N1 > 0 && M1 > 0);
+        Ask(&ch, "load jung.txt");
+        check_str("load jung replay adds nothing",
+                  g_out,
+                  "Incorporadas 0 frases y 0 simbolos de jung.txt.");
+        Ask(&ch, "estado");
+        check("estado agrees with jung receipt",
+              sscanf(g_out,
+                     "Tengo cargado: %63[^ ] (%u frases). "
+                     "Simbolos en sesion: %u.",
+                     nm, &N2, &T) == 3 &&
+                  strcmp(nm, "jung.txt") == 0 && N2 == N1 && T == M1);
+    Ask(&ch, "what does the sun mean");
+    check_prefix("ask jung sun",
+                 g_out, "Segun el texto: This does not mean that men "
+                        "loved the visible God ; they love hi");
+    Ask(&ch, "what is the mother");
+    check_prefix("ask jung mother",
+                 g_out, "Segun el texto: And the boy looks up familiarly "
+                        "To his Father , Helios , ");
+    Ask(&ch, "who is the hero");
+    check_prefix("ask jung hero long answer",
+                 g_out, "Segun el texto: — THE UNCONSCIOUS ORIGIN");
+    Ask(&ch, "what is libido");
+    check_prefix("ask jung libido",
+                 g_out, "Segun el texto: Briefly , we may designate "
+                        "this amount of libido as ");
+    Ask(&ch, "explicamelo");
+    check_prefix("follow-up advances past top",
+                 g_out, "Segun el texto: What this signifies we already "
+                        "know");
+    Ask(&ch, "explicamelo");
+    check_prefix("follow-up advances again",
+                 g_out, "Segun el texto: This confirmation is parallel "
+                        "to the postulate ");
+    Ask(&ch, "xyzqqq");
+    check_str("bare unknown abstains despite cache",
+              g_out, "No entendi la pregunta.");
+        Ask(&ch, "load noexiste.txt");
+        check_str("load txt missing abstains",
+                  g_out, "No entendi la pregunta.");
+        Ask(&ch, "load ../../x.txt");
+        check_str("load txt traversal abstains",
+                  g_out, "No entendi la pregunta.");
+        Ask(&ch, "load bible.txt");
+        check("load bible receipt parses",
+              sscanf(g_out,
+                     "Incorporadas %u frases y %u simbolos de bible.txt.",
+                     &N3, &M3) == 2 && N3 > 0 && M3 > 0);
+        Ask(&ch, "estado");
+        snprintf(exp, sizeof(exp), "jung.txt (%u frases)", N1);
+        check("estado keeps jung entry",
+              strstr(g_out, exp) != NULL);
+        snprintf(exp, sizeof(exp), "bible.txt (%u frases)", N3);
+        check("estado lists bible entry",
+              strstr(g_out, exp) != NULL);
+        check("estado shared symbols add up",
+              sscanf(g_out,
+                     "Tengo cargado: %63[^ ] (%u frases); "
+                     "bible.txt (%u frases). Simbolos en sesion: %u.",
+                     nm, &N2, &N3b, &T2) == 4 && N2 == N1 &&
+                  N3b == N3 && T2 == M1 + M3);
+    }
     Ask(&ch, "quien es el padre de david?");
     check_str("engine intact after ingests",
               g_out, "El padre de David es Jesse, segun consta "

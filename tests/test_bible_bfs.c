@@ -23,7 +23,7 @@
 #include "metaschema.h"
 #include "learn.h"
 #include "transfer.h"
-#include "bible_chat.h"
+#include "chat.h"
 
 #define FIX_ROWS 2053
 

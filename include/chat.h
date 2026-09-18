@@ -1,7 +1,7 @@
-#ifndef BIBLE_CHAT_H
-#define BIBLE_CHAT_H
+#ifndef CHAT_H
+#define CHAT_H
 
-/* bible_chat: symbolic conversational engine over the frozen C
+/* chat: symbolic conversational engine over the frozen C
    layers (schema+meta+transfer). No tensors, no backprop. */
 
 #define CHAT_TOKEN_MAX 32
@@ -10,6 +10,7 @@
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
+#include "text_lex.h"
 
 /* Relation keyword, DEDUCED from the corpus at ingest (never
    hardcoded): for each distinct TSV relation REL the stem is
@@ -54,10 +55,28 @@ typedef struct CHAT_
     char      focus[CHAT_TOKEN_MAX]; /* last entity talked about */
     int       focus_valid;
     ExecCtx   exec; /* per-query execution memory (never the KB) */
+    /* session text graphs (dynamic corpus loads; never SchemaKB,
+       never metas: unload rebuilds these exactly) */
+    GRAPH           *tgraph;
+    EMBEDDING_TABLE *temb;
+    TEXTLEX         tlex[8];
+    char            tfiles[8][64];
+    uint32_t        ntfiles;
+    /* KV-cache: last successful TEXTQ topic (words), plus shown
+       sentence indices so follow-ups advance instead of repeat */
+    char            twords[8][CHAT_TOKEN_MAX];
+    uint32_t        tnw;
+    uint32_t        tshown[64];
+    uint32_t        ntshown;
 } CHAT;
 
 void ChatInit(CHAT *ch, const char *corpus_path);
 void ChatHandle(CHAT *ch, const char *line);
+/* TEXT fast path for serving dispatchers (whole-line trial parse;
+   TEXT intents bypass the plan splitter). Returns 1 when handled
+   with out[] set (answer or honest abstain). */
+int ChatTryTextLine(CHAT *ch, const char *line, char *out,
+                    size_t size);
 
 /* ---- Fase A/B goal outcomes: per-goal result of QUERY -> SET ---- */
 typedef enum { GOAL_UNKNOWN = 0, GOAL_ANSWER, GOAL_AMBIGUOUS } GOAL_STATUS;

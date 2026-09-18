@@ -11,7 +11,7 @@
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
-#include "bible_chat.h"
+#include "chat.h"
 
 static int g_pass = 0, g_fail = 0;
 
