@@ -3,7 +3,7 @@
 **Antonio Linares (FiveTech Software)**  
 *Project Repository: [FiveTechSoft/symbols](https://github.com/FiveTechSoft/symbols)*  
 *Live Interactive Web Agent: [fivetechsoft.github.io/symbols](https://fivetechsoft.github.io/symbols/)*  
-*Version: 1.0-RC (March 2026)*
+*Version: 1.0-RC (September 2026)*
 
 ---
 
