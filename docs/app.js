@@ -214,7 +214,9 @@ function appendMessage(role, text, meta = {}) {
 
   msgDiv.innerHTML = innerHTML;
   history.appendChild(msgDiv);
-  history.scrollTop = history.scrollHeight;
+  setTimeout(() => {
+    history.scrollTop = history.scrollHeight;
+  }, 10);
 }
 
 function addSystemMessage(text) {
@@ -227,7 +229,9 @@ function addSystemMessage(text) {
   div.style.margin = "8px 0";
   div.innerText = `[system] ${text}`;
   history.appendChild(div);
-  history.scrollTop = history.scrollHeight;
+  setTimeout(() => {
+    history.scrollTop = history.scrollHeight;
+  }, 10);
 }
 
 // Web Search Tool Simulator & Dynamic Ingest

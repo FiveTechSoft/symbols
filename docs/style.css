@@ -39,6 +39,7 @@ body {
 
 /* Header & HUD Telemetry Bar */
 header {
+  flex-shrink: 0;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-dim);
   padding: 10px 20px;
@@ -173,6 +174,7 @@ header {
   flex: 1;
   display: grid;
   grid-template-columns: 290px 1fr 340px;
+  min-height: 0;
   height: calc(100vh - 65px);
   overflow: hidden;
 }
@@ -285,17 +287,51 @@ header {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
   background: var(--bg-primary);
   position: relative;
 }
 
 .chat-history {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Custom Scrollbars */
+.chat-history::-webkit-scrollbar,
+.sidebar-left::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-history::-webkit-scrollbar-track,
+.sidebar-left::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.chat-history::-webkit-scrollbar-thumb,
+.sidebar-left::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 4px;
+}
+
+.chat-history::-webkit-scrollbar-thumb:hover,
+.sidebar-left::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
+
+.chat-history,
+.sidebar-left {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-bright) var(--bg-primary);
 }
 
 /* Suggested Prompts Hero */
@@ -423,6 +459,7 @@ header {
 
 /* Chat Input Bar */
 .chat-input-area {
+  flex-shrink: 0;
   padding: 16px 24px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-dim);
