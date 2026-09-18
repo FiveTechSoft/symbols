@@ -35,4 +35,13 @@ const CRule* CRulesFind(const CRulesTable *tbl, CRuleType type, const char *key)
 int CRulesInit(void);
 const CRulesTable *CRulesTableGet(void);
 
+/* Resolve a bare dataset name under data/ (sandboxed: rejects ..,
+   slashes and drive specs; tries data/, data/c_lang/, data/agentic/
+   in order). Returns 1 with the resolved path in out. */
+int CRulesResolvePath(const char *name, char *out, size_t size);
+
+/* Load path into the global table (dynamic reload for ASK-load).
+   Returns the rule count (0 on missing/empty: fail-closed). */
+int CRulesLoadGlobal(const char *path);
+
 #endif /* C_RULES_H */

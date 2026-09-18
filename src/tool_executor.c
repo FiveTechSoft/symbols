@@ -721,6 +721,13 @@ int ToolAnswerGoal(const ToolRequest *req, const ToolResult *res,
             snprintf(out, size, "Segun fuente externa, %s: %s.\n", capS,
                      res->items[0]);
         return 1;
+    case TOOL_FS_READ:
+        if (req->subject[0] == '\0')
+            return 0;
+        if (size > 0)
+            snprintf(out, size, "Segun archivo %s: %s.\n", req->subject,
+                     res->text[0] != '\0' ? res->text : "(sin salida)");
+        return 1;
     case TOOL_SHELL:
         if (req->subject[0] == '\0')
             return 0;

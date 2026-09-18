@@ -28,6 +28,7 @@
 #include "transfer.h"
 #include "bible_chat.h"
 #include "tool_contract.h"
+#include "c_rules.h"
 
 #define CHAT_MAX_TOKS 16
 
@@ -397,11 +398,14 @@ static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
     ch->kws[i].family[sizeof(ch->kws[i].family) - 1] = '\0';
 }
 
-static uint32_t ChatIngestCorpus(CHAT *ch, const char *path)
+static uint32_t ChatIngestCorpus(CHAT *ch, const char *path,
+                                  uint32_t *scanned)
 {
     FILE *f = fopen(path, "r");
     if (f == NULL)
         return 0;
+    if (scanned != NULL)
+        *scanned = 0;
     char line[LEARN_MAX_LINE];
     uint32_t learned = 0;
     while (fgets(line, sizeof(line), f) != NULL)
@@ -424,6 +428,8 @@ static uint32_t ChatIngestCorpus(CHAT *ch, const char *path)
             continue;
         *t2 = '\0';
         char *obj = t2 + 1;
+        if (scanned != NULL)
+            (*scanned)++;
         char *eol = strpbrk(obj, "\t\r\n");
         if (eol != NULL)
             *eol = '\0';
@@ -1003,7 +1009,9 @@ typedef enum
     INT_WHY,          /* por que A hijo de B */
     INT_REL_QUERY,    /* generic deduced frame: <kw> question */
     INT_REL_BOOL,     /* generic deduced frame: es A <kw> de B */
-    INT_COMPOSE_WHY   /* why is A <kw1> of B, given B <kw2> of C */
+    INT_COMPOSE_WHY,  /* why is A <kw1> of B, given B <kw2> of C */
+    INT_LOAD,          /* carga <file.tsv> (sandboxed dataset load) */
+    INT_INGIERE       /* load <file.tsv> (hot knowledge triples) */
 } INTENT;
 
 typedef struct
@@ -1432,6 +1440,43 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
     memset(p, 0, sizeof(*p));
     if (n == 0)
         return 0;
+
+    /* ASK-load: verb + bare .tsv name, exactly two tokens. The verb
+       is a frame keyword (frozen precedent: PARENT_W et al); the
+       .tsv suffix rule is structural. Sandbox + existence probed
+       here (read-only); the load itself happens at answer time. */
+    if (n == 2 && strcmp(toks[0], "carga") == 0)
+    {
+        char path[512];
+        size_t L = strlen(toks[1]);
+        if (L > 4 && strcmp(toks[1] + L - 4, ".tsv") == 0 &&
+            CRulesResolvePath(toks[1], path, sizeof(path)))
+        {
+            strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_LOAD;
+            return 1;
+        }
+        return 0;
+    }
+
+    /* ASK-ingest: load <file.tsv> hot knowledge triples (same
+       shape/probe rules as carga; the answer counts admitted rows,
+       never silent). */
+    if (n == 2 && strcmp(toks[0], "load") == 0)
+    {
+        char path[512];
+        size_t L = strlen(toks[1]);
+        if (L > 4 && strcmp(toks[1] + L - 4, ".tsv") == 0 &&
+            CRulesResolvePath(toks[1], path, sizeof(path)))
+        {
+            strncpy(p->a, toks[1], CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->intent = INT_INGIERE;
+            return 1;
+        }
+        return 0;
+    }
 
     int kw_parent = -1, kw_child = -1, kw_grand = -1, kw_desc = -1;
     int kw_why = -1, kw_who = -1, kw_is = -1;
@@ -2168,6 +2213,43 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         break;
     }
+    case INT_LOAD:
+    {
+        /* ASK-load: resolve (sandboxed) + load into the global table.
+           Parse already probed existence; a zero count here stays
+           honest UNKNOWN with the legacy parse-fail template. */
+        char path[512];
+        int nloaded = 0;
+        (void)ch;
+        if (CRulesResolvePath(p->a, path, sizeof(path)))
+            nloaded = CRulesLoadGlobal(path);
+        if (nloaded > 0)
+            EMIT_OK("Cargadas %u reglas de %s.\n", (unsigned)nloaded,
+                    p->a);
+        else
+            EMIT("No entendi la pregunta.\n");
+        break;
+    }
+    case INT_INGIERE:
+    {
+        /* hot knowledge: same sandbox probe; rows counted so the
+           lexicon gate is measurable (admitted vs scanned). Metas
+           re-derived so admitted families answer at once. */
+        char path[512];
+        uint32_t learned = 0, scanned = 0;
+        if (CRulesResolvePath(p->a, path, sizeof(path)))
+            learned = ChatIngestCorpus(ch, path, &scanned);
+        if (scanned > 0)
+        {
+            MetaDiscover(&ch->mk);
+            MetaRuleDiscover(&ch->mk);
+            EMIT_OK("Incorporadas %u de %u afirmaciones de %s.\n",
+                    (unsigned)learned, (unsigned)scanned, p->a);
+        }
+        else
+            EMIT("No entendi la pregunta.\n");
+        break;
+    }
     case INT_REL_BOOL:
     {
         RememberFocus(ch, p->a);
@@ -2649,7 +2731,7 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     MetaKBInit(&ch->mk);
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);
     ToolInit();
-    uint32_t n = ChatIngestCorpus(ch, corpus_path);
+    uint32_t n = ChatIngestCorpus(ch, corpus_path, NULL);
     MetaDiscover(&ch->mk);
     MetaRuleDiscover(&ch->mk);
     printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", n,
@@ -2673,6 +2755,10 @@ static const char *FamLabel(const CHAT *ch, const PARSED *p)
     case INT_WHY:
     case INT_IS_PARENT:
         return "taxonomy";
+    case INT_LOAD:
+        return "load";
+    case INT_INGIERE:
+        return "ingest";
     default:
         break;
     }
@@ -2703,6 +2789,10 @@ static const char *IntentName(int intent)
         return "REL_BOOL";
     case INT_COMPOSE_WHY:
         return "COMPOSE_WHY";
+    case INT_LOAD:
+        return "LOAD";
+    case INT_INGIERE:
+        return "INGEST";
     default:
         return "NONE";
     }
@@ -2742,7 +2832,8 @@ static int SelfAnswer(const char *line, char *out, size_t size)
     size_t pos = 0;
     uint32_t i, nt;
     (void)sf;
-    if (out == NULL || size == 0 || SelfScopeText()[0] == '\0')
+    if (out == NULL || size == 0 || (SelfScopeText()[0] == '\0' &&
+                                        SelfGreetText()[0] == '\0'))
         return 0;
     norm[0] = '\0';
     for (i = 0; i < n && pos + 1 < sizeof(norm); i++)
@@ -2760,12 +2851,22 @@ static int SelfAnswer(const char *line, char *out, size_t size)
     for (i = 0; i < nt; i++)
     {
         const char *t = SelfTriggerAt(i);
-        if (t != NULL && strcmp(norm, t) == 0)
+        const char *rk = SelfTriggerReplyAt(i);
+        const char *txt = NULL;
+        if (t != NULL && rk != NULL && strcmp(norm, t) == 0)
         {
-            /* trailing newline included: all NLG consumers print
-               raw buffers (ChatHandle, wrapper). */
-            snprintf(out, size, "%s\n", SelfScopeText());
-            return 1;
+            if (strcmp(rk, "scope") == 0)
+                txt = SelfScopeText();
+            else if (strcmp(rk, "greeting") == 0)
+                txt = SelfGreetText();
+            if (txt != NULL && txt[0] != '\0')
+            {
+                /* trailing newline included: all NLG consumers
+                   print raw buffers (ChatHandle, wrapper). */
+                snprintf(out, size, "%s\n", txt);
+                return 1;
+            }
+            return 0;
         }
     }
     return 0;
@@ -3026,11 +3127,78 @@ ToolDecision ToolClassify(const CHAT *ch, const char *line,
                 strncpy(req->subject, toks[i + 1],
                         sizeof(req->subject) - 1);
                 req->subject[sizeof(req->subject) - 1] = '\0';
-                strncpy(req->relation, toks[i - 1],
-                        sizeof(req->relation) - 1);
-                req->relation[sizeof(req->relation) - 1] = '\0';
+                    strncpy(req->relation, toks[i - 1],
+                            sizeof(req->relation) - 1);
+                    req->relation[sizeof(req->relation) - 1] = '\0';
+                }
+                return DEC_NEEDS_TOOL;
             }
-            return DEC_NEEDS_TOOL;
+        {
+            /* shell-shape: a known tool/command token anywhere (verbs
+               before it are ignored, never listed); argv runs from
+               the trigger, default when empty. Explicit mention
+               outranks the person heuristic below. */
+            uint32_t i;
+            for (i = 0; i < n; i++)
+            {
+                char be[16], df[64];
+                if (!ShellLookup(toks[i], be, sizeof(be), df,
+                                 sizeof(df)))
+                    continue;
+                if (req != NULL)
+                {
+                    size_t pos = 0;
+                    uint32_t j;
+                    req->tool = TOOL_SHELL;
+                    strncpy(req->relation, be,
+                            sizeof(req->relation) - 1);
+                    req->relation[sizeof(req->relation) - 1] = '\0';
+                    for (j = i;
+                         j < n && pos + 1 < sizeof(req->subject); j++)
+                    {
+                        size_t L = strlen(toks[j]);
+                        if (j > i && pos + 1 < sizeof(req->subject))
+                            req->subject[pos++] = ' ';
+                        if (pos + L >= sizeof(req->subject))
+                            break;
+                        memcpy(req->subject + pos, toks[j], L);
+                        pos += L;
+                    }
+                    if (i + 1 >= n && df[0] != '\0')
+                    {
+                        size_t L = strlen(df);
+                        if (pos > 0 && pos + 1 < sizeof(req->subject))
+                            req->subject[pos++] = ' ';
+                        if (pos + L < sizeof(req->subject))
+                        {
+                            memcpy(req->subject + pos, df, L);
+                            pos += L;
+                        }
+                    }
+                    req->subject[pos < sizeof(req->subject)
+                                     ? pos
+                                     : sizeof(req->subject) - 1] = '\0';
+                }
+                return DEC_NEEDS_TOOL;
+            }
+        }
+        {
+            /* file-shape: sandbox-confined name with known source/text
+               extension (structural dotted token; the executor
+               re-validates before touching the filesystem). */
+            uint32_t i;
+            for (i = 0; i < n; i++)
+                if (FsNameOk(toks[i]))
+                {
+                    if (req != NULL)
+                    {
+                        req->tool = TOOL_FS_READ;
+                        strncpy(req->subject, toks[i],
+                                sizeof(req->subject) - 1);
+                        req->subject[sizeof(req->subject) - 1] = '\0';
+                    }
+                    return DEC_NEEDS_TOOL;
+                }
         }
         {
             /* person mention: last ingested-vocabulary member when
@@ -3064,4 +3232,33 @@ ToolDecision ToolClassify(const CHAT *ch, const char *line,
         return DEC_UNKNOWN;
     }
     return DEC_UNKNOWN;
+}
+
+/* Single-goal tool routing for serving paths (multi-goal lines
+   already route per goal in ChatHandleMulti): on parse-fail or
+   honest UNKNOWN, ask the planner; on NEEDS_TOOL execute and answer
+   from the result. ANSWER and AMBIGUOUS never route. Misses and
+   genuine unknowns keep the original text. Returns 1 when a tool
+   answered (out[] replaced). Pure orchestration over the frozen
+   planner/executor contract. */
+int ChatToolAnswer(CHAT *ch, const char *line, int st, GoalCause cause,
+                   const char *slot, const char *family, char *out,
+                   size_t size)
+{
+    ToolRequest treq;
+    ToolResult tres;
+    ToolDecision dec;
+    if (st != GOAL_UNKNOWN && st >= 0)
+        return 0;
+    if (out == NULL || size == 0)
+        return 0;
+    memset(&treq, 0, sizeof(treq));
+    memset(&tres, 0, sizeof(tres));
+    dec = ToolClassify(ch, line, GOAL_UNKNOWN, cause,
+                       slot == NULL ? "" : slot,
+                       family == NULL ? "" : family, &treq);
+    if (dec != DEC_NEEDS_TOOL)
+        return 0;
+    ToolExecute(&treq, &tres);
+    return ToolAnswerGoal(&treq, &tres, out, size);
 }

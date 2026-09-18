@@ -1,4 +1,4 @@
-/* c_rules: C language knowledge as relations (data/c_lang/c_rules.tsv).
+/* c_rules: C language knowledge as relations (data/c_lang/languagec.tsv).
    English code comments (project rule). One linear pass at init;
    unknown TYPEs and malformed rows warn to stderr and are discarded
    (fail-closed). Escape sequences in fields decode on load: \n \r
@@ -10,7 +10,7 @@
 #include "c_rules.h"
 
 #define CRULES_LINE_MAX 1024
-#define CRULES_PATH "data/c_lang/c_rules.tsv"
+#define CRULES_PATH "data/c_lang/languagec.tsv"
 
 static CRulesTable g_crules;
 static size_t g_crules_init_done = 0;
@@ -95,11 +95,20 @@ int CRulesLoad(const char *filepath, CRulesTable *tbl)
     FILE *f;
     char line[CRULES_LINE_MAX];
     unsigned long lineno = 0;
+    const char *tag = filepath;
+    const char *bs;
+    const char *fs;
     if (tbl == NULL)
         return 0;
     tbl->count = 0;
     if (filepath == NULL)
         return 0;
+    bs = strrchr(filepath, '\\');
+    fs = strrchr(filepath, '/');
+    if (bs != NULL && (fs == NULL || bs > fs))
+        tag = bs + 1;
+    else if (fs != NULL)
+        tag = fs + 1;
     f = fopen(filepath, "r");
     if (f == NULL)
         return 0;
@@ -113,7 +122,7 @@ int CRulesLoad(const char *filepath, CRulesTable *tbl)
         if (strchr(line, '\n') == NULL && !feof(f))
         {
             int c;
-            fprintf(stderr, "c_rules.tsv:%lu: line too long\n", lineno);
+            fprintf(stderr, "%s:%lu: line too long\n", tag, lineno);
             while ((c = fgetc(f)) != EOF && c != '\n')
                 ;
             continue;
@@ -135,24 +144,24 @@ int CRulesLoad(const char *filepath, CRulesTable *tbl)
             continue;
         if (nf != 4 || fld[1][0] == '\0')
         {
-            fprintf(stderr, "c_rules.tsv:%lu: bad row\n", lineno);
+            fprintf(stderr, "%s:%lu: bad row\n", tag, lineno);
             continue;
         }
         if (!CRuleTypeFromName(fld[0], &type))
         {
-            fprintf(stderr, "c_rules.tsv:%lu: unknown TYPE\n", lineno);
+            fprintf(stderr, "%s:%lu: unknown TYPE\n", tag, lineno);
             continue;
         }
         if (strlen(fld[1]) >= MAX_NAME_LEN ||
             strlen(fld[2]) >= MAX_EXPR_LEN ||
             strlen(fld[3]) >= MAX_EXPR_LEN)
         {
-            fprintf(stderr, "c_rules.tsv:%lu: row too long\n", lineno);
+            fprintf(stderr, "%s:%lu: row too long\n", tag, lineno);
             continue;
         }
         if (tbl->count >= MAX_C_RULES)
         {
-            fprintf(stderr, "c_rules.tsv:%lu: table full\n", lineno);
+            fprintf(stderr, "%s:%lu: table full\n", tag, lineno);
             continue;
         }
         {
@@ -195,6 +204,53 @@ int CRulesInit(void)
         g_crules_init_done = 1;
     }
     return (int)g_crules.count;
+}
+
+int CRulesLoadGlobal(const char *path)
+{
+    if (path == NULL)
+        return 0;
+    return CRulesLoad(path, &g_crules);
+}
+
+static int HasTSVSuffix(const char *s)
+{
+    size_t n = strlen(s);
+    return n > 4 && s[n - 4] == '.' && s[n - 3] == 't' &&
+           s[n - 2] == 's' && s[n - 1] == 'v';
+}
+
+int CRulesResolvePath(const char *name, char *out, size_t size)
+{
+    /* data/samples/ admits hot knowledge loads (load); rule
+       loads stay fail-closed there (triples carry unknown TYPEs). */
+    static const char *DIRS[] = {"data/", "data/c_lang/",
+                                 "data/agentic/", "data/samples/"};
+    size_t i;
+    FILE *probe;
+    if (name == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    if (!HasTSVSuffix(name))
+        return 0;
+    for (i = 0; name[i] != '\0'; i++)
+        if (name[i] == '.' && name[i + 1] == '.' || name[i] == '/' ||
+            name[i] == '\\' || name[i] == ':')
+            return 0;
+    for (i = 0; i < sizeof(DIRS) / sizeof(DIRS[0]); i++)
+    {
+        char cand[512];
+        snprintf(cand, sizeof(cand), "%s%s", DIRS[i], name);
+        probe = fopen(cand, "r");
+        if (probe != NULL)
+        {
+            fclose(probe);
+            strncpy(out, cand, size - 1);
+            out[size - 1] = '\0';
+            return 1;
+        }
+    }
+    return 0;
 }
 
 const CRulesTable *CRulesTableGet(void)
