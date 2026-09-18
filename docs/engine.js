@@ -66,6 +66,11 @@ class SymbolicEngine {
     if (t === "solomon") return "salomon";
     if (t === "jonah") return "jonas";
     if (t === "sun") return "sol";
+    if (t === "energia") return "energy";
+    if (t === "psiquica" || t === "psiquico") return "psychic";
+    if (t === "inconsciente") return "unconscious";
+    if (t === "arquetipo" || t === "arquetipos") return "archetype";
+    if (t === "simbolo" || t === "simbolos") return "symbol";
     return t;
   }
 
@@ -332,7 +337,21 @@ class SymbolicEngine {
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
     else {
-      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/\bsun\b/g, "sol");
+      const cleanNorm = clean
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\bsolomon\b/g, "salomon")
+        .replace(/\bjonah\b/g, "jonas")
+        .replace(/\bsun\b/g, "sol")
+        .replace(/\benergia\s+psiquica\b/g, "psychic energy")
+        .replace(/\benergia\b/g, "energy")
+        .replace(/\bpsiquica\b/g, "psychic")
+        .replace(/\bpsiquico\b/g, "psychic")
+        .replace(/\binconsciente\b/g, "unconscious")
+        .replace(/\barquetipo\b/g, "archetype")
+        .replace(/\barquetipos\b/g, "archetypes")
+        .replace(/\bsimbolo\b/g, "symbol")
+        .replace(/\bsimbolos\b/g, "symbols");
       // Extract target words filtered by stopwords
       let words = cleanNorm
         .replace(/[^a-z0-9\s]/g, " ")
@@ -342,7 +361,9 @@ class SymbolicEngine {
       const META_WORDS = new Set([
         "libro", "libros", "capitulo", "capitulos", "versiculo", "versiculos",
         "autor", "autoria", "lista", "texto", "parte", "partes", "nombre", "nombres",
-        "historia", "tema", "origen", "significado", "book", "books", "chapter", "chapters",
+        "historia", "tema", "origen", "significado", "proposito", "propositos",
+        "funcion", "funciones", "rol", "role", "purpose", "function", "meaning",
+        "book", "books", "chapter", "chapters",
         "escribio", "escribir", "escribe", "hizo", "hacer", "trata", "habla"
       ]);
 
@@ -355,6 +376,15 @@ class SymbolicEngine {
         cleanNorm.startsWith("desarrolla") ||
         cleanNorm.startsWith("explain") ||
         cleanNorm.startsWith("elaborate") ||
+        cleanNorm.includes("cual es su") ||
+        cleanNorm.includes("cuales son sus") ||
+        cleanNorm.includes("what is its") ||
+        cleanNorm.includes("what are its") ||
+        cleanNorm.includes("para que sirve") ||
+        cleanNorm.includes("su proposito") ||
+        cleanNorm.includes("su funcion") ||
+        cleanNorm.includes("su origen") ||
+        cleanNorm.includes("su significado") ||
         cleanNorm.includes("de que trata") ||
         cleanNorm.includes("de que habla") ||
         cleanNorm.includes("de que va") ||
@@ -425,7 +455,23 @@ class SymbolicEngine {
         const isContinuation = isAnaphoric && (cleanNorm.includes("que mas") || cleanNorm.includes("dime mas") || cleanNorm.includes("continua") || cleanNorm.includes("tell me more") || cleanNorm.includes("what else"));
         const queryPhrase = cleanNorm.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
         for (const sent of this.sentences) {
-          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/\bsun\b/g, "sol").replace(/[^a-z0-9\s]/g, " ");
+          const sLower = sent.text
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\bsolomon\b/g, "salomon")
+            .replace(/\bjonah\b/g, "jonas")
+            .replace(/\bsun\b/g, "sol")
+            .replace(/\benergia\s+psiquica\b/g, "psychic energy")
+            .replace(/\benergia\b/g, "energy")
+            .replace(/\bpsiquica\b/g, "psychic")
+            .replace(/\bpsiquico\b/g, "psychic")
+            .replace(/\binconsciente\b/g, "unconscious")
+            .replace(/\barquetipo\b/g, "archetype")
+            .replace(/\barquetipos\b/g, "archetypes")
+            .replace(/\bsimbolo\b/g, "symbol")
+            .replace(/\bsimbolos\b/g, "symbols")
+            .replace(/[^a-z0-9\s]/g, " ");
           let score = words.filter(w => sLower.includes(w)).length;
           // Substring phrase bonus for exact multi-word alignment
           if (queryPhrase.length > 5 && sLower.includes(queryPhrase)) {
@@ -466,7 +512,7 @@ class SymbolicEngine {
             this.episodic.activeFocus = words[0];
           }
 
-          // Check if any direct relation matches to provide proofTrace
+          // Check if any direct relation matches to provide proofTrace (subject or object)
           for (const w of words) {
             const canon = this.canonicalize(w);
             if (this.subMap.has(canon)) {
@@ -475,6 +521,23 @@ class SymbolicEngine {
                 const r = rels[0];
                 proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
                 break;
+              }
+            }
+            if (this.objMap && this.objMap.has(canon)) {
+              const rels = this.objMap.get(canon);
+              if (rels.length > 0) {
+                const r = rels[0];
+                proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
+                break;
+              }
+            }
+          }
+          if (!proofTrace && words.includes("psychic") && words.includes("energy")) {
+            if (this.objMap && this.objMap.has("psychic_energy")) {
+              const rels = this.objMap.get("psychic_energy");
+              if (rels.length > 0) {
+                const r = rels[0];
+                proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
               }
             }
           }

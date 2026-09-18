@@ -216,6 +216,9 @@ function extractSearchTopic(query, activeFocus = null) {
     /^(que\s+mas\s+(puedes\s+)?(decir(me)?|contar(me)?|sabes|hay)\s*(acerca\s+de|sobre|de)?)/i,
     /^(que\s+sabes\s+(acerca\s+de|sobre|de)?)/i,
     /^(que\s+es\s+(un|una|el|la)?)/i,
+    /^(cual(es)?\s+(es|son)?\s*(el|la|los|las|su|sus|de|del)?)/i,
+    /^(para\s+que\s+sirve\s*(el|la|su)?)/i,
+    /^(que\s+proposito\s+tiene\s*(el|la|su)?)/i,
     /^(hablame\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
     /^(cuentame\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
     /^(dime\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
@@ -227,9 +230,9 @@ function extractSearchTopic(query, activeFocus = null) {
     // English
     /^(what\s+else\s+can\s+you\s+tell\s+me\s+(about)?)/i,
     /^(what\s+can\s+you\s+tell\s+me\s+(about)?)/i,
+    /^(what\s+(is|are)\s*(the|its|their|a|an)?)/i,
     /^(tell\s+me\s+(more\s+)?(about)?)/i,
     /^(what\s+(do\s+you\s+know\s+about|is\s+it\s+about))/i,
-    /^(what\s+is\s+(a|an|the)?)/i,
     /^(can\s+you\s+tell\s+me\s+(about)?)/i
   ];
   for (const pat of preambles) {
@@ -238,6 +241,7 @@ function extractSearchTopic(query, activeFocus = null) {
       break;
     }
   }
+
   clean = clean
     .replace(/\b(acerca\s+de|sobre|de)\s+(el|ella|ellos|ellas|esto|eso|aquello|este|esta)\b/gi, "")
     .replace(/\b(about|of)\s+(it|him|her|them|this|that)\b/gi, "")
@@ -245,15 +249,48 @@ function extractSearchTopic(query, activeFocus = null) {
 
   const pronounOnly = /^(el|ella|ellos|ellas|esto|eso|aquello|este|esta|it|him|her|them|this|that)$/i;
   const cliticVerbs = /^(explica(lo|la|los|las|me|melo|mela)?|describe(lo|la|los|las|me|melo|mela)?|cuenta(lo|la|los|las|me|melo|mela)?|dime(lo)?|aclara(lo|la|los|las)?|detalla(lo|la)?|desarrolla(lo|la)?|continua(lo|la)?|sigue(lo|la)?|hazlo|muestraw*(lo|la)?|explain(\s+(it|this|that))?|describe(\s+(it|this|that))?|elaborate(\s+on\s+(it|this|that))?|continue|proceed|go\s+on)$/i;
+  const propertyWords = /^(proposito|propositos|funcion|funciones|significado|origen|autor|autoria|historia|purpose|function|meaning|origin|author)$/i;
 
-  if (!clean || pronounOnly.test(clean) || cliticVerbs.test(clean)) {
+  if (!clean || pronounOnly.test(clean) || cliticVerbs.test(clean) || (propertyWords.test(clean) && activeFocus)) {
     return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   clean = clean.replace(/^(el|la|los|las|un|una|the|a|an)\s+/i, "").trim();
-  if (!clean || cliticVerbs.test(clean)) {
+  if (!clean || cliticVerbs.test(clean) || (propertyWords.test(clean) && activeFocus)) {
     return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   return clean;
+}
+
+// Detect if query or conversational context is Spanish
+function detectIsSpanish(query, targetTerm) {
+  if (/[áéíóúñ¿¡]/i.test(query) || /[áéíóúñ¿¡]/i.test(targetTerm)) return true;
+
+  const spanishWords = /\b(de|la|el|los|las|un|una|unos|unas|en|que|cual|cuales|quien|quienes|su|sus|mi|mis|tu|tus|por|para|con|sin|como|donde|cuando|sobre|entre|tras|hasta|desde|hacia|es|son|era|eran|fue|fueron|hay|tiene|tienen|proposito|significado|origen|funcion|autor|autoria|historia|tema|energia|psiquica|psiquico|arquetipo|simbolo|inconsciente|libros|biblia|proverbios|salomon|sol)\b/i;
+  if (spanishWords.test(query) || spanishWords.test(targetTerm)) return true;
+
+  const spanishSuffixes = /(cion|ciones|dad|dades|ica|ico|icas|icos|ismo|ismos|ista|istas|mente)\b/i;
+  if (spanishSuffixes.test(query) || spanishSuffixes.test(targetTerm)) return true;
+
+  if (typeof engine !== "undefined" && engine?.episodic?.turns?.length > 0) {
+    const lastTurns = engine.episodic.turns.slice(-4);
+    for (const t of lastTurns) {
+      if (/[áéíóúñ¿¡]/i.test(t.query) || spanishWords.test(t.query)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Verify that candidate title actually shares meaningful tokens with search query
+function isTitleRelevant(title, queryTerm) {
+  if (!title || !queryTerm) return false;
+  const tNorm = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, " ");
+  const qNorm = queryTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, " ");
+  const qWords = qNorm.split(/\s+/).filter(w => w.length > 2);
+  if (qWords.length === 0) return true;
+  return qWords.some(w => tNorm.includes(w) || w.includes(tNorm));
 }
 
 // In-Browser Engine Execution with Autonomous Agentic Web Search Fallback
@@ -313,7 +350,7 @@ async function fetchWebKnowledge(query, topic = null) {
     const focus = engine?.episodic?.activeFocus;
     const targetTerm = topic || extractSearchTopic(query, focus) || query.replace(/[?¿!¡]/g, "").trim();
 
-    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia|proverbios|salomon|sol)\b)/i.test(targetTerm);
+    const isSpanish = detectIsSpanish(query, targetTerm);
     const primaryLang = isSpanish ? "es" : "en";
     const fallbackLang = isSpanish ? "en" : "es";
 
@@ -339,8 +376,9 @@ async function searchWiki(term, lang) {
       if (openRes.ok) {
         const openData = await openRes.json();
         const titles = openData[1] || [];
-        if (titles.length > 0) {
-          candidateTitle = titles[0];
+        const relevant = titles.find(t => isTitleRelevant(t, term));
+        if (relevant) {
+          candidateTitle = relevant;
         }
       }
     } catch (e) {
@@ -358,8 +396,9 @@ async function searchWiki(term, lang) {
           if (openRes.ok) {
             const openData = await openRes.json();
             const titles = openData[1] || [];
-            if (titles.length > 0) {
-              candidateTitle = titles[0];
+            const relevant = titles.find(t => isTitleRelevant(t, headNoun));
+            if (relevant) {
+              candidateTitle = relevant;
             }
           }
         } catch (e) {}
@@ -373,7 +412,10 @@ async function searchWiki(term, lang) {
       if (res.ok) {
         const data = await res.json();
         if (data.query && data.query.search && data.query.search.length > 0) {
-          candidateTitle = data.query.search[0].title;
+          const hit = data.query.search.find(item => isTitleRelevant(item.title, term));
+          if (hit) {
+            candidateTitle = hit.title;
+          }
         }
       }
     }
