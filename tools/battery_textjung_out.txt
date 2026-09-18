@@ -1,0 +1,78 @@
+> load jung.txt
+Incorporadas 10730 frases y 19505 simbolos de jung.txt.
+
+> estado
+Tengo cargado: jung.txt (10730 frases). Simbolos en sesion: 19505.
+
+> what does the sun mean
+Segun el texto: Naturally this does not mean that the function of reality owes its existence to the differentiation in procreative instincts exclusively .
+
+> que significa sol
+Segun el texto: Vel quod dicant Solis esse natalem , ipse est sol iustitiæ , de quo Malachias propheta dixit : ‘Dominus lucis ac noctis conditor et discretor qui a propheta Sol iustitiæ cognominatus est .
+
+> what is the mother
+Segun el texto: What Isis demands is the retransference of the libido to the mother goddess .
+
+> what is libido
+Segun el texto: What this signifies we already know—the libido sinks into its “own depths” ( a well-known comparison of Nietzsche’s ) and finds there below , in the shadows of the unconscious , the substitute for the upper world , which it has abandoned : _ the world of memories _ ( “’mid a hundred memories” ) , the strongest and most influential of which are the early infantile memory pictures .
+
+> explicamelo
+Segun el texto: Ferenczi [ 59 ] has taught us in an excellent work what is to be thought about suggestibility , that is to say , that these phenomena win new aspects in the light of the Freudian libido theory , in so much as their effects become clear through “Libido-besetzungen .
+
+> explicamelo
+Segun el texto: It remains obscure what adaptation the primitive man tried to evade through introversion and regression to the parents ; but , according to the analogy of the soul life in general , it may be assumed that the libido , which disturbed the initial equilibrium of becoming and of ceasing to be , had been stored up in the attempt to make an especially difficult adaptation , and from which it recedes even to-day .
+
+> tell me about sacrifice
+Segun el texto: Tell to me now How a god may conquer his care .
+
+> sacrifice
+Segun el texto: — THE SACRIFICE 428
+
+> what is rebirth
+Segun el texto: After the dark and obscure words of the introduction , wherein the poet expresses the prophecy of what is to come , the sun journey begins ( “night journey in the sea” ) towards the east , towards the ascent , towards the mystery of eternity and rebirth , of which Nietzsche also dreams , and which he expressed in significant words :
+
+> who is the hero
+Segun el texto: Down , deep down , far from the clamor of ships , Deep under the waves , in a peaceful cave , Dwelt the beautiful Thetis , she who protected you , the Goddess of the Sea , Mother of the youth was she ; the powerful Goddess , She who once had lovingly nursed him , On the rocky shore of his island ; she who had made him a hero With the might of her strengthening bath and the powerful song of the waves .
+
+> what does the tree mean
+Segun el texto: But this does not mean to say that this unconscious way of transformation of the incest wish into religious exercises is the only one or the only possible one .
+
+> hero
+Segun el texto: — THE UNCONSCIOUS ORIGIN OF THE HERO 191
+
+> what is the unconscious
+Segun el texto: What this signifies we already know—the libido sinks into its “own depths” ( a well-known comparison of Nietzsche’s ) and finds there below , in the shadows of the unconscious , the substitute for the upper world , which it has abandoned : _ the world of memories _ ( “’mid a hundred memories” ) , the strongest and most influential of which are the early infantile memory pictures .
+
+> where does the libido go
+Segun el texto: Where the attempt does not succeed it is called _ repression _ .
+
+> what are dreams
+Segun el texto: What are you blowing towards me , Winds , what do you bring again ?
+
+> who is god
+Segun el texto: In Thebes , where the chief god is Chnum , the latter represents the breath of the wind in his cosmic component , from which later on “the spirit of God floating over the waters” has developed ; the primitive idea of the cosmic parents , who lie pressed together until the son separates them .
+
+> what is water
+Segun el texto: What can I do , what can I begin ?
+
+> tell me about fire
+Segun el texto: Tell me true that the poison may leave thee , For he whose name is spoken will live .
+
+> what is the serpent
+Segun el texto: What can I do , what can I begin ?
+
+> what is incest
+Segun el texto: That which grows on the tree is the child , [ 541 ] which man might have by the mother ; then man himself would be in a renewed and rejuvenated form ; and precisely this is what man cannot have , because the incest prohibition forbids it .
+
+> what is a symbol
+Segun el texto: The sexuality of the unconscious is not what it seems to be ; _ it is merely a symbol _ ; it is a thought bright as day , clear as sunlight , a decision , a step forward to every goal of life—but expressed in the unreal sexual language of the unconscious , and in the thought form of an earlier stage ; a resurrection , so to speak , of earlier modes of adaptation .
+
+> who is christ
+Segun el texto: Dionysus stands in an intimate relation with the psychology of the early Asiatic God who died and rose again from the dead and whose manifold manifestations have been brought together in the figure of Christ into a firm personality enduring for centuries .
+
+> load bible.txt
+Incorporadas 28746 frases y 9274 simbolos de bible.txt.
+
+> estado
+Tengo cargado: jung.txt (10730 frases); bible.txt (28746 frases). Simbolos en sesion: 28779.
+

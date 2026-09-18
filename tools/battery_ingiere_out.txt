@@ -1,0 +1,18 @@
+> load jung.tsv
+Incorporadas 0 de 40 afirmaciones de jung.tsv.
+
+> load JUNG.TSV
+Incorporadas 0 de 40 afirmaciones de jung.tsv.
+
+> load noexiste.tsv
+No entendi la pregunta.
+
+> load languagec.tsv
+Incorporadas 0 de 20 afirmaciones de languagec.tsv.
+
+> load ../../x.tsv
+No entendi la pregunta.
+
+> quien es el padre de david?
+El padre de David es Jesse, segun consta en los registros directos.
+
