@@ -47,6 +47,18 @@ int main(int argc, char **argv)
     size_t L;
     unsigned char *img = NULL;
     size_t imglen = 0;
+    /* measurement stopwords (harness only; mirrors serving) */
+    static const char *HSTOPW[] = {
+        "the", "a", "an", "of", "to", "in", "is", "are",
+        "was", "were", "be", "do", "does", "did", "what",
+        "who", "whom", "which", "where", "when", "how",
+        "tell", "me", "about", "de", "el", "la", "los",
+        "las", "un", "una", "en", "y", "e", "o", "que",
+        "quien", "es", "son", "por", "mi", "tu", "su",
+        "no", "si", "and", "or", "for", "on", "at", "by",
+        "with", "from", "as", "it", "its", "this", "that",
+        NULL,
+    };
     if (argc < 3)
     {
         printf("usage: relprobe <corpus.txt> <word>\n");
@@ -83,9 +95,192 @@ int main(int argc, char **argv)
             fclose(fi);
         }
     }
-    /* ---- compare mode: scoring variants x questions ---- */
-    if (strcmp(word, "--compare") == 0)
+    /* ---- eval mode: formal benchmark over tests/eval_jung.txt.
+       P@1 (top == EXP), MRR over top-8 keyword hits, abstention
+       rate, coverage rate, mean latency. */
+    if (strcmp(word, "--eval") == 0)
     {
+        FILE *ef = fopen("tests/eval_jung.txt", "r");
+        char line[1024];
+        uint32_t nq = 0, p1 = 0, abok = 0, abtot = 0, cov = 0;
+        double mrr = 0.0, ms = 0.0;
+        uint32_t nexp = 0, nranked = 0;
+        if (ef == NULL)
+        {
+            printf("EVAL: cannot open tests/eval_jung.txt\n");
+            return 1;
+        }
+        while (fgets(line, sizeof(line), ef) != NULL)
+        {
+            char *q, *kw, *ex;
+            char qb[512];
+            const char *qw[16];
+            uint32_t nqw = 0;
+            char *tok;
+            uint32_t idx[8];
+            float sc[8];
+            uint32_t nret;
+            clock_t t0;
+            if (line[0] == '#' || line[0] == '\n' || line[0] == '\r' ||
+                strncmp(line, "Q: ", 3) != 0)
+                continue;
+            q = line + 3;
+            kw = strstr(q, " | KW: ");
+            ex = strstr(q, " | EXP: ");
+            if (kw == NULL || ex == NULL)
+                continue;
+            *kw = '\0';
+            *ex = '\0';
+            kw += 7;
+            ex += 8;
+            {
+                size_t L = strlen(ex);
+                while (L > 0 && (ex[L - 1] == '\n' || ex[L - 1] == '\r' ||
+                                ex[L - 1] == ' '))
+                    ex[--L] = '\0';
+            }
+            strncpy(qb, q, sizeof(qb) - 1);
+            qb[sizeof(qb) - 1] = '\0';
+            {
+                size_t L = strlen(qb);
+                while (L > 0 && (qb[L - 1] == ' ' || qb[L - 1] == '\t'))
+                    qb[--L] = '\0';
+            }
+            tok = strtok(qb, " \t\r\n?,.;:");
+            while (tok != NULL && nqw < 16)
+            {
+                uint32_t si = 0;
+                int isstop = 0;
+                char lw[64];
+                size_t li;
+                for (li = 0; li < strlen(tok) && li < 63; li++)
+                {
+                    char c = tok[li];
+                    lw[li] = (c >= 'A' && c <= 'Z') ? (char)(c + 32)
+                                                   : c;
+                }
+                lw[li] = '\0';
+                while (HSTOPW[si] != NULL)
+                {
+                    if (strcmp(lw, HSTOPW[si]) == 0)
+                    {
+                        isstop = 1;
+                        break;
+                    }
+                    si++;
+                }
+                if (!isstop)
+                    qw[nqw++] = tok;
+                tok = strtok(NULL, " \t\r\n?,.;:");
+            }
+            if (nqw == 0)
+            {
+                printf("EVAL %s | top=none 0 rank=0\n", q);
+                nq++;
+                continue;
+            }
+            t0 = clock();
+            nret = TextLexRetrieve(tl, g, emb, qw, nqw, idx, sc, 8);
+            ms += 1000.0 * (double)(clock() - t0) /
+                  (double)CLOCKS_PER_SEC;
+            nq++;
+            if (strcmp(ex, "ABSTAIN") == 0)
+            {
+                abtot++;
+                if (nret == 0)
+                    abok++;
+                else
+                    printf("EVAL-FAIL abstain [%s] got %u\n", q,
+                           idx[0]);
+                continue;
+            }
+            /* MRR + coverage over top-8 keyword hits */
+            {
+                uint32_t r;
+                int rank = 0;
+                nranked++;
+                for (r = 0; r < nret; r++)
+                {
+                    char out[2048];
+                    if (TextLexSentenceText(tl, idx[r], img,
+                                            imglen, out,
+                                            sizeof(out)) > 0)
+                    {
+                        char kb[256];
+                        char *k2;
+                        int all = 1;
+                        strncpy(kb, kw, sizeof(kb) - 1);
+                        kb[sizeof(kb) - 1] = '\0';
+                        for (k2 = strtok(kb, ",");
+                             k2 != NULL;
+                             k2 = strtok(NULL, ","))
+                        {
+                            while (*k2 == ' ')
+                                k2++;
+                            {
+                                char *p = out;
+                                size_t wl = strlen(k2);
+                                int found = 0;
+                                while (*p != '\0' && !found)
+                                {
+                                    size_t k3;
+                                    for (k3 = 0; k3 < wl; k3++)
+                                    {
+                                        char c = p[k3];
+                                        if (c >= 'A' && c <= 'Z')
+                                            c = (char)(c + 32);
+                                        if (c != k2[k3] ||
+                                            p[k3] == '\0')
+                                            break;
+                                    }
+                                    if (k3 == wl)
+                                        found = 1;
+                                    else
+                                        p++;
+                                }
+                                if (!found)
+                                    all = 0;
+                            }
+                        }
+                        if (all)
+                        {
+                            rank = (int)r + 1;
+                            if (r == 0)
+                                cov++;
+                            break;
+                        }
+                    }
+                }
+                if (rank > 0)
+                    mrr += 1.0 / (double)rank;
+                if (strcmp(ex, "-") != 0)
+                {
+                    nexp++;
+                    if (nret > 0 && idx[0] == (uint32_t)atoi(ex))
+                        p1++;
+                    else
+                        printf("EVAL-MISS p1 [%s] want %s got %s%u\n",
+                               q, ex, nret > 0 ? "" : "none ",
+                               nret > 0 ? idx[0] : 0);
+                }
+                printf("EVAL %s | top=%s%u rank=%d\n", q,
+                       nret > 0 ? "" : "none ",
+                       nret > 0 ? idx[0] : 0, rank);
+            }
+        }
+        fclose(ef);
+        printf("EVAL-SUMMARY n=%u p1=%u/%u mrr=%.3f abstain=%u/%u "
+               "coverage=%.3f ms=%.1f\n",
+               nq, p1, nexp,
+               nranked > 0 ? mrr / (double)nranked : 0.0, abok,
+               abtot,
+               nranked > 0 ? (double)cov / (double)nranked : 0.0,
+               ms);
+        free(img);
+        return 0;
+    }
+    /* ---- compare mode: scoring variants x questions ---- */
+    if (strcmp(word, "--compare") == 0)    {
         static const char *QS[] = {
             "sun", "mother", "libido", "sacrifice", "rebirth",
             "hero", "tree", "serpent", "dreams", "god", "water",
@@ -100,17 +295,6 @@ int main(int argc, char **argv)
             {"DEFAULT", 15}, {"NO_DROP", 7}, {"NO_ORDER", 11},
             {"NO_INTER", 13}, {"NO_RARITY", 14}, {"CENTROID", 24},
             {"HAMMING", 40},
-        };
-        static const char *STOPW[] = {
-            "the", "a", "an", "of", "to", "in", "is", "are",
-            "was", "were", "be", "do", "does", "did", "what",
-            "who", "whom", "which", "where", "when", "how",
-            "tell", "me", "about", "de", "el", "la", "los",
-            "las", "un", "una", "en", "y", "e", "o", "que",
-            "quien", "es", "son", "por", "mi", "tu", "su",
-            "no", "si", "and", "or", "for", "on", "at", "by",
-            "with", "from", "as", "it", "its", "this", "that",
-            NULL,
         };
         uint32_t qi, vi;
         /* image shared from main scope (single disk read) */
@@ -135,7 +319,28 @@ int main(int argc, char **argv)
                 tok = strtok(qb, " \t\r\n?,.;:");
                 while (tok != NULL && nqw < 16)
                 {
-                    qw[nqw++] = tok;
+                    uint32_t si = 0;
+                    int isstop = 0;
+                    char lw[64];
+                    size_t li;
+                    for (li = 0; li < strlen(tok) && li < 63; li++)
+                    {
+                        char c = tok[li];
+                        lw[li] = (c >= 'A' && c <= 'Z') ? (char)(c + 32)
+                                                       : c;
+                    }
+                    lw[li] = '\0';
+                    while (HSTOPW[si] != NULL)
+                    {
+                        if (strcmp(lw, HSTOPW[si]) == 0)
+                        {
+                            isstop = 1;
+                            break;
+                        }
+                        si++;
+                    }
+                    if (!isstop)
+                        qw[nqw++] = tok;
                     tok = strtok(NULL, " \t\r\n?,.;:");
                 }
                 nret = TextLexRetrieveV(tl, g, emb, qw, nqw, idx,
@@ -165,9 +370,9 @@ int main(int argc, char **argv)
                                              : c;
                             }
                             lw[li] = '\0';
-                            while (STOPW[si] != NULL)
+                            while (HSTOPW[si] != NULL)
                             {
-                                if (strcmp(lw, STOPW[si]) == 0)
+                                if (strcmp(lw, HSTOPW[si]) == 0)
                                 {
                                     isstop = 1;
                                     break;

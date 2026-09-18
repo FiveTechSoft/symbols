@@ -1,0 +1,43 @@
+# eval_jung.txt — formal ground truth for jung.txt retrieval.
+# Format: Q: <query> | KW: k1,k2,... | EXP: <sentidx|ABSTAIN|->
+# KW = topic words that a correct answer must contain (judged).
+# EXP = canonical sentence id (judged); ABSTAIN = must abstain;
+#   - = excluded from P@1 (kept for MRR/coverage).
+# Questions the engine must answer from Jung's text:
+Q: sun | KW: sun | EXP: 7159
+Q: mother | KW: mother | EXP: -
+Q: libido | KW: libido | EXP: -
+Q: sacrifice | KW: sacrifice | EXP: -
+Q: rebirth | KW: rebirth | EXP: -
+Q: hero | KW: hero | EXP: -
+Q: serpent | KW: serpent | EXP: -
+Q: dreams | KW: dreams | EXP: -
+Q: god | KW: god | EXP: -
+Q: water | KW: water | EXP: -
+Q: incest | KW: incest | EXP: -
+Q: symbol | KW: symbol | EXP: -
+Q: psyche | KW: psyche | EXP: 52
+Q: what does the sun mean | KW: sun | EXP: -
+Q: que significa sol | KW: sol | EXP: -
+Q: what is the mother | KW: mother | EXP: -
+Q: who is the hero | KW: hero | EXP: -
+Q: what does the tree mean | KW: tree | EXP: -
+Q: what is libido | KW: libido | EXP: -
+Q: tell me about fire | KW: fire | EXP: -
+Q: who is christ | KW: christ | EXP: -
+Q: what is a symbol | KW: symbol | EXP: -
+Q: what is the unconscious | KW: unconscious | EXP: -
+Q: what is water | KW: water | EXP: -
+# Out-of-corpus: honest abstention required (0% hallucination):
+Q: smartphone | KW: - | EXP: ABSTAIN
+Q: blockchain | KW: - | EXP: ABSTAIN
+Q: microchip | KW: - | EXP: ABSTAIN
+Q: ordenador | KW: - | EXP: ABSTAIN
+Q: xylophone | KW: - | EXP: ABSTAIN
+Q: nanotecnologia | KW: - | EXP: ABSTAIN
+Q: cryptocurrency | KW: - | EXP: ABSTAIN
+Q: qqqjjj | KW: - | EXP: ABSTAIN
+Q: zzzxxxyyy | KW: - | EXP: ABSTAIN
+Q: dichlorodiphenyl | KW: - | EXP: ABSTAIN
+Q: television | KW: - | EXP: ABSTAIN
+Q: napoleons astronaut | KW: - | EXP: ABSTAIN
