@@ -12,6 +12,7 @@ class SymbolicEngine {
     this.episodic = {
       turns: [],
       activeFocus: null,
+      citedSentIds: new Set(),
       learnedFacts: [],
       lastQueryTimeMs: 0
     };
@@ -22,6 +23,7 @@ class SymbolicEngine {
       "do", "does", "did", "shall", "will", "should", "would", "may", "might",
       "must", "can", "could", "that", "which", "who", "whom", "this", "these",
       "those", "there", "their", "it", "its", "as", "he", "she", "they", "we",
+      "tell", "say", "know", "knows", "explain", "describe", "give", "continue", "proceed", "next",
       "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "pero",
       "en", "sobre", "a", "para", "por", "de", "del", "con", "sin", "desde",
       "hasta", "es", "son", "era", "eran", "fue", "fueron", "ser", "estar",
@@ -30,6 +32,10 @@ class SymbolicEngine {
       "dame", "cuantos", "cuantas", "tiene", "contiene", "hay",
       "trata", "tratar", "hablame", "habla", "dime", "cuentame", "explicame",
       "refiero", "acerca", "mas", "dicho", "mismo", "misma",
+      "puedes", "puede", "puedo", "podrias", "podria", "podemos",
+      "decir", "decirme", "decirnos", "sabes", "sabe", "sabria", "sabrias",
+      "conoces", "conoce", "conocemos",
+      "continua", "continuar", "sigue", "seguir", "siguiente", "adelante",
       "hizo", "hacer", "hace",
       "me", "te", "se", "nos", "os", "yo", "tu", "mi", "mis", "ti"
     ]);
@@ -54,6 +60,7 @@ class SymbolicEngine {
       .replace(/[^a-z0-9_]/g, "");
     if (t === "solomon") return "salomon";
     if (t === "jonah") return "jonas";
+    if (t === "sun") return "sol";
     return t;
   }
 
@@ -188,9 +195,9 @@ class SymbolicEngine {
   extractSimpleTriples(tokens, sentId) {
     // Check for "X is a Y", "X begat Y", "X is the Y of Z"
     for (let i = 0; i < tokens.length - 2; i++) {
-      if (tokens[i + 1] === "is" || tokens[i + 1] === "was") {
+      if (tokens[i + 1] === "is" || tokens[i + 1] === "was" || tokens[i + 1] === "es" || tokens[i + 1] === "era") {
         let objIdx = i + 2;
-        if (tokens[objIdx] === "a" || tokens[objIdx] === "an" || tokens[objIdx] === "the") {
+        if (tokens[objIdx] === "a" || tokens[objIdx] === "an" || tokens[objIdx] === "the" || tokens[objIdx] === "un" || tokens[objIdx] === "una" || tokens[objIdx] === "el" || tokens[objIdx] === "la") {
           objIdx++;
         }
         if (objIdx < tokens.length && !this.stopwords.has(tokens[i]) && !this.stopwords.has(tokens[objIdx])) {
@@ -285,7 +292,7 @@ class SymbolicEngine {
     let status = "UNKNOWN";
 
     // Intent 1: Topic introspection ("what areas do you know?")
-    if (clean.includes("what areas") || clean.includes("que areas") || clean.includes("temas conoces") || clean.includes("topics")) {
+    if (clean.includes("what areas") || clean.includes("que areas") || clean.includes("areas que conoces") || clean.includes("temas conoces") || clean.includes("topics")) {
       const top = this.getTopConcepts(8);
       if (top.length === 0) {
         response = "The knowledge base is currently empty. Ingest text or load a preset corpus to begin.";
@@ -320,7 +327,7 @@ class SymbolicEngine {
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
     else {
-      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas");
+      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/\bsun\b/g, "sol");
       // Extract target words filtered by stopwords
       let words = cleanNorm
         .replace(/[^a-z0-9\s]/g, " ")
@@ -396,10 +403,11 @@ class SymbolicEngine {
       // 4B. Check verbatim literal sentence matching with ranking (find sentence with maximum matching query words)
       if (!response && words.length > 0) {
         let bestSent = null;
-        let maxScore = 0;
+        let maxScore = -9999;
+        const isContinuation = isAnaphoric && (cleanNorm.includes("que mas") || cleanNorm.includes("dime mas") || cleanNorm.includes("continua") || cleanNorm.includes("tell me more") || cleanNorm.includes("what else"));
         const queryPhrase = cleanNorm.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
         for (const sent of this.sentences) {
-          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/[^a-z0-9\s]/g, " ");
+          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bsolomon\b/g, "salomon").replace(/\bjonah\b/g, "jonas").replace(/\bsun\b/g, "sol").replace(/[^a-z0-9\s]/g, " ");
           let score = words.filter(w => sLower.includes(w)).length;
           // Substring phrase bonus for exact multi-word alignment
           if (queryPhrase.length > 5 && sLower.includes(queryPhrase)) {
@@ -409,6 +417,14 @@ class SymbolicEngine {
           for (const w of words) {
             if (!META_WORDS.has(w) && (sLower.startsWith(w) || sLower.includes("libro de " + w) || sLower.includes(w + " es") || sLower.includes("atribuye al rey " + w) || sLower.includes("rey " + w))) {
               score += 3;
+            }
+          }
+          // Penalty for already cited sentences:
+          if (this.episodic.citedSentIds && this.episodic.citedSentIds.has(sent.id)) {
+            if (isContinuation) {
+              score = -9999;
+            } else {
+              score -= 0.5;
             }
           }
           if (score > maxScore) {
@@ -421,6 +437,8 @@ class SymbolicEngine {
           response = `According to verified source records: "${bestSent.text}"`;
           citation = `Sentence #${bestSent.id + 1} (${bestSent.source})`;
           status = "VERBATIM_CITATION";
+          if (!this.episodic.citedSentIds) this.episodic.citedSentIds = new Set();
+          this.episodic.citedSentIds.add(bestSent.id);
           
           // Set activeFocus to the non-meta entity keyword
           const entityCandidate = words.find(w => !META_WORDS.has(w));

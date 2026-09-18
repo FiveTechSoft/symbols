@@ -200,14 +200,62 @@ async function handleUserSend() {
   }
 }
 
+// Extract semantic topic entity by stripping conversational preambles and pronouns
+function extractSearchTopic(query, activeFocus = null) {
+  if (!query) return activeFocus || "";
+  let clean = query.trim().replace(/[?¿!¡;:,"'.()]/g, " ").replace(/\s+/g, " ").trim();
+  const preambles = [
+    // Spanish
+    /^(que\s+mas\s+(puedes\s+)?(decir(me)?|contar(me)?|sabes|hay)\s*(acerca\s+de|sobre|de)?)/i,
+    /^(que\s+sabes\s+(acerca\s+de|sobre|de)?)/i,
+    /^(que\s+es\s+(un|una|el|la)?)/i,
+    /^(hablame\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
+    /^(cuentame\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
+    /^(dime\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
+    /^(explicame\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
+    /^(de\s+que\s+(trata|habla|va))\s*(el|la|los|las|de)?/i,
+    /^(puedes\s+decir(me)?\s+(mas\s+)?(acerca\s+de|sobre|de)?)/i,
+    /^(acerca\s+de\s+)/i,
+    /^(sobre\s+)/i,
+    // English
+    /^(what\s+else\s+can\s+you\s+tell\s+me\s+(about)?)/i,
+    /^(what\s+can\s+you\s+tell\s+me\s+(about)?)/i,
+    /^(tell\s+me\s+(more\s+)?(about)?)/i,
+    /^(what\s+(do\s+you\s+know\s+about|is\s+it\s+about))/i,
+    /^(what\s+is\s+(a|an|the)?)/i,
+    /^(can\s+you\s+tell\s+me\s+(about)?)/i
+  ];
+  for (const pat of preambles) {
+    if (pat.test(clean)) {
+      clean = clean.replace(pat, "").trim();
+      break;
+    }
+  }
+  clean = clean
+    .replace(/\b(acerca\s+de|sobre|de)\s+(el|ella|ellos|ellas|esto|eso|aquello|este|esta)\b/gi, "")
+    .replace(/\b(about|of)\s+(it|him|her|them|this|that)\b/gi, "")
+    .trim();
+
+  const pronounOnly = /^(el|ella|ellos|ellas|esto|eso|aquello|este|esta|it|him|her|them|this|that)$/i;
+  if (!clean || pronounOnly.test(clean)) {
+    return activeFocus || "";
+  }
+  clean = clean.replace(/^(el|la|los|las|un|una|the|a|an)\s+/i, "").trim();
+  if (!clean) {
+    return activeFocus || "";
+  }
+  return clean;
+}
+
 // In-Browser Engine Execution with Autonomous Agentic Web Search Fallback
 async function executeInBrowserEngine(query) {
   let res = engine.query(query);
 
   // If local knowledge graph returns UNKNOWN_FAIL_CLOSED and agenticWebSearch is enabled:
   if (res.status === "UNKNOWN_FAIL_CLOSED" && isAgenticWebSearchEnabled) {
-    addSystemMessage(`🔍 Zero-Hallucination Gate triggered: No local ground truth for "${query}". Invoking Real-Time Web Search Tool...`);
-    const webResult = await fetchWebKnowledge(query);
+    const topic = extractSearchTopic(query, engine?.episodic?.activeFocus);
+    addSystemMessage(`🔍 Zero-Hallucination Gate triggered: No local ground truth for "${query}". Invoking Real-Time Web Search Tool${topic ? ` (Target: '${topic}')` : ""}...`);
+    const webResult = await fetchWebKnowledge(query, topic);
 
     if (webResult && webResult.text) {
       const ing = engine.ingestText(webResult.text, `WebSearch: ${webResult.title}`);
@@ -218,7 +266,10 @@ async function executeInBrowserEngine(query) {
 
       addSystemMessage(`📥 Knowledge assimilated in ${ing.elapsedMs.toFixed(2)} ms (+${ing.sentencesAdded} sentences, +${ing.symbolsAdded} symbols from '${webResult.title}'). Re-evaluating query...`);
 
-      const secondPass = engine.query(query);
+      let secondPass = engine.query(query);
+      if (secondPass.status === "UNKNOWN_FAIL_CLOSED" && topic && topic !== query.trim().toLowerCase()) {
+        secondPass = engine.query(topic);
+      }
       if (secondPass.status !== "UNKNOWN_FAIL_CLOSED") {
         secondPass.status = "AGENTIC_WEB_GROUNDED";
         if (!secondPass.citation) {
@@ -248,19 +299,12 @@ async function executeInBrowserEngine(query) {
 }
 
 // Autonomous Web Knowledge Retrieval (Wikipedia API, CORS enabled with origin=*)
-async function fetchWebKnowledge(query) {
+async function fetchWebKnowledge(query, topic = null) {
   try {
-    const cleanQuery = query.replace(/[?¿!¡]/g, "").trim();
     const focus = engine?.episodic?.activeFocus;
-    let targetTerm = cleanQuery;
+    const targetTerm = topic || extractSearchTopic(query, focus) || query.replace(/[?¿!¡]/g, "").trim();
 
-    // Check if query is anaphoric or generic without named entity
-    const isAnaphoric = /^(de que|hablame|cuentame|que|quien|lista|dime|sobre|cuales|como)\b/i.test(cleanQuery);
-    if (focus && isAnaphoric && !cleanQuery.toLowerCase().includes(focus)) {
-      targetTerm = `${cleanQuery} ${focus}`;
-    }
-
-    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia|proverbios|salomon)\b)/i.test(targetTerm);
+    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia|proverbios|salomon|sol)\b)/i.test(targetTerm);
     const primaryLang = isSpanish ? "es" : "en";
     const fallbackLang = isSpanish ? "en" : "es";
 
