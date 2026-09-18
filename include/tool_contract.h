@@ -41,6 +41,8 @@ typedef struct
 #define TOOLCFG_SHELL_MAX 32
 #define TOOLCFG_CONTRACT_MAX 32
 #define TOOLCFG_INFO_MAX 16
+#define TOOLCFG_REL_MAX 64
+#define TOOLCFG_PERSON_MAX 64
 
 typedef struct
 {
@@ -63,14 +65,32 @@ typedef struct
     char outputs[64];
 } ToolInfoRow;
 
+typedef struct
+{
+    char subject[32];
+    char rel[32];
+    char object[64];
+} FixtureRelRow;
+
+typedef struct
+{
+    char name[32];
+    char detail[64];
+} FixturePersonRow;
+
 void ToolInit(void);
 void ToolInitFrom(const char *path);
+void FixtureInitFrom(const char *path);
 uint32_t ShellAllowCount(void);
 const ShellAllowRow *ShellAllowAt(uint32_t i);
 uint32_t ToolContractCount(void);
 const ToolContractRow *ToolContractRowAt(uint32_t i);
 uint32_t ToolInfoCount(void);
 const ToolInfoRow *ToolInfoRowAt(uint32_t i);
+uint32_t FixtureRelCount(void);
+const FixtureRelRow *FixtureRelAt(uint32_t i);
+uint32_t FixturePersonCount(void);
+const FixturePersonRow *FixturePersonAt(uint32_t i);
 
 /* Classify one resolved goal. status/cause/slot/family come from
    ChatResolveLine; line is needed only for PARSE_FAIL shape

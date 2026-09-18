@@ -17,28 +17,8 @@
 
 static int ToolEvalExpr(const char *expr, double *out);
 
-/* relation fixtures: keyed by display token (deduced stems like
-   "rey" or the user's own echoed word like "mother"). */
-static const struct
-{
-    const char *subject;
-    const char *rel;
-    const char *object;
-} REL_TBL[] = {
-    {"babylonia", "rey", "nebuchadnezzar"},
-    {"david", "mother", "nitzevet"},
-    {"saul", "rey", "israel"},
-};
-
-/* person fixtures: detail is display-ready fixture data. */
-static const struct
-{
-    const char *name;
-    const char *detail;
-} PERSON_TBL[] = {
-    {"jonas", "nacio en Gathepher"},
-    {"jesse", "nacio en Bethlehem"},
-};
+/* relation/person fixtures live in tool_config.c (file rows win,
+   frozen compiled fallback): consulted here read-only. */
 
 /* shell allowlist lives in tool_config.c (file rows win, frozen
    compiled fallback): consulted here read-only. */
@@ -388,32 +368,40 @@ void ToolExecute(const ToolRequest *req, ToolResult *res)
     switch (req->tool)
     {
     case TOOL_LOOKUP_RELATION:
-        for (size_t i = 0;
-             i < sizeof(REL_TBL) / sizeof(REL_TBL[0]) &&
-             res->nitems < 8;
+        for (uint32_t i = 0;
+             i < FixtureRelCount() && res->nitems < 8;
              i++)
-            if (strcmp(REL_TBL[i].subject, req->subject) == 0 &&
-                strcmp(REL_TBL[i].rel, req->relation) == 0)
+        {
+            const FixtureRelRow *row = FixtureRelAt(i);
+            if (row == NULL)
+                continue;
+            if (strcmp(row->subject, req->subject) == 0 &&
+                strcmp(row->rel, req->relation) == 0)
             {
-                strncpy(res->items[res->nitems], REL_TBL[i].object,
+                strncpy(res->items[res->nitems], row->object,
                         CHAT_TOKEN_MAX - 1);
                 res->items[res->nitems][CHAT_TOKEN_MAX - 1] = '\0';
                 res->nitems++;
             }
+        }
         res->ok = res->nitems > 0;
         break;
     case TOOL_LOOKUP_PERSON:
-        for (size_t i = 0;
-             i < sizeof(PERSON_TBL) / sizeof(PERSON_TBL[0]); i++)
-            if (strcmp(PERSON_TBL[i].name, req->subject) == 0)
+        for (uint32_t i = 0; i < FixturePersonCount(); i++)
+        {
+            const FixturePersonRow *row = FixturePersonAt(i);
+            if (row == NULL)
+                continue;
+            if (strcmp(row->name, req->subject) == 0)
             {
-                strncpy(res->items[0], PERSON_TBL[i].detail,
+                strncpy(res->items[0], row->detail,
                         CHAT_TOKEN_MAX - 1);
                 res->items[0][CHAT_TOKEN_MAX - 1] = '\0';
                 res->nitems = 1;
                 res->ok = 1;
                 break;
             }
+        }
         break;
     case TOOL_CALCULATOR:
     {

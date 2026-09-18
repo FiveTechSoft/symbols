@@ -11,6 +11,7 @@
 
 #define TOOLCFG_LINE_MAX 1024
 #define TOOLCFG_PATH "data/agentic/tools.tsv"
+#define FIXTURE_PATH "data/agentic/fixtures.tsv"
 
 static const ShellAllowRow COMPILED_SHELL[] = {
     {"echo", "cmd", ""},
@@ -34,12 +35,29 @@ static const ToolContractRow COMPILED_CONTRACT[] = {
     {"descendant", TOOL_LOOKUP_RELATION, 1},
 };
 
+/* frozen fixture fallbacks (identical literals, moved verbatim from
+   tool_executor.c; external stand-ins, never KB). */
+static const FixtureRelRow COMPILED_REL[] = {
+    {"babylonia", "rey", "nebuchadnezzar"},
+    {"david", "mother", "nitzevet"},
+    {"saul", "rey", "israel"},
+};
+
+static const FixturePersonRow COMPILED_PERSON[] = {
+    {"jonas", "nacio en Gathepher"},
+    {"jesse", "nacio en Bethlehem"},
+};
+
 static ShellAllowRow g_shell[TOOLCFG_SHELL_MAX];
 static uint32_t g_nshell = 0;
 static ToolContractRow g_contract[TOOLCFG_CONTRACT_MAX];
 static uint32_t g_ncontract = 0;
 static ToolInfoRow g_info[TOOLCFG_INFO_MAX];
 static uint32_t g_ninfo = 0;
+static FixtureRelRow g_rel[TOOLCFG_REL_MAX];
+static uint32_t g_nrel = 0;
+static FixturePersonRow g_person[TOOLCFG_PERSON_MAX];
+static uint32_t g_nperson = 0;
 static int g_tool_init_done = 0;
 
 static int ToolIdFromName(const char *s, ToolId *out)
@@ -59,6 +77,23 @@ static int ToolIdFromName(const char *s, ToolId *out)
     return 1;
 }
 
+static void LoadCompiledFixtures(void)
+{
+    size_t i;
+    g_nrel = 0;
+    for (i = 0;
+         i < sizeof(COMPILED_REL) / sizeof(COMPILED_REL[0]) &&
+         g_nrel < TOOLCFG_REL_MAX;
+         i++)
+        g_rel[g_nrel++] = COMPILED_REL[i];
+    g_nperson = 0;
+    for (i = 0;
+         i < sizeof(COMPILED_PERSON) / sizeof(COMPILED_PERSON[0]) &&
+         g_nperson < TOOLCFG_PERSON_MAX;
+         i++)
+        g_person[g_nperson++] = COMPILED_PERSON[i];
+}
+
 static void LoadCompiled(void)
 {
     size_t i;
@@ -74,6 +109,7 @@ static void LoadCompiled(void)
          g_ncontract < TOOLCFG_CONTRACT_MAX;
          i++)
         g_contract[g_ncontract++] = COMPILED_CONTRACT[i];
+    LoadCompiledFixtures();
     g_ninfo = 0;
 }
 
@@ -282,11 +318,130 @@ void ToolInitFrom(const char *path)
     }
 }
 
+void FixtureInitFrom(const char *path)
+{
+    FILE *f;
+    char line[TOOLCFG_LINE_MAX];
+    unsigned long lineno = 0;
+    FixtureRelRow rl[TOOLCFG_REL_MAX];
+    FixturePersonRow pl[TOOLCFG_PERSON_MAX];
+    uint32_t nrl = 0, npl = 0;
+    LoadCompiledFixtures();
+    if (path == NULL)
+        return;
+    f = fopen(path, "r");
+    if (f == NULL)
+        return;
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        char *fld[8];
+        uint32_t nf;
+        char *s = line;
+        lineno++;
+        if (strchr(line, '\n') == NULL && !feof(f))
+        {
+            int c;
+            fprintf(stderr, "fixtures.tsv:%lu: line too long\n",
+                    lineno);
+            while ((c = fgetc(f)) != EOF && c != '\n')
+                ;
+            continue;
+        }
+        while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
+            s++;
+        if (*s == '\0' || *s == '#')
+            continue;
+        {
+            size_t L = strlen(s);
+            while (L > 0 && (s[L - 1] == '\r' || s[L - 1] == '\n'))
+                s[--L] = '\0';
+        }
+        nf = SplitTabs(s, fld, 8);
+        if (nf == 0 || fld[0][0] == '\0')
+            continue;
+        if (strcmp(fld[0], "rel") == 0)
+        {
+            if (nf != 4 || fld[1][0] == '\0')
+            {
+                fprintf(stderr, "fixtures.tsv:%lu: bad rel row\n",
+                        lineno);
+                continue;
+            }
+            if (!Fits(fld[1], sizeof(rl[0].subject)) ||
+                !Fits(fld[2], sizeof(rl[0].rel)) ||
+                !Fits(fld[3], sizeof(rl[0].object)))
+            {
+                fprintf(stderr,
+                        "fixtures.tsv:%lu: rel row too long\n", lineno);
+                continue;
+            }
+            if (nrl >= TOOLCFG_REL_MAX)
+            {
+                fprintf(stderr,
+                        "fixtures.tsv:%lu: rel table full\n", lineno);
+                continue;
+            }
+            strncpy(rl[nrl].subject, fld[1],
+                    sizeof(rl[0].subject) - 1);
+            strncpy(rl[nrl].rel, fld[2], sizeof(rl[0].rel) - 1);
+            strncpy(rl[nrl].object, fld[3],
+                    sizeof(rl[0].object) - 1);
+            nrl++;
+        }
+        else if (strcmp(fld[0], "person") == 0)
+        {
+            if (nf != 3 || fld[1][0] == '\0')
+            {
+                fprintf(stderr,
+                        "fixtures.tsv:%lu: bad person row\n", lineno);
+                continue;
+            }
+            if (!Fits(fld[1], sizeof(pl[0].name)) ||
+                !Fits(fld[2], sizeof(pl[0].detail)))
+            {
+                fprintf(stderr,
+                        "fixtures.tsv:%lu: person row too long\n",
+                        lineno);
+                continue;
+            }
+            if (npl >= TOOLCFG_PERSON_MAX)
+            {
+                fprintf(stderr,
+                        "fixtures.tsv:%lu: person table full\n",
+                        lineno);
+                continue;
+            }
+            strncpy(pl[npl].name, fld[1], sizeof(pl[0].name) - 1);
+            strncpy(pl[npl].detail, fld[2],
+                    sizeof(pl[0].detail) - 1);
+            npl++;
+        }
+        else
+        {
+            fprintf(stderr, "fixtures.tsv:%lu: unknown TYPE\n",
+                    lineno);
+            continue;
+        }
+    }
+    fclose(f);
+    if (nrl > 0)
+    {
+        memcpy(g_rel, rl, nrl * sizeof(rl[0]));
+        g_nrel = nrl;
+    }
+    if (npl > 0)
+    {
+        memcpy(g_person, pl, npl * sizeof(pl[0]));
+        g_nperson = npl;
+    }
+}
+
 void ToolInit(void)
 {
     if (!g_tool_init_done)
     {
         ToolInitFrom(TOOLCFG_PATH);
+        FixtureInitFrom(FIXTURE_PATH);
         CRulesInit();
         g_tool_init_done = 1;
     }
@@ -326,4 +481,28 @@ const ToolInfoRow *ToolInfoRowAt(uint32_t i)
     if (i >= g_ninfo)
         return NULL;
     return &g_info[i];
+}
+
+uint32_t FixtureRelCount(void)
+{
+    return g_nrel;
+}
+
+const FixtureRelRow *FixtureRelAt(uint32_t i)
+{
+    if (i >= g_nrel)
+        return NULL;
+    return &g_rel[i];
+}
+
+uint32_t FixturePersonCount(void)
+{
+    return g_nperson;
+}
+
+const FixturePersonRow *FixturePersonAt(uint32_t i)
+{
+    if (i >= g_nperson)
+        return NULL;
+    return &g_person[i];
 }
