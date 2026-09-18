@@ -36,6 +36,11 @@ class SymbolicEngine {
       "decir", "decirme", "decirnos", "sabes", "sabe", "sabria", "sabrias",
       "conoces", "conoce", "conocemos",
       "continua", "continuar", "sigue", "seguir", "siguiente", "adelante",
+      "explica", "explicalo", "explicamelo", "explicame", "explicala", "explicamela",
+      "describe", "describelo", "describemelo", "describeme",
+      "cuenta", "cuentalo", "cuentamelo", "cuentame",
+      "aclara", "aclaralo", "aclaramelo", "detalla", "detallalo", "desarrolla", "desarrollalo",
+      "explain", "elaborate",
       "hizo", "hacer", "hace",
       "me", "te", "se", "nos", "os", "yo", "tu", "mi", "mis", "ti"
     ]);
@@ -342,6 +347,14 @@ class SymbolicEngine {
       ]);
 
       const isAnaphoric = 
+        cleanNorm.startsWith("explica") ||
+        cleanNorm.startsWith("describe") ||
+        cleanNorm.startsWith("cuenta") ||
+        cleanNorm.startsWith("aclara") ||
+        cleanNorm.startsWith("detalla") ||
+        cleanNorm.startsWith("desarrolla") ||
+        cleanNorm.startsWith("explain") ||
+        cleanNorm.startsWith("elaborate") ||
         cleanNorm.includes("de que trata") ||
         cleanNorm.includes("de que habla") ||
         cleanNorm.includes("de que va") ||
@@ -365,8 +378,13 @@ class SymbolicEngine {
 
       // Anaphora resolution: inherit activeFocus if query is conversational/elliptical
       if ((isAnaphoric || words.length === 0 || words.every(w => META_WORDS.has(w))) && this.episodic.activeFocus) {
-        if (!words.includes(this.episodic.activeFocus)) {
-          words.unshift(this.episodic.activeFocus);
+        const rawTokens = this.episodic.activeFocus.split(/[_\s]+/).filter(t => !this.stopwords.has(t) && t.length > 1);
+        const headNoun = rawTokens[rawTokens.length - 1];
+        const focusTokens = headNoun ? [headNoun, ...rawTokens.filter(t => t !== headNoun)] : rawTokens;
+        for (const ft of focusTokens) {
+          if (!words.includes(ft)) {
+            words.push(ft);
+          }
         }
       }
 
@@ -475,6 +493,8 @@ class SymbolicEngine {
               proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
               if (r.sourceSentId !== -1 && this.sentences[r.sourceSentId]) {
                 citation = `Sentence #${r.sourceSentId + 1}: "${this.sentences[r.sourceSentId].text}"`;
+                if (!this.episodic.citedSentIds) this.episodic.citedSentIds = new Set();
+                this.episodic.citedSentIds.add(r.sourceSentId);
               }
               status = "RELATION_MATCH";
               this.episodic.activeFocus = r.object;
@@ -537,7 +557,13 @@ class SymbolicEngine {
 
     if (preset.triples) {
       for (const t of preset.triples) {
-        this.addRelation(t.s, t.p, t.o, -1, 1.0);
+        const sCanon = this.canonicalize(t.s);
+        const matchSent = this.sentences.find(s => {
+          const lower = s.text.toLowerCase();
+          return lower.includes(sCanon) || lower.includes(t.s.toLowerCase());
+        });
+        const sentId = matchSent ? matchSent.id : -1;
+        this.addRelation(t.s, t.p, t.o, sentId, 1.0);
       }
     }
 

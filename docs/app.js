@@ -202,8 +202,15 @@ async function handleUserSend() {
 
 // Extract semantic topic entity by stripping conversational preambles and pronouns
 function extractSearchTopic(query, activeFocus = null) {
-  if (!query) return activeFocus || "";
-  let clean = query.trim().replace(/[?¿!¡;:,"'.()]/g, " ").replace(/\s+/g, " ").trim();
+  if (!query) return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
+  let clean = query
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?¿!¡;:,"'.()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const preambles = [
     // Spanish
     /^(que\s+mas\s+(puedes\s+)?(decir(me)?|contar(me)?|sabes|hay)\s*(acerca\s+de|sobre|de)?)/i,
@@ -237,12 +244,14 @@ function extractSearchTopic(query, activeFocus = null) {
     .trim();
 
   const pronounOnly = /^(el|ella|ellos|ellas|esto|eso|aquello|este|esta|it|him|her|them|this|that)$/i;
-  if (!clean || pronounOnly.test(clean)) {
-    return activeFocus || "";
+  const cliticVerbs = /^(explica(lo|la|los|las|me|melo|mela)?|describe(lo|la|los|las|me|melo|mela)?|cuenta(lo|la|los|las|me|melo|mela)?|dime(lo)?|aclara(lo|la|los|las)?|detalla(lo|la)?|desarrolla(lo|la)?|continua(lo|la)?|sigue(lo|la)?|hazlo|muestraw*(lo|la)?|explain(\s+(it|this|that))?|describe(\s+(it|this|that))?|elaborate(\s+on\s+(it|this|that))?|continue|proceed|go\s+on)$/i;
+
+  if (!clean || pronounOnly.test(clean) || cliticVerbs.test(clean)) {
+    return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   clean = clean.replace(/^(el|la|los|las|un|una|the|a|an)\s+/i, "").trim();
-  if (!clean) {
-    return activeFocus || "";
+  if (!clean || cliticVerbs.test(clean)) {
+    return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   return clean;
 }
@@ -336,6 +345,25 @@ async function searchWiki(term, lang) {
       }
     } catch (e) {
       // ignore opensearch error, proceed to fallback
+    }
+
+    // 1b. If opensearch gave no exact title and term is a multi-word compound, try its head noun
+    if (!candidateTitle && term.includes(" ")) {
+      const parts = term.trim().split(/\s+/).filter(w => w.length > 2);
+      const headNoun = parts[parts.length - 1];
+      if (headNoun && headNoun !== term) {
+        try {
+          const openUrl = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(headNoun)}&limit=5&format=json&origin=*`;
+          const openRes = await fetch(openUrl);
+          if (openRes.ok) {
+            const openData = await openRes.json();
+            const titles = openData[1] || [];
+            if (titles.length > 0) {
+              candidateTitle = titles[0];
+            }
+          }
+        } catch (e) {}
+      }
     }
 
     // 2. Fallback to list=search if opensearch gave nothing
