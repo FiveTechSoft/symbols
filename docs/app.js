@@ -3,6 +3,7 @@
 let engine = null;
 let currentMode = "browser"; // "browser" or "server"
 let serverUrl = "http://127.0.0.1:8080/v1";
+let isAgenticWebSearchEnabled = true; // Auto-fallback when local graph has no ground truth
 
 // Canvas Graph State
 let canvas, ctx;
@@ -18,10 +19,13 @@ document.addEventListener("DOMContentLoaded", () => {
   initCanvas();
   loadStoredSession();
 
-  // If empty, load default Jung preset
+  // If empty, load default Bible preset
   if (engine.sentences.length === 0) {
-    loadPresetCorpus("jung");
+    loadPresetCorpus("bible");
+    highlightActivePresetCard("bible");
   } else {
+    const savedPreset = localStorage.getItem("symbolic_active_preset") || "bible";
+    highlightActivePresetCard(savedPreset);
     updateUIStats();
     rebuildGraphVisualizer();
   }
@@ -68,9 +72,16 @@ function setupEventListeners() {
   // Preset buttons
   document.querySelectorAll(".preset-card").forEach(card => {
     card.addEventListener("click", () => {
-      document.querySelectorAll(".preset-card").forEach(c => c.classList.remove("active"));
-      card.classList.add("active");
       const presetKey = card.getAttribute("data-preset");
+      highlightActivePresetCard(presetKey);
+      // Clean previous graph data before loading selected preset
+      engine.sentences = [];
+      engine.relations = [];
+      engine.relMap.clear();
+      engine.subMap.clear();
+      engine.objMap.clear();
+      engine.symbols.clear();
+      localStorage.setItem("symbolic_active_preset", presetKey);
       loadPresetCorpus(presetKey);
     });
   });
@@ -81,8 +92,23 @@ function setupEventListeners() {
   document.getElementById("importFileInput").addEventListener("change", importMemorySession);
   document.getElementById("btnClear").addEventListener("click", clearMemorySession);
 
-  // Web search tool trigger
-  document.getElementById("btnWebSearchTool").addEventListener("click", triggerWebSearchTool);
+  // Agentic Web Tool Toggle
+  const btnAgentic = document.getElementById("btnAgenticToggle");
+  if (btnAgentic) {
+    btnAgentic.addEventListener("click", () => {
+      isAgenticWebSearchEnabled = !isAgenticWebSearchEnabled;
+      btnAgentic.innerText = isAgenticWebSearchEnabled ? "⚡ Web Tool: ON" : "⚡ Web Tool: OFF";
+      btnAgentic.style.borderColor = isAgenticWebSearchEnabled ? "var(--accent-cyan)" : "var(--border-muted)";
+      btnAgentic.style.color = isAgenticWebSearchEnabled ? "var(--accent-cyan)" : "var(--text-muted)";
+      addSystemMessage(`Agentic Web Search auto-fallback: ${isAgenticWebSearchEnabled ? 'ENABLED (Real-Time Ingestion)' : 'DISABLED (Local Graph Only)'}`);
+    });
+  }
+
+  // Web search tool manual trigger if button exists
+  const btnWebSearch = document.getElementById("btnWebSearchTool");
+  if (btnWebSearch) {
+    btnWebSearch.addEventListener("click", triggerWebSearchTool);
+  }
 
   // Engine Mode Toggle
   const engineModeSelect = document.getElementById("engineModeSelect");
@@ -92,6 +118,17 @@ function setupEventListeners() {
       addSystemMessage(`Switched execution mode to: ${currentMode === "browser" ? "Client-Side In-Browser Engine (Stand-Alone)" : "Native C11 Engine (localhost:8080)"}`);
     });
   }
+}
+
+// Helper to highlight active preset card in sidebar
+function highlightActivePresetCard(presetKey) {
+  document.querySelectorAll(".preset-card").forEach(c => {
+    if (c.getAttribute("data-preset") === presetKey) {
+      c.classList.add("active");
+    } else {
+      c.classList.remove("active");
+    }
+  });
 }
 
 // Load Preset Corpus
@@ -156,16 +193,44 @@ async function handleUserSend() {
         status: "SERVER_UNREACHABLE"
       });
       // Fallback
-      executeInBrowserEngine(query);
+      await executeInBrowserEngine(query);
     }
   } else {
-    executeInBrowserEngine(query);
+    await executeInBrowserEngine(query);
   }
 }
 
-// In-Browser Engine Execution
-function executeInBrowserEngine(query) {
-  const res = engine.query(query);
+// In-Browser Engine Execution with Autonomous Agentic Web Search Fallback
+async function executeInBrowserEngine(query) {
+  let res = engine.query(query);
+
+  // If local knowledge graph returns UNKNOWN_FAIL_CLOSED and agenticWebSearch is enabled:
+  if (res.status === "UNKNOWN_FAIL_CLOSED" && isAgenticWebSearchEnabled) {
+    addSystemMessage(`🔍 Zero-Hallucination Gate triggered: No local ground truth for "${query}". Invoking Real-Time Web Search Tool...`);
+    const webResult = await fetchWebKnowledge(query);
+
+    if (webResult && webResult.text) {
+      const ing = engine.ingestText(webResult.text, `WebSearch: ${webResult.title}`);
+      
+      saveSessionToStorage();
+      updateUIStats();
+      rebuildGraphVisualizer();
+
+      addSystemMessage(`📥 Knowledge assimilated in ${ing.elapsedMs.toFixed(2)} ms (+${ing.sentencesAdded} sentences, +${ing.symbolsAdded} symbols from '${webResult.title}'). Re-evaluating query...`);
+
+      const secondPass = engine.query(query);
+      if (secondPass.status !== "UNKNOWN_FAIL_CLOSED") {
+        secondPass.status = "AGENTIC_WEB_GROUNDED";
+        if (!secondPass.citation) {
+          secondPass.citation = `Web Source: Wikipedia ("${webResult.title}") [${webResult.url}]`;
+        }
+        res = secondPass;
+      }
+    } else {
+      addSystemMessage(`⚠ Web search returned no verified ground truth for "${query}". Preserving honest fail-closed unknown.`);
+    }
+  }
+
   saveSessionToStorage();
   updateUIStats();
 
@@ -180,6 +245,54 @@ function executeInBrowserEngine(query) {
     citation: res.citation,
     elapsedMs: res.elapsedMs
   });
+}
+
+// Autonomous Web Knowledge Retrieval (Wikipedia API, CORS enabled with origin=*)
+async function fetchWebKnowledge(query) {
+  try {
+    const cleanQuery = query.replace(/[?¿!¡]/g, "").trim();
+    const isSpanish = /[áéíóúñ¿¡]|(\b(de|la|el|los|las|en|que|quien|cuales|cuantos|libros|biblia)\b)/i.test(query);
+    const primaryLang = isSpanish ? "es" : "en";
+    const fallbackLang = isSpanish ? "en" : "es";
+
+    let result = await searchWiki(cleanQuery, primaryLang);
+    if (!result) {
+      result = await searchWiki(cleanQuery, fallbackLang);
+    }
+    return result;
+  } catch (e) {
+    console.warn("fetchWebKnowledge error:", e);
+    return null;
+  }
+}
+
+async function searchWiki(term, lang) {
+  try {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&format=json&origin=*`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.query && data.query.search && data.query.search.length > 0) {
+      const topTitle = data.query.search[0].title;
+      const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topTitle.replace(/\s+/g, "_"))}`;
+      const sumRes = await fetch(sumUrl);
+      if (sumRes.ok) {
+        const sumData = await sumRes.json();
+        if (sumData.extract) {
+          return {
+            title: sumData.title || topTitle,
+            text: sumData.extract,
+            url: sumData.content_urls ? sumData.content_urls.desktop.page : `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(topTitle)}`,
+            lang
+          };
+        }
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn("searchWiki error:", err);
+    return null;
+  }
 }
 
 // Append Message to UI
