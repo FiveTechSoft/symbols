@@ -25,9 +25,6 @@ out/
 # Shard pipeline leftovers (train_shard cleans these up, keep guarded)
 shard_*.tsv
 
-# Chat autosave (C2); never commit a live session dump
-prolog/session.knowledge.pl
-prolog/two_books_tmp.knowledge.pl
 
 # Test scratch files generated at repo root
 test_corpus.tsv
