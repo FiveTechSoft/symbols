@@ -21,7 +21,13 @@ class SymbolicEngine {
       "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
       "do", "does", "did", "shall", "will", "should", "would", "may", "might",
       "must", "can", "could", "that", "which", "who", "whom", "this", "these",
-      "those", "there", "their", "it", "its", "as", "he", "she", "they", "we"
+      "those", "there", "their", "it", "its", "as", "he", "she", "they", "we",
+      "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "pero",
+      "en", "sobre", "a", "para", "por", "de", "del", "con", "sin", "desde",
+      "hasta", "es", "son", "era", "eran", "fue", "fueron", "ser", "estar",
+      "ha", "han", "que", "cual", "cuales", "quien", "quienes", "este", "esta",
+      "estos", "estas", "ese", "esa", "esos", "esas", "su", "sus", "como",
+      "dame", "cuantos", "cuantas", "tiene", "contiene", "hay"
     ]);
   }
 
@@ -35,9 +41,13 @@ class SymbolicEngine {
     return Math.abs(hash);
   }
 
-  // Canonicalize token (lowercase, alpha-numeric)
+  // Canonicalize token (lowercase, diacritic-normalized, alpha-numeric)
   canonicalize(token) {
-    return token.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    return token
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9_]/g, "");
   }
 
   // Get or register symbol with 32D Random Indexing vector
@@ -303,20 +313,24 @@ class SymbolicEngine {
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
     else {
-      // Extract target entities from input
-      const words = clean.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => !this.stopwords.has(w));
-      
-      // Check kinship: "father of X", "padre de X", "son of X"
+      const cleanNorm = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      // Extract target words filtered by stopwords
+      const words = cleanNorm
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter(w => !this.stopwords.has(w) && w.length > 1);
+
+      // 4A. Check kinship: "father of X", "padre de X", "son of X", "hijo de X"
       let targetEntity = null;
       let targetPredicate = null;
 
-      if (clean.includes("father of") || clean.includes("padre de")) {
-        const p = clean.indexOf("father of") !== -1 ? "father of" : "padre de";
-        targetEntity = clean.substring(clean.indexOf(p) + p.length).trim().split(/\s+/)[0];
+      if (cleanNorm.includes("father of") || cleanNorm.includes("padre de")) {
+        const p = cleanNorm.includes("father of") ? "father of" : "padre de";
+        targetEntity = cleanNorm.substring(cleanNorm.indexOf(p) + p.length).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9_]/g, "");
         targetPredicate = "son_of";
-      } else if (clean.includes("son of") || clean.includes("hijo de")) {
-        const p = clean.indexOf("son of") !== -1 ? "son of" : "hijo de";
-        targetEntity = clean.substring(clean.indexOf(p) + p.length).trim().split(/\s+/)[0];
+      } else if (cleanNorm.includes("son of") || cleanNorm.includes("hijo de")) {
+        const p = cleanNorm.includes("son of") ? "son of" : "hijo de";
+        targetEntity = cleanNorm.substring(cleanNorm.indexOf(p) + p.length).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9_]/g, "");
         targetPredicate = "father_of";
       }
 
@@ -336,11 +350,49 @@ class SymbolicEngine {
         }
       }
 
-      // Check relation lookup or literal search across symbols
-      if (!response) {
+      // 4B. Check verbatim literal sentence matching with ranking (find sentence with maximum matching query words)
+      if (!response && words.length > 0) {
+        let bestSent = null;
+        let maxScore = 0;
+        const queryPhrase = cleanNorm.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+        for (const sent of this.sentences) {
+          const sLower = sent.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
+          let score = words.filter(w => sLower.includes(w)).length;
+          // Substring phrase bonus for exact multi-word alignment
+          if (queryPhrase.length > 5 && sLower.includes(queryPhrase)) {
+            score += 5;
+          }
+          if (score > maxScore) {
+            maxScore = score;
+            bestSent = sent;
+          }
+        }
+        const minRequired = Math.min(2, words.length);
+        if (bestSent && maxScore >= minRequired && maxScore > 0) {
+          response = `According to verified source records: "${bestSent.text}"`;
+          citation = `Sentence #${bestSent.id + 1} (${bestSent.source})`;
+          status = "VERBATIM_CITATION";
+          if (words[0]) this.episodic.activeFocus = words[0];
+
+          // Check if any direct relation matches to provide proofTrace
+          for (const w of words) {
+            const canon = this.canonicalize(w);
+            if (this.subMap.has(canon)) {
+              const rels = this.subMap.get(canon);
+              if (rels.length > 0) {
+                const r = rels[0];
+                proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 4C. Check direct relation lookup across symbols
+      if (!response && words.length > 0) {
         for (const w of words) {
           const canon = this.canonicalize(w);
-          // Look for direct relations
           if (this.subMap.has(canon)) {
             const rels = this.subMap.get(canon);
             if (rels.length > 0) {
@@ -358,22 +410,7 @@ class SymbolicEngine {
         }
       }
 
-      // Check verbatim literal sentence matching if not found
-      if (!response) {
-        for (const sent of this.sentences) {
-          const sLower = sent.text.toLowerCase();
-          const matchCount = words.filter(w => sLower.includes(w)).length;
-          if (matchCount >= Math.min(2, words.length) && matchCount > 0) {
-            response = `According to verified source records: "${sent.text}"`;
-            citation = `Sentence #${sent.id + 1} (${sent.source})`;
-            status = "VERBATIM_CITATION";
-            if (words[0]) this.episodic.activeFocus = words[0];
-            break;
-          }
-        }
-      }
-
-      // Fail-Closed Fallback
+      // 4D. Fail-Closed Fallback (0% hallucination)
       if (!response) {
         response = "I don't know (No verified ground truth matches this assertion).";
         status = "UNKNOWN_FAIL_CLOSED";

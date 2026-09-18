@@ -2,6 +2,7 @@
 #define SYMBOL_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef uint32_t SYMBOL_ID;
 
