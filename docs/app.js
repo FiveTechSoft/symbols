@@ -14,25 +14,31 @@ let draggedNode = null;
 let activeHighlightedNode = null;
 
 // Initialize Web Application
-document.addEventListener("DOMContentLoaded", () => {
-  engine = new SymbolicEngine();
-  initCanvas();
-  loadStoredSession();
+if (typeof document !== "undefined") {
+  document.addEventListener("DOMContentLoaded", () => {
+    engine = new SymbolicEngine();
+    fetch("english-spanish.txt")
+      .then(r => r.ok ? r.text() : null)
+      .then(txt => { if (txt) engine.loadTranslationTable(txt); })
+      .catch(() => {});
+    initCanvas();
+    loadStoredSession();
 
-  // If empty, load default Bible preset
-  if (engine.sentences.length === 0) {
-    loadPresetCorpus("bible");
-    highlightActivePresetCard("bible");
-  } else {
-    const savedPreset = localStorage.getItem("symbolic_active_preset") || "bible";
-    highlightActivePresetCard(savedPreset);
-    updateUIStats();
-    rebuildGraphVisualizer();
-  }
+    // If empty, load default Bible preset
+    if (engine.sentences.length === 0) {
+      loadPresetCorpus("bible");
+      highlightActivePresetCard("bible");
+    } else {
+      const savedPreset = localStorage.getItem("symbolic_active_preset") || "bible";
+      highlightActivePresetCard(savedPreset);
+      updateUIStats();
+      rebuildGraphVisualizer();
+    }
 
-  setupEventListeners();
-  startCanvasLoop();
-});
+    setupEventListeners();
+    startCanvasLoop();
+  });
+}
 
 // Setup DOM Event Listeners
 function setupEventListeners() {
@@ -215,6 +221,8 @@ function extractSearchTopic(query, activeFocus = null) {
     // Spanish
     /^(que\s+mas\s+(puedes\s+)?(decir(me)?|contar(me)?|sabes|hay)\s*(acerca\s+de|sobre|de)?)/i,
     /^(que\s+sabes\s+(acerca\s+de|sobre|de)?)/i,
+    /^(quien(es)?\s+(es|son|fue|fueron)?\s*(el|la|los|las|su|sus|de|del)?)/i,
+    /^(who\s+(is|are|was|were)\s*(the|a|an)?)/i,
     /^(que\s+es\s+(un|una|el|la)?)/i,
     /^(cual(es)?\s+(es|son)?\s*(el|la|los|las|su|sus|de|del)?)/i,
     /^(para\s+que\s+sirve\s*(el|la|su)?)/i,
@@ -243,19 +251,28 @@ function extractSearchTopic(query, activeFocus = null) {
   }
 
   clean = clean
-    .replace(/\b(acerca\s+de|sobre|de)\s+(el|ella|ellos|ellas|esto|eso|aquello|este|esta)\b/gi, "")
-    .replace(/\b(about|of)\s+(it|him|her|them|this|that)\b/gi, "")
+    .replace(/^(y|and|e)\s+/i, "")
+    .replace(/^(el\s+)?libro\s+de\s+/i, "")
+    .replace(/^libro\s+(?=[a-z])/i, "")
+    .replace(/\b(acerca\s+de|respecto\s+a|en\s+cuanto\s+a|sobre|de|del|a|al|para|por|con|en|hacia)\s+(el|ella|ellos|ellas|esto|eso|aquello|este|esta)\b/gi, "")
+    .replace(/\b(about|of|to|for|with|in|towards|regarding)\s+(it|him|her|them|this|that)\b/gi, "")
+    .replace(/\b(al\s+respecto|al\s+caso|al\s+tema|sobre\s+ello|acerca\s+de\s+ello|respecto\s+a\s+ello)\b/gi, "")
     .trim();
 
-  const pronounOnly = /^(el|ella|ellos|ellas|esto|eso|aquello|este|esta|it|him|her|them|this|that)$/i;
+  clean = clean.replace(/^(su|sus|his|her|its)\s+/i, "").trim();
+
+  const pronounOnly = /^(a\s+)?(el|ella|ellos|ellas|esto|eso|aquello|este|esta|al|it|him|her|them|this|that)$/i;
   const cliticVerbs = /^(explica(lo|la|los|las|me|melo|mela)?|describe(lo|la|los|las|me|melo|mela)?|cuenta(lo|la|los|las|me|melo|mela)?|dime(lo)?|aclara(lo|la|los|las)?|detalla(lo|la)?|desarrolla(lo|la)?|continua(lo|la)?|sigue(lo|la)?|hazlo|muestraw*(lo|la)?|explain(\s+(it|this|that))?|describe(\s+(it|this|that))?|elaborate(\s+on\s+(it|this|that))?|continue|proceed|go\s+on)$/i;
   const propertyWords = /^(proposito|propositos|funcion|funciones|significado|origen|autor|autoria|historia|purpose|function|meaning|origin|author)$/i;
+  const kinshipWords = /^(hijo|hija|hijos|padre|madre|padres|hermano|hermana|son|daughter|father|mother|brother|sister)$/i;
 
-  if (!clean || pronounOnly.test(clean) || cliticVerbs.test(clean) || (propertyWords.test(clean) && activeFocus)) {
+  const isAnaphoricWord = propertyWords.test(clean) || kinshipWords.test(clean);
+
+  if (!clean || pronounOnly.test(clean) || cliticVerbs.test(clean) || (isAnaphoricWord && activeFocus)) {
     return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   clean = clean.replace(/^(el|la|los|las|un|una|the|a|an)\s+/i, "").trim();
-  if (!clean || cliticVerbs.test(clean) || (propertyWords.test(clean) && activeFocus)) {
+  if (!clean || cliticVerbs.test(clean) || (isAnaphoricWord && activeFocus)) {
     return activeFocus ? activeFocus.replace(/_/g, " ").trim() : "";
   }
   return clean;
@@ -796,7 +813,14 @@ function renderGraph() {
 }
 
 function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.innerText = text;
-  return div.innerHTML;
+  if (typeof document !== "undefined") {
+    const div = document.createElement("div");
+    div.innerText = text;
+    return div.innerHTML;
+  }
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { extractSearchTopic, detectIsSpanish, isTitleRelevant };
 }

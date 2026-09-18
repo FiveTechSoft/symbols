@@ -1,0 +1,47 @@
+# Declarative English <-> Spanish Alignment Table
+# Principle: HARDCODING = 0. Declarative linguistic table externalized from code logic.
+# Format: ALIAS = CANONICAL
+
+# Names & Biblical Concepts
+solomon = salomon
+jonah = jonas
+sun = sol
+king = rey
+first = primer
+old = antiguo
+new = nuevo
+testament = testamento
+books = libros
+book = libro
+bible = biblia
+
+# Psychology & Psychoanalysis (Jung)
+energia psiquica = psychic energy
+energia = energy
+psiquica = psychic
+psiquico = psychic
+inconsciente = unconscious
+colectivo = collective
+colectiva = collective
+archetypes = archetype
+arquetipo = archetype
+arquetipos = archetype
+materno = maternal
+materna = maternal
+paterno = paternal
+paterna = paternal
+simbolos = symbol
+simbolo = symbol
+symbols = symbol
+
+# Physics & Quantum Information
+entrelazamiento = entanglement
+superposicion = superposition
+teletransportacion = teleportation
+decoherencia = decoherence
+cuantico = quantum
+cuantica = quantum
+algoritmo de shor = shor_algorithm
+shor = shor_algorithm
+algoritmo de grover = grover_algorithm
+grover = grover_algorithm

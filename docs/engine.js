@@ -25,7 +25,7 @@ class SymbolicEngine {
       "those", "there", "their", "it", "its", "as", "he", "she", "they", "we",
       "tell", "say", "know", "knows", "explain", "describe", "give", "continue", "proceed", "next",
       "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "pero",
-      "en", "sobre", "a", "para", "por", "de", "del", "con", "sin", "desde",
+      "en", "sobre", "a", "al", "para", "por", "de", "del", "con", "sin", "desde",
       "hasta", "es", "son", "era", "eran", "fue", "fueron", "ser", "estar",
       "ha", "han", "que", "cual", "cuales", "quien", "quienes", "este", "esta",
       "estos", "estas", "ese", "esa", "esos", "esas", "su", "sus", "como",
@@ -44,6 +44,72 @@ class SymbolicEngine {
       "hizo", "hacer", "hace",
       "me", "te", "se", "nos", "os", "yo", "tu", "mi", "mis", "ti"
     ]);
+
+    this.translationMap = new Map();
+    this.translationPhrases = [];
+    this.initDictionary();
+  }
+
+  // Load declarative linguistic dictionary table (HARDCODING = 0)
+  initDictionary() {
+    let dictText = null;
+    if (typeof DEFAULT_DICTIONARY_TEXT !== "undefined") {
+      dictText = DEFAULT_DICTIONARY_TEXT;
+    } else if (typeof require !== "undefined") {
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const p1 = path.resolve(__dirname, "../data/english-spanish.txt");
+        const p2 = path.resolve(__dirname, "english-spanish.txt");
+        const target = fs.existsSync(p1) ? p1 : (fs.existsSync(p2) ? p2 : null);
+        if (target) {
+          dictText = fs.readFileSync(target, "utf-8");
+        } else {
+          dictText = require("./data.js").DEFAULT_DICTIONARY_TEXT;
+        }
+      } catch (e) {}
+    }
+    if (dictText) {
+      this.loadTranslationTable(dictText);
+    }
+  }
+
+  // Ingest raw text table of declarative alias=canonical mappings
+  loadTranslationTable(rawText) {
+    if (!rawText) return;
+    this.translationMap.clear();
+    const lines = rawText.split(/\r?\n/);
+    const phrasePairs = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const parts = trimmed.split(/[=\t]/).map(s => s.trim().toLowerCase());
+      if (parts.length >= 2) {
+        const alias = parts[0];
+        const canon = parts[1];
+        this.translationMap.set(alias, canon);
+        phrasePairs.push([alias, canon]);
+      }
+    }
+    phrasePairs.sort((a, b) => b[0].length - a[0].length);
+    this.translationPhrases = phrasePairs.map(([from, to]) => ({
+      regex: new RegExp(`\\b${from.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, "gi"),
+      to
+    }));
+  }
+
+  // Normalize string through declarative translation table
+  normalizeWithTranslations(text) {
+    if (!text) return "";
+    let res = text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    if (this.translationPhrases && this.translationPhrases.length > 0) {
+      for (const p of this.translationPhrases) {
+        res = res.replace(p.regex, p.to);
+      }
+    }
+    return res;
   }
 
   // DJB2a 32-bit Hash
@@ -56,21 +122,16 @@ class SymbolicEngine {
     return Math.abs(hash);
   }
 
-  // Canonicalize token (lowercase, diacritic-normalized, alpha-numeric)
+  // Canonicalize token (lowercase, diacritic-normalized, alpha-numeric, dictionary-mapped)
   canonicalize(token) {
     let t = token
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9_]/g, "");
-    if (t === "solomon") return "salomon";
-    if (t === "jonah") return "jonas";
-    if (t === "sun") return "sol";
-    if (t === "energia") return "energy";
-    if (t === "psiquica" || t === "psiquico") return "psychic";
-    if (t === "inconsciente") return "unconscious";
-    if (t === "arquetipo" || t === "arquetipos") return "archetype";
-    if (t === "simbolo" || t === "simbolos") return "symbol";
+    if (this.translationMap && this.translationMap.has(t)) {
+      return this.translationMap.get(t);
+    }
     return t;
   }
 
@@ -337,21 +398,7 @@ class SymbolicEngine {
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
     else {
-      const cleanNorm = clean
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\bsolomon\b/g, "salomon")
-        .replace(/\bjonah\b/g, "jonas")
-        .replace(/\bsun\b/g, "sol")
-        .replace(/\benergia\s+psiquica\b/g, "psychic energy")
-        .replace(/\benergia\b/g, "energy")
-        .replace(/\bpsiquica\b/g, "psychic")
-        .replace(/\bpsiquico\b/g, "psychic")
-        .replace(/\binconsciente\b/g, "unconscious")
-        .replace(/\barquetipo\b/g, "archetype")
-        .replace(/\barquetipos\b/g, "archetypes")
-        .replace(/\bsimbolo\b/g, "symbol")
-        .replace(/\bsimbolos\b/g, "symbols");
+      const cleanNorm = this.normalizeWithTranslations(clean);
       // Extract target words filtered by stopwords
       let words = cleanNorm
         .replace(/[^a-z0-9\s]/g, " ")
@@ -385,6 +432,15 @@ class SymbolicEngine {
         cleanNorm.includes("su funcion") ||
         cleanNorm.includes("su origen") ||
         cleanNorm.includes("su significado") ||
+        cleanNorm.includes("a el") ||
+        cleanNorm.includes("a ella") ||
+        cleanNorm.includes("a ellos") ||
+        cleanNorm.includes("a ellas") ||
+        cleanNorm.includes("al respecto") ||
+        cleanNorm.includes("respecto a el") ||
+        cleanNorm.includes("respecto a ella") ||
+        cleanNorm.includes("respecto a ellos") ||
+        cleanNorm.includes("respecto a ellas") ||
         cleanNorm.includes("de que trata") ||
         cleanNorm.includes("de que habla") ||
         cleanNorm.includes("de que va") ||
@@ -395,13 +451,35 @@ class SymbolicEngine {
         cleanNorm.includes("que mas") ||
         cleanNorm.includes("sobre el") ||
         cleanNorm.includes("sobre ella") ||
+        cleanNorm.includes("sobre ellos") ||
+        cleanNorm.includes("sobre ellas") ||
         cleanNorm.includes("de el") ||
         cleanNorm.includes("de ella") ||
+        cleanNorm.includes("de ellos") ||
+        cleanNorm.includes("de ellas") ||
+        cleanNorm.includes("en cuanto a el") ||
+        cleanNorm.includes("en cuanto a ella") ||
+        cleanNorm.includes("en cuanto a ellos") ||
+        cleanNorm.includes("acerca de el") ||
+        cleanNorm.includes("acerca de ella") ||
+        cleanNorm.includes("acerca de ellos") ||
         cleanNorm.includes("su autor") ||
         cleanNorm.includes("sus libros") ||
         cleanNorm.includes("que libros") ||
         cleanNorm.includes("lista los") ||
         cleanNorm.includes("cuales son los") ||
+        cleanNorm.includes("su hijo") ||
+        cleanNorm.includes("su padre") ||
+        cleanNorm.includes("his son") ||
+        cleanNorm.includes("his father") ||
+        cleanNorm.includes("about it") ||
+        cleanNorm.includes("about him") ||
+        cleanNorm.includes("about her") ||
+        cleanNorm.includes("about them") ||
+        cleanNorm.includes("of it") ||
+        cleanNorm.includes("of him") ||
+        cleanNorm.includes("of her") ||
+        cleanNorm.includes("of them") ||
         cleanNorm.includes("tell me about") ||
         cleanNorm.includes("what is it about") ||
         cleanNorm.includes("tell me more");
@@ -430,6 +508,12 @@ class SymbolicEngine {
         const p = cleanNorm.includes("son of") ? "son of" : "hijo de";
         targetEntity = cleanNorm.substring(cleanNorm.indexOf(p) + p.length).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9_]/g, "");
         targetPredicate = "father_of";
+      } else if ((cleanNorm.includes("su hijo") || cleanNorm.includes("his son")) && this.episodic.activeFocus) {
+        targetEntity = this.episodic.activeFocus;
+        targetPredicate = "father_of";
+      } else if ((cleanNorm.includes("su padre") || cleanNorm.includes("his father")) && this.episodic.activeFocus) {
+        targetEntity = this.episodic.activeFocus;
+        targetPredicate = "son_of";
       }
 
       if (targetEntity && targetPredicate === "son_of") {
@@ -444,7 +528,21 @@ class SymbolicEngine {
             citation = `Sentence #${sonRel.sourceSentId + 1}: "${this.sentences[sonRel.sourceSentId].text}"`;
           }
           status = "EXACT_ANSWER";
-          this.episodic.activeFocus = parent.toLowerCase();
+          this.episodic.activeFocus = targetEntity.toLowerCase();
+        }
+      } else if (targetEntity && targetPredicate === "father_of") {
+        const canonTarget = this.canonicalize(targetEntity);
+        const rels = this.objMap.get(canonTarget) || [];
+        const sonRel = rels.find(r => r.predicate === "son_of");
+        if (sonRel) {
+          const child = sonRel.subject.toUpperCase();
+          response = `The son of ${targetEntity.toUpperCase()} is ${child}.`;
+          proofTrace = [`${child} ──SON_OF──> ${canonTarget.toUpperCase()}`];
+          if (sonRel.sourceSentId !== -1 && this.sentences[sonRel.sourceSentId]) {
+            citation = `Sentence #${sonRel.sourceSentId + 1}: "${this.sentences[sonRel.sourceSentId].text}"`;
+          }
+          status = "EXACT_ANSWER";
+          this.episodic.activeFocus = child.toLowerCase();
         }
       }
 
@@ -455,22 +553,7 @@ class SymbolicEngine {
         const isContinuation = isAnaphoric && (cleanNorm.includes("que mas") || cleanNorm.includes("dime mas") || cleanNorm.includes("continua") || cleanNorm.includes("tell me more") || cleanNorm.includes("what else"));
         const queryPhrase = cleanNorm.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
         for (const sent of this.sentences) {
-          const sLower = sent.text
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\bsolomon\b/g, "salomon")
-            .replace(/\bjonah\b/g, "jonas")
-            .replace(/\bsun\b/g, "sol")
-            .replace(/\benergia\s+psiquica\b/g, "psychic energy")
-            .replace(/\benergia\b/g, "energy")
-            .replace(/\bpsiquica\b/g, "psychic")
-            .replace(/\bpsiquico\b/g, "psychic")
-            .replace(/\binconsciente\b/g, "unconscious")
-            .replace(/\barquetipo\b/g, "archetype")
-            .replace(/\barquetipos\b/g, "archetypes")
-            .replace(/\bsimbolo\b/g, "symbol")
-            .replace(/\bsimbolos\b/g, "symbols")
+          const sLower = this.normalizeWithTranslations(sent.text.toLowerCase())
             .replace(/[^a-z0-9\s]/g, " ");
           let score = words.filter(w => sLower.includes(w)).length;
           // Substring phrase bonus for exact multi-word alignment
@@ -482,6 +565,11 @@ class SymbolicEngine {
             if (!META_WORDS.has(w) && (sLower.startsWith(w) || sLower.includes("libro de " + w) || sLower.includes(w + " es") || sLower.includes("atribuye al rey " + w) || sLower.includes("rey " + w))) {
               score += 3;
             }
+          }
+          // Authorship alignment bonus
+          if ((words.includes("escribio") || words.includes("wrote") || words.includes("autor") || words.includes("autoria") || words.includes("author")) &&
+              (sLower.includes("escribio") || sLower.includes("wrote") || sLower.includes("autoria") || sLower.includes("autor") || sLower.includes("author"))) {
+            score += 4;
           }
           // Penalty for already cited sentences:
           if (this.episodic.citedSentIds && this.episodic.citedSentIds.has(sent.id)) {
@@ -497,7 +585,7 @@ class SymbolicEngine {
           }
         }
         const minRequired = Math.min(2, words.length);
-        if (bestSent && maxScore >= minRequired && maxScore > 0) {
+        if (bestSent && maxScore >= (minRequired - 0.5) && maxScore > 0) {
           response = `According to verified source records: "${bestSent.text}"`;
           citation = `Sentence #${bestSent.id + 1} (${bestSent.source})`;
           status = "VERBATIM_CITATION";
@@ -512,27 +600,36 @@ class SymbolicEngine {
             this.episodic.activeFocus = words[0];
           }
 
-          // Check if any direct relation matches to provide proofTrace (subject or object)
+          // Check if any direct relation matches to provide proofTrace (prioritizing predicate matches)
+          let matchingRel = null;
           for (const w of words) {
             const canon = this.canonicalize(w);
-            if (this.subMap.has(canon)) {
-              const rels = this.subMap.get(canon);
-              if (rels.length > 0) {
-                const r = rels[0];
-                proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
+            const candidates = [...(this.subMap.get(canon) || []), ...(this.objMap ? this.objMap.get(canon) || [] : [])];
+            for (const r of candidates) {
+              const pNorm = r.predicate.toLowerCase();
+              if (words.includes(pNorm) || (pNorm === "escribio" && words.includes("wrote")) || (pNorm === "wrote" && words.includes("escribio")) || (pNorm === "first_king_of" && words.includes("primer"))) {
+                matchingRel = r;
                 break;
               }
             }
-            if (this.objMap && this.objMap.has(canon)) {
-              const rels = this.objMap.get(canon);
-              if (rels.length > 0) {
-                const r = rels[0];
-                proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
+            if (matchingRel) break;
+          }
+          if (!matchingRel) {
+            for (const w of words) {
+              const canon = this.canonicalize(w);
+              if (this.subMap.has(canon) && this.subMap.get(canon).length > 0) {
+                matchingRel = this.subMap.get(canon)[0];
+                break;
+              }
+              if (this.objMap && this.objMap.has(canon) && this.objMap.get(canon).length > 0) {
+                matchingRel = this.objMap.get(canon)[0];
                 break;
               }
             }
           }
-          if (!proofTrace && words.includes("psychic") && words.includes("energy")) {
+          if (matchingRel) {
+            proofTrace = [`${matchingRel.subject.toUpperCase()} ──${matchingRel.predicate.toUpperCase()}──> ${matchingRel.object.toUpperCase()}`];
+          } else if (words.includes("psychic") && words.includes("energy")) {
             if (this.objMap && this.objMap.has("psychic_energy")) {
               const rels = this.objMap.get("psychic_energy");
               if (rels.length > 0) {
@@ -602,8 +699,9 @@ class SymbolicEngine {
 
   // Load Preset Corpus
   loadPreset(key) {
-    if (!PRESET_CORPORA[key]) return null;
-    const preset = PRESET_CORPORA[key];
+    const corpora = typeof PRESET_CORPORA !== "undefined" ? PRESET_CORPORA : (typeof require !== "undefined" ? require("./data.js").PRESET_CORPORA : {});
+    if (!corpora[key]) return null;
+    const preset = corpora[key];
     const t0 = performance.now();
 
     for (const sent of preset.sentences) {
@@ -677,4 +775,8 @@ class SymbolicEngine {
     if (data.episodic) this.episodic = data.episodic;
     return true;
   }
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { SymbolicEngine };
 }
