@@ -102,7 +102,10 @@ typedef struct {
 } SYMBOL;
 ```
 Hashing is governed by the modified DJB2a algorithm with XOR dispersion:
-$$h(s) = \left( \prod_{i=1}^{|s|} 33 \oplus s_i \right) \ \& \ (2^k - 1)$$
+
+$$
+h(s) = \left( \prod_{i=1}^{|s|} 33 \oplus s_i \right) \land (2^k - 1)
+$$
 
 #### Relational Triples
 Knowledge is stored as discrete relational triples $\langle \text{Subject}, \text{Predicate}, \text{Object} \rangle$:
@@ -116,10 +119,15 @@ typedef struct {
 } RELATION;
 ```
 Each relation struct occupies **strictly 32 bytes**. Indexing uses a 64-bit integer mixing function (MurmurMix64) combining subject, predicate, and object into a high-dispersion hash bucket:
-$$k = (\text{subject} \ll 32) \oplus (\text{predicate} \ll 16) \oplus \text{object}$$
-$$k \leftarrow (k \oplus (k \gg 33)) \cdot \text{0xff51afd7ed558ccd}$$
-$$k \leftarrow (k \oplus (k \gg 33)) \cdot \text{0xc4ceb9fe1a85ec53}$$
-$$h_{\text{rel}} = (k \oplus (k \gg 33)) \ \& \ (\text{capacity} - 1)$$
+
+$$
+\begin{aligned}
+k &= (\text{subject} \ll 32) \oplus (\text{predicate} \ll 16) \oplus \text{object} \\
+k &\leftarrow (k \oplus (k \gg 33)) \cdot \text{0xff51afd7ed558ccd} \\
+k &\leftarrow (k \oplus (k \gg 33)) \cdot \text{0xc4ceb9fe1a85ec53} \\
+h_{\text{rel}} &= (k \oplus (k \gg 33)) \land (\text{capacity} - 1)
+\end{aligned}
+$$
 
 Using power-of-two table capacities, bitwise masking replaces costly modulo division, and open addressing with linear probing ensures cache locality. Automatic rehashing occurs when the load factor exceeds 70%.
 
@@ -130,20 +138,22 @@ To overcome the brittle discreteness of classical symbolic systems (e.g., failin
 #### Vector Construction (Hebbian Co-occurrence)
 Instead of gradient descent over large corpora, vectors are updated online via streaming Random Indexing and Hebbian co-occurrence windows:
 1. Each symbol is initially assigned an ultra-sparse ternary signature $\mathbf{r}_w \in \{-1, 0, 1\}^{32}$.
-2. When word $w$ appears within context window $\mathcal{W}$ of word $u$, vector accumulation occurs:
-$$\mathbf{v}_w^{(t+1)} = \mathbf{v}_w^{(t)} + \frac{1}{\text{dist}(w, u)} \mathbf{r}_u$$
+2. When word $w$ appears within context window $\mathcal{W}$ of word $u$, vector accumulation occurs: $\mathbf{v}_w^{(t+1)} = \mathbf{v}_w^{(t)} + \frac{1}{\text{dist}(w, u)} \mathbf{r}_u$.
 3. Vectors are normalized to unit Euclidean length: $\hat{\mathbf{v}} = \frac{\mathbf{v}}{\|\mathbf{v}\|_2}$.
 
 Semantic similarity is evaluated via cosine similarity:
-$$\text{Sim}(u, w) = \sum_{d=0}^{31} \hat{\mathbf{v}}_u[d] \cdot \hat{\mathbf{v}}_w[d]$$
+
+$$
+\text{Sim}(u, w) = \sum_{d=0}^{31} \hat{\mathbf{v}}_u[d] \cdot \hat{\mathbf{v}}_w[d]
+$$
+
 On modern x86/ARM hardware, this 32-dimensional dot product executes in **~2 nanoseconds** via SIMD vectorization.
 
 ### 2.3 First-Order Literal Sentence Store and Exact Provenance
 
 When ingesting unstructured natural language (e.g., `.txt` files), the engine constructs an in-memory literal sentence store:
 - **Streaming Parser**: Tokenizes text into sentences and normalized symbols on-the-fly with 64 KB buffering.
-- **Provenance Inverted Index**: For each extracted symbol, a compact posting list registers the literal sentence offsets:
-$$\text{Posting}(w) = \{ \text{sent\_id}_1, \text{sent\_id}_2, \dots, \text{sent\_id}_m \}$$
+- **Provenance Inverted Index**: For each extracted symbol, a compact posting list registers the literal sentence offsets: $\text{Posting}(w) = \{ \text{id}_1, \text{id}_2, \dots, \text{id}_m \}$.
 - **Zero-Hallucination Retrieval**: When answering a natural language question, the engine retrieves the exact original sentence from which the fact was extracted, appending the source text verbatim. If no matching ground truth exists, the model safely outputs `UNKNOWN`.
 
 ### 2.4 Second-Order Reflexive Meta-Graph ($\mathcal{M}$)
@@ -157,12 +167,15 @@ Beyond first-order textual facts, the engine constructs a dynamic meta-graph $\m
 A central challenge in unsupervised language understanding is discovering what a text is about without relying on hand-crafted stopword lists or pre-trained neural tokenizers.
 
 We introduce the **Concept Concentration Metric** $\kappa(w)$:
-$$\kappa(w) = \frac{\max_{d \in [0, 31]} \mathbf{v}_w[d]}{\sum_{d=0}^{31} \mathbf{v}_w[d]} \cdot \log(1 + f_w)$$
+
+$$
+\kappa(w) = \frac{\max_{d \in [0, 31]} \mathbf{v}_w[d]}{\sum_{d=0}^{31} \mathbf{v}_w[d]} \cdot \log(1 + f_w)
+$$
+
 where $\mathbf{v}_w[d] \ge 0$ is the accumulated co-occurrence mass along dimension $d$, and $f_w$ is the corpus term frequency.
 
 #### Thematic Discriminability Principle
-- **Syntactic "Glue" Words** (*the, of, and, in, with*): Appear indiscriminately across all linguistic contexts. Their co-occurrence mass is distributed uniformly across all 32 dimensions, yielding a near-zero concentration:
-$$\max_d \mathbf{v}_w[d] \approx \frac{1}{32} \sum_d \mathbf{v}_w[d] \implies \kappa(w) \to 0$$
+- **Syntactic "Glue" Words** (*the, of, and, in, with*): Appear indiscriminately across all linguistic contexts. Their co-occurrence mass is distributed uniformly across all 32 dimensions, yielding a near-zero concentration: $\max_d \mathbf{v}_w[d] \approx \frac{1}{32} \sum_d \mathbf{v}_w[d] \implies \kappa(w) \to 0$.
 - **Semantic Anchor Concepts** (*socrates, soul, algorithm, oxygen*): Appear in highly specific relational contexts. Their co-occurrence concentrates along specific semantic axes, producing high $\kappa(w)$.
 
 Sorting symbols by $\kappa(w)$ reveals the fundamental thematic pillars of any corpus immediately after ingestion, enabling autonomous conversational introspection:
@@ -191,7 +204,11 @@ While conversing with an end user or operating inside an autonomous agent harnes
 
 #### 2.6.3 Episodic Interaction Subgraph ($\mathcal{M}_{\text{ep}}$)
 Dialogue history is not stored as an opaque flat string of tokens. Instead, the engine materializes an episodic subgraph:
-$$\mathcal{M}_{\text{ep}} = \langle \text{Turn}_k, \text{FocusConcept}, \text{QueryType}, \text{Timestamp}, \text{ActivatedNodes} \rangle$$
+
+$$
+\mathcal{M}_{\text{ep}} = \langle \text{Turn}_k, \text{FocusConcept}, \text{QueryType}, \text{Timestamp}, \text{ActivatedNodes} \rangle
+$$
+
 - Tracks discourse trajectory and conversational focus shifts in $O(1)$.
 - Enables metacognitive inspection (*"what were we discussing at the start?"*, *"forget what I said about my API key"*).
 
@@ -242,13 +259,20 @@ function Deduce(Subject S, Predicate P, Object O, depth, max_depth, γ):
 ### 3.2 Matmul-Free Symbolic Attention
 
 Traditional Transformers compute attention via quadratic matrix multiplications:
-$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V, \quad \mathcal{O}(N^2 \cdot d)$$
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V, \quad \mathcal{O}(N^2 \cdot d)
+$$
 
 Symbolic LLM calculates attention over tokens in a prompt or sentence using direct Knowledge Base structural topology:
-$$\text{Attention}(t_i) = w_r \cdot \text{deg}_{\text{KB}}(t_i) + w_c \cdot \text{conn}(t_i, \{t_{\setminus i}\}) + w_p \cdot \text{pos}(t_i) + w_n \cdot \text{novelty}(t_i)$$
+
+$$
+\text{Attention}(t_i) = w_r \cdot \text{deg}_{\text{KB}}(t_i) + w_c \cdot \text{conn}(t_i, t_{\setminus i}) + w_p \cdot \text{pos}(t_i) + w_n \cdot \text{novelty}(t_i)
+$$
+
 where:
 - $\text{deg}_{\text{KB}}(t_i)$: Number of verified relations involving symbol $t_i$ in the graph.
-- $\text{conn}(t_i, \{t_{\setminus i}\})$: Number of direct relational edges connecting $t_i$ to other tokens in the same input.
+- $\text{conn}(t_i, t_{\setminus i})$: Number of direct relational edges connecting $t_i$ to other tokens in the same input.
 - $\text{pos}(t_i)$: Structural positional bias (favoring Subject-Verb-Object head positions).
 - $\text{novelty}(t_i)$: Flag denoting unseen information worthy of episodic assimilation.
 
@@ -335,7 +359,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 
 ### 5.1 Build from Source
 
-Requirements: Any standard C11 compiler (GCC, Clang, or MSVC) and CMake $\ge 3.20$.
+Requirements: Any standard C11 compiler (GCC, Clang, or MSVC) and CMake >= 3.20.
 
 ```bash
 # Clone the repository
