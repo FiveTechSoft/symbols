@@ -20,6 +20,7 @@ add_library(symbolic STATIC
     src/deep_nlg.c
     src/graph_reasoning.c
     src/cognitive_learning.c
+    src/stochastic_nlg.c
     src/numeric.c
     src/prune.c
     src/shard.c
@@ -125,6 +126,7 @@ sllm_test(test_deep_nlg        tests/test_deep_nlg.c)
 sllm_test(test_graph_reasoning tests/test_graph_reasoning.c)
 sllm_test(test_verify_3_points tests/test_verify_3_points.c)
 sllm_test(test_cognitive_learning tests/test_cognitive_learning.c)
+sllm_test(test_stochastic_nlg tests/test_stochastic_nlg.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)

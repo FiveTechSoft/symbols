@@ -500,6 +500,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **11/11 Graph Reasoning Suite (`test_graph_reasoning`)**: Validating AMIE/ILP inductive rule mining, forward deductive link prediction, and abductive hypothesis discovery with zero false positives.
 - **Formal 3-Point Cognitive Verification (`test_verify_3_points`)**: Validating tabula-rasa rule learning, autonomous forward memory expansion, and abductive proof of necessity & sufficiency.
 - **11/11 Cognitive Learning Suite (`test_cognitive_learning`)**: Validating the Peircean inquiry cycle, curiosity-driven active questioning, non-monotonic belief revision with exception guards, and self-supervised masked edge reconstruction.
+- **12/12 Stochastic NLG & Truth-Preserving Dialogue Suite (`test_stochastic_nlg`)**: Validating non-deterministic conversational generation, temperature-controlled rhetorical sampling ($\tau \in [0.0, 1.0]$), repetition penalties, and zero factual hallucinations.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
