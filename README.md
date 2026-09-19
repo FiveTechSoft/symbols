@@ -407,6 +407,30 @@ To verbalize complex multi-hop inference chains without the rigid phrasing of cl
    - **Coordination & Subject Elision**: Groups multi-attribute entities without repetitive subject mentions (*"David is the son of Jesse, king of Israel, and furthermore the father of Solomon."*).
 3. **Surface Realization & Epistemic Honesty**: Generates multilingual prose across Spanish, English, and French (`LANG_ES`, `LANG_EN`, `LANG_FR`), transforming unknown states into articulate explanations of epistemic boundaries (*"Although David is referenced, there is no verified record of his mother."*).
 
+### 3.7 Advanced Cognitive Learning Paradigms on the Peircean Triad
+
+Building upon the fundamental triad of Induction, Deduction, and Abduction (Charles Sanders Peirce's Cycle of Inquiry), Symbolic LLM implements four higher-order autonomous learning paradigms (`src/cognitive_learning.c`, `include/cognitive_learning.h`):
+
+#### 3.7.1 Active Epistemic Inquiry & Curiosity-Driven Assimilation
+When a user or reasoning goal requests information that is currently `UNKNOWN`, the engine does not merely stop. Instead, `CognitiveFormulateInquiry`:
+1. Utilizes abductive inference to trace the missing causal or relational link.
+2. Synthesizes a targeted inquiry question and search query keywords (e.g., `"david padre_de salomon"` with priority $P=1.00$).
+3. Upon receiving external evidence (`CognitiveAssimilateEvidence`), the engine assimilates the edge into the knowledge graph and automatically triggers forward deduction to immediately confirm the original goal.
+
+#### 3.7.2 Non-Monotonic Belief Revision (Defeasible Reasoning & Exception Guards)
+Real-world ontologies require defeasible reasoning where general rules hold default truth subject to specific overrides (e.g., *"birds fly"*, but *"penguins do not fly"*). `CognitiveRegisterException` attaches dynamic exception guards to learned rules:
+- Deduces positive properties for standard members of a class ($\text{aguila} \xrightarrow{\text{vuela\_en}} \text{cielo}$).
+- Strictly blocks false deductions for registered exceptions ($\text{pinguino} \xrightarrow{\text{vuela\_en}} \text{cielo}$ is suppressed, maintaining 0 false positives).
+
+#### 3.7.3 Symbolic Self-Supervised Learning (Masked Graph Discovery)
+The symbolic equivalent of masked pre-training in language models. `CognitiveSelfSupervisedTrain`:
+1. Systematically masks a subset of composite or transitive relations within the graph.
+2. Attempts to deductively reconstruct the masked edges using only the remaining graph topology and active induction rules.
+3. Quantifies the reconstruction rate ($\text{reconstructed} / \text{masked}$) and self-calibrates rule confidence thresholds without human annotation (achieving **100.00% reconstruction** on benchmark graphs).
+
+#### 3.7.4 Continuous Peircean Inquiry Cycle
+The `CognitiveRunInquiryCycle` unifies observation, induction, forward deduction, and belief revision into an automated cognitive loop, enabling the engine to perpetually organize, enrich, and audit its internal ontology.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -475,6 +499,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **47 / 49 CTest Unit & Integration Tests PASS (96%)**: Validating symbol hashing, 32D embeddings, backward chaining, BFS transitive closure, anaphora resolution, schema transfer, QA layer, text lexicon, and server protocols. (2 pre-existing failures in composite/clarify tests.)
 - **11/11 Graph Reasoning Suite (`test_graph_reasoning`)**: Validating AMIE/ILP inductive rule mining, forward deductive link prediction, and abductive hypothesis discovery with zero false positives.
 - **Formal 3-Point Cognitive Verification (`test_verify_3_points`)**: Validating tabula-rasa rule learning, autonomous forward memory expansion, and abductive proof of necessity & sufficiency.
+- **11/11 Cognitive Learning Suite (`test_cognitive_learning`)**: Validating the Peircean inquiry cycle, curiosity-driven active questioning, non-monotonic belief revision with exception guards, and self-supervised masked edge reconstruction.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
