@@ -64,4 +64,52 @@ int ServerBuildStreamResponse(const char *model, long created,
                               unsigned long seq, const char *content,
                               char *out, size_t size);
 
+/* ============================================================
+   OpenAI Tool Calling (Function Calling) Wire Protocol
+   ============================================================ */
+
+#define SERVER_MAX_TOOL_CALLS 8
+#define SERVER_ARG_JSON_MAX 4096
+
+typedef struct
+{
+    char id[64];
+    char name[64];
+    char arguments[SERVER_ARG_JSON_MAX];
+} OPENAI_TOOL_CALL;
+
+typedef struct
+{
+    OPENAI_TOOL_CALL calls[SERVER_MAX_TOOL_CALLS];
+    uint32_t count;
+} OPENAI_TOOL_CALLS;
+
+typedef struct
+{
+    char tool_call_id[64];
+    char name[64];
+    char content[8192];
+    int  has_response;
+} OPENAI_TOOL_RESPONSE;
+
+/* Extract list of function names declared in "tools": [...] array */
+int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_names);
+
+/* Extract the most recent {"role":"tool", ...} message from the body */
+int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out);
+
+/* Build full chat.completion JSON containing one or more tool_calls */
+int ServerBuildToolCallResponse(const char *model, long created,
+                                unsigned long seq, const OPENAI_TOOL_CALLS *tc,
+                                const char *content_thought, char *out,
+                                size_t size);
+
+/* Build SSE streaming chunks for tool_calls */
+int ServerBuildToolCallStreamResponse(const char *model, long created,
+                                      unsigned long seq, const OPENAI_TOOL_CALLS *tc,
+                                      char *out, size_t size);
+
+/* Classify whether a prompt represents a coding/software engineering task */
+int ServerIsCodingTask(const char *text);
+
 #endif

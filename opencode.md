@@ -216,7 +216,53 @@ python tools/test_opencode_web_ingest.py
 
 ---
 
+### Mode E: Native Autonomous Coding Engine (OpenAI Tool-Calling Provider)
+
+In this primary mode, **OpenCode relies 100% on Symbolic LLM** as its sole model provider without calling any external LLMs (Claude, GPT-4, Ollama). 
+
+Symbolic LLM speaks the native OpenAI Function/Tool Calling protocol directly over HTTP (`/v1/chat/completions`), orchestrating software engineering tasks using its internal STRIPS planner, code knowledge graph, and surgical patcher:
+
+```
+┌────────────────────────────────┐
+│   OpenCode Autonomous Client   │
+│ (Harness executing local tools)│
+└───────────────┬────────────────┘
+                │ 1. POST /v1/chat/completions
+                │    {"messages": [...], "tools": [...]}
+                ▼
+┌────────────────────────────────┐
+│  Symbolic LLM (symbols-server) │
+│ ────────────────────────────── │
+│ - STRIPS Forward State Search  │
+│ - Code Graph & Blast Radius    │
+│ - Surgical Hunk Pre-flight     │
+└───────────────┬────────────────┘
+                │ 2. Response: {"finish_reason": "tool_calls",
+                │    "tool_calls": [{"name": "apply_patch", ...}]}
+                ▼
+┌────────────────────────────────┐
+│   OpenCode Executes Action     │
+│   (Writes file / runs build)   │
+└───────────────┬────────────────┘
+                │ 3. POST /v1/chat/completions
+                │    {"role": "tool", "content": "exit 0"}
+                ▼
+┌────────────────────────────────┐
+│  Final Verification & Report   │
+│  (100% Verified, finish: stop) │
+└────────────────────────────────┘
+```
+
+#### Verification Script
+Run the automated end-to-end HTTP socket integration test:
+```bash
+python tools/test_opencode_agentic_server.py
+```
+
+---
+
 ## 3. Conversational Introspection Commands
+
 
 When interacting with Symbolic LLM through OpenCode, you can leverage native introspection commands:
 

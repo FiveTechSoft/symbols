@@ -570,3 +570,289 @@ int ServerBuildObservation(const char *ts, const char *model, int nmsg,
                  entities_json, prov_json, r, status, latency_ms);
     return (w > 0 && (size_t)w < size) ? 1 : 0;
 }
+
+/* ============================================================
+   OpenAI Tool Calling (Function Calling) Wire Implementation
+   ============================================================ */
+
+int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_names)
+{
+    if (body == NULL || names == NULL || max_names == 0)
+        return 0;
+
+    uint32_t count = 0;
+    const char *p = strstr(body, "\"tools\"");
+    if (p == NULL)
+        return 0;
+
+    while ((p = strstr(p, "\"name\"")) != NULL && count < max_names)
+    {
+        const char *q = p + 6;
+        while (IsWs(*q)) q++;
+        if (*q == ':')
+        {
+            q++;
+            while (IsWs(*q)) q++;
+            if (*q == '"')
+            {
+                char name[64];
+                if (TakeJsonString(&q, name, sizeof(name)))
+                {
+                    int dup = 0;
+                    for (uint32_t i = 0; i < count; i++)
+                    {
+                        if (strcmp(names[i], name) == 0)
+                        {
+                            dup = 1;
+                            break;
+                        }
+                    }
+                    if (!dup && name[0] != '\0')
+                    {
+                        strncpy(names[count], name, 63);
+                        names[count][63] = '\0';
+                        count++;
+                    }
+                }
+            }
+        }
+        p = q;
+    }
+    return (int)count;
+}
+
+int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
+{
+    if (body == NULL || out == NULL)
+        return 0;
+
+    memset(out, 0, sizeof(*out));
+    const char *p = body;
+    int found = 0;
+
+    while (*p != '\0')
+    {
+        if (*p == '"' && strncmp(p, "\"role\"", 6) == 0)
+        {
+            const char *q = p + 6;
+            while (IsWs(*q)) q++;
+            if (*q == ':')
+            {
+                q++;
+                while (IsWs(*q)) q++;
+                if (strncmp(q, "\"tool\"", 6) == 0)
+                {
+                    const char *obj_start = p;
+                    while (obj_start > body && *obj_start != '{') obj_start--;
+
+                    const char *obj_end = q;
+                    int depth = 1;
+                    while (*obj_end != '\0')
+                    {
+                        if (*obj_end == '{') depth++;
+                        else if (*obj_end == '}') {
+                            depth--;
+                            if (depth == 0) break;
+                        }
+                        obj_end++;
+                    }
+
+                    const char *s = obj_start;
+                    while (s < obj_end)
+                    {
+                        if (strncmp(s, "\"tool_call_id\"", 14) == 0)
+                        {
+                            const char *v = s + 14;
+                            while (IsWs(*v)) v++;
+                            if (*v == ':') {
+                                v++;
+                                while (IsWs(*v)) v++;
+                                TakeJsonString(&v, out->tool_call_id, sizeof(out->tool_call_id));
+                            }
+                        }
+                        else if (strncmp(s, "\"name\"", 6) == 0)
+                        {
+                            const char *v = s + 6;
+                            while (IsWs(*v)) v++;
+                            if (*v == ':') {
+                                v++;
+                                while (IsWs(*v)) v++;
+                                TakeJsonString(&v, out->name, sizeof(out->name));
+                            }
+                        }
+                        else if (strncmp(s, "\"content\"", 9) == 0)
+                        {
+                            const char *v = s + 9;
+                            while (IsWs(*v)) v++;
+                            if (*v == ':') {
+                                v++;
+                                while (IsWs(*v)) v++;
+                                TakeJsonString(&v, out->content, sizeof(out->content));
+                            }
+                        }
+                        s++;
+                    }
+                    out->has_response = 1;
+                    found = 1;
+                    p = obj_end;
+                    continue;
+                }
+            }
+        }
+        p++;
+    }
+    return found;
+}
+
+int ServerBuildToolCallResponse(const char *model, long created,
+                                unsigned long seq, const OPENAI_TOOL_CALLS *tc,
+                                const char *content_thought, char *out,
+                                size_t size)
+{
+    if (model == NULL || tc == NULL || tc->count == 0 || out == NULL || size == 0)
+        return 0;
+
+    char tool_calls_json[8192];
+    tool_calls_json[0] = '\0';
+    size_t rem = sizeof(tool_calls_json);
+
+    for (uint32_t i = 0; i < tc->count && i < SERVER_MAX_TOOL_CALLS; i++)
+    {
+        char item[4096];
+        char esc_args[4096];
+        if (!ServerJsonEscape(tc->calls[i].arguments, esc_args, sizeof(esc_args)))
+            return 0;
+
+        int len = snprintf(item, sizeof(item),
+                           "%s{\"id\":\"%s\",\"type\":\"function\",\"function\":"
+                           "{\"name\":\"%s\",\"arguments\":\"%s\"}}",
+                           (i > 0) ? "," : "",
+                           tc->calls[i].id,
+                           tc->calls[i].name,
+                           esc_args);
+        if (len <= 0 || (size_t)len >= sizeof(item))
+            return 0;
+
+        strncat(tool_calls_json, item, rem - strlen(tool_calls_json) - 1);
+    }
+
+    char content_json[1024];
+    if (content_thought != NULL && content_thought[0] != '\0')
+    {
+        char esc_thought[512];
+        ServerJsonEscape(content_thought, esc_thought, sizeof(esc_thought));
+        snprintf(content_json, sizeof(content_json), "\"%s\"", esc_thought);
+    }
+    else
+    {
+        strncpy(content_json, "null", sizeof(content_json) - 1);
+    }
+
+    int w = snprintf(out, size,
+                     "{\"id\":\"chatcmpl-symbols-%lu\",\"object\":\"chat."
+                     "completion\",\"created\":%ld,\"model\":\"%s\","
+                     "\"choices\":[{\"index\":0,\"message\":{\"role\":"
+                     "\"assistant\",\"content\":%s,\"tool_calls\":[%s]},"
+                     "\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":10,"
+                     "\"completion_tokens\":25,\"total_tokens\":35}}",
+                     seq, created, model, content_json, tool_calls_json);
+
+    return (w > 0 && (size_t)w < size) ? 1 : 0;
+}
+
+int ServerBuildToolCallStreamResponse(const char *model, long created,
+                                      unsigned long seq, const OPENAI_TOOL_CALLS *tc,
+                                      char *out, size_t size)
+{
+    if (model == NULL || tc == NULL || tc->count == 0 || out == NULL || size == 0)
+        return 0;
+
+    char tc_delta[8192];
+    tc_delta[0] = '\0';
+    for (uint32_t i = 0; i < tc->count && i < SERVER_MAX_TOOL_CALLS; i++)
+    {
+        char item[4096];
+        char esc_args[4096];
+        ServerJsonEscape(tc->calls[i].arguments, esc_args, sizeof(esc_args));
+        snprintf(item, sizeof(item),
+                 "%s{\"index\":%u,\"id\":\"%s\",\"type\":\"function\",\"function\":"
+                 "{\"name\":\"%s\",\"arguments\":\"%s\"}}",
+                 (i > 0) ? "," : "",
+                 i, tc->calls[i].id, tc->calls[i].name, esc_args);
+        strncat(tc_delta, item, sizeof(tc_delta) - strlen(tc_delta) - 1);
+    }
+
+    int w = snprintf(out, size,
+                     "data: {\"id\":\"chatcmpl-symbols-%lu\",\"object\":\"chat.completion.chunk\","
+                     "\"created\":%ld,\"model\":\"%s\",\"choices\":[{\"index\":0,\"delta\":"
+                     "{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[%s]},\"finish_reason\":null}]}\n\n"
+                     "data: {\"id\":\"chatcmpl-symbols-%lu\",\"object\":\"chat.completion.chunk\","
+                     "\"created\":%ld,\"model\":\"%s\",\"choices\":[{\"index\":0,\"delta\":{},"
+                     "\"finish_reason\":\"tool_calls\"}]}\n\n"
+                     "data: [DONE]\n\n",
+                     seq, created, model, tc_delta,
+                     seq, created, model);
+
+    return (w > 0 && (size_t)w < size) ? 1 : 0;
+}
+
+static int MatchWordBoundary(const char *text, const char *kw)
+{
+    size_t kwlen = strlen(kw);
+    const char *p = text;
+    while ((p = strstr(p, kw)) != NULL)
+    {
+        int before_ok = (p == text || (!isalnum((unsigned char)*(p - 1)) && *(p - 1) != '_'));
+        char after_char = *(p + kwlen);
+        int after_ok = (after_char == '\0' || (!isalnum((unsigned char)after_char) && after_char != '_'));
+        if (before_ok && after_ok)
+            return 1;
+        p++;
+    }
+    return 0;
+}
+
+int ServerIsCodingTask(const char *text)
+{
+    if (text == NULL || text[0] == '\0')
+        return 0;
+
+    char lower[1024];
+    size_t i = 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    static const char *exts[] = {
+        ".c", ".h", ".cpp", ".cc", ".py", ".js", ".ts", ".go", ".rs", ".sh", ".diff", ".patch"
+    };
+    for (size_t k = 0; k < sizeof(exts) / sizeof(exts[0]); k++)
+    {
+        const char *ep = strstr(lower, exts[k]);
+        if (ep != NULL && ep > lower && isalnum((unsigned char)*(ep - 1)))
+        {
+            char after = *(ep + strlen(exts[k]));
+            if (after == '\0' || isspace((unsigned char)after) || ispunct((unsigned char)after))
+                return 1;
+        }
+    }
+
+    static const char *coding_keywords[] = {
+        "fix", "bug", "patch", "refactor", "compile", "build", "test",
+        "tests", "gcc", "clang", "make", "cmake", "ctest", "function",
+        "struct", "segfault", "syntax", "pull request", "commit", "git",
+        "hunk", "diff", "regression", "rollback"
+    };
+
+    for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)
+    {
+        if (MatchWordBoundary(lower, coding_keywords[k]))
+            return 1;
+    }
+
+    return 0;
+}
+
