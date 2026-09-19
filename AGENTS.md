@@ -39,3 +39,7 @@ Regla arquitectónica:
 ## Tablas agénticas externas (Paso 1)
 
 - Las tablas agénticas declarativas (`allow`/`contract` en `data/agentic/tools.tsv`) se cargan una vez en `ToolInit()`. Cada tabla usa las filas válidas aportadas por el fichero cuando existe al menos una; en caso contrario conserva su fallback compilado. El parser es fail-closed: filas malformadas, `TYPE` desconocido o overflow se descartan con warning y nunca abortan la inicialización. La ruta del fichero es fija y el motor solo lo lee. El orden del fichero determina la prioridad. Esta separación de datos agénticos e implementación debe mantener la semántica existente; el contrato queda validado por `ctest 57/57`, seis baterías byte-idénticas, ejecución sin TSV idéntica y comprobación de idempotencia, 2026-09-18.
+
+## Integración Agéntica Nativa OpenCode (Modo E)
+
+- OpenCode opera con Symbolic LLM como su único proveedor LLM sin MCP ni llamadas a APIs de terceros. El endpoint HTTP `symbols_server` (`/v1/chat/completions`) implementa el protocolo wire de OpenAI Tool Calling: deserializa esquemas `tools`, ingesta retornos `role: "tool"` en bucle ReAct, formula el plan STRIPS óptimo y emite `tool_calls` con `finish_reason: "tool_calls"` hasta resolver la tarea con reporte Markdown (`finish_reason: "stop"`), manteniendo en paralelo el canal de consultas factuales directas. Validado por suite CTest 31/31 (`test_server_tool_calling.c`) y test de integración por socket HTTP real de 8 turnos (`tools/test_opencode_agentic_server.py`), 2026-09-20.
