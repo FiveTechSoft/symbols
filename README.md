@@ -450,6 +450,23 @@ $$R(\text{conclusion}) = \text{confidence}(\text{rule}) \times \prod_{p \in \tex
 - **Hypothetical Loss Analysis (`MetacognitiveAuditHypotheticalLoss`)**: Simulates the counterfactual impact of refuting an axiom $X$, calculating the exact forward cascade of derived beliefs that would collapse without support.
 - **Global Epistemic Health (`MetacognitiveAuditGraphHealth`)**: Quantifies the balance between direct observations, active deductions, and vulnerable beliefs.
 
+### 3.9 Document-Level Passage Generation & Soft Intent Mapping (`passage_nlg`)
+
+To bridge the gap between structured relational retrieval and the conversational fluency of large language models without compromising factual integrity, Symbolic LLM implements an integrated document-level passage synthesizer (`src/passage_nlg.c`, `include/passage_nlg.h`):
+
+#### 3.9.1 Soft Intent Classification & Elastic Matching
+Recognizes natural, open conversational queries (*"hablame de X"*, *"cuentame acerca de X"*, *"tell me about X"*, *"de que trata X"*) and maps them into formal semantic intents (`INTENT_SUMMARIZE_ENTITY`, `INTENT_WHY_QUERY`, `INTENT_VERIFY_QUERY`, `INTENT_METACOGNITION`).
+
+#### 3.9.2 Cross-Lingual Entity Linking
+Binds cross-lingual queries to canonical corpus symbols via declarative alignment dictionaries (`dict.c`), allowing Spanish questions (*"proverbios"*, *"salomon"*) to resolve directly against English knowledge graphs (`Proverbs`, `Solomon`).
+
+#### 3.9.3 Sub-Graph Storytelling (Passage Generator)
+Generates cohesive 4-paragraph essays combining:
+1. **Executive Framing**: Defining the entity's core ontological role.
+2. **Relational Dimensions**: Grounded compilation of verified graph edges.
+3. **Working Memory Integration**: Active context stimulated via bidirectional spreading activation.
+4. **Socratic Dialogic Closure**: Active curiosity prompts inviting deeper inquiry.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -521,6 +538,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **11/11 Cognitive Learning Suite (`test_cognitive_learning`)**: Validating the Peircean inquiry cycle, curiosity-driven active questioning, non-monotonic belief revision with exception guards, and self-supervised masked edge reconstruction.
 - **12/12 Stochastic NLG & Truth-Preserving Dialogue Suite (`test_stochastic_nlg`)**: Validating non-deterministic conversational generation, temperature-controlled rhetorical sampling ($\tau \in [0.0, 1.0]$), repetition penalties, and zero factual hallucinations.
 - **16/16 Working Memory & Metacognitive Auditing Suite (`test_metacognition`)**: Validating spreading activation along relational topologies, working memory temporal decay, recursive belief self-justification, weakest link detection, and counterfactual cascade loss analysis.
+- **10/10 Passage Generation & Elastic Intent Suite (`test_passage_nlg`)**: Validating document-level essay generation, soft intent classification, cross-lingual entity linking, and zero-hallucination multi-paragraph storytelling.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.

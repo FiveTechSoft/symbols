@@ -121,6 +121,30 @@ uint32_t WM_SpreadActivation(
                     num_deltas++;
                 }
             }
+
+            /* Also spread activation along incoming relations (bidirectional cognitive association) */
+            if (graph->relations)
+            {
+                for (uint32_t r = 0; r < graph->relations->count; r++)
+                {
+                    if (graph->relations->items[r].object == wm->nodes[i].symbol &&
+                        graph->relations->items[r].polarity == POLARITY_POSITIVE)
+                    {
+                        SYMBOL_ID target = graph->relations->items[r].subject;
+                        if (target == SYMBOL_INVALID) continue;
+
+                        float rel_w = (graph->relations->items[r].weight > 0.0f) ? graph->relations->items[r].weight : 1.0f;
+                        float delta = src_act * spread_factor * rel_w;
+
+                        if (delta >= wm->threshold && num_deltas < (MAX_WM_NODES * 4))
+                        {
+                            deltas[num_deltas].sym = target;
+                            deltas[num_deltas].energy = delta;
+                            num_deltas++;
+                        }
+                    }
+                }
+            }
         }
 
         /* Apply deltas */
