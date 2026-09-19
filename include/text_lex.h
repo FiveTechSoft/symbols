@@ -125,4 +125,8 @@ uint32_t TextLexTopConcepts(const GRAPH *graph, const EMBEDDING_TABLE *emb,
    Returns sentence index or UINT32_MAX if not found. */
 uint32_t TextLexFindSentenceBySymbol(const TEXTLEX *tl, SYMBOL_ID target_id);
 
+/* Phase 1: temperature control for QKVScore scaling.
+   T < 1 sharpens (top-1 dominant), T > 1 softens (uniform). */
+void TextLexSetTemperature(float t);
+
 #endif /* TEXT_LEX_H */

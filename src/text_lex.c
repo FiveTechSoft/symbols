@@ -2,12 +2,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "text_lex.h"
 #include "symbol.h"
 #include "embedding.h"
 
 #define TL_POS_MAX 4096
+
+static void LayerNorm(float *vec, uint32_t dim);
+static float g_temperature = 1.0f;
+static float CrossAttentionScore(const char *query, const char *symbol);
 
 typedef struct
 {
@@ -22,6 +27,76 @@ typedef struct
     uint32_t ntok;
     uint32_t cap;
 } TL_TOKBUF;
+
+/* Phase 2: QKV separation — inverted index + novelty cache.
+   Keys: symbol → sentences containing it (sparse, for fast lookup).
+   Values: per-symbol novelty (precomputed TF-IDF weight). */
+typedef struct
+{
+    SYMBOL_ID sym;
+    uint32_t *sents;    /* sentence indices containing this symbol */
+    uint32_t nsents;    /* count */
+    float novelty;      /* precomputed 1/(1+freq) */
+    uint32_t cap;
+} TL_INVENTRY;
+
+typedef struct
+{
+    TL_INVENTRY *entries;
+    uint32_t nent;
+    uint32_t cap;
+    int ready;
+} TL_INVINDEX;
+
+static TL_INVINDEX g_invindex = {NULL, 0, 0, 0};
+
+/* Phase 4: KV-cache — per-session cache for query token novelty.
+   Avoids recomputing 1/(1+freq) for repeated query tokens. */
+typedef struct
+{
+    SYMBOL_ID sym;
+    float novelty;
+    uint32_t pos;
+} TL_KVCACHE_ENTRY;
+
+typedef struct
+{
+    TL_KVCACHE_ENTRY *entries;
+    uint32_t nent;
+    uint32_t cap;
+} TL_KVCACHE;
+
+static TL_KVCACHE g_kvcache = {NULL, 0, 0};
+
+static float KVCacheLookup(SYMBOL_ID sym, const GRAPH *graph)
+{
+    uint32_t i;
+    for (i = 0; i < g_kvcache.nent; i++)
+    {
+        if (g_kvcache.entries[i].sym == sym)
+            return g_kvcache.entries[i].novelty;
+    }
+    /* miss: compute and store */
+    {
+        const SYMBOL *s = SymbolGet(graph ? graph->symbols : NULL, sym);
+        float nv = (s == NULL) ? 1.0f : 1.0f / (1.0f + (float)s->frequency);
+        if (g_kvcache.nent >= g_kvcache.cap)
+        {
+            g_kvcache.cap = g_kvcache.cap ? g_kvcache.cap * 2 : 256;
+            g_kvcache.entries = (TL_KVCACHE_ENTRY *)realloc(
+                g_kvcache.entries, g_kvcache.cap * sizeof(TL_KVCACHE_ENTRY));
+        }
+        g_kvcache.entries[g_kvcache.nent].sym = sym;
+        g_kvcache.entries[g_kvcache.nent].novelty = nv;
+        g_kvcache.nent++;
+        return nv;
+    }
+}
+
+static void KVCacheReset(void)
+{
+    g_kvcache.nent = 0;
+}
 
 TEXTLEX *TextLexCreate(void)
 {
@@ -136,6 +211,7 @@ static float g_posvec[TL_POS_MAX][EMBEDDING_DIM];
 void TextLexPosReset(void)
 {
     memset(g_posvec, 0, sizeof(g_posvec));
+    KVCacheReset();
 }
 
 /* matmul-free compatibility: top-m active-dimension overlap.
@@ -266,8 +342,24 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
         if (hit)
         {
             hits++;
+            /* Phase 2: use precomputed novelty from inverted index */
             if (g_scoring & SF_RARITY)
-                total += qnov[i];
+            {
+                float nv = qnov[i];
+                if (g_invindex.ready)
+                {
+                    uint32_t ei;
+                    for (ei = 0; ei < g_invindex.nent; ei++)
+                    {
+                        if (g_invindex.entries[ei].sym == qids[i])
+                        {
+                            nv = g_invindex.entries[ei].novelty;
+                            break;
+                        }
+                    }
+                }
+                total += nv;
+            }
         }
     }
     if (hits == 0)
@@ -309,6 +401,54 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
         }
         if (any)
             total += 1.0f / (1.0f + (float)(mx - mn));
+    }
+    /* Phase 3: symbolic positional encoding — relative distance
+       and order coherence between matching tokens. Closer tokens
+       and same-order pairs get bonus; reversed pairs get penalty. */
+    {
+        uint32_t pi_arr[64];
+        int hit_arr[64];
+        uint32_t nmatch = 0;
+        uint32_t coherence = 0;
+        float prox_sum = 0.0f;
+        for (i = 0; i < nq && nmatch < 64; i++)
+        {
+            hit_arr[nmatch] = 0;
+            for (j = 0; j < s->ntok; j++)
+            {
+                if (s->ids[j] == qids[i])
+                {
+                    pi_arr[nmatch] = j;
+                    hit_arr[nmatch] = 1;
+                    nmatch++;
+                    break;
+                }
+            }
+        }
+        for (i = 0; i < nmatch; i++)
+        {
+            if (!hit_arr[i])
+                continue;
+            /* proximity: closer to query center = higher weight */
+            prox_sum += 1.0f / (1.0f + (float)(pi_arr[i]));
+        }
+        total += prox_sum;
+        /* order coherence: pairs in same relative order as query */
+        for (i = 0; i < nmatch; i++)
+        {
+            if (!hit_arr[i])
+                continue;
+            for (k = i + 1; k < nmatch; k++)
+            {
+                if (!hit_arr[k])
+                    continue;
+                if ((qpos[i] < qpos[k] && pi_arr[i] < pi_arr[k]) ||
+                    (qpos[i] > qpos[k] && pi_arr[i] > pi_arr[k]))
+                    coherence++;
+            }
+        }
+        if (nmatch > 1)
+            total += (float)coherence / (float)(nmatch - 1);
     }
     /* centroids with positional vectors (CENTROID and HAMMING
        branches only; INTER reads the precomputed sentence
@@ -406,12 +546,110 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
     }
     if (pairs > 0)
         total += (float)conc / (float)pairs;
+    }
     /* lexical density: grammatical sentences outrank
        number/punctuation-heavy index lines. Bounded [0,1]. */
     total += s->density;
+    /* Phase 6: cross-attention — boost score when sentence tokens
+       have character-level overlap with query words (soft alignment). */
+    {
+        float xa_sum = 0.0f;
+        uint32_t xa_count = 0;
+        for (i = 0; i < nq; i++)
+        {
+            const char *qw_str = NULL;
+            /* look up query word string from graph */
+            if (graph != NULL)
+            {
+                const SYMBOL *qs = SymbolGet(graph->symbols, qids[i]);
+                if (qs != NULL && qs->name != NULL)
+                    qw_str = qs->name;
+            }
+            if (qw_str == NULL)
+                continue;
+            for (j = 0; j < s->ntok; j++)
+            {
+                const char *sw_str = NULL;
+                if (graph != NULL)
+                {
+                    const SYMBOL *ss = SymbolGet(graph->symbols, s->ids[j]);
+                    if (ss != NULL && ss->name != NULL)
+                        sw_str = ss->name;
+                }
+                if (sw_str == NULL)
+                    continue;
+                {
+                    float xa = CrossAttentionScore(qw_str, sw_str);
+                    if (xa > 0.2f)
+                    {
+                        xa_sum += xa;
+                        xa_count++;
+                    }
+                }
+            }
+        }
+        if (xa_count > 0)
+            total += xa_sum * 10.0f;
+    }
+    if (g_temperature > 0.0f && g_temperature != 1.0f)
+        total /= g_temperature;
     return total;
 }
-    return total;
+
+/* Phase 6: cross-attention — character n-gram overlap between
+   query token and corpus symbol. Soft alignment without dictionary. */
+static float CrossAttentionScore(const char *query, const char *symbol)
+{
+    uint32_t qlen, slen;
+    uint32_t qgrams[256];
+    uint32_t sgrams[256];
+    uint32_t nqg = 0, nsg = 0;
+    uint32_t i, j;
+    uint32_t overlap = 0;
+    float score;
+    if (query == NULL || symbol == NULL)
+        return 0.0f;
+    qlen = (uint32_t)strlen(query);
+    slen = (uint32_t)strlen(symbol);
+    if (qlen < 2 || slen < 2)
+        return 0.0f;
+    /* build bigrams for query (lowercased) */
+    for (i = 0; i + 1 < qlen && nqg < 256; i++)
+    {
+        unsigned char c1 = (unsigned char)query[i];
+        unsigned char c2 = (unsigned char)query[i + 1];
+        if (c1 >= 'A' && c1 <= 'Z') c1 += 32;
+        if (c2 >= 'A' && c2 <= 'Z') c2 += 32;
+        if ((c1 >= 'a' && c1 <= 'z') && (c2 >= 'a' && c2 <= 'z'))
+            qgrams[nqg++] = (uint32_t)c1 * 256 + (uint32_t)c2;
+    }
+    /* build bigrams for symbol */
+    for (i = 0; i + 1 < slen && nsg < 256; i++)
+    {
+        unsigned char c1 = (unsigned char)symbol[i];
+        unsigned char c2 = (unsigned char)symbol[i + 1];
+        if (c1 >= 'A' && c1 <= 'Z') c1 += 32;
+        if (c2 >= 'A' && c2 <= 'Z') c2 += 32;
+        if ((c1 >= 'a' && c1 <= 'z') && (c2 >= 'a' && c2 <= 'z'))
+            sgrams[nsg++] = (uint32_t)c1 * 256 + (uint32_t)c2;
+    }
+    if (nqg == 0 || nsg == 0)
+        return 0.0f;
+    /* count overlapping bigrams */
+    for (i = 0; i < nqg; i++)
+    {
+        for (j = 0; j < nsg; j++)
+        {
+            if (qgrams[i] == sgrams[j])
+            {
+                overlap++;
+                break;
+            }
+        }
+    }
+    /* Dice coefficient on bigrams */
+    score = (2.0f * (float)overlap) / ((float)nqg + (float)nsg);
+    return score;
 }
 
 /* ASCII case variants of a query token (byte-exact symbols keep
@@ -503,10 +741,7 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
             if (seen)
                 continue;
             qids[nq] = id;
-            s = SymbolGet(graph->symbols, id);
-            qnov[nq] = (s == NULL)
-                           ? 1.0f
-                           : 1.0f / (1.0f + (float)s->frequency);
+            qnov[nq] = KVCacheLookup(id, graph);
             qpos[nq] = qidx;
             nq++;
         }
@@ -627,48 +862,175 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
                 qsum[d] += g_posvec[qpos[i] % TL_POS_MAX][d];
             }
         }
+        LayerNorm(qsum, EMBEDDING_DIM);
         TopDims(qsum, qsig, TL_TOPM);
-        for (i = 0; i < tl->nsent; i++)
+        /* Phase 2: QKV fast-path — use inverted index to find
+           candidate sentences (those containing >=1 query symbol)
+           instead of scanning all sentences. O(matches) vs O(nsent). */
         {
-            float sc;
-            uint32_t j;
-            sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
-                          qsig, graph, emb);
-        if (sc <= 0.0f)
-            continue;
-        /* insertion rank, max-independent: top[0] is always the
-           global max (replace the minimum, bubble from there) */
-        j = nret;
-        if (j < max)
-        {
-            out_idx[j] = i;
-            out_score[j] = sc;
-            nret++;
-        }
-        else
-        {
-            uint32_t m = 0;
-            for (j = 0; j < max; j++)
+            /* build candidate set from inverted index */
+            char *seen = (char *)calloc(tl->nsent, 1);
+            uint32_t *cands = NULL;
+            uint32_t ncands = 0;
+            uint32_t ci;
+            for (i = 0; i < nq && g_invindex.ready; i++)
             {
-                if (out_score[j] < out_score[m])
-                    m = j;
+                uint32_t ei;
+                for (ei = 0; ei < g_invindex.nent; ei++)
+                {
+                    if (g_invindex.entries[ei].sym == qids[i])
+                    {
+                        TL_INVENTRY *e = &g_invindex.entries[ei];
+                        for (ci = 0; ci < e->nsents; ci++)
+                        {
+                            uint32_t si = e->sents[ci];
+                            if (!seen[si])
+                            {
+                                seen[si] = 1;
+                                ncands++;
+                            }
+                        }
+                        break;
+                    }
+                }
             }
-            if (sc <= out_score[m])
-                continue;
-            out_idx[m] = i;
-            out_score[m] = sc;
-            j = m;
-        }
-        while (j > 0 && out_score[j] > out_score[j - 1])
-        {
-            uint32_t ti = out_idx[j];
-            float ts = out_score[j];
-            out_idx[j] = out_idx[j - 1];
-            out_score[j] = out_score[j - 1];
-            out_idx[j - 1] = ti;
-            out_score[j - 1] = ts;
-            j--;
-        }
+            /* convert seen bitmap to cands array */
+            if (ncands > 0)
+            {
+                uint32_t ci2 = 0;
+                cands = (uint32_t *)malloc(ncands * sizeof(uint32_t));
+                for (i = 0; i < tl->nsent; i++)
+                {
+                    if (seen[i])
+                        cands[ci2++] = i;
+                }
+            }
+            free(seen);
+            /* Phase 5: sparse attention — window around each match
+               + global anchors (every sqrt(nsent) sentences).
+               Reduces scored set from all matches to local+global. */
+            if (ncands > 0 && tl->nsent > 100)
+            {
+                uint32_t window = 32;
+                uint32_t stride = 1;
+                uint32_t si2;
+                char *win_seen = (char *)calloc(tl->nsent, 1);
+                {
+                    uint32_t s2 = tl->nsent;
+                    stride = 1;
+                    while (stride * stride < s2 && stride < 256)
+                        stride++;
+                }
+                for (si2 = 0; si2 < tl->nsent; si2 += stride)
+                    win_seen[si2] = 1;
+                for (ci = 0; ci < ncands; ci++)
+                {
+                    uint32_t center = cands[ci];
+                    uint32_t lo = (center > window) ? center - window : 0;
+                    uint32_t hi = center + window;
+                    if (hi >= tl->nsent) hi = tl->nsent - 1;
+                    for (si2 = lo; si2 <= hi; si2++)
+                        win_seen[si2] = 1;
+                }
+                free(cands);
+                ncands = 0;
+                for (si2 = 0; si2 < tl->nsent; si2++)
+                    if (win_seen[si2]) ncands++;
+                cands = (uint32_t *)malloc(ncands * sizeof(uint32_t));
+                {
+                    uint32_t ci2 = 0;
+                    for (si2 = 0; si2 < tl->nsent; si2++)
+                        if (win_seen[si2]) cands[ci2++] = si2;
+                }
+                free(win_seen);
+            }
+            /* score candidates */
+            for (ci = 0; ci < ncands; ci++)
+            {
+                float sc;
+                uint32_t j;
+                i = cands[ci];
+                sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
+                              qsig, graph, emb);
+                if (sc <= 0.0f)
+                    continue;
+                j = nret;
+                if (j < max)
+                {
+                    out_idx[j] = i;
+                    out_score[j] = sc;
+                    nret++;
+                }
+                else
+                {
+                    uint32_t m = 0;
+                    for (j = 0; j < max; j++)
+                    {
+                        if (out_score[j] < out_score[m])
+                            m = j;
+                    }
+                    if (sc <= out_score[m])
+                        continue;
+                    out_idx[m] = i;
+                    out_score[m] = sc;
+                    j = m;
+                }
+                while (j > 0 && out_score[j] > out_score[j - 1])
+                {
+                    uint32_t ti = out_idx[j];
+                    float ts = out_score[j];
+                    out_idx[j] = out_idx[j - 1];
+                    out_score[j] = out_score[j - 1];
+                    out_idx[j - 1] = ti;
+                    out_score[j - 1] = ts;
+                    j--;
+                }
+            }
+            if (cands != NULL) free(cands);
+            /* fallback: if inverted index found nothing, score all */
+            if (ncands == 0)
+            {
+                for (i = 0; i < tl->nsent; i++)
+                {
+                    float sc;
+                    uint32_t j;
+                    sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
+                                  qsig, graph, emb);
+                    if (sc <= 0.0f)
+                        continue;
+                    j = nret;
+                    if (j < max)
+                    {
+                        out_idx[j] = i;
+                        out_score[j] = sc;
+                        nret++;
+                    }
+                    else
+                    {
+                        uint32_t m = 0;
+                        for (j = 0; j < max; j++)
+                        {
+                            if (out_score[j] < out_score[m])
+                                m = j;
+                        }
+                        if (sc <= out_score[m])
+                            continue;
+                        out_idx[m] = i;
+                        out_score[m] = sc;
+                        j = m;
+                    }
+                    while (j > 0 && out_score[j] > out_score[j - 1])
+                    {
+                        uint32_t ti = out_idx[j];
+                        float ts = out_score[j];
+                        out_idx[j] = out_idx[j - 1];
+                        out_score[j] = out_score[j - 1];
+                        out_idx[j - 1] = ti;
+                        out_score[j - 1] = ts;
+                        j--;
+                    }
+                }
+            }
         }
     }
     return nret;
@@ -694,6 +1056,36 @@ uint32_t TextLexRetrieveV(const TEXTLEX *tl, const GRAPH *graph,
 /* signature finalization: per-sentence top-m over word +
    positional vectors. Recomputed every ingest (fresh, order-
    deterministic; replay rewrites identical values). */
+void TextLexSetTemperature(float t)
+{
+    g_temperature = (t > 0.0f) ? t : 1.0f;
+}
+
+/* Phase 1: layer normalization + temperature (transformer concepts).
+   LayerNorm: normalize embedding centroid before signature extraction.
+   Temperature: scale QKVScore output — T<1 sharpens, T>1 softens. */
+
+static void LayerNorm(float *vec, uint32_t dim)
+{
+    float mean = 0.0f;
+    float var = 0.0f;
+    uint32_t d;
+    for (d = 0; d < dim; d++)
+        mean += vec[d];
+    mean /= (float)dim;
+    for (d = 0; d < dim; d++)
+    {
+        float diff = vec[d] - mean;
+        var += diff * diff;
+    }
+    var /= (float)dim;
+    {
+        float inv = (var > 1e-6f) ? 1.0f / sqrtf(var) : 1.0f;
+        for (d = 0; d < dim; d++)
+            vec[d] = (vec[d] - mean) * inv;
+    }
+}
+
 static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
                          EMBEDDING_TABLE *emb)
 {
@@ -720,8 +1112,73 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
                 cent[d] += g_posvec[j % TL_POS_MAX][d];
             }
         }
+        LayerNorm(cent, EMBEDDING_DIM);
         TopDims(cent, s->sig, TL_TOPM);
         s->sig_ready = 1;
+    }
+    /* Build inverted index: symbol → sentences containing it + novelty */
+    {
+        uint32_t si;
+        if (g_invindex.entries != NULL)
+        {
+            for (si = 0; si < g_invindex.nent; si++)
+                free(g_invindex.entries[si].sents);
+            free(g_invindex.entries);
+        }
+        g_invindex.nent = 0;
+        g_invindex.cap = 256;
+        g_invindex.entries = (TL_INVENTRY *)calloc(g_invindex.cap,
+                                                   sizeof(TL_INVENTRY));
+        g_invindex.ready = 1;
+        for (si = 0; si < tl->nsent; si++)
+        {
+            TL_SENT *s = &tl->sents[si];
+            uint32_t ti;
+            for (ti = 0; ti < s->ntok; ti++)
+            {
+                SYMBOL_ID id = s->ids[ti];
+                uint32_t ei;
+                int found = 0;
+                for (ei = 0; ei < g_invindex.nent; ei++)
+                {
+                    if (g_invindex.entries[ei].sym == id)
+                    {
+                        TL_INVENTRY *e = &g_invindex.entries[ei];
+                        if (e->nsents >= e->cap)
+                        {
+                            e->cap = e->cap ? e->cap * 2 : 16;
+                            e->sents = (uint32_t *)realloc(e->sents,
+                                                           e->cap * sizeof(uint32_t));
+                        }
+                        e->sents[e->nsents++] = si;
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    TL_INVENTRY *e;
+                    const SYMBOL *sym;
+                    if (g_invindex.nent >= g_invindex.cap)
+                    {
+                        g_invindex.cap *= 2;
+                        g_invindex.entries = (TL_INVENTRY *)realloc(
+                            g_invindex.entries,
+                            g_invindex.cap * sizeof(TL_INVENTRY));
+                    }
+                    e = &g_invindex.entries[g_invindex.nent];
+                    e->sym = id;
+                    e->sents = (uint32_t *)malloc(16 * sizeof(uint32_t));
+                    e->sents[0] = si;
+                    e->nsents = 1;
+                    e->cap = 16;
+                    sym = SymbolGet(graph ? graph->symbols : NULL, id);
+                    e->novelty = (sym == NULL) ? 1.0f
+                                              : 1.0f / (1.0f + (float)sym->frequency);
+                    g_invindex.nent++;
+                }
+            }
+        }
     }
 }
 
