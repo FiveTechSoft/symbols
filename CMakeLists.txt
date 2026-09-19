@@ -17,6 +17,7 @@ add_library(symbolic STATIC
     src/generator.c
     src/ingest.c
     src/nlg.c
+    src/deep_nlg.c
     src/numeric.c
     src/prune.c
     src/shard.c
@@ -118,6 +119,7 @@ sllm_test(test_textlex         tests/test_textlex.c)
 # Removed: test_server_proto, test_chain, test_bible_bfs, test_compose
 # (depend on bible_relations.tsv)
 sllm_test(test_learn          tests/test_learn.c)
+sllm_test(test_deep_nlg        tests/test_deep_nlg.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
@@ -179,4 +181,8 @@ target_link_libraries(test_battery50 symbolic)
 # test_battery100: 100-question multi-domain battery (Jung + Bible + Wikipedia)
 add_executable(test_battery100 tests/test_battery100.c)
 target_link_libraries(test_battery100 symbolic)
+
+# test_multi_hop: reasoning depth (1-hop, 2-hop, negative, cross-domain)
+add_executable(test_multi_hop tests/test_multi_hop.c)
+target_link_libraries(test_multi_hop symbolic)
 

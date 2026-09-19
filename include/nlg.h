@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "graph.h"
+#include "deep_nlg.h"
 
 #define NLG_MAX_RESPONSE 2048
 
