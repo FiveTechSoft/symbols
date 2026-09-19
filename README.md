@@ -487,6 +487,31 @@ Emits deterministic protocol messages (`ACTION_TOOL_CALL`, `ACTION_FINAL`, `ACTI
 #### 3.10.3 Abductive Error Recovery & Self-Healing
 Upon receiving a non-zero exit code (`exit_code != 0`), the agent does not abort. Instead, it enters `AGENT_STATE_DIAGNOSING_ERROR`, utilizing abductive inference to inspect compilation diagnostics, diagnose root causes (e.g. missing header includes or unresolved links), and formulate repair patches.
 
+### 3.11 The Code Knowledge Graph & Impact Analysis Engine (`code_graph`)
+
+Standard neural coding agents spend tens of thousands of tokens repeatedly grepping and reading whole files to understand codebase structure, frequently causing regressions by missing indirect callers. Symbolic LLM resolves this with a high-performance **Code Knowledge Graph (CKG)** (`src/code_graph.c`, `include/code_graph.h`):
+
+#### 3.11.1 Structural C AST & Dependency Extraction
+Parses C source code and headers into a bidirectional relational graph:
+- **Entities**: Files, Functions, Structs, Fields, and Header Inclusions.
+- **Relational Triples**:
+  - `(File, defines_func, Func)` and `(Func, in_file, File)`
+  - `(File, defines_struct, Struct)` and `(Struct, in_file, File)`
+  - `(FuncA, calls, FuncB)` and `(FuncB, called_by, FuncA)`
+  - `(FileA, includes, HeaderB)` and `(HeaderB, included_by, FileA)`
+  - `(StructA, has_field, FieldB)` and `(FieldB, field_of, StructA)`
+
+#### 3.11.2 Bidirectional O(1) Graph Traversal
+Instantaneous lookups for:
+- Reverse call graphs: "Who calls `AgentProcessObservation` across all modules?"
+- Forward call trees: "What external functions does `AgentDecideNextAction` invoke?"
+- Header dependency chains: "Which translation units include `agent_core.h`?"
+
+#### 3.11.3 Impact Analysis & Blast Radius BFS Closure
+Before executing surgical edits or refactoring signatures, the agent computes the transitive closure of all affected functions, files, and tests up to depth $K$:
+$$\text{BlastRadius}(S, K) = \bigcup_{d=1}^K \Big\{ v \in V \;\Big|\; \text{dist}_{\text{dep}}(S, v) = d \Big\}$$
+Calculates an automated risk level (`LOW`, `MEDIUM`, `HIGH`) and formats an actionable markdown report, enabling the agent to pinpoint all tests that must pass before finalizing a task.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -560,6 +585,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **16/16 Working Memory & Metacognitive Auditing Suite (`test_metacognition`)**: Validating spreading activation along relational topologies, working memory temporal decay, recursive belief self-justification, weakest link detection, and counterfactual cascade loss analysis.
 - **10/10 Passage Generation & Elastic Intent Suite (`test_passage_nlg`)**: Validating document-level essay generation, soft intent classification, cross-lingual entity linking, and zero-hallucination multi-paragraph storytelling.
 - **17/17 Agentic Core & OpenCode Tool Dispatcher Suite (`test_agent_core`)**: Validating formal tool contracts, deterministic wire protocol serialization, autonomous 5-step bug repair loops, and abductive recovery upon build failures.
+- **53/53 Code Knowledge Graph & Blast Radius Suite (`test_code_graph`)**: Validating C source and header parsing, struct field extraction, bidirectional call graph lookups, multi-hop transitive blast radius calculation, and real-world cross-module impact analysis on the project codebase.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
