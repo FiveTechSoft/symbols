@@ -3655,6 +3655,61 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        /* Fourth: raw substring search — phrase in corpus text */
+        if (!found && st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            char elow[128];
+            uint32_t ei;
+            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
+                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
+            elow[ei] = '\0';
+            size_t elen = strlen(elow);
+            if (elen >= 3)
+            {
+                for (uint32_t f = 0; f < ch->ntfiles && !found; f++)
+                {
+                    TEXTLEX *tl = &ch->tlex[f];
+                    if (tl->image == NULL || tl->imagelen == 0)
+                        continue;
+                    for (size_t pos = 0; pos + elen <= tl->imagelen && !found; pos++)
+                    {
+                        int match = 1;
+                        for (size_t k = 0; k < elen; k++)
+                        {
+                            if (tolower((unsigned char)tl->image[pos + k]) !=
+                                (unsigned char)elow[k])
+                            {
+                                match = 0;
+                                break;
+                            }
+                        }
+                        if (!match)
+                            continue;
+                        for (uint32_t s = 0; s < tl->nsent; s++)
+                        {
+                            TL_SENT *st2 = &tl->sents[s];
+                            if (st2->ntok == 0)
+                                continue;
+                            size_t ss = (size_t)st2->offs[0];
+                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
+                                        (size_t)st2->lens[st2->ntok - 1];
+                            if (pos >= ss && pos < se)
+                            {
+                                char raw[2048];
+                                if (TextLexSentenceText(tl, s, tl->image,
+                                                        tl->imagelen,
+                                                        raw, sizeof(raw)) > 0)
+                                {
+                                    st = GOAL_ANSWER;
+                                    EMIT_OK("Segun el texto: %s\n", raw);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (st != GOAL_ANSWER)
             EMIT("No tengo constancia de quien es %s.\n", capE);
         break;
@@ -3709,6 +3764,61 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        /* Raw substring fallback for WHERE */
+        if (st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            char elow[128];
+            uint32_t ei;
+            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
+                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
+            elow[ei] = '\0';
+            size_t elen = strlen(elow);
+            if (elen >= 3)
+            {
+                for (uint32_t f = 0; f < ch->ntfiles && st != GOAL_ANSWER; f++)
+                {
+                    TEXTLEX *tl = &ch->tlex[f];
+                    if (tl->image == NULL || tl->imagelen == 0)
+                        continue;
+                    for (size_t pos = 0; pos + elen <= tl->imagelen && st != GOAL_ANSWER; pos++)
+                    {
+                        int match = 1;
+                        for (size_t k = 0; k < elen; k++)
+                        {
+                            if (tolower((unsigned char)tl->image[pos + k]) !=
+                                (unsigned char)elow[k])
+                            {
+                                match = 0;
+                                break;
+                            }
+                        }
+                        if (!match)
+                            continue;
+                        for (uint32_t s = 0; s < tl->nsent; s++)
+                        {
+                            TL_SENT *st2 = &tl->sents[s];
+                            if (st2->ntok == 0)
+                                continue;
+                            size_t ss = (size_t)st2->offs[0];
+                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
+                                        (size_t)st2->lens[st2->ntok - 1];
+                            if (pos >= ss && pos < se)
+                            {
+                                char raw[2048];
+                                if (TextLexSentenceText(tl, s, tl->image,
+                                                        tl->imagelen,
+                                                        raw, sizeof(raw)) > 0)
+                                {
+                                    st = GOAL_ANSWER;
+                                    EMIT_OK("Segun el texto: %s\n", raw);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (st != GOAL_ANSWER)
             EMIT("No tengo constancia del lugar de %s.\n", capE);
         break;
@@ -3755,6 +3865,48 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 st = GOAL_ANSWER;
                 EMIT_OK("Se encontraron %u menciones de %s en los textos.\n",
                         total, capE);
+            }
+        }
+
+        /* Raw substring fallback for COUNT */
+        if (st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            char elow[128];
+            uint32_t ei;
+            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
+                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
+            elow[ei] = '\0';
+            size_t elen = strlen(elow);
+            if (elen >= 3)
+            {
+                uint32_t total = 0;
+                for (uint32_t f = 0; f < ch->ntfiles; f++)
+                {
+                    TEXTLEX *tl = &ch->tlex[f];
+                    if (tl->image == NULL || tl->imagelen == 0)
+                        continue;
+                    for (size_t pos = 0; pos + elen <= tl->imagelen; pos++)
+                    {
+                        int match = 1;
+                        for (size_t k = 0; k < elen; k++)
+                        {
+                            if (tolower((unsigned char)tl->image[pos + k]) !=
+                                (unsigned char)elow[k])
+                            {
+                                match = 0;
+                                break;
+                            }
+                        }
+                        if (match)
+                            total++;
+                    }
+                }
+                if (total > 0)
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("Se encontraron %u menciones de %s en los textos.\n",
+                            total, capE);
+                }
             }
         }
 
@@ -3808,6 +3960,61 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 {
                     st = GOAL_ANSWER;
                     EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        /* Raw substring fallback for WHY */
+        if (st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            char elow[128];
+            uint32_t ei;
+            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
+                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
+            elow[ei] = '\0';
+            size_t elen = strlen(elow);
+            if (elen >= 3)
+            {
+                for (uint32_t f = 0; f < ch->ntfiles && st != GOAL_ANSWER; f++)
+                {
+                    TEXTLEX *tl = &ch->tlex[f];
+                    if (tl->image == NULL || tl->imagelen == 0)
+                        continue;
+                    for (size_t pos = 0; pos + elen <= tl->imagelen && st != GOAL_ANSWER; pos++)
+                    {
+                        int match = 1;
+                        for (size_t k = 0; k < elen; k++)
+                        {
+                            if (tolower((unsigned char)tl->image[pos + k]) !=
+                                (unsigned char)elow[k])
+                            {
+                                match = 0;
+                                break;
+                            }
+                        }
+                        if (!match)
+                            continue;
+                        for (uint32_t s = 0; s < tl->nsent; s++)
+                        {
+                            TL_SENT *st2 = &tl->sents[s];
+                            if (st2->ntok == 0)
+                                continue;
+                            size_t ss = (size_t)st2->offs[0];
+                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
+                                        (size_t)st2->lens[st2->ntok - 1];
+                            if (pos >= ss && pos < se)
+                            {
+                                char raw[2048];
+                                if (TextLexSentenceText(tl, s, tl->image,
+                                                        tl->imagelen,
+                                                        raw, sizeof(raw)) > 0)
+                                {
+                                    st = GOAL_ANSWER;
+                                    EMIT_OK("Segun el texto: %s\n", raw);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3878,6 +4085,62 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 {
                     st = GOAL_ANSWER;
                     EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        /* Raw substring fallback for WHAT */
+        if (!found && st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            char elow[128];
+            uint32_t ei;
+            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
+                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
+            elow[ei] = '\0';
+            size_t elen = strlen(elow);
+            if (elen >= 3)
+            {
+                for (uint32_t f = 0; f < ch->ntfiles && !found; f++)
+                {
+                    TEXTLEX *tl = &ch->tlex[f];
+                    if (tl->image == NULL || tl->imagelen == 0)
+                        continue;
+                    for (size_t pos = 0; pos + elen <= tl->imagelen && !found; pos++)
+                    {
+                        int match = 1;
+                        for (size_t k = 0; k < elen; k++)
+                        {
+                            if (tolower((unsigned char)tl->image[pos + k]) !=
+                                (unsigned char)elow[k])
+                            {
+                                match = 0;
+                                break;
+                            }
+                        }
+                        if (!match)
+                            continue;
+                        for (uint32_t s = 0; s < tl->nsent; s++)
+                        {
+                            TL_SENT *st2 = &tl->sents[s];
+                            if (st2->ntok == 0)
+                                continue;
+                            size_t ss = (size_t)st2->offs[0];
+                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
+                                        (size_t)st2->lens[st2->ntok - 1];
+                            if (pos >= ss && pos < se)
+                            {
+                                char raw[2048];
+                                if (TextLexSentenceText(tl, s, tl->image,
+                                                        tl->imagelen,
+                                                        raw, sizeof(raw)) > 0)
+                                {
+                                    st = GOAL_ANSWER;
+                                    found = 1;
+                                    EMIT_OK("Segun el texto: %s\n", raw);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

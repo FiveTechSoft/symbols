@@ -176,3 +176,7 @@ target_link_libraries(test_jung_battery symbolic)
 add_executable(test_battery50 tests/test_battery50.c)
 target_link_libraries(test_battery50 symbolic)
 
+# test_battery100: 100-question multi-domain battery (Jung + Bible + Wikipedia)
+add_executable(test_battery100 tests/test_battery100.c)
+target_link_libraries(test_battery100 symbolic)
+
