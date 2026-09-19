@@ -321,6 +321,40 @@ The conversational engine maintains a lightweight working memory register:
 - **Anaphoric Focus ($O(1)$)**: Tracks the active discourse entity, resolving pronouns (*he, she, it, they, him, her*) and elliptical clauses to the current focus symbol.
 - **Dialogue Continuity Cache**: Retains recent keywords (`twords`) and already displayed sentences (`tshown`) to support natural sequential interactions (*"explain it to me"*, *"continue"*, *"tell me more"*) without repeating identical facts.
 
+### 3.4 Open-Domain Question Answering with N-Gram Phrase Extraction
+
+The QA pipeline answers questions over arbitrary text corpora through a cascaded search strategy:
+
+```
+Question → ParseIntentToks → Intent Classification
+    ↓
+INT_QA_ENTITY / WHERE / WHAT / WHY / COUNT
+    ↓
+┌─ 1. KB lookup (exact match, O(1))
+├─ 2. TextLexRetrieve (embedding similarity, O(matches))
+├─ 3. Dictionary translation → retry KB/text
+├─ 4. Raw substring search (phrase in corpus text)
+│      ├─ Entity from parser (p→a)
+│      ├─ Bigrams: all consecutive token pairs
+│      └─ Trigrams: all consecutive token triples
+└─ 5. UNKNOWN (fail-closed)
+```
+
+**N-Gram Phrase Extraction**: When the entity parser truncates a multi-word phrase (e.g., "fluid mechanics" from "what is fluid mechanics?"), the system tries all consecutive bigrams and trigrams of the question tokens as search phrases:
+
+$$\text{phrases} = \{w_i w_{i+1} : i \in [0, n)\} \cup \{w_i w_{i+1} w_{i+2} : i \in [0, n)\}$$
+
+Each phrase is searched as a case-insensitive substring in the raw corpus text ($O(|\text{corpus}|)$ per phrase). This recovers multi-word entities like "Trinity Meadows", "Formula One", "German Resistance" that single-token lookup misses.
+
+**Battery 100 Results** (Jung + Bible + Wikipedia, 41,431 sentences):
+
+| Metric | Value |
+|--------|-------|
+| Answered | 88 / 100 |
+| UNKNOWN | 12 / 100 |
+| Wrong | 0 / 100 |
+| Recall gain from n-grams | +7 questions |
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
