@@ -121,4 +121,8 @@ typedef struct
 uint32_t TextLexTopConcepts(const GRAPH *graph, const EMBEDDING_TABLE *emb,
                             TL_CONCEPT *out, uint32_t max_out);
 
+/* Direct symbol lookup: find first sentence containing target_id.
+   Returns sentence index or UINT32_MAX if not found. */
+uint32_t TextLexFindSentenceBySymbol(const TEXTLEX *tl, SYMBOL_ID target_id);
+
 #endif /* TEXT_LEX_H */

@@ -1493,3 +1493,23 @@ uint32_t TextLexTopConcepts(const GRAPH *graph, const EMBEDDING_TABLE *emb,
     free(cs);
     return limit;
 }
+
+/* Direct symbol lookup: find first sentence containing target_id.
+   O(n) integer scan — no embeddings, no TF-IDF, no case variants.
+   Returns sentence index or UINT32_MAX if not found. */
+uint32_t TextLexFindSentenceBySymbol(const TEXTLEX *tl, SYMBOL_ID target_id)
+{
+    uint32_t s, t;
+    if (tl == NULL || target_id == SYMBOL_INVALID)
+        return UINT32_MAX;
+    for (s = 0; s < tl->nsent; s++)
+    {
+        TL_SENT *st = &tl->sents[s];
+        for (t = 0; t < st->ntok; t++)
+        {
+            if (st->ids[t] == target_id)
+                return s;
+        }
+    }
+    return UINT32_MAX;
+}

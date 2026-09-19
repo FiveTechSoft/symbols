@@ -896,16 +896,35 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
                     out->has_source = 1;
                     return 1;
                 }
-                /* Retry text store with translated entity */
-                if (TextQueryEmbed(ch, translated, sent, sizeof(sent)))
+                /* Retry text store with translated entity (direct symbol lookup) */
                 {
-                    snprintf(out->text, QA_ANSWER_MAX,
-                             "Segun el texto: %s", sent);
-                    out->confidence = 0.45f;
-                    strncpy(out->source, "dict_translate",
-                            sizeof(out->source) - 1);
-                    out->has_source = 1;
-                    return 1;
+                    SYMBOL_ID tid = SymbolFind(ch->tgraph->symbols, translated);
+                    if (tid != SYMBOL_INVALID)
+                    {
+                        for (uint32_t f = 0; f < ch->ntfiles; f++)
+                        {
+                            uint32_t s = TextLexFindSentenceBySymbol(&ch->tlex[f], tid);
+                            if (s != UINT32_MAX && ch->tlex[f].image != NULL)
+                            {
+                                char raw[2048];
+                                if (TextLexSentenceText(&ch->tlex[f], s,
+                                                        ch->tlex[f].image,
+                                                        ch->tlex[f].imagelen,
+                                                        raw, sizeof(raw)) > 0)
+                                {
+                                    strncpy(sent, raw, sizeof(sent) - 1);
+                                    sent[sizeof(sent) - 1] = '\0';
+                                    snprintf(out->text, QA_ANSWER_MAX,
+                                             "Segun el texto: %s", sent);
+                                    out->confidence = 0.55f;
+                                    strncpy(out->source, "dict_translate",
+                                            sizeof(out->source) - 1);
+                                    out->has_source = 1;
+                                    return 1;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

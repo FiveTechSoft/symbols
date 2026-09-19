@@ -3627,46 +3627,28 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                         found = 1;
                     }
                 }
-                /* Try text store with translated entity */
+                /* Try text store with translated entity (direct symbol lookup) */
                 if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
                 {
-                    const char *words[4];
-                    uint32_t nw = 0;
-                    words[nw++] = translated;
-                    uint32_t best = 0, bestf = 0;
-                    float bestsc = 0.0f;
-                    int have = 0;
-                    for (uint32_t f = 0; f < ch->ntfiles; f++)
+                    SYMBOL_ID tid = SymbolFind(ch->tgraph->symbols, translated);
+                    if (tid != SYMBOL_INVALID)
                     {
-                        uint32_t idx[16];
-                        float sc[16];
-                        uint32_t r = TextLexRetrieve(&ch->tlex[f],
-                                                     ch->tgraph,
-                                                     ch->temb, words, nw,
-                                                     idx, sc, 16);
-                        for (uint32_t j = 0; j < r; j++)
+                        for (uint32_t f = 0; f < ch->ntfiles && !found; f++)
                         {
-                            if (!have || sc[j] > bestsc)
+                            uint32_t s = TextLexFindSentenceBySymbol(&ch->tlex[f], tid);
+                            if (s != UINT32_MAX && ch->tlex[f].image != NULL)
                             {
-                                best = idx[j];
-                                bestf = f;
-                                bestsc = sc[j];
-                                have = 1;
+                                char sent[2048];
+                                if (TextLexSentenceText(&ch->tlex[f], s,
+                                                        ch->tlex[f].image,
+                                                        ch->tlex[f].imagelen,
+                                                        sent, sizeof(sent)) > 0)
+                                {
+                                    st = GOAL_ANSWER;
+                                    EMIT_OK("Segun el texto [%s]: %s\n",
+                                            translated, sent);
+                                }
                             }
-                        }
-                    }
-                    if (have && bestsc > 0.1f &&
-                        ch->tlex[bestf].image != NULL)
-                    {
-                        char sent[2048];
-                        if (TextLexSentenceText(&ch->tlex[bestf], best,
-                                                ch->tlex[bestf].image,
-                                                ch->tlex[bestf].imagelen,
-                                                sent, sizeof(sent)) > 0)
-                        {
-                            st = GOAL_ANSWER;
-                            EMIT_OK("Segun el texto [%s]: %s\n",
-                                    translated, sent);
                         }
                     }
                 }
