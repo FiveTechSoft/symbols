@@ -172,3 +172,7 @@ sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
 add_executable(test_jung_battery tests/test_jung_battery.c)
 target_link_libraries(test_jung_battery symbolic)
 
+# test_battery50: 50-question cross-corpus battery (Jung + Bible)
+add_executable(test_battery50 tests/test_battery50.c)
+target_link_libraries(test_battery50 symbolic)
+

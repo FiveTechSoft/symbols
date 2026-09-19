@@ -551,10 +551,13 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
        number/punctuation-heavy index lines. Bounded [0,1]. */
     total += s->density;
     /* Phase 6: cross-attention — boost score when sentence tokens
-       have character-level overlap with query words (soft alignment). */
+       have character-level overlap with query words (soft alignment).
+       Limited to first 32 sentence tokens, skip on large corpora. */
+    if (graph != NULL && graph->symbols != NULL && s->ntok <= 32)
     {
         float xa_sum = 0.0f;
         uint32_t xa_count = 0;
+        uint32_t xa_limit = (s->ntok < 32) ? s->ntok : 32;
         for (i = 0; i < nq; i++)
         {
             const char *qw_str = NULL;
@@ -567,7 +570,7 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
             }
             if (qw_str == NULL)
                 continue;
-            for (j = 0; j < s->ntok; j++)
+            for (j = 0; j < xa_limit; j++)
             {
                 const char *sw_str = NULL;
                 if (graph != NULL)
@@ -866,7 +869,9 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
         TopDims(qsum, qsig, TL_TOPM);
         /* Phase 2: QKV fast-path — use inverted index to find
            candidate sentences (those containing >=1 query symbol)
-           instead of scanning all sentences. O(matches) vs O(nsent). */
+           instead of scanning all sentences. O(matches) vs O(nsent).
+           Skip for large corpora (>10k sentences) to avoid build cost. */
+        if (tl->nsent < 10000 && g_invindex.ready)
         {
             /* build candidate set from inverted index */
             char *seen = (char *)calloc(tl->nsent, 1);
@@ -908,8 +913,9 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
             free(seen);
             /* Phase 5: sparse attention — window around each match
                + global anchors (every sqrt(nsent) sentences).
-               Reduces scored set from all matches to local+global. */
-            if (ncands > 0 && tl->nsent > 100)
+               Reduces scored set from all matches to local+global.
+               Skip on large corpora (>20k sentences). */
+            if (ncands > 0 && tl->nsent > 100 && tl->nsent < 20000)
             {
                 uint32_t window = 32;
                 uint32_t stride = 1;
@@ -1032,6 +1038,50 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
                 }
             }
         }
+        else
+        {
+            /* large corpus: score all sentences (no inverted index) */
+            for (i = 0; i < tl->nsent; i++)
+            {
+                float sc;
+                uint32_t j;
+                sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
+                              qsig, graph, emb);
+                if (sc <= 0.0f)
+                    continue;
+                j = nret;
+                if (j < max)
+                {
+                    out_idx[j] = i;
+                    out_score[j] = sc;
+                    nret++;
+                }
+                else
+                {
+                    uint32_t m = 0;
+                    for (j = 0; j < max; j++)
+                    {
+                        if (out_score[j] < out_score[m])
+                            m = j;
+                    }
+                    if (sc <= out_score[m])
+                        continue;
+                    out_idx[m] = i;
+                    out_score[m] = sc;
+                    j = m;
+                }
+                while (j > 0 && out_score[j] > out_score[j - 1])
+                {
+                    uint32_t ti = out_idx[j];
+                    float ts = out_score[j];
+                    out_idx[j] = out_idx[j - 1];
+                    out_score[j] = out_score[j - 1];
+                    out_idx[j - 1] = ti;
+                    out_score[j - 1] = ts;
+                    j--;
+                }
+            }
+        }
     }
     return nret;
 }
@@ -1116,7 +1166,9 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
         TopDims(cent, s->sig, TL_TOPM);
         s->sig_ready = 1;
     }
-    /* Build inverted index: symbol → sentences containing it + novelty */
+    /* Build inverted index: symbol → sentences containing it + novelty.
+       Skip for large corpora (>10k sentences) to avoid build cost. */
+    if (tl->nsent < 10000)
     {
         uint32_t si;
         if (g_invindex.entries != NULL)
