@@ -3540,6 +3540,43 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
        These intents are detected by pattern matching, not vocabulary.
        They query the KB and text stores for answers. */
 
+    /* ---- Raw phrase search helper: tries all n-grams (bigrams +
+       trigrams) of the question tokens as substring search phrases.
+       This catches multi-word entities the parser may have truncated.
+       Returns 1 if a sentence is found and printed. */
+    #define RAW_SEARCH(phrase) do { \
+        char _el[128]; uint32_t _ei; \
+        for (_ei = 0; (phrase)[_ei] && _ei < sizeof(_el)-1; _ei++) \
+            _el[_ei] = (char)tolower((unsigned char)(phrase)[_ei]); \
+        _el[_ei] = '\0'; \
+        size_t _elen = strlen(_el); \
+        if (_elen < 3) break; \
+        for (uint32_t _f = 0; _f < ch->ntfiles && !found; _f++) { \
+            TEXTLEX *_tl = &ch->tlex[_f]; \
+            if (_tl->image == NULL || _tl->imagelen == 0) continue; \
+            for (size_t _p = 0; _p + _elen <= _tl->imagelen && !found; _p++) { \
+                int _m = 1; \
+                for (size_t _k = 0; _k < _elen; _k++) { \
+                    if (tolower((unsigned char)_tl->image[_p+_k]) != (unsigned char)_el[_k]) { _m=0; break; } \
+                } \
+                if (!_m) continue; \
+                for (uint32_t _s = 0; _s < _tl->nsent; _s++) { \
+                    TL_SENT *_st = &_tl->sents[_s]; \
+                    if (_st->ntok == 0) continue; \
+                    size_t _ss = (size_t)_st->offs[0]; \
+                    size_t _se = (size_t)_st->offs[_st->ntok-1] + (size_t)_st->lens[_st->ntok-1]; \
+                    if (_p >= _ss && _p < _se) { \
+                        char _raw[2048]; \
+                        if (TextLexSentenceText(_tl, _s, _tl->image, _tl->imagelen, _raw, sizeof(_raw)) > 0) { \
+                            st = GOAL_ANSWER; found = 1; \
+                            EMIT_OK("Segun el texto: %s\n", _raw); \
+                        } \
+                    } \
+                } \
+            } \
+        } \
+    } while(0)
+
     case INT_QA_ENTITY:
     {
         /* "who is X?" / "quien es X?" → find entity in KB */
@@ -3655,57 +3692,37 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
-        /* Fourth: raw substring search — phrase in corpus text */
+        /* Fourth: raw substring search — entity + n-grams */
         if (!found && st != GOAL_ANSWER && ch->ntfiles > 0)
         {
-            char elow[128];
-            uint32_t ei;
-            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
-                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
-            elow[ei] = '\0';
-            size_t elen = strlen(elow);
-            if (elen >= 3)
+            RAW_SEARCH(p->a);
+            /* Try bigrams from question tokens */
+            if (!found && p->ntoks >= 2)
             {
-                for (uint32_t f = 0; f < ch->ntfiles && !found; f++)
+                for (uint32_t bi = 0; bi + 1 < p->ntoks && !found; bi++)
                 {
-                    TEXTLEX *tl = &ch->tlex[f];
-                    if (tl->image == NULL || tl->imagelen == 0)
+                    if (IsStopTok(p->toks[bi]) || IsCopulaTok(p->toks[bi]))
                         continue;
-                    for (size_t pos = 0; pos + elen <= tl->imagelen && !found; pos++)
-                    {
-                        int match = 1;
-                        for (size_t k = 0; k < elen; k++)
-                        {
-                            if (tolower((unsigned char)tl->image[pos + k]) !=
-                                (unsigned char)elow[k])
-                            {
-                                match = 0;
-                                break;
-                            }
-                        }
-                        if (!match)
-                            continue;
-                        for (uint32_t s = 0; s < tl->nsent; s++)
-                        {
-                            TL_SENT *st2 = &tl->sents[s];
-                            if (st2->ntok == 0)
-                                continue;
-                            size_t ss = (size_t)st2->offs[0];
-                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
-                                        (size_t)st2->lens[st2->ntok - 1];
-                            if (pos >= ss && pos < se)
-                            {
-                                char raw[2048];
-                                if (TextLexSentenceText(tl, s, tl->image,
-                                                        tl->imagelen,
-                                                        raw, sizeof(raw)) > 0)
-                                {
-                                    st = GOAL_ANSWER;
-                                    EMIT_OK("Segun el texto: %s\n", raw);
-                                }
-                            }
-                        }
-                    }
+                    if (IsStopTok(p->toks[bi+1]) || IsCopulaTok(p->toks[bi+1]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 2];
+                    snprintf(phrase, sizeof(phrase), "%s %s", p->toks[bi], p->toks[bi+1]);
+                    RAW_SEARCH(phrase);
+                }
+            }
+            /* Try trigrams */
+            if (!found && p->ntoks >= 3)
+            {
+                for (uint32_t ti = 0; ti + 2 < p->ntoks && !found; ti++)
+                {
+                    if (IsStopTok(p->toks[ti]) || IsCopulaTok(p->toks[ti]))
+                        continue;
+                    if (IsStopTok(p->toks[ti+2]) || IsCopulaTok(p->toks[ti+2]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 3];
+                    snprintf(phrase, sizeof(phrase), "%s %s %s",
+                             p->toks[ti], p->toks[ti+1], p->toks[ti+2]);
+                    RAW_SEARCH(phrase);
                 }
             }
         }
@@ -3721,6 +3738,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         RememberFocus(ch, p->a);
         char capE[CHAT_TOKEN_MAX];
         Cap(p->a, capE, sizeof(capE));
+        int found = 0;
 
         /* Try text search with location keywords */
         if (ch->ntfiles > 0 && ch->tgraph != NULL)
@@ -3767,56 +3785,23 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         /* Raw substring fallback for WHERE */
         if (st != GOAL_ANSWER && ch->ntfiles > 0)
         {
-            char elow[128];
-            uint32_t ei;
-            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
-                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
-            elow[ei] = '\0';
-            size_t elen = strlen(elow);
-            if (elen >= 3)
+            found = 0;
+            RAW_SEARCH(p->a);
+            if (!found && p->ntoks >= 2)
             {
-                for (uint32_t f = 0; f < ch->ntfiles && st != GOAL_ANSWER; f++)
+                for (uint32_t bi = 0; bi + 1 < p->ntoks && !found; bi++)
                 {
-                    TEXTLEX *tl = &ch->tlex[f];
-                    if (tl->image == NULL || tl->imagelen == 0)
+                    if (IsStopTok(p->toks[bi]) || IsCopulaTok(p->toks[bi]))
                         continue;
-                    for (size_t pos = 0; pos + elen <= tl->imagelen && st != GOAL_ANSWER; pos++)
-                    {
-                        int match = 1;
-                        for (size_t k = 0; k < elen; k++)
-                        {
-                            if (tolower((unsigned char)tl->image[pos + k]) !=
-                                (unsigned char)elow[k])
-                            {
-                                match = 0;
-                                break;
-                            }
-                        }
-                        if (!match)
-                            continue;
-                        for (uint32_t s = 0; s < tl->nsent; s++)
-                        {
-                            TL_SENT *st2 = &tl->sents[s];
-                            if (st2->ntok == 0)
-                                continue;
-                            size_t ss = (size_t)st2->offs[0];
-                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
-                                        (size_t)st2->lens[st2->ntok - 1];
-                            if (pos >= ss && pos < se)
-                            {
-                                char raw[2048];
-                                if (TextLexSentenceText(tl, s, tl->image,
-                                                        tl->imagelen,
-                                                        raw, sizeof(raw)) > 0)
-                                {
-                                    st = GOAL_ANSWER;
-                                    EMIT_OK("Segun el texto: %s\n", raw);
-                                }
-                            }
-                        }
-                    }
+                    if (IsStopTok(p->toks[bi+1]) || IsCopulaTok(p->toks[bi+1]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 2];
+                    snprintf(phrase, sizeof(phrase), "%s %s", p->toks[bi], p->toks[bi+1]);
+                    RAW_SEARCH(phrase);
                 }
             }
+            if (found)
+                st = GOAL_ANSWER;
         }
 
         if (st != GOAL_ANSWER)
@@ -3921,6 +3906,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         RememberFocus(ch, p->a);
         char capE[CHAT_TOKEN_MAX];
         Cap(p->a, capE, sizeof(capE));
+        int found = 0;
 
         /* Try text search */
         if (ch->ntfiles > 0 && ch->tgraph != NULL)
@@ -3967,56 +3953,23 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         /* Raw substring fallback for WHY */
         if (st != GOAL_ANSWER && ch->ntfiles > 0)
         {
-            char elow[128];
-            uint32_t ei;
-            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
-                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
-            elow[ei] = '\0';
-            size_t elen = strlen(elow);
-            if (elen >= 3)
+            found = 0;
+            RAW_SEARCH(p->a);
+            if (!found && p->ntoks >= 2)
             {
-                for (uint32_t f = 0; f < ch->ntfiles && st != GOAL_ANSWER; f++)
+                for (uint32_t bi = 0; bi + 1 < p->ntoks && !found; bi++)
                 {
-                    TEXTLEX *tl = &ch->tlex[f];
-                    if (tl->image == NULL || tl->imagelen == 0)
+                    if (IsStopTok(p->toks[bi]) || IsCopulaTok(p->toks[bi]))
                         continue;
-                    for (size_t pos = 0; pos + elen <= tl->imagelen && st != GOAL_ANSWER; pos++)
-                    {
-                        int match = 1;
-                        for (size_t k = 0; k < elen; k++)
-                        {
-                            if (tolower((unsigned char)tl->image[pos + k]) !=
-                                (unsigned char)elow[k])
-                            {
-                                match = 0;
-                                break;
-                            }
-                        }
-                        if (!match)
-                            continue;
-                        for (uint32_t s = 0; s < tl->nsent; s++)
-                        {
-                            TL_SENT *st2 = &tl->sents[s];
-                            if (st2->ntok == 0)
-                                continue;
-                            size_t ss = (size_t)st2->offs[0];
-                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
-                                        (size_t)st2->lens[st2->ntok - 1];
-                            if (pos >= ss && pos < se)
-                            {
-                                char raw[2048];
-                                if (TextLexSentenceText(tl, s, tl->image,
-                                                        tl->imagelen,
-                                                        raw, sizeof(raw)) > 0)
-                                {
-                                    st = GOAL_ANSWER;
-                                    EMIT_OK("Segun el texto: %s\n", raw);
-                                }
-                            }
-                        }
-                    }
+                    if (IsStopTok(p->toks[bi+1]) || IsCopulaTok(p->toks[bi+1]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 2];
+                    snprintf(phrase, sizeof(phrase), "%s %s", p->toks[bi], p->toks[bi+1]);
+                    RAW_SEARCH(phrase);
                 }
             }
+            if (found)
+                st = GOAL_ANSWER;
         }
 
         if (st != GOAL_ANSWER)
@@ -4092,55 +4045,32 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         /* Raw substring fallback for WHAT */
         if (!found && st != GOAL_ANSWER && ch->ntfiles > 0)
         {
-            char elow[128];
-            uint32_t ei;
-            for (ei = 0; p->a[ei] && ei < sizeof(elow) - 1; ei++)
-                elow[ei] = (char)tolower((unsigned char)p->a[ei]);
-            elow[ei] = '\0';
-            size_t elen = strlen(elow);
-            if (elen >= 3)
+            RAW_SEARCH(p->a);
+            if (!found && p->ntoks >= 2)
             {
-                for (uint32_t f = 0; f < ch->ntfiles && !found; f++)
+                for (uint32_t bi = 0; bi + 1 < p->ntoks && !found; bi++)
                 {
-                    TEXTLEX *tl = &ch->tlex[f];
-                    if (tl->image == NULL || tl->imagelen == 0)
+                    if (IsStopTok(p->toks[bi]) || IsCopulaTok(p->toks[bi]))
                         continue;
-                    for (size_t pos = 0; pos + elen <= tl->imagelen && !found; pos++)
-                    {
-                        int match = 1;
-                        for (size_t k = 0; k < elen; k++)
-                        {
-                            if (tolower((unsigned char)tl->image[pos + k]) !=
-                                (unsigned char)elow[k])
-                            {
-                                match = 0;
-                                break;
-                            }
-                        }
-                        if (!match)
-                            continue;
-                        for (uint32_t s = 0; s < tl->nsent; s++)
-                        {
-                            TL_SENT *st2 = &tl->sents[s];
-                            if (st2->ntok == 0)
-                                continue;
-                            size_t ss = (size_t)st2->offs[0];
-                            size_t se = (size_t)st2->offs[st2->ntok - 1] +
-                                        (size_t)st2->lens[st2->ntok - 1];
-                            if (pos >= ss && pos < se)
-                            {
-                                char raw[2048];
-                                if (TextLexSentenceText(tl, s, tl->image,
-                                                        tl->imagelen,
-                                                        raw, sizeof(raw)) > 0)
-                                {
-                                    st = GOAL_ANSWER;
-                                    found = 1;
-                                    EMIT_OK("Segun el texto: %s\n", raw);
-                                }
-                            }
-                        }
-                    }
+                    if (IsStopTok(p->toks[bi+1]) || IsCopulaTok(p->toks[bi+1]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 2];
+                    snprintf(phrase, sizeof(phrase), "%s %s", p->toks[bi], p->toks[bi+1]);
+                    RAW_SEARCH(phrase);
+                }
+            }
+            if (!found && p->ntoks >= 3)
+            {
+                for (uint32_t ti = 0; ti + 2 < p->ntoks && !found; ti++)
+                {
+                    if (IsStopTok(p->toks[ti]) || IsCopulaTok(p->toks[ti]))
+                        continue;
+                    if (IsStopTok(p->toks[ti+2]) || IsCopulaTok(p->toks[ti+2]))
+                        continue;
+                    char phrase[CHAT_TOKEN_MAX * 3];
+                    snprintf(phrase, sizeof(phrase), "%s %s %s",
+                             p->toks[ti], p->toks[ti+1], p->toks[ti+2]);
+                    RAW_SEARCH(phrase);
                 }
             }
         }
