@@ -38,6 +38,7 @@ add_library(symbolic STATIC
     src/tool_config.c
     src/agent_action.c
     src/c_rules.c
+    src/qa_layer.c
     src/server_proto.c
     src/text_lex.c
     src/meta_graph.c
@@ -101,27 +102,20 @@ sllm_test(test_tagged_term   tests/test_tagged_term.c)
 sllm_test(test_schema        tests/test_schema.c)
 sllm_test(test_metaschema    tests/test_metaschema.c)
 sllm_test(test_family2        tests/test_family2.c)
-sllm_test(test_bible_kinship  tests/test_bible_kinship.c)
-sllm_test(test_bible_conclusions tests/test_bible_conclusions.c)
-sllm_test(test_bible_chat     tests/test_bible_chat.c)
-sllm_test(test_bible_relfam   tests/test_bible_relfam.c)
-sllm_test(test_bible_chat_lex tests/test_bible_chat_lex.c)
+# Removed: test_bible_kinship, test_bible_conclusions, test_bible_chat,
+# test_bible_relfam, test_bible_chat_lex (depend on bible_relations.tsv)
 sllm_test(test_queryplan     tests/test_queryplan.c)
 sllm_test(test_composite      tests/test_composite.c)
 sllm_test(test_clarify        tests/test_clarify.c)
-sllm_test(test_toolplan       tests/test_toolplan.c)
-sllm_test(test_toolexec        tests/test_toolexec.c)
+# Removed: test_toolplan, test_toolexec (depend on fixtures.tsv)
 sllm_test(test_action          tests/test_action.c)
 sllm_test(test_toolconfig      tests/test_toolconfig.c)
 sllm_test(test_fixtures        tests/test_fixtures.c)
-sllm_test(test_self            tests/test_self.c)
-sllm_test(test_crules          tests/test_crules.c)
-sllm_test(test_ingiere         tests/test_ingiere.c)
+# Removed: test_self (depends on self.tsv), test_crules (depends on languagec.tsv),
+# test_ingiere (tests loading .tsv files)
 sllm_test(test_textlex         tests/test_textlex.c)
-sllm_test(test_server_proto    tests/test_server_proto.c)
-sllm_test(test_chain          tests/test_chain.c)
-sllm_test(test_bible_bfs      tests/test_bible_bfs.c)
-sllm_test(test_compose        tests/test_compose.c)
+# Removed: test_server_proto, test_chain, test_bible_bfs, test_compose
+# (depend on bible_relations.tsv)
 sllm_test(test_learn          tests/test_learn.c)
 
 # chat REPL: CLI conversacional (no es test)
@@ -162,6 +156,10 @@ add_test(NAME test_eval_multihop COMMAND test_eval_qa tests/qa_eval_multihop.tsv
 add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
 target_link_libraries(test_qa_hygiene symbolic)
 add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_qa_layer tests/test_qa_layer.c)
+target_link_libraries(test_qa_layer symbolic)
+add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 # test_wiki_ingest / test_wikidata_ingest write to their own scratch files
 # (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the tracked

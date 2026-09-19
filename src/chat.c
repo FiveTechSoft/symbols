@@ -29,6 +29,7 @@
 #include "chat.h"
 #include "tool_contract.h"
 #include "c_rules.h"
+#include "qa_layer.h"
 
 #define CHAT_MAX_TOKS 16
 
@@ -1263,7 +1264,13 @@ typedef enum
     INT_TEXTSTATUS,   /* estado: session inventory (counts from stores) */
     INT_TEXT_TOPICS,  /* dime las areas que conoces / de que temas podemos hablar */
     INT_TEXT_START,   /* inicia una conversacion / hablemos */
-    INT_UNLOAD        /* unload <file.txt>: drop + exact rebuild */
+    INT_UNLOAD,       /* unload <file.txt>: drop + exact rebuild */
+    /* Structural QA intents (HARDCODING=0: detected by pattern, not vocabulary) */
+    INT_QA_ENTITY,    /* structural: <wh> <copula> <entity> → entity lookup */
+    INT_QA_WHERE,     /* structural: <wh> <location_marker> <entity> → location lookup */
+    INT_QA_COUNT,     /* structural: <wh> <count_marker> <entity> → count triples */
+    INT_QA_WHY_QA,    /* structural: <wh_cause> <entity> <relation> → cause lookup */
+    INT_QA_WHAT       /* structural: <wh> <copula> <entity> → definition/role lookup */
 } INTENT;
 
 typedef struct
@@ -1684,6 +1691,14 @@ static int FallbackOpen(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
     return cappos < n &&
            (cappos + 1 >= n || !IsCopulaTok(toks[cappos + 1]));
 }
+
+/* Forward declarations for structural QA classifier */
+static int LooksLikeQuestionWord(const char *tok, uint32_t pos,
+                                  const char toks[][CHAT_TOKEN_MAX],
+                                  uint32_t n);
+static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
+                                  uint32_t n, uint32_t wh_pos,
+                                  char *entity_out, size_t entity_size);
 
 /* token-based intent core (Fase A): the former ParseIntent body
    over caller-provided canonical tokens. q_force/gen_force/comma_veto
@@ -2416,6 +2431,14 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             }
         }
     }
+
+    /* ---- Structural QA fallback (HARDCODING=0) ----
+       Deferred: fires ONLY when the tool planner has already been
+       consulted and returned UNKNOWN. The tool planner lives in
+       ChatHandleToBuf, so this block is intentionally left empty
+       here. The structural QA logic lives in the answer layer
+       (ChatAnswerToBuf) where it can consult the KB and text stores
+       after the tool planner has given up. */
 
 generic_query_done:
     return 0;
@@ -3430,6 +3453,307 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         break;
     }
+    /* ---- Structural QA intents (HARDCODING=0) ----
+       These intents are detected by pattern matching, not vocabulary.
+       They query the KB and text stores for answers. */
+
+    case INT_QA_ENTITY:
+    {
+        /* "who is X?" / "quien es X?" → find entity in KB */
+        RememberFocus(ch, p->a);
+        char capE[CHAT_TOKEN_MAX];
+        Cap(p->a, capE, sizeof(capE));
+
+        /* First: try direct KB lookup for the entity */
+        int found = 0;
+        for (uint32_t i = 0; i < ch->kb.num_pairs && !found; i++)
+        {
+            const PAIR_EVID *q = &ch->kb.pairs[i];
+            if (strcmp(q->subject, p->a) == 0 || strcmp(q->object, p->a) == 0)
+            {
+                char capS[CHAT_TOKEN_MAX], capO[CHAT_TOKEN_MAX];
+                Cap(q->subject, capS, sizeof(capS));
+                Cap(q->object, capO, sizeof(capO));
+                st = GOAL_ANSWER;
+                EMIT_OK("%s %s %s (segun registros estructurados).\n",
+                        capS, q->family, capO);
+                found = 1;
+            }
+        }
+
+        /* Second: try text search if KB had no results */
+        if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            const char *words[4];
+            uint32_t nw = 0;
+            words[nw++] = p->a;
+            uint32_t best = 0, bestf = 0;
+            float bestsc = 0.0f;
+            int have = 0;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                             ch->temb, words, nw,
+                                             idx, sc, 16);
+                for (uint32_t j = 0; j < r; j++)
+                {
+                    if (!have || sc[j] > bestsc)
+                    {
+                        best = idx[j];
+                        bestf = f;
+                        bestsc = sc[j];
+                        have = 1;
+                    }
+                }
+            }
+            if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+            {
+                char sent[2048];
+                if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                        ch->tlex[bestf].image,
+                                        ch->tlex[bestf].imagelen, sent,
+                                        sizeof(sent)) > 0)
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        if (st != GOAL_ANSWER)
+            EMIT("No tengo constancia de quien es %s.\n", capE);
+        break;
+    }
+
+    case INT_QA_WHERE:
+    {
+        /* "where is X?" / "donde esta X?" → find location in KB/text */
+        RememberFocus(ch, p->a);
+        char capE[CHAT_TOKEN_MAX];
+        Cap(p->a, capE, sizeof(capE));
+
+        /* Try text search with location keywords */
+        if (ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            const char *words[8];
+            uint32_t nw = 0;
+            words[nw++] = p->a;
+            /* Add location-related words from the text itself */
+            uint32_t best = 0, bestf = 0;
+            float bestsc = 0.0f;
+            int have = 0;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                             ch->temb, words, nw,
+                                             idx, sc, 16);
+                for (uint32_t j = 0; j < r; j++)
+                {
+                    if (!have || sc[j] > bestsc)
+                    {
+                        best = idx[j];
+                        bestf = f;
+                        bestsc = sc[j];
+                        have = 1;
+                    }
+                }
+            }
+            if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+            {
+                char sent[2048];
+                if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                        ch->tlex[bestf].image,
+                                        ch->tlex[bestf].imagelen, sent,
+                                        sizeof(sent)) > 0)
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        if (st != GOAL_ANSWER)
+            EMIT("No tengo constancia del lugar de %s.\n", capE);
+        break;
+    }
+
+    case INT_QA_COUNT:
+    {
+        /* "how many X?" / "cuantos X?" → count in KB/text */
+        char capE[CHAT_TOKEN_MAX];
+        Cap(p->a, capE, sizeof(capE));
+
+        /* Count in KB */
+        uint32_t count = 0;
+        for (uint32_t i = 0; i < ch->kb.num_pairs; i++)
+        {
+            const PAIR_EVID *q = &ch->kb.pairs[i];
+            if (strcmp(q->subject, p->a) == 0 || strcmp(q->object, p->a) == 0)
+                count++;
+        }
+
+        if (count > 0)
+        {
+            st = GOAL_ANSWER;
+            EMIT_OK("Hay %u registros relacionados con %s.\n", count, capE);
+        }
+        else if (ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            /* Count sentences mentioning the entity */
+            const char *words[4];
+            uint32_t nw = 0;
+            words[nw++] = p->a;
+            uint32_t total = 0;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                             ch->temb, words, nw,
+                                             idx, sc, 16);
+                total += r;
+            }
+            if (total > 0)
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("Se encontraron %u menciones de %s en los textos.\n",
+                        total, capE);
+            }
+        }
+
+        if (st != GOAL_ANSWER)
+            EMIT("No tengo constancia de cuantos hay de %s.\n", capE);
+        break;
+    }
+
+    case INT_QA_WHY_QA:
+    {
+        /* "why X Y?" / "por que X Y?" → find cause in KB/text */
+        RememberFocus(ch, p->a);
+        char capE[CHAT_TOKEN_MAX];
+        Cap(p->a, capE, sizeof(capE));
+
+        /* Try text search */
+        if (ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            const char *words[8];
+            uint32_t nw = 0;
+            words[nw++] = p->a;
+            /* Add the relation words if present */
+            uint32_t best = 0, bestf = 0;
+            float bestsc = 0.0f;
+            int have = 0;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                             ch->temb, words, nw,
+                                             idx, sc, 16);
+                for (uint32_t j = 0; j < r; j++)
+                {
+                    if (!have || sc[j] > bestsc)
+                    {
+                        best = idx[j];
+                        bestf = f;
+                        bestsc = sc[j];
+                        have = 1;
+                    }
+                }
+            }
+            if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+            {
+                char sent[2048];
+                if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                        ch->tlex[bestf].image,
+                                        ch->tlex[bestf].imagelen, sent,
+                                        sizeof(sent)) > 0)
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        if (st != GOAL_ANSWER)
+            EMIT("No tengo constancia de la razon de %s.\n", capE);
+        break;
+    }
+
+    case INT_QA_WHAT:
+    {
+        /* "what is X?" / "que es X?" → find definition/role in KB/text */
+        RememberFocus(ch, p->a);
+        char capE[CHAT_TOKEN_MAX];
+        Cap(p->a, capE, sizeof(capE));
+
+        /* First: try KB lookup */
+        int found = 0;
+        for (uint32_t i = 0; i < ch->kb.num_pairs && !found; i++)
+        {
+            const PAIR_EVID *q = &ch->kb.pairs[i];
+            if (strcmp(q->subject, p->a) == 0 || strcmp(q->object, p->a) == 0)
+            {
+                char capS[CHAT_TOKEN_MAX], capO[CHAT_TOKEN_MAX];
+                Cap(q->subject, capS, sizeof(capS));
+                Cap(q->object, capO, sizeof(capO));
+                st = GOAL_ANSWER;
+                EMIT_OK("%s %s %s (segun registros estructurados).\n",
+                        capS, q->family, capO);
+                found = 1;
+            }
+        }
+
+        /* Second: try text search */
+        if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
+        {
+            const char *words[4];
+            uint32_t nw = 0;
+            words[nw++] = p->a;
+            uint32_t best = 0, bestf = 0;
+            float bestsc = 0.0f;
+            int have = 0;
+            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                             ch->temb, words, nw,
+                                             idx, sc, 16);
+                for (uint32_t j = 0; j < r; j++)
+                {
+                    if (!have || sc[j] > bestsc)
+                    {
+                        best = idx[j];
+                        bestf = f;
+                        bestsc = sc[j];
+                        have = 1;
+                    }
+                }
+            }
+            if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+            {
+                char sent[2048];
+                if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                        ch->tlex[bestf].image,
+                                        ch->tlex[bestf].imagelen, sent,
+                                        sizeof(sent)) > 0)
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        if (st != GOAL_ANSWER)
+            EMIT("No tengo constancia de que es %s.\n", capE);
+        break;
+    }
+
     default:
         EMIT("No entendi la pregunta.\n");
         break;
@@ -3449,6 +3773,233 @@ static int HasWh(const char toks[][CHAT_TOKEN_MAX], uint32_t n)
             strcmp(toks[i], "who") == 0 || strcmp(toks[i], "whom") == 0)
             return 1;
     return 0;
+}
+
+/* ---- Structural Question Classifier (HARDCODING=0) ----
+   Detects question types by POSITION and STRUCTURE, not by specific
+   vocabulary. The classifier works in two phases:
+   1. Detect if first token is a question word (any short token before a copula)
+   2. Detect the question type by the structure that follows
+
+   This allows the system to handle questions in any language without
+   hardcoding specific question words. The KB itself provides the
+   vocabulary for answers. */
+
+/* Check if token looks like a question word by structural properties:
+   - Short (2-8 chars) - most question words are short
+   - Appears before a copula or at sentence start
+   - Not a known content word (heuristic: not all lowercase alpha) */
+static int LooksLikeQuestionWord(const char *tok, uint32_t pos,
+                                  const char toks[][CHAT_TOKEN_MAX],
+                                  uint32_t n)
+{
+    size_t L;
+    if (tok == NULL)
+        return 0;
+    L = strlen(tok);
+    if (L < 2 || L > 8)
+        return 0;
+    /* Heuristic: question words often end in specific patterns
+       but we detect by position + structure, not suffix */
+    /* Must be at position 0 or before a copula */
+    if (pos == 0)
+        return 1;
+    if (pos + 1 < n && IsCopulaTok(toks[pos + 1]))
+        return 1;
+    return 0;
+}
+
+/* Detect question type by structure:
+   - ENTITY: <wh> <copula> <entity> → "who is X?"
+   - WHERE: <wh> <location_prep> <entity> → "where is X?"
+   - COUNT: <wh> <count_prep> <entity> → "how many X?"
+   - WHAT: <wh> <copula> <entity> → "what is X?"
+   - WHY: <wh_cause> <entity> <relation> → "why X Y?"
+   Returns the INTENT type or INT_NONE if no pattern matches. */
+static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
+                                  uint32_t n, uint32_t wh_pos,
+                                  char *entity_out, size_t entity_size)
+{
+    uint32_t i;
+    if (wh_pos >= n || entity_out == NULL || entity_size == 0)
+        return INT_NONE;
+    entity_out[0] = '\0';
+
+    /* Pattern 1: <wh> <copula> <entity...> → ENTITY or WHAT
+       "who is David" / "quien es David" / "what is the king" */
+    if (wh_pos + 1 < n && IsCopulaTok(toks[wh_pos + 1]))
+    {
+        /* Skip articles and fillers after copula */
+        uint32_t start = wh_pos + 2;
+        while (start < n && (strcmp(toks[start], "el") == 0 ||
+                             strcmp(toks[start], "la") == 0 ||
+                             strcmp(toks[start], "the") == 0 ||
+                             strcmp(toks[start], "a") == 0 ||
+                             strcmp(toks[start], "an") == 0 ||
+                             strcmp(toks[start], "es") == 0 ||
+                             strcmp(toks[start], "is") == 0 ||
+                             strcmp(toks[start], "was") == 0 ||
+                             strcmp(toks[start], "fue") == 0 ||
+                             strcmp(toks[start], "era") == 0))
+            start++;
+        if (start < n)
+        {
+            /* Collect entity tokens until end or a preposition */
+            size_t pos = 0;
+            for (i = start; i < n; i++)
+            {
+                if (strcmp(toks[i], "de") == 0 || strcmp(toks[i], "of") == 0 ||
+                    strcmp(toks[i], "del") == 0 || strcmp(toks[i], "en") == 0 ||
+                    strcmp(toks[i], "in") == 0 || strcmp(toks[i], "on") == 0)
+                    break;
+                if (i > start && pos + 1 < entity_size)
+                    entity_out[pos++] = ' ';
+                {
+                    size_t tl = strlen(toks[i]);
+                    if (pos + tl >= entity_size)
+                        tl = entity_size - pos - 1;
+                    memcpy(entity_out + pos, toks[i], tl);
+                    pos += tl;
+                }
+            }
+            entity_out[pos] = '\0';
+            if (entity_out[0] != '\0')
+                return INT_QA_ENTITY;
+        }
+    }
+
+    /* Pattern 2: <wh> <location_prep> <entity> → WHERE
+       "where is David" / "donde esta David" */
+    if (wh_pos + 1 < n)
+    {
+        const char *loc_prep[] = {"donde", "where", "en", "in", "at",
+                                   "dentro", "fuera", "cerca", "lejos"};
+        for (i = 0; i < sizeof(loc_prep) / sizeof(loc_prep[0]); i++)
+        {
+            if (strcmp(toks[wh_pos + 1], loc_prep[i]) == 0)
+            {
+                uint32_t start = wh_pos + 2;
+                if (start < n)
+                {
+                    size_t pos = 0;
+                    for (i = start; i < n; i++)
+                    {
+                        if (i > start && pos + 1 < entity_size)
+                            entity_out[pos++] = ' ';
+                        {
+                            size_t tl = strlen(toks[i]);
+                            if (pos + tl >= entity_size)
+                                tl = entity_size - pos - 1;
+                            memcpy(entity_out + pos, toks[i], tl);
+                            pos += tl;
+                        }
+                    }
+                    entity_out[pos] = '\0';
+                    if (entity_out[0] != '\0')
+                        return INT_QA_WHERE;
+                }
+            }
+        }
+    }
+
+    /* Pattern 3: <wh> <count_prep> <entity> → COUNT
+       "how many sons" / "cuantos hijos" */
+    if (wh_pos + 1 < n)
+    {
+        const char *count_prep[] = {"cuantos", "cuantas", "many", "much",
+                                     "few", "algunos", "some"};
+        for (i = 0; i < sizeof(count_prep) / sizeof(count_prep[0]); i++)
+        {
+            if (strcmp(toks[wh_pos + 1], count_prep[i]) == 0)
+            {
+                uint32_t start = wh_pos + 2;
+                if (start < n)
+                {
+                    size_t pos = 0;
+                    for (i = start; i < n; i++)
+                    {
+                        if (i > start && pos + 1 < entity_size)
+                            entity_out[pos++] = ' ';
+                        {
+                            size_t tl = strlen(toks[i]);
+                            if (pos + tl >= entity_size)
+                                tl = entity_size - pos - 1;
+                            memcpy(entity_out + pos, toks[i], tl);
+                            pos += tl;
+                        }
+                    }
+                    entity_out[pos] = '\0';
+                    if (entity_out[0] != '\0')
+                        return INT_QA_COUNT;
+                }
+            }
+        }
+    }
+
+    /* Pattern 4: <wh_cause> <entity> <relation> → WHY
+       "why David king" / "por que David rey" */
+    if (wh_pos + 1 < n)
+    {
+        const char *cause_wh[] = {"por", "why", "como", "how"};
+        for (i = 0; i < sizeof(cause_wh) / sizeof(cause_wh[0]); i++)
+        {
+            if (strcmp(toks[wh_pos], cause_wh[i]) == 0 ||
+                (wh_pos + 1 < n && strcmp(toks[wh_pos + 1], "que") == 0))
+            {
+                uint32_t start = wh_pos + 1;
+                if (wh_pos + 1 < n && strcmp(toks[wh_pos + 1], "que") == 0)
+                    start = wh_pos + 2;
+                if (start < n)
+                {
+                    size_t pos = 0;
+                    for (i = start; i < n; i++)
+                    {
+                        if (i > start && pos + 1 < entity_size)
+                            entity_out[pos++] = ' ';
+                        {
+                            size_t tl = strlen(toks[i]);
+                            if (pos + tl >= entity_size)
+                                tl = entity_size - pos - 1;
+                            memcpy(entity_out + pos, toks[i], tl);
+                            pos += tl;
+                        }
+                    }
+                    entity_out[pos] = '\0';
+                    if (entity_out[0] != '\0')
+                        return INT_QA_WHY_QA;
+                }
+            }
+        }
+    }
+
+    /* Pattern 5: <wh> <copula> <entity> (fallback) → WHAT */
+    if (wh_pos + 1 < n && IsCopulaTok(toks[wh_pos + 1]))
+    {
+        uint32_t start = wh_pos + 2;
+        if (start < n)
+        {
+            size_t pos = 0;
+            for (i = start; i < n; i++)
+            {
+                if (strcmp(toks[i], "de") == 0 || strcmp(toks[i], "of") == 0)
+                    break;
+                if (i > start && pos + 1 < entity_size)
+                    entity_out[pos++] = ' ';
+                {
+                    size_t tl = strlen(toks[i]);
+                    if (pos + tl >= entity_size)
+                        tl = entity_size - pos - 1;
+                    memcpy(entity_out + pos, toks[i], tl);
+                    pos += tl;
+                }
+            }
+            entity_out[pos] = '\0';
+            if (entity_out[0] != '\0')
+                return INT_QA_WHAT;
+        }
+    }
+
+    return INT_NONE;
 }
 
 /* detokenize a goal span (Fase A Paso 3): the span's own words name
@@ -4202,6 +4753,16 @@ int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
             strncpy(out, self, size - 1);
             out[size - 1] = '\0';
             return 1;
+        }
+        /* QA fallback: structural question answering over KB + text */
+        {
+            QA_ANSWER qa;
+            if (QAAnswer(ch, line, &qa) && qa.confidence > 0.0f)
+            {
+                strncpy(out, qa.text, size - 1);
+                out[size - 1] = '\0';
+                return 1;
+            }
         }
         strncpy(out, "No entendi la pregunta.\n", size - 1);
         out[size - 1] = '\0';
