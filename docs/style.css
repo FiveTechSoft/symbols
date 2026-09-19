@@ -552,6 +552,34 @@ header {
   pointer-events: none;
 }
 
+/* Mode Select & Mobile Toggle Button */
+.mode-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.mode-select:focus {
+  outline: none;
+  border-color: var(--accent-emerald);
+}
+
+.mode-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mobile-toggle-btn {
+  display: none;
+  font-size: 14px;
+  padding: 6px 10px;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -567,3 +595,58 @@ header {
     display: none;
   }
 }
+
+@media (max-width: 900px) {
+  .mobile-toggle-btn {
+    display: inline-flex;
+  }
+  .hud-telemetry .hud-card:nth-child(n+3) {
+    display: none;
+  }
+  .main-wrapper {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+  .sidebar-left {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 50;
+    background: var(--bg-secondary);
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.7);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .sidebar-left.open {
+    transform: translateX(0);
+  }
+  .sidebar-right {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  header {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .brand-desc {
+    display: none;
+  }
+  .hud-telemetry {
+    display: none;
+  }
+  .header-controls {
+    gap: 6px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
+

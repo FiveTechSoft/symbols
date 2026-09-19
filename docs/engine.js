@@ -21,14 +21,16 @@ class SymbolicEngine {
       "of", "with", "by", "from", "up", "about", "into", "over", "after",
       "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
       "do", "does", "did", "shall", "will", "should", "would", "may", "might",
-      "must", "can", "could", "that", "which", "who", "whom", "this", "these",
+      "must", "can", "could", "that", "which", "who", "whom", "whose", "this", "these",
       "those", "there", "their", "it", "its", "as", "he", "she", "they", "we",
+      "what", "where", "when", "why", "how",
       "tell", "say", "know", "knows", "explain", "describe", "give", "continue", "proceed", "next",
       "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "pero",
       "en", "sobre", "a", "al", "para", "por", "de", "del", "con", "sin", "desde",
       "hasta", "es", "son", "era", "eran", "fue", "fueron", "ser", "estar",
       "ha", "han", "que", "cual", "cuales", "quien", "quienes", "este", "esta",
       "estos", "estas", "ese", "esa", "esos", "esas", "su", "sus", "como",
+      "donde", "cuando", "porque", "por que", "para que",
       "dame", "cuantos", "cuantas", "tiene", "contiene", "hay",
       "trata", "tratar", "hablame", "habla", "dime", "cuentame", "explicame",
       "refiero", "acerca", "mas", "dicho", "mismo", "misma",
@@ -353,47 +355,68 @@ class SymbolicEngine {
     return { found: false, confidence: 0, proofTrace: [] };
   }
 
+  // Detect if text or query is in Spanish
+  detectIsSpanish(text) {
+    if (!text) return false;
+    if (/[áéíóúñ¿¡]/i.test(text)) return true;
+    const enCount = (text.match(/\b(the|what|who|where|when|why|how|which|whose|is|are|was|were|of|father\s+of|son\s+of|tell\s+me)\b/gi) || []).length;
+    const esCount = (text.match(/\b(de|la|el|los|las|un|una|unos|unas|en|que|cual|cuales|quien|quienes|su|sus|por|para|con|sin|como|donde|cuando|sobre|es|era|eran|fue|fueron|hay|tiene|tienen|padre\s+de|hijo\s+de|madre|hermano|rey|reina|libro|libros|biblia|codigo|grafo)\b/gi) || []).length;
+    if (enCount > esCount) return false;
+    return esCount > 0;
+  }
+
   // Natural Language Question Answering
   query(inputQuery) {
     const t0 = performance.now();
     const clean = inputQuery.trim().toLowerCase();
+    const isSpanish = this.detectIsSpanish(inputQuery);
     let response = "";
     let proofTrace = null;
     let citation = null;
     let status = "UNKNOWN";
 
     // Intent 1: Topic introspection ("what areas do you know?")
-    if (clean.includes("what areas") || clean.includes("que areas") || clean.includes("areas que conoces") || clean.includes("temas conoces") || clean.includes("topics")) {
+    if (clean.includes("what areas") || clean.includes("que areas") || clean.includes("areas que conoces") || clean.includes("temas conoces") || clean.includes("topics") || clean.includes("que temas")) {
       const top = this.getTopConcepts(8);
       if (top.length === 0) {
-        response = "The knowledge base is currently empty. Ingest text or load a preset corpus to begin.";
+        response = isSpanish
+          ? "La base de conocimiento está actualmente vacía. Ingesta texto o carga un corpus predeterminado para comenzar."
+          : "The knowledge base is currently empty. Ingest text or load a preset corpus to begin.";
       } else {
         const names = top.map(t => t.name.toUpperCase()).join(", ");
-        response = `The ingested knowledge graph centers on the following fundamental thematic pillars: ${names}. You can ask me any verified questions about these concepts.`;
+        response = isSpanish
+          ? `El grafo de conocimiento se centra en los siguientes pilares temáticos fundamentales: ${names}. Puedes hacerme cualquier pregunta verificada sobre estos conceptos.`
+          : `The ingested knowledge graph centers on the following fundamental thematic pillars: ${names}. You can ask me any verified questions about these concepts.`;
         status = "INTROSPECTION";
       }
     }
     // Intent 2: Start a conversation ("start a conversation")
-    else if (clean.includes("start a conversation") || clean.includes("inicia una conversacion") || clean.includes("conversar")) {
+    else if (clean.includes("start a conversation") || clean.includes("inicia una conversacion") || clean.includes("conversar") || clean.includes("iniciar conversacion")) {
       const top = this.getTopConcepts(1);
       if (top.length > 0) {
         const anchor = top[0];
         this.episodic.activeFocus = anchor.name;
         // Find a representative sentence
         const matchSent = this.sentences.find(s => s.text.toLowerCase().includes(anchor.name));
-        response = `Let's discuss ${anchor.name.toUpperCase()}. According to verified text records: "${matchSent ? matchSent.text : ''}". Which aspect would you like to explore?`;
+        response = isSpanish
+          ? `Hablemos de ${anchor.name.toUpperCase()}. Según los registros verificados: "${matchSent ? matchSent.text : ''}". ¿Qué aspecto te gustaría explorar?`
+          : `Let's discuss ${anchor.name.toUpperCase()}. According to verified text records: "${matchSent ? matchSent.text : ''}". Which aspect would you like to explore?`;
         if (matchSent) citation = `Sentence #${matchSent.id + 1} (${matchSent.source})`;
         status = "CONVERSATION_START";
       } else {
-        response = "No text is loaded to start a grounded conversation.";
+        response = isSpanish
+          ? "No hay texto cargado para iniciar una conversación fundamentada."
+          : "No text is loaded to start a grounded conversation.";
       }
     }
     // Intent 3: Dynamic Learning ("learn: ...", "aprende: ...", or user declarative assertion)
-    else if (clean.startsWith("learn:") || clean.startsWith("aprende:") || clean.startsWith("remember:")) {
+    else if (clean.startsWith("learn:") || clean.startsWith("aprende:") || clean.startsWith("remember:") || clean.startsWith("recuerda:")) {
       const payload = inputQuery.substring(inputQuery.indexOf(":") + 1).trim();
       const res = this.ingestText(payload, "user_dialogue");
       this.episodic.learnedFacts.push(payload);
-      response = `Understood. Stored verbatim into literal memory and incorporated ${res.symbolsAdded} new symbols and relational edges into the graph in ${res.elapsedMs.toFixed(3)} ms. Zero hallucination guaranteed.`;
+      response = isSpanish
+        ? `Entendido. Almacenado literalmente en memoria e incorporados ${res.symbolsAdded} nuevos símbolos y aristas al grafo en ${res.elapsedMs.toFixed(3)} ms. Cero alucinación garantizado.`
+        : `Understood. Stored verbatim into literal memory and incorporated ${res.symbolsAdded} new symbols and relational edges into the graph in ${res.elapsedMs.toFixed(3)} ms. Zero hallucination guaranteed.`;
       status = "DYNAMIC_LEARNED";
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
@@ -412,6 +435,20 @@ class SymbolicEngine {
         "funcion", "funciones", "rol", "role", "purpose", "function", "meaning",
         "book", "books", "chapter", "chapters",
         "escribio", "escribir", "escribe", "hizo", "hacer", "trata", "habla"
+      ]);
+
+      const NON_FOCUS_WORDS = new Set([
+        ...META_WORDS,
+        "primer", "primero", "primera", "first",
+        "segundo", "segunda", "second",
+        "tercero", "tercera", "third",
+        "nuevo", "nueva", "nuevos", "nuevas", "new",
+        "antiguo", "antigua", "antiguos", "antiguas", "old",
+        "gran", "grande", "grandes", "great", "mighty",
+        "wrote", "escribio", "authored", "dice", "says",
+        "father", "padre", "son", "hijo", "mother", "madre",
+        "rey", "king", "queen", "reina", "lord", "senor",
+        "quien", "who", "cual", "which", "what", "que", "como", "how", "donde", "where"
       ]);
 
       const isAnaphoric = 
@@ -500,13 +537,21 @@ class SymbolicEngine {
       let targetEntity = null;
       let targetPredicate = null;
 
-      if (cleanNorm.includes("father of") || cleanNorm.includes("padre de")) {
-        const p = cleanNorm.includes("father of") ? "father of" : "padre de";
-        targetEntity = cleanNorm.substring(cleanNorm.indexOf(p) + p.length).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9_]/g, "");
+      let m = null;
+      if ((m = cleanNorm.match(/\b(?:father|padre)\s+(?:of|de)\s+([a-z0-9_]+)/i))) {
+        targetEntity = m[1];
         targetPredicate = "son_of";
-      } else if (cleanNorm.includes("son of") || cleanNorm.includes("hijo de")) {
-        const p = cleanNorm.includes("son of") ? "son of" : "hijo de";
-        targetEntity = cleanNorm.substring(cleanNorm.indexOf(p) + p.length).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9_]/g, "");
+      } else if ((m = cleanNorm.match(/\b(?:de\s+quien\s+es\s+(?:hijo|son))\s+([a-z0-9_]+)/i))) {
+        targetEntity = m[1];
+        targetPredicate = "son_of";
+      } else if ((m = cleanNorm.match(/\b(?:quien\s+engendro\s+a|who\s+begat)\s+([a-z0-9_]+)/i))) {
+        targetEntity = m[1];
+        targetPredicate = "son_of";
+      } else if ((m = cleanNorm.match(/\b(?:son|hijo)\s+(?:of|de)\s+([a-z0-9_]+)/i))) {
+        targetEntity = m[1];
+        targetPredicate = "father_of";
+      } else if ((m = cleanNorm.match(/\b(?:a\s+quien\s+engendro|who\s+did\s+([a-z0-9_]+)\s+beget)\b/i))) {
+        targetEntity = m[1] || m[2];
         targetPredicate = "father_of";
       } else if ((cleanNorm.includes("su hijo") || cleanNorm.includes("his son")) && this.episodic.activeFocus) {
         targetEntity = this.episodic.activeFocus;
@@ -522,7 +567,9 @@ class SymbolicEngine {
         const sonRel = rels.find(r => r.predicate === "son_of");
         if (sonRel) {
           const parent = sonRel.object.toUpperCase();
-          response = `The father of ${targetEntity.toUpperCase()} is ${parent}.`;
+          response = isSpanish
+            ? `El padre de ${targetEntity.toUpperCase()} es ${parent}.`
+            : `The father of ${targetEntity.toUpperCase()} is ${parent}.`;
           proofTrace = [`${canonTarget.toUpperCase()} ──SON_OF──> ${parent}`];
           if (sonRel.sourceSentId !== -1 && this.sentences[sonRel.sourceSentId]) {
             citation = `Sentence #${sonRel.sourceSentId + 1}: "${this.sentences[sonRel.sourceSentId].text}"`;
@@ -536,7 +583,9 @@ class SymbolicEngine {
         const sonRel = rels.find(r => r.predicate === "son_of");
         if (sonRel) {
           const child = sonRel.subject.toUpperCase();
-          response = `The son of ${targetEntity.toUpperCase()} is ${child}.`;
+          response = isSpanish
+            ? `El hijo de ${targetEntity.toUpperCase()} es ${child}.`
+            : `The son of ${targetEntity.toUpperCase()} is ${child}.`;
           proofTrace = [`${child} ──SON_OF──> ${canonTarget.toUpperCase()}`];
           if (sonRel.sourceSentId !== -1 && this.sentences[sonRel.sourceSentId]) {
             citation = `Sentence #${sonRel.sourceSentId + 1}: "${this.sentences[sonRel.sourceSentId].text}"`;
@@ -586,17 +635,19 @@ class SymbolicEngine {
         }
         const minRequired = Math.min(2, words.length);
         if (bestSent && maxScore >= (minRequired - 0.5) && maxScore > 0) {
-          response = `According to verified source records: "${bestSent.text}"`;
+          response = isSpanish
+            ? `Según los registros verificados de la fuente: "${bestSent.text}"`
+            : `According to verified source records: "${bestSent.text}"`;
           citation = `Sentence #${bestSent.id + 1} (${bestSent.source})`;
           status = "VERBATIM_CITATION";
           if (!this.episodic.citedSentIds) this.episodic.citedSentIds = new Set();
           this.episodic.citedSentIds.add(bestSent.id);
           
           // Set activeFocus to the non-meta entity keyword
-          const entityCandidate = words.find(w => !META_WORDS.has(w));
+          const entityCandidate = words.find(w => !NON_FOCUS_WORDS.has(w));
           if (entityCandidate) {
             this.episodic.activeFocus = entityCandidate;
-          } else if (words[0]) {
+          } else if (words[0] && !this.stopwords.has(words[0])) {
             this.episodic.activeFocus = words[0];
           }
 
@@ -649,7 +700,9 @@ class SymbolicEngine {
             const rels = this.subMap.get(canon);
             if (rels.length > 0) {
               const r = rels[0];
-              response = `${r.subject.toUpperCase()} is connected via [${r.predicate.toUpperCase()}] to ${r.object.toUpperCase()}.`;
+              response = isSpanish
+                ? `${r.subject.toUpperCase()} está conectado vía [${r.predicate.toUpperCase()}] con ${r.object.toUpperCase()}.`
+                : `${r.subject.toUpperCase()} is connected via [${r.predicate.toUpperCase()}] to ${r.object.toUpperCase()}.`;
               proofTrace = [`${r.subject.toUpperCase()} ──${r.predicate.toUpperCase()}──> ${r.object.toUpperCase()}`];
               if (r.sourceSentId !== -1 && this.sentences[r.sourceSentId]) {
                 citation = `Sentence #${r.sourceSentId + 1}: "${this.sentences[r.sourceSentId].text}"`;
@@ -666,7 +719,9 @@ class SymbolicEngine {
 
       // 4D. Fail-Closed Fallback (0% hallucination)
       if (!response) {
-        response = "I don't know (No verified ground truth matches this assertion).";
+        response = isSpanish
+          ? "No lo sé (No existe verdad de base verificada en el corpus para esta afirmación)."
+          : "I don't know (No verified ground truth matches this assertion).";
         status = "UNKNOWN_FAIL_CLOSED";
       }
     }

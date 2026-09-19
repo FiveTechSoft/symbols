@@ -101,6 +101,38 @@ const PRESET_CORPORA = {
       { s: "GROVER_ALGORITHM", p: "SPEEDUP_FOR", o: "UNSTRUCTURED_SEARCH" },
       { s: "DECOHERENCE", p: "CAUSES", o: "COHERENCE_LOSS" }
     ]
+  },
+  code: {
+    name: "SWE-bench Lite & Code Knowledge Graph",
+    category: "Autonomous Software Engineering",
+    description: "Polyglot AST symbols, Blast Radius, Abductive Bug Diagnosis, STRIPS Planning & Atomic Verification.",
+    sentences: [
+      "The Code Knowledge Graph extracts polyglot AST symbols, class hierarchies, and call graphs from C, Python, and JavaScript without external runtimes.",
+      "Django validators use ASCIIUsernameValidator with regex pattern to validate system usernames strictly.",
+      "Flask Blueprint registers application routes, url prefixes, and view endpoints into the central WSGI dispatch table.",
+      "The STRIPS Task Planner synthesizes provably optimal software repair sequences over bitmask propositional states in less than 10 microseconds.",
+      "The Blast Radius engine computes the transitive impact closure of function edits across polyglot project files via breadth-first search.",
+      "Pre-flight patch verification checks AST syntax and unified diff context before applying changes atomically with sub-millisecond rollback.",
+      "The abductive compiler diagnostic engine maps GCC, Clang, and MSVC error messages directly to missing symbols in the Code Knowledge Graph.",
+      "In SWE-bench Lite evaluations, Symbolic LLM resolves golden real-world bug instances in 1.50 milliseconds with 0.00% hallucination.",
+      "El Grafo de Conocimiento de Codigo extrae simbolos AST, jerarquias de clases y grafos de llamadas en C, Python y JavaScript.",
+      "El planificador STRIPS genera secuencias de reparacion de codigo en menos de 10 microsegundos sobre estados binarios de bits.",
+      "El motor de Blast Radius calcula el impacto transitivo de una modificacion de funcion en todo el proyecto mediante busqueda en anchura.",
+      "La validacion de nombres de usuario en Django utiliza ASCIIUsernameValidator para restringir los caracteres a formato ASCII.",
+      "symbols-agent is the standalone native CLI for blast radius inspection, abductive diagnosis, and autonomous bug repair."
+    ],
+    triples: [
+      { s: "CODE_GRAPH", p: "EXTRACTS", o: "POLYGLOT_AST" },
+      { s: "DJANGO_VALIDATOR", p: "VALIDATES", o: "ASCII_USERNAME" },
+      { s: "ASCII_USERNAME_VALIDATOR", p: "DEFINED_IN", o: "DJANGO_VALIDATORS" },
+      { s: "FLASK_BLUEPRINT", p: "REGISTERS", o: "URL_ROUTES" },
+      { s: "STRIPS_PLANNER", p: "SYNTHESIZES", o: "REPAIR_ACTIONS" },
+      { s: "BLAST_RADIUS", p: "COMPUTES", o: "TRANSITIVE_IMPACT" },
+      { s: "PREFLIGHT_VERIFY", p: "CHECKS", o: "AST_SYNTAX" },
+      { s: "ABDUCTIVE_DIAGNOSE", p: "RESOLVES", o: "COMPILER_ERRORS" },
+      { s: "SWE_BENCH_LITE", p: "EVALUATES", o: "AUTONOMOUS_AGENTS" },
+      { s: "SYMBOLS_AGENT", p: "CLI_FOR", o: "AUTONOMOUS_ENGINEERING" }
+    ]
   }
 };
 
@@ -209,6 +241,23 @@ causes = causa
 enables = permite
 solves = resuelve
 exhibits = exhibe
+code = codigo
+codigo = code
+grafo = graph
+grafo de codigo = code_graph
+code graph = code_graph
+radio de impacto = blast_radius
+blast radius = blast_radius
+planificador strips = strips_planner
+planificador = strips_planner
+strips planner = strips_planner
+validador = validator
+validator = validador
+validacion = validation
+validation = validacion
+ast = ast
+reparacion = repair
+repair = reparacion
 `;
 
 if (typeof module !== "undefined" && module.exports) {

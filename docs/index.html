@@ -45,8 +45,12 @@
 
     <!-- Memory Session Controls -->
     <div class="header-controls">
+      <select id="engineModeSelect" class="btn mode-select" title="Switch execution mode: In-Browser Web Engine or Local C11 Server">
+        <option value="browser">🌐 Web Engine</option>
+        <option value="server">⚡ C11 Server (8080)</option>
+      </select>
       <button class="btn btn-primary" id="btnExport" title="Export full episodic memory & graph to JSON">
-        ⬇ Export Memory
+        ⬇ Export
       </button>
       <button class="btn" id="btnImport" title="Import memory session JSON">
         ⬆ Restore
@@ -56,7 +60,10 @@
         ⌫ Reset
       </button>
       <button class="btn" id="btnAgenticToggle" title="Toggle autonomous real-time Web Search tool when local graph has no ground truth" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">
-        ⚡ Web Tool: ON
+        ⚡ Web: ON
+      </button>
+      <button class="btn mobile-toggle-btn" id="btnToggleSidebar" title="Toggle Sidebar">
+        ☰
       </button>
     </div>
   </header>
@@ -65,11 +72,16 @@
   <div class="main-wrapper">
 
     <!-- Left Sidebar: Corpora & Episodic State -->
-    <aside class="sidebar-left">
+    <aside class="sidebar-left" id="sidebarLeft">
       <div class="sidebar-section">
         <div class="section-header">Knowledge Corpora</div>
         
-        <div class="preset-card active" data-preset="bible">
+        <div class="preset-card active" data-preset="code">
+          <div class="preset-title">SWE-bench & Code Graph</div>
+          <div class="preset-meta">Polyglot AST • Blast Radius • STRIPS Planner</div>
+        </div>
+
+        <div class="preset-card" data-preset="bible">
           <div class="preset-title">Biblia Canónica</div>
           <div class="preset-meta">66 Libros Canónicos • Genealogías & Reyes</div>
         </div>

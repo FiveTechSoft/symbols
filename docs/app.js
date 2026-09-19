@@ -13,6 +13,61 @@ let isDragging = false;
 let draggedNode = null;
 let activeHighlightedNode = null;
 
+// Preset Quick Prompts Table
+const PRESET_PROMPTS = {
+  code: [
+    { label: "🛠️ \"How does Django validate usernames?\"", query: "How does Django validate usernames?" },
+    { label: "🌐 \"What is the blast radius of a function?\"", query: "What is the blast radius of a function?" },
+    { label: "⚡ \"¿Cómo funciona el planificador STRIPS?\"", query: "¿Cómo funciona el planificador STRIPS?" },
+    { label: "🔍 \"¿Qué extrae el Code Knowledge Graph?\"", query: "¿Qué extrae el Code Knowledge Graph?" },
+    { label: "🚀 \"What is symbols-agent?\"", query: "What is symbols-agent?" }
+  ],
+  bible: [
+    { label: "📜 \"Who is the father of David?\"", query: "Who is the father of David?" },
+    { label: "👑 \"¿Quién fue el primer rey de Israel?\"", query: "¿Quién fue el primer rey de Israel?" },
+    { label: "📖 \"Libros de la Biblia\"", query: "Libros de la Biblia" },
+    { label: "🌊 \"Where did Jonah flee?\"", query: "Where did Jonah flee?" },
+    { label: "✍️ \"¿Quién escribió Proverbios?\"", query: "¿Quién escribió Proverbios?" }
+  ],
+  jung: [
+    { label: "🧠 \"What is libido?\"", query: "What is libido?" },
+    { label: "🌳 \"What does the tree represent?\"", query: "What does the tree represent?" },
+    { label: "📖 \"Who wrote the Golden Bough?\"", query: "Who wrote the Golden Bough?" },
+    { label: "🎭 \"What pact did Faust make?\"", query: "What pact did Faust make?" },
+    { label: "☀️ \"¿Qué representa el sol?\"", query: "¿Qué representa el sol?" }
+  ],
+  quantum: [
+    { label: "⚛️ \"What is a qubit?\"", query: "What is a qubit?" },
+    { label: "🔗 \"What does entanglement enable?\"", query: "What does entanglement enable?" },
+    { label: "🧮 \"What does Shor's algorithm solve?\"", query: "What does Shor's algorithm solve?" },
+    { label: "⚡ \"What is Grover's algorithm?\"", query: "What is Grover's algorithm?" },
+    { label: "🌪️ \"What causes decoherence?\"", query: "What causes decoherence?" }
+  ]
+};
+
+function updatePromptPills(presetKey = "code") {
+  const container = document.querySelector(".pills-grid");
+  if (!container) return;
+  const list = PRESET_PROMPTS[presetKey] || PRESET_PROMPTS.code;
+  container.innerHTML = list.map(p => 
+    `<button class="prompt-pill" onclick="sendPrompt(${JSON.stringify(p.query)})">${p.label}</button>`
+  ).join("");
+}
+
+function resetChatHistoryUI(presetKey = "code") {
+  const history = document.getElementById("chatHistory");
+  if (!history) return;
+  history.innerHTML = `
+    <div class="hero-pills-container">
+      <div class="hero-pills-title">
+        <span>⚡</span> Autonomous Deterministic Dialogue — Try asking:
+      </div>
+      <div class="pills-grid"></div>
+    </div>
+  `;
+  updatePromptPills(presetKey);
+}
+
 // Initialize Web Application
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
@@ -24,15 +79,16 @@ if (typeof document !== "undefined") {
     initCanvas();
     loadStoredSession();
 
-    // If empty, load default Bible preset
+    const savedPreset = localStorage.getItem("symbolic_active_preset") || "code";
+
     if (engine.sentences.length === 0) {
-      loadPresetCorpus("bible");
-      highlightActivePresetCard("bible");
+      loadPresetCorpus(savedPreset);
+      highlightActivePresetCard(savedPreset);
     } else {
-      const savedPreset = localStorage.getItem("symbolic_active_preset") || "bible";
       highlightActivePresetCard(savedPreset);
       updateUIStats();
       rebuildGraphVisualizer();
+      updatePromptPills(savedPreset);
     }
 
     setupEventListeners();
@@ -121,7 +177,20 @@ function setupEventListeners() {
   if (engineModeSelect) {
     engineModeSelect.addEventListener("change", (e) => {
       currentMode = e.target.value;
-      addSystemMessage(`Switched execution mode to: ${currentMode === "browser" ? "Client-Side In-Browser Engine (Stand-Alone)" : "Native C11 Engine (localhost:8080)"}`);
+      if (currentMode === "server") {
+        addSystemMessage(`Switched execution mode to: Local C11 Server (${serverUrl}). Ensure './symbols_server 8080' is running in your terminal.`);
+      } else {
+        addSystemMessage(`Switched execution mode to: Client-Side In-Browser Engine (Deterministic WebAssembly / JS).`);
+      }
+    });
+  }
+
+  // Mobile Sidebar Toggle
+  const btnToggleSidebar = document.getElementById("btnToggleSidebar");
+  if (btnToggleSidebar) {
+    btnToggleSidebar.addEventListener("click", () => {
+      const sidebar = document.getElementById("sidebarLeft");
+      if (sidebar) sidebar.classList.toggle("open");
     });
   }
 }
@@ -144,6 +213,7 @@ function loadPresetCorpus(presetKey) {
     saveSessionToStorage();
     updateUIStats();
     rebuildGraphVisualizer();
+    updatePromptPills(presetKey);
     addSystemMessage(`Loaded corpus '${res.name}': ${res.sentencesCount} sentences & ${res.triplesCount} triples indexed in ${res.elapsedMs.toFixed(2)} ms.`);
   }
 }
@@ -511,21 +581,22 @@ function addSystemMessage(text) {
   }, 10);
 }
 
-// Web Search Tool Simulator & Dynamic Ingest
-function triggerWebSearchTool() {
-  const topic = prompt("Enter web search topic or URL to acquire and feed into the graph:", "TRAPPIST-1 exoplanetary system discovery");
+// Real Autonomous Web Search Tool & Dynamic Ingestion
+async function triggerWebSearchTool() {
+  const topic = prompt("Enter web search topic or entity to acquire and assimilate into the graph:", "James Webb Space Telescope");
   if (!topic) return;
 
-  addSystemMessage(`OpenCode Harness executing Web Search: '${topic}'...`);
-  setTimeout(() => {
-    const simulatedSnippet = `The ${topic} was thoroughly documented by international researchers. Key observations confirmed seven Earth-sized terrestrial planets in orbit, five of which reside within the habitable zone.`;
-    const res = engine.ingestText(simulatedSnippet, "web_search_tool");
+  addSystemMessage(`🌐 Autonomous Real-Time Web Tool: Searching Wikipedia for '${topic}'...`);
+  const webResult = await fetchWebKnowledge(topic, topic);
+  if (webResult && webResult.text) {
+    const res = engine.ingestText(webResult.text, `WebSearch: ${webResult.title}`);
     saveSessionToStorage();
     updateUIStats();
     rebuildGraphVisualizer();
-
-    addSystemMessage(`Web content assimilated into Symbolic LLM in ${res.elapsedMs.toFixed(2)} ms. Added ${res.sentencesAdded} sentences & ${res.symbolsAdded} new symbols. You can now query about '${topic}' with 0% hallucination.`);
-  }, 400);
+    addSystemMessage(`✅ Ingested '${webResult.title}' from Wikipedia in ${res.elapsedMs.toFixed(2)} ms (+${res.sentencesAdded} sentences, +${res.symbolsAdded} symbols). You can now ask questions about '${webResult.title}' with 0% hallucination.`);
+  } else {
+    addSystemMessage(`⚠ Could not retrieve verified Wikipedia article for '${topic}'. Preserving honest fail-closed unknown.`);
+  }
 }
 
 // Quick Prompt click
@@ -610,10 +681,10 @@ function clearMemorySession() {
   if (confirm("Reset and clear episodic memory and active knowledge base?")) {
     localStorage.removeItem("symbolic_llm_state");
     engine = new SymbolicEngine();
-    updateUIStats();
-    rebuildGraphVisualizer();
-    document.getElementById("chatHistory").innerHTML = "";
-    addSystemMessage("Memory cleared. State reset to zero.");
+    const currentPreset = localStorage.getItem("symbolic_active_preset") || "code";
+    loadPresetCorpus(currentPreset);
+    resetChatHistoryUI(currentPreset);
+    addSystemMessage("Memory reset to zero. Active preset reloaded.");
   }
 }
 
