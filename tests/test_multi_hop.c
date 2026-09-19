@@ -65,24 +65,60 @@ int main(void)
     passed += check("que es el pecado?", out, "sin",
                     "0-hop: pecado via dict→sin", &wrong);
 
-    printf("\n--- 1-HOP: Father-of (single pair) ---\n");
+    printf("\n--- 1-HOP: Father-of (named fact, not verse echo) ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de David?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de David?", out, "Jesse",
-                    "1-hop: father of David = Jesse", &wrong);
+    passed += check("quien es el padre de David?", out,
+                    "El padre de David es Jesse",
+                    "1-hop: father of David = Jesse (named)", &wrong);
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de Solomon?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de Solomon?", out, "David",
-                    "1-hop: father of Solomon = David", &wrong);
+    passed += check("quien es el padre de Solomon?", out,
+                    "El padre de Solomon es David",
+                    "1-hop: father of Solomon = David (named)", &wrong);
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de Isaac?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de Isaac?", out, "Abraham",
-                    "1-hop: father of Isaac = Abraham", &wrong);
+    passed += check("quien es el padre de Isaac?", out,
+                    "El padre de Isaac es Abraham",
+                    "1-hop: father of Isaac = Abraham (named)", &wrong);
+
+    /* begat Pattern C, named */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "quien es el padre de Obed?", out, sizeof(out));
+    total++;
+    passed += check("quien es el padre de Obed?", out,
+                    "El padre de Obed es Boaz",
+                    "1-hop: father of Obed = Boaz (begat)", &wrong);
+
+    /* promotion: verified text pair landed in the KB */
+    {
+        char pars[8][CHAT_TOKEN_MAX];
+        uint32_t np = ChatParentsList(&ch, "david", pars, 8);
+        int has_jesse = 0;
+        for (uint32_t i = 0; i < np; i++)
+            if (strcmp(pars[i], "jesse") == 0)
+                has_jesse = 1;
+        printf("  [%s] promote: father(jesse,david) in KB (pairs=%u)\n",
+               has_jesse ? "PASS" : "FAIL", ch.kb.num_pairs);
+        total++;
+        if (has_jesse)
+            passed++;
+        else
+            wrong++;
+    }
+
+    /* second ask uses the learned pair; still a named fact */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "quien es el padre de David?", out, sizeof(out));
+    total++;
+    passed += check("quien es el padre de David?", out,
+                    "El padre de David es Jesse",
+                    "1-hop replay from KB: still named Jesse", &wrong);
 
     printf("\n--- 2-HOP: Grandfather (father->father chain) ---\n");
     memset(out, 0, sizeof(out));
@@ -193,6 +229,6 @@ int main(void)
     printf("WRONG:    %d\n", wrong);
     printf("KB pairs (bible): %u\n", ch.kb.num_pairs);
 
-    /* 3-hop + taxonomy 2-hop required. WRONG must stay 0. */
-    return (passed >= 13 && wrong == 0) ? 0 : 1;
+    /* named 1-hop + promote + 3-hop + taxonomy 2-hop. WRONG = 0. */
+    return (passed >= 16 && wrong == 0) ? 0 : 1;
 }

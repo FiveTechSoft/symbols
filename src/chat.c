@@ -999,7 +999,17 @@ static int ChatGrandparent(const CHAT *ch, const char *grandchild,
         return 0;
     int has_tax = MetaHasProperty(&ch->mk, "taxonomy", META_PROP_TRANSITIVE);
     int has_father = MetaHasProperty(&ch->mk, "father", META_PROP_TRANSITIVE);
-    if (!has_tax && !has_father)
+    int has_father_pairs = 0;
+    for (uint32_t i = 0; i < ch->kb.num_pairs; i++)
+        if (strcmp(ch->kb.pairs[i].family, "father") == 0)
+        {
+            has_father_pairs = 1;
+            break;
+        }
+    /* Grandparent is an explicit 2-hop walk, not father transitivity.
+       Promoted text pairs must be usable without licensing
+       father_of(A,C) as a false 1-hop. */
+    if (!has_tax && !has_father && !has_father_pairs)
         return 0;
     for (uint32_t i = 0; i < ch->kb.num_pairs; i++)
     {
@@ -3005,7 +3015,56 @@ static int FindParentName(CHAT *ch, const char *entity,
     return 0;
 }
 
-/* Apply FindParentName `hops` times. Fail-closed: any missing
+/* Write a verified (parent, child) father pair into the session KB.
+   Learns the family on first evidence; later pairs are idempotent
+   presents. Does NOT run meta-discovery: father is not a true
+   transitive 1-hop (grandfather ≠ father). */
+static int PromoteFatherPair(CHAT *ch, const char *parent,
+                             const char *child)
+{
+    char p[CHAT_TOKEN_MAX], c[CHAT_TOKEN_MAX], line[LEARN_MAX_LINE];
+    if (ch == NULL || parent == NULL || child == NULL)
+        return 0;
+    ChatNormTok(parent, p, sizeof(p));
+    ChatNormTok(child, c, sizeof(c));
+    if (p[0] == '\0' || c[0] == '\0' || strcmp(p, c) == 0)
+        return 0;
+    if (IsStopTok(p) || IsStopTok(c))
+        return 0;
+    snprintf(line, sizeof(line), "%s father_of %s", p, c);
+    if (!LearnerLearnLine(&ch->lr, line))
+        return 0;
+    return LearnerPresentPair(&ch->lr, "father", p, c);
+}
+
+/* KB parent if unique, else text extract + promote. Ambiguous KB
+   stays fail-closed (do not override with text). */
+static int ResolveParent(CHAT *ch, const char *child, char *parent,
+                         size_t parent_size)
+{
+    char child_n[CHAT_TOKEN_MAX];
+    char pars[8][CHAT_TOKEN_MAX];
+    uint32_t n;
+    if (ch == NULL || child == NULL || parent == NULL || parent_size < 2)
+        return 0;
+    ChatNormTok(child, child_n, sizeof(child_n));
+    n = ChatParents(ch, child_n, pars, 8);
+    if (n == 1)
+    {
+        strncpy(parent, pars[0], parent_size - 1);
+        parent[parent_size - 1] = '\0';
+        return 1;
+    }
+    if (n > 1)
+        return 0;
+    parent[0] = '\0';
+    if (!FindParentName(ch, child, parent, parent_size))
+        return 0;
+    PromoteFatherPair(ch, parent, child_n);
+    return parent[0] != '\0';
+}
+
+/* Apply ResolveParent `hops` times. Fail-closed: any missing
    link yields 0. mid receives the last intermediate (the child
    of the returned ancestor). */
 static int TextAncestor(CHAT *ch, const char *entity, int hops,
@@ -3025,7 +3084,7 @@ static int TextAncestor(CHAT *ch, const char *entity, int hops,
     for (h = 0; h < hops; h++)
     {
         nxt[0] = '\0';
-        if (!FindParentName(ch, cur, nxt, sizeof(nxt)))
+        if (!ResolveParent(ch, cur, nxt, sizeof(nxt)))
             return 0;
         if (mid != NULL && mid_size > 1)
         {
@@ -3073,25 +3132,19 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         else if (found == 0)
         {
-            /* Text search fallback: structural scan of corpus.
-               Find shortest sentence where entity appears after the
-               translated keyword. Deduced from dictionary + structure. */
-            const char *kw = DictTranslate(&ch->dict, "padre");
-            if (kw == NULL)
+            /* Named 1-hop: extract parent, promote the pair, speak
+               the fact. Verse echo is retrieval, not an answer. */
+            char parent[CHAT_TOKEN_MAX];
+            parent[0] = '\0';
+            if (p->a[0] && ResolveParent(ch, p->a, parent, sizeof(parent)))
             {
-                EMIT("No tengo traduccion para la relacion.\n");
+                RememberFocus2(ch, p->a, parent);
+                char capP[CHAT_TOKEN_MAX];
+                Cap(parent, capP, sizeof(capP));
+                st = GOAL_ANSWER;
+                EMIT("El padre de %s es %s.\n", capA, capP);
             }
-            else if (ch->ntfiles > 0 && ch->tgraph != NULL && p->a[0])
-            {
-                char sent[2048];
-                if (FindFatherOfEntity(ch, p->a, kw, sent, sizeof(sent),
-                                       NULL, 0))
-                {
-                    st = GOAL_ANSWER;
-                    EMIT_OK("Segun el texto: %s\n", sent);
-                }
-            }
-            if (st != GOAL_ANSWER)
+            else
                 EMIT("No tengo constancia del padre de %s en los textos "
                        "cargados.\n",
                        capA);
