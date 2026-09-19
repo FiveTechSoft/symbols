@@ -203,6 +203,12 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
     return n;
 }
 
+/* Parent surface forms: shared by intent parse and text retrieval. */
+static const char *const PARENT_SURFACE[] = {
+    "padre", "father", "engendro", "begat", "progenitor"
+};
+#define PARENT_SURFACE_N 5
+
 /* FASE 4: closed-class structural particles (functional vocabulary
    already present as literals across the parser; never content).
    Shared by the G1 topic test (inverse) and the G2 orphan-slot veto. */
@@ -1326,6 +1332,7 @@ typedef struct
     int    has_b;
     int    kw;                /* deduced relation index (generic) */
     int    kw2;               /* second relation index (compose why) */
+    int    hops;              /* ancestor depth: 2 = abuelo, 3 = padre+abuelo */
     char   toks[CHAT_TEXT_WORDS_MAX][CHAT_TOKEN_MAX]; /* TEXTQ query words (as asked) */
     uint32_t ntoks;
     int    t_following;      /* TEXTQ follow-up: reuse cached topic */
@@ -1962,8 +1969,6 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
 
     int kw_parent = -1, kw_child = -1, kw_grand = -1, kw_desc = -1;
     int kw_why = -1, kw_who = -1, kw_is = -1;
-    static const char *PARENT_W[] = {"padre", "father", "engendro",
-                                     "begat", "progenitor"};
     static const char *CHILD_W[] = {"hijo",  "hijos",    "children",
                                     "child", "son",      "sons",
                                     "daughter"};
@@ -1972,8 +1977,8 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                                    "descendant", "descendientes"};
     for (uint32_t i = 0; i < n; i++)
     {
-        for (int k = 0; k < 5; k++)
-            if (kw_parent < 0 && strcmp(toks[i], PARENT_W[k]) == 0)
+        for (int k = 0; k < PARENT_SURFACE_N; k++)
+            if (kw_parent < 0 && strcmp(toks[i], PARENT_SURFACE[k]) == 0)
                 kw_parent = (int)i;
         for (int k = 0; k < 7; k++)
             if (kw_child < 0 && strcmp(toks[i], CHILD_W[k]) == 0)
@@ -2121,6 +2126,28 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         return 0;
     }
 
+    /* 3-hop: padre + abuelo in the same line ("padre del abuelo de X").
+       Uses existing relation words; hop count is composition, not a
+       new lexicon entry. Entity is the argument of the later keyword. */
+    if (kw_parent >= 0 && kw_grand >= 0)
+    {
+        uint32_t from =
+            (uint32_t)(kw_grand > kw_parent ? kw_grand : kw_parent) + 1;
+        if (TokAfterDe(toks, n, from, p->a, CHAT_TOKEN_MAX) ||
+            FallbackOpen(toks, n, from))
+        {
+            if (p->a[0] == '\0' && from < n)
+                strncpy(p->a, toks[from], CHAT_TOKEN_MAX - 1),
+                    p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            if (!SlotOk(p->a))
+                return 0;
+            p->intent = INT_GRANDPARENT;
+            p->hops = 3;
+            return 1;
+        }
+        return 0;
+    }
+
     /* GRANDPARENT: "quien es el abuelo de X" */
     if (kw_grand >= 0)
     {
@@ -2135,6 +2162,7 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             if (!SlotOk(p->a))
                 return 0;
             p->intent = INT_GRANDPARENT;
+            p->hops = 2;
             return 1;
         }
         return 0;
@@ -2593,16 +2621,34 @@ static void RememberFocus2(CHAT *ch, const char *subj, const char *obj)
 
 #define CHAT_ANSWER_MAX 4096
 
+static void CopyLexTok(const TEXTLEX *tl, const TL_SENT *st, uint32_t idx,
+                       char *buf, size_t buf_size)
+{
+    size_t n;
+    if (buf == NULL || buf_size < 2 || st == NULL || idx >= st->ntok)
+        return;
+    n = (size_t)st->lens[idx];
+    if (n >= buf_size)
+        n = buf_size - 1;
+    memcpy(buf, tl->image + st->offs[idx], n);
+    buf[n] = '\0';
+}
+
 /* helper: find sentence with father-of relationship for entity.
    Pattern A: "Name father of Entity" (entity = keyword+2 tokens)
    Pattern B: "Entity ... Name his father" (entity before keyword,
               parent before possessive before keyword)
-   Returns 1 on success, fills sent_buf. */
+   Pattern C: "Name KEYWORD Entity" (Boaz begat Obed)
+   Returns 1 on success, fills sent_buf. parent_buf (optional) gets
+   the capitalized name at the winning match, not the first keyword
+   in the sentence (genealogies list many begats in one period). */
 static int FindFatherOfEntity(CHAT *ch, const char *entity,
                               const char *keyword, char *sent_buf,
-                              size_t sent_buf_size)
+                              size_t sent_buf_size,
+                              char *parent_buf, size_t parent_buf_size)
 {
     char elower[CHAT_TOKEN_MAX];
+    char best_parent[CHAT_TOKEN_MAX];
     uint32_t ei;
     for (ei = 0; entity[ei] && ei < CHAT_TOKEN_MAX - 1; ei++)
         elower[ei] = (char)tolower((unsigned char)entity[ei]);
@@ -2611,6 +2657,7 @@ static int FindFatherOfEntity(CHAT *ch, const char *entity,
     size_t kwlen = strlen(keyword);
     uint32_t best_f = 0, best_s = 0;
     int best_dist = INT_MAX, best_ok = 0;
+    best_parent[0] = '\0';
     for (uint32_t f = 0; f < ch->ntfiles; f++)
     {
         TEXTLEX *tl = &ch->tlex[f];
@@ -2664,10 +2711,32 @@ static int FindFatherOfEntity(CHAT *ch, const char *entity,
                                 int dist = 2; /* keyword-entity gap: father of Entity */
                                 if (dist < best_dist)
                                 {
+                                    uint32_t pi = t;
                                     best_dist = dist;
                                     best_f = f;
                                     best_s = s;
                                     best_ok = 1;
+                                    best_parent[0] = '\0';
+                                    while (pi > 0)
+                                    {
+                                        char tmp[CHAT_TOKEN_MAX];
+                                        pi--;
+                                        CopyLexTok(tl, st2, pi, tmp,
+                                                    sizeof(tmp));
+                                        if ((st2->lens[pi] <= 4 &&
+                                             (IsStopTok(tmp) ||
+                                              st2->lens[pi] == 1)))
+                                            continue;
+                                        if (tmp[0] >= 'A' && tmp[0] <= 'Z')
+                                        {
+                                            strncpy(best_parent, tmp,
+                                                    sizeof(best_parent) - 1);
+                                            best_parent[sizeof(best_parent) - 1] =
+                                                '\0';
+                                            break;
+                                        }
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -2712,6 +2781,9 @@ static int FindFatherOfEntity(CHAT *ch, const char *entity,
                                             best_f = f;
                                             best_s = s;
                                             best_ok = 1;
+                                            CopyLexTok(tl, st2, t - 2,
+                                                       best_parent,
+                                                       sizeof(best_parent));
                                         }
                                         break;
                                     }
@@ -2720,14 +2792,53 @@ static int FindFatherOfEntity(CHAT *ch, const char *entity,
                         }
                     }
                 }
+                /* Pattern C: Name KEYWORD Entity (no stopword).
+                   Verb connectives: "Boaz begat Obed". The predecessor
+                   must be a capitalized name so "my father David"
+                   (vocative/apposition) cannot beat "father of David". */
+                if (t >= 1 && t + 1 < st2->ntok)
+                {
+                    const char *t_prev = tl->image + st2->offs[t - 1];
+                    size_t tl_prev = (size_t)st2->lens[t - 1];
+                    if (tl_prev > 0 && t_prev[0] >= 'A' && t_prev[0] <= 'Z')
+                    {
+                        const char *t_ent = tl->image + st2->offs[t + 1];
+                        size_t tl_ent = (size_t)st2->lens[t + 1];
+                        if ((int)tl_ent == (int)elen)
+                        {
+                            int me = 1;
+                            for (size_t k = 0; k < elen; k++)
+                                if (tolower((unsigned char)t_ent[k]) !=
+                                    (unsigned char)elower[k])
+                                    { me = 0; break; }
+                            if (me && 1 < best_dist)
+                            {
+                                best_dist = 1;
+                                best_f = f;
+                                best_s = s;
+                                best_ok = 1;
+                                CopyLexTok(tl, st2, t - 1, best_parent,
+                                           sizeof(best_parent));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
     if (best_ok)
+    {
+        if (parent_buf != NULL && parent_buf_size > 1 &&
+            best_parent[0] != '\0')
+        {
+            strncpy(parent_buf, best_parent, parent_buf_size - 1);
+            parent_buf[parent_buf_size - 1] = '\0';
+        }
         return TextLexSentenceText(&ch->tlex[best_f], best_s,
                                    ch->tlex[best_f].image,
                                    ch->tlex[best_f].imagelen,
                                    sent_buf, sent_buf_size) > 0;
+    }
     return 0;
 }
 
@@ -2774,9 +2885,19 @@ static int ExtractNameBeforeKeyword(const char *sent, const char *keyword,
     return 0;
 }
 
+/* Word character class (letters/digits). Punctuation and spaces
+   are not word chars; they delimit tokens. Not a vocabulary list. */
+static int IsWordChar(unsigned char c)
+{
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+           (c >= '0' && c <= '9');
+}
+
 /* helper: extract the capitalized name closest before entity in sentence.
    Used when keyword is absent (structural fallback). Skips lowercase
-   words and stopwords until finding a capitalized proper name. */
+   words, stopwords and punctuation until a capitalized proper name.
+   Punctuation (comma between "Jesse , the father of David") must not
+   abort the scan: that was aborting 2-hop composition. */
 static int ExtractNameBeforeEntity(const char *sent, const char *entity,
                                    char *name_buf, size_t name_buf_size)
 {
@@ -2802,35 +2923,23 @@ static int ExtractNameBeforeEntity(const char *sent, const char *entity,
         }
     }
     if (fp == NULL) return 0;
-    /* scan backwards from entity position, looking for capitalized name */
+    /* scan backwards from entity, token by token */
     const char *cur = fp;
     while (cur > sent)
     {
         cur--;
-        /* skip whitespace, punctuation, lowercase words */
-        while (cur > sent && *cur != ' ')
-        {
-            /* if we hit a space, check the word before it */
-            if (*cur == ' ' || *cur == ',' || *cur == ';')
-            {
-                cur++;
-                break;
-            }
+        while (cur > sent && !IsWordChar((unsigned char)*cur))
             cur--;
-        }
-        /* skip spaces */
-        while (cur > sent && *cur == ' ') cur--;
-        if (cur <= sent && *cur != ' ') { /* check first word */ }
-        if (cur <= sent) return 0;
-        /* find end of this word (we're at the last char) */
+        if (!IsWordChar((unsigned char)*cur))
+            return 0;
         const char *we = cur + 1;
-        /* find start of this word */
-        while (cur > sent && *cur != ' ' && *cur != ',' && *cur != ';')
+        while (cur > sent && IsWordChar((unsigned char)*cur))
             cur--;
-        if (*cur == ' ' || *cur == ',') cur++;
+        if (!IsWordChar((unsigned char)*cur))
+            cur++;
         size_t wl = (size_t)(we - cur);
-        if (wl == 0) return 0;
-        /* skip stopwords and single-char tokens */
+        if (wl == 0)
+            continue;
         if (wl <= 4)
         {
             char buf[8];
@@ -2839,10 +2948,8 @@ static int ExtractNameBeforeEntity(const char *sent, const char *entity,
             if (IsStopTok(buf) || wl == 1)
                 continue;
         }
-        /* if lowercase, skip and keep looking */
         if (cur[0] >= 'a' && cur[0] <= 'z')
             continue;
-        /* capitalized name found */
         if (cur[0] >= 'A' && cur[0] <= 'Z' && wl < name_buf_size)
         {
             memcpy(name_buf, cur, wl);
@@ -2852,6 +2959,86 @@ static int ExtractNameBeforeEntity(const char *sent, const char *entity,
         return 0;
     }
     return 0;
+}
+
+/* Parent name of entity from the text store. Tries the dict
+   translation of "padre" then PARENT_SURFACE (same table as parse). */
+static int FindParentName(CHAT *ch, const char *entity,
+                          char *parent, size_t parent_size)
+{
+    const char *kws[PARENT_SURFACE_N + 1];
+    uint32_t nk = 0;
+    const char *tr;
+    uint32_t i, j;
+    if (ch == NULL || entity == NULL || entity[0] == '\0' ||
+        parent == NULL || parent_size < 2)
+        return 0;
+    tr = DictTranslate(&ch->dict, "padre");
+    if (tr != NULL)
+        kws[nk++] = tr;
+    for (i = 0; i < PARENT_SURFACE_N; i++)
+    {
+        int dup = 0;
+        for (j = 0; j < nk; j++)
+            if (strcmp(kws[j], PARENT_SURFACE[i]) == 0)
+                dup = 1;
+        if (!dup)
+            kws[nk++] = PARENT_SURFACE[i];
+    }
+    for (i = 0; i < nk; i++)
+    {
+        char sent[2048];
+        parent[0] = '\0';
+        if (!FindFatherOfEntity(ch, entity, kws[i], sent, sizeof(sent),
+                                parent, parent_size))
+            continue;
+        if (parent[0] == '\0')
+        {
+            if (!ExtractNameBeforeKeyword(sent, kws[i], parent,
+                                          parent_size))
+                ExtractNameBeforeEntity(sent, entity, parent,
+                                        parent_size);
+        }
+        if (parent[0] != '\0')
+            return 1;
+    }
+    return 0;
+}
+
+/* Apply FindParentName `hops` times. Fail-closed: any missing
+   link yields 0. mid receives the last intermediate (the child
+   of the returned ancestor). */
+static int TextAncestor(CHAT *ch, const char *entity, int hops,
+                        char *out, size_t out_size,
+                        char *mid, size_t mid_size)
+{
+    char cur[CHAT_TOKEN_MAX];
+    char nxt[CHAT_TOKEN_MAX];
+    int h;
+    if (ch == NULL || entity == NULL || hops < 1 ||
+        out == NULL || out_size < 2)
+        return 0;
+    strncpy(cur, entity, CHAT_TOKEN_MAX - 1);
+    cur[CHAT_TOKEN_MAX - 1] = '\0';
+    if (mid != NULL && mid_size > 0)
+        mid[0] = '\0';
+    for (h = 0; h < hops; h++)
+    {
+        nxt[0] = '\0';
+        if (!FindParentName(ch, cur, nxt, sizeof(nxt)))
+            return 0;
+        if (mid != NULL && mid_size > 1)
+        {
+            strncpy(mid, cur, mid_size - 1);
+            mid[mid_size - 1] = '\0';
+        }
+        strncpy(cur, nxt, CHAT_TOKEN_MAX - 1);
+        cur[CHAT_TOKEN_MAX - 1] = '\0';
+    }
+    if (strlen(cur) >= out_size)
+        return 0;
+    strcpy(out, cur);
+    return 1;
 }
 
 /* buffered answer: byte-identical text to the former ChatAnswer,
@@ -2897,7 +3084,8 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             else if (ch->ntfiles > 0 && ch->tgraph != NULL && p->a[0])
             {
                 char sent[2048];
-                if (FindFatherOfEntity(ch, p->a, kw, sent, sizeof(sent)))
+                if (FindFatherOfEntity(ch, p->a, kw, sent, sizeof(sent),
+                                       NULL, 0))
                 {
                     st = GOAL_ANSWER;
                     EMIT_OK("Segun el texto: %s\n", sent);
@@ -2971,58 +3159,37 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             stem = ChatFamStem(ch, "father");
         char gp[CHAT_TOKEN_MAX], mid[CHAT_TOKEN_MAX];
         gp[0] = '\0'; mid[0] = '\0';
-        int found_chain = ChatGrandparent(ch, p->a, gp, sizeof(gp),
+        int hops = (p->hops >= 3) ? p->hops : 2;
+        int found_chain = 0;
+        /* KB 2-hop (taxonomy/father pairs) only for depth 2.
+           Depth 3+ must not silently return a 2-hop answer. */
+        if (hops == 2)
+            found_chain = ChatGrandparent(ch, p->a, gp, sizeof(gp),
                                           mid, sizeof(mid));
-        /* Text-based 2-hop deduction: scan corpus iteratively.
-           Step 1: find sentence where entity appears after keyword
-           → extract name before keyword = father (mid).
-           Step 2: find sentence where mid appears after keyword
-           → extract name before keyword = grandfather (gp). */
         if (!found_chain && ch->ntfiles > 0 && ch->tgraph != NULL)
-        {
-            const char *kw = DictTranslate(&ch->dict, "padre");
-            if (kw != NULL)
-            {
-            char sent1[2048];
-            if (FindFatherOfEntity(ch, p->a, kw, sent1, sizeof(sent1)))
-            {
-                if (!ExtractNameBeforeKeyword(sent1, kw, mid, sizeof(mid)))
-                    ExtractNameBeforeEntity(sent1, p->a, mid, sizeof(mid));
-                if (mid[0])
-                {
-                    char sent2[2048];
-                    if (FindFatherOfEntity(ch, mid, kw, sent2,
-                                           sizeof(sent2)))
-                    {
-                        if (!ExtractNameBeforeKeyword(sent2, kw, gp,
-                                                      sizeof(gp)))
-                            ExtractNameBeforeEntity(sent2, mid, gp,
-                                                    sizeof(gp));
-                        if (gp[0])
-                            found_chain = 1;
-                    }
-                }
-            }
-            }
-        }
-        if (found_chain && gp[0] && mid[0])
+            found_chain = TextAncestor(ch, p->a, hops, gp, sizeof(gp),
+                                       mid, sizeof(mid));
+        if (found_chain && gp[0] && (hops >= 3 || mid[0]))
         {
             RememberFocus2(ch, p->a, gp);
             char capG[CHAT_TOKEN_MAX];
             Cap(gp, capG, sizeof(capG));
             Cap(mid, capM, sizeof(capM));
             st = GOAL_ANSWER;
-            if (stem != NULL)
+            if (hops >= 3)
+                EMIT("El padre del abuelo de %s es %s.\n", capA, capG);
+            else if (stem != NULL)
                 EMIT("El abuelo de %s es %s: %s es %s de %s, y %s es %s "
                        "de %s.\n",
                        capA, capG, capA, stem, capM, capM, stem, capG);
             else
                 EMIT("El abuelo de %s es %s.\n", capA, capG);
         }
+        else if (hops >= 3)
+            EMIT("No tengo constancia del padre del abuelo de %s.\n",
+                 capA);
         else
-        {
             EMIT("No tengo constancia del abuelo de %s.\n", capA);
-        }
         break;
     }
     case INT_DESCENDANT:

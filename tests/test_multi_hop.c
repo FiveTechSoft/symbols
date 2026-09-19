@@ -1,120 +1,198 @@
 /* test_multi_hop: reasoning depth measurement.
-   Loads bible.txt + bible_genealogy.tsv and tests:
-   - 0-hop: entity lookup (direct KB/text)
-   - 1-hop: father-of (single KB pair)
-   - 2-hop: grandfather (father→father chain)
-   - 3-hop: great-grandfather (father→father→father chain)
-   - negative: UNKNOWN when chain breaks
-   - cross-domain: combine text + KB
-
-   Passes if ≥6 of 10 pass. Zero regressions enforced. */
+   bible.txt: 0/1/2/3-hop father chain from text at runtime.
+   taxonomy TSV: 2-hop over a different TRANSITIVE family (isa).
+   Scores CORRECT / WRONG / UNKNOWN. WRONG must stay 0. */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "chat.h"
 
+static int is_unknown(const char *answer)
+{
+    return strstr(answer, "No tengo") != NULL ||
+           strstr(answer, "No entendi") != NULL ||
+           strstr(answer, "UNKNOWN") != NULL;
+}
+
 static int check(const char *q, const char *answer,
-                 const char *expected, const char *label)
+                 const char *expected, const char *label,
+                 int *wrong)
 {
     int pass = (strstr(answer, expected) != NULL);
-    printf("  [%s] %s\n", pass ? "PASS" : "FAIL", label);
+    int unk = is_unknown(answer);
+    const char *tag = pass ? "PASS" : (unk ? "UNKNOWN" : "WRONG");
+    printf("  [%s] %s\n", tag, label);
     if (!pass)
+    {
         printf("    Q: %s\n    A: %s\n    Expected: %s\n",
                q, answer, expected);
+        if (!unk && wrong != NULL)
+            (*wrong)++;
+    }
     return pass;
+}
+
+static int check_unk(const char *q, const char *answer,
+                     const char *label, int *wrong)
+{
+    int unk = is_unknown(answer);
+    printf("  [%s] %s\n", unk ? "PASS" : "WRONG", label);
+    if (!unk)
+    {
+        printf("    Q: %s\n    A: %s\n", q, answer);
+        if (wrong != NULL)
+            (*wrong)++;
+    }
+    return unk;
 }
 
 int main(void)
 {
     CHAT ch;
     char out[2048];
-    int passed = 0, total = 0;
+    int passed = 0, total = 0, wrong = 0;
 
     memset(&ch, 0, sizeof(ch));
     printf("Loading bible.txt (reasoning deduced from text at runtime)...\n");
-    /* No TSV: all reasoning deduced from text corpus at runtime */
     ChatInit(&ch, "data/texts/bible.txt");
     printf("Ready. KB pairs: %u\n\n", ch.kb.num_pairs);
 
-    /* === 0-HOP: direct entity lookup (text search) === */
     printf("\n--- 0-HOP: Direct entity lookup ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "que es el pecado?", out, sizeof(out));
     total++;
-    /* pecado translates to "sin" via dict; answer contains the translation */
-    passed += check("que es el pecado?", out, "sin", "0-hop: pecado via dict→sin");
+    passed += check("que es el pecado?", out, "sin",
+                    "0-hop: pecado via dict→sin", &wrong);
 
-    /* === 1-HOP: father-of (single KB pair) === */
     printf("\n--- 1-HOP: Father-of (single pair) ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de David?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de David?", out, "Jesse", "1-hop: father of David = Jesse");
+    passed += check("quien es el padre de David?", out, "Jesse",
+                    "1-hop: father of David = Jesse", &wrong);
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de Solomon?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de Solomon?", out, "David", "1-hop: father of Solomon = David");
+    passed += check("quien es el padre de Solomon?", out, "David",
+                    "1-hop: father of Solomon = David", &wrong);
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de Isaac?", out, sizeof(out));
     total++;
-    passed += check("quien es el padre de Isaac?", out, "Abraham", "1-hop: father of Isaac = Abraham");
+    passed += check("quien es el padre de Isaac?", out, "Abraham",
+                    "1-hop: father of Isaac = Abraham", &wrong);
 
-    /* === 2-HOP: grandfather (father→father chain) === */
     printf("\n--- 2-HOP: Grandfather (father->father chain) ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el abuelo de David?", out, sizeof(out));
     total++;
-    passed += check("quien es el abuelo de David?", out, "Obed", "2-hop: grandfather of David = Obed");
+    passed += check("quien es el abuelo de David?", out,
+                    "El abuelo de David es Obed",
+                    "2-hop: grandfather of David = Obed", &wrong);
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el abuelo de Solomon?", out, sizeof(out));
     total++;
-    passed += check("quien es el abuelo de Solomon?", out, "Jesse", "2-hop: grandfather of Solomon = Jesse");
+    passed += check("quien es el abuelo de Solomon?", out,
+                    "El abuelo de Solomon es Jesse",
+                    "2-hop: grandfather of Solomon = Jesse", &wrong);
 
-    /* === 3-HOP: great-grandfather (father→father→father) === */
-    printf("\n--- 3-HOP: Great-grandfather (3-hop chain) ---\n");
-    /* Not natively supported, but test if 2-hop on mid gives us there */
+    printf("\n--- 3-HOP: padre del abuelo (father->father->father) ---\n");
     memset(out, 0, sizeof(out));
-    ChatHandleToBuf(&ch, "quien es el abuelo de David?", out, sizeof(out));
-    /* If abuelo = Obed, then abuelo de Obed = Boaz (another 2-hop) */
+    ChatHandleToBuf(&ch, "quien es el padre del abuelo de David?",
+                    out, sizeof(out));
     total++;
-    /* This is a bonus test: verify the chain depth is recoverable */
-    int has_2hop = (strstr(out, "Obed") != NULL);
-    printf("  [%s] 3-hop depth: grandfather chain yields Obed (recoverable)\n",
-           has_2hop ? "PASS" : "FAIL");
-    passed += has_2hop;
+    passed += check("quien es el padre del abuelo de David?", out,
+                    "El padre del abuelo de David es Boaz",
+                    "3-hop: great-grandfather of David = Boaz", &wrong);
 
-    /* === NEGATIVE: chain breaks → UNKNOWN === */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "who is the father of the grandfather of David?",
+                    out, sizeof(out));
+    total++;
+    passed += check("who is the father of the grandfather of David?", out,
+                    "Boaz",
+                    "3-hop EN: father of grandfather of David = Boaz",
+                    &wrong);
+
     printf("\n--- NEGATIVE: Chain break → UNKNOWN ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el abuelo de Adam?", out, sizeof(out));
     total++;
-    int is_unknown = (strstr(out, "No tengo") != NULL ||
-                      strstr(out, "No entendi") != NULL);
-    printf("  [%s] negative: grandfather of Adam = UNKNOWN (no chain)\n",
-           is_unknown ? "PASS" : "FAIL");
-    if (!is_unknown)
-        printf("    A: %s\n", out);
-    passed += is_unknown;
+    passed += check_unk("quien es el abuelo de Adam?", out,
+                        "2-hop negative: grandfather of Adam = UNKNOWN",
+                        &wrong);
 
-    /* === CROSS-DOMAIN: text search finds entity, KB gives relation === */
-    printf("\n--- CROSS-DOMAIN: Text entity + KB relation ---\n");
     memset(out, 0, sizeof(out));
-    /* David is found via text (bible mentions him), father comes from KB */
+    ChatHandleToBuf(&ch, "quien es el padre del abuelo de Adam?",
+                    out, sizeof(out));
+    total++;
+    passed += check_unk("quien es el padre del abuelo de Adam?", out,
+                        "3-hop negative: great-grandfather of Adam = UNKNOWN",
+                        &wrong);
+
+    printf("\n--- CROSS-DOMAIN: Text entity + relation ---\n");
+    memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de David?", out, sizeof(out));
     total++;
-    int cross = (strstr(out, "Jesse") != NULL);
-    printf("  [%s] cross-domain: David from text, father from KB = Jesse\n",
-           cross ? "PASS" : "FAIL");
-    if (!cross)
-        printf("    A: %s\n", out);
-    passed += cross;
+    passed += check("quien es el padre de David?", out, "Jesse",
+                    "cross-domain: David from text, father = Jesse",
+                    &wrong);
+
+    printf("\n=== MULTI-HOP (bible) ===\n");
+    printf("Passed:   %d / %d\n", passed, total);
+    printf("WRONG:    %d\n", wrong);
+
+    /* taxonomy 2-hop: a different TRANSITIVE family (isa / HIJO_DE) */
+    printf("\n--- TAXONOMY 2-HOP (isa family, not father) ---\n");
+    {
+        const char *tsv = "test_multi_hop_tax.tsv";
+        FILE *f = fopen(tsv, "w");
+        if (f == NULL)
+        {
+            printf("  FAIL cannot write taxonomy scratch\n");
+            return 1;
+        }
+        fputs("robin\tHIJO_DE\tbird\n", f);
+        fputs("bird\tHIJO_DE\tanimal\n", f);
+        fclose(f);
+        CHAT tax;
+        memset(&tax, 0, sizeof(tax));
+        ChatInit(&tax, tsv);
+        remove(tsv);
+
+        memset(out, 0, sizeof(out));
+        ChatHandleToBuf(&tax, "quien es el abuelo de robin?", out,
+                        sizeof(out));
+        total++;
+        passed += check("quien es el abuelo de robin?", out,
+                        "El abuelo de Robin es Animal",
+                        "taxonomy 2-hop: robin→bird→animal", &wrong);
+
+        memset(out, 0, sizeof(out));
+        ChatHandleToBuf(&tax, "es robin hijo de animal?", out,
+                        sizeof(out));
+        total++;
+        passed += check("es robin hijo de animal?", out,
+                        "Si, Robin es hijo de Animal",
+                        "taxonomy 2-hop bool: robin isa animal", &wrong);
+
+        memset(out, 0, sizeof(out));
+        ChatHandleToBuf(&tax, "quien es el padre del abuelo de robin?",
+                        out, sizeof(out));
+        total++;
+        passed += check_unk("quien es el padre del abuelo de robin?", out,
+                            "taxonomy 3-hop negative: no 3rd isa link",
+                            &wrong);
+    }
 
     printf("\n=== MULTI-HOP RESULTS ===\n");
-    printf("Passed: %d / %d\n", passed, total);
-    printf("KB pairs: %u\n", ch.kb.num_pairs);
+    printf("Passed:   %d / %d\n", passed, total);
+    printf("WRONG:    %d\n", wrong);
+    printf("KB pairs (bible): %u\n", ch.kb.num_pairs);
 
-    return (passed >= 6) ? 0 : 1;
+    /* 3-hop + taxonomy 2-hop required. WRONG must stay 0. */
+    return (passed >= 13 && wrong == 0) ? 0 : 1;
 }
