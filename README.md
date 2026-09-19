@@ -467,6 +467,26 @@ Generates cohesive 4-paragraph essays combining:
 3. **Working Memory Integration**: Active context stimulated via bidirectional spreading activation.
 4. **Socratic Dialogic Closure**: Active curiosity prompts inviting deeper inquiry.
 
+### 3.10 Agentic AI Core & Tool Contract Dispatcher for OpenCode (`agent_core`)
+
+To enable autonomous operation inside production agentic coding harnesses (such as OpenCode, Devin, or Claude Code), Symbolic LLM implements an integrated perception-action-observation loop with formal tool contracts (`src/agent_core.c`, `include/agent_core.h`):
+
+#### 3.10.1 Formal Tool Contracts (The ReAct Core)
+Models OpenCode-standard tools with declarative preconditions, parameter signatures, and mutation flags:
+- `grep_search`: Read-only symbol and pattern discovery across the repository.
+- `find_by_name`: Read-only file path location by glob.
+- `view_file`: Read-only slice inspection of source code.
+- `replace_file_content`: Surgical, contiguous text replacement on disk.
+- `run_command`: Sandboxed shell execution for builds, test suites, and linters.
+
+#### 3.10.2 Goal-to-Tool Action Dispatching
+Maintains an autonomous cognitive state machine (`AGENT_TASK_STATE`):
+$$\text{LOCATING\_SYMBOL} \longrightarrow \text{INSPECTING\_CODE} \longrightarrow \text{APPLYING\_FIX} \longrightarrow \text{VERIFYING\_BUILD} \longrightarrow \text{COMPLETED}$$
+Emits deterministic protocol messages (`ACTION_TOOL_CALL`, `ACTION_FINAL`, `ACTION_ABSTAIN`) with zero token overhead and sub-microsecond latency.
+
+#### 3.10.3 Abductive Error Recovery & Self-Healing
+Upon receiving a non-zero exit code (`exit_code != 0`), the agent does not abort. Instead, it enters `AGENT_STATE_DIAGNOSING_ERROR`, utilizing abductive inference to inspect compilation diagnostics, diagnose root causes (e.g. missing header includes or unresolved links), and formulate repair patches.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -539,6 +559,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **12/12 Stochastic NLG & Truth-Preserving Dialogue Suite (`test_stochastic_nlg`)**: Validating non-deterministic conversational generation, temperature-controlled rhetorical sampling ($\tau \in [0.0, 1.0]$), repetition penalties, and zero factual hallucinations.
 - **16/16 Working Memory & Metacognitive Auditing Suite (`test_metacognition`)**: Validating spreading activation along relational topologies, working memory temporal decay, recursive belief self-justification, weakest link detection, and counterfactual cascade loss analysis.
 - **10/10 Passage Generation & Elastic Intent Suite (`test_passage_nlg`)**: Validating document-level essay generation, soft intent classification, cross-lingual entity linking, and zero-hallucination multi-paragraph storytelling.
+- **17/17 Agentic Core & OpenCode Tool Dispatcher Suite (`test_agent_core`)**: Validating formal tool contracts, deterministic wire protocol serialization, autonomous 5-step bug repair loops, and abductive recovery upon build failures.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
