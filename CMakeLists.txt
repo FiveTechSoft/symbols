@@ -167,3 +167,7 @@ add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTO
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
 
+# test_jung_battery: 20-question QA battery over Jung corpus
+add_executable(test_jung_battery tests/test_jung_battery.c)
+target_link_libraries(test_jung_battery symbolic)
+

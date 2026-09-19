@@ -1712,6 +1712,35 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
     if (n == 0)
         return 0;
 
+    /* ---- Structural QA intercept (top priority) ----
+       Detect question patterns BEFORE stop-word filtering.
+       Stop words (que, es, la, el...) would kill the hit scan,
+       so structural detection runs first. Pattern: first token
+       is 2-8 chars at position 0 → looks like a question word;
+       then classify by what follows (copula, location prep, etc.). */
+    if (LooksLikeQuestionWord(toks[0], 0, toks, n))
+    {
+        char entity_out[CHAT_TOKEN_MAX];
+        INTENT qa_int = DetectQuestionType(toks, n, 0,
+                                           entity_out,
+                                           sizeof(entity_out));
+        if (qa_int != INT_NONE)
+        {
+            p->intent = qa_int;
+            strncpy(p->a, entity_out, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            p->ntoks = 0;
+            for (uint32_t ti = 0; ti < n && ti < 8; ti++)
+            {
+                strncpy(p->toks[p->ntoks], toks[ti],
+                        CHAT_TOKEN_MAX - 1);
+                p->toks[p->ntoks][CHAT_TOKEN_MAX - 1] = '\0';
+                p->ntoks++;
+            }
+            return 1;
+        }
+    }
+
     /* ASK-load: verb + bare .tsv or .txt name, exactly two tokens. The verb
        is a frame keyword (frozen precedent: PARENT_W et al); the
        suffix rule is structural. Sandbox + existence probed
@@ -2884,8 +2913,29 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         }
         else
         {
+            /* Drop high-frequency function words from query:
+               tokens appearing >0.5% of all tokens are structural
+               noise (articles, copulas, prepositions) that match
+               everywhere and drown the entity. Frequency threshold
+               deduced from corpus, never hardcoded vocabulary. */
+            uint32_t total_freq = 0;
+            for (i = 0; i < ch->tgraph->symbols->count; i++)
+                total_freq += ch->tgraph->symbols->items[i].frequency;
             for (i = 0; i < p->ntoks && nw < 8; i++)
+            {
+                SYMBOL_ID sid = SymbolFind(ch->tgraph->symbols, p->toks[i]);
+                if (sid != SYMBOL_INVALID)
+                {
+                    const SYMBOL *sym = SymbolGet(ch->tgraph->symbols, sid);
+                    if (sym != NULL && total_freq > 0)
+                    {
+                        float rel = (float)sym->frequency / (float)total_freq;
+                        if (rel > 0.005f)
+                            continue;
+                    }
+                }
                 words[nw++] = p->toks[i];
+            }
         }
         /* interpretation layer: topic key (cached words on
            follow-up so the topic stays put across paraphrase),
@@ -3430,9 +3480,42 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                                             ch->tlex[bestf].imagelen, sent,
                                             sizeof(sent)) > 0)
                     {
-                        st = GOAL_ANSWER;
-                        EMIT_OK("Segun el texto: %s\n", sent);
-                        break;
+                        /* Entity presence check: verify that at least one
+                           query word appears as an exact symbol in the
+                           returned sentence. Prevents unrelated text
+                           returned by embedding similarity alone. */
+                        int entity_ok = 0;
+                        TL_SENT *st_check = &ch->tlex[bestf].sents[best];
+                        for (uint32_t qw = 0; qw < nw && !entity_ok; qw++)
+                        {
+                            SYMBOL_ID qid = SymbolFind(ch->tgraph->symbols,
+                                                       words[qw]);
+                            if (qid == SYMBOL_INVALID)
+                            {
+                                char qlow[64];
+                                uint32_t qi;
+                                for (qi = 0; words[qw][qi] && qi < sizeof(qlow)-1; qi++)
+                                    qlow[qi] = (char)tolower((unsigned char)words[qw][qi]);
+                                qlow[qi] = '\0';
+                                qid = SymbolFind(ch->tgraph->symbols, qlow);
+                            }
+                            if (qid == SYMBOL_INVALID)
+                                continue;
+                            for (uint32_t t = 0; t < st_check->ntok; t++)
+                            {
+                                if (st_check->ids[t] == qid)
+                                {
+                                    entity_ok = 1;
+                                    break;
+                                }
+                            }
+                        }
+                        if (entity_ok)
+                        {
+                            st = GOAL_ANSWER;
+                            EMIT_OK("Segun el texto: %s\n", sent);
+                            break;
+                        }
                     }
                 }
             }
@@ -4649,6 +4732,13 @@ int ChatTryTextLine(CHAT *ch, const char *line, char *out,
     if (tp.intent != INT_TEXTLOAD && tp.intent != INT_TEXTQ &&
         tp.intent != INT_TEXTSTATUS && tp.intent != INT_UNLOAD &&
         tp.intent != INT_TEXT_TOPICS && tp.intent != INT_TEXT_START)
+        return 0;
+    /* Structured questions (wh-word at position 0: quien, que, donde,
+       cuantos, etc.) must NOT be handled by the TEXT fast path — they
+       need the QA layer which verifies entity presence and definitional
+       patterns. Detection is structural: any 2-8 char token at pos 0
+       before a copula or at sentence start. */
+    if (n > 0 && LooksLikeQuestionWord(toks[0], 0, toks, n))
         return 0;
     st = ChatResolveLine(ch, line, out, size, NULL, 0, NULL, 0,
                          NULL);

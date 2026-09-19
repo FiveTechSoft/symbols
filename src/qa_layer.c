@@ -425,10 +425,25 @@ static int TextQueryEmbed(CHAT *ch, const char *entity,
     uint32_t best = 0, bestf = 0;
     float bestsc = 0.0f;
     int have = 0;
+    SYMBOL_ID eid;
 
     if (ch == NULL || entity == NULL || entity[0] == '\0')
         return 0;
     if (ch->ntfiles == 0 || ch->tgraph == NULL || ch->temb == NULL)
+        return 0;
+
+    /* Resolve entity symbol: try exact, then lowercase */
+    eid = SymbolFind(ch->tgraph->symbols, entity);
+    if (eid == SYMBOL_INVALID)
+    {
+        char lower[64];
+        uint32_t i;
+        for (i = 0; entity[i] && i < sizeof(lower) - 1; i++)
+            lower[i] = (char)tolower((unsigned char)entity[i]);
+        lower[i] = '\0';
+        eid = SymbolFind(ch->tgraph->symbols, lower);
+    }
+    if (eid == SYMBOL_INVALID)
         return 0;
 
     words[nw++] = entity;
@@ -460,9 +475,104 @@ static int TextQueryEmbed(CHAT *ch, const char *entity,
                                 ch->tlex[bestf].imagelen, sent,
                                 sizeof(sent)) > 0)
         {
-            strncpy(sentence_out, sent, size - 1);
-            sentence_out[size - 1] = '\0';
-            return 1;
+            /* Verify entity presence in returned sentence:
+               reject if entity symbol does not appear in any
+               token of the sentence. Prevents unrelated text
+               returned by embedding similarity alone. */
+            int found = 0;
+            for (uint32_t f2 = 0; f2 < ch->ntfiles && !found; f2++)
+            {
+                TEXTLEX *tl2 = &ch->tlex[f2];
+                if (tl2->nsent <= best)
+                    continue;
+                TL_SENT *st = &tl2->sents[best];
+                for (uint32_t t = 0; t < st->ntok; t++)
+                {
+                    if (st->ids[t] == eid)
+                    {
+                        found = 1;
+                        break;
+                    }
+                }
+            }
+            if (found)
+            {
+                strncpy(sentence_out, sent, size - 1);
+                sentence_out[size - 1] = '\0';
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* ---- Definitional search: find "X is/are Y" patterns in corpus ----
+   Structural scan: for each sentence, check if the entity token is
+   immediately followed by a high-frequency function word (copula
+   candidate). No vocabulary lists — frequency threshold deduced
+   from the corpus itself. Returns 1 if a definitional sentence
+   is found. */
+static int TextFindDefinition(CHAT *ch, const char *entity,
+                               char *sentence_out, size_t size)
+{
+    SYMBOL_ID eid;
+    uint32_t total_freq = 0;
+    uint32_t nfunc = 0;
+
+    if (ch == NULL || entity == NULL || entity[0] == '\0')
+        return 0;
+    if (ch->ntfiles == 0 || ch->tgraph == NULL)
+        return 0;
+
+    /* Resolve entity symbol */
+    eid = SymbolFind(ch->tgraph->symbols, entity);
+    if (eid == SYMBOL_INVALID)
+    {
+        char lower[64];
+        uint32_t i;
+        for (i = 0; entity[i] && i < sizeof(lower) - 1; i++)
+            lower[i] = (char)tolower((unsigned char)entity[i]);
+        lower[i] = '\0';
+        eid = SymbolFind(ch->tgraph->symbols, lower);
+    }
+    if (eid == SYMBOL_INVALID)
+        return 0;
+
+    /* Compute total frequency and count function words (>1% of tokens).
+       Function words are structurally defined: high-frequency tokens
+       that appear across many sentences. Copulas are a subset. */
+    for (uint32_t i = 0; i < ch->tgraph->symbols->count; i++)
+        total_freq += ch->tgraph->symbols->items[i].frequency;
+    if (total_freq == 0)
+        return 0;
+
+    /* Scan sentences for ENTITY + FUNCTION_WORD pattern */
+    for (uint32_t f = 0; f < ch->ntfiles; f++)
+    {
+        TEXTLEX *tl = &ch->tlex[f];
+        if (tl->image == NULL || tl->nsent == 0)
+            continue;
+        for (uint32_t s = 0; s < tl->nsent; s++)
+        {
+            TL_SENT *sent = &tl->sents[s];
+            for (uint32_t j = 0; j + 1 < sent->ntok; j++)
+            {
+                if (sent->ids[j] != eid)
+                    continue;
+                /* Next token: check if it's a high-frequency function
+                   word (top ~5% by frequency = likely copula/link) */
+                const SYMBOL *next = SymbolGet(ch->tgraph->symbols,
+                                               sent->ids[j + 1]);
+                if (next == NULL)
+                    continue;
+                float rel = (float)next->frequency / (float)total_freq;
+                if (rel < 0.005f)
+                    continue;
+                /* Found ENTITY + function word: extract sentence */
+                if (TextLexSentenceText(tl, s, tl->image, tl->imagelen,
+                                        sentence_out, size) > 0)
+                    return 1;
+            }
         }
     }
     return 0;
@@ -537,6 +647,17 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
             snprintf(out->text, QA_ANSWER_MAX,
                      "Segun el texto: %s", sent);
             out->confidence = 0.5f;
+            strncpy(out->source, "text_store", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
+
+        /* Try definitional search: "X is/are Y" pattern */
+        if (TextFindDefinition(ch, parse.slots[0], sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.6f;
             strncpy(out->source, "text_store", sizeof(out->source) - 1);
             out->has_source = 1;
             return 1;
