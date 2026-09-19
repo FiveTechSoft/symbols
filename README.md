@@ -551,6 +551,21 @@ Because world state evaluation operates on bitmasks, the entire state space sear
 #### 3.13.3 Dynamic Replanning on Failure
 If a verification step (`verify_build` or `run_regression_tests`) fails with a non-zero exit code, the planner does not crash or loop. It retracts the invalid patch and build predicates, asserts `PRED_ERROR_DIAGNOSED`, and automatically reformulates a recovery schedule (`diagnose_error` $\rightarrow$ `apply_patch` $\rightarrow$ `verify_build` $\rightarrow$ `run_regression_tests`) to heal the build autonomously.
 
+### 3.14 Production Autonomous Coding Orchestrator (`agent_runner`)
+
+To deliver true SWE-bench grade problem solving without human intervention, Symbolic LLM provides a unified production orchestrator (`src/agent_runner.c`, `include/agent_runner.h`):
+
+#### 3.14.1 End-to-End Autonomous Pipeline
+Takes an issue description and coordinates the complete perception-action-observation loop:
+$$\text{Issue Description} \xrightarrow{\text{STRIPS}} \text{Action Plan} \xrightarrow{\text{Code Graph}} \text{Blast Radius} \xrightarrow{\text{Agent Patch}} \text{Atomic Diffs} \xrightarrow{\text{Sandbox}} \text{Verified PR}$$
+- **Optimal Tool Calls**: Schedules minimal tool invocations using STRIPS forward search.
+- **Transitive Safety**: Pinpoints affected downstream callers and enclosing files before patching.
+- **Fail-Closed Verification Gate**: Only accepts a solution when all build and test commands exit with code 0.
+- **Automatic Rollback**: If compilation or regression tests fail and cannot be healed within the replan budget, the file on disk is restored byte-for-byte in 0.001s, preventing workspace corruption.
+
+#### 3.14.2 Senior Staff Engineer Reporting
+Emits structured Markdown pull request reports detailing the root-cause diagnosis, blast radius risk analysis, pre-flight verification invariants, git-compatible unified diff, and test proof.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -625,8 +640,9 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **10/10 Passage Generation & Elastic Intent Suite (`test_passage_nlg`)**: Validating document-level essay generation, soft intent classification, cross-lingual entity linking, and zero-hallucination multi-paragraph storytelling.
 - **17/17 Agentic Core & OpenCode Tool Dispatcher Suite (`test_agent_core`)**: Validating formal tool contracts, deterministic wire protocol serialization, autonomous 5-step bug repair loops, and abductive recovery upon build failures.
 - **53/53 Code Knowledge Graph & Blast Radius Suite (`test_code_graph`)**: Validating C source and header parsing, struct field extraction, bidirectional call graph lookups, multi-hop transitive blast radius calculation, and real-world cross-module impact analysis on the project codebase.
-- **48/48 Surgical Editing & Atomic Rollback Suite (`test_agent_patch`)**: Validating pre-flight dry-run ambiguity rejection, dynamic offset drift tracking, unified diff formatting (`diff -u`), real disk patch application, and instantaneous 0.001s byte-exact atomic rollback.
+- **56/56 Surgical Editing & Atomic Rollback Suite (`test_agent_patch`)**: Validating pre-flight dry-run ambiguity rejection, CRLF/LF transparent normalization, multi-hunk transactional patching, unified diff formatting (`diff -u`), real disk patch application, and instantaneous 0.001s byte-exact atomic rollback.
 - **40/40 Goal-Directed STRIPS Task Planner Suite (`test_agent_planner`)**: Validating STRIPS state-space forward search, optimal tool sequence scheduling, dynamic replanning on verification failure, and self-healing task execution loops.
+- **15/15 Production Agent Runner & SWE-bench Suite (`test_agent_runner`)**: Validating full perception-action-observation loops, cross-module blast radius analysis, automated atomic rollback upon verification failure, and senior staff engineer pull request reporting.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.

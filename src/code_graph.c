@@ -836,6 +836,49 @@ int CodeGraphComputeBlastRadius(const CODE_GRAPH *cg,
                     queue[tail++] = (BFS_NODE){ .sym_id = file_id, .depth = curr.depth + 1 };
             }
         }
+
+        /* 3. Functions using this type or struct: (curr, used_by, Func) */
+        RELATION *used_rels[64];
+        uint32_t n_used = GraphQuerySubjectRelation(cg->graph, curr.sym_id,
+                                                   cg->rel_used_by,
+                                                   used_rels, 64);
+        for (uint32_t i = 0; i < n_used; i++)
+        {
+            SYMBOL_ID user_id = used_rels[i]->object;
+            bool already_visited = false;
+            for (uint32_t v = 0; v < visited_count; v++)
+            {
+                if (visited[v] == user_id)
+                {
+                    already_visited = true;
+                    break;
+                }
+            }
+
+            if (!already_visited && visited_count < MAX_BLAST_ENTRIES)
+            {
+                visited[visited_count++] = user_id;
+                const SYMBOL *sym = SymbolGet(cg->graph->symbols, user_id);
+                if (sym && sym->name && out_radius->entry_count < MAX_BLAST_ENTRIES)
+                {
+                    BLAST_RADIUS_ENTRY *ent = &out_radius->entries[out_radius->entry_count++];
+                    strncpy(ent->symbol_name, sym->name, MAX_CODE_NAME - 1);
+                    ent->kind = CODE_SYM_FUNCTION;
+                    ent->depth = curr.depth + 1;
+
+                    const char *f = CodeGraphGetFunctionFile(cg, sym->name);
+                    if (f)
+                        strncpy(ent->file_path, f, MAX_CODE_PATH - 1);
+
+                    out_radius->affected_functions_count++;
+                    if (ent->depth > out_radius->max_depth_reached)
+                        out_radius->max_depth_reached = ent->depth;
+                }
+
+                if (tail < MAX_BLAST_ENTRIES)
+                    queue[tail++] = (BFS_NODE){ .sym_id = user_id, .depth = curr.depth + 1 };
+            }
+        }
     }
 
     /* Distinct affected files calculation */

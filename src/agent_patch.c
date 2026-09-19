@@ -24,6 +24,66 @@ static uint32_t count_lines(const char *text)
     return lines;
 }
 
+/* Helper to strip '\r' from a string, returning a newly allocated LF-only string */
+static char *strip_cr(const char *src)
+{
+    if (!src)
+        return NULL;
+
+    size_t len = strlen(src);
+    char *dst = (char *)malloc(len + 1);
+    if (!dst)
+        return NULL;
+
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (src[i] != '\r')
+            dst[j++] = src[i];
+    }
+    dst[j] = '\0';
+    return dst;
+}
+
+/* Helper to convert LF-only text to CRLF if target file originally used CRLF */
+static char *restore_crlf_if_needed(const char *src, bool original_had_crlf, size_t *out_size)
+{
+    if (!src)
+        return NULL;
+
+    if (!original_had_crlf)
+    {
+        size_t len = strlen(src);
+        char *dst = (char *)malloc(len + 1);
+        if (!dst) return NULL;
+        memcpy(dst, src, len + 1);
+        if (out_size) *out_size = len;
+        return dst;
+    }
+
+    /* Count LFs that need CR */
+    size_t extra = 0;
+    for (const char *p = src; *p; p++)
+    {
+        if (*p == '\n') extra++;
+    }
+
+    size_t len = strlen(src);
+    char *dst = (char *)malloc(len + extra + 1);
+    if (!dst) return NULL;
+
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (src[i] == '\n')
+            dst[j++] = '\r';
+        dst[j++] = src[i];
+    }
+    dst[j] = '\0';
+    if (out_size) *out_size = j;
+    return dst;
+}
+
 /* Helper to read entire file content into an allocated string */
 static char *read_file_to_string(const char *file_path, size_t *out_size)
 {
@@ -174,91 +234,119 @@ int PatchVerifyAgainstBuffer(const PATCH_PLAN *plan,
         return 0;
     }
 
-    /* Verify first hunk */
-    const PATCH_HUNK *hunk = &plan->hunks[0];
-
-    char full_needle[MAX_HUNK_TEXT * 3];
-    int w = snprintf(full_needle, sizeof(full_needle), "%s%s%s",
-                     hunk->context_before, hunk->target_content, hunk->context_after);
-    if (w < 0 || (size_t)w >= sizeof(full_needle))
+    /* Normalize buffer to LF for cross-platform CRLF/LF resilience */
+    char *norm_source = strip_cr(source_buffer);
+    if (!norm_source)
     {
-        report->status = PATCH_CHECK_NOT_FOUND;
+        report->status = PATCH_CHECK_IO_ERROR;
         report->is_applicable = false;
-        snprintf(report->diagnostic, sizeof(report->diagnostic),
-                 "Hunk needle exceeds internal buffer capacity.");
         return 0;
     }
 
-    /* Count occurrences */
-    size_t needle_len = strlen(full_needle);
-    const char *p = source_buffer;
-    const char *first_match = NULL;
-    uint32_t occurrences = 0;
-
-    while ((p = strstr(p, full_needle)) != NULL)
+    /* Verify each hunk */
+    for (uint32_t h = 0; h < plan->hunk_count; h++)
     {
+        const PATCH_HUNK *hunk = &plan->hunks[h];
+
+        char raw_needle[MAX_HUNK_TEXT * 3];
+        snprintf(raw_needle, sizeof(raw_needle), "%s%s%s",
+                 hunk->context_before, hunk->target_content, hunk->context_after);
+
+        char *needle = strip_cr(raw_needle);
+        if (!needle)
+        {
+            free(norm_source);
+            report->status = PATCH_CHECK_IO_ERROR;
+            report->is_applicable = false;
+            return 0;
+        }
+
+        /* Count occurrences */
+        size_t needle_len = strlen(needle);
+        const char *p = norm_source;
+        const char *first_match = NULL;
+        uint32_t occurrences = 0;
+
+        while ((p = strstr(p, needle)) != NULL)
+        {
+            if (occurrences == 0)
+                first_match = p;
+
+            occurrences++;
+            p += needle_len;
+        }
+
+        if (h == 0)
+            report->occurrences_found = occurrences;
+
         if (occurrences == 0)
-            first_match = p;
+        {
+            report->status = PATCH_CHECK_NOT_FOUND;
+            report->is_applicable = false;
+            snprintf(report->diagnostic, sizeof(report->diagnostic),
+                     "Hunk %u: Target content not found in target buffer.", h + 1);
+            free(needle);
+            free(norm_source);
+            return 0;
+        }
 
-        occurrences++;
-        p += needle_len;
+        if (occurrences > 1)
+        {
+            report->status = PATCH_CHECK_AMBIGUOUS;
+            report->is_applicable = false;
+            snprintf(report->diagnostic, sizeof(report->diagnostic),
+                     "Hunk %u: Target content found %u times; ambiguous. Provide additional context anchors.",
+                     h + 1, occurrences);
+            free(needle);
+            free(norm_source);
+            return 0;
+        }
+
+        /* Exactly 1 occurrence located */
+        size_t match_offset = (size_t)(first_match - norm_source);
+        char *norm_cb = strip_cr(hunk->context_before);
+        if (norm_cb)
+        {
+            match_offset += strlen(norm_cb);
+            free(norm_cb);
+        }
+
+        uint32_t line = 1;
+        for (size_t i = 0; i < match_offset; i++)
+        {
+            if (norm_source[i] == '\n')
+                line++;
+        }
+
+        if (h == 0)
+        {
+            report->matched_line = line;
+            if (hunk->expected_line > 0)
+                report->line_drift = (int32_t)line - (int32_t)hunk->expected_line;
+            else
+                report->line_drift = 0;
+        }
+
+        free(needle);
     }
 
-    report->occurrences_found = occurrences;
-
-    if (occurrences == 0)
-    {
-        report->status = PATCH_CHECK_NOT_FOUND;
-        report->is_applicable = false;
-        snprintf(report->diagnostic, sizeof(report->diagnostic),
-                 "Target content not found in target buffer.");
-        return 0;
-    }
-
-    if (occurrences > 1)
-    {
-        report->status = PATCH_CHECK_AMBIGUOUS;
-        report->is_applicable = false;
-        snprintf(report->diagnostic, sizeof(report->diagnostic),
-                 "Target content found %u times; ambiguous. Provide additional context_before/after.",
-                 occurrences);
-        return 0;
-    }
-
-    /* Exactly 1 occurrence located */
-    size_t match_offset = (size_t)(first_match - source_buffer);
-    if (hunk->context_before[0] != '\0')
-        match_offset += strlen(hunk->context_before);
-
-    uint32_t line = 1;
-    for (size_t i = 0; i < match_offset; i++)
-    {
-        if (source_buffer[i] == '\n')
-            line++;
-    }
-
-    report->matched_line = line;
     report->is_applicable = true;
-
-    if (hunk->expected_line > 0)
-        report->line_drift = (int32_t)line - (int32_t)hunk->expected_line;
-    else
-        report->line_drift = 0;
 
     if (report->line_drift != 0)
     {
         report->status = PATCH_CHECK_OFFSET_DRIFT;
         snprintf(report->diagnostic, sizeof(report->diagnostic),
                  "Target uniquely matched at line %u (offset drift: %+d from expected line %u).",
-                 line, report->line_drift, hunk->expected_line);
+                 report->matched_line, report->line_drift, plan->hunks[0].expected_line);
     }
     else
     {
         report->status = PATCH_CHECK_OK;
         snprintf(report->diagnostic, sizeof(report->diagnostic),
-                 "Target uniquely matched at line %u.", line);
+                 "Target uniquely matched at line %u.", report->matched_line);
     }
 
+    free(norm_source);
     return 1;
 }
 
@@ -293,7 +381,7 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     if (!plan || plan->hunk_count == 0)
         return 0;
 
-    /* 1. Pre-flight verification */
+    /* 1. Pre-flight verification of all hunks */
     PATCH_VERIFY_REPORT report;
     if (!PatchVerifyPlan(plan, &report) || !report.is_applicable)
         return 0;
@@ -304,51 +392,95 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     if (!orig_content)
         return 0;
 
+    bool had_crlf = (strstr(orig_content, "\r\n") != NULL);
+
     if (plan->backup_content)
         free(plan->backup_content);
 
     plan->backup_content = orig_content;
     plan->backup_size = orig_sz;
 
-    /* 3. Apply hunk in-memory */
-    const PATCH_HUNK *hunk = &plan->hunks[0];
-
-    char needle[MAX_HUNK_TEXT * 3];
-    snprintf(needle, sizeof(needle), "%s%s%s",
-             hunk->context_before, hunk->target_content, hunk->context_after);
-
-    char repl[MAX_HUNK_TEXT * 3];
-    snprintf(repl, sizeof(repl), "%s%s%s",
-             hunk->context_before, hunk->replacement, hunk->context_after);
-
-    const char *match = strstr(plan->backup_content, needle);
-    if (!match)
+    /* 3. Normalize working buffer to LF for seamless multi-hunk replacement */
+    char *work_buf = strip_cr(plan->backup_content);
+    if (!work_buf)
         return 0;
 
-    size_t prefix_len = (size_t)(match - plan->backup_content);
-    size_t needle_len = strlen(needle);
-    size_t repl_len   = strlen(repl);
-    size_t suffix_len = orig_sz - (prefix_len + needle_len);
-
-    size_t new_sz = prefix_len + repl_len + suffix_len;
-    char *new_content = (char *)malloc(new_sz + 1);
-    if (!new_content)
-        return 0;
-
-    memcpy(new_content, plan->backup_content, prefix_len);
-    memcpy(new_content + prefix_len, repl, repl_len);
-    memcpy(new_content + prefix_len + repl_len,
-           plan->backup_content + prefix_len + needle_len, suffix_len);
-    new_content[new_sz] = '\0';
-
-    /* 4. Write new content to disk */
-    if (!write_string_to_file(plan->target_file, new_content, new_sz))
+    /* Sequentially apply all hunks */
+    for (uint32_t h = 0; h < plan->hunk_count; h++)
     {
-        free(new_content);
+        const PATCH_HUNK *hunk = &plan->hunks[h];
+
+        char raw_needle[MAX_HUNK_TEXT * 3];
+        snprintf(raw_needle, sizeof(raw_needle), "%s%s%s",
+                 hunk->context_before, hunk->target_content, hunk->context_after);
+        char *needle = strip_cr(raw_needle);
+
+        char raw_repl[MAX_HUNK_TEXT * 3];
+        snprintf(raw_repl, sizeof(raw_repl), "%s%s%s",
+                 hunk->context_before, hunk->replacement, hunk->context_after);
+        char *repl = strip_cr(raw_repl);
+
+        if (!needle || !repl)
+        {
+            free(needle);
+            free(repl);
+            free(work_buf);
+            return 0;
+        }
+
+        const char *match = strstr(work_buf, needle);
+        if (!match)
+        {
+            free(needle);
+            free(repl);
+            free(work_buf);
+            return 0;
+        }
+
+        size_t prefix_len = (size_t)(match - work_buf);
+        size_t needle_len = strlen(needle);
+        size_t repl_len   = strlen(repl);
+        size_t work_sz    = strlen(work_buf);
+        size_t suffix_len = work_sz - (prefix_len + needle_len);
+
+        size_t new_sz = prefix_len + repl_len + suffix_len;
+        char *new_content = (char *)malloc(new_sz + 1);
+        if (!new_content)
+        {
+            free(needle);
+            free(repl);
+            free(work_buf);
+            return 0;
+        }
+
+        memcpy(new_content, work_buf, prefix_len);
+        memcpy(new_content + prefix_len, repl, repl_len);
+        memcpy(new_content + prefix_len + repl_len,
+               work_buf + prefix_len + needle_len, suffix_len);
+        new_content[new_sz] = '\0';
+
+        free(needle);
+        free(repl);
+        free(work_buf);
+        work_buf = new_content;
+    }
+
+    /* 4. Restore original line ending convention before writing to disk */
+    size_t final_sz = 0;
+    char *final_content = restore_crlf_if_needed(work_buf, had_crlf, &final_sz);
+    free(work_buf);
+
+    if (!final_content)
+        return 0;
+
+    /* 5. Atomic write to disk */
+    if (!write_string_to_file(plan->target_file, final_content, final_sz))
+    {
+        free(final_content);
         return 0;
     }
 
-    free(new_content);
+    free(final_content);
     plan->is_applied = true;
     return 1;
 }
@@ -380,60 +512,73 @@ int PatchFormatUnifiedDiff(const PATCH_PLAN *plan,
     if (plan->hunk_count == 0)
         return 0;
 
-    const PATCH_HUNK *hunk = &plan->hunks[0];
-    uint32_t match_line = (report && report->matched_line > 0) ?
-                          report->matched_line : hunk->expected_line;
-    if (match_line == 0)
-        match_line = 1;
-
-    uint32_t old_lines = count_lines(hunk->target_content);
-    uint32_t new_lines = count_lines(hunk->replacement);
-
     int offset = snprintf(out_diff, max_size,
                           "--- a/%s\n"
-                          "+++ b/%s\n"
-                          "@@ -%u,%u +%u,%u @@\n",
-                          plan->target_file, plan->target_file,
-                          match_line, old_lines,
-                          match_line, new_lines);
+                          "+++ b/%s\n",
+                          plan->target_file, plan->target_file);
 
     if (offset < 0 || (size_t)offset >= max_size)
         return 0;
 
-    /* Format target lines with '-' */
-    const char *p = hunk->target_content;
-    while (*p && (size_t)offset < max_size)
+    for (uint32_t h = 0; h < plan->hunk_count && (size_t)offset < max_size; h++)
     {
-        const char *nl = strchr(p, '\n');
-        size_t line_len = nl ? (size_t)(nl - p) : strlen(p);
+        const PATCH_HUNK *hunk = &plan->hunks[h];
+        uint32_t match_line = (report && report->matched_line > 0 && h == 0) ?
+                              report->matched_line : hunk->expected_line;
+        if (match_line == 0)
+            match_line = 1;
+
+        uint32_t old_lines = count_lines(hunk->target_content);
+        uint32_t new_lines = count_lines(hunk->replacement);
 
         int written = snprintf(out_diff + offset, max_size - (size_t)offset,
+                               "@@ -%u,%u +%u,%u @@\n",
+                               match_line, old_lines,
+                               match_line, new_lines);
+        if (written > 0 && (size_t)(offset + written) < max_size)
+            offset += written;
+
+        /* Format target lines with '-' */
+        char *norm_target = strip_cr(hunk->target_content);
+        const char *p = norm_target ? norm_target : hunk->target_content;
+        while (*p && (size_t)offset < max_size)
+        {
+            const char *nl = strchr(p, '\n');
+            size_t line_len = nl ? (size_t)(nl - p) : strlen(p);
+
+            written = snprintf(out_diff + offset, max_size - (size_t)offset,
                                "-%.*s\n", (int)line_len, p);
-        if (written > 0 && (size_t)(offset + written) < max_size)
-            offset += written;
+            if (written > 0 && (size_t)(offset + written) < max_size)
+                offset += written;
 
-        if (nl)
-            p = nl + 1;
-        else
-            break;
-    }
+            if (nl)
+                p = nl + 1;
+            else
+                break;
+        }
+        if (norm_target)
+            free(norm_target);
 
-    /* Format replacement lines with '+' */
-    p = hunk->replacement;
-    while (*p && (size_t)offset < max_size)
-    {
-        const char *nl = strchr(p, '\n');
-        size_t line_len = nl ? (size_t)(nl - p) : strlen(p);
+        /* Format replacement lines with '+' */
+        char *norm_repl = strip_cr(hunk->replacement);
+        p = norm_repl ? norm_repl : hunk->replacement;
+        while (*p && (size_t)offset < max_size)
+        {
+            const char *nl = strchr(p, '\n');
+            size_t line_len = nl ? (size_t)(nl - p) : strlen(p);
 
-        int written = snprintf(out_diff + offset, max_size - (size_t)offset,
+            written = snprintf(out_diff + offset, max_size - (size_t)offset,
                                "+%.*s\n", (int)line_len, p);
-        if (written > 0 && (size_t)(offset + written) < max_size)
-            offset += written;
+            if (written > 0 && (size_t)(offset + written) < max_size)
+                offset += written;
 
-        if (nl)
-            p = nl + 1;
-        else
-            break;
+            if (nl)
+                p = nl + 1;
+            else
+                break;
+        }
+        if (norm_repl)
+            free(norm_repl);
     }
 
     return 1;

@@ -129,6 +129,20 @@ static void test_dry_run_verification(void)
     TEST_ASSERT(rep_drift.matched_line == 10, "Located actual match at line 10");
     TEST_ASSERT(rep_drift.line_drift == 6, "Calculated exact line drift of +6 lines");
     PatchPlanFree(&plan_drift);
+
+    /* Case E: CRLF vs LF Cross-Platform Transparency */
+    const char *crlf_code = "int alpha = 10;\r\nint beta = 20;\r\nint gamma = 30;\r\n";
+    PATCH_PLAN plan_crlf;
+    PatchPlanInit(&plan_crlf, "crlf.c");
+    /* Target specified with pure LF ('\n') */
+    PatchPlanAddHunk(&plan_crlf, 2, NULL, "int beta = 20;\n", "int beta = 999;\n", NULL);
+
+    PATCH_VERIFY_REPORT rep_crlf;
+    int rc_e = PatchVerifyAgainstBuffer(&plan_crlf, crlf_code, &rep_crlf);
+    TEST_ASSERT(rc_e == 1, "Transparently matches LF target against CRLF file content");
+    TEST_ASSERT(rep_crlf.status == PATCH_CHECK_OK, "CRLF match status is OK");
+    TEST_ASSERT(rep_crlf.matched_line == 2, "CRLF target located accurately at line 2");
+    PatchPlanFree(&plan_crlf);
 }
 
 /* ============================================================
@@ -199,6 +213,55 @@ static void test_atomic_apply_and_rollback(void)
 }
 
 /* ============================================================
+   Test 3B: Multi-Hunk Transactional Patching
+   ============================================================ */
+static void test_multi_hunk_patching(void)
+{
+    printf("\n=== Test 3B: Multi-Hunk Atomic Patching ===\n");
+    const char *test_file = "test_scratch_multi.c";
+    const char *orig =
+        "#include <stdio.h>\n"
+        "int GetAlpha(void) { return 1; }\n"
+        "int GetBeta(void)  { return 2; }\n";
+
+    FILE *f = fopen(test_file, "wb");
+    fwrite(orig, 1, strlen(orig), f);
+    fclose(f);
+
+    PATCH_PLAN plan;
+    PatchPlanInit(&plan, test_file);
+    PatchPlanAddHunk(&plan, 2, NULL, "int GetAlpha(void) { return 1; }\n",
+                     "int GetAlpha(void) { return 100; }\n", NULL);
+    PatchPlanAddHunk(&plan, 3, NULL, "int GetBeta(void)  { return 2; }\n",
+                     "int GetBeta(void)  { return 200; }\n", NULL);
+
+    int rc = PatchApplyAtomic(&plan);
+    TEST_ASSERT(rc == 1, "Multi-hunk PatchApplyAtomic succeeds in one transaction");
+
+    FILE *rf = fopen(test_file, "rb");
+    char buf[512] = {0};
+    fread(buf, 1, sizeof(buf) - 1, rf);
+    fclose(rf);
+
+    TEST_ASSERT(strstr(buf, "return 100;") != NULL, "Hunk 1 applied to disk");
+    TEST_ASSERT(strstr(buf, "return 200;") != NULL, "Hunk 2 applied to disk");
+
+    /* Rollback multi-hunk */
+    int rbrc = PatchRollback(&plan);
+    TEST_ASSERT(rbrc == 1, "Multi-hunk PatchRollback succeeds");
+
+    FILE *rrest = fopen(test_file, "rb");
+    char buf_rest[512] = {0};
+    fread(buf_rest, 1, sizeof(buf_rest) - 1, rrest);
+    fclose(rrest);
+
+    TEST_ASSERT(strcmp(buf_rest, orig) == 0, "Disk file restored byte-exact across all hunks");
+
+    PatchPlanFree(&plan);
+    remove(test_file);
+}
+
+/* ============================================================
    Test 4: Unified Diff (diff -u) Formatting
    ============================================================ */
 static void test_unified_diff_formatting(void)
@@ -265,6 +328,7 @@ int main(void)
     test_lifecycle_and_formulation();
     test_dry_run_verification();
     test_atomic_apply_and_rollback();
+    test_multi_hunk_patching();
     test_unified_diff_formatting();
     test_fail_closed_boundaries();
 
