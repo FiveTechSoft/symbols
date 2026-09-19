@@ -431,6 +431,25 @@ The symbolic equivalent of masked pre-training in language models. `CognitiveSel
 #### 3.7.4 Continuous Peircean Inquiry Cycle
 The `CognitiveRunInquiryCycle` unifies observation, induction, forward deduction, and belief revision into an automated cognitive loop, enabling the engine to perpetually organize, enrich, and audit its internal ontology.
 
+### 3.8 Working Memory, Spreading Activation & Epistemic Metacognition
+
+To advance beyond static knowledge retrieval into active cognitive focus and self-reflective reasoning, Symbolic LLM implements an integrated working memory and metacognitive auditing subsystem (`src/metacognition.c`, `include/metacognition.h`):
+
+#### 3.8.1 Working Memory & Spreading Activation
+- **Dynamic Cognitive Focus**: Maintains an active sub-graph of working memory ($7 \pm 2$ active concepts) with continuous activation energy $E \in [0.0, 1.0]$.
+- **Relational Activation Spreading**: When a symbol is stimulated in conversation (e.g. `David`), energy propagates along verified relational edges to 1-hop (`Salomon`, `Betsabe`) and 2-hop (`Roboam`) neighbors, while isolated subgraphs remain dormant ($E = 0.0$).
+- **Temporal Decay & Pruning**: Implements cognitive forgetting ($E_{t+1} = E_t \times \text{decay}$); concepts falling below the activation threshold are evicted from working memory, preventing attentional clutter.
+
+#### 3.8.2 Epistemic Provenance DAG & Robustness Propagation
+Every belief records its strict causal origin (`PROV_AXIOM`, `PROV_DEDUCED`, `PROV_ASSIMILATED`). For deduced facts, epistemic robustness is mathematically compounded across parent derivation paths:
+$$R(\text{conclusion}) = \text{confidence}(\text{rule}) \times \prod_{p \in \text{premises}} R(p)$$
+
+#### 3.8.3 Metacognitive Self-Auditing & Counterfactual Loss Analysis
+- **Self-Justification (`MetacognitiveExplainBelief`)**: Explains *"Why do I believe this?"* by recursively generating the complete justification tree tracing derived facts back to base corpus axioms.
+- **Weakest Link Identification (`MetacognitiveFindWeakestLink`)**: Pinpoints the most fragile premise or lowest-confidence rule in multi-hop deduction chains.
+- **Hypothetical Loss Analysis (`MetacognitiveAuditHypotheticalLoss`)**: Simulates the counterfactual impact of refuting an axiom $X$, calculating the exact forward cascade of derived beliefs that would collapse without support.
+- **Global Epistemic Health (`MetacognitiveAuditGraphHealth`)**: Quantifies the balance between direct observations, active deductions, and vulnerable beliefs.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -501,6 +520,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **Formal 3-Point Cognitive Verification (`test_verify_3_points`)**: Validating tabula-rasa rule learning, autonomous forward memory expansion, and abductive proof of necessity & sufficiency.
 - **11/11 Cognitive Learning Suite (`test_cognitive_learning`)**: Validating the Peircean inquiry cycle, curiosity-driven active questioning, non-monotonic belief revision with exception guards, and self-supervised masked edge reconstruction.
 - **12/12 Stochastic NLG & Truth-Preserving Dialogue Suite (`test_stochastic_nlg`)**: Validating non-deterministic conversational generation, temperature-controlled rhetorical sampling ($\tau \in [0.0, 1.0]$), repetition penalties, and zero factual hallucinations.
+- **16/16 Working Memory & Metacognitive Auditing Suite (`test_metacognition`)**: Validating spreading activation along relational topologies, working memory temporal decay, recursive belief self-justification, weakest link detection, and counterfactual cascade loss analysis.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
