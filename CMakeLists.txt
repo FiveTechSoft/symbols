@@ -39,6 +39,7 @@ add_library(symbolic STATIC
     src/agent_action.c
     src/c_rules.c
     src/qa_layer.c
+    src/dict.c
     src/server_proto.c
     src/text_lex.c
     src/meta_graph.c

@@ -3605,6 +3605,74 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        /* Third: translation fallback (ES→EN dict) */
+        if (!found && st != GOAL_ANSWER)
+        {
+            const char *translated = DictTranslate(&ch->dict, p->a);
+            if (translated != NULL)
+            {
+                /* Try KB with translated entity */
+                for (uint32_t i = 0; i < ch->kb.num_pairs && !found; i++)
+                {
+                    const PAIR_EVID *q = &ch->kb.pairs[i];
+                    if (strcmp(q->subject, translated) == 0 ||
+                        strcmp(q->object, translated) == 0)
+                    {
+                        char capS[CHAT_TOKEN_MAX], capO[CHAT_TOKEN_MAX];
+                        Cap(q->subject, capS, sizeof(capS));
+                        Cap(q->object, capO, sizeof(capO));
+                        st = GOAL_ANSWER;
+                        EMIT_OK("%s %s %s (via diccionario).\n",
+                                capS, q->family, capO);
+                        found = 1;
+                    }
+                }
+                /* Try text store with translated entity */
+                if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
+                {
+                    const char *words[4];
+                    uint32_t nw = 0;
+                    words[nw++] = translated;
+                    uint32_t best = 0, bestf = 0;
+                    float bestsc = 0.0f;
+                    int have = 0;
+                    for (uint32_t f = 0; f < ch->ntfiles; f++)
+                    {
+                        uint32_t idx[16];
+                        float sc[16];
+                        uint32_t r = TextLexRetrieve(&ch->tlex[f],
+                                                     ch->tgraph,
+                                                     ch->temb, words, nw,
+                                                     idx, sc, 16);
+                        for (uint32_t j = 0; j < r; j++)
+                        {
+                            if (!have || sc[j] > bestsc)
+                            {
+                                best = idx[j];
+                                bestf = f;
+                                bestsc = sc[j];
+                                have = 1;
+                            }
+                        }
+                    }
+                    if (have && bestsc > 0.1f &&
+                        ch->tlex[bestf].image != NULL)
+                    {
+                        char sent[2048];
+                        if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                                ch->tlex[bestf].image,
+                                                ch->tlex[bestf].imagelen,
+                                                sent, sizeof(sent)) > 0)
+                        {
+                            st = GOAL_ANSWER;
+                            EMIT_OK("Segun el texto [%s]: %s\n",
+                                    translated, sent);
+                        }
+                    }
+                }
+            }
+        }
+
         if (st != GOAL_ANSWER)
             EMIT("No tengo constancia de quien es %s.\n", capE);
         break;
@@ -4487,6 +4555,8 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     MetaKBInit(&ch->mk);
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);
     ToolInit();
+    DictInit(&ch->dict);
+    DictLoad(&ch->dict, "data/english-spanish.txt");
     uint32_t total_facts = 0;
     uint32_t total_sents = 0;
     uint32_t total_syms = 0;

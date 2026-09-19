@@ -15,6 +15,7 @@
 #include "learn.h"
 #include "text_lex.h"
 #include "meta_graph.h"
+#include "dict.h"
 
 /* Relation keyword, DEDUCED from the corpus at ingest (never
    hardcoded): for each distinct TSV relation REL the stem is
@@ -77,6 +78,8 @@ typedef struct CHAT_
     /* interpretation layer (use-learned emphasis; truth stores
        above stay immutable; memset-zero is a valid empty) */
     METAGRAPH       mg;
+    /* cross-lingual translation table (english-spanish.txt) */
+    DICT            dict;
 } CHAT;
 
 void ChatInit(CHAT *ch, const char *corpus_path);

@@ -506,6 +506,214 @@ static int TextQueryEmbed(CHAT *ch, const char *entity,
     return 0;
 }
 
+/* ---- Context-aware fallback: use surrounding question words ----
+   When the entity word is not in the symbol table, use ALL other
+   question words that DO resolve as query terms. This is analogous
+   to attention: the surrounding known words navigate the semantic
+   space to find relevant sentences, even when the target word is
+   missing from the vocabulary. No entity verification — the entity
+   may not appear verbatim as a symbol, that's why we're here. */
+static int IsStopWordQA(const char *tok)
+{
+    static const char *STOP[] = {
+        "de", "of", "del", "'s", "el", "la", "los", "las", "the",
+        "un", "una", "unos", "unas", "a", "an", "en", "y", "e",
+        "o", "u", "que", "quien", "quienes", "cual", "cuales",
+        "su", "sus", "his", "her", "mi", "my", "tu", "your",
+        "es", "era", "fue", "is", "was", "son", "por", "why",
+        "no", "si", "como", "how", "donde", "where", "cuantos",
+        "cuantas", "many", "much", "few",
+    };
+    for (size_t i = 0; i < sizeof(STOP) / sizeof(STOP[0]); i++)
+        if (strcmp(tok, STOP[i]) == 0)
+            return 1;
+    return 0;
+}
+
+static int TextQueryContext(CHAT *ch, const char *question,
+                            const char *entity,
+                            char *sentence_out, size_t size)
+{
+    const char *ctx[8];
+    uint32_t nctx = 0;
+    uint32_t best = 0, bestf = 0;
+    float bestsc = 0.0f;
+    int have = 0;
+    char qtoks[16][64];
+    uint32_t ntoks = 0;
+    const char *p;
+    char elow[64];
+    uint32_t ei;
+
+    if (ch == NULL || question == NULL || entity == NULL || entity[0] == '\0')
+        return 0;
+    if (ch->ntfiles == 0 || ch->tgraph == NULL || ch->temb == NULL)
+        return 0;
+
+    /* Lowercase entity for case-insensitive comparison */
+    for (ei = 0; entity[ei] && ei < sizeof(elow) - 1; ei++)
+        elow[ei] = (char)tolower((unsigned char)entity[ei]);
+    elow[ei] = '\0';
+
+    /* Tokenize question by spaces */
+    p = question;
+    while (*p && ntoks < 16)
+    {
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+            p++;
+        if (*p == '\0')
+            break;
+        {
+            size_t tl = 0;
+            const char *start = p;
+            while (*p && *p != ' ' && *p != '\t' && *p != '\n' &&
+                   *p != '\r' && tl < 63)
+            {
+                qtoks[ntoks][tl++] = (char)tolower((unsigned char)*p);
+                p++;
+            }
+            qtoks[ntoks][tl] = '\0';
+            if (tl >= 2)
+                ntoks++;
+        }
+    }
+
+    /* Collect context words: skip stop words, entity, short tokens */
+    for (uint32_t i = 0; i < ntoks && nctx < 8; i++)
+    {
+        char low[64];
+        uint32_t j;
+        int skip = 0;
+
+        if (strlen(qtoks[i]) < 2)
+            continue;
+        if (IsStopWordQA(qtoks[i]))
+            continue;
+        /* Skip the entity itself (exact or case-insensitive) */
+        if (strcmp(qtoks[i], entity) == 0 || strcmp(qtoks[i], elow) == 0)
+            continue;
+
+        /* Try SymbolFind with original token, then lowercase */
+        for (j = 0; qtoks[i][j] && j < sizeof(low) - 1; j++)
+            low[j] = (char)tolower((unsigned char)qtoks[i][j]);
+        low[j] = '\0';
+
+        if (SymbolFind(ch->tgraph->symbols, qtoks[i]) != SYMBOL_INVALID)
+        {
+            ctx[nctx++] = qtoks[i];
+            continue;
+        }
+        if (SymbolFind(ch->tgraph->symbols, low) != SYMBOL_INVALID)
+        {
+            ctx[nctx++] = qtoks[i];
+            continue;
+        }
+    }
+
+    if (nctx == 0)
+        return 0;
+
+    /* Query with context words */
+    for (uint32_t f = 0; f < ch->ntfiles; f++)
+    {
+        uint32_t idx[16];
+        float sc[16];
+        uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                     ch->temb, ctx, nctx,
+                                     idx, sc, 16);
+        for (uint32_t j = 0; j < r; j++)
+        {
+            if (!have || sc[j] > bestsc)
+            {
+                best = idx[j];
+                bestf = f;
+                bestsc = sc[j];
+                have = 1;
+            }
+        }
+    }
+
+    if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
+    {
+        char sent[2048];
+        if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                ch->tlex[bestf].image,
+                                ch->tlex[bestf].imagelen, sent,
+                                sizeof(sent)) > 0)
+        {
+            strncpy(sentence_out, sent, size - 1);
+            sentence_out[size - 1] = '\0';
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* ---- Raw-text substring search: bypass symbol table ----
+   When the entity is not in the symbol table, scan the raw corpus
+   image for the entity string (case-insensitive). Returns the
+   first sentence that contains the entity as a substring. This is
+   the last-resort fallback: it works even when the tokenizer
+   produced a different symbol than the query word. */
+static int TextFindRaw(CHAT *ch, const char *entity,
+                       char *sentence_out, size_t size)
+{
+    if (ch == NULL || entity == NULL || entity[0] == '\0')
+        return 0;
+    if (ch->ntfiles == 0)
+        return 0;
+
+    /* Build lowercase entity for case-insensitive search */
+    char elow[128];
+    uint32_t i;
+    for (i = 0; entity[i] && i < sizeof(elow) - 1; i++)
+        elow[i] = (char)tolower((unsigned char)entity[i]);
+    elow[i] = '\0';
+    size_t elen = strlen(elow);
+    if (elen == 0)
+        return 0;
+
+    for (uint32_t f = 0; f < ch->ntfiles; f++)
+    {
+        TEXTLEX *tl = &ch->tlex[f];
+        if (tl->image == NULL || tl->imagelen == 0)
+            continue;
+        /* Scan raw image for substring match */
+        for (size_t pos = 0; pos + elen <= tl->imagelen; pos++)
+        {
+            int match = 1;
+            for (size_t k = 0; k < elen; k++)
+            {
+                if (tolower((unsigned char)tl->image[pos + k]) != (unsigned char)elow[k])
+                {
+                    match = 0;
+                    break;
+                }
+            }
+            if (!match)
+                continue;
+            /* Found substring — find which sentence contains it */
+            for (uint32_t s = 0; s < tl->nsent; s++)
+            {
+                TL_SENT *st = &tl->sents[s];
+                if (st->ntok == 0)
+                    continue;
+                /* Sentence byte range: first token start to last token end */
+                size_t sent_start = (size_t)st->offs[0];
+                size_t sent_end = (size_t)st->offs[st->ntok - 1] +
+                                  (size_t)st->lens[st->ntok - 1];
+                if (pos >= sent_start && pos < sent_end)
+                {
+                    if (TextLexSentenceText(tl, s, tl->image, tl->imagelen,
+                                            sentence_out, size) > 0)
+                        return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 /* ---- Definitional search: find "X is/are Y" patterns in corpus ----
    Structural scan: for each sentence, check if the entity token is
    immediately followed by a high-frequency function word (copula
@@ -652,6 +860,67 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
             return 1;
         }
 
+        /* Translation fallback: translate entity to canonical form */
+        {
+            const char *translated = DictTranslate(&ch->dict, parse.slots[0]);
+            if (translated != NULL)
+            {
+                /* Retry KB with translated entity */
+                if (KBFindSubject(&ch->kb, translated,
+                                  pred, sizeof(pred), obj, sizeof(obj)))
+                {
+                    char cap[QA_TOKEN_MAX];
+                    strncpy(cap, translated, sizeof(cap) - 1);
+                    cap[sizeof(cap) - 1] = '\0';
+                    cap[0] = (char)toupper((unsigned char)cap[0]);
+                    snprintf(out->text, QA_ANSWER_MAX,
+                             "%s %s %s.", cap, pred, obj);
+                    out->confidence = 0.85f;
+                    strncpy(out->source, "dict_translate",
+                            sizeof(out->source) - 1);
+                    out->has_source = 1;
+                    return 1;
+                }
+                if (KBFindObject(&ch->kb, translated,
+                                 pred, sizeof(pred), obj, sizeof(obj)))
+                {
+                    char cap[QA_TOKEN_MAX];
+                    strncpy(cap, translated, sizeof(cap) - 1);
+                    cap[sizeof(cap) - 1] = '\0';
+                    cap[0] = (char)toupper((unsigned char)cap[0]);
+                    snprintf(out->text, QA_ANSWER_MAX,
+                             "%s %s %s.", pred, obj, cap);
+                    out->confidence = 0.8f;
+                    strncpy(out->source, "dict_translate",
+                            sizeof(out->source) - 1);
+                    out->has_source = 1;
+                    return 1;
+                }
+                /* Retry text store with translated entity */
+                if (TextQueryEmbed(ch, translated, sent, sizeof(sent)))
+                {
+                    snprintf(out->text, QA_ANSWER_MAX,
+                             "Segun el texto: %s", sent);
+                    out->confidence = 0.45f;
+                    strncpy(out->source, "dict_translate",
+                            sizeof(out->source) - 1);
+                    out->has_source = 1;
+                    return 1;
+                }
+            }
+        }
+
+        /* Context fallback: use surrounding question words */
+        if (TextQueryContext(ch, question, parse.slots[0], sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.4f;
+            strncpy(out->source, "text_context", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
+
         /* Try definitional search: "X is/are Y" pattern */
         if (TextFindDefinition(ch, parse.slots[0], sent, sizeof(sent)))
         {
@@ -659,6 +928,17 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
                      "Segun el texto: %s", sent);
             out->confidence = 0.6f;
             strncpy(out->source, "text_store", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
+
+        /* Raw substring fallback: scan corpus text directly */
+        if (TextFindRaw(ch, parse.slots[0], sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.3f;
+            strncpy(out->source, "text_raw", sizeof(out->source) - 1);
             out->has_source = 1;
             return 1;
         }
@@ -699,6 +979,22 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
             }
         }
 
+        /* Context fallback */
+        {
+            char sent[1024];
+            if (TextQueryContext(ch, question, parse.slots[0],
+                                sent, sizeof(sent)))
+            {
+                snprintf(out->text, QA_ANSWER_MAX,
+                         "Segun el texto: %s", sent);
+                out->confidence = 0.4f;
+                strncpy(out->source, "text_context",
+                        sizeof(out->source) - 1);
+                out->has_source = 1;
+                return 1;
+            }
+        }
+
         snprintf(out->text, QA_ANSWER_MAX,
                  "No tengo constancia de cuantos hay de %s.",
                  parse.slots[0]);
@@ -719,6 +1015,16 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
             out->has_source = 1;
             return 1;
         }
+        if (TextQueryContext(ch, question, parse.slots[0],
+                            sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.4f;
+            strncpy(out->source, "text_context", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
         snprintf(out->text, QA_ANSWER_MAX,
                  "No tengo constancia del lugar de %s.", parse.slots[0]);
         out->confidence = 0.0f;
@@ -735,6 +1041,16 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
                      "Segun el texto: %s", sent);
             out->confidence = 0.5f;
             strncpy(out->source, "text_store", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
+        if (TextQueryContext(ch, question, parse.slots[0],
+                            sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.4f;
+            strncpy(out->source, "text_context", sizeof(out->source) - 1);
             out->has_source = 1;
             return 1;
         }
@@ -780,6 +1096,22 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
             }
         }
 
+        /* Context fallback */
+        {
+            char sent[1024];
+            if (TextQueryContext(ch, question, parse.slots[0],
+                                sent, sizeof(sent)))
+            {
+                snprintf(out->text, QA_ANSWER_MAX,
+                         "Segun el texto: %s", sent);
+                out->confidence = 0.4f;
+                strncpy(out->source, "text_context",
+                        sizeof(out->source) - 1);
+                out->has_source = 1;
+                return 1;
+            }
+        }
+
         snprintf(out->text, QA_ANSWER_MAX,
                  "No tengo constancia de relaciones de %s.",
                  parse.slots[0]);
@@ -817,6 +1149,17 @@ int QAAnswer(CHAT *ch, const char *question, QA_ANSWER *out)
                      "Segun el texto: %s", sent);
             out->confidence = 0.5f;
             strncpy(out->source, "text_store", sizeof(out->source) - 1);
+            out->has_source = 1;
+            return 1;
+        }
+
+        if (TextQueryContext(ch, question, parse.slots[0],
+                            sent, sizeof(sent)))
+        {
+            snprintf(out->text, QA_ANSWER_MAX,
+                     "Segun el texto: %s", sent);
+            out->confidence = 0.4f;
+            strncpy(out->source, "text_context", sizeof(out->source) - 1);
             out->has_source = 1;
             return 1;
         }
