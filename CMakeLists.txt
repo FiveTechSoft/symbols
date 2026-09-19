@@ -141,6 +141,7 @@ sllm_test(test_code_graph tests/test_code_graph.c)
 sllm_test(test_agent_patch tests/test_agent_patch.c)
 sllm_test(test_agent_planner tests/test_agent_planner.c)
 sllm_test(test_agent_runner tests/test_agent_runner.c)
+sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
