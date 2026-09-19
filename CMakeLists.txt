@@ -134,6 +134,9 @@ sllm_test(test_metacognition tests/test_metacognition.c)
 add_executable(chat_main src/chat_main.c)
 target_link_libraries(chat_main symbolic)
 
+add_executable(demo_conversation tests/demo_conversation.c)
+target_link_libraries(demo_conversation symbolic)
+
 # symbols-server: OpenAI-compatible model endpoint (harness, no es test)
 add_executable(symbols-server src/symbols_server.c)
 if(WIN32)
