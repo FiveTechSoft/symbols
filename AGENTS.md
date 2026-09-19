@@ -43,3 +43,8 @@ Regla arquitectónica:
 ## Integración Agéntica Nativa OpenCode (Modo E)
 
 - OpenCode opera con Symbolic LLM como su único proveedor LLM sin MCP ni llamadas a APIs de terceros. El endpoint HTTP `symbols_server` (`/v1/chat/completions`) implementa el protocolo wire de OpenAI Tool Calling: deserializa esquemas `tools`, ingesta retornos `role: "tool"` en bucle ReAct, formula el plan STRIPS óptimo y emite `tool_calls` con `finish_reason: "tool_calls"` hasta resolver la tarea con reporte Markdown (`finish_reason: "stop"`), manteniendo en paralelo el canal de consultas factuales directas. Validado por suite CTest 31/31 (`test_server_tool_calling.c`) y test de integración por socket HTTP real de 8 turnos (`tools/test_opencode_agentic_server.py`), 2026-09-20.
+
+## Motor Abductivo de Diagnóstico y Linters (Fase 7)
+
+- El motor abductivo (`src/agent_diagnose.c`, `include/agent_diagnose.h`) parsea salidas terminales de compiladores (GCC, Clang y MSVC) extrayendo posición de error, clasificación taxonómica formal (`DIAG_ERR_UNDECLARED_SYMBOL`, `MISSING_MEMBER`, `ARITY_MISMATCH`, `TYPE_MISMATCH`, `MISSING_HEADER`, `SYNTAX`, `REDEFINITION`), sugerencias "did you mean" y enlace abductivo directo con el Grafo de Conocimiento del Código (`CodeGraphGetFunctionFile`). Activa dinámicamente predicados STRIPS (`PRED_ERROR_DIAGNOSED`) disparando replanificación curativa sin loops ciegos ni alucinaciones. Validado por suite CTest 39/39 (`tests/test_agent_diagnose.c`) y 0 regresiones en suites agénticas, 2026-09-20.
+

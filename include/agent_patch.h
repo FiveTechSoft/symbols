@@ -27,7 +27,7 @@
 #define MAX_PATCH_PATH       260
 #define MAX_HUNK_TEXT        4096
 #define MAX_PATCH_HUNKS      16
-#define MAX_DIFF_BUFFER      8192
+#define MAX_DIFF_BUFFER      16384
 #define MAX_PATCH_DIAG       512
 
 /* Status of a patch verification pre-flight check */

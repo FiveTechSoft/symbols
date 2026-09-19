@@ -24,19 +24,20 @@
 #include "code_graph.h"
 #include "agent_patch.h"
 #include "agent_planner.h"
+#include "agent_diagnose.h"
 
 #define MAX_TASK_ID      64
 #define MAX_TASK_DESC    512
 #define MAX_CMD_LEN      256
-#define MAX_REPORT_SIZE  4096
+#define MAX_REPORT_SIZE  32768
 
-/* Formal definition of an SWE-bench / GitHub coding issue */
+/* Full definition of a software engineering task (SWE-bench benchmark unit) */
 typedef struct
 {
     char task_id[MAX_TASK_ID];
     char issue_description[MAX_TASK_DESC];
-    char target_symbol[MAX_CODE_NAME];
     char target_file[MAX_PATCH_PATH];
+    char target_symbol[MAX_CODE_NAME];
     uint32_t target_line;
     char context_before[MAX_HUNK_TEXT];
     char buggy_snippet[MAX_HUNK_TEXT];
@@ -49,15 +50,16 @@ typedef struct
 /* Execution and verification report for a task */
 typedef struct
 {
-    char     task_id[MAX_TASK_ID];
-    bool     is_solved;
-    uint32_t total_tool_calls;
-    uint32_t replans_triggered;
-    uint32_t affected_callers_count;
-    uint32_t affected_files_count;
-    char     risk_level[16];
-    char     unified_diff[MAX_DIFF_BUFFER];
-    char     senior_engineer_report[MAX_REPORT_SIZE];
+    char              task_id[MAX_TASK_ID];
+    bool              is_solved;
+    uint32_t          total_tool_calls;
+    uint32_t          replans_triggered;
+    uint32_t          affected_callers_count;
+    uint32_t          affected_files_count;
+    char              risk_level[16];
+    char              unified_diff[MAX_DIFF_BUFFER];
+    DIAGNOSTIC_REPORT diagnostic_report;
+    char              senior_engineer_report[MAX_REPORT_SIZE];
 } SWE_BENCH_RESULT;
 
 /* The Unified Production Agent Runner */

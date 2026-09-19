@@ -566,6 +566,34 @@ $$\text{Issue Description} \xrightarrow{\text{STRIPS}} \text{Action Plan} \xrigh
 #### 3.14.2 Senior Staff Engineer Reporting
 Emits structured Markdown pull request reports detailing the root-cause diagnosis, blast radius risk analysis, pre-flight verification invariants, git-compatible unified diff, and test proof.
 
+### 3.15 Compiler & Linter Error Abductive Engine (`agent_diagnose`)
+
+Real-world coding agents struggle with error resolution, often hallucinating fixes or repeatedly compiling without understanding why the build broke. Symbolic LLM incorporates an abductive compiler and linter error analysis engine (`src/agent_diagnose.c`, `include/agent_diagnose.h`):
+
+#### 3.15.1 Multi-Compiler Diagnostic Parsing
+Parses raw terminal compiler outputs across major compilation toolchains without external regex libraries:
+- **GCC / Clang Format**: `file:line:col: error: message`
+- **MSVC Format**: `file(line,col): error Cxxxx: message`
+- **Error Classification**: Automatically maps diagnostic messages into a formal taxonomy:
+  - `DIAG_ERR_UNDECLARED_SYMBOL`: Missing identifiers or typo'd symbols.
+  - `DIAG_ERR_MISSING_MEMBER`: Dereferencing non-existent struct or object fields.
+  - `DIAG_ERR_ARITY_MISMATCH`: Function called with too few/many arguments.
+  - `DIAG_ERR_TYPE_MISMATCH`: Incompatible types or invalid conversions.
+  - `DIAG_ERR_MISSING_HEADER`: Missing includes (e.g., `#include <stdint.h>`).
+  - `DIAG_ERR_SYNTAX`: Syntax errors, unmatched braces, missing semicolons.
+  - `DIAG_ERR_REDEFINITION`: Conflicting duplicate declarations.
+
+#### 3.15.2 "Did You Mean" Suggestion & Code Graph Abductive Resolution
+Extracts compiler-provided hints (`did you mean 'X'?`) and performs abductive lookups against the in-memory **Code Knowledge Graph**:
+- When an undeclared symbol is encountered, queries `CodeGraphGetFunctionFile` to determine which translation unit or header defines the missing symbol.
+- Synthesizes automated remediation hints (e.g. `Did you forget to include 'header.h'?`).
+
+#### 3.15.3 STRIPS Error Predicate Binding & Automated Remediation
+Binds diagnostic findings directly into the STRIPS world state:
+- Asserts `PRED_ERROR_DIAGNOSED` into the planner's state bitmask.
+- Triggers dynamic replanning to schedule targeted surgical patches (`diagnose_error` $\rightarrow$ `apply_patch` $\rightarrow$ `verify_build`).
+- Emits structured, transparent diagnostic failure reports with exact line locations, error classifications, and remediation steps.
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -646,6 +674,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **35/35 Hard-Core Stress Benchmark Suite (`test_agent_hard_tasks`)**: Validating resilience under extreme SWE-bench edge cases including adversarial ambiguity traps (fail-closed rejection and context-anchor disambiguation), multi-hunk interleaved refactors with CRLF Windows line endings, multi-file blast radius propagation across 4 modules, and real end-to-end GCC compilation and test failure recovery loops.
 - **4/4 High-Resolution TPS & Throughput Suite (`test_tps_benchmark`)**: Validating generation speeds exceeding 20,000,000 tokens/second (BPE equiv.) in document NLG, open conversational dialogue turns, deep rhetorical structure realization, and >700,000 STRIPS goal plans/second.
 - **31/31 OpenAI Tool-Calling & OpenCode Integration Suite (`test_server_tool_calling`)**: Validating JSON-RPC function schema extraction, tool response unmarshaling (`role: "tool"`), `tool_calls` message serialization, SSE streaming chunks, coding task intent routing, and multi-turn ReAct orchestration.
+- **39/39 Compiler & Linter Error Abductive Engine Suite (`test_agent_diagnose`)**: Validating multi-format compiler diagnostic parsing (GCC, Clang, MSVC), "did you mean" suggestion extraction, Code Knowledge Graph abductive symbol location, STRIPS error predicate binding, and automated Markdown failure reports.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
