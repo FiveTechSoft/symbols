@@ -18,6 +18,7 @@ add_library(symbolic STATIC
     src/ingest.c
     src/nlg.c
     src/deep_nlg.c
+    src/graph_reasoning.c
     src/numeric.c
     src/prune.c
     src/shard.c
@@ -120,6 +121,7 @@ sllm_test(test_textlex         tests/test_textlex.c)
 # (depend on bible_relations.tsv)
 sllm_test(test_learn          tests/test_learn.c)
 sllm_test(test_deep_nlg        tests/test_deep_nlg.c)
+sllm_test(test_graph_reasoning tests/test_graph_reasoning.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
