@@ -87,6 +87,14 @@ CODE_GRAPH *CodeGraphCreate(uint32_t symbol_capacity, uint32_t relation_capacity
     cg->rel_has_field      = GraphAddSymbol(cg->graph, "has_field");
     cg->rel_field_of       = GraphAddSymbol(cg->graph, "field_of");
     cg->rel_in_file        = GraphAddSymbol(cg->graph, "in_file");
+    /* Polyglot relational predicates */
+    cg->rel_defines_class  = GraphAddSymbol(cg->graph, "defines_class");
+    cg->rel_has_method     = GraphAddSymbol(cg->graph, "has_method");
+    cg->rel_method_of      = GraphAddSymbol(cg->graph, "method_of");
+    cg->rel_inherits_from  = GraphAddSymbol(cg->graph, "inherits_from");
+    cg->rel_inherited_by   = GraphAddSymbol(cg->graph, "inherited_by");
+    cg->rel_imports        = GraphAddSymbol(cg->graph, "imports");
+    cg->rel_imported_by    = GraphAddSymbol(cg->graph, "imported_by");
 
     return cg;
 }
@@ -103,10 +111,10 @@ void CodeGraphDestroy(CODE_GRAPH *cg)
 }
 
 /* ============================================================
-   Ingestion / Parsing Engine
+   Ingestion / Parsing Engine: C/C++
    ============================================================ */
 
-int CodeGraphIngestSource(CODE_GRAPH *cg, const char *file_path, const char *source_code)
+static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *source_code)
 {
     if (!cg || !cg->graph || !file_path || !source_code)
         return 0;
@@ -472,6 +480,888 @@ int CodeGraphIngestSource(CODE_GRAPH *cg, const char *file_path, const char *sou
     return 1;
 }
 
+/* ============================================================
+   Language Detection
+   ============================================================ */
+
+CODE_LANGUAGE CodeGraphDetectLanguage(const char *file_path)
+{
+    if (!file_path)
+        return CODE_LANG_C;
+
+    const char *dot = strrchr(file_path, '.');
+    if (!dot)
+        return CODE_LANG_C;
+
+    if (strcmp(dot, ".py") == 0 || strcmp(dot, ".pyw") == 0)
+        return CODE_LANG_PYTHON;
+
+    if (strcmp(dot, ".ts") == 0 || strcmp(dot, ".tsx") == 0)
+        return CODE_LANG_TYPESCRIPT;
+
+    if (strcmp(dot, ".js") == 0 || strcmp(dot, ".jsx") == 0 ||
+        strcmp(dot, ".mjs") == 0 || strcmp(dot, ".cjs") == 0)
+        return CODE_LANG_JAVASCRIPT;
+
+    return CODE_LANG_C;
+}
+
+/* ============================================================
+   Ingestion / Parsing Engine: Python
+   ============================================================ */
+
+static inline bool is_py_id_start(char c)
+{
+    return isalpha((unsigned char)c) || c == '_';
+}
+
+static inline bool is_py_id_char(char c)
+{
+    return isalnum((unsigned char)c) || c == '_';
+}
+
+static bool is_py_keyword(const char *name)
+{
+    static const char *const kw[] = {
+        "and", "as", "assert", "async", "await", "break", "class",
+        "continue", "def", "del", "elif", "else", "except", "finally",
+        "for", "from", "global", "if", "import", "in", "is", "lambda",
+        "nonlocal", "not", "or", "pass", "raise", "return", "try",
+        "while", "with", "yield", "match", "case", "True", "False", "None",
+        NULL
+    };
+    for (int i = 0; kw[i]; i++)
+    {
+        if (strcmp(name, kw[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+int CodeGraphIngestPython(CODE_GRAPH *cg, const char *file_path, const char *source_code)
+{
+    if (!cg || !cg->graph || !file_path || !source_code)
+        return 0;
+
+    SYMBOL_ID file_sym = GraphAddSymbol(cg->graph, file_path);
+    cg->total_files++;
+
+    const char *p = source_code;
+    uint32_t line_number = 1;
+
+    char current_class[MAX_CODE_NAME] = {0};
+    int current_class_indent = -1;
+    char current_func[MAX_CODE_NAME]  = {0};
+    int current_func_indent = -1;
+
+    bool at_line_start = true;
+    int current_indent = 0;
+
+    while (*p)
+    {
+        /* 1. Track newlines */
+        if (*p == '\n')
+        {
+            line_number++;
+            at_line_start = true;
+            p++;
+            continue;
+        }
+
+        /* 2. Skip carriage returns */
+        if (*p == '\r')
+        {
+            p++;
+            continue;
+        }
+
+        /* 3. Handle line indentation at start of line */
+        if (at_line_start)
+        {
+            current_indent = 0;
+            while (*p == ' ' || *p == '\t')
+            {
+                if (*p == ' ') current_indent++;
+                else if (*p == '\t') current_indent += 4;
+                p++;
+            }
+
+            if (*p == '\n' || *p == '\r')
+                continue;
+
+            if (*p == '#')
+            {
+                while (*p && *p != '\n')
+                    p++;
+                continue;
+            }
+
+            /* Non-empty line: adjust scopes according to indentation */
+            if (*p != '\0')
+            {
+                if (current_func[0] && current_indent <= current_func_indent)
+                {
+                    current_func[0] = '\0';
+                    current_func_indent = -1;
+                }
+                if (current_class[0] && current_indent <= current_class_indent)
+                {
+                    current_class[0] = '\0';
+                    current_class_indent = -1;
+                }
+            }
+            at_line_start = false;
+        }
+
+        /* 4. Single-line comment */
+        if (*p == '#')
+        {
+            while (*p && *p != '\n')
+                p++;
+            continue;
+        }
+
+        /* 5. Triple-quoted docstrings """ or ''' */
+        if (p[0] == '"' && p[1] == '"' && p[2] == '"')
+        {
+            p += 3;
+            while (*p && !(p[0] == '"' && p[1] == '"' && p[2] == '"'))
+            {
+                if (*p == '\n') line_number++;
+                p++;
+            }
+            if (*p) p += 3;
+            continue;
+        }
+        if (p[0] == '\'' && p[1] == '\'' && p[2] == '\'')
+        {
+            p += 3;
+            while (*p && !(p[0] == '\'' && p[1] == '\'' && p[2] == '\''))
+            {
+                if (*p == '\n') line_number++;
+                p++;
+            }
+            if (*p) p += 3;
+            continue;
+        }
+
+        /* 6. Standard strings "..." or '...' */
+        if (*p == '"')
+        {
+            p++;
+            while (*p && *p != '"' && *p != '\n')
+            {
+                if (*p == '\\' && p[1]) p += 2;
+                else p++;
+            }
+            if (*p == '"') p++;
+            continue;
+        }
+        if (*p == '\'')
+        {
+            p++;
+            while (*p && *p != '\'' && *p != '\n')
+            {
+                if (*p == '\\' && p[1]) p += 2;
+                else p++;
+            }
+            if (*p == '\'') p++;
+            continue;
+        }
+
+        /* 7. Whitespace inside line */
+        if (isspace((unsigned char)*p))
+        {
+            p++;
+            continue;
+        }
+
+        /* 8. Python Identifiers and Keywords */
+        if (is_py_id_start(*p))
+        {
+            char token[MAX_CODE_NAME] = {0};
+            int len = 0;
+            while (is_py_id_char(*p) && len < MAX_CODE_NAME - 1)
+            {
+                token[len++] = *p++;
+            }
+            token[len] = '\0';
+
+            /* Handle async def */
+            if (strcmp(token, "async") == 0)
+            {
+                const char *q = p;
+                while (*q && isspace((unsigned char)*q) && *q != '\n')
+                    q++;
+                if (strncmp(q, "def", 3) == 0 && !is_py_id_char(q[3]))
+                {
+                    p = q + 3;
+                    strcpy(token, "def");
+                }
+            }
+
+            /* Function Definition: def func_name(...) */
+            if (strcmp(token, "def") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n')
+                    p++;
+
+                if (is_py_id_start(*p))
+                {
+                    char fn_name[MAX_CODE_NAME] = {0};
+                    int fn_len = 0;
+                    while (is_py_id_char(*p) && fn_len < MAX_CODE_NAME - 1)
+                    {
+                        fn_name[fn_len++] = *p++;
+                    }
+                    fn_name[fn_len] = '\0';
+
+                    SYMBOL_ID fn_sym = GraphAddSymbol(cg->graph, fn_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_defines_func, fn_sym);
+                    GraphAddRelation(cg->graph, fn_sym, cg->rel_in_file, file_sym);
+                    cg->total_functions++;
+
+                    if (current_class[0] != '\0')
+                    {
+                        SYMBOL_ID cls_sym = GraphAddSymbol(cg->graph, current_class);
+                        GraphAddRelation(cg->graph, cls_sym, cg->rel_has_method, fn_sym);
+                        GraphAddRelation(cg->graph, fn_sym, cg->rel_method_of, cls_sym);
+                    }
+
+                    strncpy(current_func, fn_name, MAX_CODE_NAME - 1);
+                    current_func[MAX_CODE_NAME - 1] = '\0';
+                    current_func_indent = current_indent;
+                }
+                continue;
+            }
+
+            /* Class Definition: class ClassName(Base): */
+            if (strcmp(token, "class") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n')
+                    p++;
+
+                if (is_py_id_start(*p))
+                {
+                    char cls_name[MAX_CODE_NAME] = {0};
+                    int cls_len = 0;
+                    while (is_py_id_char(*p) && cls_len < MAX_CODE_NAME - 1)
+                    {
+                        cls_name[cls_len++] = *p++;
+                    }
+                    cls_name[cls_len] = '\0';
+
+                    SYMBOL_ID cls_sym = GraphAddSymbol(cg->graph, cls_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_defines_class, cls_sym);
+                    GraphAddRelation(cg->graph, cls_sym, cg->rel_in_file, file_sym);
+                    cg->total_classes++;
+
+                    /* Check for inheritance */
+                    const char *q = p;
+                    while (*q && isspace((unsigned char)*q) && *q != '\n')
+                        q++;
+
+                    if (*q == '(')
+                    {
+                        q++;
+                        while (*q && isspace((unsigned char)*q) && *q != '\n')
+                            q++;
+                        if (is_py_id_start(*q))
+                        {
+                            char base_name[MAX_CODE_NAME] = {0};
+                            int base_len = 0;
+                            while (is_py_id_char(*q) && base_len < MAX_CODE_NAME - 1)
+                            {
+                                base_name[base_len++] = *q++;
+                            }
+                            base_name[base_len] = '\0';
+                            if (base_name[0] != '\0')
+                            {
+                                SYMBOL_ID base_sym = GraphAddSymbol(cg->graph, base_name);
+                                GraphAddRelation(cg->graph, cls_sym, cg->rel_inherits_from, base_sym);
+                                GraphAddRelation(cg->graph, base_sym, cg->rel_inherited_by, cls_sym);
+                            }
+                        }
+                    }
+
+                    strncpy(current_class, cls_name, MAX_CODE_NAME - 1);
+                    current_class[MAX_CODE_NAME - 1] = '\0';
+                    current_class_indent = current_indent;
+                    current_func[0] = '\0';
+                    current_func_indent = -1;
+                }
+                continue;
+            }
+
+            /* Import statements: import os, sys */
+            if (strcmp(token, "import") == 0)
+            {
+                while (*p && *p != '\n')
+                {
+                    while (*p && (isspace((unsigned char)*p) || *p == ','))
+                        p++;
+                    if (*p == '\n' || *p == '\0')
+                        break;
+                    if (is_py_id_start(*p))
+                    {
+                        char mod_name[MAX_CODE_NAME] = {0};
+                        int mod_len = 0;
+                        while ((is_py_id_char(*p) || *p == '.') && mod_len < MAX_CODE_NAME - 1)
+                        {
+                            mod_name[mod_len++] = *p++;
+                        }
+                        mod_name[mod_len] = '\0';
+
+                        if (strcmp(mod_name, "as") == 0)
+                        {
+                            while (*p && isspace((unsigned char)*p)) p++;
+                            while (is_py_id_char(*p)) p++;
+                            continue;
+                        }
+
+                        if (mod_name[0])
+                        {
+                            SYMBOL_ID mod_sym = GraphAddSymbol(cg->graph, mod_name);
+                            GraphAddRelation(cg->graph, file_sym, cg->rel_imports, mod_sym);
+                            GraphAddRelation(cg->graph, mod_sym, cg->rel_imported_by, file_sym);
+                        }
+                    }
+                    else
+                    {
+                        p++;
+                    }
+                }
+                continue;
+            }
+
+            /* From imports: from django.db import models */
+            if (strcmp(token, "from") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n')
+                    p++;
+                char mod_name[MAX_CODE_NAME] = {0};
+                int mod_len = 0;
+                while ((is_py_id_char(*p) || *p == '.') && mod_len < MAX_CODE_NAME - 1)
+                {
+                    mod_name[mod_len++] = *p++;
+                }
+                mod_name[mod_len] = '\0';
+
+                if (mod_name[0])
+                {
+                    SYMBOL_ID mod_sym = GraphAddSymbol(cg->graph, mod_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_imports, mod_sym);
+                    GraphAddRelation(cg->graph, mod_sym, cg->rel_imported_by, file_sym);
+                }
+
+                while (*p && *p != '\n')
+                {
+                    if (strncmp(p, "import", 6) == 0 && isspace((unsigned char)p[6]))
+                    {
+                        p += 6;
+                        while (*p && *p != '\n')
+                        {
+                            while (*p && (isspace((unsigned char)*p) || *p == ',' || *p == '('))
+                                p++;
+                            if (*p == '\n' || *p == '\0' || *p == ')')
+                                break;
+                            if (is_py_id_start(*p))
+                            {
+                                char item_name[MAX_CODE_NAME] = {0};
+                                int item_len = 0;
+                                while (is_py_id_char(*p) && item_len < MAX_CODE_NAME - 1)
+                                {
+                                    item_name[item_len++] = *p++;
+                                }
+                                item_name[item_len] = '\0';
+                                if (strcmp(item_name, "as") == 0)
+                                {
+                                    while (*p && isspace((unsigned char)*p)) p++;
+                                    while (is_py_id_char(*p)) p++;
+                                    continue;
+                                }
+                                if (item_name[0])
+                                {
+                                    SYMBOL_ID item_sym = GraphAddSymbol(cg->graph, item_name);
+                                    GraphAddRelation(cg->graph, file_sym, cg->rel_uses_type, item_sym);
+                                }
+                            }
+                            else
+                            {
+                                p++;
+                            }
+                        }
+                        break;
+                    }
+                    p++;
+                }
+                continue;
+            }
+
+            /* Function / Method Calls: check if followed by '(' */
+            const char *q = p;
+            while (*q && isspace((unsigned char)*q) && *q != '\n')
+                q++;
+
+            if (*q == '(' && !is_py_keyword(token))
+            {
+                if (current_func[0] != '\0')
+                {
+                    SYMBOL_ID caller_sym = GraphAddSymbol(cg->graph, current_func);
+                    SYMBOL_ID callee_sym = GraphAddSymbol(cg->graph, token);
+                    GraphAddRelation(cg->graph, caller_sym, cg->rel_calls, callee_sym);
+                    GraphAddRelation(cg->graph, callee_sym, cg->rel_called_by, caller_sym);
+                    cg->total_calls++;
+                }
+            }
+
+            continue;
+        }
+
+        p++;
+    }
+
+    return 1;
+}
+
+/* ============================================================
+   Ingestion / Parsing Engine: TypeScript / JavaScript
+   ============================================================ */
+
+static inline bool is_ts_id_start(char c)
+{
+    return isalpha((unsigned char)c) || c == '_' || c == '$';
+}
+
+static inline bool is_ts_id_char(char c)
+{
+    return isalnum((unsigned char)c) || c == '_' || c == '$';
+}
+
+static bool is_ts_keyword(const char *name)
+{
+    static const char *const kw[] = {
+        "if", "else", "while", "for", "do", "switch", "case", "default",
+        "return", "break", "continue", "throw", "try", "catch", "finally",
+        "typeof", "instanceof", "new", "delete", "void", "in", "of",
+        "function", "class", "interface", "type", "import", "export",
+        "const", "let", "var", "async", "await", "yield", NULL
+    };
+    for (int i = 0; kw[i]; i++)
+    {
+        if (strcmp(name, kw[i]) == 0)
+            return true;
+    }
+    return false;
+}
+
+int CodeGraphIngestTypeScript(CODE_GRAPH *cg, const char *file_path, const char *source_code)
+{
+    if (!cg || !cg->graph || !file_path || !source_code)
+        return 0;
+
+    SYMBOL_ID file_sym = GraphAddSymbol(cg->graph, file_path);
+    cg->total_files++;
+
+    const char *p = source_code;
+    uint32_t line_number = 1;
+    int brace_depth = 0;
+
+    char current_class[MAX_CODE_NAME] = {0};
+    int class_brace_depth = -1;
+    char current_func[MAX_CODE_NAME]  = {0};
+    int func_brace_depth = -1;
+
+    while (*p)
+    {
+        /* 1. Newline tracking */
+        if (*p == '\n')
+        {
+            line_number++;
+            p++;
+            continue;
+        }
+
+        /* 2. Whitespace skipping */
+        if (isspace((unsigned char)*p))
+        {
+            p++;
+            continue;
+        }
+
+        /* 3. Single-line comment */
+        if (p[0] == '/' && p[1] == '/')
+        {
+            p += 2;
+            while (*p && *p != '\n')
+                p++;
+            continue;
+        }
+
+        /* 4. Multi-line block comment */
+        if (p[0] == '/' && p[1] == '*')
+        {
+            p += 2;
+            while (*p && !(p[0] == '*' && p[1] == '/'))
+            {
+                if (*p == '\n')
+                    line_number++;
+                p++;
+            }
+            if (*p)
+                p += 2;
+            continue;
+        }
+
+        /* 5. String literals (including template literals `...`) */
+        if (*p == '"' || *p == '\'' || *p == '`')
+        {
+            char quote = *p++;
+            while (*p && *p != quote)
+            {
+                if (*p == '\\' && p[1])
+                    p += 2;
+                else
+                {
+                    if (*p == '\n')
+                        line_number++;
+                    p++;
+                }
+            }
+            if (*p == quote)
+                p++;
+            continue;
+        }
+
+        /* 6. Brace tracking */
+        if (*p == '{')
+        {
+            brace_depth++;
+            p++;
+            continue;
+        }
+
+        if (*p == '}')
+        {
+            brace_depth--;
+            if (current_func[0] && brace_depth < func_brace_depth)
+            {
+                current_func[0] = '\0';
+                func_brace_depth = -1;
+            }
+            if (current_class[0] && brace_depth < class_brace_depth)
+            {
+                current_class[0] = '\0';
+                class_brace_depth = -1;
+            }
+            p++;
+            continue;
+        }
+
+        /* 7. Identifiers and keywords */
+        if (is_ts_id_start(*p))
+        {
+            char token[MAX_CODE_NAME] = {0};
+            int len = 0;
+            while (is_ts_id_char(*p) && len < MAX_CODE_NAME - 1)
+            {
+                token[len++] = *p++;
+            }
+            token[len] = '\0';
+
+            /* Import statement: import ... from 'module' */
+            if (strcmp(token, "import") == 0)
+            {
+                while (*p && *p != '\n' && *p != ';')
+                {
+                    if (strncmp(p, "from", 4) == 0 && isspace((unsigned char)p[4]))
+                    {
+                        p += 4;
+                        while (*p && isspace((unsigned char)*p))
+                            p++;
+                        if (*p == '\'' || *p == '"' || *p == '`')
+                        {
+                            char q = *p++;
+                            char mod_name[MAX_CODE_NAME] = {0};
+                            int mlen = 0;
+                            while (*p && *p != q && mlen < MAX_CODE_NAME - 1)
+                            {
+                                mod_name[mlen++] = *p++;
+                            }
+                            mod_name[mlen] = '\0';
+                            if (*p == q) p++;
+
+                            if (mod_name[0])
+                            {
+                                SYMBOL_ID mod_sym = GraphAddSymbol(cg->graph, mod_name);
+                                GraphAddRelation(cg->graph, file_sym, cg->rel_imports, mod_sym);
+                                GraphAddRelation(cg->graph, mod_sym, cg->rel_imported_by, file_sym);
+                            }
+                        }
+                        break;
+                    }
+                    p++;
+                }
+                continue;
+            }
+
+            /* Require call: require('module') */
+            if (strcmp(token, "require") == 0)
+            {
+                while (*p && isspace((unsigned char)*p)) p++;
+                if (*p == '(')
+                {
+                    p++;
+                    while (*p && isspace((unsigned char)*p)) p++;
+                    if (*p == '\'' || *p == '"')
+                    {
+                        char q = *p++;
+                        char mod_name[MAX_CODE_NAME] = {0};
+                        int mlen = 0;
+                        while (*p && *p != q && mlen < MAX_CODE_NAME - 1)
+                        {
+                            mod_name[mlen++] = *p++;
+                        }
+                        mod_name[mlen] = '\0';
+                        if (*p == q) p++;
+                        if (mod_name[0])
+                        {
+                            SYMBOL_ID mod_sym = GraphAddSymbol(cg->graph, mod_name);
+                            GraphAddRelation(cg->graph, file_sym, cg->rel_imports, mod_sym);
+                            GraphAddRelation(cg->graph, mod_sym, cg->rel_imported_by, file_sym);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            /* Class definition: class ClassName extends BaseClass */
+            if (strcmp(token, "class") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n') p++;
+                if (is_ts_id_start(*p))
+                {
+                    char cls_name[MAX_CODE_NAME] = {0};
+                    int clen = 0;
+                    while (is_ts_id_char(*p) && clen < MAX_CODE_NAME - 1)
+                    {
+                        cls_name[clen++] = *p++;
+                    }
+                    cls_name[clen] = '\0';
+
+                    SYMBOL_ID cls_sym = GraphAddSymbol(cg->graph, cls_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_defines_class, cls_sym);
+                    GraphAddRelation(cg->graph, cls_sym, cg->rel_in_file, file_sym);
+                    cg->total_classes++;
+
+                    strncpy(current_class, cls_name, MAX_CODE_NAME - 1);
+                    class_brace_depth = brace_depth + 1;
+
+                    /* Check extends */
+                    while (*p && isspace((unsigned char)*p) && *p != '\n') p++;
+                    if (strncmp(p, "extends", 7) == 0 && isspace((unsigned char)p[7]))
+                    {
+                        p += 7;
+                        while (*p && isspace((unsigned char)*p)) p++;
+                        if (is_ts_id_start(*p))
+                        {
+                            char base_name[MAX_CODE_NAME] = {0};
+                            int blen = 0;
+                            while (is_ts_id_char(*p) && blen < MAX_CODE_NAME - 1)
+                            {
+                                base_name[blen++] = *p++;
+                            }
+                            base_name[blen] = '\0';
+                            if (base_name[0])
+                            {
+                                SYMBOL_ID base_sym = GraphAddSymbol(cg->graph, base_name);
+                                GraphAddRelation(cg->graph, cls_sym, cg->rel_inherits_from, base_sym);
+                                GraphAddRelation(cg->graph, base_sym, cg->rel_inherited_by, cls_sym);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            /* Interface definition: interface InterfaceName */
+            if (strcmp(token, "interface") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n') p++;
+                if (is_ts_id_start(*p))
+                {
+                    char iface_name[MAX_CODE_NAME] = {0};
+                    int ilen = 0;
+                    while (is_ts_id_char(*p) && ilen < MAX_CODE_NAME - 1)
+                    {
+                        iface_name[ilen++] = *p++;
+                    }
+                    iface_name[ilen] = '\0';
+
+                    SYMBOL_ID iface_sym = GraphAddSymbol(cg->graph, iface_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_defines_struct, iface_sym);
+                    GraphAddRelation(cg->graph, iface_sym, cg->rel_in_file, file_sym);
+                    cg->total_structs++;
+                }
+                continue;
+            }
+
+            /* Function definition: function funcName(...) */
+            if (strcmp(token, "function") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n') p++;
+                if (is_ts_id_start(*p))
+                {
+                    char fn_name[MAX_CODE_NAME] = {0};
+                    int fn_len = 0;
+                    while (is_ts_id_char(*p) && fn_len < MAX_CODE_NAME - 1)
+                    {
+                        fn_name[fn_len++] = *p++;
+                    }
+                    fn_name[fn_len] = '\0';
+
+                    SYMBOL_ID fn_sym = GraphAddSymbol(cg->graph, fn_name);
+                    GraphAddRelation(cg->graph, file_sym, cg->rel_defines_func, fn_sym);
+                    GraphAddRelation(cg->graph, fn_sym, cg->rel_in_file, file_sym);
+                    cg->total_functions++;
+
+                    strncpy(current_func, fn_name, MAX_CODE_NAME - 1);
+                    func_brace_depth = brace_depth + 1;
+                }
+                continue;
+            }
+
+            /* Arrow function: const funcName = (...) => { */
+            if (strcmp(token, "const") == 0 || strcmp(token, "let") == 0 || strcmp(token, "var") == 0)
+            {
+                while (*p && isspace((unsigned char)*p) && *p != '\n') p++;
+                if (is_ts_id_start(*p))
+                {
+                    char fn_name[MAX_CODE_NAME] = {0};
+                    int fn_len = 0;
+                    while (is_ts_id_char(*p) && fn_len < MAX_CODE_NAME - 1)
+                    {
+                        fn_name[fn_len++] = *p++;
+                    }
+                    fn_name[fn_len] = '\0';
+
+                    const char *q = p;
+                    while (*q && isspace((unsigned char)*q) && *q != '\n') q++;
+                    if (*q == '=')
+                    {
+                        q++;
+                        while (*q && isspace((unsigned char)*q) && *q != '\n') q++;
+                        bool is_func = false;
+                        if (strncmp(q, "function", 8) == 0 || strncmp(q, "async", 5) == 0)
+                            is_func = true;
+                        else if (*q == '(' || is_ts_id_start(*q))
+                        {
+                            const char *arr = q;
+                            while (*arr && *arr != '\n' && *arr != ';')
+                            {
+                                if (arr[0] == '=' && arr[1] == '>')
+                                {
+                                    is_func = true;
+                                    break;
+                                }
+                                arr++;
+                            }
+                        }
+
+                        if (is_func)
+                        {
+                            SYMBOL_ID fn_sym = GraphAddSymbol(cg->graph, fn_name);
+                            GraphAddRelation(cg->graph, file_sym, cg->rel_defines_func, fn_sym);
+                            GraphAddRelation(cg->graph, fn_sym, cg->rel_in_file, file_sym);
+                            cg->total_functions++;
+
+                            strncpy(current_func, fn_name, MAX_CODE_NAME - 1);
+                            func_brace_depth = brace_depth + 1;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            /* Class method definition: inside class, methodName(...) { */
+            if (current_class[0] != '\0' && brace_depth == class_brace_depth && !is_ts_keyword(token))
+            {
+                const char *q = p;
+                while (*q && isspace((unsigned char)*q) && *q != '\n') q++;
+                if (*q == '(')
+                {
+                    int p_depth = 1;
+                    q++;
+                    while (*q && p_depth > 0)
+                    {
+                        if (*q == '(') p_depth++;
+                        else if (*q == ')') p_depth--;
+                        q++;
+                    }
+                    while (*q && isspace((unsigned char)*q)) q++;
+                    if (*q == ':')
+                    {
+                        while (*q && *q != '{' && *q != ';' && *q != '\n') q++;
+                    }
+                    if (*q == '{')
+                    {
+                        SYMBOL_ID fn_sym = GraphAddSymbol(cg->graph, token);
+                        SYMBOL_ID cls_sym = GraphAddSymbol(cg->graph, current_class);
+                        GraphAddRelation(cg->graph, file_sym, cg->rel_defines_func, fn_sym);
+                        GraphAddRelation(cg->graph, fn_sym, cg->rel_in_file, file_sym);
+                        GraphAddRelation(cg->graph, cls_sym, cg->rel_has_method, fn_sym);
+                        GraphAddRelation(cg->graph, fn_sym, cg->rel_method_of, cls_sym);
+                        cg->total_functions++;
+
+                        strncpy(current_func, token, MAX_CODE_NAME - 1);
+                        func_brace_depth = brace_depth + 1;
+                        continue;
+                    }
+                }
+            }
+
+            /* Function call detection: inside function, token followed by '(' */
+            if (current_func[0] != '\0' && !is_ts_keyword(token))
+            {
+                const char *q = p;
+                while (*q && isspace((unsigned char)*q) && *q != '\n') q++;
+                if (*q == '(')
+                {
+                    SYMBOL_ID caller_sym = GraphAddSymbol(cg->graph, current_func);
+                    SYMBOL_ID callee_sym = GraphAddSymbol(cg->graph, token);
+                    GraphAddRelation(cg->graph, caller_sym, cg->rel_calls, callee_sym);
+                    GraphAddRelation(cg->graph, callee_sym, cg->rel_called_by, caller_sym);
+                    cg->total_calls++;
+                }
+            }
+
+            continue;
+        }
+
+        p++;
+    }
+
+    return 1;
+}
+
+/* ============================================================
+   Polyglot Ingestion Dispatcher
+   ============================================================ */
+
+int CodeGraphIngestSource(CODE_GRAPH *cg, const char *file_path, const char *source_code)
+{
+    if (!cg || !file_path || !source_code)
+        return 0;
+
+    CODE_LANGUAGE lang = CodeGraphDetectLanguage(file_path);
+    if (lang == CODE_LANG_PYTHON)
+        return CodeGraphIngestPython(cg, file_path, source_code);
+    else if (lang == CODE_LANG_TYPESCRIPT || lang == CODE_LANG_JAVASCRIPT)
+        return CodeGraphIngestTypeScript(cg, file_path, source_code);
+    else
+        return CodeGraphIngestC(cg, file_path, source_code);
+}
+
 int CodeGraphIngestFile(CODE_GRAPH *cg, const char *file_path)
 {
     if (!cg || !file_path)
@@ -633,6 +1523,108 @@ uint32_t CodeGraphGetFileFunctions(const CODE_GRAPH *cg, const char *file_path,
         }
     }
     return count;
+}
+
+uint32_t CodeGraphGetClasses(const CODE_GRAPH *cg, const char *file_path,
+                            char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    if (!cg || !cg->graph || !file_path || !results || max_results == 0)
+        return 0;
+
+    SYMBOL_ID f_id = SymbolFind(cg->graph->symbols, file_path);
+    if (f_id == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *rel_ptrs[128];
+    uint32_t n = GraphQuerySubjectRelation(cg->graph, f_id, cg->rel_defines_class,
+                                           rel_ptrs, 128);
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < n && count < max_results; i++)
+    {
+        const SYMBOL *s = SymbolGet(cg->graph->symbols, rel_ptrs[i]->object);
+        if (s && s->name)
+        {
+            strncpy(results[count], s->name, MAX_CODE_NAME - 1);
+            results[count][MAX_CODE_NAME - 1] = '\0';
+            count++;
+        }
+    }
+    return count;
+}
+
+uint32_t CodeGraphGetClassMethods(const CODE_GRAPH *cg, const char *class_name,
+                                 char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    if (!cg || !cg->graph || !class_name || !results || max_results == 0)
+        return 0;
+
+    SYMBOL_ID c_id = SymbolFind(cg->graph->symbols, class_name);
+    if (c_id == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *rel_ptrs[128];
+    uint32_t n = GraphQuerySubjectRelation(cg->graph, c_id, cg->rel_has_method,
+                                           rel_ptrs, 128);
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < n && count < max_results; i++)
+    {
+        const SYMBOL *s = SymbolGet(cg->graph->symbols, rel_ptrs[i]->object);
+        if (s && s->name)
+        {
+            strncpy(results[count], s->name, MAX_CODE_NAME - 1);
+            results[count][MAX_CODE_NAME - 1] = '\0';
+            count++;
+        }
+    }
+    return count;
+}
+
+uint32_t CodeGraphGetImports(const CODE_GRAPH *cg, const char *file_path,
+                            char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    if (!cg || !cg->graph || !file_path || !results || max_results == 0)
+        return 0;
+
+    SYMBOL_ID f_id = SymbolFind(cg->graph->symbols, file_path);
+    if (f_id == SYMBOL_INVALID)
+        return 0;
+
+    RELATION *rel_ptrs[128];
+    uint32_t n = GraphQuerySubjectRelation(cg->graph, f_id, cg->rel_imports,
+                                           rel_ptrs, 128);
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < n && count < max_results; i++)
+    {
+        const SYMBOL *s = SymbolGet(cg->graph->symbols, rel_ptrs[i]->object);
+        if (s && s->name)
+        {
+            strncpy(results[count], s->name, MAX_CODE_NAME - 1);
+            results[count][MAX_CODE_NAME - 1] = '\0';
+            count++;
+        }
+    }
+    return count;
+}
+
+const char *CodeGraphGetBaseClass(const CODE_GRAPH *cg, const char *class_name)
+{
+    if (!cg || !cg->graph || !class_name)
+        return NULL;
+
+    SYMBOL_ID c_id = SymbolFind(cg->graph->symbols, class_name);
+    if (c_id == SYMBOL_INVALID)
+        return NULL;
+
+    RELATION *rel_ptrs[4];
+    uint32_t n = GraphQuerySubjectRelation(cg->graph, c_id, cg->rel_inherits_from,
+                                           rel_ptrs, 4);
+    if (n > 0)
+    {
+        const SYMBOL *s = SymbolGet(cg->graph->symbols, rel_ptrs[0]->object);
+        if (s)
+            return s->name;
+    }
+    return NULL;
 }
 
 uint32_t CodeGraphGetIncludes(const CODE_GRAPH *cg, const char *file_path,
@@ -877,6 +1869,87 @@ int CodeGraphComputeBlastRadius(const CODE_GRAPH *cg,
 
                 if (tail < MAX_BLAST_ENTRIES)
                     queue[tail++] = (BFS_NODE){ .sym_id = user_id, .depth = curr.depth + 1 };
+            }
+        }
+
+        /* 4. Files importing this module/symbol: (curr, imported_by, File) */
+        RELATION *imp_rels[64];
+        uint32_t n_imp = GraphQuerySubjectRelation(cg->graph, curr.sym_id,
+                                                   cg->rel_imported_by,
+                                                   imp_rels, 64);
+        for (uint32_t i = 0; i < n_imp; i++)
+        {
+            SYMBOL_ID file_id = imp_rels[i]->object;
+            bool already_visited = false;
+            for (uint32_t v = 0; v < visited_count; v++)
+            {
+                if (visited[v] == file_id)
+                {
+                    already_visited = true;
+                    break;
+                }
+            }
+
+            if (!already_visited && visited_count < MAX_BLAST_ENTRIES)
+            {
+                visited[visited_count++] = file_id;
+                const SYMBOL *sym = SymbolGet(cg->graph->symbols, file_id);
+                if (sym && sym->name && out_radius->entry_count < MAX_BLAST_ENTRIES)
+                {
+                    BLAST_RADIUS_ENTRY *ent = &out_radius->entries[out_radius->entry_count++];
+                    strncpy(ent->symbol_name, sym->name, MAX_CODE_NAME - 1);
+                    ent->kind = CODE_SYM_FILE;
+                    ent->depth = curr.depth + 1;
+                    strncpy(ent->file_path, sym->name, MAX_CODE_PATH - 1);
+
+                    if (ent->depth > out_radius->max_depth_reached)
+                        out_radius->max_depth_reached = ent->depth;
+                }
+
+                if (tail < MAX_BLAST_ENTRIES)
+                    queue[tail++] = (BFS_NODE){ .sym_id = file_id, .depth = curr.depth + 1 };
+            }
+        }
+
+        /* 5. Subclasses inheriting from this class: (curr, inherited_by, SubClass) */
+        RELATION *inh_rels[64];
+        uint32_t n_inh = GraphQuerySubjectRelation(cg->graph, curr.sym_id,
+                                                   cg->rel_inherited_by,
+                                                   inh_rels, 64);
+        for (uint32_t i = 0; i < n_inh; i++)
+        {
+            SYMBOL_ID sub_id = inh_rels[i]->object;
+            bool already_visited = false;
+            for (uint32_t v = 0; v < visited_count; v++)
+            {
+                if (visited[v] == sub_id)
+                {
+                    already_visited = true;
+                    break;
+                }
+            }
+
+            if (!already_visited && visited_count < MAX_BLAST_ENTRIES)
+            {
+                visited[visited_count++] = sub_id;
+                const SYMBOL *sym = SymbolGet(cg->graph->symbols, sub_id);
+                if (sym && sym->name && out_radius->entry_count < MAX_BLAST_ENTRIES)
+                {
+                    BLAST_RADIUS_ENTRY *ent = &out_radius->entries[out_radius->entry_count++];
+                    strncpy(ent->symbol_name, sym->name, MAX_CODE_NAME - 1);
+                    ent->kind = CODE_SYM_CLASS;
+                    ent->depth = curr.depth + 1;
+
+                    const char *f = CodeGraphGetFunctionFile(cg, sym->name);
+                    if (f)
+                        strncpy(ent->file_path, f, MAX_CODE_PATH - 1);
+
+                    if (ent->depth > out_radius->max_depth_reached)
+                        out_radius->max_depth_reached = ent->depth;
+                }
+
+                if (tail < MAX_BLAST_ENTRIES)
+                    queue[tail++] = (BFS_NODE){ .sym_id = sub_id, .depth = curr.depth + 1 };
             }
         }
     }

@@ -36,8 +36,21 @@ typedef enum
     CODE_SYM_FUNCTION,
     CODE_SYM_STRUCT,
     CODE_SYM_FIELD,
-    CODE_SYM_HEADER
+    CODE_SYM_HEADER,
+    CODE_SYM_CLASS,
+    CODE_SYM_METHOD,
+    CODE_SYM_INTERFACE,
+    CODE_SYM_MODULE
 } CODE_SYMBOL_KIND;
+
+/* Programming language classification for polyglot AST parsing */
+typedef enum
+{
+    CODE_LANG_C = 0,
+    CODE_LANG_PYTHON,
+    CODE_LANG_TYPESCRIPT,
+    CODE_LANG_JAVASCRIPT
+} CODE_LANGUAGE;
 
 /* Risk assessment levels based on blast radius */
 typedef enum
@@ -84,9 +97,18 @@ typedef struct
     SYMBOL_ID  rel_has_field;
     SYMBOL_ID  rel_field_of;
     SYMBOL_ID  rel_in_file;
+    /* Polyglot relations: Python & TypeScript/JavaScript */
+    SYMBOL_ID  rel_defines_class;
+    SYMBOL_ID  rel_has_method;
+    SYMBOL_ID  rel_method_of;
+    SYMBOL_ID  rel_inherits_from;
+    SYMBOL_ID  rel_inherited_by;
+    SYMBOL_ID  rel_imports;
+    SYMBOL_ID  rel_imported_by;
     uint32_t   total_files;
     uint32_t   total_functions;
     uint32_t   total_structs;
+    uint32_t   total_classes;
     uint32_t   total_calls;
 } CODE_GRAPH;
 
@@ -104,10 +126,19 @@ void        CodeGraphDestroy(CODE_GRAPH *cg);
    Ingestion / Parsing API
    ============================================================ */
 
-/* Parse and ingest C source code from an in-memory buffer */
+/* Detect programming language from file extension */
+CODE_LANGUAGE CodeGraphDetectLanguage(const char *file_path);
+
+/* Parse and ingest source code from an in-memory buffer (auto-detects language) */
 int  CodeGraphIngestSource(CODE_GRAPH *cg, const char *file_path, const char *source_code);
 
-/* Parse and ingest a C source or header file from disk */
+/* Parse and ingest Python source code specifically */
+int  CodeGraphIngestPython(CODE_GRAPH *cg, const char *file_path, const char *source_code);
+
+/* Parse and ingest TypeScript / JavaScript source code specifically */
+int  CodeGraphIngestTypeScript(CODE_GRAPH *cg, const char *file_path, const char *source_code);
+
+/* Parse and ingest a source or header file from disk (auto-detects language) */
 int  CodeGraphIngestFile(CODE_GRAPH *cg, const char *file_path);
 
 /* ============================================================
@@ -126,7 +157,22 @@ uint32_t CodeGraphGetCallees(const CODE_GRAPH *cg, const char *func_name,
 uint32_t CodeGraphGetFileFunctions(const CODE_GRAPH *cg, const char *file_path,
                                   char results[][MAX_CODE_NAME], uint32_t max_results);
 
-/* Return names of all headers directly included by file_path */
+/* Return names of all classes defined in file_path (Python / TypeScript) */
+uint32_t CodeGraphGetClasses(const CODE_GRAPH *cg, const char *file_path,
+                            char results[][MAX_CODE_NAME], uint32_t max_results);
+
+/* Return names of all methods defined within class_name */
+uint32_t CodeGraphGetClassMethods(const CODE_GRAPH *cg, const char *class_name,
+                                 char results[][MAX_CODE_NAME], uint32_t max_results);
+
+/* Return names of all modules imported by file_path */
+uint32_t CodeGraphGetImports(const CODE_GRAPH *cg, const char *file_path,
+                            char results[][MAX_CODE_NAME], uint32_t max_results);
+
+/* Return the base class inherited by class_name, or NULL if none */
+const char *CodeGraphGetBaseClass(const CODE_GRAPH *cg, const char *class_name);
+
+/* Return names of all headers directly included by file_path (C/C++) */
 uint32_t CodeGraphGetIncludes(const CODE_GRAPH *cg, const char *file_path,
                              char results[][MAX_CODE_NAME], uint32_t max_results);
 
