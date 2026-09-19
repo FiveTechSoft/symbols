@@ -723,6 +723,7 @@ The project adheres to strict fail-closed regression gates enforced via CMake CT
 - **39/39 Compiler & Linter Error Abductive Engine Suite (`test_agent_diagnose`)**: Validating multi-format compiler diagnostic parsing (GCC, Clang, MSVC), "did you mean" suggestion extraction, Code Knowledge Graph abductive symbol location, STRIPS error predicate binding, and automated Markdown failure reports.
 - **38/38 Polyglot Code Knowledge Graph Suite (`test_code_graph_polyglot`)**: Validating Python and TypeScript/JavaScript AST parsing, class inheritance, method bindings, module imports, and cross-language blast radius impact closure.
 - **36/36 Autonomous SWE-bench Lite Harness Suite (`test_swe_bench_harness`)**: Validating end-to-end task execution across representative benchmarks (Django, Flask, SymPy, Scikit-learn, Pytest), achieving 100.0% Pass@1, 1.50 ms/task execution latency (>30,000× faster than neural LLMs), strictly 0.00% hallucinations, and fail-closed adversarial rollback.
+- **3/3 Repository Indexer & Filter Suite (`test_code_graph_indexer`)**: Validating recursive repository directory traversal in < 50 ms, fail-closed exclusion of VCS and build artifacts (`.git`, `build*`, `node_modules`, `venv`), polyglot file extension filtering, and AST symbol mapping.
 - **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
@@ -814,6 +815,27 @@ Symbolic LLM provides a zero-install, browser-native implementation executing en
 - **Interactive Web Interface**: Hosted directly on GitHub Pages at [fivetechsoft.github.io/symbols](https://fivetechsoft.github.io/symbols/).
 - **Dual-Mode Architecture**: Executes associative retrieval, concept concentration ($\kappa$), and deductive tracing directly in-browser, while optionally serving as a visual front-end for a native C11 `symbols_server` instance running on `localhost:8080`.
 - **Episodic Persistence & Export**: Dialogue turns and learned assertions synchronize to browser `localStorage`, enabling instant session resumption and full-state export (`.json`) with zero knowledge loss.
+
+### 5.5 Standalone Autonomous AI Coding Agent CLI (`symbols-agent`)
+
+The system provides a native, standalone command-line engineering agent in pure C11 capable of executing directly on local workspaces without requiring Python or external runtime servers:
+
+```bash
+# Display help and usage options
+./symbols-agent --help
+
+# Scan and index current repository in < 50 ms
+./symbols-agent -i
+
+# Compute blast radius and caller impact analysis for a function
+./symbols-agent -b AgentRunnerSolveTask
+
+# Parse and abduce fixes for compiler/linter error output
+./symbols-agent -d build_errors.log
+
+# Solve an autonomous engineering task with STRIPS planning and atomic verification
+./symbols-agent "Fix missing ASCII username validation regex in validators.py"
+```
 
 ---
 

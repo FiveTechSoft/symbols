@@ -198,6 +198,27 @@ typedef struct
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
 static uint32_t g_num_sessions = 0;
+static CODE_GRAPH *g_server_code_graph = NULL;
+
+static const char *FindFileForIssue(const char *issue)
+{
+    if (!g_server_code_graph || !issue)
+        return NULL;
+
+    char buf[512];
+    strncpy(buf, issue, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    char *tok = strtok(buf, " \t\r\n,.;:\"'()");
+    while (tok)
+    {
+        const char *file = CodeGraphGetFunctionFile(g_server_code_graph, tok);
+        if (file)
+            return file;
+        tok = strtok(NULL, " \t\r\n,.;:\"'()");
+    }
+    return NULL;
+}
 
 static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
                                    unsigned long seq, OPENAI_TOOL_CALLS *out_tc)
@@ -205,6 +226,10 @@ static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
     memset(out_tc, 0, sizeof(*out_tc));
     out_tc->count = 1;
     snprintf(out_tc->calls[0].id, sizeof(out_tc->calls[0].id), "call_sym_%lu", seq);
+
+    const char *target_file = FindFileForIssue(issue);
+    if (!target_file)
+        target_file = "src/main.c";
 
     if (strcmp(op->name, "locate_symbol") == 0)
     {
@@ -215,9 +240,8 @@ static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
     else if (strcmp(op->name, "inspect_code") == 0)
     {
         strncpy(out_tc->calls[0].name, "inspect_code", sizeof(out_tc->calls[0].name) - 1);
-        strncpy(out_tc->calls[0].arguments,
-                "{\"file\":\"src/main.c\",\"start_line\":1,\"end_line\":100}",
-                sizeof(out_tc->calls[0].arguments) - 1);
+        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                 "{\"file\":\"%s\",\"start_line\":1,\"end_line\":100}", target_file);
     }
     else if (strcmp(op->name, "diagnose_error") == 0)
     {
@@ -228,9 +252,9 @@ static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
     else if (strcmp(op->name, "apply_patch") == 0)
     {
         strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
-        strncpy(out_tc->calls[0].arguments,
-                "{\"file\":\"src/main.c\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
-                sizeof(out_tc->calls[0].arguments) - 1);
+        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                 "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
+                 target_file);
     }
     else if (strcmp(op->name, "verify_build") == 0)
     {
@@ -603,13 +627,53 @@ int main(int argc, char **argv)
         port = atoi(argv[1]);
     if (port <= 0 || port > 65535)
         port = SERVER_PORT_DEFAULT;
+    char repo_dir[1024];
+    repo_dir[0] = '\0';
+    const char *env_repo = getenv("SYMBOLS_REPO");
+    if (env_repo != NULL && env_repo[0] != '\0')
+    {
+        strncpy(repo_dir, env_repo, sizeof(repo_dir) - 1);
+        repo_dir[sizeof(repo_dir) - 1] = '\0';
+    }
+    else if (argc > 2)
+    {
+#ifdef _WIN32
+        DWORD attr = GetFileAttributesA(argv[2]);
+        if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            strncpy(repo_dir, argv[2], sizeof(repo_dir) - 1);
+            repo_dir[sizeof(repo_dir) - 1] = '\0';
+        }
+#else
+        struct stat st;
+        if (stat(argv[2], &st) == 0 && S_ISDIR(st.st_mode))
+        {
+            strncpy(repo_dir, argv[2], sizeof(repo_dir) - 1);
+            repo_dir[sizeof(repo_dir) - 1] = '\0';
+        }
+#endif
+    }
+
+    if (repo_dir[0] != '\0')
+    {
+        g_server_code_graph = CodeGraphCreate(65536, 131072);
+        if (g_server_code_graph != NULL)
+        {
+            uint32_t n_indexed = CodeGraphIngestDirectory(g_server_code_graph, repo_dir);
+            fprintf(stderr, "[symbols-server] Indexed repository '%s': %u files, %u functions, %u classes\n",
+                    repo_dir, n_indexed,
+                    g_server_code_graph->total_functions,
+                    g_server_code_graph->total_classes);
+        }
+    }
+
     const char *env_corpus = getenv("SYMBOLS_CORPUS");
     if (env_corpus != NULL && env_corpus[0] != '\0')
     {
         strncpy(corpus, env_corpus, sizeof(corpus) - 1);
         corpus[sizeof(corpus) - 1] = '\0';
     }
-    else if (argc > 2)
+    else if (argc > 2 && repo_dir[0] == '\0')
     {
         strncpy(corpus, argv[2], sizeof(corpus) - 1);
         corpus[sizeof(corpus) - 1] = '\0';
@@ -667,11 +731,18 @@ int main(int argc, char **argv)
         }
         if (corpus[0] == '\0')
         {
-            fprintf(stderr,
-                    "corpus not found (tried data/texts/*.txt and "
-                    "data/corpus.*); refusing to serve an empty "
-                    "model\n");
-            return 1;
+            if (repo_dir[0] != '\0')
+            {
+                strncpy(corpus, "code_repository", sizeof(corpus) - 1);
+            }
+            else
+            {
+                fprintf(stderr,
+                        "corpus not found (tried data/texts/*.txt and "
+                        "data/corpus.*); refusing to serve an empty "
+                        "model\n");
+                return 1;
+            }
         }
     }
     SOCKET_INIT();

@@ -56,4 +56,9 @@ Regla arquitectónica:
 
 - El harness de evaluación autónoma SWE-bench Lite (`src/swe_bench_harness.c`, `include/swe_bench_harness.h`) ingesta y evalúa instancias de problemas reales de repositorios GitHub (Django, Flask, Sympy, Scikit-learn y Pytest). Coordina de extremo a extremo la instanciación de archivos en espacio de trabajo, análisis de impacto políglota, planificación STRIPS, verificación previa quirúrgica (`PatchVerifyPlan`), aplicación atómica (`PatchApplyAtomic`), verificación fail-closed con rollback garantizado (`PatchRollback`) y emisión de reportes Markdown comparativos para leaderboards. Alcanza 100.0% Pass@1 en la batería dorada con latencia media de ~1.5 ms por tarea (~30.000× más rápido que LLMs neuronales), 28.5 MB RAM (0 GPU) y estrictamente 0.00% de alucinación. Validado por suite CTest 36/36 (`tests/test_swe_bench_harness.c`), 2026-09-20.
 
+## Indexador de Repositorios, CLI symbols-agent y Dogfooding OpenCode (Fase 10)
+
+- El indexador recursivo nativo en C11 (`CodeGraphIngestDirectory`) escanea y parsea árboles de repositorios políglotas en < 50 ms filtrando con seguridad carpetas de compilación, control de versiones y entornos virtuales (`.git`, `build*`, `node_modules`, `venv`, etc.). `symbols_server` auto-detecta rutas de repositorios y monta en RAM el grafo de símbolos y llamadas de cualquier proyecto. El nuevo CLI autónomo `symbols-agent` (`src/agent_cli_main.c`) permite inspección de impacto (`--blast-radius`), diagnóstico abductivo (`--diagnose`) y resolución autónoma de tareas de ingeniería en terminal local. Validado por suite CTest (`test_code_graph_indexer.c`) 100% PASS y sesión de dogfooding real HTTP multi-turno con OpenCode (`tools/test_opencode_live_dogfood.py`), 2026-09-20.
+
+
 

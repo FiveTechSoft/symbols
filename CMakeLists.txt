@@ -149,6 +149,7 @@ sllm_test(test_server_tool_calling tests/test_server_tool_calling.c)
 sllm_test(test_agent_diagnose tests/test_agent_diagnose.c)
 sllm_test(test_code_graph_polyglot tests/test_code_graph_polyglot.c)
 sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
+sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
@@ -164,6 +165,10 @@ if(WIN32)
 else()
     target_link_libraries(symbols-server symbolic)
 endif()
+
+# symbols-agent: Standalone autonomous AI coding agent CLI
+add_executable(symbols-agent src/agent_cli_main.c)
+target_link_libraries(symbols-agent symbolic)
 
 # relprobe: graph relation inspector (diagnostic CLI, no es test)
 add_executable(relprobe tools/relprobe.c)

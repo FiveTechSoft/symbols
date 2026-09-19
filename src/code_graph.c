@@ -10,6 +10,17 @@
 #include <ctype.h>
 #include "code_graph.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 /* Helper to check valid C identifier start character */
 static inline bool is_id_start(char c)
 {
@@ -2041,3 +2052,172 @@ int CodeGraphFormatBlastRadius(const CODE_GRAPH *cg,
 
     return 1;
 }
+
+/* ============================================================
+   Directory Ingestion API
+   ============================================================ */
+
+bool CodeGraphShouldIgnoreName(const char *name)
+{
+    if (!name || name[0] == '\0')
+        return true;
+
+    /* Current and parent directories */
+    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+        return true;
+
+    /* Version control */
+    if (strcmp(name, ".git") == 0 || strcmp(name, ".github") == 0 ||
+        strcmp(name, ".svn") == 0 || strcmp(name, ".hg") == 0)
+        return true;
+
+    /* Build artifacts */
+    if (strcmp(name, "build") == 0 || strncmp(name, "build-", 6) == 0 ||
+        strncmp(name, "cmake-build-", 12) == 0 ||
+        strcmp(name, "bin") == 0 || strcmp(name, "obj") == 0 ||
+        strcmp(name, "target") == 0 || strcmp(name, "dist") == 0 ||
+        strcmp(name, "out") == 0)
+        return true;
+
+    /* Package and environment caches */
+    if (strcmp(name, "node_modules") == 0 ||
+        strcmp(name, "venv") == 0 || strcmp(name, ".venv") == 0 ||
+        strcmp(name, "env") == 0 || strcmp(name, ".env") == 0 ||
+        strcmp(name, "__pycache__") == 0 ||
+        strcmp(name, ".pytest_cache") == 0 ||
+        strcmp(name, ".mypy_cache") == 0 ||
+        strcmp(name, ".ruff_cache") == 0)
+        return true;
+
+    /* IDE folders */
+    if (strcmp(name, ".idea") == 0 || strcmp(name, ".vscode") == 0 ||
+        strcmp(name, ".gemini") == 0)
+        return true;
+
+    return false;
+}
+
+bool CodeGraphIsSupportedFile(const char *path)
+{
+    if (!path)
+        return false;
+
+    const char *dot = strrchr(path, '.');
+    if (!dot)
+        return false;
+
+    /* C / C++ */
+    if (strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0 ||
+        strcmp(dot, ".cpp") == 0 || strcmp(dot, ".hpp") == 0 ||
+        strcmp(dot, ".cc") == 0 || strcmp(dot, ".cxx") == 0)
+        return true;
+
+    /* Python */
+    if (strcmp(dot, ".py") == 0 || strcmp(dot, ".pyw") == 0)
+        return true;
+
+    /* TypeScript / JavaScript */
+    if (strcmp(dot, ".ts") == 0 || strcmp(dot, ".tsx") == 0 ||
+        strcmp(dot, ".js") == 0 || strcmp(dot, ".jsx") == 0 ||
+        strcmp(dot, ".mjs") == 0 || strcmp(dot, ".cjs") == 0)
+        return true;
+
+    return false;
+}
+
+#ifdef _WIN32
+static uint32_t IngestDirectoryRec(CODE_GRAPH *cg, const char *dir, uint32_t depth)
+{
+    if (depth > 32)
+        return 0;
+
+    char search_pattern[MAX_CODE_PATH];
+    snprintf(search_pattern, sizeof(search_pattern), "%s\\*", dir);
+
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA(search_pattern, &fd);
+    if (hFind == INVALID_HANDLE_VALUE)
+        return 0;
+
+    uint32_t count = 0;
+    do
+    {
+        const char *name = fd.cFileName;
+        if (CodeGraphShouldIgnoreName(name))
+            continue;
+
+        char full_path[MAX_CODE_PATH];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir, name);
+
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        {
+            count += IngestDirectoryRec(cg, full_path, depth + 1);
+        }
+        else if (CodeGraphIsSupportedFile(name))
+        {
+            if (CodeGraphIngestFile(cg, full_path))
+                count++;
+        }
+    } while (FindNextFileA(hFind, &fd));
+
+    FindClose(hFind);
+    return count;
+}
+#else
+static uint32_t IngestDirectoryRec(CODE_GRAPH *cg, const char *dir, uint32_t depth)
+{
+    if (depth > 32)
+        return 0;
+
+    DIR *d = opendir(dir);
+    if (!d)
+        return 0;
+
+    uint32_t count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(d)) != NULL)
+    {
+        const char *name = entry->d_name;
+        if (CodeGraphShouldIgnoreName(name))
+            continue;
+
+        char full_path[MAX_CODE_PATH];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir, name);
+
+        struct stat st;
+        if (stat(full_path, &st) == 0)
+        {
+            if (S_ISDIR(st.st_mode))
+            {
+                count += IngestDirectoryRec(cg, full_path, depth + 1);
+            }
+            else if (S_ISREG(st.st_mode) && CodeGraphIsSupportedFile(name))
+            {
+                if (CodeGraphIngestFile(cg, full_path))
+                    count++;
+            }
+        }
+    }
+    closedir(d);
+    return count;
+}
+#endif
+
+uint32_t CodeGraphIngestDirectory(CODE_GRAPH *cg, const char *root_dir)
+{
+    if (!cg || !root_dir || root_dir[0] == '\0')
+        return 0;
+
+    char clean_root[MAX_CODE_PATH];
+    strncpy(clean_root, root_dir, sizeof(clean_root) - 1);
+    clean_root[sizeof(clean_root) - 1] = '\0';
+    size_t len = strlen(clean_root);
+    while (len > 1 && (clean_root[len - 1] == '/' || clean_root[len - 1] == '\\'))
+    {
+        clean_root[len - 1] = '\0';
+        len--;
+    }
+
+    return IngestDirectoryRec(cg, clean_root, 0);
+}
+

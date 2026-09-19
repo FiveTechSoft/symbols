@@ -53,6 +53,14 @@ void AgentRunnerDestroy(AGENT_RUNNER *runner)
     free(runner);
 }
 
+uint32_t AgentRunnerIndexWorkspace(AGENT_RUNNER *runner)
+{
+    if (!runner || !runner->code_graph || runner->workspace_dir[0] == '\0')
+        return 0;
+
+    return CodeGraphIngestDirectory(runner->code_graph, runner->workspace_dir);
+}
+
 /* ============================================================
    Execution API
    ============================================================ */

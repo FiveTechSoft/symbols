@@ -78,6 +78,9 @@ typedef struct
 AGENT_RUNNER *AgentRunnerCreate(const char *workspace_dir, uint32_t max_replans);
 void          AgentRunnerDestroy(AGENT_RUNNER *runner);
 
+/* Index the entire workspace directory recursively into the runner's code graph */
+uint32_t      AgentRunnerIndexWorkspace(AGENT_RUNNER *runner);
+
 /* ============================================================
    Execution API
    ============================================================ */

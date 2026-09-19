@@ -141,6 +141,15 @@ int  CodeGraphIngestTypeScript(CODE_GRAPH *cg, const char *file_path, const char
 /* Parse and ingest a source or header file from disk (auto-detects language) */
 int  CodeGraphIngestFile(CODE_GRAPH *cg, const char *file_path);
 
+/* Check whether a file or directory name should be ignored (e.g. .git, build, node_modules) */
+bool CodeGraphShouldIgnoreName(const char *name);
+
+/* Check whether a file path has an ingestable code extension */
+bool CodeGraphIsSupportedFile(const char *path);
+
+/* Parse and ingest an entire directory recursively (auto-filters ignored folders and detects languages) */
+uint32_t CodeGraphIngestDirectory(CODE_GRAPH *cg, const char *root_dir);
+
 /* ============================================================
    Query API
    ============================================================ */
