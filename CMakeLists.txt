@@ -25,6 +25,7 @@ add_library(symbolic STATIC
     src/passage_nlg.c
     src/agent_core.c
     src/code_graph.c
+    src/agent_patch.c
     src/numeric.c
     src/prune.c
     src/shard.c
@@ -135,6 +136,7 @@ sllm_test(test_metacognition tests/test_metacognition.c)
 sllm_test(test_passage_nlg tests/test_passage_nlg.c)
 sllm_test(test_agent_core tests/test_agent_core.c)
 sllm_test(test_code_graph tests/test_code_graph.c)
+sllm_test(test_agent_patch tests/test_agent_patch.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
