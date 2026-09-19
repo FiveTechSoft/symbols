@@ -167,11 +167,3 @@ add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTO
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
 
-# bible_import: CLI de ingest del corpus biblico (no es test)
-add_executable(bible_import src/bible_import.c)
-target_link_libraries(bible_import symbolic)
-
-# bible_query: CLI de consulta/medicion sobre bible_graph.dat
-add_executable(bible_query src/bible_query.c)
-target_link_libraries(bible_query symbolic)
-

@@ -1,7 +1,7 @@
 /* chat_main: REPL conversacional sobre el wrapper de clarificacion
    (Fase B), que a su vez usa el motor puro chat.
-   Uso: chat_main [corpus.tsv]
-   Sin argumentos usa data/bible/bible_relations.tsv */
+   Uso: chat_main [corpus.txt ...]
+   Sin argumentos usa el primer fichero disponible de data/texts/ */
 #include <stdio.h>
 #include <string.h>
 #include "chat_clarify.h"
@@ -25,8 +25,7 @@ int main(int argc, char **argv)
             "data/texts/bible.txt",
             "data/texts/jung.txt",
             "data/texts/corpus.txt",
-            "data/corpus.txt",
-            "data/bible/bible_relations.tsv"
+            "data/corpus.txt"
         };
         corpus[0] = '\0';
         for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)
@@ -42,8 +41,8 @@ int main(int argc, char **argv)
         }
         if (corpus[0] == '\0')
         {
-            strncpy(corpus, "data/texts/bible.txt", sizeof(corpus) - 1);
-            corpus[sizeof(corpus) - 1] = '\0';
+            fprintf(stderr, "no corpus found in data/texts/\n");
+            return 1;
         }
     }
     CLARIFY chat;

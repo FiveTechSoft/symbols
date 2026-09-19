@@ -169,7 +169,7 @@ static unsigned long g_seq = 0;
 
 /* session state: master CHAT for the process lifetime (the accept
    loop is single-threaded). Dynamic corpus loads (load X.txt)
-   persist across requests; the bible corpus ingests once. */
+   persist across requests; the base corpus ingests once. */
 static CHAT g_session;
 static int g_session_ready = 0;
 
@@ -457,8 +457,7 @@ int main(int argc, char **argv)
             "data/texts/jung.txt",
             "data/texts/corpus.txt",
             "data/corpus.txt",
-            "data/corpus.tsv",
-            "data/bible/bible_relations.tsv"
+            "data/corpus.tsv"
         };
         char exedir[768];
         FILE *probe = NULL;
@@ -504,8 +503,8 @@ int main(int argc, char **argv)
         if (corpus[0] == '\0')
         {
             fprintf(stderr,
-                    "corpus not found (tried data/corpus.tsv and "
-                    "data/bible/bible_relations.tsv); refusing to serve an empty "
+                    "corpus not found (tried data/texts/*.txt and "
+                    "data/corpus.*); refusing to serve an empty "
                     "model\n");
             return 1;
         }
