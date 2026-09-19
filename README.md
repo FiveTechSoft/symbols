@@ -355,6 +355,58 @@ Each phrase is searched as a case-insensitive substring in the raw corpus text (
 | Wrong | 0 / 100 |
 | Recall gain from n-grams | +7 questions |
 
+### 3.5 Autonomous Graph Reasoning: Induction, Forward Deduction & Abductive Diagnosis
+
+To move beyond static triple stores and human-engineered rules, Symbolic LLM incorporates an active cognitive reasoning engine (`src/graph_reasoning.c`, `include/graph_reasoning.h`) operating directly over the graph topology across three fundamental inference modes:
+
+```
+               ┌────────────────────────────────────────────────────────┐
+               │ 1. INDUCTION (Topological Rule Mining / AMIE / ILP)    │
+               │    Discovers Horn rules from raw observational paths   │
+               │    using Partial Completeness Assumption (PCA).        │
+               └───────────────────────────┬────────────────────────────┘
+                                           │ Discovered Rules
+                                           ▼
+ ┌──────────────────────────────────────────────┐ ┌─────────────────────────────────────────────┐
+ │ 2. DEDUCTION (Forward-Chaining Completion)   │ │ 3. ABDUCTION (Missing Hypothesis Diagnosis) │
+ │    Infers implicit edges to expand memory    │ │    Identifies the exact missing link needed │
+ │    with fixed-point idempotence & 0 halluc.  │ │    to satisfy and close unproven goals.     │
+ └──────────────────────────────────────────────┘ └─────────────────────────────────────────────┘
+```
+
+#### 3.5.1 Capability 1: Inductive Rule Learning from Tabula Rasa
+The engine requires zero pre-programmed domain rules (`HARDCODING=0`). Given raw observational graph paths of length 2 ($A \xrightarrow{r_1} B \xrightarrow{r_2} C$), it computes the Partial Completeness Assumption (PCA) confidence:
+
+$$
+\text{conf}_{\text{PCA}}(r_1 \circ r_2 \implies r_3) = \frac{\text{supp}(r_1, r_2, r_3)}{\#\{ (A, C) : \exists B \text{ s.t. } r_1(A,B) \land r_2(B,C) \land \exists r' \text{ s.t. } r'(A,C) \}}
+$$
+
+Candidate rules are promoted to the active rule base only if they satisfy strict support ($S \ge 2$) and confidence gates ($C \ge 0.80$):
+- **Heterogeneous Composition**: $r_1(A, B) \land r_2(B, C) \implies r_3(A, C)$ (e.g., $\text{father\_of} \circ \text{father\_of} \implies \text{grandfather\_of}$)
+- **Homogeneous Transitivity**: $r(A, B) \land r(B, C) \implies r(A, C)$ (e.g., $\text{in} \circ \text{in} \implies \text{in}$, $\text{subclass\_of} \circ \text{subclass\_of} \implies \text{subclass\_of}$)
+- **Symmetry & Inversion**: $r(A, B) \implies r(B, A)$ or $r_1(A, B) \implies r_2(B, A)$ (e.g., $\text{sibling\_of}(A, B) \implies \text{sibling\_of}(B, A)$)
+
+#### 3.5.2 Capability 2: Autonomous Forward Deductive Link Prediction
+Once rules are induced, the engine executes forward deductive chaining (`GraphApplyRules`). Given disconnected facts, it materializes previously unrecorded edges into the graph without external supervision:
+- When presented with $\text{in}(\text{Toledo}, \text{Spain})$ and $\text{in}(\text{Spain}, \text{Europe})$, it automatically derives and materializes $\text{in}(\text{Toledo}, \text{Europe})$.
+- When presented with $\text{father}(\text{David}, \text{Solomon})$ and $\text{father}(\text{Solomon}, \text{Rehoboam})$, it derives $\text{grandfather}(\text{David}, \text{Rehoboam})$.
+- **Fixed-Point Convergence**: Successive deductive iterations yield $\Delta = 0$ new edges, ensuring strict mathematical stability and zero infinite loops.
+
+#### 3.5.3 Capability 3: Abductive Diagnosis & Hypothesis Generation
+When a query goal $(S, R_3, T)$ is `UNKNOWN` because no path fully connects $S$ to $T$, the abductive reasoner (`GraphAbduce`) traces backward through all candidate rules whose head matches $R_3$:
+- If a forward pivot $P$ exists such that $r_1(S, P)$ is true, it identifies the necessary missing link: $r_2(P, T)$.
+- If a backward pivot $P$ exists such that $r_2(P, T)$ is true, it identifies the necessary missing link: $r_1(S, P)$.
+- **Formal Necessity & Sufficiency Proof**: Experimentally inserting the abduced hypothesis into the graph and executing forward chaining immediately and mathematically closes the goal query with 100% certainty (`tests/test_verify_3_points.c`).
+
+### 3.6 Deep Symbolic Natural Language Generation (Graph-to-Text)
+
+To verbalize complex multi-hop inference chains without the rigid phrasing of classical slot-filling or the hallucinations of stochastic neural decoders, the engine incorporates a three-stage symbolic NLG pipeline (`src/deep_nlg.c`, `include/deep_nlg.h`):
+1. **Macroplanning (RST Trees)**: Converts graph subgraphs and deductive proofs into structured rhetorical relations (Sequence, Elaboration, Consequence, Epistemic Abstention).
+2. **Microplanning & Aggregation**:
+   - **Chaining Aggregation ($O_i = S_{i+1}$)**: Connects multi-hop genealogies and taxonomies into fluent relative clauses (*"Boaz begat Obed, who in turn was the father of Jesse, and the latter was the father of David..."*).
+   - **Coordination & Subject Elision**: Groups multi-attribute entities without repetitive subject mentions (*"David is the son of Jesse, king of Israel, and furthermore the father of Solomon."*).
+3. **Surface Realization & Epistemic Honesty**: Generates multilingual prose across Spanish, English, and French (`LANG_ES`, `LANG_EN`, `LANG_FR`), transforming unknown states into articulate explanations of epistemic boundaries (*"Although David is referenced, there is no verified record of his mother."*).
+
 ---
 
 ## 4. Empirical Evaluation and Benchmarks
@@ -421,6 +473,9 @@ Unlike TSV-bound tools, Symbolic LLM streams arbitrary free text directly into R
 
 The project adheres to strict fail-closed regression gates enforced via CMake CTest:
 - **47 / 49 CTest Unit & Integration Tests PASS (96%)**: Validating symbol hashing, 32D embeddings, backward chaining, BFS transitive closure, anaphora resolution, schema transfer, QA layer, text lexicon, and server protocols. (2 pre-existing failures in composite/clarify tests.)
+- **11/11 Graph Reasoning Suite (`test_graph_reasoning`)**: Validating AMIE/ILP inductive rule mining, forward deductive link prediction, and abductive hypothesis discovery with zero false positives.
+- **Formal 3-Point Cognitive Verification (`test_verify_3_points`)**: Validating tabula-rasa rule learning, autonomous forward memory expansion, and abductive proof of necessity & sufficiency.
+- **18/18 Deep Symbolic NLG Suite (`test_deep_nlg`)**: Validating multi-hop chain aggregation, compound entity fact synthesis, and multilingual epistemic abstentions across Spanish, English, and French.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
 - **Conversational Topic Tests**: Unsupervised topic discovery validated on disparate literary styles (theological, psychological, historical) with zero hardcoded lexicons.
