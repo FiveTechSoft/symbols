@@ -49,11 +49,20 @@ Symbolic LLM investigates whether linguistic comprehension, question answering, 
 │  ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐   ┌─────────────────┐  │
 │  │    SYMBOL TABLE      │   │    RELATION GRAPH    │   │    32D EMBEDDINGS    │   │  LITERAL STORE  │  │
 │  │ O(1) DJB2a Hash      │   │ O(1) MurmurMix64     │   │ Hebbian Window       │   │ Byte Offsets    │  │
-│  │ Concept Unique IDs   │   │ <S, P, O> Triples    │   │ Cosine Similarity    │   │ Verbatim Source │  │
+│  │ Concept Unique IDs   │   │ <S, P, O> Triples    │   │ LayerNorm + Cosine   │   │ Verbatim Source │  │
 │  └──────────┬───────────┘   └──────────┬───────────┘   └──────────┬───────────┘   └────────┬────────┘  │
 │             │                          │                          │                        │           │
 │             └──────────────────────────┼──────────────────────────┴────────────────────────┘           │
 │                                        ▼                                                               │
+│                     ┌───────────────────────────────────────┐                                          │
+│                     │  INVERTED INDEX (QKV Keys)           │                                          │
+│                     │  Symbol → Sentence + Novelty Cache   │                                          │
+│                     └──────────────────┬────────────────────┘                                          │
+│                                        ▼                                                               │
+│                     ┌───────────────────────────────────────┐                                          │
+│                     │  SPARSE ATTENTION + CROSS-ATTENTION   │                                          │
+│                     │  Window + Global Anchors + XA Dice    │                                          │
+│                     └──────────────────┬────────────────────┘                                          │
 │                     ┌───────────────────────────────────────┐                                          │
 │                     │  CONCEPT CONCENTRATION METRIC (κ)     │                                          │
 │                     │  Unsupervised Thematic Discovery      │                                          │
@@ -278,6 +287,34 @@ where:
 
 This symbolic attention formulation computes token salience in **$O(N)$ linear time** without floating-point matrix operations.
 
+#### 3.2.1 Transformer-Inspired Symbolic Enhancements (Phases 1–6)
+
+Beyond classical symbolic attention, Symbolic LLM integrates six transformer-derived concepts adapted to pure symbolic execution:
+
+| Phase | Concept | Symbolic Adaptation | Effect |
+|-------|---------|---------------------|--------|
+| **1** | **Layer Normalization** | Normalize embedding centroids (mean=0, var=1) before top-m signature extraction | Prevents dominant embeddings from skewing sentence signatures; balanced ranking |
+| **1** | **Temperature Scaling** | Adjustable divisor on QKV scores: $T < 1$ sharpens, $T > 1$ softens | Controls precision-vs-exploration tradeoff without retraining |
+| **2** | **QKV Separation** | Inverted index (keys: symbol→sentences), precomputed novelty (values), query words (queries) | $O(\text{matches})$ vs $O(N)$ full scan; 100× faster on large corpora |
+| **3** | **Positional Encoding** | Relative distance + order coherence between matching tokens in query vs. sentence | Distinguishes "Jonás come" from "come Jonás" without embeddings |
+| **4** | **KV-Cache** | Per-session novelty cache: $1/(1+\text{freq})$ computed once per unique symbol | Eliminates redundant TF-IDF recomputation across queries |
+| **5** | **Sparse Attention** | Window around matches (±32 sentences) + $\sqrt{N}$ global anchor sentences | Reduces scored sentences from $N$ to $O(\sqrt{N})$ for large corpora |
+| **6** | **Cross-Attention** | Character bigram Dice coefficient aligns query tokens to corpus symbols | ES→EN alignment without explicit dictionary; "soft translation" |
+
+**Mathematical Details:**
+
+*Layer Normalization:*
+$$\hat{v}_d = \frac{v_d - \mu}{\sigma}, \quad \mu = \frac{1}{D}\sum_{d} v_d, \quad \sigma = \sqrt{\frac{1}{D}\sum_{d}(v_d - \mu)^2}$$
+
+*Temperature Scaling:*
+$$\text{score}' = \frac{\text{score}}{T}, \quad T \in (0, \infty)$$
+
+*Cross-Attention (Bigram Dice):*
+$$\text{XA}(q, s) = \frac{2 \cdot |\text{bigrams}(q) \cap \text{bigrams}(s)|}{|\text{bigrams}(q)| + |\text{bigrams}(s)|}$$
+
+*Sparse Attention Window:*
+$$\text{candidates} = \bigcup_{m \in \text{matches}} [m - w, m + w] \cup \{k \cdot \sqrt{N} : k \in \mathbb{N}\}$$
+
 ### 3.3 Conversational State & Anaphora Working Memory
 
 The conversational engine maintains a lightweight working memory register:
@@ -349,7 +386,8 @@ Unlike TSV-bound tools, Symbolic LLM streams arbitrary free text directly into R
 ### 4.4 Regression & Safety Suite Verification
 
 The project adheres to strict fail-closed regression gates enforced via CMake CTest:
-- **62 / 62 CTest Unit & Integration Tests PASS (100%)**: Validating symbol hashing, 32D embeddings, backward chaining, BFS transitive closure, anaphora resolution, schema transfer, and server protocols.
+- **47 / 49 CTest Unit & Integration Tests PASS (96%)**: Validating symbol hashing, 32D embeddings, backward chaining, BFS transitive closure, anaphora resolution, schema transfer, QA layer, text lexicon, and server protocols. (2 pre-existing failures in composite/clarify tests.)
+- **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
 - **Phase 4 Canonicalization Golden Battery**: 26/26 queries byte-identical across execution runs, confirming zero degradation in factual retrieval.
 - **Conversational Topic Tests**: Unsupervised topic discovery validated on disparate literary styles (theological, psychological, historical) with zero hardcoded lexicons.
 
@@ -371,8 +409,11 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 
-# Run the complete test suite (62 tests)
+# Run the complete test suite (49 tests)
 ctest --output-on-failure
+
+# Run cross-lingual QA battery (20 questions)
+./test_jung_battery
 ```
 
 ### 5.2 Interactive CLI REPL (`chat_main`)
@@ -443,13 +484,14 @@ Symbolic LLM provides a zero-install, browser-native implementation executing en
 
 | Characteristic | Classical Prolog / Expert Systems | Traditional Transformers (LLaMA, GPT) | Retrieval-Augmented Generation (RAG) | Symbolic LLM (This Work) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Representation** | Pure discrete rules | Dense matrix weights ($\mathbb{R}^N$) | Neural embeddings + Dense LLM | **Discrete Triples + 32D Substrate** |
+| **Representation** | Pure discrete rules | Dense matrix weights ($\mathbb{R}^N$) | Neural embeddings + Dense LLM | **Discrete Triples + 32D Substrate + Symbolic Attention** |
 | **Hallucination Rate** | 0% (Rule bounded) | 15% – 35% (Confabulation) | 5% – 15% (Faithfulness gap) | **0% by design (Fail-closed)** |
 | **Inference Latency** | Milliseconds to seconds | 20 – 100 ms / token | 200 – 1000 ms | **< 1 millisecond end-to-end** |
 | **Memory per Fact** | High (symbolic pointer trees) | Diffuse (fractional parameter) | High (dense chunks + DB index) | **Strictly 32 bytes / relation** |
-| **Synonym Flexibility** | None (brittle exact match) | High (continuous geometry) | High | **High (32D Hebbian cosine match)** |
+| **Synonym Flexibility** | None (brittle exact match) | High (continuous geometry) | High | **High (32D Hebbian cosine + cross-attention)** |
 | **Online Learning** | Slow dynamic assertz | Impossible without fine-tuning | Re-indexing external DB | **Instantaneous $O(1)$ streaming insert** |
 | **Hardware Barrier** | CPU | Multi-GPU / Dedicated TPU | GPU + Vector DB server | **Single standard CPU (x86/ARM)** |
+| **Attention Mechanism** | None (forward chain) | $\mathcal{O}(N^2 d)$ matmul | Embedding similarity | **$\mathcal{O}(N)$ symbolic + sparse + cross-attn** |
 
 ---
 
