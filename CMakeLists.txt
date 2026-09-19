@@ -122,6 +122,7 @@ sllm_test(test_textlex         tests/test_textlex.c)
 sllm_test(test_learn          tests/test_learn.c)
 sllm_test(test_deep_nlg        tests/test_deep_nlg.c)
 sllm_test(test_graph_reasoning tests/test_graph_reasoning.c)
+sllm_test(test_verify_3_points tests/test_verify_3_points.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
