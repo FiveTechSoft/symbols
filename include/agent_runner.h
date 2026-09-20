@@ -25,6 +25,7 @@
 #include "agent_patch.h"
 #include "agent_planner.h"
 #include "agent_diagnose.h"
+#include "agent_shell.h"
 
 #define MAX_TASK_ID      64
 #define MAX_TASK_DESC    512
@@ -59,6 +60,7 @@ typedef struct
     char              risk_level[16];
     char              unified_diff[MAX_DIFF_BUFFER];
     DIAGNOSTIC_REPORT diagnostic_report;
+    SHELL_EXEC_RESULT last_shell_exec;
     char              senior_engineer_report[MAX_REPORT_SIZE];
 } SWE_BENCH_RESULT;
 

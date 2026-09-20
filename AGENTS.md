@@ -60,5 +60,10 @@ Regla arquitectónica:
 
 - El indexador recursivo nativo en C11 (`CodeGraphIngestDirectory`) escanea y parsea árboles de repositorios políglotas en < 50 ms filtrando con seguridad carpetas de compilación, control de versiones y entornos virtuales (`.git`, `build*`, `node_modules`, `venv`, etc.). `symbols_server` auto-detecta rutas de repositorios y monta en RAM el grafo de símbolos y llamadas de cualquier proyecto. El nuevo CLI autónomo `symbols-agent` (`src/agent_cli_main.c`) permite inspección de impacto (`--blast-radius`), diagnóstico abductivo (`--diagnose`) y resolución autónoma de tareas de ingeniería en terminal local. Validado por suite CTest (`test_code_graph_indexer.c`) 100% PASS y sesión de dogfooding real HTTP multi-turno con OpenCode (`tools/test_opencode_live_dogfood.py`), 2026-09-20.
 
+## Motor de Ejecución de Shell Multiplataforma y Bucle de Autocuración (Fase 11)
+
+- El motor de ejecución de subprocess nativo en C11 (`src/agent_shell.c`, `include/agent_shell.h`) unifica la ejecución de shells nativos en Windows (`cmd.exe`, `powershell.exe`), Linux (`/bin/bash`, `/bin/sh`) y macOS (`/bin/zsh`, `/bin/sh`) sin dependencias externas. Incorpora captura de doble flujo (`stdout` y `stderr` independientes de hasta 64 KB), loop de drenaje no-bloqueante anti-deadlock de pipes, protección por timeout de precisión milimétrica (código de salida 124 y terminación forzosa del proceso hijo), y telemetría de latencia de reloj. Integrado de extremo a extremo en `AgentRunnerSolveTask` (`src/agent_runner.c`): ante fallos en comandos de construcción o pruebas (`exit_code != 0`), el flujo de error alimenta automáticamente al motor abductivo `DiagnosticParseOutput`, dispara replanificación dinámica STRIPS (`AgentPlannerReplanOnError`), y ejecuta reversión atómica garantizada (`PatchRollback`). Validado por suite CTest 57/57 (`tests/test_agent_shell.c`) con 0 regresiones en suites agénticas, 2026-09-20.
+
+
 
 

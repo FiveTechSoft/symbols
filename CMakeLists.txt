@@ -29,6 +29,7 @@ add_library(symbolic STATIC
     src/agent_planner.c
     src/agent_runner.c
     src/agent_diagnose.c
+    src/agent_shell.c
     src/swe_bench_harness.c
     src/numeric.c
     src/prune.c
@@ -150,6 +151,7 @@ sllm_test(test_agent_diagnose tests/test_agent_diagnose.c)
 sllm_test(test_code_graph_polyglot tests/test_code_graph_polyglot.c)
 sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
 sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
+sllm_test(test_agent_shell tests/test_agent_shell.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)
