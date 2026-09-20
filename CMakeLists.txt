@@ -60,6 +60,7 @@ add_library(symbolic STATIC
     src/vsa.c
     src/ccg_realizer.c
     src/commonsense.c
+    src/persona.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -253,4 +254,7 @@ sllm_test(test_ccg_realizer tests/test_ccg_realizer.c)
 
 # Pillar 3: Large-Scale Commonsense & World Knowledge Ingestion
 sllm_test(test_commonsense tests/test_commonsense.c)
+
+# Pillar 4: Pragmatic Conditioning, Epistemic Perspectives & Persona Filters
+sllm_test(test_persona tests/test_persona.c)
 
