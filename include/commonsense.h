@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include "graph.h"
 #include "relation.h"
+#include "i18n.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -188,6 +190,17 @@ int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
                                         CS_INFERENCE_PATH *path,
                                         char *out,
                                         size_t out_size);
+
+/* Query physical consequence with multilingual realization support (EN/ES/FR) */
+int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
+                                            LANG_ID lang,
+                                            const char *subject,
+                                            const char *action,
+                                            const char *target,
+                                            CS_INFERENCE_PATH *path,
+                                            char *out,
+                                            size_t out_size);
+
 
 #ifdef __cplusplus
 }

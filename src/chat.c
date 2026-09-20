@@ -31,6 +31,9 @@
 #include "c_rules.h"
 #include "qa_layer.h"
 #include "model.h"
+#include "commonsense.h"
+#include "persona.h"
+
 
 #define CHAT_MAX_TOKS 16
 
@@ -65,13 +68,21 @@ static int FoldChar(const char *s, char *out)
     }
     switch (c)
     {
-    case 0xE1: case 0xC1: *out = 'a'; break; /* a-acute */
-    case 0xE9: case 0xC9: *out = 'e'; break; /* e-acute */
-    case 0xED: case 0xCD: *out = 'i'; break; /* i-acute */
-    case 0xF3: case 0xD3: *out = 'o'; break; /* o-acute */
-    case 0xFA: case 0xDA: *out = 'u'; break; /* u-acute */
-    case 0xFC: case 0xDC: *out = 'u'; break; /* u-diaeresis */
-    case 0xF1: case 0xD1: *out = 'n'; break; /* n-tilde */
+    case 0xE1: case 0xC1: *out = 'a'; break; /* Latin-1 a-acute */
+    case 0xE9: case 0xC9: *out = 'e'; break; /* Latin-1 e-acute */
+    case 0xED: case 0xCD: *out = 'i'; break; /* Latin-1 i-acute */
+    case 0xF3: case 0xD3: *out = 'o'; break; /* Latin-1 o-acute */
+    case 0xFA: case 0xDA: *out = 'u'; break; /* Latin-1 u-acute */
+    case 0xFC: case 0xDC: *out = 'u'; break; /* Latin-1 u-diaeresis */
+    case 0xF1: case 0xD1: *out = 'n'; break; /* Latin-1 n-tilde */
+    /* CP850 (DOS OEM Spanish/Western Europe) */
+    case 0x82: case 0x90: *out = 'e'; break; /* CP850 e-acute */
+    case 0xA0:            *out = 'a'; break; /* CP850 a-acute */
+    case 0xA1:            *out = 'i'; break; /* CP850 i-acute */
+    case 0xA2:            *out = 'o'; break; /* CP850 o-acute */
+    case 0xA3:            *out = 'u'; break; /* CP850 u-acute */
+    case 0x81: case 0x9A: *out = 'u'; break; /* CP850 u-diaeresis */
+    case 0xA4: case 0xA5: *out = 'n'; break; /* CP850 n-tilde */
     default:
         *out = (char)tolower(c);
         if (c >= 0x80)
@@ -80,6 +91,7 @@ static int FoldChar(const char *s, char *out)
     }
     return 1;
 }
+
 
 /* ---- FASE 4 CanonicalizeQuery: surface flags (SURFACE_FLAGS lives
    in chat.h) + canonical tokens. Punctuation is signal, not
@@ -111,17 +123,30 @@ static uint32_t Split(const char *line, char toks[][CHAT_TOKEN_MAX],
         size_t len = (size_t)(p - start);
         if (len == 0)
             continue;
-        /* leading inverted question marks (UTF-8 C2 BF) and inverted
-           exclamation marks (UTF-8 C2 A1, possibly repeated):
+        /* leading inverted question marks (UTF-8 C2 BF or Latin-1 BF) and inverted
+           exclamation marks (UTF-8 C2 A1 or Latin-1 A1, possibly repeated):
            interrogative/exclamative force, never token content */
-        while (len >= 2 && (unsigned char)start[0] == 0xC2 &&
-               ((unsigned char)start[1] == 0xBF || (unsigned char)start[1] == 0xA1))
+        while (len >= 1)
         {
-            if ((unsigned char)start[1] == 0xBF && sf)
-                sf->question = 1;
-            start += 2;
-            len -= 2;
+            if (len >= 2 && (unsigned char)start[0] == 0xC2 &&
+                ((unsigned char)start[1] == 0xBF || (unsigned char)start[1] == 0xA1))
+            {
+                if ((unsigned char)start[1] == 0xBF && sf)
+                    sf->question = 1;
+                start += 2;
+                len -= 2;
+            }
+            else if ((unsigned char)start[0] == 0xBF || (unsigned char)start[0] == 0xA1)
+            {
+                if ((unsigned char)start[0] == 0xBF && sf)
+                    sf->question = 1;
+                start += 1;
+                len -= 1;
+            }
+            else
+                break;
         }
+
         /* trailing ASCII punctuation run: peel it, keep the signal */
         while (len > 0)
         {
@@ -716,6 +741,23 @@ static void TextSessionRemember(CHAT *ch, const char *name)
     ch->tfiles[ch->ntfiles][sizeof(ch->tfiles[0]) - 1] = '\0';
     ch->ntfiles++;
 }
+
+/* lazy commonsense & world knowledge graph (Pillar 3) */
+static GRAPH *ChatGetCommonsenseGraph(CHAT *ch)
+{
+    if (ch == NULL)
+        return NULL;
+    if (ch->cs_graph != NULL)
+        return ch->cs_graph;
+    GRAPH *g = GraphCreate(32768, 65536);
+    if (g == NULL)
+        return NULL;
+    CS_STATS stats;
+    CommonsenseIngestSeed(g, &stats);
+    ch->cs_graph = g;
+    return ch->cs_graph;
+}
+
 
 /* ---- queries against the frozen layers ----
 
@@ -1340,8 +1382,11 @@ typedef enum
     INT_QA_WHERE,     /* structural: <wh> <location_marker> <entity> → location lookup */
     INT_QA_COUNT,     /* structural: <wh> <count_marker> <entity> → count triples */
     INT_QA_WHY_QA,    /* structural: <wh_cause> <entity> <relation> → cause lookup */
-    INT_QA_WHAT       /* structural: <wh> <copula> <entity> → definition/role lookup */
+    INT_QA_WHAT,      /* structural: <wh> <copula> <entity> → definition/role lookup */
+    INT_QA_CONSEQUENCE, /* structural: <wh_consequence> <condition...> → causal consequence */
+    INT_QA_AFFORDANCE   /* structural: <wh_affordance> <entity...> → used_for / capable_of */
 } INTENT;
+
 
 typedef struct
 {
@@ -1740,8 +1785,10 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
         if (TrialParseGoal(ch, toks, 0, n, -1, force_q, sf.genitive,
                            &whole))
         {
-            if (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY)
+            if (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY ||
+                whole.intent == INT_QA_CONSEQUENCE || whole.intent == INT_QA_AFFORDANCE)
                 return EmitGoal(ch, toks, 0, n, -1, plan);
+
             /* If session has loaded text corpora and the whole line parses as
                a unified text or QA query without explicit coordinators, keep it intact. */
             if (ch->ntfiles > 0 &&
@@ -1790,6 +1837,106 @@ static int LooksLikeQuestionWord(const char *tok, uint32_t pos,
 static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
                                   uint32_t n, uint32_t wh_pos,
                                   char *entity_out, size_t entity_size);
+
+/* Parse physical consequence condition: extracts subject, action, target */
+static int ParseConsequenceCondition(const DICT *dict,
+                                     const char toks[][CHAT_TOKEN_MAX],
+                                     uint32_t start, uint32_t n,
+                                     char *sub_out, size_t sub_size,
+                                     char *act_out, size_t act_size,
+                                     char *tgt_out, size_t tgt_size)
+{
+    if (start >= n || sub_out == NULL || act_out == NULL || tgt_out == NULL)
+        return 0;
+    sub_out[0] = '\0';
+    act_out[0] = '\0';
+    tgt_out[0] = '\0';
+
+    /* Multi-word entity check: e.g. "vaso de cristal" */
+    for (uint32_t i = start; i + 2 < n; i++)
+    {
+        if (strcmp(toks[i], "vaso") == 0 &&
+            strcmp(toks[i + 1], "de") == 0 &&
+            strcmp(toks[i + 2], "cristal") == 0)
+        {
+            strncpy(sub_out, "glass", sub_size - 1);
+            sub_out[sub_size - 1] = '\0';
+            break;
+        }
+    }
+
+    for (uint32_t i = start; i < n; i++)
+    {
+        /* Action detection */
+        if (act_out[0] == '\0')
+        {
+            if (strcmp(toks[i], "cae") == 0 || strcmp(toks[i], "caer") == 0 ||
+                strcmp(toks[i], "caen") == 0 || strcmp(toks[i], "caiga") == 0 ||
+                strcmp(toks[i], "falls") == 0 || strcmp(toks[i], "fall") == 0 ||
+                strcmp(toks[i], "dropped") == 0 || strcmp(toks[i], "drop") == 0 ||
+                strcmp(toks[i], "drops") == 0)
+            {
+                strncpy(act_out, "dropped on", act_size - 1);
+                act_out[act_size - 1] = '\0';
+                continue;
+            }
+        }
+
+        /* Target surface detection */
+        if (tgt_out[0] == '\0')
+        {
+            if (strcmp(toks[i], "suelo") == 0 || strcmp(toks[i], "piso") == 0 ||
+                strcmp(toks[i], "floor") == 0 || strcmp(toks[i], "ground") == 0 ||
+                strcmp(toks[i], "concrete") == 0 || strcmp(toks[i], "hormigon") == 0)
+            {
+                const char *tr = DictTranslate(dict, toks[i]);
+                strncpy(tgt_out, tr ? tr : toks[i], tgt_size - 1);
+                tgt_out[tgt_size - 1] = '\0';
+                continue;
+            }
+        }
+
+        /* Subject detection if not yet found by multi-word */
+        if (sub_out[0] == '\0')
+        {
+            /* Skip grammatical particles / articles */
+            if (strcmp(toks[i], "se") == 0 || strcmp(toks[i], "un") == 0 ||
+                strcmp(toks[i], "una") == 0 || strcmp(toks[i], "el") == 0 ||
+                strcmp(toks[i], "la") == 0 || strcmp(toks[i], "al") == 0 ||
+                strcmp(toks[i], "a") == 0 || strcmp(toks[i], "en") == 0 ||
+                strcmp(toks[i], "de") == 0 || strcmp(toks[i], "the") == 0 ||
+                strcmp(toks[i], "is") == 0 || strcmp(toks[i], "to") == 0)
+            {
+                continue;
+            }
+            const char *tr = DictTranslate(dict, toks[i]);
+            if (tr != NULL)
+            {
+                strncpy(sub_out, tr, sub_size - 1);
+                sub_out[sub_size - 1] = '\0';
+            }
+            else
+            {
+                strncpy(sub_out, toks[i], sub_size - 1);
+                sub_out[sub_size - 1] = '\0';
+            }
+        }
+    }
+
+    /* Fallback defaults for missing components */
+    if (act_out[0] == '\0')
+    {
+        strncpy(act_out, "dropped on", act_size - 1);
+        act_out[act_size - 1] = '\0';
+    }
+    if (tgt_out[0] == '\0')
+    {
+        strncpy(tgt_out, "floor", tgt_size - 1);
+        tgt_out[tgt_size - 1] = '\0';
+    }
+
+    return (sub_out[0] != '\0');
+}
 
 /* token-based intent core (Fase A): the former ParseIntent body
    over caller-provided canonical tokens. q_force/gen_force/comma_veto
@@ -1861,6 +2008,33 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         }
         if (!has_frozen_kw)
         {
+            /* Check physical consequence question */
+            if (n >= 4 &&
+                ((strcmp(toks[0], "que") == 0 &&
+                  (strcmp(toks[1], "pasa") == 0 || strcmp(toks[1], "ocurre") == 0 || strcmp(toks[1], "sucede") == 0) &&
+                  strcmp(toks[2], "si") == 0) ||
+                 (strcmp(toks[0], "what") == 0 &&
+                  strcmp(toks[1], "happens") == 0 &&
+                  (strcmp(toks[2], "if") == 0 || strcmp(toks[2], "when") == 0))))
+            {
+                if (ParseConsequenceCondition(&ch->dict, toks, 3, n,
+                                              p->a, sizeof(p->a),
+                                              p->cc, sizeof(p->cc),
+                                              p->b, sizeof(p->b)))
+                {
+                    p->intent = INT_QA_CONSEQUENCE;
+                    p->has_b = 1;
+                    p->ntoks = 0;
+                    for (uint32_t ti = 0; ti < n && ti < CHAT_TEXT_WORDS_MAX; ti++)
+                    {
+                        strncpy(p->toks[p->ntoks], toks[ti], CHAT_TOKEN_MAX - 1);
+                        p->toks[p->ntoks][CHAT_TOKEN_MAX - 1] = '\0';
+                        p->ntoks++;
+                    }
+                    return 1;
+                }
+            }
+
             char entity_out[CHAT_TOKEN_MAX];
             INTENT qa_int = DetectQuestionType(toks, n, 0,
                                                entity_out,
@@ -1870,6 +2044,7 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 p->intent = qa_int;
                 strncpy(p->a, entity_out, CHAT_TOKEN_MAX - 1);
                 p->a[CHAT_TOKEN_MAX - 1] = '\0';
+
                 p->ntoks = 0;
                 for (uint32_t ti = 0; ti < n && ti < CHAT_TEXT_WORDS_MAX; ti++)
                 {
@@ -4446,8 +4621,25 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         Cap(p->a, capE, sizeof(capE));
         int found = 0;
 
+        /* Try commonsense spatial location reasoning */
+        GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+        if (cs != NULL)
+        {
+            const char *canon = DictTranslate(&ch->dict, p->a);
+            const char *ent = canon ? canon : p->a;
+            CS_INFERENCE_PATH cs_path;
+            char cs_out[256];
+            if (CommonsenseQueryLocation(cs, ent, &cs_path, cs_out, sizeof(cs_out)))
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("%s\n", cs_out);
+                break;
+            }
+        }
+
         /* Try text search with location keywords */
         if (ch->ntfiles > 0 && ch->tgraph != NULL)
+
         {
             const char *words[8];
             uint32_t nw = 0;
@@ -4786,9 +4978,67 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         break;
     }
 
+    case INT_QA_CONSEQUENCE:
+    {
+        /* "what happens if X..." / "que pasa si X..." → physical causal consequence */
+        GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+        if (cs != NULL)
+        {
+            CS_INFERENCE_PATH path;
+            char cs_out[512];
+            const char *sub = p->a[0] ? p->a : "glass";
+            const char *act = p->cc[0] ? p->cc : "dropped on";
+            const char *tgt = p->b[0] ? p->b : "floor";
+
+            /* Check language from question tokens */
+            int is_es = 0;
+            for (uint32_t ti = 0; ti < p->ntoks; ti++)
+            {
+                if (strcmp(p->toks[ti], "que") == 0 || strcmp(p->toks[ti], "pasa") == 0 ||
+                    strcmp(p->toks[ti], "suelo") == 0 || strcmp(p->toks[ti], "cristal") == 0 ||
+                    strcmp(p->toks[ti], "vaso") == 0 || strcmp(p->toks[ti], "se") == 0)
+                {
+                    is_es = 1;
+                    break;
+                }
+            }
+
+            LANG_ID lang = is_es ? LANG_ES : LANG_EN;
+            if (CommonsenseQueryPhysicalConsequenceLang(cs, lang, sub, act, tgt, &path, cs_out, sizeof(cs_out)))
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("%s\n", cs_out);
+                break;
+            }
+        }
+        EMIT("No tengo constancia de las consecuencias fisicas de esa accion.\n");
+        break;
+    }
+
+    case INT_QA_AFFORDANCE:
+    {
+        GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+        if (cs != NULL)
+        {
+            const char *canon = DictTranslate(&ch->dict, p->a);
+            const char *ent = canon ? canon : p->a;
+            char cs_out[256];
+            const char *rel = p->b[0] ? p->b : "USED_FOR";
+            if (CommonsenseQueryAffordance(cs, ent, rel, cs_out, sizeof(cs_out)))
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("%s\n", cs_out);
+                break;
+            }
+        }
+        EMIT("No tengo constancia del uso de %s.\n", p->a);
+        break;
+    }
+
     default:
         EMIT("No entendi la pregunta.\n");
         break;
+
     }
 #undef EMIT
     if (size > 0)
@@ -5699,8 +5949,13 @@ static const char *IntentName(int intent)
         return "TEXT_START";
     case INT_UNLOAD:
         return "UNLOAD";
+    case INT_QA_CONSEQUENCE:
+        return "CONSEQUENCE";
+    case INT_QA_AFFORDANCE:
+        return "AFFORDANCE";
     default:
         return "NONE";
+
     }
 }
 

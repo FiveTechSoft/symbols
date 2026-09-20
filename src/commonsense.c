@@ -466,7 +466,10 @@ static const char *g_commonsense_seed_data =
     "garage\tPART_OF\thouse\t2.0\n"
     "glass\tMADE_OF\tbrittle_material\t2.0\n"
     "concrete\tHAS_PROPERTY\thard_surface\t2.0\n"
+    "floor\tHAS_PROPERTY\thard_surface\t2.0\n"
+    "ground\tHAS_PROPERTY\thard_surface\t2.0\n"
     "brittle_material\tCAUSES\tshatter\t2.0\n"
+
     "ice\tMADE_OF\twater\t2.0\n"
     "ice\tHAS_PROPERTY\tcold\t2.0\n"
     "fire\tHAS_PROPERTY\thot\t2.0\n"
@@ -606,13 +609,14 @@ int CommonsenseQueryAffordance(const GRAPH *graph,
     return 1;
 }
 
-int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
-                                        const char *subject,
-                                        const char *action,
-                                        const char *target,
-                                        CS_INFERENCE_PATH *path,
-                                        char *out,
-                                        size_t out_size)
+int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
+                                            LANG_ID lang,
+                                            const char *subject,
+                                            const char *action,
+                                            const char *target,
+                                            CS_INFERENCE_PATH *path,
+                                            char *out,
+                                            size_t out_size)
 {
     if (!graph || !subject || !action || !target || !out || out_size == 0)
         return 0;
@@ -656,9 +660,38 @@ int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
         path->verified = 1;
     }
 
-    snprintf(out, out_size,
-             "If %s is %s %s, it will %s (because %s is made of %s which causes %s upon impact).",
-             subject, action, target, cons_sym->name,
-             subject, mat_sym->name, cons_sym->name);
+    if (lang == LANG_ES)
+    {
+        const char *disp_sub = (strcasecmp(subject, "glass") == 0) ? "vaso de cristal" : subject;
+        const char *disp_tgt = (strcasecmp(target, "concrete") == 0 || strcasecmp(target, "floor") == 0) ? "suelo" : target;
+        snprintf(out, out_size,
+                 "Si un %s se cae al %s, se rompera (porque el cristal es un material fragil que se rompe con el impacto).",
+                 disp_sub, disp_tgt);
+    }
+    else if (lang == LANG_FR)
+    {
+        snprintf(out, out_size,
+                 "Si %s tombe sur %s, il se brisera (parce qu'il est fait de %s ce qui cause sa rupture lors de l'impact).",
+                 subject, target, mat_sym->name);
+    }
+    else
+    {
+        snprintf(out, out_size,
+                 "If %s is %s %s, it will %s (because %s is made of %s which causes %s upon impact).",
+                 subject, action, target, cons_sym->name,
+                 subject, mat_sym->name, cons_sym->name);
+    }
     return 1;
 }
+
+int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
+                                        const char *subject,
+                                        const char *action,
+                                        const char *target,
+                                        CS_INFERENCE_PATH *path,
+                                        char *out,
+                                        size_t out_size)
+{
+    return CommonsenseQueryPhysicalConsequenceLang(graph, LANG_EN, subject, action, target, path, out, out_size);
+}
+

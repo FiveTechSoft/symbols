@@ -80,7 +80,10 @@ typedef struct CHAT_
     METAGRAPH       mg;
     /* cross-lingual translation table (english-spanish.txt) */
     DICT            dict;
+    /* lazy commonsense & world knowledge graph */
+    GRAPH           *cs_graph;
 } CHAT;
+
 
 void ChatInit(CHAT *ch, const char *corpus_path);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);

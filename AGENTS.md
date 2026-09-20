@@ -89,6 +89,18 @@ Regla arquitectónica:
   4. **Pilar 4: Condicionamiento Pragmático, Perspectivas Epistémicas y Filtros de Persona** (`src/persona.c`, `include/persona.h`): Operador de proyección matemática $\Pi_{\text{style}} : \mathcal{G} \to \mathcal{G}_{\text{biased}}$ sobre el Meta-Grafo Reflexivo sin prompt injection estocástico. 6 perspectivas epistémicas (`neutral`, `architect`, `auditor`, `tutor`, `concise`, `socratic`), perfiles declarativos, umbrales epistémicos y abstención honesta en $0.58\ \mu\text{s}$/proyección (1.7M proj/s) en EN/ES/FR. Teorema formal de no-interferencia verificado empíricamente (`PersonaVerifyNonInterference`): $\text{Facts}(\Pi_P(Q)) \equiv \text{Facts}(Q)$ con 0 alucinaciones y fronteras fail-closed. Validado por `test_persona` (40/40 PASS).
   5. Resultado global CTest: 100% pruebas aprobadas (65 Passed, 9 Skipped por modelo Wikipedia opcional, 0 Failed de 74 tests totales). Validado por ejecución en `build-gcc`, 2026-09-20.
 
+## Integración Conversacional de Sentido Común y Causalidad Física (Fase 15)
+
+- Integración del grafo ontológico y causal de sentido común (Pilar 3) y realización multilingüe/persona (Pilares 2 y 4) en el despachador conversacional `chat.c`, `chat_clarify.c` y `chat_main.c`:
+  1. Nuevos intents estructurales de QA: `INT_QA_CONSEQUENCE` (causalidad física: "¿qué pasa si...", "what happens if...") e `INT_QA_AFFORDANCE` (usos y capacidades: "¿para qué sirve...", "what is ... used for").
+  2. Extracción composicional y cross-lingual de argumentos (sujeto, acción, superficie objetivo) asistida por el diccionario declarativo `data/english-spanish.txt` (`HARDCODING=0`).
+  3. Robustez de codificación en terminales multiplataforma: soporte para marcas interrogativas y caracteres acentuados en UTF-8, ISO-8859-1 (Latin-1) y CP850 (OEM Windows console) en `Split` y `FoldChar`.
+  4. Deducción ontológica cerrada: consulta "¿qué pasa si se cae un vaso de cristal al suelo?" resuelve directamente en RAM:
+     $$\text{glass} \xrightarrow{\text{MADE\_OF}} \text{brittle\_material} \xrightarrow{\text{CAUSES}} \text{shatter}$$
+     Generando: *"Si un vaso de cristal se cae al suelo, se rompera (porque el cristal es un material fragil que se rompe con el impacto)."*
+  5. Validado por ejecución directa en `chat_main.exe` con corpus textual activo y suite global CTest 74/74 PASS (65 Passed, 9 Skipped, 0 Failed), 2026-09-20.
+
+
 
 
 
