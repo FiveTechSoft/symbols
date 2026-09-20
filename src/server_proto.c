@@ -8,6 +8,7 @@
 #include "compat.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "agent_diagnose.h"
 
 int ServerJsonEscape(const char *in, char *out, size_t size)
 {
@@ -621,6 +622,61 @@ int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_
     return (int)count;
 }
 
+void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp)
+{
+    if (resp == NULL || resp->content[0] == '\0')
+        return;
+
+    /* 1. Check for JSON "exit_code": N, "returncode": N, or "code": N */
+    const char *ec = strstr(resp->content, "\"exit_code\"");
+    if (!ec) ec = strstr(resp->content, "\"returncode\"");
+    if (!ec) ec = strstr(resp->content, "\"code\"");
+    if (ec)
+    {
+        const char *col = strchr(ec, ':');
+        if (col)
+        {
+            col++;
+            while (*col == ' ' || *col == '\t') col++;
+            resp->has_exit_code = 1;
+            resp->exit_code = atoi(col);
+            if (resp->exit_code != 0)
+                resp->is_error = 1;
+        }
+    }
+
+    /* 2. Check for JSON "status": "error" or "status": "failed" */
+    const char *st = strstr(resp->content, "\"status\"");
+    if (st)
+    {
+        if (strstr(st, "\"error\"") || strstr(st, "\"failed\"") || strstr(st, "\"fail\""))
+            resp->is_error = 1;
+    }
+
+    /* 3. Run abductive compiler/linter diagnostic parser */
+    DIAGNOSTIC_REPORT diag;
+    memset(&diag, 0, sizeof(diag));
+    DiagnosticParseOutput(resp->content, &diag);
+    if (diag.error_count > 0)
+    {
+        resp->is_error = 1;
+    }
+
+    /* 4. Check for explicit build / test failure patterns */
+    if (strstr(resp->content, "FAILED") != NULL ||
+        strstr(resp->content, "BUILD FAILED") != NULL ||
+        strstr(resp->content, "Assertion failed") != NULL ||
+        strstr(resp->content, "No such file or directory") != NULL)
+    {
+        if (!strstr(resp->content, "0 failed") &&
+            !strstr(resp->content, "failures=0") &&
+            !strstr(resp->content, "0 tests failed"))
+        {
+            resp->is_error = 1;
+        }
+    }
+}
+
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
 {
     if (body == NULL || out == NULL)
@@ -693,6 +749,7 @@ int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
                         s++;
                     }
                     out->has_response = 1;
+                    ServerInspectToolResponse(out);
                     found = 1;
                     p = obj_end;
                     continue;

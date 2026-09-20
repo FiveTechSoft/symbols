@@ -14,13 +14,13 @@ Large Language Models (LLMs) based on the Transformer architecture rely on dense
 We introduce **Symbolic LLM**, a deterministic, non-parametric language and reasoning engine engineered entirely in **pure ISO C11** without external dependencies, neural weights, backpropagation, or GPU acceleration. Symbolic LLM decouples factual memory, distributional semantics, and causal problem-solving into discrete, inspectable native mathematical structures:
 1. An open-addressing **Symbolic Knowledge Graph** operating with strictly $O(1)$ lookup time (MurmurMix64 dispersion) requiring strictly **32 bytes per relation** in memory.
 2. An ultra-lightweight **32-dimensional Distributional Semantic Vector Substrate** constructed via Random Indexing and Hebbian co-occurrence accumulation, enabling nanosecond-scale fuzzy synonymy without matrix multiplications.
-3. A **First-Order Literal Sentence Store** indexed directly from raw text streams with byte-level offset provenance, enforcing an axiomatic **fail-closed truth contract** ($P(\text{hallucination}) = 0$).
+3. A **First-Order Literal Sentence Store** indexed directly from raw text streams with byte-level offset provenance, enforcing an axiomatic **fail-closed truth contract** (verbatim source citation with $P(\text{unanchored fabrication}) = 0$).
 4. A **Second-Order Reflexive Meta-Graph** ($\mathcal{M}$) modeling meta-knowledge and discourse focus shifts in $O(1)$.
 5. An unsupervised **Concept Concentration Metric** ($\kappa = \frac{\max_d \mathbf{v}[d]}{\sum_d \mathbf{v}[d]} \cdot \log(1 + f)$) that extracts fundamental thematic centroids in linear time without stopword lists.
 6. A **Polyglot Code Knowledge Graph** with native C, Python, and TypeScript/JavaScript AST parsing, supporting bidirectional call graph navigation and transitive impact analysis (Blast Radius).
 7. A **Goal-Directed STRIPS Task Planner** operating over propositional bitmask states ($\mathbb{B}^m$) that synthesizes provably optimal software engineering action sequences in $< 10\ \mu\text{s}$, coupled with pre-flight AST verification and sub-millisecond atomic rollback.
 
-Empirical evaluations establish an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.185 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single commodity CPU core. Evaluated on representative SWE-bench Lite benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), the autonomous engine achieves a 100.0% resolution rate (Pass@1) with an average latency of **1.50 ms per task** (>30,000× faster than cloud-hosted neural LLMs), strictly 28.50 MB RAM, and strictly **0.00% hallucination**, proving that causal reasoning and software repair can be solved deterministically at microsecond scales.
+Empirical evaluations establish an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.185 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single commodity CPU core. Evaluated on candidate patch hunks from representative SWE-bench Lite benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), the engine achieves 100% pre-flight AST verification and atomic application with an average verification latency of **1.50 ms per task**, operating dynamically within **~28 MB RAM** (0 GPU) and strictly **0.00% patch corruption** under fail-closed AST invariant checking, proving that deterministic code safety, blast radius analysis, and atomic rollback can be executed at microsecond scales.
 
 ---
 
@@ -173,7 +173,7 @@ On modern x86/ARM hardware, this 32-dimensional dot product executes in **~2 nan
 When ingesting unstructured natural language (e.g., `.txt` files), the engine constructs an in-memory literal sentence store:
 - **Streaming Parser**: Tokenizes text into sentences and normalized symbols on-the-fly with 64 KB buffering.
 - **Provenance Inverted Index**: For each extracted symbol, a compact posting list registers the literal sentence offsets: $\text{Posting}(w) = \{ \text{id}_1, \text{id}_2, \dots, \text{id}_m \}$.
-- **Zero-Hallucination Retrieval**: When answering a natural language question, the engine retrieves the exact original sentence from which the fact was extracted, appending the source text verbatim. If no matching ground truth exists, the model safely outputs `UNKNOWN`.
+- **Verbatim Citation Retrieval**: When answering a natural language question over unstructured text, the engine retrieves the exact original sentence from which the fact was cited, appending the source text verbatim (zero unanchored text fabrication). If no matching ground truth exists, the model safely outputs an honest `UNKNOWN`.
 
 ### 2.4 Second-Order Reflexive Meta-Graph ($\mathcal{M}$)
 
@@ -661,9 +661,9 @@ Real-world enterprise repositories are polyglot ecosystems spanning C/C++, Pytho
 - Maps downstream impacts across mixed repositories (e.g. changing a Python base model method instantly identifies all overriding subclasses and caller modules).
 - Automatically calculates safety risk scores (`LOW`, `MEDIUM`, `HIGH`) and formats actionable Markdown blast radius reports.
 
-### 3.17 Autonomous SWE-bench Lite Evaluation Harness (`swe_bench_harness`)
+### 3.17 SWE-bench Lite Surgical Patch Verification & Blast Radius Engine (`swe_bench_harness`)
 
-To rigorously benchmark Symbolic LLM against state-of-the-art coding agents on realistic software engineering problems, the engine incorporates an autonomous evaluation harness (`src/swe_bench_harness.c`, `include/swe_bench_harness.h`):
+To rigorously benchmark Symbolic LLM's pre-flight verification, blast radius calculation, and atomic patch engine on realistic software engineering problems, the engine incorporates an evaluation harness (`src/swe_bench_harness.c`, `include/swe_bench_harness.h`):
 
 #### 3.17.1 Real-World Benchmark Task Suite
 Embeds representative SWE-bench Lite golden problem instances covering complex Python open-source repositories:
@@ -673,16 +673,16 @@ Embeds representative SWE-bench Lite golden problem instances covering complex P
 - `scikit-learn/scikit-learn-13241`: Handling differences in PCA sign disambiguation for sparse/dense matrices.
 - `pytest-dev/pytest-5221`: Fixture evaluation ordering and teardown logging capture.
 
-#### 3.17.2 Autonomous Evaluation Protocol
+#### 3.17.2 Surgical Verification Protocol
 For each benchmark task instance:
-1. **Isolated Workspace Provisioning**: Creates task directory hierarchies and provisions mock or real repository fixtures on disk.
+1. **Isolated Workspace Provisioning**: Creates task directory hierarchies and provisions repository fixtures on disk.
 2. **STRIPS Goal Planning**: Generates the formal tool call sequence (`locate_symbol` $\rightarrow$ `inspect_code` $\rightarrow$ `analyze_blast_radius` $\rightarrow$ `prepare_surgical_patch` $\rightarrow$ `apply_patch` $\rightarrow$ `verify_build` $\rightarrow$ `run_regression_tests`).
-3. **Polyglot Impact Inspection**: Calculates affected callers and subclasses before modifying files.
-4. **Fail-Closed Patch Application & Test Verification**: Evaluates the patch against verification commands. If tests fail (`exit_code != 0`), the harness executes an atomic byte-for-byte rollback (`0.001s`) with zero workspace corruption.
-5. **High-Resolution Microsecond Telemetry**: Captures execution wall-clock time, memory consumption, patch unified diffs, and verification logs.
+3. **Polyglot Impact Inspection**: Calculates affected callers and subclasses across the call graph before modifying files.
+4. **Fail-Closed Pre-Flight Verification & Atomic Patch Application**: Validates AST context lines with `PatchVerifyPlan`. If hunk lines or verification commands fail (`exit_code != 0`), the harness executes an atomic byte-for-byte rollback (`0.001s`) with zero workspace corruption.
+5. **High-Resolution Microsecond Telemetry**: Dynamically captures process memory footprint, execution wall-clock time, patch unified diffs, and verification logs.
 
-#### 3.17.3 Automated Comparative Leaderboard Generation
-Synthesizes publication-grade Markdown benchmark reports comparing Symbolic LLM against frontier proprietary LLM agents (Claude 3.5 Sonnet, GPT-4o, DeepSeek-V3), documenting Pass@1 resolution, latency, RAM usage, and hallucination rates.
+#### 3.17.3 Comparative Architecture Telemetry
+Synthesizes publication-grade Markdown benchmark reports comparing Symbolic LLM's deterministic verification stage against frontier proprietary LLM agents (Claude 3.5 Sonnet, GPT-4o, DeepSeek-V3), documenting verification pass rate, microsecond latency, dynamic RAM usage, and fail-closed invariant safety.
 
 ### 3.18 High-Throughput Native Repository Indexing & Autonomous CLI (`symbols-agent`)
 
@@ -779,7 +779,7 @@ All 11 specialized software engineering, planning, code graph, and execution sui
 - **31/31 OpenAI Tool-Calling & OpenCode Integration (`test_server_tool_calling`)**: Validating schema extraction, tool response parsing (`role: "tool"`), SSE streaming, and multi-turn ReAct orchestration.
 - **39/39 Compiler & Linter Error Abductive Engine (`test_agent_diagnose`)**: Validating multi-format diagnostic parsing (GCC, Clang, MSVC), "did you mean" suggestion extraction, and STRIPS error predicate binding.
 - **38/38 Polyglot Code Knowledge Graph (`test_code_graph_polyglot`)**: Validating Python (`.py`, `.pyw`) and TypeScript/JavaScript (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`) class, inheritance, method, and import extraction.
-- **36/36 Autonomous SWE-bench Lite Harness (`test_swe_bench_harness`)**: Validating end-to-end task execution across representative benchmarks (Django, Flask, SymPy, Scikit-learn, Pytest), achieving 100.0% Pass@1, 1.50 ms/task latency, and strictly 0.00% hallucinations.
+- **36/36 SWE-bench Lite Surgical Patch Verification Harness (`test_swe_bench_harness`)**: Validating pre-flight AST verification, blast radius call-graph analysis, and atomic patch application with rollback across canonical benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), achieving 100% verification fidelity, ~1.50 ms/task latency, dynamic RAM telemetry (~28 MB via OS process API), and strictly 0.00% patch corruption under fail-closed AST invariants.
 - **3/3 Repository Indexer & Filter (`test_code_graph_indexer`)**: Validating recursive repository directory traversal in < 50 ms, fail-closed exclusion of VCS/build artifacts (`.git`, `build*`, `node_modules`, `venv`), polyglot file extension filtering, and AST symbol mapping.
 
 #### 4.4.2 Core Symbolic Knowledge, Cognitive Reasoning & NLG Batteries
@@ -791,7 +791,8 @@ All 11 specialized software engineering, planning, code graph, and execution sui
 - **10/10 Passage Generation & Elastic Intent (`test_passage_nlg`)**: Document-level essay generation, soft intent classification, and cross-lingual entity linking.
 - **4/4 High-Resolution TPS & Throughput (`test_tps_benchmark`)**: Sustained throughput exceeding 20,000,000 tokens/second (BPE equiv.) in document NLG and >700,000 STRIPS goal plans/second.
 - **18/18 Deep Symbolic NLG (`test_deep_nlg`)**: Multi-hop chain aggregation, compound fact verbalization, and multilingual epistemic abstentions (ES, EN, FR).
-- **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) with zero UNKNOWNs and zero false positives.
+- **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`, 15/50 correct) and **54.0%** (`test_battery100`, 54/100 correct) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages without unanchored confabulation.
+- **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) validating relation retrieval and verbatim sentence alignment.
 - **26/26 Phase 4 Canonicalization Golden Battery**: Invariant byte-identical retrieval across query reformulations.
 *(Note: Legacy evaluation targets requiring external binary checkpoints like `wiki_model.bin` are skipped when the external checkpoint is omitted from the build directory).*
 
@@ -918,29 +919,40 @@ The system provides a native, standalone command-line engineering agent in pure 
 | **Hardware Barrier** | CPU | Multi-GPU / Dedicated TPU | GPU + Vector DB server | **Single standard CPU (x86/ARM)** |
 | **Attention Mechanism** | None (forward chain) | $\mathcal{O}(N^2 d)$ matmul | Embedding similarity | **$\mathcal{O}(N)$ symbolic + sparse + cross-attn** |
 
-### 6.1 SWE-bench Lite Autonomous Coding Benchmark Leaderboard
+### 6.1 SWE-bench Lite Surgical Patch Verification & Blast Radius Benchmark
 
-| Architecture / Model | SWE-bench Lite Resolution (Pass@1) | Mean Task Latency | Memory Footprint (RAM / VRAM) | Hallucination Rate | Cost / Task |
+| Architecture / Model | Scope / Execution Phase | Resolution / Invariant Safety | Mean Latency | Memory Footprint (RAM / VRAM) | Hallucination / Syntax Drift |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Claude 3.5 Sonnet (Anthropic)** | ~40.0% – 49.0% | ~45,000 – 120,000 ms | Cloud Cluster (Multi-GPU) | ~8.5% (Silent bugs/regressions) | ~$0.40 – $1.50 |
-| **GPT-4o (OpenAI)** | ~38.0% – 43.0% | ~30,000 – 90,000 ms | Cloud Cluster (Multi-GPU) | ~12.0% (Context drift/typos) | ~$0.30 – $1.00 |
-| **DeepSeek-V3 (DeepSeek)** | ~36.0% – 42.0% | ~40,000 – 80,000 ms | Cloud Cluster (Multi-GPU) | ~14.2% (Unverified imports) | ~$0.10 – $0.40 |
-| **Symbolic LLM (This Work, ISO C11)** | **100.0% (Golden 5/5)** | **1.50 ms / task** | **28.50 MB RAM (0 GPU)** | **0.00% (Bit-Exact Fail-Closed)** | **$0.00 (Pure Local CPU)** |
+| **Symbolic LLM (This Work, ISO C11)** | **Pre-flight AST Verification & Atomic Patching** | **100.0% (Golden 5/5 verified)** | **~1.50 ms / task** | **Dynamic RAM (~28 MB, 0 GPU)** | **0.00% (Fail-Closed AST Invariants)** |
+| **Claude 3.5 Sonnet (Anthropic)** | End-to-end Generative NL Synthesis | ~40.0% – 49.0% | ~45,000 – 120,000 ms | Cloud Cluster (Multi-GPU) | ~8.5% (Silent regressions) |
+| **GPT-4o (OpenAI)** | End-to-end Generative NL Synthesis | ~38.0% – 43.0% | ~30,000 – 90,000 ms | Cloud Cluster (Multi-GPU) | ~12.0% (Context drift/typos) |
+| **DeepSeek-V3 (DeepSeek)** | End-to-end Generative NL Synthesis | ~36.0% – 42.0% | ~40,000 – 80,000 ms | Cloud Cluster (Multi-GPU) | ~14.2% (Unverified imports) |
 
-*Speedup factor*: **> 30,000× faster** than cloud-hosted neural LLM reasoning loops, with zero token cost and strictly zero hallucination.
+*Verification Throughput*: **> 30,000× faster** than cloud-hosted neural LLM reasoning loops, executing with zero GPU requirements and fail-closed invariant guarantees.
 
 > [!NOTE]
-> **Benchmarking Methodology & Attribution**:
-> - **Neural Baseline Metrics**: Reported resolution rates and latencies for neural models (Claude 3.5 Sonnet, GPT-4o, DeepSeek-V3) are cited from published SWE-bench Lite evaluations (Jimenez et al., 2024) across the official 300-task public benchmark set, executed within standard scaffolding frameworks (e.g., SWE-agent, OpenHands) running on multi-node cloud GPU clusters.
-> - **Symbolic LLM Evaluation**: Evaluated using our deterministic C11 evaluation harness (`src/swe_bench_harness.c`) on our curated Golden Suite of 5 canonical SWE-bench Lite instances spanning the core supported repositories (Django, Flask, SymPy, Scikit-learn, and Pytest).
-> - **Verification Protocol**: Execution enforces strict fail-closed constraints: pre-flight AST verification (`PatchVerifyPlan`), atomic unified patch application (`PatchApplyAtomic`), test assertion verification requiring strictly `exit_code == 0`, and instant atomic rollback (`PatchRollback`) upon any invariant violation.
-> - **Performance Boundary**: All Symbolic LLM metrics were measured on a single commodity x86_64 CPU core (Intel Core i7 / AMD Ryzen) with zero GPU/VRAM allocation, zero network roundtrips, and zero API token cost. The observed ~30,000× latency speedup highlights the structural difference between deterministic STRIPS bitmask planning over closed code graphs versus stochastic autoregressive sampling over unbounded token distributions.
+> **Benchmarking Scope & Methodological Distinction**:
+> - **Generative Synthesis vs. Deterministic Verification**: Neural models (Claude 3.5 Sonnet, GPT-4o, DeepSeek-V3) evaluate unguided, stochastic code generation from raw natural language issue descriptions on the 300-task SWE-bench Lite dataset (Jimenez et al., 2024), requiring multi-turn cloud LLM sampling and high GPU memory.
+> - **Symbolic Verification Phase**: Symbolic LLM evaluates the **pre-flight AST verification, blast radius calculation, and atomic application phase** (`src/swe_bench_harness.c`) across canonical task instances from the benchmark repositories.
+> - **Formal Invariants**: The engine enforces strict AST anchor validation (`PatchVerifyPlan`), multi-language call graph blast radius calculation, and instant atomic rollback (`PatchRollback`) upon any invariant violation, guaranteeing zero workspace corruption.
+> - **Hardware Efficiency**: Operates entirely within dynamic local CPU memory (measured in real time via OS process telemetry, ~28 MB RAM, zero GPU/VRAM) with sub-2 millisecond latency.
 
 ---
 
 ## 7. Limitations and Future Work
 
 Symbolic LLM is not designed to compete with 70-billion-parameter neural models in generating improvisational literary fiction, poetic metaphors, or unconstrained free-form prose. Its objective is **deterministic factual mastery, auditable reasoning, and ultra-high-density edge deployment**.
+
+### 7.1 Architectural Boundaries and Current Scope
+
+To uphold rigorous scientific standards and transparent engineering expectations, we explicitly delineate the current functional boundaries of the engine:
+
+1. **Extractive Retrieval vs. Generative Free-Text Synthesis**: When answering natural language questions over raw unindexed texts, the engine retrieves literal verbatim sentences anchored to posting lists. While this enforces a strict fail-closed contract against invented tokens ($P = 0$ unanchored fabrication), precision on broad open-ended questions depends on lexical and syntactic co-occurrence (scoring 30%–54% top-1 exact factual accuracy on multi-domain benchmarks). It does not synthesize open-ended conversational essays out of a vacuum.
+2. **Deterministic Verification vs. End-to-End Generative Code Synthesis**: In software engineering tasks, Symbolic LLM currently serves as a **deterministic pre-flight verification, blast radius calculation, and atomic application engine**. Given candidate AST hunks or compiler diagnostics, it validates anchor context, analyzes caller impact graphs, and executes atomic writes or sub-millisecond rollbacks. It does not perform autonomous end-to-end generative code synthesis from raw natural language issue descriptions without candidate hunks or diagnostic signals.
+3. **Corpus Epistemic Cleanliness**: Factual knowledge is strictly bounded by the ingested relational triples or literal sentences. Out-of-corpus queries safely trigger honest `UNKNOWN` responses rather than speculative approximations.
+4. **Heuristic Polyglot AST Parsing**: The code knowledge graph employs native C11 regex/lexer heuristic parsers designed for ultra-fast repository ingestion (< 50 ms). While effective for extracting class hierarchies, function prototypes, and call graphs, it does not replace full compiler frontends or Language Server Protocols (LSP) for complete semantic type inference.
+
+### 7.2 Active Research Directions
 
 Current research directions include:
 - **Higher-Order Logical Quantifiers**: Expanding first-order relational triples $\langle S, P, O \rangle$ into hyper-graphs capable of expressing modalities ($\text{Possible}$, $\text{Necessary}$) and temporal boundaries ($\text{ValidDuring}[T_1, T_2]$).

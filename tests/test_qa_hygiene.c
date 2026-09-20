@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     if (!f) { printf("FAIL: no puedo abrir %s\n", tsv_path); return 2; }
 
     MODEL *m = ModelLoad(model_path);
-    if (!m || !m->graph) { printf("FAIL: no model %s\n", model_path); fclose(f); return 2; }
+    if (!m || !m->graph) { printf("SKIP: no model %s\n", model_path); fclose(f); return 77; }
     GRAPH *graph = m->graph;
 
     char line[1024];

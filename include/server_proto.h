@@ -90,10 +90,16 @@ typedef struct
     char name[64];
     char content[8192];
     int  has_response;
+    int  has_exit_code;
+    int  exit_code;
+    int  is_error;
 } OPENAI_TOOL_RESPONSE;
 
 /* Extract list of function names declared in "tools": [...] array */
 int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_names);
+
+/* Inspect tool response content for exit codes, error statuses, and diagnostics */
+void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp);
 
 /* Extract the most recent {"role":"tool", ...} message from the body */
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out);

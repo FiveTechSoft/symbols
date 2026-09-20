@@ -63,6 +63,9 @@ target_include_directories(symbolic PUBLIC include)
 if(NOT MSVC)
     target_link_libraries(symbolic PUBLIC m)
 endif()
+if(WIN32)
+    target_link_libraries(symbolic PUBLIC psapi)
+endif()
 
 add_executable(sllm_cli src/main_cli.c)
 target_link_libraries(sllm_cli symbolic)
@@ -203,6 +206,19 @@ add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_mod
 add_executable(test_qa_layer tests/test_qa_layer.c)
 target_link_libraries(test_qa_layer symbolic)
 add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+set_tests_properties(
+    test_wiki_inference
+    test_eval_qa
+    test_eval_count
+    test_eval_negation
+    test_eval_default
+    test_eval_reverse
+    test_eval_conjunctive
+    test_eval_multihop
+    test_qa_hygiene
+    PROPERTIES SKIP_RETURN_CODE 77
+)
 
 # test_wiki_ingest / test_wikidata_ingest write to their own scratch files
 # (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the tracked

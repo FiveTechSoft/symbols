@@ -84,6 +84,8 @@ typedef struct CHAT_
 
 void ChatInit(CHAT *ch, const char *corpus_path);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);
+int ChatIsBinaryModel(const char *path);
+uint32_t ChatLoadModel(CHAT *ch, const char *path);
 void ChatHandle(CHAT *ch, const char *line);
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size);
 /* TEXT fast path for serving dispatchers (whole-line trial parse;

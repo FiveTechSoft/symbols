@@ -30,6 +30,7 @@
 #include "tool_contract.h"
 #include "c_rules.h"
 #include "qa_layer.h"
+#include "model.h"
 
 #define CHAT_MAX_TOKS 16
 
@@ -1811,7 +1812,23 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 strcmp(toks[fi], "descendiente") == 0 ||
                 strcmp(toks[fi], "descendants") == 0 ||
                 strcmp(toks[fi], "descendant") == 0 ||
-                strcmp(toks[fi], "descendientes") == 0;
+                strcmp(toks[fi], "descendientes") == 0 ||
+                /* spouse keywords */
+                strcmp(toks[fi], "esposa") == 0 ||
+                strcmp(toks[fi], "esposo") == 0 ||
+                strcmp(toks[fi], "wife") == 0 ||
+                strcmp(toks[fi], "husband") == 0 ||
+                /* sibling keywords */
+                strcmp(toks[fi], "hermano") == 0 ||
+                strcmp(toks[fi], "hermana") == 0 ||
+                strcmp(toks[fi], "brother") == 0 ||
+                strcmp(toks[fi], "sister") == 0 ||
+                /* ruler / king keywords */
+                strcmp(toks[fi], "rey") == 0 ||
+                strcmp(toks[fi], "reina") == 0 ||
+                strcmp(toks[fi], "king") == 0 ||
+                strcmp(toks[fi], "queen") == 0 ||
+                strcmp(toks[fi], "reigns") == 0;
         }
         if (!has_frozen_kw)
         {
@@ -5121,6 +5138,12 @@ static int ChatHandleMultiBuf(CHAT *ch, const QueryPlan *plan,
             if (ok)
             {
                 ApplyFocus(ch, &p);
+                if (strcmp(p.a, "he") == 0 || strcmp(p.a, "she") == 0 ||
+                    strcmp(p.a, "it") == 0 || strcmp(p.a, "el") == 0 ||
+                    strcmp(p.a, "ella") == 0)
+                {
+                    p.a[0] = '\0';
+                }
                 if (p.a[0] == '\0')
                 {
                     ok = 0;
@@ -5285,9 +5308,87 @@ static void ApplyFocus(CHAT *ch, PARSED *p)
     }
 }
 
+int ChatIsBinaryModel(const char *path)
+{
+    if (path == NULL || path[0] == '\0')
+        return 0;
+    size_t L = strlen(path);
+    if (L > 4 && (strcmp(path + L - 4, ".bin") == 0 || strcmp(path + L - 4, ".BIN") == 0))
+        return 1;
+    FILE *f = fopen(path, "rb");
+    if (f == NULL)
+        return 0;
+    uint32_t magic = 0;
+    size_t r = fread(&magic, sizeof(uint32_t), 1, f);
+    fclose(f);
+    return (r == 1 && magic == MODEL_MAGIC);
+}
+
+uint32_t ChatLoadModel(CHAT *ch, const char *path)
+{
+    if (ch == NULL || path == NULL || path[0] == '\0')
+        return 0;
+    MODEL *m = ModelLoad(path);
+    if (m == NULL)
+        return 0;
+    uint32_t learned = 0;
+    if (m->graph != NULL && m->graph->relations != NULL && m->graph->symbols != NULL)
+    {
+        uint32_t nrel = RelationCount(m->graph->relations);
+        for (uint32_t i = 0; i < nrel; i++)
+        {
+            const RELATION *r = RelationGet(m->graph->relations, i);
+            if (!r) continue;
+            const SYMBOL *s_sub = SymbolGet(m->graph->symbols, r->subject);
+            const SYMBOL *s_rel = SymbolGet(m->graph->symbols, r->relation);
+            const SYMBOL *s_obj = SymbolGet(m->graph->symbols, r->object);
+            if (!s_sub || !s_rel || !s_obj || !s_sub->name || !s_rel->name || !s_obj->name)
+                continue;
+            char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
+            ChatNormTok(s_sub->name, norm_s, sizeof(norm_s));
+            ChatNormTok(s_obj->name, norm_o, sizeof(norm_o));
+            if (strcmp(norm_s, norm_o) == 0)
+                continue;
+            char conn_buf[LEARN_MAX_LINE];
+            const char *conn = GenericRelToConn(s_rel->name, conn_buf, sizeof(conn_buf));
+            if (conn == NULL)
+            {
+                /* Fallback: try lowercase relation name as connective */
+                size_t rlen = strlen(s_rel->name);
+                if (rlen < sizeof(conn_buf))
+                {
+                    for (size_t k = 0; k < rlen; k++)
+                        conn_buf[k] = (char)tolower((unsigned char)s_rel->name[k]);
+                    conn_buf[rlen] = '\0';
+                    if (LearnerIsConnective(conn_buf))
+                        conn = conn_buf;
+                }
+            }
+            if (conn == NULL)
+                continue;
+            char sent[LEARN_MAX_LINE];
+            snprintf(sent, sizeof(sent), "%s %s %s", norm_s, conn, norm_o);
+            if (LearnerLearnLine(&ch->lr, sent))
+            {
+                KwdRecord(ch, s_rel->name, conn);
+                learned++;
+            }
+        }
+    }
+    if (learned > 0)
+    {
+        MetaDiscover(&ch->mk);
+        MetaRuleDiscover(&ch->mk);
+    }
+    ModelDestroy(m);
+    return learned;
+}
+
 static int IsTextFile(const char *path)
 {
     if (path == NULL || path[0] == '\0')
+        return 0;
+    if (ChatIsBinaryModel(path))
         return 0;
     size_t L = strlen(path);
     if (L > 4 && (strcmp(path + L - 4, ".txt") == 0 || strcmp(path + L - 4, ".TXT") == 0))
@@ -5312,6 +5413,10 @@ uint32_t ChatLoadCorpus(CHAT *ch, const char *path)
 {
     if (ch == NULL || path == NULL || path[0] == '\0')
         return 0;
+    if (ChatIsBinaryModel(path))
+    {
+        return ChatLoadModel(ch, path);
+    }
     if (IsTextFile(path))
     {
         if (TextSessionEnsure(ch) && ch->ntfiles < CHAT_TEXT_FILES_MAX)
@@ -5374,7 +5479,11 @@ void ChatInit(CHAT *ch, const char *corpus_path)
                 *(--end) = '\0';
             if (*p)
             {
-                if (IsTextFile(p))
+                if (ChatIsBinaryModel(p))
+                {
+                    total_facts += ChatLoadModel(ch, p);
+                }
+                else if (IsTextFile(p))
                 {
                     if (TextSessionEnsure(ch) && ch->ntfiles < CHAT_TEXT_FILES_MAX)
                     {

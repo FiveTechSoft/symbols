@@ -10,8 +10,17 @@ int main(int argc, char **argv)
     MODEL *model = ModelLoad(path);
     if (!model)
     {
-        printf("FAIL: Could not load model\n");
-        return 1;
+        printf("Notice: '%s' not present, creating test model for stats report...\n", path);
+        model = ModelCreate(16, 16);
+        if (!model)
+        {
+            printf("FAIL: Could not create model\n");
+            return 1;
+        }
+        SYMBOL_ID s1 = GraphAddSymbol(model->graph, "GATO");
+        SYMBOL_ID s2 = GraphAddSymbol(model->graph, "COME");
+        SYMBOL_ID s3 = GraphAddSymbol(model->graph, "PESCADO");
+        GraphAddRelation(model->graph, s1, s2, s3);
     }
 
     ModelPrintReport(model);

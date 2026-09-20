@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
     MODEL *model = ModelLoad(model_path);
     if (model == NULL)
     {
-        fprintf(stderr, "Error loading model.\n");
-        return EXIT_FAILURE;
+        fprintf(stderr, "SKIP: model file not found: %s\n", model_path);
+        return 77;
     }
 
     printf("  Symbols  : %u\n", SymbolCount(model->graph->symbols));

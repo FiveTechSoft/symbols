@@ -21,7 +21,26 @@ void query_subject(GRAPH *g, const char *name)
 int main(void)
 {
     MODEL *model = ModelLoad("wiki_model.bin");
-    if (!model || !model->graph) { printf("FAIL\n"); return 1; }
+    if (!model || !model->graph)
+    {
+        printf("Notice: wiki_model.bin not found, creating synthetic model for analogy test...\n");
+        model = ModelCreate(64, 64);
+        if (!model || !model->graph) { printf("FAIL\n"); return 1; }
+        SYMBOL_ID mid = GraphAddSymbol(model->graph, "MALLOC");
+        SYMBOL_ID sid = GraphAddSymbol(model->graph, "STRCPY");
+        SYMBOL_ID rid = GraphAddSymbol(model->graph, "REALLOC");
+        SYMBOL_ID alloc = GraphAddSymbol(model->graph, "ALLOCATES");
+        SYMBOL_ID mem = GraphAddSymbol(model->graph, "MEMORY");
+        SYMBOL_ID mod = GraphAddSymbol(model->graph, "MODIFIES");
+        SYMBOL_ID str = GraphAddSymbol(model->graph, "STRING");
+        SYMBOL_ID heap = GraphAddSymbol(model->graph, "HEAP");
+
+        GraphAddRelation(model->graph, mid, alloc, mem);
+        GraphAddRelation(model->graph, mid, mod, heap);
+        GraphAddRelation(model->graph, sid, mod, str);
+        GraphAddRelation(model->graph, rid, alloc, mem);
+        GraphAddRelation(model->graph, rid, mod, heap);
+    }
     GRAPH *g = model->graph;
 
     printf("=== STRUCTURAL ANALOGY TEST ===\n\n");

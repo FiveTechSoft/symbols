@@ -134,6 +134,59 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodingTask("What areas do you know?") == 0, "Introspection query is not coding task");
 }
 
+/* 6. Test Tool Error and Diagnostic Validation */
+static void test_tool_error_validation(void)
+{
+    printf("\n=== Test 6: Tool Error and Exit Code Validation ===\n");
+    
+    /* 6a: Tool returns non-zero exit code in JSON */
+    const char *err_payload = 
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_002\",\"name\":\"execute_command\","
+        "\"content\":\"{\\\"exit_code\\\":1,\\\"stderr\\\":\\\"Build failed\\\"}\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp1;
+    int ok1 = ServerExtractLastToolResponse(err_payload, &resp1);
+    TEST_ASSERT(ok1 == 1, "Extracted tool response with exit code 1");
+    TEST_ASSERT(resp1.has_exit_code == 1, "Detected has_exit_code flag");
+    TEST_ASSERT(resp1.exit_code == 1, "Extracted exit_code == 1");
+    TEST_ASSERT(resp1.is_error == 1, "Flagged is_error == 1 due to exit_code != 0");
+
+    /* 6b: Tool returns compiler error diagnostics */
+    const char *diag_payload = 
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_003\",\"name\":\"execute_command\","
+        "\"content\":\"src/main.c:42:10: error: 'undefined_var' undeclared\\nmake: *** Error 1\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp2;
+    int ok2 = ServerExtractLastToolResponse(diag_payload, &resp2);
+    TEST_ASSERT(ok2 == 1, "Extracted compiler error diagnostic");
+    TEST_ASSERT(resp2.is_error == 1, "Flagged is_error == 1 due to compiler diagnostic");
+
+    /* 6c: Tool returns clean success */
+    const char *ok_payload = 
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_004\",\"name\":\"execute_command\","
+        "\"content\":\"{\\\"exit_code\\\":0,\\\"status\\\":\\\"ok\\\"}\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp3;
+    int ok3 = ServerExtractLastToolResponse(ok_payload, &resp3);
+    TEST_ASSERT(ok3 == 1, "Extracted success response");
+    TEST_ASSERT(resp3.has_exit_code == 1, "Detected has_exit_code == 1");
+    TEST_ASSERT(resp3.exit_code == 0, "Extracted exit_code == 0");
+    TEST_ASSERT(resp3.is_error == 0, "is_error == 0 for clean exit");
+}
+
+/* 7. Test Binary Model Detection in Chat Layer */
+static void test_binary_model_support(void)
+{
+    printf("\n=== Test 7: Binary Model Detection in Chat Layer ===\n");
+    TEST_ASSERT(ChatIsBinaryModel("wiki_model.bin") == 1, "Detects 'wiki_model.bin' as binary model");
+    TEST_ASSERT(ChatIsBinaryModel("data/texts/bible.txt") == 0, "'bible.txt' is not binary model");
+    TEST_ASSERT(ChatIsBinaryModel("data/corpus.tsv") == 0, "'corpus.tsv' is not binary model");
+    TEST_ASSERT(ChatIsBinaryModel(NULL) == 0, "NULL path safely returns 0");
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -145,6 +198,8 @@ int main(void)
     test_tool_call_response_building();
     test_tool_call_streaming_response();
     test_coding_task_intent();
+    test_tool_error_validation();
+    test_binary_model_support();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

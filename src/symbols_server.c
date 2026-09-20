@@ -18,6 +18,8 @@
 #include "server_proto.h"
 #include "agent_planner.h"
 #include "agent_runner.h"
+#include "agent_diagnose.h"
+#include "model.h"
 
 #define SERVER_PORT_DEFAULT 8099
 #define SERVER_HDR_MAX 16384
@@ -194,11 +196,18 @@ typedef struct
     STRIPS_PLAN current_plan;
     uint32_t    current_step_idx;
     char        current_issue[256];
+
+    /* Verification telemetry & self-healing state */
+    int               had_error;
+    int               replan_count;
+    DIAGNOSTIC_REPORT last_diagnostic;
+    char              last_error_summary[512];
 } ServerSession;
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
 static uint32_t g_num_sessions = 0;
 static CODE_GRAPH *g_server_code_graph = NULL;
+static MODEL *g_server_model = NULL;
 
 static const char *FindFileForIssue(const char *issue)
 {
@@ -345,6 +354,75 @@ static void HandleCompletions(socket_t s, const char *body,
     if (has_tool_resp && sess->agent_active)
     {
         sess->last_active = time(NULL);
+
+        /* Inspect tool output and diagnose compiler/shell errors */
+        DIAGNOSTIC_REPORT diag;
+        memset(&diag, 0, sizeof(diag));
+        DiagnosticParseOutput(tool_resp.content, &diag);
+
+        int step_failed = 0;
+        if (tool_resp.is_error || diag.error_count > 0)
+        {
+            step_failed = 1;
+            sess->had_error = 1;
+            sess->last_diagnostic = diag;
+            if (diag.error_count > 0)
+            {
+                snprintf(sess->last_error_summary, sizeof(sess->last_error_summary),
+                         "%u compiler error(s): %.120s (%.64s:%u)",
+                         diag.error_count, diag.items[0].raw_message,
+                         diag.items[0].file, diag.items[0].line);
+            }
+            else if (tool_resp.has_exit_code)
+            {
+                snprintf(sess->last_error_summary, sizeof(sess->last_error_summary),
+                         "Command exited with non-zero status %d", tool_resp.exit_code);
+            }
+            else
+            {
+                snprintf(sess->last_error_summary, sizeof(sess->last_error_summary),
+                         "Step execution reported failure");
+            }
+        }
+
+        /* If error occurred, attempt abductive dynamic replanning */
+        if (step_failed && sess->replan_count < 2)
+        {
+            sess->replan_count++;
+            AGENT_PLANNER planner;
+            AgentPlannerInit(&planner);
+            const char *focus_sym = diag.root_symbol[0] ? diag.root_symbol :
+                                   (diag.root_file[0] ? diag.root_file : sess->current_issue);
+            int ok_replan = AgentPlannerReplanOnError(&planner, &sess->current_plan, focus_sym);
+            if (ok_replan && sess->current_plan.step_count > 0)
+            {
+                sess->current_step_idx = 0;
+                sess->had_error = 0; /* Reset for curative retry */
+                const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[0].op;
+                OPENAI_TOOL_CALLS tc;
+                FormatOperatorToolCall(next_op, sess->current_issue, ++g_seq, &tc);
+
+                char thought[256];
+                snprintf(thought, sizeof(thought),
+                         "Detected error (%s). Re-planning dynamic STRIPS remedy for '%s'.",
+                         sess->last_error_summary, focus_sym);
+
+                if (ServerWantsStream(body))
+                {
+                    char sse[16384];
+                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc, sse, sizeof(sse));
+                    SendRaw(s, 200, "OK", "text/event-stream", sse);
+                }
+                else
+                {
+                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
+                                                thought, resp, sizeof(resp));
+                    SendJson(s, 200, "OK", resp);
+                }
+                return;
+            }
+        }
+
         sess->current_step_idx++;
 
         if (sess->current_step_idx < sess->current_plan.step_count)
@@ -370,16 +448,31 @@ static void HandleCompletions(socket_t s, const char *body,
         }
         else
         {
-            /* STRIPS plan completed successfully: Emit final PR report */
+            /* STRIPS plan reached end: verify whether execution truly succeeded or failed */
             sess->agent_active = 0;
-            snprintf(content, sizeof(content),
-                     "### Autonomous Coding Task Completed\n\n"
-                     "All %u steps of the STRIPS plan for issue '%s' have been executed.\n"
-                     "- **Status**: 100%% Verified\n"
-                     "- **Regressions**: 0\n"
-                     "- **Build**: PASS\n\n"
-                     "The patch is applied and verified against the codebase.",
-                     sess->current_plan.step_count, sess->current_issue);
+            if (sess->had_error)
+            {
+                snprintf(content, sizeof(content),
+                         "### Autonomous Coding Task Unresolved / Verification Failed\n\n"
+                         "The STRIPS plan for issue '%s' completed execution, but verification failed.\n"
+                         "- **Status**: FAILED\n"
+                         "- **Build / Test**: FAIL\n"
+                         "- **Failure Cause**: %s\n\n"
+                         "Repository changes have not been certified. Review diagnostics above.",
+                         sess->current_issue,
+                         sess->last_error_summary[0] ? sess->last_error_summary : "Errors reported during tool execution");
+            }
+            else
+            {
+                snprintf(content, sizeof(content),
+                         "### Autonomous Coding Task Completed\n\n"
+                         "All %u steps of the STRIPS plan for issue '%s' have been executed.\n"
+                         "- **Status**: 100%% Verified\n"
+                         "- **Regressions**: 0\n"
+                         "- **Build**: PASS\n\n"
+                         "The patch is applied and verified against the codebase.",
+                         sess->current_plan.step_count, sess->current_issue);
+            }
 
             if (ServerWantsStream(body))
             {
@@ -403,6 +496,50 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    /* Check for /save and /load conversational commands */
+    if (strncmp(query, "/save ", 6) == 0)
+    {
+        const char *path = query + 6;
+        while (*path == ' ') path++;
+        if (g_server_model != NULL && ModelSave(g_server_model, path))
+            snprintf(content, sizeof(content), "Model saved to '%s'.", path);
+        else
+            snprintf(content, sizeof(content), "Error saving model to '%s'.", path);
+
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    if (strncmp(query, "/load ", 6) == 0)
+    {
+        const char *path = query + 6;
+        while (*path == ' ') path++;
+        if (ChatIsBinaryModel(path))
+        {
+            MODEL *new_m = ModelLoad(path);
+            if (new_m != NULL)
+            {
+                if (g_server_model != NULL) ModelDestroy(g_server_model);
+                g_server_model = new_m;
+                ChatInit(&g_session, path);
+                snprintf(content, sizeof(content), "Binary model loaded successfully from '%s'.", path);
+            }
+            else
+            {
+                snprintf(content, sizeof(content), "Failed to load binary model from '%s'.", path);
+            }
+        }
+        else
+        {
+            ChatInit(&g_session, path);
+            snprintf(content, sizeof(content), "Corpus loaded from '%s'.", path);
+        }
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
     char declared_tools[8][64];
     int num_declared = ServerExtractToolsDeclared(body, declared_tools, 8);
     int is_coding = ServerIsCodingTask(query);
@@ -412,6 +549,10 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         sess->agent_active = 1;
         sess->current_step_idx = 0;
+        sess->had_error = 0;
+        sess->replan_count = 0;
+        sess->last_error_summary[0] = '\0';
+        memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
 
         AGENT_PLANNER planner;
@@ -445,6 +586,10 @@ static void HandleCompletions(socket_t s, const char *body,
 
     if (!g_session_ready)
     {
+        if (ChatIsBinaryModel(corpus) && g_server_model == NULL)
+        {
+            g_server_model = ModelLoad(corpus);
+        }
         ChatInit(&g_session, corpus);
         g_session_ready = 1;
     }
@@ -546,6 +691,34 @@ static void HandleCompletions(socket_t s, const char *body,
             status, latency_ms);
 }
 
+static int ReadHttpBody(socket_t s, const char *hdr, size_t hlen,
+                        long content_len, char *body, size_t body_max)
+{
+    if (content_len < 0 || (size_t)content_len >= body_max)
+        return 0;
+
+    const char *bstart = strstr(hdr, "\r\n\r\n");
+    if (!bstart)
+        return 0;
+    bstart += 4;
+
+    size_t hbody = hlen - (size_t)(bstart - hdr);
+    if (hbody > (size_t)content_len)
+        hbody = (size_t)content_len;
+    memcpy(body, bstart, hbody);
+    size_t got = hbody;
+    while (got < (size_t)content_len)
+    {
+        int rc = recv(s, body + got,
+                      (int)((size_t)content_len - got), 0);
+        if (rc <= 0)
+            return 0;
+        got += (size_t)rc;
+    }
+    body[content_len] = '\0';
+    return 1;
+}
+
 static void HandleClient(socket_t s, const char *corpus)
 {
     char hdr[SERVER_HDR_MAX + 1];
@@ -572,6 +745,11 @@ static void HandleClient(socket_t s, const char *corpus)
     method[0] = '\0';
     path[0] = '\0';
     sscanf(hdr, "%15s %255s", method, path);
+
+    char *cl = strstr(hdr, "Content-Length:");
+    if (cl != NULL)
+        content_len = strtol(cl + 15, NULL, 10);
+
     if (strcmp(method, "GET") == 0 &&
         strcmp(path, "/v1/models") == 0)
     {
@@ -581,35 +759,127 @@ static void HandleClient(socket_t s, const char *corpus)
         return;
     }
     if (strcmp(method, "POST") == 0 &&
+        (strcmp(path, "/v1/model/load") == 0 || strcmp(path, "/v1/models/load") == 0))
+    {
+        static char body[SERVER_BODY_MAX + 1];
+        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
+        {
+            SendError(s, 400, "Bad Request", "bad content length or body");
+            return;
+        }
+        char target_path[512] = {0};
+        const char *p = strstr(body, "\"path\"");
+        if (p)
+        {
+            const char *col = strchr(p, ':');
+            if (col)
+            {
+                col++;
+                while (*col == ' ' || *col == '\t' || *col == '"') col++;
+                const char *end = col;
+                while (*end != '\0' && *end != '"' && *end != '}' && *end != ',' && *end != '\r' && *end != '\n') end++;
+                size_t len = (size_t)(end - col);
+                if (len >= sizeof(target_path)) len = sizeof(target_path) - 1;
+                strncpy(target_path, col, len);
+                target_path[len] = '\0';
+            }
+        }
+        if (target_path[0] == '\0')
+        {
+            SendError(s, 400, "Bad Request", "missing 'path' parameter");
+            return;
+        }
+        if (ChatIsBinaryModel(target_path))
+        {
+            MODEL *new_m = ModelLoad(target_path);
+            if (new_m == NULL)
+            {
+                SendError(s, 500, "Internal Error", "failed to load binary model");
+                return;
+            }
+            if (g_server_model != NULL) ModelDestroy(g_server_model);
+            g_server_model = new_m;
+            ChatInit(&g_session, target_path);
+            g_session_ready = 1;
+            char resp_buf[512];
+            snprintf(resp_buf, sizeof(resp_buf),
+                     "{\"status\":\"ok\",\"format\":\"binary_v2\",\"path\":\"%s\","
+                     "\"symbols\":%u,\"relations\":%u}",
+                     target_path,
+                     SymbolCount(g_server_model->graph->symbols),
+                     RelationCount(g_server_model->graph->relations));
+            SendJson(s, 200, "OK", resp_buf);
+            return;
+        }
+        else
+        {
+            ChatInit(&g_session, target_path);
+            g_session_ready = 1;
+            char resp_buf[512];
+            snprintf(resp_buf, sizeof(resp_buf),
+                     "{\"status\":\"ok\",\"format\":\"corpus_text\",\"path\":\"%s\"}",
+                     target_path);
+            SendJson(s, 200, "OK", resp_buf);
+            return;
+        }
+    }
+    if (strcmp(method, "POST") == 0 &&
+        (strcmp(path, "/v1/model/save") == 0 || strcmp(path, "/v1/models/save") == 0))
+    {
+        static char body[SERVER_BODY_MAX + 1];
+        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
+        {
+            SendError(s, 400, "Bad Request", "bad content length or body");
+            return;
+        }
+        char target_path[512] = {0};
+        const char *p = strstr(body, "\"path\"");
+        if (p)
+        {
+            const char *col = strchr(p, ':');
+            if (col)
+            {
+                col++;
+                while (*col == ' ' || *col == '\t' || *col == '"') col++;
+                const char *end = col;
+                while (*end != '\0' && *end != '"' && *end != '}' && *end != ',' && *end != '\r' && *end != '\n') end++;
+                size_t len = (size_t)(end - col);
+                if (len >= sizeof(target_path)) len = sizeof(target_path) - 1;
+                strncpy(target_path, col, len);
+                target_path[len] = '\0';
+            }
+        }
+        if (target_path[0] == '\0')
+        {
+            SendError(s, 400, "Bad Request", "missing 'path' parameter");
+            return;
+        }
+        if (g_server_model == NULL)
+        {
+            SendError(s, 400, "Bad Request", "no binary model loaded in memory to save");
+            return;
+        }
+        if (!ModelSave(g_server_model, target_path))
+        {
+            SendError(s, 500, "Internal Error", "failed to save binary model");
+            return;
+        }
+        char resp_buf[512];
+        snprintf(resp_buf, sizeof(resp_buf),
+                 "{\"status\":\"ok\",\"format\":\"binary_v2\",\"path\":\"%s\"}",
+                 target_path);
+        SendJson(s, 200, "OK", resp_buf);
+        return;
+    }
+    if (strcmp(method, "POST") == 0 &&
         strcmp(path, "/v1/chat/completions") == 0)
     {
         static char body[SERVER_BODY_MAX + 1];
-        const char *bstart;
-        char *cl;
-        size_t hbody, got;
-        cl = strstr(hdr, "Content-Length:");
-        if (cl != NULL)
-            content_len = strtol(cl + 15, NULL, 10);
-        if (content_len < 0 || content_len > SERVER_BODY_MAX)
+        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
         {
             SendError(s, 400, "Bad Request", "bad content length");
             return;
         }
-        bstart = strstr(hdr, "\r\n\r\n") + 4;
-        hbody = hlen - (size_t)(bstart - hdr);
-        if (hbody > (size_t)content_len)
-            hbody = (size_t)content_len;
-        memcpy(body, bstart, hbody);
-        got = hbody;
-        while (got < (size_t)content_len)
-        {
-            rc = recv(s, body + got,
-                      (int)((size_t)content_len - got), 0);
-            if (rc <= 0)
-                return;
-            got += (size_t)rc;
-        }
-        body[content_len] = '\0';
         HandleCompletions(s, body, corpus);
         return;
     }
@@ -623,10 +893,31 @@ int main(int argc, char **argv)
     int port = SERVER_PORT_DEFAULT;
     char corpus[1024];
     corpus[0] = '\0';
-    if (argc > 1)
+    char model_path[1024];
+    model_path[0] = '\0';
+
+    if (argc > 1 && argv[1][0] != '-')
         port = atoi(argv[1]);
     if (port <= 0 || port > 65535)
         port = SERVER_PORT_DEFAULT;
+
+    /* Check for explicit --model / -m flags */
+    const char *env_model = getenv("SYMBOLS_MODEL");
+    if (env_model != NULL && env_model[0] != '\0')
+    {
+        strncpy(model_path, env_model, sizeof(model_path) - 1);
+        model_path[sizeof(model_path) - 1] = '\0';
+    }
+    for (int a = 1; a < argc; a++)
+    {
+        if ((strcmp(argv[a], "--model") == 0 || strcmp(argv[a], "-m") == 0) && a + 1 < argc)
+        {
+            strncpy(model_path, argv[a + 1], sizeof(model_path) - 1);
+            model_path[sizeof(model_path) - 1] = '\0';
+            a++;
+        }
+    }
+
     char repo_dir[1024];
     repo_dir[0] = '\0';
     const char *env_repo = getenv("SYMBOLS_REPO");
@@ -635,7 +926,7 @@ int main(int argc, char **argv)
         strncpy(repo_dir, env_repo, sizeof(repo_dir) - 1);
         repo_dir[sizeof(repo_dir) - 1] = '\0';
     }
-    else if (argc > 2)
+    else if (argc > 2 && argv[2][0] != '-')
     {
 #ifdef _WIN32
         DWORD attr = GetFileAttributesA(argv[2]);
@@ -668,12 +959,17 @@ int main(int argc, char **argv)
     }
 
     const char *env_corpus = getenv("SYMBOLS_CORPUS");
-    if (env_corpus != NULL && env_corpus[0] != '\0')
+    if (model_path[0] != '\0')
+    {
+        strncpy(corpus, model_path, sizeof(corpus) - 1);
+        corpus[sizeof(corpus) - 1] = '\0';
+    }
+    else if (env_corpus != NULL && env_corpus[0] != '\0')
     {
         strncpy(corpus, env_corpus, sizeof(corpus) - 1);
         corpus[sizeof(corpus) - 1] = '\0';
     }
-    else if (argc > 2 && repo_dir[0] == '\0')
+    else if (argc > 2 && repo_dir[0] == '\0' && argv[2][0] != '-')
     {
         strncpy(corpus, argv[2], sizeof(corpus) - 1);
         corpus[sizeof(corpus) - 1] = '\0';
@@ -682,6 +978,7 @@ int main(int argc, char **argv)
     {
         /* CWD layout first, then exe-relative (build-* / dirs) */
         static const char *cand_paths[] = {
+            "wiki_model.bin",
             "data/texts/bible.txt",
             "data/texts/jung.txt",
             "data/texts/corpus.txt",
@@ -700,7 +997,7 @@ int main(int argc, char **argv)
         corpus[0] = '\0';
         for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)
         {
-            probe = fopen(cand_paths[i], "r");
+            probe = fopen(cand_paths[i], "rb");
             if (probe != NULL)
             {
                 fclose(probe);
@@ -719,7 +1016,7 @@ int main(int argc, char **argv)
                 for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)
                 {
                     snprintf(corpus, sizeof(corpus), "%s/../%s", exedir, cand_paths[i]);
-                    probe = fopen(corpus, "r");
+                    probe = fopen(corpus, "rb");
                     if (probe != NULL)
                     {
                         fclose(probe);
@@ -738,13 +1035,31 @@ int main(int argc, char **argv)
             else
             {
                 fprintf(stderr,
-                        "corpus not found (tried data/texts/*.txt and "
+                        "corpus not found (tried wiki_model.bin, data/texts/*.txt and "
                         "data/corpus.*); refusing to serve an empty "
                         "model\n");
                 return 1;
             }
         }
     }
+
+    /* Initialize binary model if path is a binary model */
+    if (ChatIsBinaryModel(corpus))
+    {
+        g_server_model = ModelLoad(corpus);
+        if (g_server_model != NULL)
+        {
+            fprintf(stderr, "[symbols-server] Loaded binary model from '%s' (%u symbols, %u relations)\n",
+                    corpus,
+                    SymbolCount(g_server_model->graph->symbols),
+                    RelationCount(g_server_model->graph->relations));
+        }
+        else
+        {
+            fprintf(stderr, "[symbols-server] Warning: failed to load binary model '%s'\n", corpus);
+        }
+    }
+
     SOCKET_INIT();
     ls = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (!IS_VALID_SOCKET(ls))
