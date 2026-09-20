@@ -9,6 +9,16 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Unreleased] - 2026-09-21
 
 ### Añadido
+- **Saludos Conversacionales y Resolución de Identidad (`ServerIsGreeting`, `ServerAnswerGreeting`, `SelfAnswer`)**:
+  - Detección precisa de intenciones de saludo y cortesía (`hola`, `hello`, `hi`, `buenos dias`, `que tal`) y preguntas de identidad (`quien eres`, `who are you`, `que sabes hacer`).
+  - Emisión de respuesta inmediata de copiloto sin secuestro por búsqueda textual sobre el corpus de fondo ni distancias Levenshtein espurias (p. ej. `hola` asimilado a `hold` del texto bíblico).
+  - Modulación pragmática según la persona activa (`PERSONA_PIRATE_QUANTUM`, `PERSONA_NEUTRAL`) y soporte multilingüe (español / inglés).
+  - Priorización de `SelfAnswer` en `ChatHandleToBuf` e incorporación de guardia `IsGreetingTok` en `ParseIntentToks`.
+  - Fallback compilado `LoadCompiledSelf()` con 20 disparadores canónicos y persistencia declarativa en `data/agentic/self.tsv`.
+
+---
+
+## [Phase 21] - 2026-09-21
 - **Síntesis Directa de Código Algorítmico (`ServerIsCodeSynthesisTask`, `ServerSynthesizeCode`)**:
   - Clasificación de peticiones de síntesis de algoritmos y funciones en lenguaje C (p. ej. `escribe en C la funcion de fibonacci`, `write a function to calculate factorial`, `invertir cadena`, `busqueda binaria`).
   - Generación directa de código C11 idiomático formateado en bloques Markdown con explicaciones de complejidad temporal/espacial y verificaciones de desbordamiento, completando la respuesta con `finish_reason: "stop"`.

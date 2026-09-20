@@ -49,6 +49,40 @@ static const FixturePersonRow COMPILED_PERSON[] = {
     {"jesse", "nacio en Bethlehem"},
 };
 
+static const char COMPILED_SELF_SCOPE[] =
+    "Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.";
+
+static const char COMPILED_SELF_GREET[] =
+    "¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?";
+
+typedef struct {
+    const char *trigger;
+    const char *reply;
+} SelfTriggerPair;
+
+static const SelfTriggerPair COMPILED_SELF_TRIG[] = {
+    {"quien eres", "scope"},
+    {"quien eres tu", "scope"},
+    {"who are you", "scope"},
+    {"what are you", "scope"},
+    {"que eres", "scope"},
+    {"que sabes hacer", "scope"},
+    {"what can you do", "scope"},
+    {"que sabes", "scope"},
+    {"que puedo preguntarte", "scope"},
+    {"hola", "greeting"},
+    {"hello", "greeting"},
+    {"hi", "greeting"},
+    {"hey", "greeting"},
+    {"buenos dias", "greeting"},
+    {"buenas tardes", "greeting"},
+    {"buenas noches", "greeting"},
+    {"buenas", "greeting"},
+    {"que tal", "greeting"},
+    {"como estas", "greeting"},
+    {"how are you", "greeting"},
+};
+
 static ShellAllowRow g_shell[TOOLCFG_SHELL_MAX];
 static uint32_t g_nshell = 0;
 static ToolContractRow g_contract[TOOLCFG_CONTRACT_MAX];
@@ -65,6 +99,26 @@ static char g_self_trig[TOOLCFG_SELF_TRIG_MAX][64];
 static char g_self_reply[TOOLCFG_SELF_TRIG_MAX][16];
 static uint32_t g_ntrig = 0;
 static int g_tool_init_done = 0;
+
+static void LoadCompiledSelf(void)
+{
+    strncpy(g_self_scope, COMPILED_SELF_SCOPE, sizeof(g_self_scope) - 1);
+    g_self_scope[sizeof(g_self_scope) - 1] = '\0';
+    strncpy(g_self_greet, COMPILED_SELF_GREET, sizeof(g_self_greet) - 1);
+    g_self_greet[sizeof(g_self_greet) - 1] = '\0';
+    g_ntrig = 0;
+    for (size_t i = 0;
+         i < sizeof(COMPILED_SELF_TRIG) / sizeof(COMPILED_SELF_TRIG[0]) &&
+         g_ntrig < TOOLCFG_SELF_TRIG_MAX;
+         i++)
+    {
+        strncpy(g_self_trig[g_ntrig], COMPILED_SELF_TRIG[i].trigger, sizeof(g_self_trig[0]) - 1);
+        g_self_trig[g_ntrig][sizeof(g_self_trig[0]) - 1] = '\0';
+        strncpy(g_self_reply[g_ntrig], COMPILED_SELF_TRIG[i].reply, sizeof(g_self_reply[0]) - 1);
+        g_self_reply[g_ntrig][sizeof(g_self_reply[0]) - 1] = '\0';
+        g_ntrig++;
+    }
+}
 
 static int ToolIdFromName(const char *s, ToolId *out)
 {
@@ -448,6 +502,7 @@ void ToolInit(void)
     {
         ToolInitFrom(TOOLCFG_PATH);
         FixtureInitFrom(FIXTURE_PATH);
+        LoadCompiledSelf();
         SelfInitFrom(SELF_PATH);
         CRulesInit();
         g_tool_init_done = 1;
@@ -654,13 +709,22 @@ void SelfInitFrom(const char *path)
         }
     }
     fclose(f);
-    strncpy(g_self_scope, scope, sizeof(g_self_scope) - 1);
-    g_self_scope[sizeof(g_self_scope) - 1] = '\0';
-    strncpy(g_self_greet, greet, sizeof(g_self_greet) - 1);
-    g_self_greet[sizeof(g_self_greet) - 1] = '\0';
-    memcpy(g_self_trig, trig, ntrig * sizeof(trig[0]));
-    memcpy(g_self_reply, treply, ntrig * sizeof(treply[0]));
-    g_ntrig = ntrig;
+    if (scope[0] != '\0')
+    {
+        strncpy(g_self_scope, scope, sizeof(g_self_scope) - 1);
+        g_self_scope[sizeof(g_self_scope) - 1] = '\0';
+    }
+    if (greet[0] != '\0')
+    {
+        strncpy(g_self_greet, greet, sizeof(g_self_greet) - 1);
+        g_self_greet[sizeof(g_self_greet) - 1] = '\0';
+    }
+    if (ntrig > 0)
+    {
+        memcpy(g_self_trig, trig, ntrig * sizeof(trig[0]));
+        memcpy(g_self_reply, treply, ntrig * sizeof(treply[0]));
+        g_ntrig = ntrig;
+    }
 }
 
 const char *SelfScopeText(void)

@@ -1,0 +1,26 @@
+# self.tsv — scope and greeting data for Symbols engine.
+# scope: KEY=lang, VALUE=reply text.
+# greeting: KEY=lang, VALUE=reply text.
+# trigger: normalized input line -> "scope" or "greeting".
+scope	es	Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.
+greeting	es	¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?
+trigger	quien eres	scope
+trigger	quien eres tu	scope
+trigger	who are you	scope
+trigger	what are you	scope
+trigger	que eres	scope
+trigger	que sabes hacer	scope
+trigger	what can you do	scope
+trigger	que sabes	scope
+trigger	que puedo preguntarte	scope
+trigger	hola	greeting
+trigger	hello	greeting
+trigger	hi	greeting
+trigger	hey	greeting
+trigger	buenos dias	greeting
+trigger	buenas tardes	greeting
+trigger	buenas noches	greeting
+trigger	buenas	greeting
+trigger	que tal	greeting
+trigger	como estas	greeting
+trigger	how are you	greeting

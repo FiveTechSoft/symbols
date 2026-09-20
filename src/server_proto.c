@@ -1141,5 +1141,163 @@ int ServerIsCodingTask(const char *text)
     return 0;
 }
 
+int ServerIsGreeting(const char *text)
+{
+    if (text == NULL || text[0] == '\0')
+        return 0;
+
+    char norm[512];
+    size_t i = 0, j = 0;
+    while (text[i] != '\0' && j < sizeof(norm) - 1)
+    {
+        unsigned char c = (unsigned char)text[i];
+        if (isalnum(c) || c == ' ')
+            norm[j++] = (char)tolower(c);
+        else if (c == 0xc3)
+        {
+            /* UTF-8 accented vowels */
+            unsigned char c2 = (unsigned char)text[++i];
+            if (c2 == 0xa1 || c2 == 0x81) norm[j++] = 'a';
+            else if (c2 == 0xa9 || c2 == 0x89) norm[j++] = 'e';
+            else if (c2 == 0xad || c2 == 0x8d) norm[j++] = 'i';
+            else if (c2 == 0xb3 || c2 == 0x93) norm[j++] = 'o';
+            else if (c2 == 0xba || c2 == 0x9a) norm[j++] = 'u';
+            else norm[j++] = ' ';
+        }
+        else
+            norm[j++] = ' ';
+        i++;
+    }
+    norm[j] = '\0';
+
+    /* Collapse multiple spaces and trim */
+    char clean[512];
+    size_t c_len = 0;
+    int prev_space = 1;
+    for (size_t k = 0; k < j; k++)
+    {
+        if (norm[k] == ' ')
+        {
+            if (!prev_space && c_len + 1 < sizeof(clean))
+            {
+                clean[c_len++] = ' ';
+                prev_space = 1;
+            }
+        }
+        else
+        {
+            if (c_len + 1 < sizeof(clean))
+            {
+                clean[c_len++] = norm[k];
+                prev_space = 0;
+            }
+        }
+    }
+    if (c_len > 0 && clean[c_len - 1] == ' ')
+        c_len--;
+    clean[c_len] = '\0';
+
+    if (clean[0] == '\0')
+        return 0;
+
+    static const char *GREETINGS[] = {
+        "hola", "hello", "hi", "hey", "buenos dias", "buenas tardes",
+        "buenas noches", "buenas", "saludos", "que tal", "como estas",
+        "how are you", "good morning", "good afternoon", "good evening",
+        "quien eres", "quien eres tu", "who are you", "what are you",
+        "que eres", "presentate", "que sabes hacer", "what can you do",
+        "hola buenos dias", "hola buenas tardes", "hola buenas noches",
+        "hola que tal", "hello there"
+    };
+
+    for (size_t k = 0; k < sizeof(GREETINGS) / sizeof(GREETINGS[0]); k++)
+    {
+        if (strcmp(clean, GREETINGS[k]) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t out_sz)
+{
+    if (!out || out_sz == 0)
+        return 0;
+    out[0] = '\0';
+    if (!query) query = "";
+
+    char lower[512];
+    size_t i = 0;
+    while (query[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)query[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    int is_english = (strstr(lower, "hello") || strstr(lower, "hi") || strstr(lower, "hey") ||
+                      strstr(lower, "who are you") || strstr(lower, "what are you") ||
+                      strstr(lower, "how are you") || strstr(lower, "what can you do") ||
+                      strstr(lower, "good morning") || strstr(lower, "good afternoon"));
+
+    int is_identity = (strstr(lower, "quien eres") || strstr(lower, "who are you") ||
+                       strstr(lower, "what are you") || strstr(lower, "que eres") ||
+                       strstr(lower, "presentate") || strstr(lower, "que sabes hacer") ||
+                       strstr(lower, "what can you do"));
+
+    /* Persona 6: PERSONA_PIRATE_QUANTUM */
+    if (persona_id == 6)
+    {
+        if (is_identity)
+        {
+            snprintf(out, out_sz,
+                "¡Arrr! Soy Symbols, corsario del ciberespacio y motor simbólico de cálculo cuántico. "
+                "Inspecciono código, parcho navíos de software y deduzco la verdad sin un solo gramo de alucinación estocástica.");
+        }
+        else
+        {
+            snprintf(out, out_sz,
+                "¡Ahoy, camarada! Soy el contramaestre cuántico de Symbols. "
+                "¿Qué singladura de código o misterio abordamos hoy en el navío?");
+        }
+        return 1;
+    }
+
+    if (is_english)
+    {
+        if (is_identity)
+        {
+            snprintf(out, out_sz,
+                "I am Symbols, a local symbolic AI assistant and development copilot. "
+                "I can help you inspect the repository, write and edit C, Python, and JavaScript code, "
+                "analyze functions and dependencies, and answer queries from the indexed knowledge base without GPU or cloud dependencies.");
+        }
+        else
+        {
+            snprintf(out, out_sz,
+                "Hello! I am Symbols, your local AI coding assistant. "
+                "How can I help you today with your project or code?");
+        }
+    }
+    else
+    {
+        if (is_identity)
+        {
+            snprintf(out, out_sz,
+                "Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. "
+                "Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, "
+                "analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado sin dependencias externas ni GPUs.");
+        }
+        else
+        {
+            snprintf(out, out_sz,
+                "¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. "
+                "¿En qué puedo ayudarte hoy con tu proyecto o código?");
+        }
+    }
+
+    return 1;
+}
+
 
 

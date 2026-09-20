@@ -127,5 +127,11 @@ int ServerIsInspectionTask(const char *text);
 /* Classify whether a prompt represents a direct code generation or synthesis task */
 int ServerIsCodeSynthesisTask(const char *text);
 
+/* Classify whether a prompt represents a conversational greeting or identity question */
+int ServerIsGreeting(const char *text);
+
+/* Generate a friendly response for greetings and identity queries */
+int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t out_sz);
+
 #endif
 

@@ -177,3 +177,23 @@ Regla arquitectónica:
      - Batería de discriminación de intenciones en `tests/test_server_tool_calling.c` ampliada a 198/198 PASS.
      - Suite de pruebas de casos de usuario `tools/test_opencode_user_cases.py` verificando los 4 flujos de trabajo (creación de ficheros, inspección de subcarpetas, cargas mayores a 75 KB y síntesis de Fibonacci) con 100% éxito.
      - Suite global CTest 100% verde (67 Passed, 9 Skipped condicionales, 0 Failed de 76 tests), 2026-09-21.
+
+## Saludos Conversacionales, Identidad y Supresión de Falsos Positivos Levenshtein (Fase 22)
+
+- Resolución conversacional de cortesía, identidad de copiloto y prevención de secuestro léxico en `symbols-server` y el motor `chat` (`src/symbols_server.c`, `src/server_proto.c`, `src/chat.c`, `src/tool_config.c`, `data/agentic/self.tsv`):
+  1. **Supresión del Secuestro Levenshtein en Saludos**:
+     - Diagnóstico: la consulta natural `"hola"` era asimilada por distancia Levenshtein a `"hold"` (distancia 1) dentro de `data/texts/bible.txt`, disparando una búsqueda textual espuria que retornaba versículos bíblicos (`hold: 3:11 Behold, I come quickly...`).
+     - Solución: incorporación de `IsGreetingTok` en `src/chat.c` para blindar los tokens de saludo (`hola`, `hello`, `hi`, `hey`, `buenas`, `saludos`), impidiendo su evaluación como error tipográfico en `ParseIntentToks`.
+  2. **Priorización de Saludo e Identidad en `ChatHandleToBuf`**:
+     - Ejecución preferente de `SelfAnswer(line, out, size)` antes de la vía rápida de texto (`ChatTryTextLine`), resolviendo de forma determinista cualquier interacción de cortesía o presentación.
+  3. **Fallback Compilado y Tabla Declarativa Externa (`data/agentic/self.tsv`, `tool_config.c`)**:
+     - Incorporación de `LoadCompiledSelf()` con configuración estática `COMPILED_SELF_SCOPE`, `COMPILED_SELF_GREET` y tabla de 20 disparadores de saludo e identidad (`quien eres`, `who are you`, `hola`, `hello`, `buenos dias`, etc.).
+     - Creación de `data/agentic/self.tsv` garantizando persistencia declarativa y compatibilidad con pruebas históricas.
+  4. **Manejadores Agénticos Nativos en Servidor (`ServerIsGreeting`, `ServerAnswerGreeting`)**:
+     - Clasificación unificada de saludos e identidad en `server_proto.c`, con respuesta multilingüe (ES/EN) y modulación por perspectiva pragmática/persona (`PERSONA_PIRATE_QUANTUM`).
+     - Emisión con `finish_reason: "stop"` y soporte nativo para streaming Server-Sent Events (SSE).
+  5. **Verificación Formal y CTest**:
+     - Suite `tests/test_server_tool_calling.c` ampliada a 212/212 PASS.
+     - Pruebas HTTP en vivo verificando respuestas inmediatas de saludo y presentación en ES/EN.
+     - Suite global CTest 100% verde (67 Passed, 9 Skipped condicionales, 0 Failed de 76 tests), 2026-09-21.
+

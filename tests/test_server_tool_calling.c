@@ -161,9 +161,27 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodeSynthesisTask("write a function to calculate factorial") == 1, "Classifies 'write a function...' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("lista las subcarpetas") == 0, "Inspection is not code synthesis");
 
+    /* Conversational greetings and identity queries */
+    TEST_ASSERT(ServerIsGreeting("hola") == 1, "Detects 'hola' as greeting");
+    TEST_ASSERT(ServerIsGreeting("¡Hola!") == 1, "Detects '¡Hola!' as greeting");
+    TEST_ASSERT(ServerIsGreeting("hello") == 1, "Detects 'hello' as greeting");
+    TEST_ASSERT(ServerIsGreeting("buenos dias") == 1, "Detects 'buenos dias' as greeting");
+    TEST_ASSERT(ServerIsGreeting("quien eres") == 1, "Detects 'quien eres' as greeting/identity");
+    TEST_ASSERT(ServerIsGreeting("who are you") == 1, "Detects 'who are you' as greeting/identity");
+    TEST_ASSERT(ServerIsCodingTask("hola") == 0, "'hola' is not coding task");
+    TEST_ASSERT(ServerIsInspectionTask("hola") == 0, "'hola' is not inspection task");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("hola") == 0, "'hola' is not code synthesis");
+
+    char gbuf[512];
+    TEST_ASSERT(ServerAnswerGreeting("hola", 0, gbuf, sizeof(gbuf)) == 1, "Answers 'hola'");
+    TEST_ASSERT(strstr(gbuf, "Symbols") != NULL, "'hola' response contains Symbols");
+    TEST_ASSERT(ServerAnswerGreeting("hello", 0, gbuf, sizeof(gbuf)) == 1, "Answers 'hello'");
+    TEST_ASSERT(strstr(gbuf, "Symbols") != NULL, "'hello' response contains Symbols");
+
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");
     TEST_ASSERT(ServerIsCodeSynthesisTask("Who is the father of Solomon?") == 0, "Factual query is not code synthesis");
+    TEST_ASSERT(ServerIsGreeting("Who is the father of Solomon?") == 0, "Factual query is not greeting");
     TEST_ASSERT(ServerIsCodingTask("Tell me about wisdom and proverbs") == 0, "Topical query is not coding task");
     TEST_ASSERT(ServerIsCodingTask("What areas do you know?") == 0, "Introspection query is not coding task");
     TEST_ASSERT(ServerIsInspectionTask("Who is the father of Solomon?") == 0, "Factual query is not inspection");

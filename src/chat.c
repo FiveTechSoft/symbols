@@ -264,6 +264,19 @@ static int IsStopTok(const char *tok)
     return 0;
 }
 
+static int IsGreetingTok(const char *tok)
+{
+    static const char *GREET[] = {
+        "hola", "hello", "hi", "hey", "buenas", "saludos"
+    };
+    if (tok == NULL)
+        return 0;
+    for (size_t i = 0; i < sizeof(GREET) / sizeof(GREET[0]); i++)
+        if (strcmp(tok, GREET[i]) == 0)
+            return 1;
+    return 0;
+}
+
 /* Spanish verb+clitic shape (explicamelo, dime, hazlo): a stem
    of 2+ chars plus a clitic ending. Closed functional material
    (like STOP), productive morphology, never topic words. Bare
@@ -2933,7 +2946,7 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 const SYMBOL *ss;
                 uint32_t dd = 99;
                 uint32_t k;
-                if (IsStopTok(toks[i]))
+                if (IsStopTok(toks[i]) || IsGreetingTok(toks[i]))
                     continue;
                 sub = LevNearest(ch->tgraph, toks[i], 3, &dd);
                 if (sub == SYMBOL_INVALID)
@@ -6437,6 +6450,12 @@ int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
     uint32_t ntok = 0;
     SURFACE_FLAGS sf;
     memset(&sf, 0, sizeof(sf));
+    /* Self/greeting reply first: exact matches for greetings (hola, hello)
+       and identity (quien eres) must be answered directly without falling
+       through to fuzzy corpus text search. */
+    if (SelfAnswer(line, out, size))
+        return 1;
+
     {
         /* TEXT fast path first: dynamic-corpus lines bypass the
            plan splitter (fragments re-parse into vetoed goals,

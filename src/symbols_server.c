@@ -1317,6 +1317,26 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    /* Direct greeting / conversational identity queries */
+    if (ServerIsGreeting(query))
+    {
+        char greet_resp[4096];
+        ServerAnswerGreeting(query, (int)sess->persona_id, greet_resp, sizeof(greet_resp));
+
+        if (ServerWantsStream(body))
+        {
+            char sse[4096];
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, greet_resp, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, greet_resp, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
+    }
+
     int is_coding = ServerIsCodingTask(query);
 
     /* Direct C code synthesis queries: respond with generated C code in markdown directly */
