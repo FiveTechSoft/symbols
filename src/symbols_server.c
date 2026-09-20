@@ -266,6 +266,30 @@ static const char *FindFileForIssue(const char *issue)
     return NULL;
 }
 
+static void ExtractGlobPattern(const char *text, char *out_pattern, size_t size)
+{
+    if (!text || !out_pattern || size == 0)
+        return;
+
+    char buf[512];
+    strncpy(buf, text, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    char *tok = strtok(buf, " \t\r\n,;\"'");
+    while (tok)
+    {
+        if (strchr(tok, '*') || strchr(tok, '?'))
+        {
+            strncpy(out_pattern, tok, size - 1);
+            out_pattern[size - 1] = '\0';
+            return;
+        }
+        tok = strtok(NULL, " \t\r\n,;\"'");
+    }
+    strncpy(out_pattern, "*", size - 1);
+    out_pattern[size - 1] = '\0';
+}
+
 static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERATOR *op,
                                    const char *issue, unsigned long seq,
                                    OPENAI_TOOL_CALLS *out_tc)
@@ -283,8 +307,17 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
         int is_folder = ServerIsInspectionTask(issue);
         if (is_folder && HasDeclaredTool(sess, "glob"))
         {
+            char pattern[64];
+            ExtractGlobPattern(issue, pattern, sizeof(pattern));
             strncpy(out_tc->calls[0].name, "glob", sizeof(out_tc->calls[0].name) - 1);
-            strncpy(out_tc->calls[0].arguments, "{\"pattern\":\"*\"}", sizeof(out_tc->calls[0].arguments) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"pattern\":\"%s\"}", pattern);
+        }
+        else if (HasDeclaredTool(sess, "bash") && (strncmp(issue, "dir", 3) == 0 || strncmp(issue, "ls", 2) == 0))
+        {
+            strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%.120s\"}", issue);
         }
         else if (HasDeclaredTool(sess, "grep"))
         {

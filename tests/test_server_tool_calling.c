@@ -137,6 +137,16 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsInspectionTask("inspecciona el directorio src") == 1, "Classifies 'inspecciona el directorio src' as inspection");
     TEST_ASSERT(ServerIsInspectionTask("Fix the memory leak in parser.c") == 0, "Fix task is not read-only inspection");
 
+    /* Shell and wildcard inspection tasks */
+    TEST_ASSERT(ServerIsCodingTask("dir *.*") == 1, "Detects 'dir *.*'");
+    TEST_ASSERT(ServerIsInspectionTask("dir *.*") == 1, "Classifies 'dir *.*' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("dir") == 1, "Detects 'dir'");
+    TEST_ASSERT(ServerIsInspectionTask("dir") == 1, "Classifies 'dir' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("ls -la") == 1, "Detects 'ls -la'");
+    TEST_ASSERT(ServerIsInspectionTask("ls -la") == 1, "Classifies 'ls -la' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("*.c") == 1, "Detects '*.c'");
+    TEST_ASSERT(ServerIsInspectionTask("*.c") == 1, "Classifies '*.c' as inspection");
+
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");
     TEST_ASSERT(ServerIsCodingTask("Tell me about wisdom and proverbs") == 0, "Topical query is not coding task");

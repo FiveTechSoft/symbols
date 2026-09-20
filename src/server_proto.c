@@ -944,12 +944,28 @@ int ServerIsInspectionTask(const char *text)
         "repository", "files", "workspace", "list", "explore",
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "explora",
-        "explorar", "muestra", "mostrar", "mira", "mirar"
+        "explorar", "muestra", "mostrar", "mira", "mirar",
+        "dir", "ls", "pwd", "tree"
     };
     for (size_t k = 0; k < sizeof(inspect_keywords) / sizeof(inspect_keywords[0]); k++)
     {
         if (MatchWordBoundary(lower, inspect_keywords[k]))
             return 1;
+    }
+
+    /* Check for wildcard glob masks (*.*, *.c, etc.) */
+    if (strstr(lower, "*.*") != NULL || strchr(lower, '*') != NULL)
+    {
+        for (size_t k = 0; k < strlen(lower); k++)
+        {
+            if (lower[k] == '*' && (k + 1 < strlen(lower) && (lower[k + 1] == '.' || isalnum((unsigned char)lower[k + 1]))))
+                return 1;
+            if (lower[k] == '*' && k > 0 && lower[k - 1] == '.')
+                return 1;
+            if (lower[k] == '*' && (k == 0 || isspace((unsigned char)lower[k - 1])) &&
+                (k + 1 == strlen(lower) || isspace((unsigned char)lower[k + 1])))
+                return 1;
+        }
     }
 
     return 0;
@@ -993,7 +1009,7 @@ int ServerIsCodingTask(const char *text)
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "codigo",
         "analiza", "analizar", "arregla", "corrige", "compilar", "compila",
-        "ejecuta", "ejecutar"
+        "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status"
     };
 
     for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)
