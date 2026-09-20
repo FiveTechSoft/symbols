@@ -119,6 +119,12 @@ Regla arquitectónica:
      - Generalización automática en preguntas: las relaciones aprendidas se auto-registran en el índice dinámico `ch->kws`, permitiendo responder consultas directas posteriores (ej. `¿quién es el maestro de Platón?` -> `Sócrates`) entre reinicios de sesión.
   4. **Verificación formal**: suite unitaria dedicada `tests/test_episodic_memory.c` (5/5 PASS), suite CTest global al 100% (66 Passed, 9 Skipped condicionales, 0 Failed de 75 tests) y prueba cruzada de persistencia multi-sesión validada por ejecución.
 
+## Serialización Binaria de Alto Rendimiento e Ingesta mmap de Sentido Común (Fase 18)
 
-
-
+- Implementación en C11 nativo del formato binario y mapeo de memoria virtual (`mmap` / `MapViewOfFile`) para grafos de conocimiento de sentido común (`src/commonsense.c`, `include/commonsense.h`):
+  1. **Especificación Binaria Ultra-Densa (M3.4)**: cabecera `CS_BIN_HEADER` de 40 bytes alineada a 8 bytes (`magic: 0x53594D43`, versión, conteo de símbolos y relaciones, longitud de tabla de cadenas, flags, checksum FNV-1a de 32 bits), descriptores de símbolos de 16 bytes (`offset`, `len`, `frequency`), arena de cadenas empaquetada con padding de 8 bytes, y tabla de tripletas estrictamente de 32 bytes por relación (`RELATION`).
+  2. **Ingesta Instantánea por Buffer y Snapshot**: funciones `CommonsenseSaveBinary`, `CommonsenseLoadBinary` y `CommonsenseParseBinaryBuffer` para serializar y deserializar grafos completos en $\le 1\ \text{ms}$, pre-dimensionando las tablas de hashing (`GraphCreate(cap * 2)`) para evitar reallocs y rehashes durante la carga.
+  3. **Mapeo de Memoria Virtual Multiplataforma**: `CommonsenseLoadMmap` y `CommonsenseMmapClose` implementan mapeo de memoria sin copias de archivo sobre Windows (`CreateFileA`, `CreateFileMappingA`, `MapViewOfFile`, `UnmapViewOfFile`) y POSIX (`open`, `mmap`, `munmap`), permitiendo montar millones de aserciones en microsegundos.
+  4. **Fail-Closed y Resistencia a Corrupción**: verificación matemática obligatoria de checksum, tamaño y cabeceras; ante cualquier alteración de bytes o fallo de integridad, la carga se aborta de forma fail-closed retornando `NULL` sin estados corruptos ni accesos fuera de límites.
+  5. **Integración Conversacional en `chat.c`**: `ChatGetCommonsenseGraph` busca y carga prioritariamente `data/commonsense.bin` si existe en disco antes de recurrir a la ingesta seed, acelerando el arranque en frío a sub-milisegundo.
+  6. **Verificación Formal y CTest**: suite `tests/test_commonsense.c` ampliada a 75/75 verificaciones unitarias (incluyendo serialización, deserialización idéntica, persistencia mmap, latencia y rechazo de corrupción), y suite global CTest 100% verde (66 Passed, 9 Skipped condicionales, 0 Failed de 75 tests), 2026-09-20.

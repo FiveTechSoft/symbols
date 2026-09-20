@@ -761,11 +761,18 @@ static GRAPH *ChatGetCommonsenseGraph(CHAT *ch)
         return NULL;
     if (ch->cs_graph != NULL)
         return ch->cs_graph;
-    GRAPH *g = GraphCreate(32768, 65536);
+
+    /* Check if pre-compiled binary snapshot exists (data/commonsense.bin) */
+    GRAPH *g = CommonsenseLoadBinary("data/commonsense.bin");
     if (g == NULL)
-        return NULL;
-    CS_STATS stats;
-    CommonsenseIngestSeed(g, &stats);
+    {
+        /* Fallback: Create and ingest seed */
+        g = GraphCreate(32768, 65536);
+        if (g == NULL)
+            return NULL;
+        CS_STATS stats;
+        CommonsenseIngestSeed(g, &stats);
+    }
     ch->cs_graph = g;
     return ch->cs_graph;
 }

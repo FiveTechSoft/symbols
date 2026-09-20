@@ -17,6 +17,18 @@
 #include "commonsense.h"
 #include "persona.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 /* High-resolution timer helper */
 static double CsGetTimeSec(void)
 {
@@ -728,5 +740,383 @@ int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
                                         size_t out_size)
 {
     return CommonsenseQueryPhysicalConsequencePersona(graph, NULL, LANG_EN, subject, action, target, path, out, out_size);
+}
+
+/* =========================================================================
+   Part 4: High-Performance Binary Serialization & mmap Ingestion (M3.4)
+   ========================================================================= */
+
+#pragma pack(push, 1)
+typedef struct
+{
+    uint32_t name_offset; /* Byte offset into string arena */
+    uint32_t name_len;    /* String length (excluding null) */
+    uint64_t frequency;   /* Occurrence frequency */
+} CS_BIN_SYM_RECORD;
+
+typedef struct
+{
+    uint32_t subject;
+    uint32_t relation;
+    uint32_t object;
+    uint32_t polarity;
+    uint64_t count;
+    float    weight;
+    uint32_t source;
+} CS_BIN_REL_RECORD;
+#pragma pack(pop)
+
+static uint32_t CsComputeChecksum(const uint8_t *data, size_t len)
+{
+    uint32_t hash = 2166136261u;
+    for (size_t i = 0; i < len; i++)
+    {
+        hash ^= data[i];
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+int CommonsenseSaveBinary(const GRAPH *graph, const char *filepath)
+{
+    if (!graph || !graph->symbols || !graph->relations || !filepath)
+        return 0;
+
+    if (sizeof(CS_BIN_HEADER) != 40 || sizeof(CS_BIN_SYM_RECORD) != 16 || sizeof(CS_BIN_REL_RECORD) != 32)
+        return 0;
+
+    uint32_t symbol_count = graph->symbols->count;
+    uint32_t relation_count = graph->relations->count;
+
+    uint64_t string_table_len = 0;
+    for (uint32_t i = 0; i < symbol_count; i++)
+    {
+        const SYMBOL *s = SymbolGet(graph->symbols, i + 1);
+        const char *name = (s && s->name) ? s->name : "";
+        string_table_len += strlen(name) + 1;
+    }
+    uint64_t padded_str_len = (string_table_len + 7) & ~7ULL;
+
+    uint64_t sym_bytes = (uint64_t)symbol_count * sizeof(CS_BIN_SYM_RECORD);
+    uint64_t rel_bytes = (uint64_t)relation_count * sizeof(CS_BIN_REL_RECORD);
+    uint64_t payload_size = sym_bytes + padded_str_len + rel_bytes;
+    uint64_t file_size = sizeof(CS_BIN_HEADER) + payload_size;
+
+    uint8_t *file_buf = (uint8_t *)calloc(1, (size_t)file_size);
+    if (!file_buf)
+        return 0;
+
+    CS_BIN_HEADER *hdr = (CS_BIN_HEADER *)file_buf;
+    hdr->magic = CS_BIN_MAGIC;
+    hdr->version = CS_BIN_VERSION;
+    hdr->symbol_count = symbol_count;
+    hdr->relation_count = relation_count;
+    hdr->string_table_len = string_table_len;
+    hdr->file_size = file_size;
+    hdr->flags = 0x1;
+
+    CS_BIN_SYM_RECORD *descs = (CS_BIN_SYM_RECORD *)(file_buf + sizeof(CS_BIN_HEADER));
+    char *str_arena = (char *)(file_buf + sizeof(CS_BIN_HEADER) + sym_bytes);
+    uint32_t curr_str_off = 0;
+
+    for (uint32_t i = 0; i < symbol_count; i++)
+    {
+        const SYMBOL *s = SymbolGet(graph->symbols, i + 1);
+        const char *name = (s && s->name) ? s->name : "";
+        size_t len = strlen(name);
+
+        descs[i].name_offset = curr_str_off;
+        descs[i].name_len = (uint32_t)len;
+        descs[i].frequency = s ? s->frequency : 1;
+
+        memcpy(str_arena + curr_str_off, name, len + 1);
+        curr_str_off += (uint32_t)(len + 1);
+    }
+
+    CS_BIN_REL_RECORD *rels = (CS_BIN_REL_RECORD *)(file_buf + sizeof(CS_BIN_HEADER) + sym_bytes + padded_str_len);
+    for (uint32_t j = 0; j < relation_count; j++)
+    {
+        const RELATION *r = RelationGet(graph->relations, j);
+        if (r)
+        {
+            rels[j].subject = r->subject;
+            rels[j].relation = r->relation;
+            rels[j].object = r->object;
+            rels[j].polarity = (uint32_t)r->polarity;
+            rels[j].count = r->count;
+            rels[j].weight = r->weight;
+            rels[j].source = r->source;
+        }
+    }
+
+    hdr->checksum = CsComputeChecksum(file_buf + sizeof(CS_BIN_HEADER), (size_t)payload_size);
+
+    FILE *fp = fopen(filepath, "wb");
+    if (!fp)
+    {
+        free(file_buf);
+        return 0;
+    }
+    size_t written = fwrite(file_buf, 1, (size_t)file_size, fp);
+    fclose(fp);
+    free(file_buf);
+
+    return (written == (size_t)file_size) ? 1 : 0;
+}
+
+GRAPH *CommonsenseParseBinaryBuffer(const uint8_t *buffer, size_t size)
+{
+    if (!buffer || size < sizeof(CS_BIN_HEADER))
+        return NULL;
+
+    const CS_BIN_HEADER *hdr = (const CS_BIN_HEADER *)buffer;
+    if (hdr->magic != CS_BIN_MAGIC || hdr->version != CS_BIN_VERSION)
+        return NULL;
+
+    if (hdr->file_size != (uint64_t)size)
+        return NULL;
+
+    uint64_t sym_bytes = (uint64_t)hdr->symbol_count * sizeof(CS_BIN_SYM_RECORD);
+    uint64_t padded_str_len = (hdr->string_table_len + 7) & ~7ULL;
+    uint64_t rel_bytes = (uint64_t)hdr->relation_count * sizeof(CS_BIN_REL_RECORD);
+    uint64_t min_expected = sizeof(CS_BIN_HEADER) + sym_bytes + padded_str_len + rel_bytes;
+
+    if (size < min_expected)
+        return NULL;
+
+    uint32_t calc_cs = CsComputeChecksum(buffer + sizeof(CS_BIN_HEADER), size - sizeof(CS_BIN_HEADER));
+    if (hdr->checksum != calc_cs)
+        return NULL;
+
+    uint32_t sym_cap = (hdr->symbol_count < 16) ? 32 : (hdr->symbol_count * 2);
+    uint32_t rel_cap = (hdr->relation_count < 16) ? 32 : (hdr->relation_count * 2);
+
+    GRAPH *g = GraphCreate(sym_cap, rel_cap);
+    if (!g) return NULL;
+
+    const CS_BIN_SYM_RECORD *sym_recs = (const CS_BIN_SYM_RECORD *)(buffer + sizeof(CS_BIN_HEADER));
+    const char *str_table = (const char *)(buffer + sizeof(CS_BIN_HEADER) + sym_bytes);
+    const CS_BIN_REL_RECORD *rel_recs = (const CS_BIN_REL_RECORD *)(buffer + sizeof(CS_BIN_HEADER) + sym_bytes + padded_str_len);
+
+    for (uint32_t i = 0; i < hdr->symbol_count; i++)
+    {
+        uint32_t off = sym_recs[i].name_offset;
+        if (off >= hdr->string_table_len)
+        {
+            GraphDestroy(g);
+            return NULL;
+        }
+        const char *name = str_table + off;
+        SYMBOL_ID sid = SymbolAdd(g->symbols, name);
+        if (sid == SYMBOL_INVALID)
+        {
+            GraphDestroy(g);
+            return NULL;
+        }
+        const SYMBOL *s = SymbolGet(g->symbols, sid);
+        if (s)
+        {
+            ((SYMBOL *)s)->frequency = sym_recs[i].frequency;
+        }
+    }
+
+    for (uint32_t j = 0; j < hdr->relation_count; j++)
+    {
+        const CS_BIN_REL_RECORD *r = &rel_recs[j];
+        if (r->subject == SYMBOL_INVALID || r->relation == SYMBOL_INVALID || r->object == SYMBOL_INVALID)
+            continue;
+        if (r->subject > hdr->symbol_count || r->relation > hdr->symbol_count || r->object > hdr->symbol_count)
+            continue;
+
+        RELATION *existing = RelationFindPolar(g->relations, r->subject, r->relation, r->object, (RELATION_POLARITY)r->polarity);
+        if (existing)
+        {
+            existing->count = r->count;
+            existing->weight = r->weight;
+            existing->source = r->source;
+        }
+        else
+        {
+            if (RelationAddPolar(g->relations, r->subject, r->relation, r->object, (RELATION_POLARITY)r->polarity))
+            {
+                RELATION *rel = &g->relations->items[g->relations->count - 1];
+                rel->count = r->count;
+                rel->weight = r->weight;
+                rel->source = r->source;
+            }
+        }
+    }
+
+    return g;
+}
+
+GRAPH *CommonsenseLoadBinary(const char *filepath)
+{
+    if (!filepath) return NULL;
+
+    FILE *fp = fopen(filepath, "rb");
+    if (!fp) return NULL;
+
+    if (fseek(fp, 0, SEEK_END) != 0)
+    {
+        fclose(fp);
+        return NULL;
+    }
+
+    long sz = ftell(fp);
+    if (sz < (long)sizeof(CS_BIN_HEADER))
+    {
+        fclose(fp);
+        return NULL;
+    }
+    fseek(fp, 0, SEEK_SET);
+
+    uint8_t *buf = (uint8_t *)malloc((size_t)sz);
+    if (!buf)
+    {
+        fclose(fp);
+        return NULL;
+    }
+
+    size_t read_bytes = fread(buf, 1, (size_t)sz, fp);
+    fclose(fp);
+
+    if (read_bytes != (size_t)sz)
+    {
+        free(buf);
+        return NULL;
+    }
+
+    GRAPH *g = CommonsenseParseBinaryBuffer(buf, (size_t)sz);
+    free(buf);
+    return g;
+}
+
+GRAPH *CommonsenseLoadMmap(const char *filepath, CS_MMAP_CONTEXT *ctx)
+{
+    if (!filepath || !ctx)
+        return NULL;
+
+    memset(ctx, 0, sizeof(*ctx));
+
+#ifdef _WIN32
+    HANDLE hFile = CreateFileA(filepath, GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return NULL;
+
+    LARGE_INTEGER liSize;
+    if (!GetFileSizeEx(hFile, &liSize) || liSize.QuadPart < (LONGLONG)sizeof(CS_BIN_HEADER))
+    {
+        CloseHandle(hFile);
+        return NULL;
+    }
+
+    HANDLE hMap = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    if (!hMap)
+    {
+        CloseHandle(hFile);
+        return NULL;
+    }
+
+    void *view = MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+    if (!view)
+    {
+        CloseHandle(hMap);
+        CloseHandle(hFile);
+        return NULL;
+    }
+
+    GRAPH *g = CommonsenseParseBinaryBuffer((const uint8_t *)view, (size_t)liSize.QuadPart);
+    if (!g)
+    {
+        UnmapViewOfFile(view);
+        CloseHandle(hMap);
+        CloseHandle(hFile);
+        return NULL;
+    }
+
+    ctx->os_handle = (void *)hFile;
+    ctx->map_handle = (void *)hMap;
+    ctx->map_view = view;
+    ctx->file_size = (size_t)liSize.QuadPart;
+    ctx->graph = g;
+    return g;
+#else
+    int fd = open(filepath, O_RDONLY);
+    if (fd < 0)
+        return NULL;
+
+    struct stat st;
+    if (fstat(fd, &st) < 0 || st.st_size < (off_t)sizeof(CS_BIN_HEADER))
+    {
+        close(fd);
+        return NULL;
+    }
+
+    void *view = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (view == MAP_FAILED)
+    {
+        close(fd);
+        return NULL;
+    }
+
+    GRAPH *g = CommonsenseParseBinaryBuffer((const uint8_t *)view, (size_t)st.st_size);
+    if (!g)
+    {
+        munmap(view, (size_t)st.st_size);
+        close(fd);
+        return NULL;
+    }
+
+    ctx->os_handle = (void *)(intptr_t)fd;
+    ctx->map_handle = NULL;
+    ctx->map_view = view;
+    ctx->file_size = (size_t)st.st_size;
+    ctx->graph = g;
+    return g;
+#endif
+}
+
+void CommonsenseMmapClose(CS_MMAP_CONTEXT *ctx)
+{
+    if (!ctx) return;
+
+    if (ctx->graph)
+    {
+        GraphDestroy(ctx->graph);
+        ctx->graph = NULL;
+    }
+
+#ifdef _WIN32
+    if (ctx->map_view)
+    {
+        UnmapViewOfFile(ctx->map_view);
+        ctx->map_view = NULL;
+    }
+    if (ctx->map_handle)
+    {
+        CloseHandle((HANDLE)ctx->map_handle);
+        ctx->map_handle = NULL;
+    }
+    if (ctx->os_handle && ctx->os_handle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle((HANDLE)ctx->os_handle);
+        ctx->os_handle = NULL;
+    }
+#else
+    if (ctx->map_view && ctx->file_size > 0)
+    {
+        munmap(ctx->map_view, ctx->file_size);
+        ctx->map_view = NULL;
+    }
+    if (ctx->os_handle)
+    {
+        int fd = (int)(intptr_t)ctx->os_handle;
+        if (fd >= 0) close(fd);
+        ctx->os_handle = NULL;
+    }
+#endif
+    ctx->file_size = 0;
 }
 

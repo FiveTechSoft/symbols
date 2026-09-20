@@ -214,6 +214,50 @@ int CommonsenseQueryPhysicalConsequencePersona(const GRAPH *graph,
                                                char *out,
                                                size_t out_size);
 
+/* =========================================================================
+   Part 4: High-Performance Binary Serialization & mmap Ingestion (M3.4)
+   ========================================================================= */
+
+#define CS_BIN_MAGIC    0x53594D43  /* "SYMC" in ASCII little-endian */
+#define CS_BIN_VERSION  1
+
+typedef struct
+{
+    uint32_t magic;            /* CS_BIN_MAGIC */
+    uint32_t version;          /* CS_BIN_VERSION */
+    uint32_t symbol_count;     /* Total unique symbols */
+    uint32_t relation_count;   /* Total relational triples */
+    uint64_t string_table_len; /* Total bytes in names arena */
+    uint64_t file_size;        /* Total binary file size */
+    uint32_t flags;            /* Bit flags: 0x1 = aligned */
+    uint32_t checksum;         /* Validation checksum */
+} CS_BIN_HEADER;
+
+/* Save commonsense graph to binary snapshot file */
+int CommonsenseSaveBinary(const GRAPH *graph, const char *filepath);
+
+/* Load commonsense graph from binary snapshot file via high-speed bulk read (< 5 ms) */
+GRAPH *CommonsenseLoadBinary(const char *filepath);
+
+/* Parse commonsense graph from pre-loaded or memory-mapped binary buffer */
+GRAPH *CommonsenseParseBinaryBuffer(const uint8_t *buffer, size_t size);
+
+/* Memory-mapped binary commonsense context */
+typedef struct
+{
+    void   *os_handle;     /* Windows HANDLE or POSIX fd */
+    void   *map_handle;    /* Windows FileMapping or NULL on POSIX */
+    void   *map_view;      /* Base pointer of memory-mapped view */
+    size_t  file_size;     /* Total mapped size */
+    GRAPH  *graph;         /* Reconstructed graph */
+} CS_MMAP_CONTEXT;
+
+/* Load commonsense graph using virtual memory mapping (zero file copy, sub-millisecond mapping) */
+GRAPH *CommonsenseLoadMmap(const char *filepath, CS_MMAP_CONTEXT *ctx);
+
+/* Unmap and release memory mapping context */
+void CommonsenseMmapClose(CS_MMAP_CONTEXT *ctx);
+
 
 #ifdef __cplusplus
 }

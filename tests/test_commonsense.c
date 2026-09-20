@@ -326,6 +326,162 @@ int main(void)
         GraphDestroy(g);
     }
 
+    /* =====================================================================
+       Test 11: Binary Snapshot Serialization (CommonsenseSaveBinary)
+       ===================================================================== */
+    printf("\n--- Test 11: Binary Snapshot Serialization ---\n");
+    const char *test_bin_path = "test_commonsense_snapshot.bin";
+    {
+        GRAPH *g = GraphCreate(2048, 2048);
+        CS_STATS stats;
+        CommonsenseIngestSeed(g, &stats);
+
+        int saved = CommonsenseSaveBinary(g, test_bin_path);
+        check_int("CommonsenseSaveBinary returned success", saved, 1);
+
+        FILE *fp = fopen(test_bin_path, "rb");
+        check_int("Binary snapshot file created on disk", (fp != NULL), 1);
+        if (fp)
+        {
+            CS_BIN_HEADER hdr;
+            size_t rd = fread(&hdr, 1, sizeof(hdr), fp);
+            check_int("Header read size matches 40 bytes", (int)rd, 40);
+            check_int("Header magic is CS_BIN_MAGIC", hdr.magic == CS_BIN_MAGIC, 1);
+            check_int("Header version is CS_BIN_VERSION", (int)hdr.version, CS_BIN_VERSION);
+            check_int("Header symbol count matches source graph", (int)hdr.symbol_count, (int)g->symbols->count);
+            fclose(fp);
+        }
+
+        /* Also export the default production snapshot to data/commonsense.bin if in repo root */
+        FILE *fp_check = fopen("data/english-spanish.txt", "rb");
+        if (fp_check)
+        {
+            fclose(fp_check);
+            CommonsenseSaveBinary(g, "data/commonsense.bin");
+        }
+
+        GraphDestroy(g);
+    }
+
+    /* =====================================================================
+       Test 12: High-Speed Binary Deserialization (CommonsenseLoadBinary)
+       ===================================================================== */
+    printf("\n--- Test 12: High-Speed Binary Deserialization ---\n");
+    {
+        double t0 = (double)clock() / (double)CLOCKS_PER_SEC;
+        GRAPH *loaded = CommonsenseLoadBinary(test_bin_path);
+        double t1 = (double)clock() / (double)CLOCKS_PER_SEC;
+        double load_ms = (t1 - t0) * 1000.0;
+
+        printf("  [BENCH] CommonsenseLoadBinary took %.3f ms\n", load_ms);
+        check_int("CommonsenseLoadBinary returned non-NULL graph", (loaded != NULL), 1);
+
+        if (loaded)
+        {
+            /* Verify all functional affordances and reasoning work identically */
+            char out[256];
+            int ok_aff = CommonsenseQueryAffordance(loaded, "knife", "USED_FOR", out, sizeof(out));
+            check_int("Loaded graph knife affordance succeeded", ok_aff, 1);
+            check_str("Loaded graph knife affordance text", out, "A knife is used to cut.");
+
+            CS_INFERENCE_PATH path;
+            int ok_phys = CommonsenseQueryPhysicalConsequence(loaded, "glass", "dropped on", "concrete",
+                                                             &path, out, sizeof(out));
+            check_int("Loaded graph physical consequence succeeded", ok_phys, 1);
+            check_contains("Loaded graph glass shatter", out, "it will shatter");
+
+            /* Verify taxonomy */
+            SYMBOL_ID dog_id = SymbolFind(loaded->symbols, "dog");
+            SYMBOL_ID is_a_id = SymbolFind(loaded->symbols, "IS_A");
+            RELATION *res[4];
+            uint32_t c1 = RelationFindBySubjectRelation(loaded->relations, dog_id, is_a_id, res, 4);
+            check_int("Loaded graph dog is a canine", (int)c1, 1);
+
+            GraphDestroy(loaded);
+        }
+    }
+
+    /* =====================================================================
+       Test 13: Virtual Memory-Mapped Commonsense Graph (CommonsenseLoadMmap)
+       ===================================================================== */
+    printf("\n--- Test 13: Virtual Memory-Mapped Commonsense Graph (mmap) ---\n");
+    {
+        CS_MMAP_CONTEXT mmap_ctx;
+        double t0 = (double)clock() / (double)CLOCKS_PER_SEC;
+        GRAPH *mmap_graph = CommonsenseLoadMmap(test_bin_path, &mmap_ctx);
+        double t1 = (double)clock() / (double)CLOCKS_PER_SEC;
+        double map_ms = (t1 - t0) * 1000.0;
+
+        printf("  [BENCH] CommonsenseLoadMmap took %.3f ms\n", map_ms);
+        check_int("CommonsenseLoadMmap returned non-NULL graph", (mmap_graph != NULL), 1);
+        check_int("Context map_view is valid", (mmap_ctx.map_view != NULL), 1);
+        check_int("Context file_size > 0", (mmap_ctx.file_size > 0), 1);
+
+        if (mmap_graph)
+        {
+            /* Verify physical reasoning on mmap graph */
+            char out[256];
+            CS_INFERENCE_PATH path;
+            int ok_phys = CommonsenseQueryPhysicalConsequence(mmap_graph, "glass", "dropped on", "concrete",
+                                                             &path, out, sizeof(out));
+            check_int("Mmap graph physical consequence derived", ok_phys, 1);
+            check_contains("Mmap graph predicts shatter", out, "it will shatter");
+
+            /* Verify affordance */
+            int ok_bird = CommonsenseQueryAffordance(mmap_graph, "bird", "CAPABLE_OF", out, sizeof(out));
+            check_int("Mmap graph bird affordance", ok_bird, 1);
+            check_str("Mmap graph bird can fly", out, "A bird can fly.");
+        }
+
+        CommonsenseMmapClose(&mmap_ctx);
+        check_int("Mmap context cleaned up (map_view NULL)", (mmap_ctx.map_view == NULL), 1);
+    }
+
+    /* =====================================================================
+       Test 14: Corrupted Snapshot Fail-Closed Verification
+       ===================================================================== */
+    printf("\n--- Test 14: Corrupted Snapshot Fail-Closed Verification ---\n");
+    {
+        const char *corrupt_path = "test_corrupt.bin";
+        FILE *fp_src = fopen(test_bin_path, "rb");
+        if (fp_src)
+        {
+            fseek(fp_src, 0, SEEK_END);
+            long sz = ftell(fp_src);
+            fseek(fp_src, 0, SEEK_SET);
+
+            uint8_t *tmp = (uint8_t *)malloc((size_t)sz);
+            if (tmp)
+            {
+                size_t rd = fread(tmp, 1, (size_t)sz, fp_src);
+                fclose(fp_src);
+
+                if (rd == (size_t)sz && sz > 60)
+                {
+                    /* Corrupt payload byte */
+                    tmp[50] ^= 0xFF;
+
+                    FILE *fp_corrupt = fopen(corrupt_path, "wb");
+                    if (fp_corrupt)
+                    {
+                        fwrite(tmp, 1, (size_t)sz, fp_corrupt);
+                        fclose(fp_corrupt);
+                    }
+
+                    GRAPH *g_bad = CommonsenseLoadBinary(corrupt_path);
+                    check_int("Corrupted binary snapshot rejected (NULL)", (g_bad == NULL), 1);
+                    remove(corrupt_path);
+                }
+                free(tmp);
+            }
+            else
+            {
+                fclose(fp_src);
+            }
+        }
+        remove(test_bin_path);
+    }
+
     printf("\n=======================================================\n");
     printf("PILLAR 3 COMMONSENSE INGESTION SUMMARY: %d PASSED, %d FAILED\n", g_pass, g_fail);
     printf("=======================================================\n");
