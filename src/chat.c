@@ -530,6 +530,12 @@ static const RelMapRow COMPILED_RELMAP[] = {
     {"COMPONENT_OF", "part_of"},
     {"COMPONENTE_DE", "part_of"},
     {"GENTILICIO", "gentilicio_of"},
+    {"INCLUYE", "includes_of"},
+    {"INCLUDES", "includes_of"},
+    {"APLICA", "applies_of"},
+    {"APLICA_A", "applies_of"},
+    {"APLICA_A_MOTOR", "applies_of"},
+    {"APPLIES_TO", "applies_of"},
 };
 
 static RelMapRow g_relmap[RELMAP_MAX];
@@ -590,9 +596,11 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
     if (LearnerIsConnective(rel))
         return rel;
 
-    /* 3. Suffix rule for _DE / _de or _OF / _of */
+    /* 3. Suffix rule for _DE / _de, _OF / _of, _A / _a, _TO / _to */
     size_t len = strlen(rel);
-    if (len > 3 && (strcasecmp(rel + len - 3, "_DE") == 0 || strcasecmp(rel + len - 3, "_de") == 0))
+    if (len > 3 && (strcasecmp(rel + len - 3, "_DE") == 0 || strcasecmp(rel + len - 3, "_de") == 0 ||
+                    strcasecmp(rel + len - 3, "_OF") == 0 || strcasecmp(rel + len - 3, "_of") == 0 ||
+                    strcasecmp(rel + len - 3, "_TO") == 0 || strcasecmp(rel + len - 3, "_to") == 0))
     {
         size_t stem_len = len - 3;
         if (stem_len + 4 < bsize)
@@ -603,9 +611,9 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
             return buf;
         }
     }
-    if (len > 3 && (strcasecmp(rel + len - 3, "_OF") == 0 || strcasecmp(rel + len - 3, "_of") == 0))
+    if (len > 2 && (strcasecmp(rel + len - 2, "_A") == 0 || strcasecmp(rel + len - 2, "_a") == 0))
     {
-        size_t stem_len = len - 3;
+        size_t stem_len = len - 2;
         if (stem_len + 4 < bsize)
         {
             for (size_t i = 0; i < stem_len; i++)
@@ -699,6 +707,24 @@ static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
     size_t len = strlen(norm_rel);
     if (len > 3 && (strcmp(norm_rel + len - 3, "_de") == 0 || strcmp(norm_rel + len - 3, "_of") == 0))
         len -= 3;
+    else if (len > 2 && strcmp(norm_rel + len - 2, "_a") == 0)
+        len -= 2;
+    else if (len > 3 && strcmp(norm_rel + len - 3, "_to") == 0)
+        len -= 3;
+    else
+    {
+        /* Infix preposition check: e.g. "aplica_a_motor" -> "aplica" */
+        static const char *infixes[] = {"_a_", "_de_", "_to_", "_for_", "_with_"};
+        for (size_t k = 0; k < sizeof(infixes) / sizeof(infixes[0]); k++)
+        {
+            char *found = strstr(norm_rel, infixes[k]);
+            if (found != NULL && found > norm_rel)
+            {
+                len = (size_t)(found - norm_rel);
+                break;
+            }
+        }
+    }
     if (len == 0 || len >= CHAT_TOKEN_MAX)
         return;
     char es[CHAT_TOKEN_MAX];
@@ -1510,6 +1536,15 @@ static int TokAfterDe(const char toks[][CHAT_TOKEN_MAX], uint32_t n,
     {
         if (strcmp(toks[i], "de") == 0 || strcmp(toks[i], "of") == 0)
         {
+            uint32_t target = i + 1;
+            while (target < n && IsStopTok(toks[target]))
+                target++;
+            if (target < n)
+            {
+                strncpy(out, toks[target], CHAT_TOKEN_MAX - 1);
+                out[CHAT_TOKEN_MAX - 1] = '\0';
+                return 1;
+            }
             strncpy(out, toks[i + 1], CHAT_TOKEN_MAX - 1);
             out[CHAT_TOKEN_MAX - 1] = '\0';
             return 1;
@@ -2810,11 +2845,14 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             p->intent = INT_REL_QUERY;
             return 1;
         }
-        if (FallbackOpen(toks, n, from))
+        uint32_t a_idx = from;
+        while (a_idx < n && IsStopTok(toks[a_idx]))
+            a_idx++;
+        if (a_idx < n && FallbackOpen(toks, n, a_idx))
         {
-            if (!SlotOk(toks[from]))
+            if (!SlotOk(toks[a_idx]))
                 return 0; /* FASE 4 G2 */
-            strncpy(p->a, toks[from], CHAT_TOKEN_MAX - 1);
+            strncpy(p->a, toks[a_idx], CHAT_TOKEN_MAX - 1);
             p->a[CHAT_TOKEN_MAX - 1] = '\0';
             p->kw = kwx;
             p->intent = INT_REL_QUERY;

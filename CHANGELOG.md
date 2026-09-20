@@ -21,8 +21,13 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - Los comandos conversacionales `/load <ruta>` confirman de inmediato en el mensaje cuántos hechos entraron al motor de QA.
 - **Batería de pruebas unitarias para modelos con relaciones personalizadas (`test_model_generic_rel`)**:
   - Verificación end-to-end de serialización, carga binaria, 0 hechos descartados y respuestas de QA exactas en lenguaje natural sin respuestas "I don't know".
+  - Cobertura de consultas en español e inglés con artículos determinados (`¿qué incluye el kit_a?`, `que contiene el kit_pro`, `what includes the kit_a`, `a que aplica el kit_b`).
 
 ### Corregido
+- **Salto de artículos y partículas funcionales en captura de argumentos relacionales (`FallbackOpen`, `TokAfterDe`)**:
+  - En `FallbackOpen` y `TokAfterDe`, el analizador salta de forma no destructiva los artículos y determinantes (`el`, `la`, `los`, `las`, `the`, `un`, `una`, etc.) antes de capturar el argumento relacional. Consultas formuladas de forma natural como `¿qué incluye el kit_a?` o `what includes the kit_a` resuelven limpiamente al identificador objetivo (`kit_a`) en lugar de ser rechazadas por veto de palabras vacías (`SlotOk`).
+  - Soporte composicional para nombres de relaciones con sufijos (`_A`, `_TO`, `_DE`, `_OF`) y separadores infijos (`_a_`, `_de_`, `_to_`, `_for_`, `_with_`) extrayendo la raíz verbal correcta (`APLICA_A` / `APLICA_A_MOTOR` -> `aplica`).
+  - Añadidas equivalencias canónicas en `COMPILED_RELMAP` para dominios industriales y de ingeniería (`INCLUYE`, `INCLUDES`, `APLICA`, `APLICA_A`, `APLICA_A_MOTOR`, `APPLIES_TO`).
 - **Extracción de patrones de comodín (`ExtractGlobPattern`)**:
   - Los signos de interrogación (`?`, `¿`) de preguntas en lenguaje natural (p. ej. *"¿qué es lo que hay en esta carpeta?"*) ahora se tratan como puntuación y no se confunden con comodines de archivo único, resolviendo por defecto al patrón universal `*`.
 - **Visualización del contenido del directorio en inspección de carpetas**:

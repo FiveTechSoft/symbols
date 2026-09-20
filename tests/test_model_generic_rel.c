@@ -44,20 +44,27 @@ int main(void)
     SYMBOL_ID s_france  = SymbolAdd(m->graph->symbols, "francia");
     SYMBOL_ID s_paris   = SymbolAdd(m->graph->symbols, "paris");
 
-    /* Add custom relations: contains, requires, part_of, CONTIENE, capital */
+    SYMBOL_ID s_kit_b   = SymbolAdd(m->graph->symbols, "kit_b");
+    SYMBOL_ID s_motor   = SymbolAdd(m->graph->symbols, "motor_v8");
+
+    /* Add custom relations: contains, requires, part_of, CONTIENE, capital, INCLUYE, APLICA_A */
     SYMBOL_ID r_contains = SymbolAdd(m->graph->symbols, "contains");
     SYMBOL_ID r_requires = SymbolAdd(m->graph->symbols, "requires");
     SYMBOL_ID r_part_of  = SymbolAdd(m->graph->symbols, "part_of");
     SYMBOL_ID r_contiene = SymbolAdd(m->graph->symbols, "CONTIENE");
     SYMBOL_ID r_capital  = SymbolAdd(m->graph->symbols, "capital");
+    SYMBOL_ID r_incluye  = SymbolAdd(m->graph->symbols, "INCLUYE");
+    SYMBOL_ID r_aplica   = SymbolAdd(m->graph->symbols, "APLICA_A");
 
     RelationAdd(m->graph->relations, s_kit_a,   r_contains, s_sensor);
     RelationAdd(m->graph->relations, s_kit_a,   r_requires, s_batt);
     RelationAdd(m->graph->relations, s_sensor,  r_part_of,  s_sys);
     RelationAdd(m->graph->relations, s_kit_pro, r_contiene, s_wifi);
     RelationAdd(m->graph->relations, s_france,  r_capital,  s_paris);
+    RelationAdd(m->graph->relations, s_kit_a,   r_incluye,  s_sensor);
+    RelationAdd(m->graph->relations, s_kit_b,   r_aplica,   s_motor);
 
-    TEST_ASSERT(RelationCount(m->graph->relations) == 5, "5 relations in graph");
+    TEST_ASSERT(RelationCount(m->graph->relations) == 7, "7 relations in graph");
 
     /* Save model to disk */
     int saved = ModelSave(m, bin_path);
@@ -73,8 +80,8 @@ int main(void)
     ChatInit(&ch, bin_path);
 
     uint32_t facts = ChatFactCount(&ch);
-    printf("   Facts loaded into QA engine: %u / 5\n", facts);
-    TEST_ASSERT(facts == 5, "All 5 custom relations learned into QA facts (0 dropped)");
+    printf("   Facts loaded into QA engine: %u / 7\n", facts);
+    TEST_ASSERT(facts == 7, "All 7 custom relations learned into QA facts (0 dropped)");
 
     /* 4. Query QA engine on custom relations */
     char out[1024];
@@ -103,10 +110,10 @@ int main(void)
     TEST_ASSERT(strstr(out, "Telemetry_system") != NULL, "Answer contains 'Telemetry_system'");
     TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
 
-    /* Query 4: kit_pro CONTIENE -> modulo_wifi */
+    /* Query 4: kit_pro CONTIENE -> modulo_wifi (with article 'el' and question marks) */
     memset(out, 0, sizeof(out));
-    ok = ChatHandleToBuf(&ch, "que contiene kit_pro", out, sizeof(out));
-    TEST_ASSERT(ok == 1, "ChatHandleToBuf handled 'que contiene kit_pro'");
+    ok = ChatHandleToBuf(&ch, "que contiene el kit_pro", out, sizeof(out));
+    TEST_ASSERT(ok == 1, "ChatHandleToBuf handled 'que contiene el kit_pro'");
     printf("   Answer: %s\n", out);
     TEST_ASSERT(strstr(out, "Modulo_wifi") != NULL, "Answer contains 'Modulo_wifi'");
     TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
@@ -117,6 +124,30 @@ int main(void)
     TEST_ASSERT(ok == 1, "ChatHandleToBuf handled 'el capital de francia es'");
     printf("   Answer: %s\n", out);
     TEST_ASSERT(strstr(out, "Paris") != NULL, "Answer contains 'Paris'");
+    TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
+
+    /* Query 6: Javier's exact query: '¿qué incluye el kit_a?' */
+    memset(out, 0, sizeof(out));
+    ok = ChatHandleToBuf(&ch, "\xC2\xBFqu\xC3\xA9 incluye el kit_a?", out, sizeof(out));
+    TEST_ASSERT(ok == 1, "ChatHandleToBuf handled '¿qué incluye el kit_a?'");
+    printf("   Answer: %s\n", out);
+    TEST_ASSERT(strstr(out, "Sensor_temp") != NULL, "Answer contains 'Sensor_temp'");
+    TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
+
+    /* Query 7: English with article: 'what includes the kit_a' */
+    memset(out, 0, sizeof(out));
+    ok = ChatHandleToBuf(&ch, "what includes the kit_a", out, sizeof(out));
+    TEST_ASSERT(ok == 1, "ChatHandleToBuf handled 'what includes the kit_a'");
+    printf("   Answer: %s\n", out);
+    TEST_ASSERT(strstr(out, "Sensor_temp") != NULL, "Answer contains 'Sensor_temp'");
+    TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
+
+    /* Query 8: 'a que aplica el kit_b' */
+    memset(out, 0, sizeof(out));
+    ok = ChatHandleToBuf(&ch, "a que aplica el kit_b", out, sizeof(out));
+    TEST_ASSERT(ok == 1, "ChatHandleToBuf handled 'a que aplica el kit_b'");
+    printf("   Answer: %s\n", out);
+    TEST_ASSERT(strstr(out, "Motor_v8") != NULL, "Answer contains 'Motor_v8'");
     TEST_ASSERT(!ServerIsUnknown(out), "Answer is not unknown");
 
     /* 5. Server completions pipeline test */
