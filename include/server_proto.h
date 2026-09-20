@@ -124,4 +124,8 @@ int ServerIsCodingTask(const char *text);
 /* Classify whether a prompt represents a read-only code/workspace inspection task */
 int ServerIsInspectionTask(const char *text);
 
+/* Classify whether a prompt represents a direct code generation or synthesis task */
+int ServerIsCodeSynthesisTask(const char *text);
+
 #endif
+

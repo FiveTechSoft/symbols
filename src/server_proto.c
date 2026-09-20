@@ -97,7 +97,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
         return 0;
     p = *pp + 1;
     out[0] = '\0';
-    while (*p != '\0' && *p != '"' && o + 1 < size)
+    while (*p != '\0' && *p != '"')
     {
         if (*p == '\\')
         {
@@ -105,33 +105,20 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
             char tmp[4];
             int nb = 0;
             p++;
-            if (*p == 'n')
+            char esc_c = 0;
+            if (*p == 'n') esc_c = '\n';
+            else if (*p == 'r') esc_c = '\r';
+            else if (*p == 't') esc_c = '\t';
+            else if (*p == 'b') esc_c = '\b';
+            else if (*p == 'f') esc_c = '\f';
+            else if (*p == '\\' || *p == '"' || *p == '/') esc_c = *p;
+
+            if (esc_c != 0)
             {
-                out[o++] = '\n';
+                if (o + 1 < size)
+                    out[o++] = esc_c;
                 p++;
             }
-            else if (*p == 'r')
-            {
-                out[o++] = '\r';
-                p++;
-            }
-            else if (*p == 't')
-            {
-                out[o++] = '\t';
-                p++;
-            }
-            else if (*p == 'b')
-            {
-                out[o++] = '\b';
-                p++;
-            }
-            else if (*p == 'f')
-            {
-                out[o++] = '\f';
-                p++;
-            }
-            else if (*p == '\\' || *p == '"' || *p == '/')
-                out[o++] = *p++;
             else if (*p == 'u')
             {
                 p++;
@@ -151,7 +138,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
                     v = 0x10000 + ((pending_hi - 0xD800) << 10) +
                         (v - 0xDC00);
                     have_hi = 0;
-                    /* non-BMP: emit replacement (outside vocab) */
+                    /* non-BMP: emit replacement */
                     if (o + 1 < size)
                         out[o++] = '?';
                 }
@@ -165,17 +152,24 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
                 else
                 {
                     nb = DecodeU(v, tmp);
-                    if (o + (size_t)nb >= size)
-                        return 0;
-                    memcpy(out + o, tmp, (size_t)nb);
-                    o += (size_t)nb;
+                    if (o + (size_t)nb < size)
+                    {
+                        memcpy(out + o, tmp, (size_t)nb);
+                        o += (size_t)nb;
+                    }
                 }
             }
             else
-                return 0;
+            {
+                if (*p != '\0') p++;
+            }
         }
         else
-            out[o++] = *p++;
+        {
+            if (o + 1 < size)
+                out[o++] = *p;
+            p++;
+        }
     }
     out[o] = '\0';
     if (have_hi)
@@ -1015,10 +1009,82 @@ int ServerIsInspectionTask(const char *text)
     return 0;
 }
 
+int ServerIsCodeSynthesisTask(const char *text)
+{
+    if (text == NULL || text[0] == '\0')
+        return 0;
+
+    char lower[1024];
+    size_t i = 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    /* If it contains repository action/mutation keywords on existing files, it's a bugfix/action task */
+    static const char *repo_actions[] = {
+        "fix", "bug", "patch", "refactor", "compile", "build", "test",
+        "tests", "replan", "repair", "hunk", "diff", "arregla", "corrige",
+        "compila", "compilar", "ejecuta", "ejecutar", "ctest", "cmake"
+    };
+    for (size_t k = 0; k < sizeof(repo_actions) / sizeof(repo_actions[0]); k++)
+    {
+        if (MatchWordBoundary(lower, repo_actions[k]))
+            return 0;
+    }
+
+    if (ServerIsInspectionTask(text))
+        return 0;
+
+    /* Standalone algorithm / coding prompt keywords */
+    if (strstr(lower, "fibonacci") != NULL || strstr(lower, "factorial") != NULL)
+        return 1;
+
+    static const char *synth_verbs[] = {
+        "escribe", "escribir", "crea", "crear", "genera", "generar",
+        "haz", "hacer", "programa", "programar", "implementa", "implementar",
+        "desarrolla", "desarrollar", "write", "generate", "implement", "code"
+    };
+    int has_verb = 0;
+    for (size_t k = 0; k < sizeof(synth_verbs) / sizeof(synth_verbs[0]); k++)
+    {
+        if (MatchWordBoundary(lower, synth_verbs[k]))
+        {
+            has_verb = 1;
+            break;
+        }
+    }
+
+    static const char *synth_nouns[] = {
+        "funcion", "función", "funciones", "function", "functions",
+        "metodo", "método", "method", "algoritmo", "algorithm",
+        "programa", "program", "codigo", "código",
+        "quicksort", "sort", "ordenar", "ordenamiento",
+        "busqueda", "búsqueda", "puntero", "punteros",
+        "en c", "en c11", "in c", "c code"
+    };
+    int has_noun = 0;
+    for (size_t k = 0; k < sizeof(synth_nouns) / sizeof(synth_nouns[0]); k++)
+    {
+        if (strstr(lower, synth_nouns[k]) != NULL)
+        {
+            has_noun = 1;
+            break;
+        }
+    }
+
+    return (has_verb && has_noun);
+}
+
 int ServerIsCodingTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
         return 0;
+
+    if (ServerIsCodeSynthesisTask(text))
+        return 1;
 
     char lower[1024];
     size_t i = 0;
@@ -1057,7 +1123,10 @@ int ServerIsCodingTask(const char *text)
         "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status", "proyecto",
         "subcarpetas", "subcarpeta", "subdirectorios", "subdirectorio",
         "subfolders", "subdirectories", "lista", "listar",
-        "crear", "crea", "create", "archivo", "fichero"
+        "crear", "crea", "create", "archivo", "fichero",
+        "escribe", "escribir", "genera", "generar", "programa", "programar",
+        "implementa", "implementar", "funcion", "función", "funciones",
+        "fibonacci", "factorial"
     };
 
     for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)
@@ -1071,5 +1140,6 @@ int ServerIsCodingTask(const char *text)
 
     return 0;
 }
+
 
 

@@ -152,13 +152,23 @@ static void test_coding_task_intent(void)
     /* File creation tasks */
     TEST_ASSERT(ServerIsCodingTask("crea un fichero test.txt") == 1, "Detects 'crea un fichero test.txt'");
     TEST_ASSERT(ServerIsInspectionTask("crea un fichero test.txt") == 0, "File creation is not read-only inspection");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("crea un fichero test.txt") == 0, "File creation is not pure code synthesis");
+
+    /* Code synthesis tasks */
+    TEST_ASSERT(ServerIsCodingTask("escribe en C la funcion de fibonacci") == 1, "Detects 'escribe en C la funcion de fibonacci'");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("escribe en C la funcion de fibonacci") == 1, "Classifies as code synthesis");
+    TEST_ASSERT(ServerIsInspectionTask("escribe en C la funcion de fibonacci") == 0, "Code synthesis is not inspection");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("write a function to calculate factorial") == 1, "Classifies 'write a function...' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("lista las subcarpetas") == 0, "Inspection is not code synthesis");
 
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("Who is the father of Solomon?") == 0, "Factual query is not code synthesis");
     TEST_ASSERT(ServerIsCodingTask("Tell me about wisdom and proverbs") == 0, "Topical query is not coding task");
     TEST_ASSERT(ServerIsCodingTask("What areas do you know?") == 0, "Introspection query is not coding task");
     TEST_ASSERT(ServerIsInspectionTask("Who is the father of Solomon?") == 0, "Factual query is not inspection");
 }
+
 
 /* 6. Test Tool Error and Diagnostic Validation */
 static void test_tool_error_validation(void)

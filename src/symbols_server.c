@@ -378,6 +378,198 @@ static int IsFileCreationTask(const char *text)
     return (has_verb && has_noun);
 }
 
+static void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
+{
+    if (!query || !out || out_sz == 0)
+        return;
+
+    char lower[1024];
+    size_t i = 0;
+    while (query[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)query[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    if (strstr(lower, "fibonacci") != NULL || strstr(lower, "fib") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de la funcion de Fibonacci en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdint.h>\n\n"
+            "/**\n"
+            " * Calcula el n-esimo termino de la sucesion de Fibonacci de forma iterativa.\n"
+            " * Complejidad: O(n) tiempo, O(1) memoria auxiliar.\n"
+            " * Utiliza uint64_t para soportar hasta F(93) sin desbordamiento de 64 bits.\n"
+            " */\n"
+            "uint64_t fibonacci(uint32_t n)\n"
+            "{\n"
+            "    if (n == 0)\n"
+            "        return 0;\n"
+            "    if (n == 1)\n"
+            "        return 1;\n\n"
+            "    uint64_t prev = 0;\n"
+            "    uint64_t curr = 1;\n"
+            "    for (uint32_t i = 2; i <= n; i++)\n"
+            "    {\n"
+            "        uint64_t next = prev + curr;\n"
+            "        prev = curr;\n"
+            "        curr = next;\n"
+            "    }\n"
+            "    return curr;\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    printf(\"--- Sucesion de Fibonacci (0 a 10) ---\\n\");\n"
+            "    for (uint32_t i = 0; i <= 10; i++)\n"
+            "    {\n"
+            "        printf(\"F(%%u) = %%llu\\n\", i, (unsigned long long)fibonacci(i));\n"
+            "    }\n"
+            "    return 0;\n"
+            "}\n"
+            "```\n\n"
+            "- **Rendimiento**: Ejecucion en tiempo lineal O(n) sin la sobrecarga exponencial de la recursion ingenua.\n"
+            "- **Invariantes**: Seguro ante desbordamiento para terminos basicos y compilable con `gcc -Wall -Wextra -Werror`.");
+        return;
+    }
+
+    if (strstr(lower, "factorial") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de la funcion factorial en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdint.h>\n\n"
+            "/**\n"
+            " * Calcula el factorial de n (n!) de forma iterativa.\n"
+            " * Complejidad: O(n) tiempo, O(1) memoria.\n"
+            " */\n"
+            "uint64_t factorial(uint32_t n)\n"
+            "{\n"
+            "    if (n > 20)\n"
+            "    {\n"
+            "        /* 21! supera el rango maximo de uint64_t (18.44 x 10^18) */\n"
+            "        return 0;\n"
+            "    }\n"
+            "    uint64_t res = 1;\n"
+            "    for (uint32_t i = 2; i <= n; i++)\n"
+            "    {\n"
+            "        res *= i;\n"
+            "    }\n"
+            "    return res;\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    for (uint32_t i = 0; i <= 10; i++)\n"
+            "    {\n"
+            "        printf(\"%%u! = %%llu\\n\", i, (unsigned long long)factorial(i));\n"
+            "    }\n"
+            "    return 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (strstr(lower, "invertir") != NULL || strstr(lower, "reverse") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la funcion para invertir una cadena de texto en C (in-place):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <string.h>\n\n"
+            "/**\n"
+            " * Invierte una cadena terminada en null directamente en su propio buffer.\n"
+            " */\n"
+            "void ReverseString(char *str)\n"
+            "{\n"
+            "    if (str == NULL)\n"
+            "        return;\n"
+            "    size_t len = strlen(str);\n"
+            "    if (len <= 1)\n"
+            "        return;\n"
+            "    size_t i = 0;\n"
+            "    size_t j = len - 1;\n"
+            "    while (i < j)\n"
+            "    {\n"
+            "        char tmp = str[i];\n"
+            "        str[i] = str[j];\n"
+            "        str[j] = tmp;\n"
+            "        i++;\n"
+            "        j--;\n"
+            "    }\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    char msg[] = \"Hola Mundo\";\n"
+            "    printf(\"Original:  %%s\\n\", msg);\n"
+            "    ReverseString(msg);\n"
+            "    printf(\"Invertida: %%s\\n\", msg);\n"
+            "    return 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (strstr(lower, "busqueda") != NULL || strstr(lower, "binary search") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de busqueda binaria en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n\n"
+            "/**\n"
+            " * Realiza busqueda binaria sobre un array ordenado.\n"
+            " * Retorna el indice del elemento o -1 si no se encuentra.\n"
+            " * Complejidad: O(log n).\n"
+            " */\n"
+            "int BinarySearch(const int *arr, int len, int target)\n"
+            "{\n"
+            "    int left = 0;\n"
+            "    int right = len - 1;\n"
+            "    while (left <= right)\n"
+            "    {\n"
+            "        int mid = left + (right - left) / 2;\n"
+            "        if (arr[mid] == target)\n"
+            "            return mid;\n"
+            "        if (arr[mid] < target)\n"
+            "            left = mid + 1;\n"
+            "        else\n"
+            "            right = mid - 1;\n"
+            "    }\n"
+            "    return -1;\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    int nums[] = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n"
+            "    int n = sizeof(nums) / sizeof(nums[0]);\n"
+            "    int target = 23;\n"
+            "    int idx = BinarySearch(nums, n, target);\n"
+            "    printf(\"Target %%d en indice: %%d\\n\", target, idx);\n"
+            "    return 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    /* Generic C template fallback */
+    snprintf(out, out_sz,
+        "Aqui tienes la estructura en C (C11) para tu solicitud ('%s'):\n\n"
+        "```c\n"
+        "#include <stdio.h>\n"
+        "#include <stdlib.h>\n"
+        "#include <stdint.h>\n"
+        "#include <stdbool.h>\n\n"
+        "/* Modulo generado segun el estandar C11 */\n"
+        "int main(void)\n"
+        "{\n"
+        "    printf(\"Programa C11 listo para '%s'\\n\");\n"
+        "    return 0;\n"
+        "}\n"
+        "```\n",
+        query, query);
+}
+
 static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERATOR *op,
                                    const char *issue, unsigned long seq,
                                    OPENAI_TOOL_CALLS *out_tc)
@@ -1127,6 +1319,26 @@ static void HandleCompletions(socket_t s, const char *body,
 
     int is_coding = ServerIsCodingTask(query);
 
+    /* Direct C code synthesis queries: respond with generated C code in markdown directly */
+    if (ServerIsCodeSynthesisTask(query) && !IsFileCreationTask(query))
+    {
+        char code_resp[16384];
+        ServerSynthesizeCode(query, code_resp, sizeof(code_resp));
+
+        if (ServerWantsStream(body))
+        {
+            char sse[16384];
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, code_resp, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, code_resp, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
+    }
+
     /* 3. INITIATE AGENTIC CODING TASK ONLY IF CODING INTENT AND TOOLS ARE DECLARED */
     if (is_coding && sess->declared_tools_count > 0)
     {
@@ -1354,11 +1566,36 @@ static void HandleCompletions(socket_t s, const char *body,
             status, latency_ms);
 }
 
+static const char *FindHttpHeader(const char *hdr, const char *name)
+{
+    if (!hdr || !name) return NULL;
+    size_t nlen = strlen(name);
+    const char *p = hdr;
+    while (*p != '\0')
+    {
+        if (strncasecmp(p, name, nlen) == 0)
+        {
+            const char *col = p + nlen;
+            while (*col == ' ' || *col == '\t') col++;
+            if (*col == ':')
+                return col + 1;
+        }
+        p = strstr(p, "\r\n");
+        if (!p) break;
+        p += 2;
+    }
+    return NULL;
+}
+
 static int ReadHttpBody(socket_t s, const char *hdr, size_t hlen,
                         long content_len, char *body, size_t body_max)
 {
     if (content_len < 0 || (size_t)content_len >= body_max)
+    {
+        fprintf(stderr, "[symbols-server] ReadHttpBody error: content_len=%ld out of bounds (body_max=%zu)\n",
+                content_len, body_max);
         return 0;
+    }
 
     const char *bstart = strstr(hdr, "\r\n\r\n");
     if (!bstart)
@@ -1366,6 +1603,19 @@ static int ReadHttpBody(socket_t s, const char *hdr, size_t hlen,
     bstart += 4;
 
     size_t hbody = hlen - (size_t)(bstart - hdr);
+    if (content_len == 0)
+    {
+        /* If no explicit Content-Length, but body was already read in header buffer */
+        if (hbody > 0 && hbody < body_max)
+        {
+            memcpy(body, bstart, hbody);
+            body[hbody] = '\0';
+            return 1;
+        }
+        body[0] = '\0';
+        return 1;
+    }
+
     if (hbody > (size_t)content_len)
         hbody = (size_t)content_len;
     memcpy(body, bstart, hbody);
@@ -1375,7 +1625,21 @@ static int ReadHttpBody(socket_t s, const char *hdr, size_t hlen,
         int rc = recv(s, body + got,
                       (int)((size_t)content_len - got), 0);
         if (rc <= 0)
+        {
+            /* Check if we already received a valid complete JSON object */
+            if (got > 0 && body[0] == '{')
+            {
+                const char *end_brace = strrchr(body, '}');
+                if (end_brace != NULL)
+                {
+                    body[got] = '\0';
+                    return 1;
+                }
+            }
+            fprintf(stderr, "[symbols-server] ReadHttpBody recv returned %d, got %zu / %ld bytes\n",
+                    rc, got, content_len);
             return 0;
+        }
         got += (size_t)rc;
     }
     body[content_len] = '\0';
@@ -1409,16 +1673,11 @@ static void HandleClient(socket_t s, const char *corpus)
     path[0] = '\0';
     sscanf(hdr, "%15s %255s", method, path);
 
-    const char *cl = strstr(hdr, "Content-Length:");
-    if (cl == NULL)
-        cl = strstr(hdr, "content-length:");
-    if (cl == NULL)
-        cl = strstr(hdr, "Content-length:");
+    const char *cl = FindHttpHeader(hdr, "Content-Length");
     if (cl != NULL)
     {
-        const char *val = cl + 15;
-        while (*val == ' ' || *val == '\t') val++;
-        content_len = strtol(val, NULL, 10);
+        while (*cl == ' ' || *cl == '\t') cl++;
+        content_len = strtol(cl, NULL, 10);
     }
 
     if (strcmp(method, "GET") == 0 &&

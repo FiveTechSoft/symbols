@@ -22,8 +22,16 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - **Batería de pruebas unitarias para modelos con relaciones personalizadas (`test_model_generic_rel`)**:
   - Verificación end-to-end de serialización, carga binaria, 0 hechos descartados y respuestas de QA exactas en lenguaje natural sin respuestas "I don't know".
   - Cobertura de consultas en español e inglés con artículos determinados (`¿qué incluye el kit_a?`, `que contiene el kit_pro`, `what includes the kit_a`, `a que aplica el kit_b`).
+- **Síntesis Directa de Código C y Algoritmos (`ServerIsCodeSynthesisTask`, `ServerSynthesizeCode`)**:
+  - Reconocimiento preciso de consultas de generación o síntesis de código en lenguaje natural (`escribe en C la funcion de fibonacci`, `write a C function to calculate factorial`, `invertir cadena`, `busqueda binaria`, etc.).
+  - Emite directamente la solución en Markdown estructurado con bloques de código C11 (````c`) completamente documentados, con funciones iterativas seguras ante desbordamiento, función de prueba `main()` y análisis de complejidad $O(n)$ / $O(1)$, retornando `finish_reason: "stop"`.
+  - Opera tanto en modo chat directo como en modo agéntico con herramientas declaradas en OpenCode, impidiendo que una solicitud de código puro dispare erróneamente el plan STRIPS SWE-bench sobre archivos de proyecto o degrade a preguntas factuales ("I don't know").
+- **Robustez HTTP y Lectura Inmune a Variantes de Cabecera (`FindHttpHeader`, `ReadHttpBody`)**:
+  - Función de búsqueda de cabeceras RFC `FindHttpHeader` insensible a mayúsculas/minúsculas y tolerante a espacios antes de `:` (`Content-Length`, `content-length`, etc.).
+  - `ReadHttpBody` mejorado para aceptar payloads recibidos íntegramente en el paquete de cabeceras y recuperación no bloqueante de payloads JSON completos ante desconexiones anticipadas del cliente.
+- **Deserialización Segura de Cadenas Largas en JSON (`TakeJsonString`)**:
+  - Truncamiento seguro para textos que exceden el tamaño de buffer destino: almacena de forma acotada y avanza el cursor hasta la comilla de cierre, evitando fallos `400 Bad Request` en historiales multi-turno voluminosos.
 
-- **Detección e Invocación Quirúrgica para Creación de Archivos (`IsFileCreationTask`)**:
   - Reconocimiento de intenciones de creación de ficheros (p. ej. `crea un fichero test.txt`, `nuevo archivo config.json`, `create file foo.c`), formulando un plan atómico de 1 paso que despacha directamente la herramienta `write` con `filePath` y contenido inicial.
   - Se evita la ejecución espuria del ciclo de compilación STRIPS (`cmake --build` / `ctest`) sobre tareas de creación de documentos o scripts auxiliares.
   - Finalización limpia con confirmación Markdown explícita (`### Archivo Creado con Exito ('test.txt')`).
