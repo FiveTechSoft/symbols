@@ -146,6 +146,12 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsInspectionTask("ls -la") == 1, "Classifies 'ls -la' as inspection");
     TEST_ASSERT(ServerIsCodingTask("*.c") == 1, "Detects '*.c'");
     TEST_ASSERT(ServerIsInspectionTask("*.c") == 1, "Classifies '*.c' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("lista las subcarpetas") == 1, "Detects 'lista las subcarpetas'");
+    TEST_ASSERT(ServerIsInspectionTask("lista las subcarpetas") == 1, "Classifies 'lista las subcarpetas' as inspection");
+
+    /* File creation tasks */
+    TEST_ASSERT(ServerIsCodingTask("crea un fichero test.txt") == 1, "Detects 'crea un fichero test.txt'");
+    TEST_ASSERT(ServerIsInspectionTask("crea un fichero test.txt") == 0, "File creation is not read-only inspection");
 
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");
@@ -183,7 +189,29 @@ static void test_tool_error_validation(void)
     TEST_ASSERT(ok2 == 1, "Extracted compiler error diagnostic");
     TEST_ASSERT(resp2.is_error == 1, "Flagged is_error == 1 due to compiler diagnostic");
 
-    /* 6c: Tool returns clean success */
+    /* 6c: Tool returns plain text error (cmake cache error) */
+    const char *cmake_err_payload =
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_003b\",\"name\":\"bash\","
+        "\"content\":\"Error: could not load cache\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp_cmake;
+    int ok_cmake = ServerExtractLastToolResponse(cmake_err_payload, &resp_cmake);
+    TEST_ASSERT(ok_cmake == 1, "Extracted cmake error response");
+    TEST_ASSERT(resp_cmake.is_error == 1, "Flagged is_error == 1 for 'Error: could not load cache'");
+
+    /* 6d: Tool returns 'No tests were found' */
+    const char *ctest_err_payload =
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_003c\",\"name\":\"bash\","
+        "\"content\":\"Test project C:/tmp\\nNo tests were found!!!\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp_ctest;
+    int ok_ctest = ServerExtractLastToolResponse(ctest_err_payload, &resp_ctest);
+    TEST_ASSERT(ok_ctest == 1, "Extracted ctest error response");
+    TEST_ASSERT(resp_ctest.is_error == 1, "Flagged is_error == 1 for 'No tests were found'");
+
+    /* 6e: Tool returns clean success */
     const char *ok_payload = 
         "{\"model\":\"symbols\",\"messages\":["
         "{\"role\":\"tool\",\"tool_call_id\":\"call_004\",\"name\":\"execute_command\","

@@ -23,17 +23,23 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - Verificación end-to-end de serialización, carga binaria, 0 hechos descartados y respuestas de QA exactas en lenguaje natural sin respuestas "I don't know".
   - Cobertura de consultas en español e inglés con artículos determinados (`¿qué incluye el kit_a?`, `que contiene el kit_pro`, `what includes the kit_a`, `a que aplica el kit_b`).
 
-### Corregido
-- **Salto de artículos y partículas funcionales en captura de argumentos relacionales (`FallbackOpen`, `TokAfterDe`)**:
-  - En `FallbackOpen` y `TokAfterDe`, el analizador salta de forma no destructiva los artículos y determinantes (`el`, `la`, `los`, `las`, `the`, `un`, `una`, etc.) antes de capturar el argumento relacional. Consultas formuladas de forma natural como `¿qué incluye el kit_a?` o `what includes the kit_a` resuelven limpiamente al identificador objetivo (`kit_a`) en lugar de ser rechazadas por veto de palabras vacías (`SlotOk`).
-  - Soporte composicional para nombres de relaciones con sufijos (`_A`, `_TO`, `_DE`, `_OF`) y separadores infijos (`_a_`, `_de_`, `_to_`, `_for_`, `_with_`) extrayendo la raíz verbal correcta (`APLICA_A` / `APLICA_A_MOTOR` -> `aplica`).
-  - Añadidas equivalencias canónicas en `COMPILED_RELMAP` para dominios industriales y de ingeniería (`INCLUYE`, `INCLUDES`, `APLICA`, `APLICA_A`, `APLICA_A_MOTOR`, `APPLIES_TO`).
-- **Extracción de patrones de comodín (`ExtractGlobPattern`)**:
-  - Los signos de interrogación (`?`, `¿`) de preguntas en lenguaje natural (p. ej. *"¿qué es lo que hay en esta carpeta?"*) ahora se tratan como puntuación y no se confunden con comodines de archivo único, resolviendo por defecto al patrón universal `*`.
-- **Visualización del contenido del directorio en inspección de carpetas**:
-  - Preservación íntegra de la salida devuelta por la herramienta `glob` en el resumen final de Markdown para que el usuario siempre vea la lista real de archivos.
-- **Traducción de consultas no entendidas**:
-  - Corregido el fallo por el cual consultas legítimas sobre modelos binarios cargados devolvían "I don't know." debido a que las relaciones no se habían ingresado en `ch->kb`.
+- **Detección e Invocación Quirúrgica para Creación de Archivos (`IsFileCreationTask`)**:
+  - Reconocimiento de intenciones de creación de ficheros (p. ej. `crea un fichero test.txt`, `nuevo archivo config.json`, `create file foo.c`), formulando un plan atómico de 1 paso que despacha directamente la herramienta `write` con `filePath` y contenido inicial.
+  - Se evita la ejecución espuria del ciclo de compilación STRIPS (`cmake --build` / `ctest`) sobre tareas de creación de documentos o scripts auxiliares.
+  - Finalización limpia con confirmación Markdown explícita (`### Archivo Creado con Exito ('test.txt')`).
+- **Gestión de Cargas HTTP de Gran Tamaño en Sesiones Multi-Turno (`SERVER_BODY_MAX`)**:
+  - Ampliado el buffer máximo de peticiones HTTP a 2 MB (`2097152` bytes) y trasladado a memoria estática (`g_http_body`), eliminando de raíz el error `400 Bad Request: bad content length` que se producía cuando el cliente OpenCode enviaba esquemas de herramientas y varias vueltas de historial con salidas de archivo superiores a 64 KB.
+  - Búferes estáticos de respuesta (`content`: 32 KB, `resp`: 64 KB, `last_tool_output`: 16 KB) previniendo desbordamientos de pila y truncamientos en inspección de árboles de directorio extensos.
+- **Compatibilidad RFC para Cabeceras HTTP (`Content-Length`)**:
+  - Comprobación insensible a mayúsculas/minúsculas para `Content-Length:`, `content-length:` y `Content-length:`.
+- **Ampliación Léxica de Exploración e Inspección**:
+  - Soporte en `ServerIsInspectionTask`, `ServerIsCodingTask` y `IsFolderOrGlobQuery` para comandos de exploración natural como `lista las subcarpetas`, `subdirectorios`, `subfolders`, `listar`, etc., despachando automáticamente la herramienta `glob` de OpenCode.
+- **Corrección de Extracción de Nombres de Archivo (`FindFileForIssue`)**:
+  - Eliminado el punto `.` como delimitador en `strtok` y añadido saneamiento de puntuación de cola (`.` `,` `;` `?` `)`), permitiendo extraer con total fidelidad nombres reales con extensión (`test.txt`, `main.c`, `config.json`, etc.) en lugar de degradar erróneamente a `CMakeLists.txt`.
+- **Detección Rigurosa de Errores de Terminal y Herramientas (`ServerInspectToolResponse`)**:
+  - `ServerInspectToolResponse` detecta ahora salidas de fallo en texto plano de herramientas como `bash` y `cmake` (p. ej. `Error: could not load cache`, `No tests were found`, `command not found`, `Permission denied`), impidiendo reportes falsos de verificación aprobada cuando una herramienta falla sin código JSON explícito.
+- **Soporte para Formato de Contenido de Usuario en Array**:
+  - `ServerExtractQuery` procesa tanto el formato simple de cadena (`"content": "..."`) como el formato en array estándar de OpenAI (`"content": [{"type": "text", "text": "..."}]`).
 
 ---
 

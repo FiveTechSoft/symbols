@@ -25,9 +25,11 @@
 
 #define SERVER_PORT_DEFAULT 8099
 #define SERVER_HDR_MAX 16384
-#define SERVER_BODY_MAX 65536
+#define SERVER_BODY_MAX (2 * 1024 * 1024)
 #define SERVER_OBS_FILE "observations.jsonl"
 #define SERVER_MODEL_ID "symbols"
+
+static char g_http_body[SERVER_BODY_MAX + 1];
 
 static int SendAll(socket_t s, const char *buf, size_t len)
 {
@@ -204,7 +206,7 @@ typedef struct
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
-    char              last_tool_output[4096];
+    char              last_tool_output[16384];
 
     /* Persona conditioning */
     PERSONA_ID        persona_id;
@@ -242,14 +244,26 @@ static const char *FindFileForIssue(const char *issue)
     strncpy(buf, issue, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-    char *tok = strtok(buf, " \t\r\n,.;:\"'()");
+    char *tok = strtok(buf, " \t\r\n,;:\"'()<>{}`");
     while (tok)
     {
+        /* Strip any trailing punctuation */
+        size_t tlen = strlen(tok);
+        while (tlen > 0 && (tok[tlen - 1] == '.' || tok[tlen - 1] == ',' || tok[tlen - 1] == ';' ||
+                            tok[tlen - 1] == '?' || tok[tlen - 1] == '!' || tok[tlen - 1] == ')' ||
+                            tok[tlen - 1] == '\"' || tok[tlen - 1] == '\''))
+        {
+            tok[--tlen] = '\0';
+        }
+
         const char *dot = strrchr(tok, '.');
         if (dot && (strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0 ||
                     strcmp(dot, ".cpp") == 0 || strcmp(dot, ".py") == 0 ||
                     strcmp(dot, ".ts") == 0 || strcmp(dot, ".js") == 0 ||
-                    strcmp(dot, ".md") == 0 || strcmp(dot, ".txt") == 0))
+                    strcmp(dot, ".md") == 0 || strcmp(dot, ".txt") == 0 ||
+                    strcmp(dot, ".json") == 0 || strcmp(dot, ".yml") == 0 ||
+                    strcmp(dot, ".yaml") == 0 || strcmp(dot, ".toml") == 0 ||
+                    strcmp(dot, ".sh") == 0 || strcmp(dot, ".bat") == 0))
         {
             strncpy(found_path, tok, sizeof(found_path) - 1);
             found_path[sizeof(found_path) - 1] = '\0';
@@ -262,7 +276,7 @@ static const char *FindFileForIssue(const char *issue)
             if (file)
                 return file;
         }
-        tok = strtok(NULL, " \t\r\n,.;:\"'()");
+        tok = strtok(NULL, " \t\r\n,;:\"'()<>{}`");
     }
     return NULL;
 }
@@ -318,7 +332,9 @@ static int IsFolderOrGlobQuery(const char *text)
         "folder", "directory", "carpeta", "directorio", "workspace",
         "repo", "repository", "repositorio", "dir", "ls", "tree", "files",
         "archivos", "ficheros", "codebase", "project", "proyecto",
-        "estructura", "structure", "pwd"
+        "estructura", "structure", "pwd", "subcarpetas", "subcarpeta",
+        "subdirectorios", "subdirectorio", "subfolders", "subdirectories",
+        "lista", "listar"
     };
     for (size_t k = 0; k < sizeof(folder_kws) / sizeof(folder_kws[0]); k++)
     {
@@ -337,6 +353,31 @@ static int IsFolderOrGlobQuery(const char *text)
     return 0;
 }
 
+static int IsFileCreationTask(const char *text)
+{
+    if (!text) return 0;
+    char lower[512];
+    size_t i = 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    if (strchr(lower, '?') || strstr(lower, "\xC2\xBF"))
+        return 0;
+
+    int has_verb = (strstr(lower, "crea") != NULL || strstr(lower, "crear") != NULL ||
+                    strstr(lower, "create") != NULL || strstr(lower, "nuevo") != NULL ||
+                    strstr(lower, "new") != NULL || strstr(lower, "touch") != NULL ||
+                    strstr(lower, "make") != NULL || strstr(lower, "haz") != NULL);
+    int has_noun = (strstr(lower, "fichero") != NULL || strstr(lower, "archivo") != NULL ||
+                    strstr(lower, "file") != NULL || strchr(lower, '.') != NULL);
+
+    return (has_verb && has_noun);
+}
+
 static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERATOR *op,
                                    const char *issue, unsigned long seq,
                                    OPENAI_TOOL_CALLS *out_tc)
@@ -349,7 +390,39 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
     if (!target_file)
         target_file = "CMakeLists.txt";
 
-    if (strcmp(op->name, "locate_symbol") == 0)
+    if (strcmp(op->name, "create_file") == 0)
+    {
+        if (HasDeclaredTool(sess, "write"))
+        {
+            strncpy(out_tc->calls[0].name, "write", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\",\"content\":\"\"}", target_file);
+        }
+        else if (HasDeclaredTool(sess, "bash"))
+        {
+            strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"touch %s\"}", target_file);
+        }
+        else if (HasDeclaredTool(sess, "edit"))
+        {
+            strncpy(out_tc->calls[0].name, "edit", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\"}", target_file);
+        }
+        else if (sess && sess->declared_tools_count > 0)
+        {
+            strncpy(out_tc->calls[0].name, sess->declared_tools[0], sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].arguments, "{}", sizeof(out_tc->calls[0].arguments) - 1);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "write", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\",\"content\":\"\"}", target_file);
+        }
+    }
+    else if (strcmp(op->name, "locate_symbol") == 0)
     {
         int is_folder = IsFolderOrGlobQuery(issue);
         if (is_folder && HasDeclaredTool(sess, "glob"))
@@ -616,7 +689,10 @@ static ServerSession *GetOrCreateSession(const char *session_id)
 static void HandleCompletions(socket_t s, const char *body,
                               const char *corpus)
 {
-    char query[4096], raw[4096], content[4096], resp[12288];
+    char query[4096], raw[4096];
+    static char content[32768];
+    static char resp[65536];
+    static char sse[65536];
     char obs[16384], ts[32], ent_json[2048], prov_json[4096];
     char session_id[64] = "default";
     ServerSession *sess = NULL;
@@ -805,7 +881,19 @@ static void HandleCompletions(socket_t s, const char *body,
             }
             else
             {
-                if (ServerIsInspectionTask(sess->current_issue))
+                if (IsFileCreationTask(sess->current_issue))
+                {
+                    const char *target_file = FindFileForIssue(sess->current_issue);
+                    if (!target_file) target_file = "archivo";
+                    snprintf(content, sizeof(content),
+                             "### Archivo Creado con Exito ('%s')\n\n"
+                             "Se ha creado el archivo `%s` en el espacio de trabajo.\n"
+                             "- **Estado**: Creado con exito\n"
+                             "- **Archivo**: %s\n\n"
+                             "El archivo esta listo para su edicion o uso en el proyecto.",
+                             target_file, target_file, target_file);
+                }
+                else if (ServerIsInspectionTask(sess->current_issue))
                 {
                     if (sess->last_tool_output[0] != '\0')
                     {
@@ -1051,17 +1139,38 @@ static void HandleCompletions(socket_t s, const char *body,
         memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
 
+        int is_creation = IsFileCreationTask(query);
         int is_inspection = ServerIsInspectionTask(query);
         int is_folder_glob = IsFolderOrGlobQuery(query);
-        uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
-                        (is_inspection ? PRED_CODE_INSPECTED :
-                        (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED));
 
-        AGENT_PLANNER planner;
-        AgentPlannerInit(&planner);
-        AgentPlannerFormulate(&planner, query, PRED_SYMBOL_KNOWN,
-                              goal,
-                              &sess->current_plan);
+        if (is_creation)
+        {
+            sess->current_plan.step_count = 1;
+            strncpy(sess->current_plan.goal_description, query, sizeof(sess->current_plan.goal_description) - 1);
+            sess->current_plan.initial_state = PRED_SYMBOL_KNOWN;
+            sess->current_plan.goal_state = PRED_PATCH_APPLIED;
+            sess->current_plan.steps[0].op = (STRIPS_OPERATOR){
+                .tool_id = OP_TOOL_REPLACE_CONTENT,
+                .preconditions = PRED_SYMBOL_KNOWN,
+                .add_effects = PRED_PATCH_APPLIED,
+                .del_effects = 0,
+                .cost = 1
+            };
+            strncpy(sess->current_plan.steps[0].op.name, "create_file", sizeof(sess->current_plan.steps[0].op.name) - 1);
+            strncpy(sess->current_plan.steps[0].op.description, "Create new file in workspace", sizeof(sess->current_plan.steps[0].op.description) - 1);
+        }
+        else
+        {
+            uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
+                            (is_inspection ? PRED_CODE_INSPECTED :
+                            (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED));
+
+            AGENT_PLANNER planner;
+            AgentPlannerInit(&planner);
+            AgentPlannerFormulate(&planner, query, PRED_SYMBOL_KNOWN,
+                                  goal,
+                                  &sess->current_plan);
+        }
 
         /* Advance past any internal OP_TOOL_NONE operators */
         while (sess->current_step_idx < sess->current_plan.step_count &&
@@ -1076,15 +1185,17 @@ static void HandleCompletions(socket_t s, const char *body,
             OPENAI_TOOL_CALLS tc;
             FormatOperatorToolCall(sess, first_op, sess->current_issue, ++g_seq, &tc);
 
-            const char *thought = is_inspection ?
+            const char *thought = is_creation ?
+                "Formulated file creation plan for workspace. Initiating write step." :
+                (is_inspection ?
                 "Formulated inspection plan for workspace. Initiating exploration." :
-                "Formulated STRIPS plan to resolve coding task. Initiating first step.";
+                "Formulated STRIPS plan to resolve coding task. Initiating first step.");
 
             if (ServerWantsStream(body))
             {
-                char sse[16384];
-                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc, sse, sizeof(sse));
-                SendRaw(s, 200, "OK", "text/event-stream", sse);
+                char sse_local[16384];
+                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc, sse_local, sizeof(sse_local));
+                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
             }
             else
             {
@@ -1098,8 +1209,17 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     else if (is_coding && sess->declared_tools_count == 0)
     {
-        /* Coding or inspection query, but client declared no tools */
-        if (g_server_code_graph != NULL)
+        int is_creation = IsFileCreationTask(query);
+        if (is_creation)
+        {
+            const char *target_file = FindFileForIssue(query);
+            if (!target_file) target_file = "archivo";
+            snprintf(content, sizeof(content),
+                     "### Solicitud de Creacion de Archivo ('%s')\n\n"
+                     "Para crear '%s' directamente en el espacio de trabajo, habilita las herramientas de agente (tools) en tu cliente OpenCode.",
+                     target_file, target_file);
+        }
+        else if (g_server_code_graph != NULL)
         {
             snprintf(content, sizeof(content),
                      "### Repositorio de Codigo Indexado\n\n"
@@ -1289,9 +1409,17 @@ static void HandleClient(socket_t s, const char *corpus)
     path[0] = '\0';
     sscanf(hdr, "%15s %255s", method, path);
 
-    char *cl = strstr(hdr, "Content-Length:");
+    const char *cl = strstr(hdr, "Content-Length:");
+    if (cl == NULL)
+        cl = strstr(hdr, "content-length:");
+    if (cl == NULL)
+        cl = strstr(hdr, "Content-length:");
     if (cl != NULL)
-        content_len = strtol(cl + 15, NULL, 10);
+    {
+        const char *val = cl + 15;
+        while (*val == ' ' || *val == '\t') val++;
+        content_len = strtol(val, NULL, 10);
+    }
 
     if (strcmp(method, "GET") == 0 &&
         strcmp(path, "/v1/models") == 0)
@@ -1304,14 +1432,13 @@ static void HandleClient(socket_t s, const char *corpus)
     if (strcmp(method, "POST") == 0 &&
         (strcmp(path, "/v1/model/load") == 0 || strcmp(path, "/v1/models/load") == 0))
     {
-        static char body[SERVER_BODY_MAX + 1];
-        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
+        if (!ReadHttpBody(s, hdr, hlen, content_len, g_http_body, sizeof(g_http_body)))
         {
             SendError(s, 400, "Bad Request", "bad content length or body");
             return;
         }
         char target_path[512] = {0};
-        const char *p = strstr(body, "\"path\"");
+        const char *p = strstr(g_http_body, "\"path\"");
         if (p)
         {
             const char *col = strchr(p, ':');
@@ -1372,14 +1499,13 @@ static void HandleClient(socket_t s, const char *corpus)
     if (strcmp(method, "POST") == 0 &&
         (strcmp(path, "/v1/model/save") == 0 || strcmp(path, "/v1/models/save") == 0))
     {
-        static char body[SERVER_BODY_MAX + 1];
-        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
+        if (!ReadHttpBody(s, hdr, hlen, content_len, g_http_body, sizeof(g_http_body)))
         {
             SendError(s, 400, "Bad Request", "bad content length or body");
             return;
         }
         char target_path[512] = {0};
-        const char *p = strstr(body, "\"path\"");
+        const char *p = strstr(g_http_body, "\"path\"");
         if (p)
         {
             const char *col = strchr(p, ':');
@@ -1420,13 +1546,12 @@ static void HandleClient(socket_t s, const char *corpus)
     if (strcmp(method, "POST") == 0 &&
         strcmp(path, "/v1/chat/completions") == 0)
     {
-        static char body[SERVER_BODY_MAX + 1];
-        if (!ReadHttpBody(s, hdr, hlen, content_len, body, sizeof(body)))
+        if (!ReadHttpBody(s, hdr, hlen, content_len, g_http_body, sizeof(g_http_body)))
         {
             SendError(s, 400, "Bad Request", "bad content length");
             return;
         }
-        HandleCompletions(s, body, corpus);
+        HandleCompletions(s, g_http_body, corpus);
         return;
     }
     SendError(s, 404, "Not Found", "unknown path");

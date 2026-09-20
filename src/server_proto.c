@@ -269,6 +269,25 @@ int ServerExtractQuery(const char *body, char *out, size_t size)
                             found = 1;
                             ok = 1;
                         }
+                        else if (*s == '[')
+                        {
+                            const char *tkey = strstr(s, "\"text\"");
+                            if (tkey != NULL)
+                            {
+                                const char *tc = strchr(tkey, ':');
+                                if (tc != NULL)
+                                {
+                                    tc++;
+                                    while (IsWs(*tc)) tc++;
+                                    if (*tc == '"' && TakeJsonString(&tc, content, sizeof(content)))
+                                    {
+                                        strncpy(last, content, sizeof(last) - 1);
+                                        found = 1;
+                                        ok = 1;
+                                    }
+                                }
+                            }
+                        }
                         break;
                     }
                     /* stop at next role key (another message) */
@@ -586,7 +605,21 @@ int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_
     if (p == NULL)
         return 0;
 
-    while ((p = strstr(p, "\"name\"")) != NULL && count < max_names)
+    const char *arr_start = strchr(p, '[');
+    if (arr_start == NULL)
+        return 0;
+
+    int depth = 1;
+    const char *arr_end = arr_start + 1;
+    while (*arr_end != '\0' && depth > 0)
+    {
+        if (*arr_end == '[') depth++;
+        else if (*arr_end == ']') depth--;
+        arr_end++;
+    }
+
+    p = arr_start;
+    while ((p = strstr(p, "\"name\"")) != NULL && p < arr_end && count < max_names)
     {
         const char *q = p + 6;
         while (IsWs(*q)) q++;
@@ -666,9 +699,18 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp)
     if (strstr(resp->content, "FAILED") != NULL ||
         strstr(resp->content, "BUILD FAILED") != NULL ||
         strstr(resp->content, "Assertion failed") != NULL ||
-        strstr(resp->content, "No such file or directory") != NULL)
+        strstr(resp->content, "No such file or directory") != NULL ||
+        strstr(resp->content, "Error:") != NULL ||
+        strstr(resp->content, "error:") != NULL ||
+        strstr(resp->content, "FATAL:") != NULL ||
+        strstr(resp->content, "fatal:") != NULL ||
+        strstr(resp->content, "No tests were found") != NULL ||
+        strstr(resp->content, "is not recognized as an internal") != NULL ||
+        strstr(resp->content, "command not found") != NULL ||
+        strstr(resp->content, "Permission denied") != NULL)
     {
         if (!strstr(resp->content, "0 failed") &&
+            !strstr(resp->content, "0 errors") &&
             !strstr(resp->content, "failures=0") &&
             !strstr(resp->content, "0 tests failed"))
         {
@@ -945,7 +987,9 @@ int ServerIsInspectionTask(const char *text)
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "explora",
         "explorar", "muestra", "mostrar", "mira", "mirar", "proyecto",
-        "dir", "ls", "pwd", "tree"
+        "dir", "ls", "pwd", "tree", "subcarpetas", "subcarpeta",
+        "subdirectorios", "subdirectorio", "subfolders", "subdirectories",
+        "lista", "listar"
     };
     for (size_t k = 0; k < sizeof(inspect_keywords) / sizeof(inspect_keywords[0]); k++)
     {
@@ -1010,7 +1054,10 @@ int ServerIsCodingTask(const char *text)
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "codigo",
         "analiza", "analizar", "arregla", "corrige", "compilar", "compila",
-        "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status", "proyecto"
+        "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status", "proyecto",
+        "subcarpetas", "subcarpeta", "subdirectorios", "subdirectorio",
+        "subfolders", "subdirectories", "lista", "listar",
+        "crear", "crea", "create", "archivo", "fichero"
     };
 
     for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)
