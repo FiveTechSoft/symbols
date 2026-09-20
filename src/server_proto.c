@@ -941,10 +941,10 @@ int ServerIsInspectionTask(const char *text)
 
     static const char *inspect_keywords[] = {
         "review", "inspect", "folder", "directory", "codebase", "repo",
-        "repository", "files", "workspace", "list", "explore",
+        "repository", "files", "workspace", "list", "explore", "project",
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "explora",
-        "explorar", "muestra", "mostrar", "mira", "mirar",
+        "explorar", "muestra", "mostrar", "mira", "mirar", "proyecto",
         "dir", "ls", "pwd", "tree"
     };
     for (size_t k = 0; k < sizeof(inspect_keywords) / sizeof(inspect_keywords[0]); k++)
@@ -986,7 +986,8 @@ int ServerIsCodingTask(const char *text)
     lower[i] = '\0';
 
     static const char *exts[] = {
-        ".c", ".h", ".cpp", ".cc", ".py", ".js", ".ts", ".go", ".rs", ".sh", ".diff", ".patch"
+        ".c", ".h", ".cpp", ".cc", ".py", ".js", ".ts", ".go", ".rs", ".sh",
+        ".diff", ".patch", ".md", ".txt", ".json", ".yml", ".yaml", ".toml"
     };
     for (size_t k = 0; k < sizeof(exts) / sizeof(exts[0]); k++)
     {
@@ -1005,11 +1006,11 @@ int ServerIsCodingTask(const char *text)
         "struct", "segfault", "syntax", "pull request", "commit", "git",
         "hunk", "diff", "regression", "rollback", "symbol", "symbols",
         "header", "workspace", "codebase", "repo", "repository", "files",
-        "folder", "directory", "review", "inspect",
+        "folder", "directory", "review", "inspect", "project",
         "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
         "directorio", "repositorio", "archivos", "ficheros", "codigo",
         "analiza", "analizar", "arregla", "corrige", "compilar", "compila",
-        "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status"
+        "ejecuta", "ejecutar", "dir", "ls", "pwd", "tree", "status", "proyecto"
     };
 
     for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)

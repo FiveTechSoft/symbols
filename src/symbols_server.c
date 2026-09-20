@@ -290,6 +290,44 @@ static void ExtractGlobPattern(const char *text, char *out_pattern, size_t size)
     out_pattern[size - 1] = '\0';
 }
 
+static int IsFolderOrGlobQuery(const char *text)
+{
+    if (!text) return 0;
+    char lower[512];
+    size_t i = 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    if (strchr(lower, '*') || strchr(lower, '?'))
+        return 1;
+
+    static const char *folder_kws[] = {
+        "folder", "directory", "carpeta", "directorio", "workspace",
+        "repo", "repository", "repositorio", "dir", "ls", "tree", "files",
+        "archivos", "ficheros", "codebase", "project", "proyecto",
+        "estructura", "structure", "pwd"
+    };
+    for (size_t k = 0; k < sizeof(folder_kws) / sizeof(folder_kws[0]); k++)
+    {
+        const char *p = lower;
+        size_t kwlen = strlen(folder_kws[k]);
+        while ((p = strstr(p, folder_kws[k])) != NULL)
+        {
+            int before_ok = (p == lower || (!isalnum((unsigned char)*(p - 1)) && *(p - 1) != '_'));
+            char after_char = *(p + kwlen);
+            int after_ok = (after_char == '\0' || (!isalnum((unsigned char)after_char) && after_char != '_'));
+            if (before_ok && after_ok)
+                return 1;
+            p++;
+        }
+    }
+    return 0;
+}
+
 static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERATOR *op,
                                    const char *issue, unsigned long seq,
                                    OPENAI_TOOL_CALLS *out_tc)
@@ -304,7 +342,7 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
 
     if (strcmp(op->name, "locate_symbol") == 0)
     {
-        int is_folder = ServerIsInspectionTask(issue);
+        int is_folder = IsFolderOrGlobQuery(issue);
         if (is_folder && HasDeclaredTool(sess, "glob"))
         {
             char pattern[64];
@@ -313,11 +351,17 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
                      "{\"pattern\":\"%s\"}", pattern);
         }
-        else if (HasDeclaredTool(sess, "bash") && (strncmp(issue, "dir", 3) == 0 || strncmp(issue, "ls", 2) == 0))
+        else if (is_folder && HasDeclaredTool(sess, "bash") && (strncmp(issue, "dir", 3) == 0 || strncmp(issue, "ls", 2) == 0))
         {
             strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
                      "{\"command\":\"%.120s\"}", issue);
+        }
+        else if (HasDeclaredTool(sess, "read") && target_file && strchr(issue, '.'))
+        {
+            strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\"}", target_file);
         }
         else if (HasDeclaredTool(sess, "grep"))
         {

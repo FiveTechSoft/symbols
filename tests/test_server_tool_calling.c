@@ -234,6 +234,79 @@ static void test_last_role_extraction(void)
     TEST_ASSERT(strcmp(role, "tool") == 0, "Last role is 'tool' for active tool response");
 }
 
+/* 9. Comprehensive Intent Discrimination Battery */
+static void test_discrimination_battery(void)
+{
+    printf("\n=== Test 9: Comprehensive Intent Discrimination Battery ===\n");
+
+    /* Group 1: Shell & Wildcard Exploration Commands (Coding=1, Inspection=1) */
+    const char *shell_cmds[] = {
+        "dir", "dir *.*", "dir /w", "dir *.h", "ls", "ls -l", "ls -la", "ls *.py",
+        "pwd", "tree", "*.*", "*.c", "*.h", "*.py", "*.json", "*.md"
+    };
+    for (size_t i = 0; i < sizeof(shell_cmds) / sizeof(shell_cmds[0]); i++)
+    {
+        TEST_ASSERT(ServerIsCodingTask(shell_cmds[i]) == 1, "Shell/wildcard detected as coding task");
+        TEST_ASSERT(ServerIsInspectionTask(shell_cmds[i]) == 1, "Shell/wildcard detected as inspection task");
+    }
+
+    /* Group 2: Repository and Workspace Inspection (Coding=1, Inspection=1) */
+    const char *workspace_queries[] = {
+        "revisa esta carpeta", "revisar el directorio actual", "inspecciona este proyecto",
+        "inspeccionar archivos", "archivos del workspace", "qué archivos hay",
+        "lista los ficheros", "explora el repositorio", "review this directory",
+        "inspect the codebase", "list repository files", "show files in workspace",
+        "explore the project structure"
+    };
+    for (size_t i = 0; i < sizeof(workspace_queries) / sizeof(workspace_queries[0]); i++)
+    {
+        TEST_ASSERT(ServerIsCodingTask(workspace_queries[i]) == 1, "Workspace query detected as coding task");
+        TEST_ASSERT(ServerIsInspectionTask(workspace_queries[i]) == 1, "Workspace query detected as inspection task");
+    }
+
+    /* Group 3: Coding Mutation, Build, Test, and Repair Tasks (Coding=1, Inspection=0) */
+    const char *mutation_tasks[] = {
+        "fix the memory leak in parser.c", "arregla el fallo de segmentacion",
+        "corrige la funcion login", "refactor the database layer",
+        "apply this patch to server.h", "aplica el parche en main.c",
+        "run tests and build", "compila el proyecto con cmake",
+        "cmake --build .", "ctest --output-on-failure",
+        "gcc -Wall -Wextra main.c", "git commit -m fix"
+    };
+    for (size_t i = 0; i < sizeof(mutation_tasks) / sizeof(mutation_tasks[0]); i++)
+    {
+        TEST_ASSERT(ServerIsCodingTask(mutation_tasks[i]) == 1, "Mutation/build detected as coding task");
+        TEST_ASSERT(ServerIsInspectionTask(mutation_tasks[i]) == 0, "Mutation/build is NOT read-only inspection");
+    }
+
+    /* Group 4: Factual and Domain Knowledge Questions (Coding=0, Inspection=0) */
+    const char *factual_queries[] = {
+        "Who is the father of Solomon?", "¿Quién es el padre de Salomón?",
+        "Tell me about wisdom and proverbs", "Háblame de la sabiduría",
+        "Where was Jonah sent?", "¿A dónde fue enviado Jonás?",
+        "What is the archetype of the shadow?", "¿Qué es el inconsciente colectivo?",
+        "What areas do you know?", "¿Qué áreas de conocimiento tienes?"
+    };
+    for (size_t i = 0; i < sizeof(factual_queries) / sizeof(factual_queries[0]); i++)
+    {
+        TEST_ASSERT(ServerIsCodingTask(factual_queries[i]) == 0, "Factual query is NOT coding task");
+        TEST_ASSERT(ServerIsInspectionTask(factual_queries[i]) == 0, "Factual query is NOT inspection task");
+    }
+
+    /* Group 5: Physical Causality and Affordance Questions (Coding=0, Inspection=0) */
+    const char *causality_queries[] = {
+        "¿Qué pasa si se cae un vaso de cristal al suelo?", "What happens if a glass falls to the floor?",
+        "¿Qué pasa si se calienta el hielo?", "What happens if you heat ice?",
+        "¿Para qué sirve un martillo?", "What is a hammer used for?",
+        "¿Qué pasa si se suelta una piedra en el aire?"
+    };
+    for (size_t i = 0; i < sizeof(causality_queries) / sizeof(causality_queries[0]); i++)
+    {
+        TEST_ASSERT(ServerIsCodingTask(causality_queries[i]) == 0, "Causality query is NOT coding task");
+        TEST_ASSERT(ServerIsInspectionTask(causality_queries[i]) == 0, "Causality query is NOT inspection task");
+    }
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -248,6 +321,7 @@ int main(void)
     test_tool_error_validation();
     test_binary_model_support();
     test_last_role_extraction();
+    test_discrimination_battery();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);
@@ -255,3 +329,4 @@ int main(void)
 
     return (g_tests_passed == g_tests_run) ? 0 : 1;
 }
+
