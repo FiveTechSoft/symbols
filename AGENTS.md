@@ -160,3 +160,20 @@ Regla arquitectónica:
   5. **Corrección de Extracción de Archivo (`FindFileForIssue`)**: Eliminado el delimitador `.` en `strtok` con recorte de puntuación final, resolviendo nombres reales con extensión (`test.txt`, `main.c`, etc.) en lugar de degradar erróneamente a `CMakeLists.txt`.
   6. **Detección de Errores de Construcción y Terminal (`ServerInspectToolResponse`)**: Detección de fallos en texto plano (`Error: could not load cache`, `No tests were found`, `command not found`, `Permission denied`) evitando falsos positivos de `Build: PASS`.
   7. **Verificación Formal**: Suite unitaria `tests/test_server_tool_calling.c` (191/191 PASS), suite `tests/test_model_generic_rel.c` (7/7 PASS), suite en vivo `tools/test_discrimination_live.py` (29/29 PASS), verificación end-to-end `tools/test_opencode_user_cases.py` (100% PASS), y suite global CTest 76/76 PASS (67 Passed, 9 Skipped condicionales, 0 Failed), 2026-09-21.
+
+## Síntesis Directa de Código Algorítmico y Robustez HTTP (Fase 21)
+
+- Especialización de intenciones agénticas y robustez de transporte HTTP en `symbols-server` (`src/symbols_server.c`, `src/server_proto.c`, `include/server_proto.h`):
+  1. **Síntesis Directa de Código Algorítmico (`ServerIsCodeSynthesisTask`, `ServerSynthesizeCode`)**:
+     - Reconocimiento de peticiones de síntesis algorítmica pura (ej. `escribe en C la funcion de fibonacci`, `write a function to calculate factorial`, `invertir cadena`, `busqueda binaria`).
+     - Emisión directa de código C11 idiomático formateado en bloques Markdown con explicaciones de complejidad temporal/espacial y verificaciones de desbordamiento, completando la respuesta con `finish_reason: "stop"`.
+     - Evita la activación innecesaria del bucle STRIPS de modificación de archivos (`patch -> build -> ctest`) para consultas de generación de código que no modifican el repositorio del usuario.
+  2. **Decodificación Robusta de Cadenas JSON (`TakeJsonString`)**:
+     - Soporte para secuencias de escape estándar en cadenas JSON (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t`), impidiendo truncamientos prematuros al procesar payloads con código fuente entrecomillado.
+  3. **Extracción y Transporte HTTP Robusto (`FindHttpHeader`, `ReadHttpBody`)**:
+     - Búsqueda genérica e insensible a mayúsculas/minúsculas de cabeceras HTTP (`FindHttpHeader`).
+     - Recuperación segura del cuerpo HTTP en `ReadHttpBody` cuando el contenido ya fue recibido en el búfer inicial de cabeceras o ante desconexiones tempranas con JSON completo ya recibido.
+  4. **Verificación Integral y 100% CTest**:
+     - Batería de discriminación de intenciones en `tests/test_server_tool_calling.c` ampliada a 198/198 PASS.
+     - Suite de pruebas de casos de usuario `tools/test_opencode_user_cases.py` verificando los 4 flujos de trabajo (creación de ficheros, inspección de subcarpetas, cargas mayores a 75 KB y síntesis de Fibonacci) con 100% éxito.
+     - Suite global CTest 100% verde (67 Passed, 9 Skipped condicionales, 0 Failed de 76 tests), 2026-09-21.

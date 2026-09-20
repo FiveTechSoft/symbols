@@ -6,9 +6,22 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ---
 
-## [Unreleased] - 2026-09-20
+## [Unreleased] - 2026-09-21
 
 ### Añadido
+- **Síntesis Directa de Código Algorítmico (`ServerIsCodeSynthesisTask`, `ServerSynthesizeCode`)**:
+  - Clasificación de peticiones de síntesis de algoritmos y funciones en lenguaje C (p. ej. `escribe en C la funcion de fibonacci`, `write a function to calculate factorial`, `invertir cadena`, `busqueda binaria`).
+  - Generación directa de código C11 idiomático formateado en bloques Markdown con explicaciones de complejidad temporal/espacial y verificaciones de desbordamiento, completando la respuesta con `finish_reason: "stop"`.
+  - Se evita la activación del bucle STRIPS de modificación de archivos (`patch -> build -> ctest`) para consultas de generación de código que no modifican el repositorio del usuario.
+- **Decodificación Robusta de Cadenas JSON (`TakeJsonString`)**:
+  - Soporte para secuencias de escape estándar en cadenas JSON (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t`), impidiendo truncamientos prematuros al procesar payloads con código fuente entrecomillado.
+- **Extracción y Transporte HTTP Robusto (`FindHttpHeader`, `ReadHttpBody`)**:
+  - Búsqueda genérica e insensible a mayúsculas/minúsculas de cabeceras HTTP (`FindHttpHeader`).
+  - Recuperación segura del cuerpo HTTP en `ReadHttpBody` cuando el contenido ya fue recibido en el búfer inicial de cabeceras o ante desconexiones tempranas con JSON completo ya recibido.
+
+---
+
+## [Phase 20] - 2026-09-21
 - **Soporte universal para relaciones genéricas en modelos binarios (`GenericRelToConn`, `ChatLoadModel`)**:
   - Eliminada la barrera de relaciones fijas: cualquier relación arbitraria o personalizada (p. ej. `contains`, `part_of`, `requires`, `kit_contains`, `component_of`, `directed_by`, etc.) se normaliza de forma automática y composicional a conectivos naturales reconocibles por el motor de QA sin perder semántica (`HARDCODING=0`).
   - Mapeo declarativo de sinónimos canónicos frecuentes en `COMPILED_RELMAP` (`CONTIENE`, `CONTAINS`, `PART_OF`, `PARTE_DE`, `REQUIRES`, `REQUIERE`, `COMPONENT_OF`, `COMPONENTE_DE`, `GENTILICIO`).
