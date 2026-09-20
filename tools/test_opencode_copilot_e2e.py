@@ -25,19 +25,30 @@ def main():
         print(f"Error: {server_exe} not found. Please compile first.")
         return 1
 
-    print(f"\n[1] Starting symbols-server on port {port}...")
-    print(f"    Repository: {repo_path}")
-    print(f"    Corpora:    {corpus_arg}")
-
-    proc = subprocess.Popen(
-        [server_exe, str(port), repo_path, corpus_arg],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    time.sleep(2.0)
-
+    already_running = False
     try:
+        req_check = urllib.request.Request(f"http://127.0.0.1:{port}/v1/models")
+        with urllib.request.urlopen(req_check, timeout=1) as r:
+            if r.status == 200:
+                already_running = True
+                print(f"\n[1] Detected symbols-server already active on port {port}. Reusing resident instance.")
+    except Exception:
+        pass
+
+    proc = None
+    if not already_running:
+        print(f"\n[1] Starting symbols-server on port {port}...")
+        print(f"    Repository: {repo_path}")
+        print(f"    Corpora:    {corpus_arg}")
+
+        proc = subprocess.Popen(
+            [server_exe, str(port), repo_path, corpus_arg],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        time.sleep(2.0)
+
         # Check if process is running
         if proc.poll() is not None:
             stdout, stderr = proc.communicate()
@@ -45,6 +56,7 @@ def main():
             print(f"Stderr:\n{stderr}")
             return 1
 
+    try:
         base_url = f"http://127.0.0.1:{port}"
 
         # 1. Test GET /v1/models
@@ -131,12 +143,15 @@ def main():
         return 0
 
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        print("\n[6] symbols-server process terminated cleanly.")
+        if proc is not None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            print("\n[6] symbols-server process terminated cleanly.")
+        else:
+            print("\n[6] Keeping resident symbols-server process active.")
 
 if __name__ == "__main__":
     sys.exit(main())
