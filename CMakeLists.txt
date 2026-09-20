@@ -262,3 +262,6 @@ sllm_test(test_persona tests/test_persona.c)
 # Continuous Episodic Memory Persistence
 sllm_test(test_episodic_memory tests/test_episodic_memory.c)
 
+# Universal Generic Relation Ingestion & Binary Model QA
+sllm_test(test_model_generic_rel tests/test_model_generic_rel.c)
+

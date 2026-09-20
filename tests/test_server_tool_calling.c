@@ -254,9 +254,9 @@ static void test_discrimination_battery(void)
     const char *workspace_queries[] = {
         "revisa esta carpeta", "revisar el directorio actual", "inspecciona este proyecto",
         "inspeccionar archivos", "archivos del workspace", "qué archivos hay",
-        "lista los ficheros", "explora el repositorio", "review this directory",
-        "inspect the codebase", "list repository files", "show files in workspace",
-        "explore the project structure"
+        "que es lo que hay en esta carpeta ?", "lista los ficheros", "explora el repositorio",
+        "review this directory", "inspect the codebase", "list repository files",
+        "show files in workspace", "explore the project structure"
     };
     for (size_t i = 0; i < sizeof(workspace_queries) / sizeof(workspace_queries[0]); i++)
     {

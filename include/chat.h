@@ -102,6 +102,7 @@ const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);
 int ChatIsBinaryModel(const char *path);
 uint32_t ChatLoadModel(CHAT *ch, const char *path);
+uint32_t ChatFactCount(const CHAT *ch);
 void ChatHandle(CHAT *ch, const char *line);
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size);
 /* TEXT fast path for serving dispatchers (whole-line trial parse;

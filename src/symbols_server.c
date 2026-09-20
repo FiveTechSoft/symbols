@@ -276,16 +276,24 @@ static void ExtractGlobPattern(const char *text, char *out_pattern, size_t size)
     strncpy(buf, text, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-    char *tok = strtok(buf, " \t\r\n,;\"'");
+    char *tok = strtok(buf, " \t\r\n,;\"'¿?");
     while (tok)
     {
-        if (strchr(tok, '*') || strchr(tok, '?'))
+        /* Explicit wildcard like *.c, *.*, * */
+        if (strchr(tok, '*'))
         {
             strncpy(out_pattern, tok, size - 1);
             out_pattern[size - 1] = '\0';
             return;
         }
-        tok = strtok(NULL, " \t\r\n,;\"'");
+        /* Only accept '?' as glob wildcard if part of an actual filename token, not standalone */
+        if (strchr(tok, '?') && strlen(tok) > 1 && (strchr(tok, '.') || isalnum((unsigned char)tok[0])))
+        {
+            strncpy(out_pattern, tok, size - 1);
+            out_pattern[size - 1] = '\0';
+            return;
+        }
+        tok = strtok(NULL, " \t\r\n,;\"'¿?");
     }
     strncpy(out_pattern, "*", size - 1);
     out_pattern[size - 1] = '\0';
@@ -891,7 +899,7 @@ static void HandleCompletions(socket_t s, const char *body,
                 if (g_server_model != NULL) ModelDestroy(g_server_model);
                 g_server_model = new_m;
                 ChatInit(&g_session, path);
-                snprintf(content, sizeof(content), "Binary model loaded successfully from '%s'.", path);
+                snprintf(content, sizeof(content), "Binary model loaded successfully from '%s' (%u facts loaded).", path, ChatFactCount(&g_session));
             }
             else
             {
@@ -901,7 +909,7 @@ static void HandleCompletions(socket_t s, const char *body,
         else
         {
             ChatInit(&g_session, path);
-            snprintf(content, sizeof(content), "Corpus loaded from '%s'.", path);
+            snprintf(content, sizeof(content), "Corpus loaded from '%s' (%u facts loaded).", path, ChatFactCount(&g_session));
         }
         ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
         SendJson(s, 200, "OK", resp);
@@ -1339,10 +1347,11 @@ static void HandleClient(socket_t s, const char *corpus)
             char resp_buf[512];
             snprintf(resp_buf, sizeof(resp_buf),
                      "{\"status\":\"ok\",\"format\":\"binary_v2\",\"path\":\"%s\","
-                     "\"symbols\":%u,\"relations\":%u}",
+                     "\"symbols\":%u,\"relations\":%u,\"facts_loaded\":%u}",
                      target_path,
                      SymbolCount(g_server_model->graph->symbols),
-                     RelationCount(g_server_model->graph->relations));
+                     RelationCount(g_server_model->graph->relations),
+                     ChatFactCount(&g_session));
             SendJson(s, 200, "OK", resp_buf);
             return;
         }
@@ -1352,8 +1361,10 @@ static void HandleClient(socket_t s, const char *corpus)
             g_session_ready = 1;
             char resp_buf[512];
             snprintf(resp_buf, sizeof(resp_buf),
-                     "{\"status\":\"ok\",\"format\":\"corpus_text\",\"path\":\"%s\"}",
-                     target_path);
+                     "{\"status\":\"ok\",\"format\":\"corpus_text\",\"path\":\"%s\","
+                     "\"facts_loaded\":%u}",
+                     target_path,
+                     ChatFactCount(&g_session));
             SendJson(s, 200, "OK", resp_buf);
             return;
         }

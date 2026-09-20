@@ -521,6 +521,15 @@ static const RelMapRow COMPILED_RELMAP[] = {
     {"IDIOMA", "language_of"},
     {"IDIOMA_OFICIAL", "language_of"},
     {"MIEMBRO_DE", "member_of"},
+    {"CONTIENE", "contains_of"},
+    {"CONTAINS", "contains_of"},
+    {"PART_OF", "part_of"},
+    {"PARTE_DE", "part_of"},
+    {"REQUIRES", "requires_of"},
+    {"REQUIERE", "requires_of"},
+    {"COMPONENT_OF", "part_of"},
+    {"COMPONENTE_DE", "part_of"},
+    {"GENTILICIO", "gentilicio_of"},
 };
 
 static RelMapRow g_relmap[RELMAP_MAX];
@@ -566,14 +575,14 @@ static void RelMapInit(void)
 
 static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
 {
-    if (rel == NULL || rel[0] == '\0')
+    if (rel == NULL || rel[0] == '\0' || buf == NULL || bsize < 5)
         return NULL;
     RelMapInit();
 
-    /* 1. Consult table */
+    /* 1. Consult table (case-insensitive) */
     for (uint32_t i = 0; i < g_nrelmap; i++)
     {
-        if (strcmp(rel, g_relmap[i].tag) == 0)
+        if (strcasecmp(rel, g_relmap[i].tag) == 0)
             return g_relmap[i].conn;
     }
 
@@ -583,7 +592,7 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
 
     /* 3. Suffix rule for _DE / _de or _OF / _of */
     size_t len = strlen(rel);
-    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+    if (len > 3 && (strcasecmp(rel + len - 3, "_DE") == 0 || strcasecmp(rel + len - 3, "_de") == 0))
     {
         size_t stem_len = len - 3;
         if (stem_len + 4 < bsize)
@@ -594,7 +603,7 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
             return buf;
         }
     }
-    if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
+    if (len > 3 && (strcasecmp(rel + len - 3, "_OF") == 0 || strcasecmp(rel + len - 3, "_of") == 0))
     {
         size_t stem_len = len - 3;
         if (stem_len + 4 < bsize)
@@ -605,6 +614,76 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
             return buf;
         }
     }
+
+    /* 4. Universal generic relation support (HARDCODING=0):
+       Normalize arbitrary relation names (e.g. contains, part_of, kit_contains,
+       DIRECTED_BY, gentilicio, ciudad_mas_poblada) into a valid natural connective.
+       Non-alphanumeric characters fold to '_'. If it already ends in _of or is a
+       primitive connective, use as is. If it ends in _de, replace with _of.
+       Otherwise, append _of to ensure Learner recognizes it as a relational connective. */
+    char clean[CHAT_TOKEN_MAX];
+    ChatNormTok(rel, clean, sizeof(clean));
+
+    char norm[CHAT_TOKEN_MAX];
+    size_t nlen = 0;
+    for (size_t i = 0; clean[i] != '\0' && nlen + 1 < sizeof(norm); i++)
+    {
+        unsigned char c = (unsigned char)clean[i];
+        if (isalnum(c))
+        {
+            norm[nlen++] = (char)tolower(c);
+        }
+        else if (c == '_' || isspace(c) || c == '-' || c == '/' || c == '.')
+        {
+            if (nlen > 0 && norm[nlen - 1] != '_')
+                norm[nlen++] = '_';
+        }
+    }
+    while (nlen > 0 && norm[nlen - 1] == '_')
+        nlen--;
+    norm[nlen] = '\0';
+
+    if (nlen == 0)
+        return NULL;
+
+    /* Primitive connective check on normalized form (e.g. reigns, isa, cong) */
+    if (LearnerIsConnective(norm))
+    {
+        if (nlen < bsize)
+        {
+            strcpy(buf, norm);
+            return buf;
+        }
+    }
+
+    /* If it already ends in _of and nlen > 3 */
+    if (nlen > 3 && strcmp(norm + nlen - 3, "_of") == 0)
+    {
+        if (nlen < bsize)
+        {
+            strcpy(buf, norm);
+            return buf;
+        }
+    }
+    /* If it ends in _de and nlen > 3 */
+    if (nlen > 3 && strcmp(norm + nlen - 3, "_de") == 0)
+    {
+        size_t stem = nlen - 3;
+        if (stem + 4 < bsize)
+        {
+            memcpy(buf, norm, stem);
+            strcpy(buf + stem, "_of");
+            return buf;
+        }
+    }
+    /* Append _of to make it a generic connective recognized by Learner */
+    if (nlen + 4 < bsize)
+    {
+        memcpy(buf, norm, nlen);
+        strcpy(buf + nlen, "_of");
+        return buf;
+    }
+
     return NULL;
 }
 
@@ -615,16 +694,15 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
    the pairs landed. No relation word is hardcoded. */
 static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
 {
-    char es[CHAT_TOKEN_MAX];
-    size_t len = strlen(rel);
-    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+    char norm_rel[CHAT_TOKEN_MAX];
+    ChatNormTok(rel, norm_rel, sizeof(norm_rel));
+    size_t len = strlen(norm_rel);
+    if (len > 3 && (strcmp(norm_rel + len - 3, "_de") == 0 || strcmp(norm_rel + len - 3, "_of") == 0))
         len -= 3;
-    else if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
-        len -= 3;
-    if (len == 0 || len >= sizeof(es))
+    if (len == 0 || len >= CHAT_TOKEN_MAX)
         return;
-    for (size_t i = 0; i < len; i++)
-        es[i] = (char)tolower((unsigned char)rel[i]);
+    char es[CHAT_TOKEN_MAX];
+    memcpy(es, norm_rel, len);
     es[len] = '\0';
 
     /* EN stem: the connective minus a trailing "_of" suffix
@@ -1532,7 +1610,9 @@ static void MatchKwSpan(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         {
             const REL_KW *kw = &ch->kws[k];
             int hit = strcmp(toks[i], kw->es_stem) == 0 ||
-                      strcmp(toks[i], kw->en_stem) == 0;
+                      strcmp(toks[i], kw->en_stem) == 0 ||
+                      strcmp(toks[i], kw->family) == 0 ||
+                      strcmp(toks[i], kw->conn) == 0;
             if (!hit)
                 for (size_t e = 0; e < CHAT_EN_SURFACE_N; e++)
                     if (strcmp(toks[i], CHAT_EN_SURFACE[e].en_word) == 0 &&
@@ -1545,7 +1625,9 @@ static void MatchKwSpan(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             if (!hit)
                 for (uint32_t c = 1; c < ncand && !hit; c++)
                     if (strcmp(cand[c], kw->es_stem) == 0 ||
-                        strcmp(cand[c], kw->en_stem) == 0)
+                        strcmp(cand[c], kw->en_stem) == 0 ||
+                        strcmp(cand[c], kw->family) == 0 ||
+                        strcmp(cand[c], kw->conn) == 0)
                         hit = 1;
             if (hit)
             {
@@ -2032,7 +2114,9 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 for (uint32_t ki = 0; ki < ch->num_kws; ki++)
                 {
                     if (strcmp(toks[fi], ch->kws[ki].es_stem) == 0 ||
-                        strcmp(toks[fi], ch->kws[ki].en_stem) == 0)
+                        strcmp(toks[fi], ch->kws[ki].en_stem) == 0 ||
+                        strcmp(toks[fi], ch->kws[ki].family) == 0 ||
+                        strcmp(toks[fi], ch->kws[ki].conn) == 0)
                     {
                         has_frozen_kw = 1;
                         break;
@@ -2310,11 +2394,15 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             if ((int)k == kwx)
                 continue;
             int hit = strcmp(toks[i], ch->kws[k].es_stem) == 0 ||
-                      strcmp(toks[i], ch->kws[k].en_stem) == 0;
+                      strcmp(toks[i], ch->kws[k].en_stem) == 0 ||
+                      strcmp(toks[i], ch->kws[k].family) == 0 ||
+                      strcmp(toks[i], ch->kws[k].conn) == 0;
             if (!hit)
                 for (uint32_t c = 1; c < ncand && !hit; c++)
                     if (strcmp(cand[c], ch->kws[k].es_stem) == 0 ||
-                        strcmp(cand[c], ch->kws[k].en_stem) == 0)
+                        strcmp(cand[c], ch->kws[k].en_stem) == 0 ||
+                        strcmp(cand[c], ch->kws[k].family) == 0 ||
+                        strcmp(cand[c], ch->kws[k].conn) == 0)
                         hit = 1;
             if (hit)
             {
@@ -2505,7 +2593,9 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             int is_kw_variant = 0;
             for (uint32_t c = 0; c < nrc && !is_kw_variant; c++)
                 if (strcmp(rcand[c], ch->kws[kwx].es_stem) == 0 ||
-                    strcmp(rcand[c], ch->kws[kwx].en_stem) == 0)
+                    strcmp(rcand[c], ch->kws[kwx].en_stem) == 0 ||
+                    strcmp(rcand[c], ch->kws[kwx].family) == 0 ||
+                    strcmp(rcand[c], ch->kws[kwx].conn) == 0)
                     is_kw_variant = 1;
             for (size_t e = 0; e < CHAT_EN_SURFACE_N && !is_kw_variant;
                  e++)
@@ -5710,6 +5800,7 @@ uint32_t ChatLoadModel(CHAT *ch, const char *path)
     uint32_t learned = 0;
     if (m->graph != NULL && m->graph->relations != NULL && m->graph->symbols != NULL)
     {
+        TextSessionEnsure(ch);
         uint32_t nrel = RelationCount(m->graph->relations);
         for (uint32_t i = 0; i < nrel; i++)
         {
@@ -5723,23 +5814,16 @@ uint32_t ChatLoadModel(CHAT *ch, const char *path)
             char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
             ChatNormTok(s_sub->name, norm_s, sizeof(norm_s));
             ChatNormTok(s_obj->name, norm_o, sizeof(norm_o));
+            for (size_t k = 0; norm_s[k] != '\0'; k++)
+                if (isspace((unsigned char)norm_s[k])) norm_s[k] = '_';
+            for (size_t k = 0; norm_o[k] != '\0'; k++)
+                if (isspace((unsigned char)norm_o[k])) norm_o[k] = '_';
+            if (norm_s[0] == '\0' || norm_o[0] == '\0')
+                continue;
             if (strcmp(norm_s, norm_o) == 0)
                 continue;
             char conn_buf[LEARN_MAX_LINE];
             const char *conn = GenericRelToConn(s_rel->name, conn_buf, sizeof(conn_buf));
-            if (conn == NULL)
-            {
-                /* Fallback: try lowercase relation name as connective */
-                size_t rlen = strlen(s_rel->name);
-                if (rlen < sizeof(conn_buf))
-                {
-                    for (size_t k = 0; k < rlen; k++)
-                        conn_buf[k] = (char)tolower((unsigned char)s_rel->name[k]);
-                    conn_buf[rlen] = '\0';
-                    if (LearnerIsConnective(conn_buf))
-                        conn = conn_buf;
-                }
-            }
             if (conn == NULL)
                 continue;
             char sent[LEARN_MAX_LINE];
@@ -5748,6 +5832,10 @@ uint32_t ChatLoadModel(CHAT *ch, const char *path)
             {
                 KwdRecord(ch, s_rel->name, conn);
                 learned++;
+            }
+            if (ch->tgraph != NULL)
+            {
+                IngestTripleSource(ch->tgraph, norm_s, s_rel->name, norm_o, "model");
             }
         }
     }
@@ -5758,6 +5846,11 @@ uint32_t ChatLoadModel(CHAT *ch, const char *path)
     }
     ModelDestroy(m);
     return learned;
+}
+
+uint32_t ChatFactCount(const CHAT *ch)
+{
+    return ch ? ch->kb.num_pairs : 0;
 }
 
 static int IsTextFile(const char *path)

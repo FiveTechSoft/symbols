@@ -97,21 +97,27 @@ static void CmdLearn(LEARNER *lr, const char *line)
    table is ingestion vocabulary, never asserted. */
 static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
 {
-    if (rel == NULL || rel[0] == '\0')
+    if (rel == NULL || rel[0] == '\0' || buf == NULL || bsize < 5)
         return NULL;
-    if (strcmp(rel, "HIJO_DE") == 0)
+    if (strcasecmp(rel, "HIJO_DE") == 0)
         return "isa";
-    if (strcmp(rel, "REY_DE") == 0)
+    if (strcasecmp(rel, "REY_DE") == 0)
         return "reigns";
-    if (strcmp(rel, "HERMANO_DE") == 0)
+    if (strcasecmp(rel, "HERMANO_DE") == 0)
         return "sibling_of";
-    if (strcmp(rel, "PADRE_DE") == 0)
+    if (strcasecmp(rel, "PADRE_DE") == 0)
         return "father_of";
-    if (strcmp(rel, "ESPOSA_DE") == 0)
+    if (strcasecmp(rel, "ESPOSA_DE") == 0)
         return "wife_of";
+    if (strcasecmp(rel, "CAPITAL") == 0)
+        return "capital_of";
+    if (strcasecmp(rel, "CONTIENE") == 0 || strcasecmp(rel, "CONTAINS") == 0)
+        return "contains_of";
+    if (strcasecmp(rel, "PART_OF") == 0 || strcasecmp(rel, "PARTE_DE") == 0)
+        return "part_of";
 
     size_t len = strlen(rel);
-    if (len > 3 && (strcmp(rel + len - 3, "_DE") == 0 || strcmp(rel + len - 3, "_de") == 0))
+    if (len > 3 && (strcasecmp(rel + len - 3, "_DE") == 0 || strcasecmp(rel + len - 3, "_de") == 0))
     {
         size_t stem_len = len - 3;
         if (stem_len + 4 < bsize)
@@ -122,7 +128,7 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
             return buf;
         }
     }
-    if (len > 3 && (strcmp(rel + len - 3, "_OF") == 0 || strcmp(rel + len - 3, "_of") == 0))
+    if (len > 3 && (strcasecmp(rel + len - 3, "_OF") == 0 || strcasecmp(rel + len - 3, "_of") == 0))
     {
         size_t stem_len = len - 3;
         if (stem_len + 4 < bsize)
@@ -133,6 +139,61 @@ static const char *GenericRelToConn(const char *rel, char *buf, size_t bsize)
             return buf;
         }
     }
+
+    /* Universal generic relation support: normalize arbitrary relation names */
+    char norm[SCHEMA_TOKEN_MAX];
+    size_t nlen = 0;
+    for (size_t i = 0; rel[i] != '\0' && nlen + 1 < sizeof(norm); i++)
+    {
+        unsigned char c = (unsigned char)rel[i];
+        if (isalnum(c))
+            norm[nlen++] = (char)tolower(c);
+        else if (c == '_' || isspace(c) || c == '-' || c == '/' || c == '.')
+        {
+            if (nlen > 0 && norm[nlen - 1] != '_')
+                norm[nlen++] = '_';
+        }
+    }
+    while (nlen > 0 && norm[nlen - 1] == '_')
+        nlen--;
+    norm[nlen] = '\0';
+
+    if (nlen == 0)
+        return NULL;
+
+    if (LearnerIsConnective(norm))
+    {
+        if (nlen < bsize)
+        {
+            strcpy(buf, norm);
+            return buf;
+        }
+    }
+    if (nlen > 3 && strcmp(norm + nlen - 3, "_of") == 0)
+    {
+        if (nlen < bsize)
+        {
+            strcpy(buf, norm);
+            return buf;
+        }
+    }
+    if (nlen > 3 && strcmp(norm + nlen - 3, "_de") == 0)
+    {
+        size_t stem = nlen - 3;
+        if (stem + 4 < bsize)
+        {
+            memcpy(buf, norm, stem);
+            strcpy(buf + stem, "_of");
+            return buf;
+        }
+    }
+    if (nlen + 4 < bsize)
+    {
+        memcpy(buf, norm, nlen);
+        strcpy(buf + nlen, "_of");
+        return buf;
+    }
+
     return NULL;
 }
 
