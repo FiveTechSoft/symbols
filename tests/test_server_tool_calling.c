@@ -187,6 +187,33 @@ static void test_binary_model_support(void)
     TEST_ASSERT(ChatIsBinaryModel(NULL) == 0, "NULL path safely returns 0");
 }
 
+/* 8. Test Last Role Extraction for Conversation Turns */
+static void test_last_role_extraction(void)
+{
+    printf("\n=== Test 8: Last Role Extraction ===\n");
+    const char *payload_user = 
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"user\",\"content\":\"Fix main.c\"},"
+        "{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"read\"}}]},"
+        "{\"role\":\"tool\",\"content\":\"code\"},"
+        "{\"role\":\"user\",\"content\":\"¿Qué pasa si se calienta el hielo?\"}"
+        "]}";
+    char role[32];
+    int ok = ServerExtractLastRole(payload_user, role, sizeof(role));
+    TEST_ASSERT(ok == 1, "Extracted last role from multi-turn history");
+    TEST_ASSERT(strcmp(role, "user") == 0, "Last role is 'user' despite previous tool message");
+
+    const char *payload_tool = 
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"user\",\"content\":\"Fix main.c\"},"
+        "{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"read\"}}]},"
+        "{\"role\":\"tool\",\"content\":\"file contents\"}"
+        "]}";
+    ok = ServerExtractLastRole(payload_tool, role, sizeof(role));
+    TEST_ASSERT(ok == 1, "Extracted last role from tool resumption");
+    TEST_ASSERT(strcmp(role, "tool") == 0, "Last role is 'tool' for active tool response");
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -200,6 +227,7 @@ int main(void)
     test_coding_task_intent();
     test_tool_error_validation();
     test_binary_model_support();
+    test_last_role_extraction();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

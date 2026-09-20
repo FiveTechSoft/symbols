@@ -761,6 +761,50 @@ int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
     return found;
 }
 
+int ServerExtractLastRole(const char *body, char *out, size_t size)
+{
+    if (body == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    const char *p = body;
+    char last[32] = {0};
+    int found = 0;
+
+    while (*p != '\0')
+    {
+        if (*p == '"' && strncmp(p, "\"role\"", 6) == 0)
+        {
+            const char *q = p + 6;
+            while (IsWs(*q)) q++;
+            if (*q == ':')
+            {
+                q++;
+                while (IsWs(*q)) q++;
+                if (*q == '"')
+                {
+                    q++;
+                    char tmp[32];
+                    size_t o = 0;
+                    while (*q != '\0' && *q != '"' && o + 1 < sizeof(tmp))
+                        tmp[o++] = *q++;
+                    tmp[o] = '\0';
+                    if (*q == '"')
+                    {
+                        strncpy(last, tmp, sizeof(last) - 1);
+                        last[sizeof(last) - 1] = '\0';
+                        found = 1;
+                    }
+                }
+            }
+        }
+        p++;
+    }
+    if (!found) return 0;
+    strncpy(out, last, size - 1);
+    out[size - 1] = '\0';
+    return 1;
+}
+
 int ServerBuildToolCallResponse(const char *model, long created,
                                 unsigned long seq, const OPENAI_TOOL_CALLS *tc,
                                 const char *content_thought, char *out,

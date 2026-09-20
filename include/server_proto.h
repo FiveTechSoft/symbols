@@ -104,6 +104,9 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp);
 /* Extract the most recent {"role":"tool", ...} message from the body */
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out);
 
+/* Extract the role of the very last message in the "messages" array */
+int ServerExtractLastRole(const char *body, char *out, size_t size);
+
 /* Build full chat.completion JSON containing one or more tool_calls */
 int ServerBuildToolCallResponse(const char *model, long created,
                                 unsigned long seq, const OPENAI_TOOL_CALLS *tc,
