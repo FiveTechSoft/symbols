@@ -5,187 +5,222 @@
 
 ---
 
+<div style="page-break-after: always;"></div>
+
 ## FIG. 1: OVERALL SYSTEM ARCHITECTURE
 
 ```
-+---------------------------------------------------------------------------------+
-|                                SYMBOLIC LLM AGENT                               |
-|                                                                                 |
-|  +---------------------------------------------------------------------------+  |
-|  |                        KNOWLEDGE & SYMBOLIC MEMORY                        |  |
-|  |  +----------------------+  +---------------------+  +------------------+  |  |
-|  |  | AST CODE GRAPH       |  | TEXTLEX STORE       |  | RELATIONAL GRAPH |  |  |
-|  |  | (Functions, Structs, |  | (Lexical/Semantic   |  | (Bidirectional   |  |  |
-|  |  |  Calls, Polyglot)    |  |  Corpus Knowledge)  |  |  Triples KB)     |  |  |
-|  |  +----------------------+  +---------------------+  +------------------+  |  |
-|  +---------------------------------------------------------------------------+  |
-|                                      |                                          |
-|                                      v                                          |
-|  +---------------------------------------------------------------------------+  |
-|  |                        GOAL-DIRECTED REASONING LOOP                       |  |
-|  |                                                                           |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |      | STRIPS PLANNER (agent_planner)                              |      |  |
-|  |      | State Vector: [PRED_SYMBOL_KNOWN ... PRED_TESTS_VERIFIED]   |      |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |                                     |                                     |  |
-|  |                                     v                                     |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |      | ATOMIC SURGICAL PATCH ENGINE (agent_patch)                  |      |  |
-|  |      | Pre-Flight Ambiguity Gate + CRLF/LF Transparent Alignment   |      |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |                                     |                                     |  |
-|  |                                     v                                     |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |      | CROSS-PLATFORM SUBPROCESS ENGINE (agent_shell)              |      |  |
-|  |      | Windows (cmd/powershell), Linux (bash), macOS (zsh)        |      |  |
-|  |      | Dual-Pipe Non-Blocking Draining + 10ms Hard Timeout Timer   |      |  |
-|  |      +-------------------------------------------------------------+      |  |
-|  |                                     |                                     |  |
-|  |            +------------------------+------------------------+            |  |
-|  |            | (exit == 0)                                     | (exit != 0)|  |
-|  |            v                                                 v            |  |
-|  |  +--------------------+                    +---------------------------+  |  |
-|  |  | SUCCESS / VERIFIED |                    | ABDUCTIVE DIAGNOSTIC      |  |  |
-|  |  | Formally Proved    |                    | ENGINE (agent_diagnose)   |  |  |
-|  |  | Zero Regressions   |                    | Root Cause + Symbol Link  |  |  |
-|  |  +--------------------+                    +---------------------------+  |  |
-|  |                                                              |            |  |
-|  |                                                              v            |  |
-|  |                                            +---------------------------+  |  |
-|  |                                            | ATOMIC ROLLBACK (0.001s)  |  |  |
-|  |                                            | Zero Disk Contamination   |  |  |
-|  |                                            +---------------------------+  |  |
-|  +---------------------------------------------------------------------------+  |
-+---------------------------------------------------------------------------------+
++------------------------------------------------------------+
+|                    SYMBOLIC LLM AGENT                      |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  |             KNOWLEDGE & SYMBOLIC MEMORY              |  |
+|  |  +----------------+ +----------------+ +----------+  |  |
+|  |  | AST CODE GRAPH | | TEXTLEX STORE  | | TRIPLES  |  |  |
+|  |  | (Functions,    | | (Lexical /     | | REL GRAPH|  |  |
+|  |  |  Structs, AST) | |  Semantics)    | | (KB)     |  |  |
+|  |  +----------------+ +----------------+ +----------+  |  |
+|  +------------------------------------------------------+  |
+|                           |                                |
+|                           v                                |
+|  +------------------------------------------------------+  |
+|  |             GOAL-DIRECTED REASONING LOOP             |  |
+|  |                                                      |  |
+|  |  +------------------------------------------------+  |  |
+|  |  | STRIPS PLANNER (agent_planner)                 |  |  |
+|  |  | State Vector: [PRED_KNOWN ... PRED_VERIFIED]    |  |  |
+|  |  +------------------------------------------------+  |  |
+|  |                           |                          |  |
+|  |                           v                          |  |
+|  |  +------------------------------------------------+  |  |
+|  |  | ATOMIC PATCH ENGINE (agent_patch)              |  |  |
+|  |  | Pre-flight Ambiguity Gate + CRLF/LF Alignment  |  |  |
+|  |  +------------------------------------------------+  |  |
+|  |                           |                          |  |
+|  |                           v                          |  |
+|  |  +------------------------------------------------+  |  |
+|  |  | SUBPROCESS ENGINE (agent_shell)                |  |  |
+|  |  | Win (cmd/ps), Linux (bash), macOS (zsh)        |  |  |
+|  |  | Dual-Pipe Non-blocking Drain + 10ms Timeout    |  |  |
+|  |  +------------------------------------------------+  |  |
+|  |                           |                          |  |
+|  |             +-------------+-------------+            |  |
+|  | (exit == 0) |                           | (exit != 0)|  |
+|  |             v                           v            |  |
+|  |  +--------------------+       +-------------------+  |  |
+|  |  | SUCCESS / VERIFIED |       | ABDUCTIVE REPAIR  |  |  |
+|  |  | Formally Proved    |       | (agent_diagnose)  |  |  |
+|  |  | Zero Regressions   |       | Deduce fix from   |  |  |
+|  |  +--------------------+       | compiler stderr   |  |  |
+|  |                               +-------------------+  |  |
+|  |                                         |            |  |
+|  |                                         v            |  |
+|  |                               +-------------------+  |  |
+|  |                               | ATOMIC ROLLBACK   |  |  |
+|  |                               | (0.001s restore)  |  |  |
+|  |                               +-------------------+  |  |
+|  +------------------------------------------------------+  |
++------------------------------------------------------------+
 ```
 
 ---
+
+<div style="page-break-after: always;"></div>
 
 ## FIG. 2: CLOSED-LOOP ABDUCTIVE SELF-HEALING WORKFLOW
 
-```mermaid
-flowchart TD
-    Start([Task Initiated]) --> Ingest[Ingest Target Codebase into CodeGraph]
-    Ingest --> Blast[Compute Blast Radius & Downstream Callers]
-    Blast --> Plan[Formulate STRIPS Plan]
-    Plan --> PatchVerify{Pre-Flight Verification: Exactly 1 match?}
-    
-    PatchVerify -->|No: Ambiguous or 0| Abort([Fail-Closed: Reject Mutation])
-    PatchVerify -->|Yes: Safe| ApplyPatch[Apply Atomic Patch to Disk]
-    
-    ApplyPatch --> Subproc[Execute Verification via agent_shell]
-    Subproc --> ExitCheck{Command Exit Code == 0?}
-    
-    ExitCheck -->|Yes: PASS| SeniorReport[Emit Senior Verified Report]
-    SeniorReport --> Done([Task Completed Successfully])
-    
-    ExitCheck -->|No: FAIL| DrainStderr[Capture Isolated stderr Buffer]
-    DrainStderr --> Diagnose[DiagnosticParseOutput: Classify Defect]
-    Diagnose --> LinkGraph[CodeGraph Linked Abduction: Deduce Missing Symbol/Header]
-    LinkGraph --> Rollback[PatchRollback: In-Memory Instant File Restoration]
-    Rollback --> Replan[AgentPlannerReplanOnError: Update STRIPS Goals]
-    Replan --> Plan
+```
+                      [START: Task Initiated]
+                                 |
+                                 v
+                [Ingest Codebase into CodeGraph]
+                                 |
+                                 v
+               [Compute Blast Radius & Callers]
+                                 |
+                                 v
+                     [Formulate STRIPS Plan]
+                                 |
+                                 v
+               {Pre-Flight Verification: Safe?}
+                 /                            \
+      (Ambiguous/None)                      (Safe)
+               /                                \
+              v                                  v
+    [FAIL-CLOSED: Abort]             [Apply Atomic Patch]
+                                                 |
+                                                 v
+                                     [Execute Verification]
+                                     (agent_shell Subprocess)
+                                                 |
+                                                 v
+                                       {Exit Code == 0?}
+                                         /            \
+                                    (Yes)              (No)
+                                     /                    \
+                                    v                      v
+                       [Emit Senior PR Report]     [Capture Stderr]
+                                    |                      |
+                                    v                      v
+                       [SUCCESS: Task Done]        [Classify Defect]
+                                                           |
+                                                           v
+                                                  [Abduce Remedy]
+                                                           |
+                                                           v
+                                                  [Atomic Rollback]
+                                                  (0.001s snapshot)
+                                                           |
+                                                           v
+                                                  [Dynamic Replan]
+                                                           |
+                                                           +---> (Loop to Plan)
 ```
 
 ---
 
-## FIG. 3: DEADLOCK-FREE DUAL-PIPE ASYNCHRONOUS SUBPROCESS ENGINE
+<div style="page-break-after: always;"></div>
+
+## FIG. 3: DEADLOCK-FREE DUAL-PIPE SUBPROCESS ENGINE
 
 ```
-                           +------------------------+
-                           |  PARENT AGENT PROCESS  |
-                           +------------------------+
-                               |                |
-             [CreatePipe: Stdout]              [CreatePipe: Stderr]
-                               |                |
-             +-----------------+----------------+-----------------+
-             |                                                    |
-             v                                                    v
-      hOutRead (Parent)                                    hErrRead (Parent)
-      (Inheritance = FALSE)                                (Inheritance = FALSE)
-             ^                                                    ^
-             | Non-blocking PeekNamedPipe / poll                  | Non-blocking PeekNamedPipe / poll
-             | 10ms Quantum Polling Loop                          | 10ms Quantum Polling Loop
-             |                                                    |
-      hOutWrite (Child)                                    hErrWrite (Child)
-      (Inheritance = TRUE)                                 (Inheritance = TRUE)
-             ^                                                    ^
-             +-----------------+----------------+-----------------+
-                               |                |
-                               | dup2 / Handles |
-                               |                |
-                           +------------------------+
-                           |  CHILD PROCESS (SHELL) |
-                           |  GCC / Clang / Pytest  |
-                           +------------------------+
-                                       |
-                                       v [Timer Check]
-                        If Elapsed Time >= Timeout_MS:
-                                       |
-                     +-----------------------------------+
-                     | TerminateProcess / kill(SIGKILL)  |
-                     | Exit Code forced to 124           |
-                     | Zero OS Process Leaks             |
-                     +-----------------------------------+
+                     +-----------------------+
+                     |  PARENT AGENT PROCESS |
+                     +-----------------------+
+                         |               |
+              [CreatePipe: Stdout]  [CreatePipe: Stderr]
+                         |               |
+              +----------+---------------+----------+
+              |                                     |
+              v                                     v
+       hOutRead (Parent)                     hErrRead (Parent)
+       (Inherit = FALSE)                     (Inherit = FALSE)
+              ^                                     ^
+              | Non-blocking Peek / poll            | Non-blocking Peek / poll
+              | 10ms Quantum Drain                  | 10ms Quantum Drain
+              |                                     |
+       hOutWrite (Child)                     hErrWrite (Child)
+       (Inherit = TRUE)                      (Inherit = TRUE)
+              ^                                     ^
+              +----------+---------------+----------+
+                         |               |
+                         | dup2 / Handles|
+                         |               |
+                     +-----------------------+
+                     | CHILD PROCESS (SHELL) |
+                     | GCC / Clang / Pytest  |
+                     +-----------------------+
+                                 |
+                                 v [Timer Check]
+                   If Elapsed Time >= Timeout_MS:
+                                 |
+                +----------------------------------+
+                | TerminateProcess / kill(SIGKILL) |
+                | Exit Code forced to 124          |
+                | Zero Leaked Background Tasks     |
+                +----------------------------------+
 ```
 
 ---
+
+<div style="page-break-after: always;"></div>
 
 ## FIG. 4: TRANSITIVE BLAST RADIUS & RISK STRATIFICATION
 
 ```
-             [MODIFIED TARGET FUNCTION: MathMultiply]
-                                |
-            +-------------------+-------------------+
-            | Depth 1                               | Depth 1
-            v                                       v
-    [CalculateArea]                         [VolumeCompute]
-            |                                       |
-            | Depth 2                               | Depth 2
-            v                                       v
-    [GeometryController]                    [RenderPipeline]
-            |                                       |
-            +-------------------+-------------------+
-                                | Depth 3
-                                v
-                       [IntegrationTestSuite]
+           [TARGET FUNCTION MODIFIED: MathMultiply]
+                               |
+            +------------------+------------------+
+            | Depth 1                             | Depth 1
+            v                                     v
+     [CalculateArea]                       [VolumeCompute]
+            |                                     |
+            | Depth 2                             | Depth 2
+            v                                     v
+   [GeometryController]                  [RenderPipeline]
+            |                                     |
+            +------------------+------------------+
+                               | Depth 3
+                               v
+                     [IntegrationTestSuite]
 
       * Blast Radius Metrics:
         - Affected Callers: 5 functions
         - Affected Files:   3 files (math.c, geometry.c, render.c)
         - Risk Level:       HIGH (> 2 files affected)
-        - Action:           Enforce multi-file verification gate before commit.
+        - Action:           Enforce multi-file verification gate.
 ```
 
 ---
 
+<div style="page-break-after: always;"></div>
+
 ## FIG. 5: ATOMIC PATCH TRANSACTION & FAIL-CLOSED GATE
 
 ```
-    [Original File on Disk]
-              |
-              v (Read into RAM)
-    [Pre-Flight Verification]
-    - Verify Context Lines
-    - Verify Buggy Lines (Count == 1)
-    - Normalize Line Endings (CRLF <-> LF)
-              |
-              +----------------------------+
-              | Status == OK               | Status == AMBIGUOUS / NOT_FOUND
-              v                            v
-    [In-Memory Backup Created]       [REJECT MUTATION]
-              |                      - File on disk 100% untouched
-              v                      - Zero side effects
-    [Write Hunk to Disk]
-              |
-              v
-    [Compiler / Test Verification]
-              |
-              +----------------------------+
-              | Exit Code == 0             | Exit Code != 0
-              v                            v
-    [COMMIT MUTATION]               [ATOMIC ROLLBACK]
-    - Backup discarded              - Restore original bytes in < 0.001s
-    - Patch finalized on disk       - Disk file identical to pre-test state
+                [Original File on Persistent Disk]
+                                |
+                                v (Read into RAM)
+                    [Pre-Flight Verification]
+                    - Context Matching
+                    - Buggy Match Count == 1
+                    - Transparent CRLF / LF Normalization
+                                |
+                +---------------+---------------+
+                | Status == OK                  | Status == AMBIGUOUS
+                v                               v
+    [In-Memory Backup Snapshot]         [REJECT MUTATION]
+                |                       - Disk 100% untouched
+                v                       - Zero side effects
+      [Write Hunk to Disk]
+                |
+                v
+       [Compiler Verification]
+                |
+        +-------+-------+
+        | Exit == 0     | Exit != 0
+        v               v
+    [COMMIT]        [ATOMIC ROLLBACK]
+    - Success       - Restore original bytes (< 0.001s)
+    - Validated     - Disk identical to pre-test state
 ```
