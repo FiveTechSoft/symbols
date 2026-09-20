@@ -20,6 +20,8 @@
 #include "agent_runner.h"
 #include "agent_diagnose.h"
 #include "model.h"
+#include "persona.h"
+#include "episodic_memory.h"
 
 #define SERVER_PORT_DEFAULT 8099
 #define SERVER_HDR_MAX 16384
@@ -202,6 +204,9 @@ typedef struct
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
+
+    /* Persona conditioning */
+    PERSONA_ID        persona_id;
 
     /* Declared tools by client in current turn */
     int               declared_tools_count;
@@ -609,6 +614,17 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    /* Ensure session knowledge graph is initialized */
+    if (!g_session_ready)
+    {
+        if (ChatIsBinaryModel(corpus) && g_server_model == NULL)
+        {
+            g_server_model = ModelLoad(corpus);
+        }
+        ChatInit(&g_session, corpus);
+        g_session_ready = 1;
+    }
+
     /* Check for /save and /load conversational commands */
     if (strncmp(query, "/save ", 6) == 0)
     {
@@ -648,6 +664,127 @@ static void HandleCompletions(socket_t s, const char *body,
             ChatInit(&g_session, path);
             snprintf(content, sizeof(content), "Corpus loaded from '%s'.", path);
         }
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    /* Conversational persona command */
+    if (strncmp(query, "/persona", 8) == 0 || strncmp(query, ":persona", 8) == 0 ||
+        (strncmp(query, "persona ", 8) == 0 && !strchr(query, '?')) ||
+        strcmp(query, "modo pirata") == 0 || strcmp(query, "/pirata") == 0 || strcmp(query, ":pirata") == 0)
+    {
+        PERSONA_ID pid = PERSONA_NEUTRAL;
+        if (strcmp(query, "modo pirata") == 0 || strcmp(query, "/pirata") == 0 || strcmp(query, ":pirata") == 0)
+        {
+            pid = PERSONA_PIRATE_QUANTUM;
+        }
+        else
+        {
+            const char *p = strchr(query, ' ');
+            while (p && isspace((unsigned char)*p)) p++;
+            if (p && *p)
+                pid = PersonaFindByName(p);
+        }
+        sess->persona_id = pid;
+        ChatSetPersona(&g_session, pid);
+        if (pid == PERSONA_PIRATE_QUANTUM)
+            snprintf(content, sizeof(content), "Ahoy, capitan! Ahora os habla el contramaestre cuantico desde el castillo de proa.");
+        else
+            snprintf(content, sizeof(content), "Modo persona configurado a: %s", PersonaGetName(pid));
+
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    /* Episodic memory commands: /learn, /aprende */
+    if (strncmp(query, "/learn ", 7) == 0 || strncmp(query, "/aprende ", 9) == 0 ||
+        strncmp(query, ":learn ", 7) == 0 || strncmp(query, ":aprende ", 9) == 0)
+    {
+        const char *p = strchr(query, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s_tok[64], r_tok[64], o_tok[64];
+        if (p && sscanf(p, "%63s %63s %63s", s_tok, r_tok, o_tok) == 3)
+        {
+            int rc = ChatLearnTriple(&g_session, s_tok, r_tok, o_tok, "user");
+            if (rc == 1)
+                snprintf(content, sizeof(content), "[memoria] Hecho aprendido y guardado persistentemente: %s --%s--> %s.", s_tok, r_tok, o_tok);
+            else if (rc == 2)
+                snprintf(content, sizeof(content), "[memoria] Hecho ya conocido, reforzado en memoria: %s --%s--> %s.", s_tok, r_tok, o_tok);
+            else
+                snprintf(content, sizeof(content), "[memoria] No se pudo incorporar la tripleta.");
+        }
+        else
+        {
+            snprintf(content, sizeof(content), "Uso: /learn SUJETO RELACION OBJETO  (ej: /learn Juan hermano_de Pedro)");
+        }
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    /* Conversational natural language learning */
+    if (strncasecmp(query, "aprende que ", 12) == 0 ||
+        strncasecmp(query, "recuerda que ", 13) == 0 ||
+        strncasecmp(query, "learn that ", 11) == 0)
+    {
+        const char *p = strchr(query, ' ');
+        if (p) p = strchr(p + 1, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s_tok[64], copula[32], r_tok[64], prep[32], o_tok[64];
+        if (p && sscanf(p, "%63s %31s %63s %31s %63s", s_tok, copula, r_tok, prep, o_tok) == 5 &&
+            (strcasecmp(copula, "es") == 0 || strcasecmp(copula, "is") == 0) &&
+            (strcasecmp(prep, "de") == 0 || strcasecmp(prep, "of") == 0))
+        {
+            char full_rel[64];
+            snprintf(full_rel, sizeof(full_rel), "%s_%s", r_tok, prep);
+            int rc = ChatLearnTriple(&g_session, s_tok, full_rel, o_tok, "conversation");
+            if (rc)
+            {
+                snprintf(content, sizeof(content), "[memoria] Hecho registrado: %s es %s de %s (guardado en memoria continua).", s_tok, r_tok, o_tok);
+                ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+                SendJson(s, 200, "OK", resp);
+                return;
+            }
+        }
+    }
+
+    /* Episodic memory inspection: /memory, /memoria */
+    if (strcmp(query, "/memory") == 0 || strcmp(query, "/memoria") == 0 ||
+        strcmp(query, ":memory") == 0 || strcmp(query, ":memoria") == 0 ||
+        strcmp(query, "/episodic") == 0)
+    {
+        uint32_t cnt = ChatEpisodicCount(&g_session);
+        if (cnt == 0)
+        {
+            snprintf(content, sizeof(content), "[memoria] No hay recuerdos episodicos guardados actualmente en data/memory/episodic.tsv.");
+        }
+        else
+        {
+            size_t written = snprintf(content, sizeof(content), "[memoria] %u recuerdos episodicos continuos guardados:\n", cnt);
+            for (uint32_t i = 0; i < cnt && written + 128 < sizeof(content); i++)
+            {
+                const EPISODIC_RECORD *rec = ChatEpisodicGet(&g_session, i);
+                if (rec)
+                {
+                    written += snprintf(content + written, sizeof(content) - written,
+                                        "  %u. %s --%s--> %s (origen: %s)\n",
+                                        i + 1, rec->subject, rec->relation, rec->object, rec->source);
+                }
+            }
+        }
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    /* Episodic memory purge: /forget, /olvida */
+    if (strcmp(query, "/forget") == 0 || strcmp(query, "/olvida") == 0 ||
+        strcmp(query, ":forget") == 0 || strcmp(query, "/clear-memory") == 0)
+    {
+        ChatEpisodicClear(&g_session);
+        snprintf(content, sizeof(content), "[memoria] Memoria episodica borrada tanto de la sesion como de disco.");
         ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
         SendJson(s, 200, "OK", resp);
         return;
@@ -704,17 +841,7 @@ static void HandleCompletions(socket_t s, const char *body,
         }
     }
 
-    if (!g_session_ready)
-    {
-        if (ChatIsBinaryModel(corpus) && g_server_model == NULL)
-        {
-            g_server_model = ModelLoad(corpus);
-        }
-        ChatInit(&g_session, corpus);
-        g_session_ready = 1;
-    }
-
-    /* Restore session dialogue state */
+    /* Restore session dialogue state and persona */
     strncpy(g_session.focus, sess->focus, sizeof(g_session.focus) - 1);
     g_session.focus[sizeof(g_session.focus) - 1] = '\0';
     g_session.focus_valid = sess->focus_valid;
@@ -722,6 +849,7 @@ static void HandleCompletions(socket_t s, const char *body,
     g_session.focus_secondary[sizeof(g_session.focus_secondary) - 1] = '\0';
     g_session.focus_secondary_valid = sess->focus_secondary_valid;
     g_session.exec = sess->exec;
+    ChatSetPersona(&g_session, sess->persona_id);
 
     memset(&parsed, 0, sizeof(parsed));
     ChatParseLine(&g_session, query, &parsed);
