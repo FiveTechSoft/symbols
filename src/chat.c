@@ -5713,7 +5713,7 @@ int ChatTryTextLine(CHAT *ch, const char *line, char *out,
        need the QA layer which verifies entity presence and definitional
        patterns. Detection is structural: any 2-8 char token at pos 0
        before a copula or at sentence start. */
-    if (n > 0 && LooksLikeQuestionWord(toks[0], 0, toks, n))
+    if (tp.intent == INT_TEXTQ && n > 0 && LooksLikeQuestionWord(toks[0], 0, toks, n))
         return 0;
     st = ChatResolveLine(ch, line, out, size, NULL, 0, NULL, 0,
                          NULL);

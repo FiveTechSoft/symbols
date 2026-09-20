@@ -4,14 +4,14 @@ import sys
 def test_multicorpus():
     cmd = [
         "build-gcc/chat_main.exe",
-        "data/bible/bible_relations.tsv",
-        "data/samples/geo_knowledge.tsv"
+        "data/texts/bible.txt",
+        "data/texts/jung.txt"
     ]
     queries = [
         "quien es el padre de david",
-        "capital de francia",
-        "capital de espana",
-        "es paris la capital de francia",
+        "quien es Jung?",
+        "dime las areas que conoces",
+        "inicia una conversacion",
         "quien es el rey de babilonia",
         "salir"
     ]

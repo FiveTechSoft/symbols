@@ -969,10 +969,18 @@ int main(int argc, char **argv)
         strncpy(corpus, env_corpus, sizeof(corpus) - 1);
         corpus[sizeof(corpus) - 1] = '\0';
     }
-    else if (argc > 2 && repo_dir[0] == '\0' && argv[2][0] != '-')
+    else if (argc > 2)
     {
-        strncpy(corpus, argv[2], sizeof(corpus) - 1);
-        corpus[sizeof(corpus) - 1] = '\0';
+        int start_arg = (repo_dir[0] != '\0' && strcmp(repo_dir, argv[2]) == 0) ? 3 : 2;
+        corpus[0] = '\0';
+        for (int i = start_arg; i < argc; i++)
+        {
+            if (argv[i][0] == '-')
+                continue;
+            if (corpus[0] != '\0')
+                strncat(corpus, ";", sizeof(corpus) - strlen(corpus) - 1);
+            strncat(corpus, argv[i], sizeof(corpus) - strlen(corpus) - 1);
+        }
     }
     else
     {
