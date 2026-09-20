@@ -5,7 +5,7 @@
 
 PORT=${1:-8099}
 REPO_DIR=${2:-.}
-CORPORA="data/texts/bible.txt;data/c_lang/c_corpus.txt"
+CORPORA="data/c_lang/c_corpus.txt"
 
 if [ -f "build-gcc/symbols-server" ]; then
     EXE="build-gcc/symbols-server"

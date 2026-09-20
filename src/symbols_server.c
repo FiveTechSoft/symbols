@@ -1838,6 +1838,9 @@ static void HandleClient(socket_t s, const char *corpus)
 
 int main(int argc, char **argv)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+
     socket_t ls;
     struct sockaddr_in addr;
     int port = SERVER_PORT_DEFAULT;
@@ -1936,11 +1939,13 @@ int main(int argc, char **argv)
     {
         /* CWD layout first, then exe-relative (build-* / dirs) */
         static const char *cand_paths[] = {
+            "data/c_lang/c_corpus.txt",
+            "data/texts/c_corpus.txt",
+            "data/texts/corpus.txt",
+            "data/corpus.txt",
             "wiki_model.bin",
             "data/texts/bible.txt",
             "data/texts/jung.txt",
-            "data/texts/corpus.txt",
-            "data/corpus.txt",
             "data/corpus.tsv"
         };
         char exedir[768];
@@ -2026,12 +2031,15 @@ int main(int argc, char **argv)
         SOCKET_CLEANUP();
         return 1;
     }
+    int opt = 1;
+    setsockopt(ls, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     addr.sin_port = htons((u_short)port);
     if (bind(ls, (struct sockaddr *)&addr, sizeof(addr)) != 0 ||
-        listen(ls, 4) != 0)
+        listen(ls, 64) != 0)
     {
         fprintf(stderr, "bind/listen on 127.0.0.1:%d failed\n", port);
         CLOSESOCKET(ls);

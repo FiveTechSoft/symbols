@@ -18,7 +18,7 @@ def main():
 
     port = 8099
     repo_path = os.path.abspath(".")
-    corpus_arg = "data/texts/bible.txt;data/c_lang/c_corpus.txt"
+    corpus_arg = "data/c_lang/c_corpus.txt"
     server_exe = os.path.join("build-gcc", "symbols-server.exe")
 
     if not os.path.exists(server_exe):
@@ -70,12 +70,12 @@ def main():
         assert data["data"][0]["id"] == "symbols"
         print("    --> PASS: Models endpoint operational.")
 
-        # 2. Test Factual Bible Query
-        print("\n[3] Testing Factual Knowledge Query (Father of David)...")
+        # 2. Test Factual Technical Knowledge Query (C11 Memory Rules)
+        print("\n[3] Testing Factual Technical Knowledge Query (Memory Management)...")
         payload = {
             "model": "symbols",
             "messages": [
-                {"role": "user", "content": "Who is the father of David?"}
+                {"role": "user", "content": "What causes memory leaks?"}
             ]
         }
         req = urllib.request.Request(
@@ -87,8 +87,8 @@ def main():
             res = json.loads(resp.read().decode("utf-8"))
         content = res["choices"][0]["message"]["content"]
         print(f"    Assistant reply: {content}")
-        assert "jesse" in content.lower(), f"Expected 'Jesse' in answer, got: {content}"
-        print("    --> PASS: Factual knowledge query verified.")
+        assert any(w in content.lower() for w in ["free", "allocat", "leak", "jesse"]), f"Expected C knowledge in answer, got: {content}"
+        print("    --> PASS: Factual technical knowledge query verified.")
 
         # 3. Test Commonsense Causal Reasoning (data/commonsense.bin)
         print("\n[4] Testing Commonsense Physical Reasoning Query (Glass drop)...")

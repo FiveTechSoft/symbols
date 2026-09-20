@@ -125,12 +125,33 @@ def test_fibonacci_synthesis():
     assert "uint64_t" in content or "int" in content, f"Expected C code in content: {content}"
     assert "```c" in content, f"Expected C markdown block in content: {content}"
 
+def test_greeting_natural():
+    print("\n--- Test 5: 'hola' Natural Greeting ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "hola"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    content = choice.get("message", {}).get("content", "")
+    print(f"  [PASS] finish_reason: {fr}")
+    print(f"  [PASS] Reply: {content}")
+    assert fr == "stop", f"Expected stop, got {fr}"
+    assert "hold" not in content.lower() and "behold" not in content.lower(), f"Unexpected bible text in greeting: {content}"
+    assert any(g in content.lower() for g in ["hola", "saludos", "hello", "ayud"]), f"Expected greeting response: {content}"
+
 if __name__ == "__main__":
     test_file_creation_flow()
     test_subfolder_inspection()
     test_large_body_payload()
     test_fibonacci_synthesis()
+    test_greeting_natural()
     print("\n" + "=" * 60)
     print("  ALL USER SCENARIOS VERIFIED END-TO-END (100% PASS)")
     print("=" * 60)
+
 

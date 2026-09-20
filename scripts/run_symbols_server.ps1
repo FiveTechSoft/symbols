@@ -11,7 +11,7 @@ param(
     [string]$RepoDir = "."
 )
 
-$Corpora = "data/texts/bible.txt;data/c_lang/c_corpus.txt"
+$Corpora = "data/c_lang/c_corpus.txt"
 $ExePath = if (Test-Path "build-gcc\symbols-server.exe") { "build-gcc\symbols-server.exe" } elseif (Test-Path "build\symbols-server.exe") { "build\symbols-server.exe" } else { $null }
 
 if (-not $ExePath) {

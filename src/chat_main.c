@@ -26,10 +26,12 @@ int main(int argc, char **argv)
     if (corpus[0] == '\0')
     {
         static const char *cand_paths[] = {
-            "data/texts/bible.txt",
-            "data/texts/jung.txt",
+            "data/c_lang/c_corpus.txt",
+            "data/texts/c_corpus.txt",
             "data/texts/corpus.txt",
-            "data/corpus.txt"
+            "data/corpus.txt",
+            "data/texts/bible.txt",
+            "data/texts/jung.txt"
         };
         corpus[0] = '\0';
         for (size_t i = 0; i < sizeof(cand_paths) / sizeof(cand_paths[0]); i++)

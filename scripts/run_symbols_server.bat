@@ -3,7 +3,7 @@ REM ============================================================
 REM run_symbols_server.bat: Starts Symbolic LLM Copilot Server
 REM Port: 8099 (default)
 REM Repo: Current directory (AST & Blast Radius Knowledge Graph)
-REM Corpora: Bible text, C Language ontology, Commonsense Snapshot
+REM Corpora: C Language Standard (C11), AST & Code Knowledge Graph
 REM ============================================================
 
 set PORT=%1
@@ -12,7 +12,7 @@ if "%PORT%"=="" set PORT=8099
 set REPO_DIR=%2
 if "%REPO_DIR%"=="" set REPO_DIR=.
 
-set CORPORA=data/texts/bible.txt;data/c_lang/c_corpus.txt
+set CORPORA=data/c_lang/c_corpus.txt
 
 echo ======================================================================
 echo   STARTING SYMBOLIC LLM LOCAL COPILOT SERVER ON PORT %PORT%
