@@ -73,5 +73,6 @@ int main(int argc, char **argv)
             break;
         ClarifyHandle(&chat, line);
     }
+    ChatDestroy(&chat.ch);
     return 0;
 }

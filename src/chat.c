@@ -33,6 +33,7 @@
 #include "model.h"
 #include "commonsense.h"
 #include "persona.h"
+#include "ingest.h"
 
 
 #define CHAT_MAX_TOKS 16
@@ -2016,6 +2017,21 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 strcmp(toks[fi], "king") == 0 ||
                 strcmp(toks[fi], "queen") == 0 ||
                 strcmp(toks[fi], "reigns") == 0;
+        }
+        if (!has_frozen_kw)
+        {
+            for (uint32_t fi = 0; fi < n && !has_frozen_kw; fi++)
+            {
+                for (uint32_t ki = 0; ki < ch->num_kws; ki++)
+                {
+                    if (strcmp(toks[fi], ch->kws[ki].es_stem) == 0 ||
+                        strcmp(toks[fi], ch->kws[ki].en_stem) == 0)
+                    {
+                        has_frozen_kw = 1;
+                        break;
+                    }
+                }
+            }
         }
         if (!has_frozen_kw)
         {
@@ -5884,6 +5900,36 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     }
     MetaDiscover(&ch->mk);
     MetaRuleDiscover(&ch->mk);
+
+    /* Initialize and load persistent continuous episodic memory */
+    EpisodicStoreInit(&ch->episodic, "data/memory/episodic.tsv");
+    uint32_t epi_loaded = EpisodicStoreLoad(&ch->episodic);
+    if (epi_loaded > 0)
+    {
+        for (uint32_t i = 0; i < ch->episodic.count; i++)
+        {
+            const EPISODIC_RECORD *rec = &ch->episodic.records[i];
+            char conn_buf[LEARN_MAX_LINE];
+            const char *conn = GenericRelToConn(rec->relation, conn_buf, sizeof(conn_buf));
+            if (conn != NULL)
+            {
+                char sent[LEARN_MAX_LINE];
+                snprintf(sent, sizeof(sent), "%s %s %s", rec->subject, conn, rec->object);
+                if (LearnerLearnLine(&ch->lr, sent))
+                {
+                    KwdRecord(ch, rec->relation, conn);
+                }
+            }
+            if (ch->tgraph != NULL)
+            {
+                IngestTripleSource(ch->tgraph, rec->subject, rec->relation, rec->object,
+                                   rec->source[0] ? rec->source : "episodic");
+            }
+        }
+        MetaDiscover(&ch->mk);
+        MetaRuleDiscover(&ch->mk);
+    }
+
     if (total_sents > 0 && total_facts == 0)
         printf("[chat] text corpus: %u sentences, %u symbols\n", total_sents, total_syms);
     else if (total_sents > 0 && total_facts > 0)
@@ -5892,6 +5938,102 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     else
         printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", total_facts,
                ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
+
+    if (epi_loaded > 0)
+        printf("[chat] episodic memory: %u persistent memories active\n", epi_loaded);
+}
+
+int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source)
+{
+    if (!ch || !subject || !relation || !object) return 0;
+
+    char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
+    ChatNormTok(subject, norm_s, sizeof(norm_s));
+    ChatNormTok(object, norm_o, sizeof(norm_o));
+    if (norm_s[0] == '\0' || norm_o[0] == '\0') return 0;
+    if (strcmp(norm_s, norm_o) == 0) return 0;
+
+    char rel_buf[CHAT_TOKEN_MAX];
+    strncpy(rel_buf, relation, sizeof(rel_buf) - 1);
+    rel_buf[sizeof(rel_buf) - 1] = '\0';
+    for (char *p = rel_buf; *p; p++)
+    {
+        *p = (char)tolower((unsigned char)*p);
+    }
+
+    /* Check if relation needs standard _de suffix */
+    if (strcmp(rel_buf, "padre") == 0) strcpy(rel_buf, "padre_de");
+    else if (strcmp(rel_buf, "hermano") == 0) strcpy(rel_buf, "hermano_de");
+    else if (strcmp(rel_buf, "esposa") == 0) strcpy(rel_buf, "esposa_de");
+    else if (strcmp(rel_buf, "hijo") == 0) strcpy(rel_buf, "hijo_de");
+    else if (strcmp(rel_buf, "father") == 0) strcpy(rel_buf, "father_of");
+    else if (strcmp(rel_buf, "brother") == 0) strcpy(rel_buf, "brother_of");
+    else if (strcmp(rel_buf, "wife") == 0) strcpy(rel_buf, "wife_of");
+
+    /* 1. Append to episodic store (auto-persists to disk) */
+    int rc = EpisodicStoreAppend(&ch->episodic, norm_s, rel_buf, norm_o, source ? source : "user");
+    if (rc == 0) return 0;
+
+    /* 2. Ingest into schema / meta reasoning engine */
+    char conn_buf[LEARN_MAX_LINE];
+    const char *conn = GenericRelToConn(rel_buf, conn_buf, sizeof(conn_buf));
+    if (conn != NULL)
+    {
+        char sent[LEARN_MAX_LINE];
+        snprintf(sent, sizeof(sent), "%s %s %s", norm_s, conn, norm_o);
+        if (LearnerLearnLine(&ch->lr, sent))
+        {
+            KwdRecord(ch, rel_buf, conn);
+            MetaDiscover(&ch->mk);
+            MetaRuleDiscover(&ch->mk);
+        }
+    }
+
+    /* 3. Ingest into session text graph if active */
+    if (ch->tgraph != NULL)
+    {
+        IngestTripleSource(ch->tgraph, norm_s, rel_buf, norm_o, source ? source : "user");
+    }
+
+    return 1;
+}
+
+uint32_t ChatEpisodicCount(const CHAT *ch)
+{
+    return ch ? EpisodicStoreCount(&ch->episodic) : 0;
+}
+
+void ChatEpisodicClear(CHAT *ch)
+{
+    if (!ch) return;
+    EpisodicStoreClear(&ch->episodic);
+}
+
+const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx)
+{
+    if (!ch) return NULL;
+    return EpisodicStoreGet(&ch->episodic, idx);
+}
+
+void ChatDestroy(CHAT *ch)
+{
+    if (!ch) return;
+    EpisodicStoreDestroy(&ch->episodic);
+    if (ch->tgraph != NULL)
+    {
+        GraphDestroy(ch->tgraph);
+        ch->tgraph = NULL;
+    }
+    if (ch->temb != NULL)
+    {
+        EmbeddingTableDestroy(ch->temb);
+        ch->temb = NULL;
+    }
+    if (ch->cs_graph != NULL)
+    {
+        GraphDestroy(ch->cs_graph);
+        ch->cs_graph = NULL;
+    }
 }
 
 /* frame family label for the tool planner (deduced families pass

@@ -208,6 +208,89 @@ void ClarifyHandle(CLARIFY *w, const char *line)
         return;
     }
 
+    /* Episodic memory commands: /learn, /aprende, /memory, /forget */
+    if (strncmp(line, "/learn ", 7) == 0 || strncmp(line, "/aprende ", 9) == 0 ||
+        strncmp(line, ":learn ", 7) == 0 || strncmp(line, ":aprende ", 9) == 0)
+    {
+        const char *p = strchr(line, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s[64], r[64], o[64];
+        if (p && sscanf(p, "%63s %63s %63s", s, r, o) == 3)
+        {
+            int rc = ChatLearnTriple(&w->ch, s, r, o, "user");
+            if (rc == 1)
+                printf("[memoria] Hecho aprendido y guardado persistentemente: %s --%s--> %s.\n", s, r, o);
+            else if (rc == 2)
+                printf("[memoria] Hecho ya conocido, reforzado en memoria: %s --%s--> %s.\n", s, r, o);
+            else
+                printf("[memoria] No se pudo incorporar la tripleta.\n");
+        }
+        else
+        {
+            printf("Uso: /learn SUJETO RELACION OBJETO  (ej: /learn Juan hermano_de Pedro)\n");
+        }
+        return;
+    }
+
+    if (strcmp(line, "/memory") == 0 || strcmp(line, "/memoria") == 0 ||
+        strcmp(line, ":memory") == 0 || strcmp(line, ":memoria") == 0 ||
+        strcmp(line, "/episodic") == 0)
+    {
+        uint32_t cnt = ChatEpisodicCount(&w->ch);
+        if (cnt == 0)
+        {
+            printf("[memoria] No hay recuerdos episodicos guardados actualmente en data/memory/episodic.tsv.\n");
+        }
+        else
+        {
+            printf("[memoria] %u recuerdos episodicos continuos guardados en data/memory/episodic.tsv:\n", cnt);
+            for (uint32_t i = 0; i < cnt; i++)
+            {
+                const EPISODIC_RECORD *rec = ChatEpisodicGet(&w->ch, i);
+                if (rec)
+                {
+                    printf("  %u. %s --%s--> %s (origen: %s)\n",
+                           i + 1, rec->subject, rec->relation, rec->object, rec->source);
+                }
+            }
+        }
+        return;
+    }
+
+    if (strcmp(line, "/forget") == 0 || strcmp(line, "/olvida") == 0 ||
+        strcmp(line, ":forget") == 0 || strcmp(line, "/clear-memory") == 0)
+    {
+        ChatEpisodicClear(&w->ch);
+        printf("[memoria] Memoria episodica borrada tanto de la sesion como de disco.\n");
+        return;
+    }
+
+    /* Conversational natural language learning:
+       "aprende que S es P de O" / "recuerda que S es P de O" / "learn that S is P of O" */
+    if (strncasecmp(line, "aprende que ", 12) == 0 ||
+        strncasecmp(line, "recuerda que ", 13) == 0 ||
+        strncasecmp(line, "learn that ", 11) == 0)
+    {
+        const char *p = strchr(line, ' ');
+        if (p) p = strchr(p + 1, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s[64], copula[32], r[64], prep[32], o[64];
+        if (p && sscanf(p, "%63s %31s %63s %31s %63s", s, copula, r, prep, o) == 5 &&
+            (strcasecmp(copula, "es") == 0 || strcasecmp(copula, "is") == 0) &&
+            (strcasecmp(prep, "de") == 0 || strcasecmp(prep, "of") == 0))
+        {
+            char full_rel[64];
+            snprintf(full_rel, sizeof(full_rel), "%s_%s", r, prep);
+            int rc = ChatLearnTriple(&w->ch, s, full_rel, o, "conversation");
+            if (rc)
+            {
+                printf("[memoria] Hecho registrado: %s es %s de %s (guardado en memoria continua).\n", s, r, o);
+                return;
+            }
+        }
+    }
+
+
     char toks[CLAR_MAX_TOKS][CHAT_TOKEN_MAX];
     QueryPlan plan;
     uint32_t ntok = 0;

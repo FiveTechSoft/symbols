@@ -61,6 +61,7 @@ add_library(symbolic STATIC
     src/ccg_realizer.c
     src/commonsense.c
     src/persona.c
+    src/episodic_memory.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -257,4 +258,7 @@ sllm_test(test_commonsense tests/test_commonsense.c)
 
 # Pillar 4: Pragmatic Conditioning, Epistemic Perspectives & Persona Filters
 sllm_test(test_persona tests/test_persona.c)
+
+# Continuous Episodic Memory Persistence
+sllm_test(test_episodic_memory tests/test_episodic_memory.c)
 

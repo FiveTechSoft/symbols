@@ -934,6 +934,16 @@ AI   > According to the structural system analysis: Abraham which structurally e
 User > Who is the father of Melchizedek?
 AI   > Architectural boundary: insufficient grounded documentation for Melchizedek.
 
+User > aprende que Socrates es maestro de Platon
+AI   > [memoria] Hecho registrado: Socrates es maestro de Platon (guardado en memoria continua).
+
+User > ¿quien es el maestro de Platon?
+AI   > maestro de Platon: Socrates.
+
+User > /memory
+AI   > [memoria] 1 recuerdos episodicos continuos guardados en data/memory/episodic.tsv:
+       1. socrates --maestro_de--> platon (origen: conversation)
+
 User > what areas do you know?
 AI   > The ingested texts cover topics such as: Altertumskunde, Bough, Mephistopheles, 
        Negelein, Fulfilment, Mead, Fathers, White (with 10,730 sentences and 19,505 symbols 

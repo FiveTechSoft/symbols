@@ -108,5 +108,17 @@ Regla arquitectónica:
   3. Integración conversacional en vivo: soporte para conmutación interactiva de perspectiva en `chat_clarify.c` (`/persona <name>`, `:persona <name>`, `modo pirata`) y opción de inicio en línea de comandos en `chat_main.c` (`-p <name>`, `--persona <name>`).
   4. Verificación matemática y de rendimiento: 56/56 pruebas en `test_persona.c`, 2.19 millones de proyecciones/segundo ($0.45\ \mu\text{s}$/proj), 0% alucinaciones, y suite CTest 74/74 PASS (65 Passed, 9 Skipped, 0 Failed), 2026-09-20.
 
+## Persistencia Episódica Continua y Aprendizaje Conversacional en Vivo (Fase 17)
+
+- Implementación del subsistema de memoria episódica continua en C11 (`src/episodic_memory.c`, `include/episodic_memory.h`):
+  1. **Almacén TSV persistente** (`data/memory/episodic.tsv`): registro estructurado con tuplas `<subject>\t<relation>\t<object>\t<source>\t<timestamp>`, deduplicación $O(1)$ idempotente y auto-flushing inmediato a disco tras cada aprendizaje.
+  2. **Ciclo de vida automático en `ChatInit`**: en el arranque de `chat_main` y `symbols_server`, si existe almacén episódico se recargan e ingieren automáticamente todas las memorias acumuladas, incorporándolas al motor inferencial (`ch->lr`, `ch->kb`, `ch->tgraph`) y deduciendo dinámicamente sus esquemas y meta-reglas (`MetaDiscover`, `MetaRuleDiscover`).
+  3. **Comandos conversacionales y aprendizaje natural en vivo**:
+     - Comandos interactivos: `/learn S P O` o `/aprende S P O`, `/memory` (inspección de memorias activas con origen y marcas de tiempo), y `/forget` o `/olvida` (purga garantizada en RAM y disco).
+     - Aprendizaje en lenguaje natural: interceptor para patrones conversacionales (`aprende que S es P de O`, `recuerda que S es P de O`, `learn that S is P of O`) que normaliza la relación e indexa inmediatamente la afirmación.
+     - Generalización automática en preguntas: las relaciones aprendidas se auto-registran en el índice dinámico `ch->kws`, permitiendo responder consultas directas posteriores (ej. `¿quién es el maestro de Platón?` -> `Sócrates`) entre reinicios de sesión.
+  4. **Verificación formal**: suite unitaria dedicada `tests/test_episodic_memory.c` (5/5 PASS), suite CTest global al 100% (66 Passed, 9 Skipped condicionales, 0 Failed de 75 tests) y prueba cruzada de persistencia multi-sesión validada por ejecución.
+
+
 
 

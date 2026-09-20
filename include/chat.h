@@ -17,6 +17,7 @@
 #include "meta_graph.h"
 #include "dict.h"
 #include "persona.h"
+#include "episodic_memory.h"
 
 /* Relation keyword, DEDUCED from the corpus at ingest (never
    hardcoded): for each distinct TSV relation REL the stem is
@@ -85,12 +86,19 @@ typedef struct CHAT_
     GRAPH           *cs_graph;
     /* active pragmatic persona filter (Pillar 4) */
     PERSONA_FILTER  persona;
+    /* persistent continuous episodic memory store */
+    EPISODIC_STORE  episodic;
 } CHAT;
 
 
 void ChatInit(CHAT *ch, const char *corpus_path);
+void ChatDestroy(CHAT *ch);
 void ChatSetPersona(CHAT *ch, PERSONA_ID id);
 PERSONA_ID ChatGetPersona(const CHAT *ch);
+int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source);
+uint32_t ChatEpisodicCount(const CHAT *ch);
+void ChatEpisodicClear(CHAT *ch);
+const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);
 int ChatIsBinaryModel(const char *path);
 uint32_t ChatLoadModel(CHAT *ch, const char *path);
