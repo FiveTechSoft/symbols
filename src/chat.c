@@ -216,12 +216,21 @@ static const char *const PARENT_SURFACE[] = {
 static int IsStopTok(const char *tok)
 {
     static const char *STOP[] = {
-        "de", "of", "del", "'s", "el", "la", "los", "las", "the",
-        "un", "una", "unos", "unas", "a", "an", "en", "y", "e",
-        "o", "u", "que", "quien", "quienes", "cual", "cuales",
-        "su", "sus", "his", "her", "mi", "my", "tu", "your",
-        "es", "era", "fue", "is", "was", "son", "por", "why",
-        "no", "si",
+        /* Connectives and prepositions */
+        "de", "of", "del", "'s", "en", "in", "on", "at", "for", "with", "y", "e", "and",
+        "o", "u", "or", "por",
+        /* Articles and determiners */
+        "el", "la", "los", "las", "the", "un", "una", "unos", "unas", "a", "an",
+        /* Question particles (wh-words) */
+        "que", "quien", "quienes", "cual", "cuales", "donde", "como", "cuantos", "cuantas",
+        "who", "what", "where", "when", "why", "how", "which", "whom", "whose",
+        /* Possessives and pronouns */
+        "su", "sus", "his", "her", "its", "their", "mi", "my", "tu", "your",
+        /* Copulas and auxiliaries */
+        "es", "era", "fue", "son", "is", "was", "are", "were", "be", "been",
+        "do", "did", "does",
+        /* Polarity */
+        "no", "not", "si", "yes",
     };
     for (size_t i = 0; i < sizeof(STOP) / sizeof(STOP[0]); i++)
         if (strcmp(tok, STOP[i]) == 0)
@@ -1729,9 +1738,29 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
         PARSED whole;
         int force_q = sf.question || HasWh(toks, n);
         if (TrialParseGoal(ch, toks, 0, n, -1, force_q, sf.genitive,
-                           &whole) &&
-            (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY))
-            return EmitGoal(ch, toks, 0, n, -1, plan);
+                           &whole))
+        {
+            if (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY)
+                return EmitGoal(ch, toks, 0, n, -1, plan);
+            /* If session has loaded text corpora and the whole line parses as
+               a unified text or QA query without explicit coordinators, keep it intact. */
+            if (ch->ntfiles > 0 &&
+                (whole.intent == INT_TEXTQ || whole.intent == INT_QA_ENTITY))
+            {
+                int has_coord = 0;
+                for (uint32_t ci = 0; ci < n; ci++)
+                {
+                    if (strcmp(toks[ci], "y") == 0 || strcmp(toks[ci], "and") == 0 ||
+                        strcmp(toks[ci], ";") == 0)
+                    {
+                        has_coord = 1;
+                        break;
+                    }
+                }
+                if (!has_coord)
+                    return EmitGoal(ch, toks, 0, n, -1, plan);
+            }
+        }
     }
     if (PlanRange(ch, toks, 0, n, -1,
                   sf.question || HasWh(toks, n), sf.genitive,
@@ -1842,7 +1871,7 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 strncpy(p->a, entity_out, CHAT_TOKEN_MAX - 1);
                 p->a[CHAT_TOKEN_MAX - 1] = '\0';
                 p->ntoks = 0;
-                for (uint32_t ti = 0; ti < n && ti < 8; ti++)
+                for (uint32_t ti = 0; ti < n && ti < CHAT_TEXT_WORDS_MAX; ti++)
                 {
                     strncpy(p->toks[p->ntoks], toks[ti],
                             CHAT_TOKEN_MAX - 1);
@@ -3475,7 +3504,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
            Follow-ups (KV-cache) reuse the cached topic and skip
            shown sentences: advance, never repeat. Fresh topics
            reset the shown list. */
-        const char *words[8];
+        const char *words[CHAT_TEXT_WORDS_MAX];
         uint32_t nw = 0;
         uint32_t i;
         uint32_t f;
@@ -3488,12 +3517,12 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             RememberFocus(ch, p->a);
         if (p->t_following)
         {
-            for (k = 0; k < ch->tnw && nw < 8; k++)
+            for (k = 0; k < ch->tnw && nw < CHAT_TEXT_WORDS_MAX; k++)
                 words[nw++] = ch->twords[k];
             /* autoregressive state: shown sentences join the
                query (content symbols only, deterministic order).
                Q' orients from where the dialogue stands. */
-            for (k = 0; k < ch->ntshown && nw < 8; k++)
+            for (k = 0; k < ch->ntshown && nw < CHAT_TEXT_WORDS_MAX; k++)
             {
                 uint32_t f2 = ch->tshown[k] >> 24;
                 uint32_t sx = ch->tshown[k] & 0xFFFFFFu;
@@ -3504,7 +3533,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 sn = TextLexSentence(&ch->tlex[f2], sx);
                 if (sn == NULL)
                     continue;
-                for (t = 0; t < sn->ntok && nw < 8; t++)
+                for (t = 0; t < sn->ntok && nw < CHAT_TEXT_WORDS_MAX; t++)
                 {
                     const SYMBOL *sm;
                     char low[CHAT_TOKEN_MAX];
@@ -3544,23 +3573,23 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         else
         {
             /* Drop high-frequency function words from query:
-               tokens appearing >0.5% of all tokens are structural
+               tokens appearing >0.3% of all tokens are structural
                noise (articles, copulas, prepositions) that match
                everywhere and drown the entity. Frequency threshold
                deduced from corpus, never hardcoded vocabulary. */
             uint32_t total_freq = 0;
             for (i = 0; i < ch->tgraph->symbols->count; i++)
                 total_freq += ch->tgraph->symbols->items[i].frequency;
-            for (i = 0; i < p->ntoks && nw < 8; i++)
+            for (i = 0; i < p->ntoks && nw < CHAT_TEXT_WORDS_MAX; i++)
             {
-                SYMBOL_ID sid = SymbolFind(ch->tgraph->symbols, p->toks[i]);
+                SYMBOL_ID sid = TextLexFindSymbol(ch->tgraph, p->toks[i]);
                 if (sid != SYMBOL_INVALID)
                 {
                     const SYMBOL *sym = SymbolGet(ch->tgraph->symbols, sid);
                     if (sym != NULL && total_freq > 0)
                     {
                         float rel = (float)sym->frequency / (float)total_freq;
-                        if (rel > 0.005f)
+                        if (rel > 0.003f)
                             continue;
                     }
                 }
@@ -4234,9 +4263,48 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         /* Second: try text search if KB had no results */
         if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
         {
-            const char *words[4];
+            const char *words[CHAT_TEXT_WORDS_MAX];
             uint32_t nw = 0;
-            words[nw++] = p->a;
+            char ent_toks[16][CHAT_TOKEN_MAX];
+            uint32_t nent = 0;
+            char ent_buf[CHAT_TOKEN_MAX * 2];
+            strncpy(ent_buf, p->a, sizeof(ent_buf) - 1);
+            ent_buf[sizeof(ent_buf) - 1] = '\0';
+            char *sp = strtok(ent_buf, " \t\r\n");
+            while (sp != NULL && nent < 16 && nw < CHAT_TEXT_WORDS_MAX)
+            {
+                strncpy(ent_toks[nent], sp, CHAT_TOKEN_MAX - 1);
+                ent_toks[nent][CHAT_TOKEN_MAX - 1] = '\0';
+                words[nw++] = ent_toks[nent];
+                nent++;
+                sp = strtok(NULL, " \t\r\n");
+            }
+            uint32_t total_freq = 0;
+            for (uint32_t fi = 0; fi < ch->tgraph->symbols->count; fi++)
+                total_freq += ch->tgraph->symbols->items[fi].frequency;
+            for (uint32_t ti = 0; ti < p->ntoks && nw < CHAT_TEXT_WORDS_MAX; ti++)
+            {
+                if (IsStopTok(p->toks[ti]))
+                    continue;
+                SYMBOL_ID sid = TextLexFindSymbol(ch->tgraph, p->toks[ti]);
+                if (sid != SYMBOL_INVALID && total_freq > 0)
+                {
+                    const SYMBOL *sym = SymbolGet(ch->tgraph->symbols, sid);
+                    if (sym != NULL && ((float)sym->frequency / (float)total_freq) > 0.003f)
+                        continue;
+                }
+                int dup = 0;
+                for (uint32_t wi = 0; wi < nw; wi++)
+                {
+                    if (strcmp(words[wi], p->toks[ti]) == 0)
+                    {
+                        dup = 1;
+                        break;
+                    }
+                }
+                if (!dup)
+                    words[nw++] = p->toks[ti];
+            }
             uint32_t best = 0, bestf = 0;
             float bestsc = 0.0f;
             int have = 0;
@@ -4789,12 +4857,41 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
         return INT_NONE;
     entity_out[0] = '\0';
 
-    /* Pattern 1: <wh> <copula> <entity...> → ENTITY or WHAT
-       "who is David" / "quien es David" / "what is the king" */
-    if (wh_pos + 1 < n && IsCopulaTok(toks[wh_pos + 1]))
+    /* Pattern 1: <wh> [noun...] <copula/aux> <entity...> → ENTITY or WHAT
+       "who is David" / "what is pipe flow" / "what sport did Afanasenkov play" /
+       "how did the Clean Water Act affect Trinity Meadows" */
+    int is_link = 0;
+    uint32_t link_pos = wh_pos + 1;
+    if (link_pos < n && (IsCopulaTok(toks[link_pos]) ||
+                         strcmp(toks[link_pos], "did") == 0 ||
+                         strcmp(toks[link_pos], "does") == 0 ||
+                         strcmp(toks[link_pos], "do") == 0 ||
+                         strcmp(toks[link_pos], "are") == 0 ||
+                         strcmp(toks[link_pos], "were") == 0))
     {
-        /* Skip articles and fillers after copula */
-        uint32_t start = wh_pos + 2;
+        is_link = 1;
+    }
+    else if (wh_pos + 2 < n && (IsCopulaTok(toks[wh_pos + 2]) ||
+                                strcmp(toks[wh_pos + 2], "did") == 0 ||
+                                strcmp(toks[wh_pos + 2], "does") == 0 ||
+                                strcmp(toks[wh_pos + 2], "do") == 0 ||
+                                strcmp(toks[wh_pos + 2], "are") == 0 ||
+                                strcmp(toks[wh_pos + 2], "were") == 0))
+    {
+        link_pos = wh_pos + 2;
+        is_link = 1;
+    }
+    else if (wh_pos + 4 < n && (IsCopulaTok(toks[wh_pos + 4]) ||
+                                strcmp(toks[wh_pos + 4], "did") == 0))
+    {
+        link_pos = wh_pos + 4;
+        is_link = 1;
+    }
+
+    if (is_link)
+    {
+        /* Skip articles and fillers after copula/auxiliary */
+        uint32_t start = link_pos + 1;
         while (start < n && (strcmp(toks[start], "el") == 0 ||
                              strcmp(toks[start], "la") == 0 ||
                              strcmp(toks[start], "the") == 0 ||
@@ -4808,14 +4905,9 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
             start++;
         if (start < n)
         {
-            /* Collect entity tokens until end or a preposition */
             size_t pos = 0;
             for (i = start; i < n; i++)
             {
-                if (strcmp(toks[i], "de") == 0 || strcmp(toks[i], "of") == 0 ||
-                    strcmp(toks[i], "del") == 0 || strcmp(toks[i], "en") == 0 ||
-                    strcmp(toks[i], "in") == 0 || strcmp(toks[i], "on") == 0)
-                    break;
                 if (i > start && pos + 1 < entity_size)
                     entity_out[pos++] = ' ';
                 {

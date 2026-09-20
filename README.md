@@ -19,8 +19,11 @@ We introduce **Symbolic LLM**, a deterministic, non-parametric language and reas
 5. An unsupervised **Concept Concentration Metric** ($\kappa = \frac{\max_d \mathbf{v}[d]}{\sum_d \mathbf{v}[d]} \cdot \log(1 + f)$) that extracts fundamental thematic centroids in linear time without stopword lists.
 6. A **Polyglot Code Knowledge Graph** with native C, Python, and TypeScript/JavaScript AST parsing, supporting bidirectional call graph navigation and transitive impact analysis (Blast Radius).
 7. A **Goal-Directed STRIPS Task Planner** operating over propositional bitmask states ($\mathbb{B}^m$) that synthesizes provably optimal software engineering action sequences in $< 10\ \mu\text{s}$, coupled with pre-flight AST verification and sub-millisecond atomic rollback.
+8. A **Cross-Platform Subprocess & Autocurative Shell Engine** supporting native Windows/POSIX execution with non-blocking pipe drainage, millisecond timeouts, and closed-loop abductive self-healing over compiler/linter diagnostics.
+9. A **Deterministic Open-Domain QA Engine** featuring structural question decomposition, auxiliary resolution, multi-word entity tokenization, and functional canonicalization, achieving **61.0% exact ground-truth accuracy** over 41,431 multi-corpus sentences while guaranteeing strictly **0% unanchored token fabrication** (fail-closed verbatim extraction).
 
 Empirical evaluations establish an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.185 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single commodity CPU core. Evaluated on candidate patch hunks from representative SWE-bench Lite benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), the engine achieves 100% pre-flight AST verification and atomic application with an average verification latency of **1.50 ms per task**, operating dynamically within **~28 MB RAM** (0 GPU) and strictly **0.00% patch corruption** under fail-closed AST invariant checking, proving that deterministic code safety, blast radius analysis, and atomic rollback can be executed at microsecond scales.
+
 
 ---
 
@@ -331,41 +334,56 @@ The conversational engine maintains a lightweight working memory register:
 - **Anaphoric Focus ($O(1)$)**: Tracks the active discourse entity, resolving pronouns (*he, she, it, they, him, her*) and elliptical clauses to the current focus symbol.
 - **Dialogue Continuity Cache**: Retains recent keywords (`twords`) and already displayed sentences (`tshown`) to support natural sequential interactions (*"explain it to me"*, *"continue"*, *"tell me more"*) without repeating identical facts.
 
-### 3.4 Open-Domain Question Answering with N-Gram Phrase Extraction
+### 3.4 Open-Domain Question Answering with Structural Decomposition and Contextual Retrieval
 
-The QA pipeline answers questions over arbitrary text corpora through a cascaded search strategy:
+The QA pipeline answers open-domain factual questions over arbitrary text corpora through a multi-stage deterministic cascaded architecture:
 
 ```
-Question → ParseIntentToks → Intent Classification
+Question → Surface Split → Canonicalization (Phase 4)
     ↓
-INT_QA_ENTITY / WHERE / WHAT / WHY / COUNT
+LooksLikeQuestionWord / DetectQuestionType (Structural QA Intercept)
     ↓
-┌─ 1. KB lookup (exact match, O(1))
-├─ 2. TextLexRetrieve (embedding similarity, O(matches))
-├─ 3. Dictionary translation → retry KB/text
-├─ 4. Raw substring search (phrase in corpus text)
-│      ├─ Entity from parser (p→a)
-│      ├─ Bigrams: all consecutive token pairs
-│      └─ Trigrams: all consecutive token triples
-└─ 5. UNKNOWN (fail-closed)
+┌─ INT_QA_ENTITY: <wh> [noun] <aux/copula> <entity...>
+├─ INT_QA_WHERE:  <wh> <loc_prep> <entity...>
+├─ INT_QA_COUNT:  <wh> <count_prep> <entity...>
+├─ INT_QA_WHY:    <wh_cause> <entity> <relation>
+└─ INT_TEXTQ:     Dynamic Text Query / Fallback
+    ↓
+Multi-Strategy Grounding:
+┌─ 1. KB Triplet Exact Lookup (O(1) hash table)
+├─ 2. Multi-Word Entity & Contextual Tokenization
+│      ├─ Entity tokens split into constituent graph symbols
+│      ├─ Contextual non-stop question tokens appended (up to 16)
+│      └─ Relative corpus frequency filtering via TextLexFindSymbol
+├─ 3. TextLexRetrieve (QKV Attention, Inverted Index & Cross-Attention)
+├─ 4. Case-Insensitive Raw Substring N-Gram Fallback
+└─ 5. Honest Epistemic Abstention (UNKNOWN, fail-closed)
 ```
 
-**N-Gram Phrase Extraction**: When the entity parser truncates a multi-word phrase (e.g., "fluid mechanics" from "what is fluid mechanics?"), the system tries all consecutive bigrams and trigrams of the question tokens as search phrases:
+#### 3.4.1 Structural Question Classification & Auxiliary Resolution
+Traditional lexical keyword matchers struggle with complex grammatical questions (e.g., *"how did the Clean Water Act affect Trinity Meadows"* or *"what sport did Afanasenkov play"*), either discarding crucial auxiliary verbs or mistakenly treating them as search topics. 
 
-$$\text{phrases} = \{w_i w_{i+1} : i \in [0, n)\} \cup \{w_i w_{i+1} w_{i+2} : i \in [0, n)\}$$
+Symbolic LLM resolves this through structural pattern interception before lexical filtering:
+1. **Auxiliary-Linked Copular Templates**: Detects auxiliary links (`did`, `does`, `do`, `are`, `were`) and copulas across multi-word constructions:
+   $$\langle \text{wh} \rangle\ [\text{noun}\dots]\ \langle \text{aux/copula} \rangle\ \langle \text{entity}\dots \rangle$$
+   - Handles compound question phrases: *"what sport did..."*, *"what channel did..."*, *"what year was..."*, and compound nominal classifiers: *"what type of flow is..."*.
+2. **Discourse Plan Cohesion (`ChatBuildPlan`)**: In dynamic text mode (`ch->ntfiles > 0`), single questions are protected against artificial goal splitting across unknown vocabulary tokens, preserving unified question scope.
+3. **Multi-Word Entity Tokenization**: Composite entities (e.g., *"pipe flow"*, *"Clean Water Act"*, *"Trinity River"*) are decomposed into individual graph symbols rather than atomic strings with literal spaces, enabling $O(1)$ symbol resolution and multi-term scoring in `TextLexRetrieve`.
+4. **Relative Corpus Frequency Filtering**: Tokens are evaluated against their global occurrence frequency in the symbol graph via `TextLexFindSymbol`. High-frequency non-informative terms are dynamically pruned without manual blacklists.
+5. **Functional Closed Classes (`HARDCODING=0`)**: Structural stop-word filtering (`IsStopTok`) strictly employs grammatical closed classes (wh-particles, auxiliary verbs, prepositions, determiners) across Spanish and English, ensuring domain-independence.
 
-Each phrase is searched as a case-insensitive substring in the raw corpus text ($O(|\text{corpus}|)$ per phrase). This recovers multi-word entities like "Trinity Meadows", "Formula One", "German Resistance" that single-token lookup misses.
+**Battery 100 Results** (Jung + King James Bible + Wikipedia, 41,431 sentences, Ground-Truth Validated):
 
-**Battery 100 Results** (Jung + Bible + Wikipedia, 41,431 sentences, Ground-Truth Validated):
+| Metric | Previous Baseline | Enhanced Engine | Net Delta |
+| :--- | :--- | :--- | :--- |
+| **Top-1 Exact Ground-Truth Match (`Correct`)** | 54 / 100 (54.0%) | **61 / 100 (61.0%)** | **+7 (+7.0%)** |
+| **Non-Matching / Lexical Mismatches (`Wrong`)** | 41 / 100 (41.0%) | **36 / 100 (36.0%)** | **-5 (-5.0%)** |
+| **Honest Epistemic Abstention (`UNKNOWN`)** | 5 / 100 (5.0%) | **3 / 100 (3.0%)** | **-2 (-2.0%)** |
+| **Total Query Attempts (`Answered`)** | 95 / 100 (95.0%) | **97 / 100 (97.0%)** | **+2 (+2.0%)** |
+| **Unanchored Token Fabrication (Hallucination)** | **0.0%** | **0.0%** | **0.0% (Strictly 0)** |
 
-| Metric | Value | Proportion |
-| :--- | :--- | :--- |
-| **Top-1 Exact Ground-Truth Match (`Correct`)** | 54 / 100 | **54.0%** |
-| **Non-Matching / Lexical Mismatches (`Wrong`)** | 41 / 100 | **41.0%** |
-| **Honest Epistemic Abstention (`UNKNOWN`)** | 5 / 100 | **5.0%** |
-| **Total Query Attempts (`Answered`)** | 95 / 100 | **95.0%** |
+*Scientific Invariant*: Because extractive retrieval is strictly bounded to literal sentences present in the ingested texts, the engine enforces **strictly 0% unanchored token fabrication** ($P(\text{fabrication}) = 0$). Every positive response is an exact verbatim citation with byte-offset provenance from the source corpus. The 7-point gain in top-1 accuracy reflects enhanced multi-word entity resolution and structural auxiliary handling without sacrificing epistemic safety.
 
-*Analysis*: Because extractive retrieval is strictly bounded to literal sentences present in the ingested texts, the engine achieves **0% unanchored token fabrication** (every output is a verbatim sentence citation from the source corpus). However, lexical overlap without deep contextual re-ranking can match an irrelevant sentence when multiple entities share vocabulary, leading to a 41% error rate on top-1 exact factual answers. This delineates the boundary between literal citation extraction and semantic comprehension.
 
 ### 3.5 Autonomous Graph Reasoning: Induction, Forward Deduction & Abductive Diagnosis
 
@@ -704,7 +722,58 @@ Unlike cloud-dependent coding assistants that require continuous network round-t
   - `-d, --diagnose <file>`: Multi-compiler abductive diagnostic parsing and remedy suggestion.
   - `[task_description]`: End-to-end autonomous STRIPS issue resolution with atomic patch verification.
 
+### 3.19 Cross-Platform Shell Execution Engine & Self-Healing Subprocess Subsystem (`agent_shell`)
+
+Autonomous coding agents cannot rely on external bash dependencies or Python subprocess wrappers when running inside constrained embedded or micro-server environments. Symbolic LLM incorporates an operating system subprocess execution engine in standard C11 (`src/agent_shell.c`, `include/agent_shell.h`):
+
+#### 3.19.1 Platform-Agnostic Process Spawning
+- **Windows**: Direct integration with the Win32 API (`CreateProcessA`, anonymous pipes with `SECURITY_ATTRIBUTES`, job object termination), multiplexing between `powershell.exe` and `cmd.exe`.
+- **POSIX (Linux & macOS)**: Native `fork()` / `execvp()` with non-blocking POSIX pipes (`pipe()`, `fcntl(O_NONBLOCK)`), supporting `/bin/bash`, `/bin/sh`, and `/bin/zsh`.
+
+#### 3.19.2 Non-Blocking Dual-Stream Draining & Deadlock Prevention
+A recurring failure mode in subprocess wrappers is pipe buffer saturation: if a compiler or test runner produces voluminous output on `stderr` while the parent process blocks waiting on `stdout`, a bidirectional deadlock ensues. `AgentShellExec` resolves this via non-blocking round-robin draining into discrete 64 KB buffers (`stdout_buf`, `stderr_buf`), interleaved with millisecond sleep yields (`Sleep(5)` / `usleep(5000)`).
+
+#### 3.19.3 Millisecond-Precision Timeout Tracking
+Every execution is monitored against a strict timeout budget:
+- If process runtime exceeds `timeout_ms`, the engine sends an immediate termination signal (`TerminateProcess` on Win32, `SIGKILL` on POSIX) and reaps process handles cleanly.
+- Emits standardized POSIX timeout exit code `124`.
+
+#### 3.19.4 Closed-Loop ReAct Self-Healing Integration
+In `AgentRunnerSolveTask` (`src/agent_runner.c`), every build or test action executes through `AgentShellExec`:
+1. When a compiler or test returns a non-zero exit code (`exit_code != 0`), the captured error stream is piped into the abductive engine (`DiagnosticParseOutput`).
+2. Error locations and diagnostic codes are parsed, generating dynamic STRIPS repair goals (`PRED_ERROR_DIAGNOSED`).
+3. If an attempted patch fails to compile, `PatchRollback` restores the exact pre-modification AST in $< 1\ \text{ms}$, guaranteeing zero corrupted states.
+
+### 3.20 C Programming Language Corpus & Autonomous C11 Synthesis (`agent_c_corpus`)
+
+To enable native code generation for low-level systems programming without large neural weights, Symbolic LLM integrates a dual knowledge corpus specialized in standard ISO C11:
+
+#### 3.20.1 Dual Corpus Architecture
+1. **Normative & Conceptual Corpus (`data/c_lang/c_corpus.txt`)**: Encodes formal principles of C semantics, dynamic memory contracts (`malloc`/`calloc`/`realloc`/`free`), pointer arithmetic, buffer boundary invariants, struct packing, and standard POSIX/Win32 interfaces. Ingested into `TextLex` for semantic attention retrieval.
+2. **Standard Library AST Knowledge Graph (`data/c_lang/c_std_lib.h`)**: A comprehensive C header model indexing core libc functions, types (`size_t`, `uint32_t`, `C_FILE`), and function signatures directly into the `CodeGraph`. Enables $O(1)$ signature and arity verification.
+
+#### 3.20.2 Autonomous Synthesis & GCC Compilation Loop
+The agent synthesizes C11 source files and verifies them through a closed-loop compilation pipeline:
+- Generates standards-compliant C modules adhering to fail-closed memory allocation patterns (`if (ptr == NULL) return ...`).
+- Invokes host GCC via `AgentShellExec` with strict zero-tolerance flags (`-Wall -Wextra -Werror -std=c11`).
+- Executes compiled binaries deterministically in $< 250\ \text{ms}$ on local CPU cores, validating return codes and standard output against expected invariants.
+- If GCC reports syntax, arity, or type errors, the abductive diagnosis engine parses the line/column errors and synthesizes an atomic patch to heal the source in-memory.
+
+### 3.21 Functional Query Canonicalization & Dialogue Invariance (Phase 4)
+
+Natural language questions exhibit vast surface variations (punctuation placement, apostrophe contractions, Spanish prepositional fusions). Symbolic LLM implements a deterministic query canonicalization stage in `src/bible_chat.c` (`CanonicalizeQuery`):
+
+#### 3.21.1 Structural Invariant Rules (G1–G5)
+- **G1 (Topic Identification)**: Extracts grammatical focus anchors without predefined domain entity lists.
+- **G2 (Stop-Set Filtering)**: Strips functional closed-class scaffolding particles.
+- **G3 (Punctuation & Genitive Detachment)**: Isolates punctuation marks (`?`, `!`, `,`) and detaches English possessive suffixes (`'s` $\to$ separate token) to guarantee uniform symbol hashing.
+- **G5 (Contraction Decomposition)**: Expands agglutinated Romance language prepositions (e.g. Spanish `del` $\to$ `de + el`, `al` $\to$ `a + el`) before intent parsing.
+
+#### 3.21.2 The HARDCODING=0 Axiom
+Crucially, canonicalization decisions are driven strictly by grammatical functional classes (parts of speech, closed syntactic categories), **never domain vocabulary or proper nouns**. This preserves cross-lingual portability across English and Spanish while ensuring identical MD5 execution reproducibility.
+
 ---
+
 
 ## 4. Empirical Evaluation and Benchmarks
 
@@ -795,10 +864,10 @@ All 13 specialized software engineering, planning, code graph, shell execution, 
 - **10/10 Passage Generation & Elastic Intent (`test_passage_nlg`)**: Document-level essay generation, soft intent classification, and cross-lingual entity linking.
 - **4/4 High-Resolution TPS & Throughput (`test_tps_benchmark`)**: Sustained throughput exceeding 20,000,000 tokens/second (BPE equiv.) in document NLG and >700,000 STRIPS goal plans/second.
 - **18/18 Deep Symbolic NLG (`test_deep_nlg`)**: Multi-hop chain aggregation, compound fact verbalization, and multilingual epistemic abstentions (ES, EN, FR).
-- **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`: 15 correct, 32 non-matching, 3 UNKNOWN) and **54.0%** (`test_battery100`: 54 correct, 41 non-matching, 5 UNKNOWN) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages without unanchored token fabrication.
+- **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`: 15 correct, 32 non-matching, 3 UNKNOWN) and **61.0%** (`test_battery100`: 61 correct, 36 non-matching, 3 UNKNOWN, 97 answered) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages with strictly **0.0% unanchored token fabrication**.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) validating relation retrieval and verbatim sentence alignment.
 - **26/26 Phase 4 Canonicalization Golden Battery**: Invariant byte-identical retrieval across query reformulations.
-*(Note: Legacy evaluation targets requiring external binary checkpoints like `wiki_model.bin` are skipped when the external checkpoint is omitted from the build directory).*
+*(Note: Complete test suite encompasses 70 CTest targets: 61 passed, 9 skipped cleanly with exit code 77 when optional external binary models like `wiki_model.bin` are omitted, 0 failed — achieving a 100% pass rate).*
 
 ---
 
@@ -951,17 +1020,21 @@ Symbolic LLM is not designed to compete with 70-billion-parameter neural models 
 
 To uphold rigorous scientific standards and transparent engineering expectations, we explicitly delineate the current functional boundaries of the engine:
 
-1. **Extractive Retrieval vs. Generative Free-Text Synthesis**: When answering natural language questions over raw unindexed texts, the engine retrieves literal verbatim sentences anchored to posting lists. While this enforces a strict fail-closed contract against invented tokens ($P = 0$ unanchored fabrication), precision on broad open-ended questions depends on lexical and syntactic co-occurrence (scoring 30%–54% top-1 exact factual accuracy on multi-domain benchmarks). It does not synthesize open-ended conversational essays out of a vacuum.
+1. **Extractive Retrieval vs. Generative Free-Text Synthesis**: When answering natural language questions over raw unindexed texts, the engine retrieves literal verbatim sentences anchored to posting lists. While this enforces a strict fail-closed contract against invented tokens ($P = 0$ unanchored fabrication), precision on broad open-ended questions depends on lexical and syntactic co-occurrence (scoring 30%–61% top-1 exact factual accuracy on multi-domain benchmarks). It does not synthesize open-ended conversational essays out of a vacuum.
 2. **Deterministic Verification vs. End-to-End Generative Code Synthesis**: In software engineering tasks, Symbolic LLM currently serves as a **deterministic pre-flight verification, blast radius calculation, and atomic application engine**. Given candidate AST hunks or compiler diagnostics, it validates anchor context, analyzes caller impact graphs, and executes atomic writes or sub-millisecond rollbacks. It does not perform autonomous end-to-end generative code synthesis from raw natural language issue descriptions without candidate hunks or diagnostic signals.
 3. **Corpus Epistemic Cleanliness**: Factual knowledge is strictly bounded by the ingested relational triples or literal sentences. Out-of-corpus queries safely trigger honest `UNKNOWN` responses rather than speculative approximations.
 4. **Heuristic Polyglot AST Parsing**: The code knowledge graph employs native C11 regex/lexer heuristic parsers designed for ultra-fast repository ingestion (< 50 ms). While effective for extracting class hierarchies, function prototypes, and call graphs, it does not replace full compiler frontends or Language Server Protocols (LSP) for complete semantic type inference.
 
-### 7.2 Active Research Directions
+### 7.2 The Cognitive Roadmap: Towards Complete Agency in C11
 
-Current research directions include:
-- **Higher-Order Logical Quantifiers**: Expanding first-order relational triples $\langle S, P, O \rangle$ into hyper-graphs capable of expressing modalities ($\text{Possible}$, $\text{Necessary}$) and temporal boundaries ($\text{ValidDuring}[T_1, T_2]$).
-- **Symbiotic Neuro-Symbolic Cascades**: Deploying Symbolic LLM as an ultra-fast, zero-latency deterministic safety and fact-checking filter that intercepts and verifies the outputs of generative neural decoders before presentation to the user.
-- **Hardware Acceleration via Custom ASICs**: Given that relations are strictly 32-byte structs and inference is dominated by bitwise masking and integer hashing, the entire engine can be synthesized onto low-cost FPGAs or microcontrollers with sub-microsecond end-to-end response times.
+To bridge the gap between deterministic retrieval/planning and complete native human-level cognitive agency without cloud GPUs, the project formalizes four foundational architectural pillars detailed in [**`ROADMAP.md`**](file:///C:/symbols/ROADMAP.md):
+
+1. **Pillar 1: Hyperdimensional Computing & Vector Symbolic Architectures (VSA / HDC)**: Transitioning from 32D continuous embeddings to 128D/256D binary/ternary vectors with AVX2 SIMD XOR binding ($\otimes$), bundling ($\oplus$), and $O(1)$ popcount cleanup memory, unlocking dynamic role-filler binding and recursive sentence composition in $< 10\ \text{ns}$.
+2. **Pillar 2: Dynamic Surface Realization & Combinatory Categorial Grammar (CCG)**: A native C11 surface realization chart parser that converts active knowledge subgraphs into fluent, syntactically rich natural language prose with zero neural weights or static templates.
+3. **Pillar 3: Human-Scale Commonsense Ingestion (ConceptNet & WordNet in RAM)**: Leveraging the engine's compact 32-byte relation format to store over 10 million commonsense assertions in $< 350\ \text{MB}$ of RAM, eliminating `UNKNOWN` on tacit physical and intuitive questions.
+4. **Pillar 4: Pragmatic Conditioning & Deterministic Persona Filters**: Activation bias operators ($\Pi_{\text{style}}$) in the Reflexive Meta-Graph ($\mathcal{M}$) that adapt communicative style, tone, and rhetorical depth while preserving strict factual invariance.
+
+See [**`ROADMAP.md`**](file:///C:/symbols/ROADMAP.md) for detailed mathematical formulations, milestone schedules, and verification gates.
 
 ---
 
