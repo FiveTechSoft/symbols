@@ -58,6 +58,7 @@ add_library(symbolic STATIC
     src/text_lex.c
     src/meta_graph.c
     src/vsa.c
+    src/ccg_realizer.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -245,4 +246,7 @@ target_link_libraries(test_multi_hop symbolic)
 
 # Pillar 1: Vector Symbolic Architecture (VSA / HDC)
 sllm_test(test_vsa tests/test_vsa.c)
+
+# Pillar 2: Combinatory Categorial Grammar (CCG) & Surface Realization
+sllm_test(test_ccg_realizer tests/test_ccg_realizer.c)
 

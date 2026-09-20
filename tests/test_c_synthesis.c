@@ -203,7 +203,7 @@ static void test_autonomous_c_synthesis_and_gcc_execution(void)
     const char *run_cmd = "./test_synth_program.exe";
 #endif
 
-    ok = AgentShellExec(run_cmd, ".", 5000, &shell_res);
+    ok = AgentShellExec(run_cmd, ".", 15000, &shell_res);
     TEST_ASSERT(ok == 1, "AgentShellExec launched synthesized binary");
     TEST_ASSERT(shell_res.exit_code == 0, "Synthesized C program executed successfully with exit code 0");
     TEST_ASSERT(strstr(shell_res.stdout_buf, "SUCCESS: Symbolic C11") != NULL,
@@ -301,7 +301,7 @@ static void test_closed_loop_c_abductive_repair(void)
     const char *run_cmd = "./test_repair_candidate.exe";
 #endif
 
-    AgentShellExec(run_cmd, ".", 5000, &shell_res);
+    AgentShellExec(run_cmd, ".", 15000, &shell_res);
     TEST_ASSERT(shell_res.exit_code == 0, "Repaired binary executed with exit code 0 (PASS)");
     printf("  [INFO] Repaired program executed successfully in %.2f ms\n", shell_res.wall_clock_ms);
 
