@@ -6,13 +6,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ---
 
-## [Unreleased] - 2026-09-21
-
-### Añadido
-- **Saludos Conversacionales y Resolución de Identidad (`ServerIsGreeting`, `ServerAnswerGreeting`, `SelfAnswer`)**:
-  - Detección precisa de intenciones de saludo y cortesía (`hola`, `hello`, `hi`, `buenos dias`, `que tal`) y preguntas de identidad (`quien eres`, `who are you`, `que sabes hacer`).
-  - Emisión de respuesta inmediata de copiloto sin secuestro por búsqueda textual sobre el corpus de fondo ni distancias Levenshtein espurias (p. ej. `hola` asimilado a `hold` del texto bíblico).
-  - Modulación pragmática según la persona activa (`PERSONA_PIRATE_QUANTUM`, `PERSONA_NEUTRAL`) y soporte multilingüe (español / inglés).
+## [Phase 22] - 2026-09-21
+- **Saludos Conversacionales, Identidad y Supresión de Falsos Positivos Levenshtein (`ServerIsGreeting`, `ServerAnswerGreeting`, `IsGreetingTok`)**:
+  - Blindaje léxico en `src/chat.c`: `IsGreetingTok` evita que tokens de cortesía (`hola`, `hello`, `hi`, `hey`, `buenas`, `saludos`) sean asimilados por distancia Levenshtein a términos bíblicos (`hold`), eliminando respuestas fuera de contexto.
+  - Interceptor prioritario de saludos e identidad en `symbols-server` y `server_proto`: responde al instante en lenguaje natural ("¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo...") con `finish_reason: "stop"`, tanto en español como en inglés, y con modulación por perspectiva/persona.
+  - Fallback compilado y tabla declarativa externa (`COMPILED_SELF_SCOPE`, `COMPILED_SELF_GREET`, `data/agentic/self.tsv`) con 20 disparadores de saludo y presentación.
   - Priorización de `SelfAnswer` en `ChatHandleToBuf` e incorporación de guardia `IsGreetingTok` en `ParseIntentToks`.
   - Fallback compilado `LoadCompiledSelf()` con 20 disparadores canónicos y persistencia declarativa en `data/agentic/self.tsv`.
 
