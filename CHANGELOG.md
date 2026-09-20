@@ -4,6 +4,14 @@ Todas las novedades, mejoras y correcciones notables de **Symbolic LLM / symbols
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Phase 23] - 2026-09-21
+- **Configuración Predeterminada de Corpus Técnico para Copiloto de Programación**:
+  - `data/c_lang/c_corpus.txt` (estándar C11, memoria dinámica, tipos e invariantes de libc) establecido como corpus de conocimiento predeterminado en `symbols-server` y `chat_main`.
+  - Actualizados los scripts de lanzamiento (`run_symbols_server.bat`, `run_symbols_server.ps1`, `run_symbols_server.sh`) para arrancar con el corpus de C11 por defecto.
+  - Los textos bíblicos (`bible.txt`) y de psicología analítica (`jung.txt`) se desvinculan del arranque predeterminado, preservándose intacta la capacidad de carga explícita mediante argumento en línea de comandos o vía `/load`.
+  - Las consultas técnicas como *"What causes memory leaks?"* se resuelven directamente con las directrices de C11 (`"Failing to free allocated memory causes memory leaks that exhaust available system resources."`), sin riesgo de secuestro léxico o respuestas anacrónicas.
+  - Validación completa con CTest (67 Passed, 9 Skipped, 0 Failed de 76 tests), 212/212 pruebas unitarias de protocolo agéntico y 100% éxito en los harnesses de prueba OpenCode (`test_opencode_user_cases.py` y `test_opencode_copilot_e2e.py`).
+
 ---
 
 ## [Phase 22] - 2026-09-21

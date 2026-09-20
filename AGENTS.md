@@ -197,3 +197,14 @@ Regla arquitectónica:
      - Pruebas HTTP en vivo verificando respuestas inmediatas de saludo y presentación en ES/EN.
      - Suite global CTest 100% verde (67 Passed, 9 Skipped condicionales, 0 Failed de 76 tests), 2026-09-21.
 
+## Configuración Predeterminada de Corpus Técnico para Copiloto de Programación (Fase 23)
+
+- Desacoplamiento de textos bíblicos como corpus predeterminado en `symbols-server`, `chat_main` y scripts de inicio (`scripts/run_symbols_server.bat`, `scripts/run_symbols_server.ps1`, `scripts/run_symbols_server.sh`, `src/symbols_server.c`, `src/chat_main.c`):
+  1. **Corpus de Programación en C como Predeterminado**:
+     - `symbols-server` y `chat_main` configuran `data/c_lang/c_corpus.txt` como primer candidato prioritario en `cand_paths`.
+     - Los scripts de arranque (`run_symbols_server.bat`, `.ps1`, `.sh`) configuran por defecto `CORPORA=data/c_lang/c_corpus.txt`, indexando el estándar C11 (gestión de memoria dinámica, tipos, invariantes de seguridad de buffers, libc) y el Grafo de Conocimiento del Repositorio (AST y radio de impacto).
+     - La Biblia (`data/texts/bible.txt`) y otros textos históricos permanecen disponibles bajo demanda explícita (`--corpus`, argumento CLI, o `/load`), pero ya no se montan de forma predeterminada, evitando interferencias léxicas con consultas técnicas y comandos de usuario.
+  2. **Verificación y Pruebas E2E**:
+     - Adaptada la suite de integración end-to-end `tools/test_opencode_copilot_e2e.py` para verificar consultas de conocimiento de programación ("What causes memory leaks?") respondiendo con principios de gestión de memoria C11.
+     - Añadida prueba de saludo natural en `tools/test_opencode_user_cases.py` ("hola" responde como copiloto de IA sin referencias a versículos bíblicos).
+     - Suite CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests) y pruebas unitarias de servidor 212/212 PASS, 2026-09-21.
