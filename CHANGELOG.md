@@ -4,6 +4,21 @@ Todas las novedades, mejoras y correcciones notables de **Symbolic LLM / symbols
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Phase 25] - 2026-09-21
+- **Tolerancia a Errores Tipográficos y Sintagmas Nominales en Síntesis de Código (`ServerIsCodeSynthesisTask`)**:
+  - **Detección Difusa / Levenshtein de Algoritmos (`EditDistance`, `MatchesAlgorithmKeyword`)**:
+    - Incorporada distancia de edición acotada ($\le 2$) y coincidencia de prefijos en algoritmos clásicos (`fibonacci`, `factorial`, `quicksort`, etc.).
+    - Consultas con erratas tipográficas comunes como `funcion fibinacci en C`, `fibonaci`, `facturial`, etc. se reconocen de forma robusta como solicitudes de síntesis de código en lugar de derivarse erróneamente al planificador de parches de repositorio.
+  - **Soporte para Sintagmas Nominales sin Verbo Imperativo**:
+    - Consultas estructuradas como `[sustantivo de código] + [especificación de lenguaje]` (p. ej. `funcion ... en C`, `algoritmo de ordenamiento en C`, `busqueda binaria en c`, `ejemplo de punteros en C`) se clasifican directamente como síntesis de código, eliminando el requisito excluyente previo de incluir un verbo imperativo (`escribe`, `haz`).
+    - Se previene la formulación errónea de planes STRIPS con herramientas de modificación (`CMakeLists.txt`, `cmake --build`, `ctest`) ante peticiones informativas de funciones de programación.
+  - **Verificación Completa**:
+    - Pruebas unitarias de discriminación en `tests/test_server_tool_calling.c` (226/226 PASS).
+    - Prueba E2E `test_fibinacci_typo_synthesis` en `tools/test_opencode_user_cases.py` verificando respuesta Markdown inmediata con `finish_reason: "stop"` y 0 llamadas a herramientas (100% PASS).
+    - Suite global CTest 76/76 verde (67 Passed, 9 Skipped, 0 Failed).
+
+---
+
 ## [Phase 24] - 2026-09-21
 - **Protección y Limpieza de Inspección de Archivos y Directorios (`dir *.*`, `glob`, `read`, `grep`)**:
   - **Eliminación de Falsos Positivos de Error en `ServerInspectToolResponse`**:

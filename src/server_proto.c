@@ -1278,6 +1278,57 @@ int ServerIsInspectionTask(const char *text)
     return 0;
 }
 
+static int EditDistance(const char *s1, const char *s2)
+{
+    int len1 = (int)strlen(s1);
+    int len2 = (int)strlen(s2);
+    if (abs(len1 - len2) > 2) return 99;
+
+    int dp[32][32];
+    if (len1 >= 30 || len2 >= 30) return 99;
+    for (int i = 0; i <= len1; i++) dp[i][0] = i;
+    for (int j = 0; j <= len2; j++) dp[0][j] = j;
+
+    for (int i = 1; i <= len1; i++)
+    {
+        for (int j = 1; j <= len2; j++)
+        {
+            int cost = (tolower((unsigned char)s1[i - 1]) == tolower((unsigned char)s2[j - 1])) ? 0 : 1;
+            int d1 = dp[i - 1][j] + 1;
+            int d2 = dp[i][j - 1] + 1;
+            int d3 = dp[i - 1][j - 1] + cost;
+            int min = d1 < d2 ? d1 : d2;
+            dp[i][j] = min < d3 ? min : d3;
+        }
+    }
+    return dp[len1][len2];
+}
+
+static int MatchesAlgorithmKeyword(const char *text)
+{
+    if (!text) return 0;
+    if (strstr(text, "fibonacci") != NULL || strstr(text, "fib") != NULL ||
+        strstr(text, "factorial") != NULL || strstr(text, "quicksort") != NULL ||
+        strstr(text, "mergesort") != NULL || strstr(text, "bubblesort") != NULL)
+        return 1;
+
+    char buf[512];
+    strncpy(buf, text, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    char *tok = strtok(buf, " \t\r\n,;\"'¿?.!():");
+    while (tok)
+    {
+        if (strlen(tok) >= 4)
+        {
+            if (EditDistance(tok, "fibonacci") <= 2) return 1;
+            if (EditDistance(tok, "factorial") <= 2) return 1;
+            if (EditDistance(tok, "quicksort") <= 2) return 1;
+        }
+        tok = strtok(NULL, " \t\r\n,;\"'¿?.!():");
+    }
+    return 0;
+}
+
 int ServerIsCodeSynthesisTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
@@ -1307,14 +1358,15 @@ int ServerIsCodeSynthesisTask(const char *text)
     if (ServerIsInspectionTask(text))
         return 0;
 
-    /* Standalone algorithm / coding prompt keywords */
-    if (strstr(lower, "fibonacci") != NULL || strstr(lower, "factorial") != NULL)
+    /* Standalone algorithm / coding prompt keywords (including typo tolerance) */
+    if (MatchesAlgorithmKeyword(lower))
         return 1;
 
     static const char *synth_verbs[] = {
         "escribe", "escribir", "crea", "crear", "genera", "generar",
         "haz", "hacer", "programa", "programar", "implementa", "implementar",
-        "desarrolla", "desarrollar", "write", "generate", "implement", "code"
+        "desarrolla", "desarrollar", "write", "generate", "implement", "code",
+        "dame", "give", "muestra", "mostrar"
     };
     int has_verb = 0;
     for (size_t k = 0; k < sizeof(synth_verbs) / sizeof(synth_verbs[0]); k++)
@@ -1328,11 +1380,11 @@ int ServerIsCodeSynthesisTask(const char *text)
 
     static const char *synth_nouns[] = {
         "funcion", "función", "funciones", "function", "functions",
-        "metodo", "método", "method", "algoritmo", "algorithm",
-        "programa", "program", "codigo", "código",
+        "metodo", "método", "method", "methods", "algoritmo", "algorithm",
+        "programa", "program", "codigo", "código", "code",
         "quicksort", "sort", "ordenar", "ordenamiento",
-        "busqueda", "búsqueda", "puntero", "punteros",
-        "en c", "en c11", "in c", "c code"
+        "busqueda", "búsqueda", "puntero", "punteros", "pointer", "pointers",
+        "invertir", "reverse", "ejemplo", "example"
     };
     int has_noun = 0;
     for (size_t k = 0; k < sizeof(synth_nouns) / sizeof(synth_nouns[0]); k++)
@@ -1344,7 +1396,28 @@ int ServerIsCodeSynthesisTask(const char *text)
         }
     }
 
-    return (has_verb && has_noun);
+    static const char *synth_langs[] = {
+        "en c", "en c11", "in c", "in c11", "c code", "codigo c", "código c",
+        "lenguaje c", "c language", "en python", "in python", "en js", "in js",
+        "en javascript", "in javascript", "en typescript"
+    };
+    int has_lang = 0;
+    for (size_t k = 0; k < sizeof(synth_langs) / sizeof(synth_langs[0]); k++)
+    {
+        if (strstr(lower, synth_langs[k]) != NULL)
+        {
+            has_lang = 1;
+            break;
+        }
+    }
+
+    if (has_noun && has_lang)
+        return 1;
+
+    if (has_verb && has_noun)
+        return 1;
+
+    return 0;
 }
 
 int ServerIsCodingTask(const char *text)

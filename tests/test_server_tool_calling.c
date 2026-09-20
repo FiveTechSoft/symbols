@@ -160,6 +160,11 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsInspectionTask("escribe en C la funcion de fibonacci") == 0, "Code synthesis is not inspection");
     TEST_ASSERT(ServerIsCodeSynthesisTask("write a function to calculate factorial") == 1, "Classifies 'write a function...' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("lista las subcarpetas") == 0, "Inspection is not code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("funcion fibinacci en C") == 1, "Classifies 'funcion fibinacci en C' with typo as code synthesis");
+    TEST_ASSERT(ServerIsCodingTask("funcion fibinacci en C") == 1, "Detects 'funcion fibinacci en C' as coding task");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("funcion fibonacci en C") == 1, "Classifies 'funcion fibonacci en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("funcion para ordenar un array en C") == 1, "Classifies 'funcion para ordenar un array en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("busqueda binaria en c") == 1, "Classifies 'busqueda binaria en c' as code synthesis");
 
     /* Conversational greetings and identity queries */
     TEST_ASSERT(ServerIsGreeting("hola") == 1, "Detects 'hola' as greeting");

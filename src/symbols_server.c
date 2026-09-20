@@ -393,7 +393,8 @@ static void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
     }
     lower[i] = '\0';
 
-    if (strstr(lower, "fibonacci") != NULL || strstr(lower, "fib") != NULL)
+    if (strstr(lower, "fibonacci") != NULL || strstr(lower, "fib") != NULL ||
+        strstr(lower, "fibinacci") != NULL)
     {
         snprintf(out, out_sz,
             "Aqui tienes la implementacion de la funcion de Fibonacci en C (C11):\n\n"

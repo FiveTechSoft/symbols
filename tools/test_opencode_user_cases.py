@@ -125,6 +125,30 @@ def test_fibonacci_synthesis():
     assert "uint64_t" in content or "int" in content, f"Expected C code in content: {content}"
     assert "```c" in content, f"Expected C markdown block in content: {content}"
 
+def test_fibinacci_typo_synthesis():
+    print("\n--- Test 4b: 'funcion fibinacci en C' (Typo & Noun-Only Phrase) ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "funcion fibinacci en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    content = choice.get("message", {}).get("content", "")
+    print(f"  [PASS] finish_reason: {fr}")
+    print(f"  [PASS] Direct C synthesis response:\n{content[:120]}...")
+    assert fr == "stop", f"Expected stop, got {fr}"
+    assert len(tc) == 0, f"Expected 0 tool calls for code synthesis, got {len(tc)}"
+    assert "fibonacci" in content.lower() or "fibinacci" in content.lower()
+    assert "uint64_t" in content or "int" in content
+    assert "```c" in content
+    assert "FAILED" not in content
+    assert "Verification Failed" not in content
+
 def test_greeting_natural():
     print("\n--- Test 5: 'hola' Natural Greeting ---")
     payload = {
@@ -231,6 +255,7 @@ if __name__ == "__main__":
     test_subfolder_inspection()
     test_large_body_payload()
     test_fibonacci_synthesis()
+    test_fibinacci_typo_synthesis()
     test_greeting_natural()
     test_dir_wildcard_flow()
     test_dir_dot_flow()
