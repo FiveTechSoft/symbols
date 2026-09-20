@@ -207,6 +207,7 @@ typedef struct
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
     char              last_tool_output[16384];
+    char              last_tool_call_name[64];
 
     /* Persona conditioning */
     PERSONA_ID        persona_id;
@@ -917,6 +918,12 @@ static void HandleCompletions(socket_t s, const char *body,
     if (strcmp(last_role, "tool") == 0)
     {
         has_tool_resp = ServerExtractLastToolResponse(body, &tool_resp);
+        if (has_tool_resp && tool_resp.name[0] == '\0' && sess->last_tool_call_name[0] != '\0')
+        {
+            strncpy(tool_resp.name, sess->last_tool_call_name, sizeof(tool_resp.name) - 1);
+            tool_resp.name[sizeof(tool_resp.name) - 1] = '\0';
+            ServerInspectToolResponse(&tool_resp);
+        }
     }
     else if (strcmp(last_role, "user") == 0)
     {
@@ -948,13 +955,36 @@ static void HandleCompletions(socket_t s, const char *body,
             }
         }
 
-        /* Inspect tool output and diagnose compiler/shell errors */
+        /* Determine whether this step was an inspection tool or task */
+        int is_inspection = ServerIsInspectionTask(sess->current_issue) ||
+                            IsFolderOrGlobQuery(sess->current_issue) ||
+                            (strcmp(tool_resp.name, "glob") == 0) ||
+                            (strcmp(tool_resp.name, "read") == 0) ||
+                            (strcmp(tool_resp.name, "grep") == 0) ||
+                            (strcmp(sess->last_tool_call_name, "glob") == 0) ||
+                            (strcmp(sess->last_tool_call_name, "read") == 0) ||
+                            (strcmp(sess->last_tool_call_name, "grep") == 0);
+
         DIAGNOSTIC_REPORT diag;
         memset(&diag, 0, sizeof(diag));
-        DiagnosticParseOutput(tool_resp.content, &diag);
+        if (!is_inspection)
+        {
+            DiagnosticParseOutput(tool_resp.content, &diag);
+        }
 
         int step_failed = 0;
-        if (tool_resp.is_error || diag.error_count > 0)
+        if (is_inspection)
+        {
+            /* Inspection steps fail ONLY on explicit non-zero exit code or JSON error status */
+            if ((tool_resp.has_exit_code && tool_resp.exit_code != 0) || tool_resp.is_error)
+            {
+                step_failed = 1;
+                sess->had_error = 1;
+                snprintf(sess->last_error_summary, sizeof(sess->last_error_summary),
+                         "Inspection tool reported failure");
+            }
+        }
+        else if (tool_resp.is_error || diag.error_count > 0)
         {
             step_failed = 1;
             sess->had_error = 1;
@@ -1002,6 +1032,11 @@ static void HandleCompletions(socket_t s, const char *body,
                     const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[sess->current_step_idx].op;
                     OPENAI_TOOL_CALLS tc;
                     FormatOperatorToolCall(sess, next_op, sess->current_issue, ++g_seq, &tc);
+                    if (tc.count > 0)
+                    {
+                        strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
+                        sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
+                    }
 
                     char thought[256];
                     snprintf(thought, sizeof(thought),
@@ -1040,6 +1075,11 @@ static void HandleCompletions(socket_t s, const char *body,
             const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[sess->current_step_idx].op;
             OPENAI_TOOL_CALLS tc;
             FormatOperatorToolCall(sess, next_op, sess->current_issue, ++g_seq, &tc);
+            if (tc.count > 0)
+            {
+                strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
+                sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
+            }
 
             if (ServerWantsStream(body))
             {
@@ -1085,16 +1125,18 @@ static void HandleCompletions(socket_t s, const char *body,
                              "El archivo esta listo para su edicion o uso en el proyecto.",
                              target_file, target_file, target_file);
                 }
-                else if (ServerIsInspectionTask(sess->current_issue))
+                else if (ServerIsInspectionTask(sess->current_issue) || IsFolderOrGlobQuery(sess->current_issue))
                 {
                     if (sess->last_tool_output[0] != '\0')
                     {
+                        char formatted[16384];
+                        ServerFormatInspectionOutput(sess->last_tool_output, formatted, sizeof(formatted));
                         snprintf(content, sizeof(content),
                                  "### Contenido del Directorio / Exploracion ('%s')\n\n"
                                  "```\n%s\n```\n\n"
                                  "*Exploracion completada con exito.*",
                                  sess->current_issue,
-                                 sess->last_tool_output);
+                                 formatted);
                     }
                     else
                     {
@@ -1368,6 +1410,7 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->replan_count = 0;
         sess->last_error_summary[0] = '\0';
         sess->last_tool_output[0] = '\0';
+        sess->last_tool_call_name[0] = '\0';
         memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
 
@@ -1416,6 +1459,11 @@ static void HandleCompletions(socket_t s, const char *body,
             const STRIPS_OPERATOR *first_op = &sess->current_plan.steps[sess->current_step_idx].op;
             OPENAI_TOOL_CALLS tc;
             FormatOperatorToolCall(sess, first_op, sess->current_issue, ++g_seq, &tc);
+            if (tc.count > 0)
+            {
+                strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
+                sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
+            }
 
             const char *thought = is_creation ?
                 "Formulated file creation plan for workspace. Initiating write step." :

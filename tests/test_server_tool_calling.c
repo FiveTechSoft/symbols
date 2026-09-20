@@ -251,6 +251,48 @@ static void test_tool_error_validation(void)
     TEST_ASSERT(resp3.has_exit_code == 1, "Detected has_exit_code == 1");
     TEST_ASSERT(resp3.exit_code == 0, "Extracted exit_code == 0");
     TEST_ASSERT(resp3.is_error == 0, "is_error == 0 for clean exit");
+
+    /* 6f: Glob tool returns JSON with status: ok, error: null, matches: [...] */
+    const char *glob_ok_payload =
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_005\",\"name\":\"glob\","
+        "\"content\":\"{\\\"status\\\":\\\"ok\\\",\\\"matches\\\":[\\\"src\\\",\\\"include\\\"],\\\"error\\\":null}\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp_glob;
+    int ok_glob = ServerExtractLastToolResponse(glob_ok_payload, &resp_glob);
+    TEST_ASSERT(ok_glob == 1, "Extracted glob response with 'error': null");
+    TEST_ASSERT(resp_glob.is_error == 0, "is_error == 0 for glob with 'error': null");
+
+    /* 6g: Glob tool output containing 'error:' or 'failed' inside filenames */
+    const char *glob_errtext_payload =
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_006\",\"name\":\"glob\","
+        "\"content\":\"src/error_handler.c\\ntests/test_failed_cases.c\"}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp_glob2;
+    int ok_glob2 = ServerExtractLastToolResponse(glob_errtext_payload, &resp_glob2);
+    TEST_ASSERT(ok_glob2 == 1, "Extracted glob response with error words in filenames");
+    TEST_ASSERT(resp_glob2.is_error == 0, "is_error == 0 because glob is an inspection tool");
+
+    /* 6h: Tool returns multi-part array content [{"type": "text", "text": "..."}] */
+    const char *array_payload =
+        "{\"model\":\"symbols\",\"messages\":["
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_007\",\"name\":\"glob\","
+        "\"content\":[{\"type\":\"text\",\"text\":\"build-gcc\\nsrc\\ninclude\"}]}"
+        "]}";
+    OPENAI_TOOL_RESPONSE resp_array;
+    int ok_array = ServerExtractLastToolResponse(array_payload, &resp_array);
+    TEST_ASSERT(ok_array == 1, "Extracted multi-part array tool content");
+    TEST_ASSERT(strstr(resp_array.content, "build-gcc") != NULL, "Extracted text contains build-gcc");
+    TEST_ASSERT(resp_array.is_error == 0, "is_error == 0 for multi-part array content");
+
+    /* 6i: ServerFormatInspectionOutput cleanly formats JSON matches */
+    char formatted[1024];
+    const char *json_matches = "{\"status\":\"ok\",\"matches\":[\"build-gcc\",\"src\",\"include\",\"CMakeLists.txt\"],\"error\":null}";
+    int fmt_ok = ServerFormatInspectionOutput(json_matches, formatted, sizeof(formatted));
+    TEST_ASSERT(fmt_ok == 1, "ServerFormatInspectionOutput succeeded on JSON matches");
+    TEST_ASSERT(strstr(formatted, "build-gcc\nsrc\ninclude\nCMakeLists.txt") != NULL,
+                "Formatted output contains line-delimited files without JSON punctuation");
 }
 
 /* 7. Test Binary Model Detection in Chat Layer */

@@ -4,6 +4,27 @@ Todas las novedades, mejoras y correcciones notables de **Symbolic LLM / symbols
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Phase 24] - 2026-09-21
+- **Protección y Limpieza de Inspección de Archivos y Directorios (`dir *.*`, `glob`, `read`, `grep`)**:
+  - **Eliminación de Falsos Positivos de Error en `ServerInspectToolResponse`**:
+    - Corregida la verificación del campo JSON `"status"`: ahora inspecciona estrictamente el valor del campo tras los dos puntos (`"error"`, `"fail"`), evitando que respuestas exitosas con campos posteriores como `"error": null` o `"error": false` activen falsamente `is_error = 1`.
+    - Detección precisa de campos de error JSON (`"isError": true`, `"is_error": true`, `"error": "<mensaje>"`), ignorando valores neutros (`null`, `false`, `""`, `0`).
+    - Detección segura de códigos de salida numéricos en JSON (`"exit_code"`, `"returncode"`, `"exitCode"`, etc.) exigiendo dígitos o signo entero tras `:`, previniendo colisiones con campos de texto como `"code": "printf(...)"`.
+  - **Inmunidad para Herramientas de Inspección y Lectura de Código**:
+    - Herramientas de solo lectura (`glob`, `read`, `grep`, `locate_symbol`, `view_file`, `find_by_name`, `grep_search`) quedan exentas del escaneo por patrones de error de compilador o de pruebas (`DiagnosticParseOutput` y cadenas como `error:`, `FAILED`, `Permission denied`), impidiendo que rutas de archivo o código leído conteniendo esas palabras disparen bucles de replanificación o fallos espurios de verificación.
+  - **Extracción de Contenido Multiformato en `ServerExtractLastToolResponse` (`TakeJsonContent`)**:
+    - Soporte transparente para contenidos de herramientas tanto en cadena de texto plano (`"content": "..."`) como en arrays de partes (`"content": [{"type": "text", "text": "..."}]`) o listas JSON crudas de coincidencias (`["file1", "file2"]`).
+  - **Formateo Limpio de Salida de Exploración (`ServerFormatInspectionOutput`)**:
+    - Formateo automático de arrays JSON de coincidencias (`"matches": [...]`, `"files": [...]` o listas) en líneas limpias de texto delimitadas por saltos de línea dentro del bloque markdown `### Contenido del Directorio / Exploracion`, completando con `finish_reason: "stop"` sin errores ni advertencias de verificación fallida.
+  - **Inferencia de Nombre de Herramienta en Sesión Agéntica**:
+    - Almacenamiento de `last_tool_call_name` en la sesión del servidor, permitiendo identificar la herramienta ejecutada incluso si el cliente OpenCode omite la clave `"name"` en el mensaje `{"role": "tool"}`.
+  - **Verificación Completa**:
+    - Nuevas pruebas 6f, 6g, 6h, 6i en `tests/test_server_tool_calling.c` (221/221 PASS).
+    - Dos nuevas pruebas end-to-end en `tools/test_opencode_user_cases.py` (`test_dir_wildcard_flow` y `test_dir_dot_flow`) ejecutadas contra el servidor HTTP en vivo (100% PASS).
+    - Suite global CTest 76/76 verde (67 Passed, 9 Skipped, 0 Failed).
+
+---
+
 ## [Phase 23] - 2026-09-21
 - **Configuración Predeterminada de Corpus Técnico para Copiloto de Programación**:
   - `data/c_lang/c_corpus.txt` (estándar C11, memoria dinámica, tipos e invariantes de libc) establecido como corpus de conocimiento predeterminado en `symbols-server` y `chat_main`.

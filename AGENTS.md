@@ -211,3 +211,21 @@ Regla arquitectónica:
      - Adaptada la suite de integración end-to-end `tools/test_opencode_copilot_e2e.py` para verificar consultas de conocimiento de programación ("What causes memory leaks?") respondiendo con principios de gestión de memoria C11.
      - Añadida prueba de saludo natural en `tools/test_opencode_user_cases.py` ("hola" responde como copiloto de IA sin referencias a versículos bíblicos).
      - Suite CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests) y pruebas unitarias de servidor 212/212 PASS, 2026-09-21.
+
+## Protección y Limpieza de Inspección de Archivos y Directorios (Fase 24)
+
+- Corrección de falsos positivos de error y saneamiento integral de inspección en `src/server_proto.c` y `src/symbols_server.c`:
+  1. **Supresión de Falsos Positivos en `ServerInspectToolResponse`**:
+     - Inspección estricta del valor tras `"status":` (`"error"`, `"fail"`), impidiendo que respuestas exitosas con `"error": null` o `"error": false` disparen `is_error = 1`.
+     - Detección precisa de booleanos y mensajes en `"isError": true`, `"is_error": true`, `"error": "<string>"`, ignorando `null`, `false`, `""` y `0`.
+     - Verificación de tipos en códigos de salida: `"exit_code"`, `"returncode"`, `"exitCode"` exigen dígitos enteros tras `:`, evitando falsas banderas en campos de código fuente (`"code": "..."`).
+  2. **Inmunidad Estructural para Herramientas de Inspección**:
+     - Las herramientas de lectura (`glob`, `read`, `grep`, `locate_symbol`, `view_file`, `find_by_name`, `grep_search`) quedan inmunes a la búsqueda de patrones de error de compilador (`DiagnosticParseOutput`) o texto de fallo (`FAILED`, `error:`, `Permission denied`), impidiendo que rutas de archivo o código leído causen bucles de replanificación o fallos de verificación agéntica.
+     - Registro de `last_tool_call_name` en la sesión del servidor para identificar la herramienta ejecutada aun cuando el cliente OpenCode omita el atributo `"name"` en el rol `tool`.
+  3. **Extracción Multiformato y Formateo Limpio (`TakeJsonContent`, `ServerFormatInspectionOutput`)**:
+     - `TakeJsonContent` extrae limpiamente respuestas de herramientas en cadena directa (`"content": "..."`), array multi-parte (`[{"type": "text", "text": "..."}]`) o listas JSON de archivos (`["..."]`).
+     - `ServerFormatInspectionOutput` convierte listas y arrays de coincidencias en líneas de texto limpias sin puntuación JSON para el bloque Markdown `### Contenido del Directorio / Exploracion ('dir *.*')` con `finish_reason: "stop"`.
+  4. **Verificación y Pruebas**:
+     - Ampliada `tests/test_server_tool_calling.c` con pruebas 6f, 6g, 6h, 6i (221/221 PASS).
+     - Incorporadas pruebas E2E `test_dir_wildcard_flow` y `test_dir_dot_flow` en `tools/test_opencode_user_cases.py` (100% PASS).
+     - Suite CTest global verde al 100% (67 Passed, 9 Skipped, 0 Failed de 76 tests), 2026-09-21.

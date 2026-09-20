@@ -649,14 +649,138 @@ int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_
     return (int)count;
 }
 
+static int IsInspectionToolName(const char *name)
+{
+    if (name == NULL || name[0] == '\0')
+        return 0;
+    if (strcmp(name, "glob") == 0 ||
+        strcmp(name, "read") == 0 ||
+        strcmp(name, "grep") == 0 ||
+        strcmp(name, "locate_symbol") == 0 ||
+        strcmp(name, "view_file") == 0 ||
+        strcmp(name, "find_by_name") == 0 ||
+        strcmp(name, "grep_search") == 0)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int TakeJsonContent(const char **pp, char *out, size_t size)
+{
+    if (pp == NULL || *pp == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    while (IsWs(**pp)) (*pp)++;
+    if (**pp == '"')
+    {
+        return TakeJsonString(pp, out, size);
+    }
+    else if (**pp == '[')
+    {
+        const char *p = *pp;
+        /* Check if array contains multi-part text objects: [{"type":"text","text":"..."}] */
+        const char *t = strstr(p, "\"text\"");
+        if (t != NULL)
+        {
+            /* Find end of outer array */
+            const char *end = p;
+            int arr_depth = 0;
+            int in_quote = 0;
+            while (*end != '\0')
+            {
+                if (*end == '"' && (end == p || *(end - 1) != '\\'))
+                    in_quote = !in_quote;
+                if (!in_quote)
+                {
+                    if (*end == '[') arr_depth++;
+                    else if (*end == ']') {
+                        arr_depth--;
+                        if (arr_depth == 0) { end++; break; }
+                    }
+                }
+                end++;
+            }
+
+            const char *cur = p;
+            size_t o = 0;
+            int found_any = 0;
+            while (cur < end && (t = strstr(cur, "\"text\"")) != NULL && t < end)
+            {
+                const char *v = t + 6;
+                while (IsWs(*v)) v++;
+                if (*v == ':')
+                {
+                    v++;
+                    while (IsWs(*v)) v++;
+                    if (*v == '"')
+                    {
+                        char chunk[4096];
+                        if (TakeJsonString(&v, chunk, sizeof(chunk)))
+                        {
+                            if (found_any && o + 1 < size)
+                                out[o++] = '\n';
+                            size_t clen = strlen(chunk);
+                            if (o + clen < size)
+                            {
+                                memcpy(out + o, chunk, clen);
+                                o += clen;
+                                out[o] = '\0';
+                            }
+                            found_any = 1;
+                        }
+                    }
+                }
+                cur = (v > t) ? v : t + 6;
+            }
+            *pp = end;
+            return found_any ? 1 : 0;
+        }
+        else
+        {
+            /* Raw JSON array: copy balanced array literal */
+            int depth = 0;
+            int in_quote = 0;
+            size_t o = 0;
+            while (*p != '\0')
+            {
+                if (*p == '"' && (p == *pp || *(p - 1) != '\\'))
+                    in_quote = !in_quote;
+                if (!in_quote)
+                {
+                    if (*p == '[') depth++;
+                    else if (*p == ']') {
+                        depth--;
+                        if (o + 1 < size) out[o++] = *p;
+                        if (depth == 0) { p++; break; }
+                        p++;
+                        continue;
+                    }
+                }
+                if (o + 1 < size) out[o++] = *p;
+                p++;
+            }
+            out[o] = '\0';
+            *pp = p;
+            return o > 0 ? 1 : 0;
+        }
+    }
+    return 0;
+}
+
 void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp)
 {
     if (resp == NULL || resp->content[0] == '\0')
         return;
 
-    /* 1. Check for JSON "exit_code": N, "returncode": N, or "code": N */
+    resp->is_error = 0;
+
+    /* 1. Check for JSON "exit_code": N, "returncode": N, "exitCode": N, "status_code": N, or "code": N */
     const char *ec = strstr(resp->content, "\"exit_code\"");
     if (!ec) ec = strstr(resp->content, "\"returncode\"");
+    if (!ec) ec = strstr(resp->content, "\"return_code\"");
+    if (!ec) ec = strstr(resp->content, "\"exitCode\"");
+    if (!ec) ec = strstr(resp->content, "\"status_code\"");
     if (!ec) ec = strstr(resp->content, "\"code\"");
     if (ec)
     {
@@ -664,23 +788,78 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp)
         if (col)
         {
             col++;
-            while (*col == ' ' || *col == '\t') col++;
-            resp->has_exit_code = 1;
-            resp->exit_code = atoi(col);
-            if (resp->exit_code != 0)
-                resp->is_error = 1;
+            while (*col == ' ' || *col == '\t' || *col == '\r' || *col == '\n') col++;
+            if (*col == '-' || isdigit((unsigned char)*col))
+            {
+                resp->has_exit_code = 1;
+                resp->exit_code = atoi(col);
+                if (resp->exit_code != 0)
+                    resp->is_error = 1;
+            }
         }
     }
 
-    /* 2. Check for JSON "status": "error" or "status": "failed" */
+    /* 2a. Check for JSON "status": "error" or "status": "failed" (strictly inspect value) */
     const char *st = strstr(resp->content, "\"status\"");
     if (st)
     {
-        if (strstr(st, "\"error\"") || strstr(st, "\"failed\"") || strstr(st, "\"fail\""))
-            resp->is_error = 1;
+        const char *col = strchr(st, ':');
+        if (col)
+        {
+            col++;
+            while (*col == ' ' || *col == '\t' || *col == '\r' || *col == '\n' || *col == '"') col++;
+            if (strncasecmp(col, "error", 5) == 0 ||
+                strncasecmp(col, "fail", 4) == 0)
+            {
+                resp->is_error = 1;
+            }
+        }
     }
 
-    /* 3. Run abductive compiler/linter diagnostic parser */
+    /* 2b. Check for JSON "isError": true or "is_error": true */
+    const char *ie = strstr(resp->content, "\"isError\"");
+    if (!ie) ie = strstr(resp->content, "\"is_error\"");
+    if (ie)
+    {
+        const char *col = strchr(ie, ':');
+        if (col)
+        {
+            col++;
+            while (*col == ' ' || *col == '\t' || *col == '\r' || *col == '\n') col++;
+            if (strncmp(col, "true", 4) == 0)
+            {
+                resp->is_error = 1;
+            }
+        }
+    }
+
+    /* 2c. Check for JSON "error": <string> (ignore "error": null / false / "" / 0) */
+    const char *ef = strstr(resp->content, "\"error\"");
+    if (ef)
+    {
+        const char *col = strchr(ef, ':');
+        if (col)
+        {
+            col++;
+            while (*col == ' ' || *col == '\t' || *col == '\r' || *col == '\n') col++;
+            if (strncmp(col, "true", 4) == 0)
+            {
+                resp->is_error = 1;
+            }
+            else if (*col == '"' && *(col + 1) != '"')
+            {
+                resp->is_error = 1;
+            }
+        }
+    }
+
+    /* Read-only inspection tools (glob, read, grep) must never be scanned for build/compiler errors */
+    if (IsInspectionToolName(resp->name))
+    {
+        return;
+    }
+
+    /* 3. Run abductive compiler/linter diagnostic parser on command/build output */
     DIAGNOSTIC_REPORT diag;
     memset(&diag, 0, sizeof(diag));
     DiagnosticParseOutput(resp->content, &diag);
@@ -711,6 +890,96 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp)
             resp->is_error = 1;
         }
     }
+}
+
+int ServerFormatInspectionOutput(const char *in, char *out, size_t size)
+{
+    if (in == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+
+    /* Check if input contains JSON array under "matches": [...] or "files": [...] */
+    const char *m = strstr(in, "\"matches\"");
+    if (!m) m = strstr(in, "\"files\"");
+    if (m)
+    {
+        const char *bracket = strchr(m, '[');
+        if (bracket)
+        {
+            const char *p = bracket + 1;
+            size_t o = 0;
+            int count = 0;
+            while (*p != '\0' && *p != ']')
+            {
+                while (isspace((unsigned char)*p) || *p == ',') p++;
+                if (*p == '"')
+                {
+                    char item[512];
+                    if (TakeJsonString(&p, item, sizeof(item)))
+                    {
+                        if (count > 0 && o + 1 < size)
+                            out[o++] = '\n';
+                        size_t ilen = strlen(item);
+                        if (o + ilen < size)
+                        {
+                            memcpy(out + o, item, ilen);
+                            o += ilen;
+                            out[o] = '\0';
+                        }
+                        count++;
+                    }
+                }
+                else
+                {
+                    p++;
+                }
+            }
+            if (count > 0)
+                return 1;
+        }
+    }
+
+    /* Check if input itself is a raw JSON string array: ["file1", "file2", ...] */
+    const char *p = in;
+    while (IsWs(*p)) p++;
+    if (*p == '[')
+    {
+        p++;
+        size_t o = 0;
+        int count = 0;
+        while (*p != '\0' && *p != ']')
+        {
+            while (isspace((unsigned char)*p) || *p == ',') p++;
+            if (*p == '"')
+            {
+                char item[512];
+                if (TakeJsonString(&p, item, sizeof(item)))
+                {
+                    if (count > 0 && o + 1 < size)
+                        out[o++] = '\n';
+                    size_t ilen = strlen(item);
+                    if (o + ilen < size)
+                    {
+                        memcpy(out + o, item, ilen);
+                        o += ilen;
+                        out[o] = '\0';
+                    }
+                    count++;
+                }
+            }
+            else
+            {
+                p++;
+            }
+        }
+        if (count > 0)
+            return 1;
+    }
+
+    /* Fallback: copy raw input */
+    strncpy(out, in, size - 1);
+    out[size - 1] = '\0';
+    return 1;
 }
 
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
@@ -779,7 +1048,7 @@ int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
                             if (*v == ':') {
                                 v++;
                                 while (IsWs(*v)) v++;
-                                TakeJsonString(&v, out->content, sizeof(out->content));
+                                TakeJsonContent(&v, out->content, sizeof(out->content));
                             }
                         }
                         s++;

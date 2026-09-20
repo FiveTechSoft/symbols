@@ -144,12 +144,96 @@ def test_greeting_natural():
     assert "hold" not in content.lower() and "behold" not in content.lower(), f"Unexpected bible text in greeting: {content}"
     assert any(g in content.lower() for g in ["hola", "saludos", "hello", "ayud"]), f"Expected greeting response: {content}"
 
+def test_dir_wildcard_flow():
+    print("\n--- Test 6: 'dir *.*' Wildcard Inspection Flow ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "dir *.*"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    assert fr == "tool_calls", f"Expected tool_calls, got {fr}"
+    assert len(tc) > 0, "Expected at least 1 tool call"
+    tool_name = tc[0]["function"]["name"]
+    tool_args = json.loads(tc[0]["function"]["arguments"])
+    print(f"  [PASS] Step 1 dispatched tool: {tool_name}, args: {tool_args}")
+    assert tool_name == "glob", f"Expected 'glob', got {tool_name}"
+    assert tool_args.get("pattern") in ["*.*", "*"], f"Expected '*.*' pattern, got {tool_args.get('pattern')}"
+
+    # Step 2: Client returns OpenCode Glob JSON response with matches and "error": null
+    tool_call_id = tc[0]["id"]
+    payload["messages"].append(choice["message"])
+    payload["messages"].append({
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "name": tool_name,
+        "content": json.dumps({
+            "status": "ok",
+            "matches": ["build-gcc", "src", "include", "CMakeLists.txt"],
+            "error": None
+        })
+    })
+    res2 = query(payload)
+    choice2 = res2["choices"][0]
+    fr2 = choice2.get("finish_reason")
+    content2 = choice2.get("message", {}).get("content", "")
+    print(f"  [PASS] Step 2 completion finish_reason: {fr2}")
+    print(f"  [PASS] Clean content report:\n{content2}")
+    assert fr2 == "stop", f"Expected finish_reason == 'stop', got {fr2}"
+    assert "FAILED" not in content2, f"Did not expect FAILED in output: {content2}"
+    assert "Verification Failed" not in content2, f"Did not expect verification failed: {content2}"
+    assert "build-gcc" in content2, f"Expected 'build-gcc' in output: {content2}"
+    assert "CMakeLists.txt" in content2, f"Expected 'CMakeLists.txt' in output: {content2}"
+    assert "Exploracion completada con exito" in content2 or "Revision de Directorio" in content2
+
+def test_dir_dot_flow():
+    print("\n--- Test 7: 'dir .' Flow with Array Tool Response & Omitted Name ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "dir ."}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    assert fr == "tool_calls", f"Expected tool_calls, got {fr}"
+    tool_call_id = tc[0]["id"]
+
+    # Step 2: Multi-part array response with name omitted
+    payload["messages"].append(choice["message"])
+    payload["messages"].append({
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "content": [
+            {"type": "text", "text": "build-gcc\nsrc\ninclude\nREADME.md"}
+        ]
+    })
+    res2 = query(payload)
+    choice2 = res2["choices"][0]
+    fr2 = choice2.get("finish_reason")
+    content2 = choice2.get("message", {}).get("content", "")
+    print(f"  [PASS] Step 2 completion finish_reason: {fr2}")
+    assert fr2 == "stop", f"Expected finish_reason == 'stop', got {fr2}"
+    assert "FAILED" not in content2
+    assert "build-gcc" in content2
+    assert "src" in content2
+
 if __name__ == "__main__":
     test_file_creation_flow()
     test_subfolder_inspection()
     test_large_body_payload()
     test_fibonacci_synthesis()
     test_greeting_natural()
+    test_dir_wildcard_flow()
+    test_dir_dot_flow()
     print("\n" + "=" * 60)
     print("  ALL USER SCENARIOS VERIFIED END-TO-END (100% PASS)")
     print("=" * 60)

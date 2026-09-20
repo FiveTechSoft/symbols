@@ -104,6 +104,9 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp);
 /* Extract the most recent {"role":"tool", ...} message from the body */
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out);
 
+/* Format raw inspection tool output (JSON matches/files or plain text) into clean readable lines */
+int ServerFormatInspectionOutput(const char *in, char *out, size_t size);
+
 /* Extract the role of the very last message in the "messages" array */
 int ServerExtractLastRole(const char *body, char *out, size_t size);
 
