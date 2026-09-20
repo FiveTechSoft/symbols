@@ -35,6 +35,7 @@ typedef enum
     PERSONA_TUTOR,         /* Didactic Tutor: intuitive, step-by-step causal explanations */
     PERSONA_CONCISE,       /* Executive / Minimalist: telegraphic density, zero fluff */
     PERSONA_SOCRATIC,      /* Socratic Explorer: prompts inquiry, examines premises */
+    PERSONA_PIRATE_QUANTUM,/* 18th-century pirate who just grasped quantum mechanics */
     PERSONA_COUNT
 } PERSONA_ID;
 
@@ -60,7 +61,7 @@ typedef struct
 } PERSONA_LEXICON;
 
 /* Persona Filter / Mask Struct */
-typedef struct
+typedef struct PERSONA_FILTER_
 {
     PERSONA_ID      id;
     PERSONA_PROFILE profile;
@@ -124,6 +125,17 @@ uint32_t PersonaRealizeAbstain(const PERSONA_FILTER *filter,
                                const char *relation,
                                char *out,
                                size_t out_size);
+
+/* Realize physical causal consequence under persona perspective */
+uint32_t PersonaRealizePhysicalConsequence(const PERSONA_FILTER *filter,
+                                           LANG_ID lang,
+                                           const char *subject,
+                                           const char *action,
+                                           const char *target,
+                                           const char *material,
+                                           const char *consequence,
+                                           char *out,
+                                           size_t out_size);
 
 /* =========================================================================
    Part 3: Mathematical Non-Interference Verification

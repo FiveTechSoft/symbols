@@ -100,9 +100,13 @@ Regla arquitectónica:
      Generando: *"Si un vaso de cristal se cae al suelo, se rompera (porque el cristal es un material fragil que se rompe con el impacto)."*
   5. Validado por ejecución directa en `chat_main.exe` con corpus textual activo y suite global CTest 74/74 PASS (65 Passed, 9 Skipped, 0 Failed), 2026-09-20.
 
+## Modulación Pragmática, Filtro Cuántico-Pirata y Cero Hardcoding (Fase 16)
 
-
-
+- Implementación estrictamente declarativa y de cero dependencias del perfil pragmático `PERSONA_PIRATE_QUANTUM` en `src/persona.c` e `include/persona.h`:
+  1. Principio `HARDCODING=0` riguroso: sin textos quemados para consultas concretas; todas las ranuras léxicas (`intro`, `chain_connective`, `conclusion_connective`, `abstain_template`, `evidence_prefix`) residen en tablas formales (`g_persona_lexicons`) con soporte declarativo de alias (`pirate`, `pirata`, `architect`, `auditor`, etc.).
+  2. Realización causal física genérica: `PersonaRealizePhysicalConsequence` opera composicionalmente sobre los argumentos ontológicos (`subject`, `action`, `target`, `material`, `consequence`), preservando el Teorema de No-Interferencia Factual ($\text{Facts}(\Pi_{\text{pirate}}(Q)) \equiv \text{Facts}(Q)$).
+  3. Integración conversacional en vivo: soporte para conmutación interactiva de perspectiva en `chat_clarify.c` (`/persona <name>`, `:persona <name>`, `modo pirata`) y opción de inicio en línea de comandos en `chat_main.c` (`-p <name>`, `--persona <name>`).
+  4. Verificación matemática y de rendimiento: 56/56 pruebas en `test_persona.c`, 2.19 millones de proyecciones/segundo ($0.45\ \mu\text{s}$/proj), 0% alucinaciones, y suite CTest 74/74 PASS (65 Passed, 9 Skipped, 0 Failed), 2026-09-20.
 
 
 

@@ -83,11 +83,19 @@ int main(void)
         check_int("Find 'concise'", PersonaFindByName("concise"), PERSONA_CONCISE);
         check_int("Find 'socratic'", PersonaFindByName("socratic"), PERSONA_SOCRATIC);
         check_int("Find 'neutral'", PersonaFindByName("neutral"), PERSONA_NEUTRAL);
+        check_int("Find 'pirate_quantum'", PersonaFindByName("pirate_quantum"), PERSONA_PIRATE_QUANTUM);
+        check_int("Find alias 'pirate'", PersonaFindByName("pirate"), PERSONA_PIRATE_QUANTUM);
+        check_int("Find alias 'pirata'", PersonaFindByName("pirata"), PERSONA_PIRATE_QUANTUM);
 
         PERSONA_FILTER f;
         PersonaFilterInit(&f, PERSONA_AUDITOR);
         check_int("Auditor epistemic threshold >= 1.5", (f.profile.epistemic_threshold >= 1.5f), 1);
         check_int("Auditor requires provenance", f.profile.require_provenance, 1);
+
+        PERSONA_FILTER f_pir;
+        PersonaFilterInit(&f_pir, PERSONA_PIRATE_QUANTUM);
+        check_int("Pirate requires provenance", f_pir.profile.require_provenance, 1);
+        check_int("Pirate uses rhetorical intro", f_pir.profile.use_rhetorical_intro, 1);
     }
 
     /* =====================================================================
@@ -132,6 +140,14 @@ int main(void)
         PersonaFilterInit(&f_concise, PERSONA_CONCISE);
         PersonaRealizeFact(&f_concise, LANG_EN, "david", "father", "solomon", "kings.tsv:1", out, sizeof(out));
         check_str("Concise output is telegraphic", out, "David: father Solomon.");
+
+        /* 6. Pirate Quantum */
+        PERSONA_FILTER f_pir;
+        PersonaFilterInit(&f_pir, PERSONA_PIRATE_QUANTUM);
+        PersonaRealizeFact(&f_pir, LANG_EN, "david", "father", "solomon", "kings.tsv:1", out, sizeof(out));
+        check_contains("Pirate includes wave function framing", out, "wave function");
+        check_contains("Pirate includes core fact", out, "David is the father of Solomon");
+        check_contains("Pirate includes quantum log provenance", out, "Quantum ship's log entry: kings.tsv:1");
     }
 
     /* =====================================================================
@@ -163,12 +179,19 @@ int main(void)
         PersonaRealizeChain(&f_concise, LANG_EN, "abraham", hops, 1, "grandfather", "jacob", out, sizeof(out));
         check_contains("Concise chain notation", out, "Abraham -> Isaac");
         check_contains("Concise chain result", out, "[Result: Abraham is grandfather of Jacob]");
+
+        /* Pirate Quantum Chain */
+        PERSONA_FILTER f_pir;
+        PersonaFilterInit(&f_pir, PERSONA_PIRATE_QUANTUM);
+        PersonaRealizeChain(&f_pir, LANG_EN, "abraham", hops, 1, "grandfather", "jacob", out, sizeof(out));
+        check_contains("Pirate chain entanglement", out, "entangles faster than a Spanish galleon with Isaac");
+        check_contains("Pirate chain superposition", out, "Abraham is the grandfather of Jacob in pure quantum superposition");
     }
 
     /* =====================================================================
-       Test 4: Multi-Lingual Persona Framing (ES & FR)
+       Test 4: Multi-Lingual Persona Framing (ES & FR) & Physical Causality
        ===================================================================== */
-    printf("\n--- Test 4: Multi-Lingual Persona Adaptation ---\n");
+    printf("\n--- Test 4: Multi-Lingual Persona Adaptation & Causality ---\n");
     {
         char out[512];
         PERSONA_FILTER f_arch;
@@ -179,6 +202,19 @@ int main(void)
         check_contains("Spanish architect framing", out, "Desde la perspectiva arquitectonica");
         check_contains("Spanish fact", out, "David es padre de Salomon");
         check_contains("Spanish provenance", out, "Procedencia arquitectonica: reyes.tsv:1");
+
+        /* Spanish Pirate Quantum */
+        PERSONA_FILTER f_pir_es;
+        PersonaFilterInit(&f_pir_es, PERSONA_PIRATE_QUANTUM);
+        PersonaRealizeFact(&f_pir_es, LANG_ES, "david", "padre", "salomon", "reyes.tsv:1", out, sizeof(out));
+        check_contains("Spanish pirate framing", out, "colapso de la funcion de onda");
+        check_contains("Spanish pirate fact", out, "David es padre de Salomon");
+
+        /* Physical Consequence: Quantum Pirate */
+        PersonaRealizePhysicalConsequence(&f_pir_es, LANG_ES, "vaso de cristal", "cae al", "suelo", "cristal", "se rompera", out, sizeof(out));
+        check_contains("Quantum pirate physical causality intro", out, "colapso de la funcion de onda");
+        check_contains("Quantum pirate core consequence", out, "se rompera");
+        check_contains("Quantum pirate provenance", out, "Bitacora de observacion cuantica");
 
         /* French Auditor */
         PERSONA_FILTER f_audit;
@@ -210,6 +246,11 @@ int main(void)
         PersonaFilterInit(&f_concise, PERSONA_CONCISE);
         PersonaRealizeAbstain(&f_concise, LANG_EN, "melchizedek", "origin", out, sizeof(out));
         check_str("Concise abstention", out, "UNKNOWN: Melchizedek.");
+
+        PERSONA_FILTER f_pir;
+        PersonaFilterInit(&f_pir, PERSONA_PIRATE_QUANTUM);
+        PersonaRealizeAbstain(&f_pir, LANG_EN, "melchizedek", "origin", out, sizeof(out));
+        check_contains("Pirate quantum abstention", out, "Heisenberg's uncertainty principle swallowed all trace of Melchizedek into Davy Jones' locker");
     }
 
     /* =====================================================================

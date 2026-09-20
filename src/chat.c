@@ -472,11 +472,22 @@ void ChatAnswerParentSingle(const CHAT *ch, const char *child,
                             const char *parent, char *out, size_t size)
 {
     char capC[CHAT_TOKEN_MAX], capP[CHAT_TOKEN_MAX];
-    (void)ch;
     Cap(child, capC, sizeof(capC));
     Cap(parent, capP, sizeof(capP));
     if (size == 0)
         return;
+    if (ch != NULL && ch->persona.id != PERSONA_NEUTRAL)
+    {
+        PersonaRealizeFact(&ch->persona, LANG_ES, capP, "padre", capC,
+                           "registros directos", out, size);
+        size_t len = strlen(out);
+        if (len + 1 < size)
+        {
+            out[len] = '\n';
+            out[len + 1] = '\0';
+        }
+        return;
+    }
     snprintf(out, size,
              "El padre de %s es %s, segun consta en los registros "
              "directos.\n",
@@ -5004,7 +5015,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
 
             LANG_ID lang = is_es ? LANG_ES : LANG_EN;
-            if (CommonsenseQueryPhysicalConsequenceLang(cs, lang, sub, act, tgt, &path, cs_out, sizeof(cs_out)))
+            if (CommonsenseQueryPhysicalConsequencePersona(cs, &ch->persona, lang, sub, act, tgt, &path, cs_out, sizeof(cs_out)))
             {
                 st = GOAL_ANSWER;
                 EMIT_OK("%s\n", cs_out);
@@ -5791,9 +5802,22 @@ uint32_t ChatLoadCorpus(CHAT *ch, const char *path)
     return n;
 }
 
+void ChatSetPersona(CHAT *ch, PERSONA_ID id)
+{
+    if (!ch) return;
+    PersonaFilterInit(&ch->persona, id);
+}
+
+PERSONA_ID ChatGetPersona(const CHAT *ch)
+{
+    if (!ch) return PERSONA_NEUTRAL;
+    return ch->persona.id;
+}
+
 void ChatInit(CHAT *ch, const char *corpus_path)
 {
     memset(ch, 0, sizeof(*ch));
+    PersonaFilterInit(&ch->persona, PERSONA_NEUTRAL);
     SchemaKBInit(&ch->kb);
     MetaKBInit(&ch->mk);
     LearnerInit(&ch->lr, &ch->kb, &ch->mk);

@@ -184,6 +184,30 @@ static int ClarifyTryResolve(CLARIFY *w, const char *line, char *out,
 
 void ClarifyHandle(CLARIFY *w, const char *line)
 {
+    if (strncmp(line, "/persona", 8) == 0 || strncmp(line, ":persona", 8) == 0 ||
+        (strncmp(line, "persona ", 8) == 0 && !strchr(line, '?')))
+    {
+        const char *p = strchr(line, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        if (p && *p)
+        {
+            PERSONA_ID pid = PersonaFindByName(p);
+            ChatSetPersona(&w->ch, pid);
+            if (pid == PERSONA_PIRATE_QUANTUM)
+                printf("Ahoy, capitan! Ahora os habla el contramaestre cuantico desde el castillo de proa.\n");
+            else
+                printf("Modo persona configurado a: %s\n", PersonaGetName(pid));
+            return;
+        }
+    }
+    if (strcmp(line, "modo pirata") == 0 || strcmp(line, "/pirata") == 0 ||
+        strcmp(line, ":pirata") == 0)
+    {
+        ChatSetPersona(&w->ch, PERSONA_PIRATE_QUANTUM);
+        printf("Ahoy, capitan! Ahora os habla el contramaestre cuantico desde el castillo de proa.\n");
+        return;
+    }
+
     char toks[CLAR_MAX_TOKS][CHAT_TOKEN_MAX];
     QueryPlan plan;
     uint32_t ntok = 0;

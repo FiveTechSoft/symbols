@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "commonsense.h"
+#include "persona.h"
 
 /* High-resolution timer helper */
 static double CsGetTimeSec(void)
@@ -482,7 +483,13 @@ static const char *g_commonsense_seed_data =
     "dog\tCAPABLE_OF\tbark\t2.0\n"
     "dog\tIS_A\tcanine\t2.0\n"
     "canine\tIS_A\tmammal\t2.0\n"
-    "mammal\tIS_A\tanimal\t2.0\n";
+    "mammal\tIS_A\tanimal\t2.0\n"
+    "quantum_system\tCAPABLE_OF\tsuperposition\t2.0\n"
+    "quantum_particle\tHAS_PROPERTY\twave_particle_duality\t2.0\n"
+    "wave_function\tCAUSES\twave_function_collapse\t2.0\n"
+    "entanglement\tCAUSES\tnon_local_correlation\t2.0\n"
+    "decoherence\tCAUSES\tclassical_emergence\t2.0\n"
+    "schrodinger_cat\tIS_A\tthought_experiment\t2.0\n";
 
 int CommonsenseIngestSeed(GRAPH *graph, CS_STATS *stats)
 {
@@ -609,14 +616,15 @@ int CommonsenseQueryAffordance(const GRAPH *graph,
     return 1;
 }
 
-int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
-                                            LANG_ID lang,
-                                            const char *subject,
-                                            const char *action,
-                                            const char *target,
-                                            CS_INFERENCE_PATH *path,
-                                            char *out,
-                                            size_t out_size)
+int CommonsenseQueryPhysicalConsequencePersona(const GRAPH *graph,
+                                               const PERSONA_FILTER *filter,
+                                               LANG_ID lang,
+                                               const char *subject,
+                                               const char *action,
+                                               const char *target,
+                                               CS_INFERENCE_PATH *path,
+                                               char *out,
+                                               size_t out_size)
 {
     if (!graph || !subject || !action || !target || !out || out_size == 0)
         return 0;
@@ -660,10 +668,25 @@ int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
         path->verified = 1;
     }
 
+    const char *disp_sub = subject;
+    const char *disp_tgt = target;
+    const char *disp_mat = mat_sym->name;
     if (lang == LANG_ES)
     {
-        const char *disp_sub = (strcasecmp(subject, "glass") == 0) ? "vaso de cristal" : subject;
-        const char *disp_tgt = (strcasecmp(target, "concrete") == 0 || strcasecmp(target, "floor") == 0) ? "suelo" : target;
+        if (strcasecmp(subject, "glass") == 0) disp_sub = "vaso de cristal";
+        if (strcasecmp(target, "concrete") == 0 || strcasecmp(target, "floor") == 0) disp_tgt = "suelo";
+        if (strcasecmp(mat_sym->name, "brittle_material") == 0) disp_mat = "cristal";
+    }
+
+    if (filter != NULL && filter->id != PERSONA_NEUTRAL)
+    {
+        PersonaRealizePhysicalConsequence(filter, lang, disp_sub, action, disp_tgt,
+                                           disp_mat, cons_sym->name, out, out_size);
+        return 1;
+    }
+
+    if (lang == LANG_ES)
+    {
         snprintf(out, out_size,
                  "Si un %s se cae al %s, se rompera (porque el cristal es un material fragil que se rompe con el impacto).",
                  disp_sub, disp_tgt);
@@ -684,6 +707,18 @@ int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
     return 1;
 }
 
+int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
+                                            LANG_ID lang,
+                                            const char *subject,
+                                            const char *action,
+                                            const char *target,
+                                            CS_INFERENCE_PATH *path,
+                                            char *out,
+                                            size_t out_size)
+{
+    return CommonsenseQueryPhysicalConsequencePersona(graph, NULL, lang, subject, action, target, path, out, out_size);
+}
+
 int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
                                         const char *subject,
                                         const char *action,
@@ -692,6 +727,6 @@ int CommonsenseQueryPhysicalConsequence(const GRAPH *graph,
                                         char *out,
                                         size_t out_size)
 {
-    return CommonsenseQueryPhysicalConsequenceLang(graph, LANG_EN, subject, action, target, path, out, out_size);
+    return CommonsenseQueryPhysicalConsequencePersona(graph, NULL, LANG_EN, subject, action, target, path, out, out_size);
 }
 

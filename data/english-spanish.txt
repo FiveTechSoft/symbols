@@ -288,4 +288,8 @@ papel = paper
 perro = dog
 pajaro = bird
 pez = fish
+material fragil = brittle_material
+brittle_material = material fragil
+shatter = romper
+romper = shatter
 

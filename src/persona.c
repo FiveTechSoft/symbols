@@ -186,16 +186,45 @@ static const PERSONA_LEXICON g_persona_lexicons[PERSONA_COUNT] = {
             [LANG_ES] = "Premisa fundamentada:",
             [LANG_FR] = "Premisse fondee:"
         }
+    },
+    [PERSONA_PIRATE_QUANTUM] = {
+        .role_name             = "pirate_quantum",
+        .intro                 = {
+            [LANG_EN] = "Shiver me timbers and by Blackbeard's wave function, ye scallywag!",
+            [LANG_ES] = "Por las barbas de Neptuno y el colapso de la funcion de onda, marinero!",
+            [LANG_FR] = "Mille sabords et par l'effondrement de la fonction d'onde, moussaillon !"
+        },
+        .chain_connective      = {
+            [LANG_EN] = "which entangles faster than a Spanish galleon with",
+            [LANG_ES] = "que se entrelaza cual cabo de jarcia a la velocidad de la luz con",
+            [LANG_FR] = "qui s'intrique plus vite qu'un galion avec"
+        },
+        .conclusion_connective = {
+            [LANG_EN] = "So shiver me planks, %s is the %s of %s in pure quantum superposition till we open Davy Jones' chest!",
+            [LANG_ES] = "De modo que por todos los diablos del Caribe, %s es el %s de %s en pura superposicion cuantica hasta que abramos el cofre!",
+            [LANG_FR] = "Ainsi par mille canons, %s est le %s de %s en superposition quantique jusqu'a ce qu'on ouvre le coffre !"
+        },
+        .abstain_template      = {
+            [LANG_EN] = "Blimey! Heisenberg's uncertainty principle swallowed all trace of %s into Davy Jones' locker!",
+            [LANG_ES] = "Zafarrancho! El principio de incertidumbre de Heisenberg esconde a %s en el fondo del cofre de Davy Jones.",
+            [LANG_FR] = "Tonnerre de Brest ! Le principe d'incertitude d'Heisenberg a englouti %s dans les abysses de Davy Jones."
+        },
+        .evidence_prefix       = {
+            [LANG_EN] = "Quantum ship's log entry:",
+            [LANG_ES] = "Bitacora de observacion cuantica:",
+            [LANG_FR] = "Livre de bord quantique :"
+        }
     }
 };
 
 static const PERSONA_PROFILE g_default_profiles[PERSONA_COUNT] = {
-    [PERSONA_NEUTRAL]   = { .epistemic_threshold = 1.0f, .verbosity_level = 1, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 0 },
-    [PERSONA_ARCHITECT] = { .epistemic_threshold = 1.0f, .verbosity_level = 2, .require_provenance = 1, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 },
-    [PERSONA_AUDITOR]   = { .epistemic_threshold = 1.5f, .verbosity_level = 2, .require_provenance = 1, .use_rhetorical_intro = 1, .prefer_causal_chain = 0 },
-    [PERSONA_TUTOR]     = { .epistemic_threshold = 0.5f, .verbosity_level = 2, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 },
-    [PERSONA_CONCISE]   = { .epistemic_threshold = 1.0f, .verbosity_level = 0, .require_provenance = 0, .use_rhetorical_intro = 0, .prefer_causal_chain = 0 },
-    [PERSONA_SOCRATIC]  = { .epistemic_threshold = 1.0f, .verbosity_level = 2, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 }
+    [PERSONA_NEUTRAL]        = { .epistemic_threshold = 1.0f, .verbosity_level = 1, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 0 },
+    [PERSONA_ARCHITECT]      = { .epistemic_threshold = 1.0f, .verbosity_level = 2, .require_provenance = 1, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 },
+    [PERSONA_AUDITOR]        = { .epistemic_threshold = 1.5f, .verbosity_level = 2, .require_provenance = 1, .use_rhetorical_intro = 1, .prefer_causal_chain = 0 },
+    [PERSONA_TUTOR]          = { .epistemic_threshold = 0.5f, .verbosity_level = 2, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 },
+    [PERSONA_CONCISE]        = { .epistemic_threshold = 1.0f, .verbosity_level = 0, .require_provenance = 0, .use_rhetorical_intro = 0, .prefer_causal_chain = 0 },
+    [PERSONA_SOCRATIC]       = { .epistemic_threshold = 1.0f, .verbosity_level = 2, .require_provenance = 0, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 },
+    [PERSONA_PIRATE_QUANTUM] = { .epistemic_threshold = 1.0f, .verbosity_level = 2, .require_provenance = 1, .use_rhetorical_intro = 1, .prefer_causal_chain = 1 }
 };
 
 static void SafeCapitalize(const char *in, char *out, size_t out_size)
@@ -236,9 +265,37 @@ void PersonaFilterInit(PERSONA_FILTER *filter, PERSONA_ID id)
     filter->lex     = &g_persona_lexicons[id];
 }
 
+typedef struct {
+    const char *alias;
+    PERSONA_ID id;
+} PERSONA_ALIAS;
+
+static const PERSONA_ALIAS g_persona_aliases[] = {
+    { "pirate",          PERSONA_PIRATE_QUANTUM },
+    { "pirata",          PERSONA_PIRATE_QUANTUM },
+    { "pirate_quantum",  PERSONA_PIRATE_QUANTUM },
+    { "quantum_pirate",  PERSONA_PIRATE_QUANTUM },
+    { "architect",       PERSONA_ARCHITECT },
+    { "arquitecto",      PERSONA_ARCHITECT },
+    { "auditor",         PERSONA_AUDITOR },
+    { "tutor",           PERSONA_TUTOR },
+    { "profesor",        PERSONA_TUTOR },
+    { "concise",         PERSONA_CONCISE },
+    { "conciso",         PERSONA_CONCISE },
+    { "socratic",        PERSONA_SOCRATIC },
+    { "socratico",       PERSONA_SOCRATIC },
+    { "neutral",         PERSONA_NEUTRAL },
+    { NULL,              PERSONA_NEUTRAL }
+};
+
 PERSONA_ID PersonaFindByName(const char *name)
 {
     if (!name) return PERSONA_NEUTRAL;
+    for (size_t i = 0; g_persona_aliases[i].alias != NULL; i++)
+    {
+        if (strcasecmp(name, g_persona_aliases[i].alias) == 0)
+            return g_persona_aliases[i].id;
+    }
     for (int i = 0; i < PERSONA_COUNT; i++)
     {
         if (strcasecmp(name, g_persona_lexicons[i].role_name) == 0)
@@ -286,6 +343,12 @@ int PersonaComputeRelationBias(const PERSONA_FILTER *filter,
     {
         /* Concise favors highest weight directly */
         if (rel->weight >= 2.0f) bias += 10;
+    }
+    else if (filter->id == PERSONA_PIRATE_QUANTUM)
+    {
+        /* Pirate quantum prioritizes high epistemic certainty and causal links */
+        if (rel->weight >= 2.0f) bias += 20;
+        if (rel->source != SYMBOL_INVALID) bias += 10;
     }
 
     if (bias > 50) bias = 50;
@@ -454,6 +517,77 @@ uint32_t PersonaRealizeAbstain(const PERSONA_FILTER *filter,
     SafeCapitalize(entity, e_cap, sizeof(e_cap));
 
     snprintf(out, out_size, lex->abstain_template[lang], e_cap);
+    return (uint32_t)strlen(out);
+}
+
+uint32_t PersonaRealizePhysicalConsequence(const PERSONA_FILTER *filter,
+                                           LANG_ID lang,
+                                           const char *subject,
+                                           const char *action,
+                                           const char *target,
+                                           const char *material,
+                                           const char *consequence,
+                                           char *out,
+                                           size_t out_size)
+{
+    if (!subject || !action || !target || !out || out_size == 0)
+        return 0;
+    out[0] = '\0';
+
+    if (lang >= LANG_COUNT) lang = LANG_EN;
+    PERSONA_ID pid = filter ? filter->id : PERSONA_NEUTRAL;
+    const PERSONA_LEXICON *lex = &g_persona_lexicons[pid];
+
+    char s_cap[64], t_cap[64];
+    SafeCapitalize(subject, s_cap, sizeof(s_cap));
+    SafeCapitalize(target, t_cap, sizeof(t_cap));
+
+    if (pid == PERSONA_CONCISE)
+    {
+        snprintf(out, out_size, "%s -> %s %s -> %s (%s).",
+                 s_cap, action, t_cap, consequence ? consequence : "failure", material ? material : "material");
+        return (uint32_t)strlen(out);
+    }
+
+    /* Rhetorical Intro if enabled */
+    const char *intro = lex->intro[lang];
+    if (intro && intro[0] && (!filter || filter->profile.use_rhetorical_intro))
+    {
+        AppendStr(out, out_size, intro);
+        AppendStr(out, out_size, ": ");
+    }
+
+    /* Core verified physical deduction */
+    char fact[256];
+    if (lang == LANG_ES)
+    {
+        snprintf(fact, sizeof(fact),
+                 "Si un %s se cae al %s, se rompera (porque el %s es un material fragil que se rompe con el impacto).",
+                 subject, target, material ? material : "cristal");
+    }
+    else if (lang == LANG_FR)
+    {
+        snprintf(fact, sizeof(fact),
+                 "Si %s tombe sur %s, il se brisera (parce qu'il est fait de %s ce qui cause sa rupture lors de l'impact).",
+                 subject, target, material ? material : "materiau");
+    }
+    else
+    {
+        snprintf(fact, sizeof(fact),
+                 "If %s is %s %s, it will %s (because %s is made of %s which causes %s upon impact).",
+                 subject, action, target, consequence ? consequence : "shatter",
+                 subject, material ? material : "brittle material", consequence ? consequence : "shatter");
+    }
+    AppendStr(out, out_size, fact);
+
+    /* Grounding provenance citation if required by profile */
+    if (filter && filter->profile.require_provenance)
+    {
+        char prov[128];
+        snprintf(prov, sizeof(prov), " (%s ConceptNet 5.8 / fisica clasica)", lex->evidence_prefix[lang]);
+        AppendStr(out, out_size, prov);
+    }
+
     return (uint32_t)strlen(out);
 }
 

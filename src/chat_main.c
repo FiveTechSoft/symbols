@@ -9,17 +9,21 @@
 int main(int argc, char **argv)
 {
     char corpus[1024];
-    if (argc > 1)
+    corpus[0] = '\0';
+    PERSONA_ID init_persona = PERSONA_NEUTRAL;
+
+    for (int i = 1; i < argc; i++)
     {
-        corpus[0] = '\0';
-        for (int i = 1; i < argc; i++)
+        if ((strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--persona") == 0) && i + 1 < argc)
         {
-            if (i > 1)
-                strncat(corpus, ";", sizeof(corpus) - strlen(corpus) - 1);
-            strncat(corpus, argv[i], sizeof(corpus) - strlen(corpus) - 1);
+            init_persona = PersonaFindByName(argv[++i]);
+            continue;
         }
+        if (corpus[0] != '\0')
+            strncat(corpus, ";", sizeof(corpus) - strlen(corpus) - 1);
+        strncat(corpus, argv[i], sizeof(corpus) - strlen(corpus) - 1);
     }
-    else
+    if (corpus[0] == '\0')
     {
         static const char *cand_paths[] = {
             "data/texts/bible.txt",
@@ -47,6 +51,14 @@ int main(int argc, char **argv)
     }
     CLARIFY chat;
     ClarifyInit(&chat, corpus);
+    if (init_persona != PERSONA_NEUTRAL)
+    {
+        ChatSetPersona(&chat.ch, init_persona);
+        if (init_persona == PERSONA_PIRATE_QUANTUM)
+            printf("Ahoy! El contramaestre cuantico del siglo XVIII esta al timon.\n");
+        else
+            printf("Modo persona activo: %s\n", PersonaGetName(init_persona));
+    }
     printf("Listo. Escribe una pregunta (o 'salir').\n");
     char line[512];
     while (fgets(line, sizeof(line), stdin))

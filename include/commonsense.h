@@ -201,6 +201,19 @@ int CommonsenseQueryPhysicalConsequenceLang(const GRAPH *graph,
                                             char *out,
                                             size_t out_size);
 
+struct PERSONA_FILTER_;
+
+/* Query physical consequence with persona projection and multilingual support */
+int CommonsenseQueryPhysicalConsequencePersona(const GRAPH *graph,
+                                               const struct PERSONA_FILTER_ *filter,
+                                               LANG_ID lang,
+                                               const char *subject,
+                                               const char *action,
+                                               const char *target,
+                                               CS_INFERENCE_PATH *path,
+                                               char *out,
+                                               size_t out_size);
+
 
 #ifdef __cplusplus
 }
