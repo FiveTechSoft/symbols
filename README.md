@@ -356,14 +356,16 @@ $$\text{phrases} = \{w_i w_{i+1} : i \in [0, n)\} \cup \{w_i w_{i+1} w_{i+2} : i
 
 Each phrase is searched as a case-insensitive substring in the raw corpus text ($O(|\text{corpus}|)$ per phrase). This recovers multi-word entities like "Trinity Meadows", "Formula One", "German Resistance" that single-token lookup misses.
 
-**Battery 100 Results** (Jung + Bible + Wikipedia, 41,431 sentences):
+**Battery 100 Results** (Jung + Bible + Wikipedia, 41,431 sentences, Ground-Truth Validated):
 
-| Metric | Value |
-|--------|-------|
-| Answered | 88 / 100 |
-| UNKNOWN | 12 / 100 |
-| Wrong | 0 / 100 |
-| Recall gain from n-grams | +7 questions |
+| Metric | Value | Proportion |
+| :--- | :--- | :--- |
+| **Top-1 Exact Ground-Truth Match (`Correct`)** | 54 / 100 | **54.0%** |
+| **Non-Matching / Lexical Mismatches (`Wrong`)** | 41 / 100 | **41.0%** |
+| **Honest Epistemic Abstention (`UNKNOWN`)** | 5 / 100 | **5.0%** |
+| **Total Query Attempts (`Answered`)** | 95 / 100 | **95.0%** |
+
+*Analysis*: Because extractive retrieval is strictly bounded to literal sentences present in the ingested texts, the engine achieves **0% unanchored token fabrication** (every output is a verbatim sentence citation from the source corpus). However, lexical overlap without deep contextual re-ranking can match an irrelevant sentence when multiple entities share vocabulary, leading to a 41% error rate on top-1 exact factual answers. This delineates the boundary between literal citation extraction and semantic comprehension.
 
 ### 3.5 Autonomous Graph Reasoning: Induction, Forward Deduction & Abductive Diagnosis
 
@@ -768,8 +770,8 @@ Unlike TSV-bound tools, Symbolic LLM streams arbitrary free text directly into R
 
 The project adheres to strict fail-closed regression gates enforced via CMake CTest, divided into two verifiable tiers:
 
-#### 4.4.1 Autonomous Agentic & Code Intelligence Suite: 343 / 343 PASS (100.0%)
-All 11 specialized software engineering, planning, code graph, and execution suites pass unconditionally with zero memory leaks and zero regression failures:
+#### 4.4.1 Autonomous Agentic & Code Intelligence Suite: 443 / 443 PASS (100.0%)
+All 13 specialized software engineering, planning, code graph, shell execution, and C synthesis suites pass unconditionally with zero memory leaks and zero regression failures:
 - **17/17 Agentic Core & OpenCode Tool Dispatcher (`test_agent_core`)**: Validating formal tool contracts, deterministic JSON serialization, autonomous 5-step repair loops, and abductive recovery.
 - **53/53 Code Knowledge Graph & Blast Radius (`test_code_graph`)**: Validating C source and header parsing, struct extraction, reverse caller maps, and multi-hop impact analysis.
 - **56/56 Surgical Editing & Atomic Rollback (`test_agent_patch`)**: Validating pre-flight ambiguity rejection, CRLF/LF normalization, unified diff formatting (`diff -u`), and sub-millisecond atomic rollback.
@@ -781,6 +783,8 @@ All 11 specialized software engineering, planning, code graph, and execution sui
 - **38/38 Polyglot Code Knowledge Graph (`test_code_graph_polyglot`)**: Validating Python (`.py`, `.pyw`) and TypeScript/JavaScript (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`) class, inheritance, method, and import extraction.
 - **36/36 SWE-bench Lite Surgical Patch Verification Harness (`test_swe_bench_harness`)**: Validating pre-flight AST verification, blast radius call-graph analysis, and atomic patch application with rollback across canonical benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), achieving 100% verification fidelity, ~1.50 ms/task latency, dynamic RAM telemetry (~28 MB via OS process API), and strictly 0.00% patch corruption under fail-closed AST invariants.
 - **3/3 Repository Indexer & Filter (`test_code_graph_indexer`)**: Validating recursive repository directory traversal in < 50 ms, fail-closed exclusion of VCS/build artifacts (`.git`, `build*`, `node_modules`, `venv`), polyglot file extension filtering, and AST symbol mapping.
+- **57/57 Cross-Platform Shell Execution Engine (`test_agent_shell`)**: Validating cmd/powershell/bash subprocess spawning, non-blocking pipe draining, millisecond timeout termination (exit code 124), and bidirectional telemetry.
+- **43/43 C Code Synthesis & Autonomic GCC Self-Healing (`test_c_synthesis`)**: Validating native C module generation, strict GCC compilation under `-Wall -Wextra -Werror`, and abductive diagnostic self-healing loops.
 
 #### 4.4.2 Core Symbolic Knowledge, Cognitive Reasoning & NLG Batteries
 - **11/11 Graph Reasoning Suite (`test_graph_reasoning`)**: AMIE/ILP inductive rule mining, forward deductive link prediction, and abductive hypothesis discovery.
@@ -791,7 +795,7 @@ All 11 specialized software engineering, planning, code graph, and execution sui
 - **10/10 Passage Generation & Elastic Intent (`test_passage_nlg`)**: Document-level essay generation, soft intent classification, and cross-lingual entity linking.
 - **4/4 High-Resolution TPS & Throughput (`test_tps_benchmark`)**: Sustained throughput exceeding 20,000,000 tokens/second (BPE equiv.) in document NLG and >700,000 STRIPS goal plans/second.
 - **18/18 Deep Symbolic NLG (`test_deep_nlg`)**: Multi-hop chain aggregation, compound fact verbalization, and multilingual epistemic abstentions (ES, EN, FR).
-- **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`, 15/50 correct) and **54.0%** (`test_battery100`, 54/100 correct) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages without unanchored confabulation.
+- **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`: 15 correct, 32 non-matching, 3 UNKNOWN) and **54.0%** (`test_battery100`: 54 correct, 41 non-matching, 5 UNKNOWN) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages without unanchored token fabrication.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) validating relation retrieval and verbatim sentence alignment.
 - **26/26 Phase 4 Canonicalization Golden Battery**: Invariant byte-identical retrieval across query reformulations.
 *(Note: Legacy evaluation targets requiring external binary checkpoints like `wiki_model.bin` are skipped when the external checkpoint is omitted from the build directory).*
@@ -814,7 +818,7 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 
-# Run the complete test suite (49 tests)
+# Run the complete test suite (70 tests: 61 passed, 9 skipped for external wiki_model.bin)
 ctest --output-on-failure
 
 # Run cross-lingual QA battery (20 questions)
@@ -911,7 +915,7 @@ The system provides a native, standalone command-line engineering agent in pure 
 | Characteristic | Classical Prolog / Expert Systems | Traditional Transformers (LLaMA, GPT) | Retrieval-Augmented Generation (RAG) | Symbolic LLM (This Work) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Representation** | Pure discrete rules | Dense matrix weights ($\mathbb{R}^N$) | Neural embeddings + Dense LLM | **Discrete Triples + 32D Substrate + Symbolic Attention** |
-| **Hallucination Rate** | 0% (Rule bounded) | 15% – 35% (Confabulation) | 5% – 15% (Faithfulness gap) | **0% by design (Fail-closed)** |
+| **Hallucination / Unanchored Fabrication** | 0% (Rule bounded) | 15% – 35% (Confabulation) | 5% – 15% (Faithfulness gap) | **0% Unanchored Fabrication (Fail-closed; citations are verbatim extractive)** |
 | **Inference Latency** | Milliseconds to seconds | 20 – 100 ms / token | 200 – 1000 ms | **< 1 millisecond end-to-end** |
 | **Memory per Fact** | High (symbolic pointer trees) | Diffuse (fractional parameter) | High (dense chunks + DB index) | **Strictly 32 bytes / relation** |
 | **Synonym Flexibility** | None (brittle exact match) | High (continuous geometry) | High | **High (32D Hebbian cosine + cross-attention)** |
