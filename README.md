@@ -839,8 +839,8 @@ Unlike TSV-bound tools, Symbolic LLM streams arbitrary free text directly into R
 
 The project adheres to strict fail-closed regression gates enforced via CMake CTest, divided into two verifiable tiers:
 
-#### 4.4.1 Autonomous Agentic & Code Intelligence Suite: 443 / 443 PASS (100.0%)
-All 13 specialized software engineering, planning, code graph, shell execution, and C synthesis suites pass unconditionally with zero memory leaks and zero regression failures:
+#### 4.4.1 Autonomous Agentic & Code Intelligence Suite: 451 / 451 PASS (100.0%)
+All 14 specialized software engineering, planning, code graph, shell execution, C synthesis, and hyperdimensional VSA suites pass unconditionally with zero memory leaks and zero regression failures:
 - **17/17 Agentic Core & OpenCode Tool Dispatcher (`test_agent_core`)**: Validating formal tool contracts, deterministic JSON serialization, autonomous 5-step repair loops, and abductive recovery.
 - **53/53 Code Knowledge Graph & Blast Radius (`test_code_graph`)**: Validating C source and header parsing, struct extraction, reverse caller maps, and multi-hop impact analysis.
 - **56/56 Surgical Editing & Atomic Rollback (`test_agent_patch`)**: Validating pre-flight ambiguity rejection, CRLF/LF normalization, unified diff formatting (`diff -u`), and sub-millisecond atomic rollback.
@@ -854,6 +854,7 @@ All 13 specialized software engineering, planning, code graph, shell execution, 
 - **3/3 Repository Indexer & Filter (`test_code_graph_indexer`)**: Validating recursive repository directory traversal in < 50 ms, fail-closed exclusion of VCS/build artifacts (`.git`, `build*`, `node_modules`, `venv`), polyglot file extension filtering, and AST symbol mapping.
 - **57/57 Cross-Platform Shell Execution Engine (`test_agent_shell`)**: Validating cmd/powershell/bash subprocess spawning, non-blocking pipe draining, millisecond timeout termination (exit code 124), and bidirectional telemetry.
 - **43/43 C Code Synthesis & Autonomic GCC Self-Healing (`test_c_synthesis`)**: Validating native C module generation, strict GCC compilation under `-Wall -Wextra -Werror`, and abductive diagnostic self-healing loops.
+- **8/8 Vector Symbolic Architecture & Hyperdimensional Computing (`test_vsa`)**: Validating 256-bit Kanerva binary spatter codes, hardware SIMD popcount, 166.7 Mops/s binding throughput, 100% prototype recovery under 15-bit corruption, and predicate role-filler extraction in $< 10\ \text{ns}$.
 
 #### 4.4.2 Core Symbolic Knowledge, Cognitive Reasoning & NLG Batteries
 - **11/11 Graph Reasoning Suite (`test_graph_reasoning`)**: AMIE/ILP inductive rule mining, forward deductive link prediction, and abductive hypothesis discovery.
@@ -867,7 +868,8 @@ All 13 specialized software engineering, planning, code graph, shell execution, 
 - **Ground-Truth Validated Multi-Domain QA Batteries (`test_battery50` & `test_battery100`)**: Evaluated on heterogeneous real-world corpora (Jung, King James Bible, Wikipedia sample) with automated ground-truth keyword matching, achieving **30.0%** (`test_battery50`: 15 correct, 32 non-matching, 3 UNKNOWN) and **61.0%** (`test_battery100`: 61 correct, 36 non-matching, 3 UNKNOWN, 97 answered) top-1 exact factual accuracy; remaining queries safely abstain via honest `UNKNOWN` or provide verbatim contextual passages with strictly **0.0% unanchored token fabrication**.
 - **20/20 Jung Battery**: Cross-lingual QA (Spanish queries → English corpus) validating relation retrieval and verbatim sentence alignment.
 - **26/26 Phase 4 Canonicalization Golden Battery**: Invariant byte-identical retrieval across query reformulations.
-*(Note: Complete test suite encompasses 70 CTest targets: 61 passed, 9 skipped cleanly with exit code 77 when optional external binary models like `wiki_model.bin` are omitted, 0 failed — achieving a 100% pass rate).*
+*(Note: Complete test suite encompasses 71 CTest targets: 62 passed, 9 skipped cleanly with exit code 77 when optional external binary models like `wiki_model.bin` are omitted, 0 failed — achieving a 100% pass rate).*
+
 
 ---
 

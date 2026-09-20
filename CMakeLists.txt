@@ -57,6 +57,7 @@ add_library(symbolic STATIC
     src/server_proto.c
     src/text_lex.c
     src/meta_graph.c
+    src/vsa.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -241,4 +242,7 @@ target_link_libraries(test_battery100 symbolic)
 # test_multi_hop: reasoning depth (1-hop, 2-hop, negative, cross-domain)
 add_executable(test_multi_hop tests/test_multi_hop.c)
 target_link_libraries(test_multi_hop symbolic)
+
+# Pillar 1: Vector Symbolic Architecture (VSA / HDC)
+sllm_test(test_vsa tests/test_vsa.c)
 
