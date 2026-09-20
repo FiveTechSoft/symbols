@@ -59,6 +59,7 @@ add_library(symbolic STATIC
     src/meta_graph.c
     src/vsa.c
     src/ccg_realizer.c
+    src/commonsense.c
 )
 
 target_include_directories(symbolic PUBLIC include)
@@ -249,4 +250,7 @@ sllm_test(test_vsa tests/test_vsa.c)
 
 # Pillar 2: Combinatory Categorial Grammar (CCG) & Surface Realization
 sllm_test(test_ccg_realizer tests/test_ccg_realizer.c)
+
+# Pillar 3: Large-Scale Commonsense & World Knowledge Ingestion
+sllm_test(test_commonsense tests/test_commonsense.c)
 
