@@ -204,7 +204,10 @@ Regla arquitectónica:
      - `symbols-server` y `chat_main` configuran `data/c_lang/c_corpus.txt` como primer candidato prioritario en `cand_paths`.
      - Los scripts de arranque (`run_symbols_server.bat`, `.ps1`, `.sh`) configuran por defecto `CORPORA=data/c_lang/c_corpus.txt`, indexando el estándar C11 (gestión de memoria dinámica, tipos, invariantes de seguridad de buffers, libc) y el Grafo de Conocimiento del Repositorio (AST y radio de impacto).
      - La Biblia (`data/texts/bible.txt`) y otros textos históricos permanecen disponibles bajo demanda explícita (`--corpus`, argumento CLI, o `/load`), pero ya no se montan de forma predeterminada, evitando interferencias léxicas con consultas técnicas y comandos de usuario.
-  2. **Verificación y Pruebas E2E**:
+  2. **Aislamiento de Sesiones Stateless y Wrap-Around de Respuestas**:
+     - Eliminada la contaminación cruzada entre peticiones HTTP: ante consultas individuales (`nmsg <= 1`), `symbols-server` restablece limpiamente el foco (`focus_valid = 0`) y el historial de oraciones mostradas (`ntshown = 0`), evitando que un nuevo cliente herede el contexto o sesgo léxico de peticiones previas.
+     - En `src/chat.c`, `INT_TEXTQ` incorpora wrap-around determinista: si todas las frases coincidentes de un tema en el corpus ya fueron emitidas en una conversación y la nueva consulta es directa (`!p->t_following`), reinicia `ntshown = 0` y selecciona la mejor respuesta en lugar de devolver falso negativo ("No entendi la pregunta").
+  3. **Verificación y Pruebas E2E**:
      - Adaptada la suite de integración end-to-end `tools/test_opencode_copilot_e2e.py` para verificar consultas de conocimiento de programación ("What causes memory leaks?") respondiendo con principios de gestión de memoria C11.
      - Añadida prueba de saludo natural en `tools/test_opencode_user_cases.py` ("hola" responde como copiloto de IA sin referencias a versículos bíblicos).
      - Suite CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests) y pruebas unitarias de servidor 212/212 PASS, 2026-09-21.

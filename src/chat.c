@@ -3997,6 +3997,37 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 }
             }
         }
+        if (!have && !p->t_following)
+        {
+            /* Wrap-around: all matching candidates have been shown in this dialogue;
+               for a fresh query, reset shown history and select the top candidate */
+            ch->ntshown = 0;
+            for (f = 0; f < ch->ntfiles; f++)
+            {
+                uint32_t idx[16];
+                float sc[16];
+                uint32_t nret;
+                uint32_t r;
+                if (p->t_sub[0] != '\0' &&
+                    strcmp(ch->tfiles[f], p->t_sub) != 0)
+                    continue;
+                nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                       ch->temb, words, nw, idx, sc, 16);
+                for (r = 0; r < nret; r++)
+                {
+                    float tot = sc[r] + (float)MGBoost(
+                        &ch->mg, qkey, f, idx[r], ch->tshown,
+                        ch->ntshown);
+                    if (!have || tot > bestsc)
+                    {
+                        have = 1;
+                        best = idx[r];
+                        bestsc = tot;
+                        bestf = f;
+                    }
+                }
+            }
+        }
         if (have && ch->tlex[bestf].image != NULL)
         {
             char sent[2048];

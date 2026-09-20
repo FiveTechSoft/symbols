@@ -1489,13 +1489,26 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* Restore session dialogue state and persona */
-    strncpy(g_session.focus, sess->focus, sizeof(g_session.focus) - 1);
-    g_session.focus[sizeof(g_session.focus) - 1] = '\0';
-    g_session.focus_valid = sess->focus_valid;
-    strncpy(g_session.focus_secondary, sess->focus_secondary, sizeof(g_session.focus_secondary) - 1);
-    g_session.focus_secondary[sizeof(g_session.focus_secondary) - 1] = '\0';
-    g_session.focus_secondary_valid = sess->focus_secondary_valid;
-    g_session.exec = sess->exec;
+    if (nmsg <= 1)
+    {
+        g_session.focus[0] = '\0';
+        g_session.focus_valid = 0;
+        g_session.focus_secondary[0] = '\0';
+        g_session.focus_secondary_valid = 0;
+        memset(&g_session.exec, 0, sizeof(g_session.exec));
+        g_session.ntshown = 0;
+        g_session.tnw = 0;
+    }
+    else
+    {
+        strncpy(g_session.focus, sess->focus, sizeof(g_session.focus) - 1);
+        g_session.focus[sizeof(g_session.focus) - 1] = '\0';
+        g_session.focus_valid = sess->focus_valid;
+        strncpy(g_session.focus_secondary, sess->focus_secondary, sizeof(g_session.focus_secondary) - 1);
+        g_session.focus_secondary[sizeof(g_session.focus_secondary) - 1] = '\0';
+        g_session.focus_secondary_valid = sess->focus_secondary_valid;
+        g_session.exec = sess->exec;
+    }
     ChatSetPersona(&g_session, sess->persona_id);
 
     memset(&parsed, 0, sizeof(parsed));
