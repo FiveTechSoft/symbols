@@ -204,6 +204,7 @@ typedef struct
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
+    char              last_tool_output[4096];
 
     /* Persona conditioning */
     PERSONA_ID        persona_id;
@@ -652,6 +653,25 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         sess->last_active = time(NULL);
 
+        /* Save tool output for inspection reporting */
+        if (tool_resp.content[0] != '\0')
+        {
+            if (sess->last_tool_output[0] == '\0')
+            {
+                strncpy(sess->last_tool_output, tool_resp.content, sizeof(sess->last_tool_output) - 1);
+                sess->last_tool_output[sizeof(sess->last_tool_output) - 1] = '\0';
+            }
+            else
+            {
+                size_t cur_len = strlen(sess->last_tool_output);
+                if (cur_len + 4 < sizeof(sess->last_tool_output))
+                {
+                    strncat(sess->last_tool_output, "\n", sizeof(sess->last_tool_output) - cur_len - 1);
+                    strncat(sess->last_tool_output, tool_resp.content, sizeof(sess->last_tool_output) - strlen(sess->last_tool_output) - 1);
+                }
+            }
+        }
+
         /* Inspect tool output and diagnose compiler/shell errors */
         DIAGNOSTIC_REPORT diag;
         memset(&diag, 0, sizeof(diag));
@@ -779,13 +799,24 @@ static void HandleCompletions(socket_t s, const char *body,
             {
                 if (ServerIsInspectionTask(sess->current_issue))
                 {
-                    snprintf(content, sizeof(content),
-                             "### Revision de Directorio / Inspeccion Completada\n\n"
-                             "Se han ejecutado los pasos de exploracion para '%s'.\n"
-                             "- **Estado**: Inspeccion finalizada con exito\n"
-                             "- **Herramientas**: Ejecucion verificada sin errores\n\n"
-                             "El espacio de trabajo esta listo. Indica que archivo o cambio deseas examinar a continuacion.",
-                             sess->current_issue);
+                    if (sess->last_tool_output[0] != '\0')
+                    {
+                        snprintf(content, sizeof(content),
+                                 "### Contenido del Directorio / Exploracion ('%s')\n\n"
+                                 "```\n%s\n```\n\n"
+                                 "*Exploracion completada con exito.*",
+                                 sess->current_issue,
+                                 sess->last_tool_output);
+                    }
+                    else
+                    {
+                        snprintf(content, sizeof(content),
+                                 "### Revision de Directorio / Inspeccion Completada\n\n"
+                                 "Se han ejecutado los pasos de exploracion para '%s'.\n"
+                                 "- **Estado**: Inspeccion finalizada con exito\n\n"
+                                 "El espacio de trabajo esta listo. Indica que archivo o cambio deseas examinar a continuacion.",
+                                 sess->current_issue);
+                    }
                 }
                 else
                 {
@@ -1008,12 +1039,15 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->had_error = 0;
         sess->replan_count = 0;
         sess->last_error_summary[0] = '\0';
+        sess->last_tool_output[0] = '\0';
         memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
 
         int is_inspection = ServerIsInspectionTask(query);
-        uint32_t goal = is_inspection ? PRED_CODE_INSPECTED :
-                        (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED);
+        int is_folder_glob = IsFolderOrGlobQuery(query);
+        uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
+                        (is_inspection ? PRED_CODE_INSPECTED :
+                        (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED));
 
         AGENT_PLANNER planner;
         AgentPlannerInit(&planner);
