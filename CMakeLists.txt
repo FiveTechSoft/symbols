@@ -152,6 +152,7 @@ sllm_test(test_code_graph_polyglot tests/test_code_graph_polyglot.c)
 sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
 sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 sllm_test(test_agent_shell tests/test_agent_shell.c)
+sllm_test(test_c_synthesis tests/test_c_synthesis.c)
 
 # chat REPL: CLI conversacional (no es test)
 add_executable(chat_main src/chat_main.c)

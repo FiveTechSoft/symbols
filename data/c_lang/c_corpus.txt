@@ -1,0 +1,90 @@
+# C Language Knowledge Corpus (ISO/IEC 9899 C11 Standard)
+# Structured conceptual and practical guide for symbolic AI programming.
+
+The C programming language is a procedural, statically typed language specified by the ISO/IEC 9899 standard.
+C provides low-level memory access, a small set of keywords, and clean structural abstraction.
+Every C program begins execution in the entry point function named main.
+The main function returns an integer status code to the operating system where zero indicates success.
+
+Data types in C define the size and representation of values stored in computer memory.
+Fundamental integer types include char, short, int, long, and long long.
+Unsigned integer variants store non-negative values and never produce undefined behavior on overflow.
+Floating point types include float, double, and long double for IEEE 754 representations.
+The stdint header defines fixed-width integers such as int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, and uint64_t.
+The size_t type is an unsigned integer representing the byte size of any object in memory.
+The bool type with true and false literals is defined in the stdbool header.
+
+Pointers are variables that store the memory addresses of other objects.
+The address-of operator & returns the memory address of a variable.
+The dereference operator * accesses the value stored at the memory address held by a pointer.
+A null pointer points to no valid memory address and is represented by the macro NULL in stddef.
+Dereferencing a null pointer causes undefined behavior and typically crashes with a segmentation fault.
+Pointer arithmetic calculates addresses based on the byte size of the pointed-to type.
+A void pointer is a generic pointer type that can hold the address of any data object without type inspection.
+Const pointers protect data from unintended modification and enforce interface safety.
+
+Memory management in C distinguishes between automatic, static, and dynamic storage durations.
+Automatic variables are allocated on the call stack and are deallocated automatically when execution exits their scope.
+Static variables retain their values throughout the entire execution lifetime of the program.
+Dynamic memory is allocated on the system heap at runtime using functions declared in the stdlib header.
+The malloc function allocates an uninitialized block of memory with a specified byte size.
+The calloc function allocates memory and initializes all bytes to zero.
+The realloc function resizes an existing heap allocation while preserving its existing contents.
+The free function releases dynamically allocated heap memory back to the operating system.
+Failing to free allocated memory causes memory leaks that exhaust available system resources.
+Accessing memory after it has been freed produces dangling pointers and use-after-free vulnerabilities.
+Calling free twice on the exact same pointer leads to double free corruption and crashes.
+
+Arrays in C are contiguous blocks of elements of identical type stored sequentially in memory.
+Array indexing is zero-based where the first element is at index zero.
+Buffer overflow occurs when a program writes data beyond the allocated boundaries of an array or buffer.
+Buffer overflows corrupt adjacent stack or heap memory and represent critical security flaws.
+Off-by-one errors occur when loop bounds incorrectly access an index equal to the array capacity.
+Always verify array indices against buffer capacity guards before reading or writing elements.
+
+Strings in C are null-terminated arrays of characters ending with the null byte zero.
+The string header provides standard string manipulation and memory inspection functions.
+The strlen function computes the number of characters in a string excluding the terminating null byte.
+The strcpy and strcat functions do not perform bounds checking and should be avoided in secure code.
+The strncpy function copies at most n characters from source to destination buffer.
+The snprintf function securely formats text into a bounded destination buffer preventing buffer overflow.
+The strcmp function compares two strings lexicographically and returns zero when strings are identical.
+The memcpy function copies a specified count of bytes between non-overlapping memory buffers.
+The memmove function copies bytes safely even when source and destination buffers overlap.
+The memset function fills a block of memory with a specified byte value.
+
+Structures in C are user-defined composite types that group related variables of different types under a single name.
+The struct keyword defines a composite structure type with named member fields.
+Members of a structure variable are accessed using the dot operator.
+Members of a structure pointed to by a pointer are accessed using the arrow operator.
+The typedef keyword creates convenient type aliases for complex structure declarations.
+Structures can be nested inside other structures to represent hierarchical data models.
+Bit-fields allow packing integer members into specified numbers of bits to conserve memory.
+Unions allow storing different data types in the same shared memory location.
+Enumerations defined with the enum keyword assign symbolic names to integer constants.
+
+Functions encapsulate reusable logic and enforce modular programming architecture.
+A function prototype declares the function name, return type, and parameter types before its definition.
+Header files with extension h declare public function prototypes and data structures for external consumers.
+Source files with extension c implement the actual logic and internal helper functions.
+Static functions have internal linkage and are visible only within the translation unit where they are defined.
+Inline functions suggest that the compiler replace function calls with the actual function body to reduce call overhead.
+Function pointers store addresses of functions enabling callbacks, event tables, and polymorphism.
+
+Control flow statements guide execution paths based on boolean evaluations and loop conditions.
+The if and else statements perform conditional execution based on non-zero truth values.
+The switch statement dispatches execution to matching constant case labels.
+The while loop repeats execution as long as the condition expression evaluates to non-zero.
+The for loop provides concise initialization, condition evaluation, and increment operations.
+The do-while loop guarantees that the loop body executes at least once before evaluating the condition.
+The break statement exits the innermost enclosing loop or switch block immediately.
+The continue statement skips the remainder of the current loop iteration and proceeds to the next iteration.
+
+Defensive programming principles protect C software from runtime crashes and unexpected failures.
+Every function must validate its pointer arguments and capacity limits before performing operations.
+Return status codes should explicitly communicate operation success or failure to calling code.
+Always check the return value of dynamic allocation functions because malloc returns NULL on exhaustion.
+Use the assert macro from assert header to document invariants and catch logic bugs during development.
+Compiling with strict flags such as Wall, Wextra, and Werror helps catch subtle bugs before deployment.
+Clean modular C code minimizes global state and relies on pure functions and opaque handles.
+The GCC, Clang, and MSVC compilers translate C source code into high-performance native machine instructions.

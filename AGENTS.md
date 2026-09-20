@@ -64,6 +64,14 @@ Regla arquitectónica:
 
 - El motor de ejecución de subprocess nativo en C11 (`src/agent_shell.c`, `include/agent_shell.h`) unifica la ejecución de shells nativos en Windows (`cmd.exe`, `powershell.exe`), Linux (`/bin/bash`, `/bin/sh`) y macOS (`/bin/zsh`, `/bin/sh`) sin dependencias externas. Incorpora captura de doble flujo (`stdout` y `stderr` independientes de hasta 64 KB), loop de drenaje no-bloqueante anti-deadlock de pipes, protección por timeout de precisión milimétrica (código de salida 124 y terminación forzosa del proceso hijo), y telemetría de latencia de reloj. Integrado de extremo a extremo en `AgentRunnerSolveTask` (`src/agent_runner.c`): ante fallos en comandos de construcción o pruebas (`exit_code != 0`), el flujo de error alimenta automáticamente al motor abductivo `DiagnosticParseOutput`, dispara replanificación dinámica STRIPS (`AgentPlannerReplanOnError`), y ejecuta reversión atómica garantizada (`PatchRollback`). Validado por suite CTest 57/57 (`tests/test_agent_shell.c`) con 0 regresiones en suites agénticas, 2026-09-20.
 
+## Corpus de Programación en C y Síntesis Autónoma con Autocuración GCC (Fase 12)
+
+- El sistema incorpora un doble corpus especializado para programación en C11:
+  1. Corpus conceptual y normativo (`data/c_lang/c_corpus.txt`) con principios formales de tipos, memoria dinámica (`malloc`/`calloc`/`realloc`/`free`), punteros, invariantes de seguridad de buffers y funciones estándar, indexado por `TextLexIngest` para recuperación semántica por atención.
+  2. Modelo de grafo de la biblioteca estándar de C (`data/c_lang/c_std_lib.h`) indexado en el Grafo de Conocimiento del Código (`CodeGraphIngestFile`), habilitando resolución O(1) de firmas y estructuras de libc (`C_FILE`, `malloc`, `snprintf`, `memcpy`, etc.).
+  3. Bucle cerrado de síntesis y autocuración de código C: síntesis de módulos C compilados nativamente en < 250 ms con GCC bajo `-Wall -Wextra -Werror` vía `AgentShellExec`, con ejecución determinista de binarios verificados y autodiagnóstico abductivo (`DiagnosticParseOutput` + parche atómico) ante errores de compilador. Validado por suite CTest 43/43 (`tests/test_c_synthesis.c`) con 12/12 suites agénticas en verde, 2026-09-20.
+
+
 
 
 
