@@ -121,4 +121,7 @@ int ServerBuildToolCallStreamResponse(const char *model, long created,
 /* Classify whether a prompt represents a coding/software engineering task */
 int ServerIsCodingTask(const char *text);
 
+/* Classify whether a prompt represents a read-only code/workspace inspection task */
+int ServerIsInspectionTask(const char *text);
+
 #endif

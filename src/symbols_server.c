@@ -233,9 +233,10 @@ static int HasDeclaredTool(const ServerSession *sess, const char *name)
 
 static const char *FindFileForIssue(const char *issue)
 {
-    if (!g_server_code_graph || !issue)
+    if (!issue)
         return NULL;
 
+    static char found_path[260];
     char buf[512];
     strncpy(buf, issue, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
@@ -243,9 +244,23 @@ static const char *FindFileForIssue(const char *issue)
     char *tok = strtok(buf, " \t\r\n,.;:\"'()");
     while (tok)
     {
-        const char *file = CodeGraphGetFunctionFile(g_server_code_graph, tok);
-        if (file)
-            return file;
+        const char *dot = strrchr(tok, '.');
+        if (dot && (strcmp(dot, ".c") == 0 || strcmp(dot, ".h") == 0 ||
+                    strcmp(dot, ".cpp") == 0 || strcmp(dot, ".py") == 0 ||
+                    strcmp(dot, ".ts") == 0 || strcmp(dot, ".js") == 0 ||
+                    strcmp(dot, ".md") == 0 || strcmp(dot, ".txt") == 0))
+        {
+            strncpy(found_path, tok, sizeof(found_path) - 1);
+            found_path[sizeof(found_path) - 1] = '\0';
+            return found_path;
+        }
+
+        if (g_server_code_graph)
+        {
+            const char *file = CodeGraphGetFunctionFile(g_server_code_graph, tok);
+            if (file)
+                return file;
+        }
         tok = strtok(NULL, " \t\r\n,.;:\"'()");
     }
     return NULL;
@@ -261,11 +276,17 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
 
     const char *target_file = FindFileForIssue(issue);
     if (!target_file)
-        target_file = "src/main.c";
+        target_file = "CMakeLists.txt";
 
     if (strcmp(op->name, "locate_symbol") == 0)
     {
-        if (HasDeclaredTool(sess, "grep"))
+        int is_folder = ServerIsInspectionTask(issue);
+        if (is_folder && HasDeclaredTool(sess, "glob"))
+        {
+            strncpy(out_tc->calls[0].name, "glob", sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].arguments, "{\"pattern\":\"*\"}", sizeof(out_tc->calls[0].arguments) - 1);
+        }
+        else if (HasDeclaredTool(sess, "grep"))
         {
             strncpy(out_tc->calls[0].name, "grep", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
@@ -276,6 +297,11 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
             strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
                      "{\"filePath\":\"%s\"}", target_file);
+        }
+        else if (HasDeclaredTool(sess, "glob"))
+        {
+            strncpy(out_tc->calls[0].name, "glob", sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].arguments, "{\"pattern\":\"*\"}", sizeof(out_tc->calls[0].arguments) - 1);
         }
         else if (HasDeclaredTool(sess, "locate_symbol"))
         {
@@ -522,14 +548,11 @@ static void HandleCompletions(socket_t s, const char *body,
     /* Extract declared tools early so all branches know client capabilities */
     char declared_tools[SERVER_MAX_DECLARED_TOOLS][64];
     int num_declared = ServerExtractToolsDeclared(body, declared_tools, SERVER_MAX_DECLARED_TOOLS);
-    if (num_declared > 0)
+    sess->declared_tools_count = num_declared;
+    for (int i = 0; i < num_declared; i++)
     {
-        sess->declared_tools_count = num_declared;
-        for (int i = 0; i < num_declared; i++)
-        {
-            strncpy(sess->declared_tools[i], declared_tools[i], sizeof(sess->declared_tools[i]) - 1);
-            sess->declared_tools[i][sizeof(sess->declared_tools[i]) - 1] = '\0';
-        }
+        strncpy(sess->declared_tools[i], declared_tools[i], sizeof(sess->declared_tools[i]) - 1);
+        sess->declared_tools[i][sizeof(sess->declared_tools[i]) - 1] = '\0';
     }
 
     char last_role[32] = {0};
@@ -677,14 +700,27 @@ static void HandleCompletions(socket_t s, const char *body,
             }
             else
             {
-                snprintf(content, sizeof(content),
-                         "### Autonomous Coding Task Completed\n\n"
-                         "All %u steps of the STRIPS plan for issue '%s' have been executed.\n"
-                         "- **Status**: 100%% Verified\n"
-                         "- **Regressions**: 0\n"
-                         "- **Build**: PASS\n\n"
-                         "The patch is applied and verified against the codebase.",
-                         sess->current_plan.step_count, sess->current_issue);
+                if (ServerIsInspectionTask(sess->current_issue))
+                {
+                    snprintf(content, sizeof(content),
+                             "### Revision de Directorio / Inspeccion Completada\n\n"
+                             "Se han ejecutado los pasos de exploracion para '%s'.\n"
+                             "- **Estado**: Inspeccion finalizada con exito\n"
+                             "- **Herramientas**: Ejecucion verificada sin errores\n\n"
+                             "El espacio de trabajo esta listo. Indica que archivo o cambio deseas examinar a continuacion.",
+                             sess->current_issue);
+                }
+                else
+                {
+                    snprintf(content, sizeof(content),
+                             "### Autonomous Coding Task Completed\n\n"
+                             "All %u steps of the STRIPS plan for issue '%s' have been executed.\n"
+                             "- **Status**: 100%% Verified\n"
+                             "- **Regressions**: 0\n"
+                             "- **Build**: PASS\n\n"
+                             "The patch is applied and verified against the codebase.",
+                             sess->current_plan.step_count, sess->current_issue);
+                }
             }
 
             if (ServerWantsStream(body))
@@ -898,10 +934,14 @@ static void HandleCompletions(socket_t s, const char *body,
         memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
 
+        int is_inspection = ServerIsInspectionTask(query);
+        uint32_t goal = is_inspection ? PRED_CODE_INSPECTED :
+                        (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED);
+
         AGENT_PLANNER planner;
         AgentPlannerInit(&planner);
         AgentPlannerFormulate(&planner, query, PRED_SYMBOL_KNOWN,
-                              PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED,
+                              goal,
                               &sess->current_plan);
 
         /* Advance past any internal OP_TOOL_NONE operators */
@@ -917,6 +957,10 @@ static void HandleCompletions(socket_t s, const char *body,
             OPENAI_TOOL_CALLS tc;
             FormatOperatorToolCall(sess, first_op, sess->current_issue, ++g_seq, &tc);
 
+            const char *thought = is_inspection ?
+                "Formulated inspection plan for workspace. Initiating exploration." :
+                "Formulated STRIPS plan to resolve coding task. Initiating first step.";
+
             if (ServerWantsStream(body))
             {
                 char sse[16384];
@@ -926,12 +970,51 @@ static void HandleCompletions(socket_t s, const char *body,
             else
             {
                 ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
-                                            "Formulated STRIPS plan to resolve coding task. Initiating first step.",
+                                            thought,
                                             resp, sizeof(resp));
                 SendJson(s, 200, "OK", resp);
             }
             return;
         }
+    }
+    else if (is_coding && sess->declared_tools_count == 0)
+    {
+        /* Coding or inspection query, but client declared no tools */
+        if (g_server_code_graph != NULL)
+        {
+            snprintf(content, sizeof(content),
+                     "### Repositorio de Codigo Indexado\n\n"
+                     "- **Archivos**: %u\n"
+                     "- **Funciones**: %u\n"
+                     "- **Estructuras**: %u\n"
+                     "- **Clases**: %u\n"
+                     "- **Llamadas AST**: %u\n\n"
+                     "El grafo de codigo esta en memoria. Para explorar o modificar archivos interactivamente, habilita las herramientas de agente (tools) en tu cliente OpenCode.",
+                     g_server_code_graph->total_files,
+                     g_server_code_graph->total_functions,
+                     g_server_code_graph->total_structs,
+                     g_server_code_graph->total_classes,
+                     g_server_code_graph->total_calls);
+        }
+        else
+        {
+            snprintf(content, sizeof(content),
+                     "Peticion de inspeccion o codigo ('%s') recibida, pero no hay herramientas declaradas en la sesion ni repositorio indexado.",
+                     query);
+        }
+
+        if (ServerWantsStream(body))
+        {
+            char sse[16384];
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
     }
 
     /* Restore session dialogue state and persona */

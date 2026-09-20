@@ -128,10 +128,20 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodingTask("Run tests and build the project") == 1, "Detects 'tests' & 'build'");
     TEST_ASSERT(ServerIsCodingTask("apply this patch to main.h") == 1, "Detects 'patch' & 'main.h'");
 
+    /* Spanish and English repository/inspection tasks */
+    TEST_ASSERT(ServerIsCodingTask("revisa esta carpeta") == 1, "Detects 'revisa' & 'carpeta'");
+    TEST_ASSERT(ServerIsInspectionTask("revisa esta carpeta") == 1, "Classifies 'revisa esta carpeta' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("review this folder") == 1, "Detects 'review' & 'folder'");
+    TEST_ASSERT(ServerIsInspectionTask("review this folder") == 1, "Classifies 'review this folder' as inspection");
+    TEST_ASSERT(ServerIsCodingTask("inspecciona el directorio src") == 1, "Detects 'inspecciona' & 'directorio'");
+    TEST_ASSERT(ServerIsInspectionTask("inspecciona el directorio src") == 1, "Classifies 'inspecciona el directorio src' as inspection");
+    TEST_ASSERT(ServerIsInspectionTask("Fix the memory leak in parser.c") == 0, "Fix task is not read-only inspection");
+
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");
     TEST_ASSERT(ServerIsCodingTask("Tell me about wisdom and proverbs") == 0, "Topical query is not coding task");
     TEST_ASSERT(ServerIsCodingTask("What areas do you know?") == 0, "Introspection query is not coding task");
+    TEST_ASSERT(ServerIsInspectionTask("Who is the father of Solomon?") == 0, "Factual query is not inspection");
 }
 
 /* 6. Test Tool Error and Diagnostic Validation */

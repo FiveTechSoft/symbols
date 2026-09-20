@@ -913,6 +913,48 @@ static int MatchWordBoundary(const char *text, const char *kw)
     return 0;
 }
 
+int ServerIsInspectionTask(const char *text)
+{
+    if (text == NULL || text[0] == '\0')
+        return 0;
+
+    char lower[1024];
+    size_t i = 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    /* If it contains mutation/build action keywords, it's a mutation/build task, not inspection */
+    static const char *action_keywords[] = {
+        "fix", "bug", "patch", "refactor", "compile", "build", "test",
+        "tests", "replan", "repair", "hunk", "diff", "arregla", "corrige",
+        "compila", "compilar", "ejecuta", "ejecutar"
+    };
+    for (size_t k = 0; k < sizeof(action_keywords) / sizeof(action_keywords[0]); k++)
+    {
+        if (MatchWordBoundary(lower, action_keywords[k]))
+            return 0;
+    }
+
+    static const char *inspect_keywords[] = {
+        "review", "inspect", "folder", "directory", "codebase", "repo",
+        "repository", "files", "workspace", "list", "explore",
+        "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
+        "directorio", "repositorio", "archivos", "ficheros", "explora",
+        "explorar", "muestra", "mostrar", "mira", "mirar"
+    };
+    for (size_t k = 0; k < sizeof(inspect_keywords) / sizeof(inspect_keywords[0]); k++)
+    {
+        if (MatchWordBoundary(lower, inspect_keywords[k]))
+            return 1;
+    }
+
+    return 0;
+}
+
 int ServerIsCodingTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
@@ -945,7 +987,13 @@ int ServerIsCodingTask(const char *text)
         "fix", "bug", "patch", "refactor", "compile", "build", "test",
         "tests", "gcc", "clang", "make", "cmake", "ctest", "function",
         "struct", "segfault", "syntax", "pull request", "commit", "git",
-        "hunk", "diff", "regression", "rollback"
+        "hunk", "diff", "regression", "rollback", "symbol", "symbols",
+        "header", "workspace", "codebase", "repo", "repository", "files",
+        "folder", "directory", "review", "inspect",
+        "revisa", "revisar", "inspecciona", "inspeccionar", "carpeta",
+        "directorio", "repositorio", "archivos", "ficheros", "codigo",
+        "analiza", "analizar", "arregla", "corrige", "compilar", "compila",
+        "ejecuta", "ejecutar"
     };
 
     for (size_t k = 0; k < sizeof(coding_keywords) / sizeof(coding_keywords[0]); k++)
@@ -954,6 +1002,10 @@ int ServerIsCodingTask(const char *text)
             return 1;
     }
 
+    if (ServerIsInspectionTask(text))
+        return 1;
+
     return 0;
 }
+
 
