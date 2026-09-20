@@ -3,7 +3,7 @@
 # run_symbols_server.sh: Starts Symbolic LLM Copilot Server
 # ============================================================
 
-PORT=${1:-8080}
+PORT=${1:-8099}
 REPO_DIR=${2:-.}
 CORPORA="data/texts/bible.txt;data/c_lang/c_corpus.txt"
 

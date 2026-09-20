@@ -16,7 +16,7 @@ def main():
     print("  E2E TEST: SYMBOLIC LLM LOCAL COPILOT FOR OPENCODE / EDITORS         ")
     print("======================================================================")
 
-    port = 8080
+    port = 8099
     repo_path = os.path.abspath(".")
     corpus_arg = "data/texts/bible.txt;data/c_lang/c_corpus.txt"
     server_exe = os.path.join("build-gcc", "symbols-server.exe")

@@ -132,17 +132,20 @@ Regla arquitectónica:
 ## Copiloto Local Autónomo OpenCode y Despliegue de Servidor (Fase 19)
 
 - Integración y despliegue del motor `symbols-server` como copiloto local permanente en OpenCode y entornos de desarrollo:
-  1. **Configuración de Espacio de Trabajo (`opencode.json`)**: Definición del proveedor local OpenAI-compatible (`symbols`) en puerto 8080 con ventana de contexto de 8192 tokens, streaming Server-Sent Events (SSE) y tool-calling nativo activado (`locate_symbol`, `inspect_code`, `apply_patch`, `execute_command`).
+  1. **Configuración de Espacio de Trabajo (`opencode.json`)**: Definición del proveedor local OpenAI-compatible (`symbols`) en el puerto nativo 8099 (`SERVER_PORT_DEFAULT`) con ventana de contexto de 8192 tokens, streaming Server-Sent Events (SSE) y tool-calling activado con esquema estándar `provider.symbols`.
   2. **Scripts Multiplataforma de Lanzamiento (`scripts/`)**:
-     - `run_symbols_server.bat` para Windows Batch.
+     - `run_symbols_server.bat` para Windows Batch (puerto por defecto 8099).
      - `run_symbols_server.ps1` para PowerShell con parámetros tipados (`Port`, `RepoDir`).
      - `run_symbols_server.sh` para entornos POSIX/Linux/macOS.
      - Configuran automáticamente el montaje del grafo de conocimiento del repositorio actual, corpus textual (`data/texts/bible.txt;data/c_lang/c_corpus.txt`), grafo de sentido común binario (`data/commonsense.bin`) y memoria episódica continua (`data/memory/episodic.tsv`).
-  3. **Verificación Integral Extremo a Extremo (`tools/test_opencode_copilot_e2e.py`)**:
+  3. **Discriminación Rigurosa de Intenciones y Mapeo Agnóstico de Herramientas**:
+     - Filtro estricto de activación agéntica: `(is_coding && num_declared > 0)`. Preguntas conversacionales, factuales y de sentido común físico (ej. *¿qué pasa si se cae un vaso de cristal al suelo?*) se resuelven directamente por texto sin invocar herramientas ni emitir falsos planes de ingeniería.
+     - Mapeo polimórfico de operadores STRIPS a las herramientas declaradas por el cliente: adapta dinámicamente `locate_symbol` $\to$ `grep`/`read`, `inspect_code` $\to$ `read`, `apply_patch` $\to$ `edit`, y `execute_command` $\to$ `bash` según el conjunto de herramientas disponible en el agente OpenCode.
+  4. **Verificación Integral Extremo a Extremo (`tools/test_opencode_copilot_e2e.py`)**:
      - Comprobación de disponibilidad de modelos (`GET /v1/models` -> `symbols`).
      - Validación de consultas factuales de conocimiento (padre de David -> Jesse).
-     - Validación de razonamiento causal físico de sentido común (caída de vaso de cristal -> se romperá).
-     - Validación de flujo agéntico autónomo STRIPS (`POST /v1/chat/completions` con `tools` -> emisión de `tool_calls` determinista con `locate_symbol`).
+     - Validación de razonamiento causal físico de sentido común (caída de vaso de cristal -> se romperá) incluso cuando el cliente declara herramientas.
+     - Validación de flujo agéntico autónomo STRIPS para tareas reales de código (`POST /v1/chat/completions` con `tools` -> emisión de `tool_calls` adaptadas a herramientas declaradas).
      - Cierre y terminación limpia del proceso sin fugas de recursos ni cuelgues.
-  4. **Documentación (`opencode.md`)**: Actualización completa de la guía de integración de OpenCode reflejando los nuevos scripts, el esquema `opencode.json` y la suite de verificación.
-  5. Validado por ejecución directa en terminal (100% de verificaciones de integración pasadas) y suite global CTest 75/75 PASS (66 Passed, 9 Skipped condicionales, 0 Failed), 2026-09-20.
+  5. **Documentación (`opencode.md`)**: Actualización completa de la guía de integración de OpenCode reflejando los nuevos scripts, el esquema `opencode.json` y la suite de verificación.
+  6. Validado por ejecución directa en terminal (100% de verificaciones de integración pasadas) y suite global CTest 75/75 PASS (66 Passed, 9 Skipped condicionales, 0 Failed), 2026-09-20.

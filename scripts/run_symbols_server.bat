@@ -1,13 +1,13 @@
 @echo off
 REM ============================================================
 REM run_symbols_server.bat: Starts Symbolic LLM Copilot Server
-REM Port: 8080 (default)
+REM Port: 8099 (default)
 REM Repo: Current directory (AST & Blast Radius Knowledge Graph)
 REM Corpora: Bible text, C Language ontology, Commonsense Snapshot
 REM ============================================================
 
 set PORT=%1
-if "%PORT%"=="" set PORT=8080
+if "%PORT%"=="" set PORT=8099
 
 set REPO_DIR=%2
 if "%REPO_DIR%"=="" set REPO_DIR=.

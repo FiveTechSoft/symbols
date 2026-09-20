@@ -22,17 +22,17 @@ OpenCode is designed for autonomous coding, project exploration, and agentic wor
 Symbolic LLM includes an embedded HTTP server ([`symbols_server`](file:///C:/symbols/src/symbols_server.c)) that implements the standard OpenAI `/v1/chat/completions` API.
 
 #### 1. Start the Server
-Compile and run `symbols-server` on port `8080` (or any preferred port), pointing to your repository and knowledge corpora:
+Compile and run `symbols-server` on port `8099` (native default port), pointing to your repository and knowledge corpora:
 
 ```bash
 # Windows Batch:
-scripts\run_symbols_server.bat 8080 .
+scripts\run_symbols_server.bat 8099 .
 
 # PowerShell:
-.\scripts\run_symbols_server.ps1 -Port 8080 -RepoDir .
+.\scripts\run_symbols_server.ps1 -Port 8099 -RepoDir .
 
 # Linux / macOS:
-./scripts/run_symbols_server.sh 8080 .
+./scripts/run_symbols_server.sh 8099 .
 ```
 
 #### 2. Configure OpenCode
@@ -41,28 +41,25 @@ A pre-configured [`opencode.json`](file:///C:/symbols/opencode.json) is already 
 ```json
 {
   "$schema": "https://opencode.ai/config.schema.json",
-  "providers": {
-    "symbolic_local": {
-      "type": "openai",
-      "baseUrl": "http://127.0.0.1:8080/v1",
-      "apiKey": "local-symbolic-token",
-      "models": [
-        {
-          "id": "symbols",
-          "name": "Symbolic LLM Copilot (C11)",
-          "contextWindow": 8192,
-          "supportsStreaming": true,
-          "supportsToolCalling": true
+  "model": "symbols/symbols",
+  "provider": {
+    "symbols": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Symbols (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8099/v1"
+      },
+      "models": {
+        "symbols": {
+          "name": "Symbols",
+          "tool_call": true,
+          "limit": {
+            "context": 8192,
+            "output": 4096
+          }
         }
-      ]
+      }
     }
-  },
-  "defaultModel": "symbols",
-  "tools": {
-    "locate_symbol": true,
-    "inspect_code": true,
-    "apply_patch": true,
-    "execute_command": true
   }
 }
 ```
@@ -71,7 +68,7 @@ A pre-configured [`opencode.json`](file:///C:/symbols/opencode.json) is already 
 Verify that OpenCode can reach the server:
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:8099/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer local-symbolic-token" \
   -d '{

@@ -202,12 +202,27 @@ typedef struct
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
+
+    /* Declared tools by client in current turn */
+    int               declared_tools_count;
+    char              declared_tools[8][64];
 } ServerSession;
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
 static uint32_t g_num_sessions = 0;
 static CODE_GRAPH *g_server_code_graph = NULL;
 static MODEL *g_server_model = NULL;
+
+static int HasDeclaredTool(const ServerSession *sess, const char *name)
+{
+    if (!sess) return 0;
+    for (int i = 0; i < sess->declared_tools_count; i++)
+    {
+        if (strcmp(sess->declared_tools[i], name) == 0)
+            return 1;
+    }
+    return 0;
+}
 
 static const char *FindFileForIssue(const char *issue)
 {
@@ -229,8 +244,9 @@ static const char *FindFileForIssue(const char *issue)
     return NULL;
 }
 
-static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
-                                   unsigned long seq, OPENAI_TOOL_CALLS *out_tc)
+static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERATOR *op,
+                                   const char *issue, unsigned long seq,
+                                   OPENAI_TOOL_CALLS *out_tc)
 {
     memset(out_tc, 0, sizeof(*out_tc));
     out_tc->count = 1;
@@ -242,42 +258,139 @@ static void FormatOperatorToolCall(const STRIPS_OPERATOR *op, const char *issue,
 
     if (strcmp(op->name, "locate_symbol") == 0)
     {
-        strncpy(out_tc->calls[0].name, "locate_symbol", sizeof(out_tc->calls[0].name) - 1);
-        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                 "{\"query\":\"%.120s\"}", issue);
+        if (HasDeclaredTool(sess, "locate_symbol"))
+        {
+            strncpy(out_tc->calls[0].name, "locate_symbol", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"query\":\"%.120s\"}", issue);
+        }
+        else if (HasDeclaredTool(sess, "grep"))
+        {
+            strncpy(out_tc->calls[0].name, "grep", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"pattern\":\"%.120s\"}", issue);
+        }
+        else if (HasDeclaredTool(sess, "read"))
+        {
+            strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\"}", target_file);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "locate_symbol", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"query\":\"%.120s\"}", issue);
+        }
     }
     else if (strcmp(op->name, "inspect_code") == 0)
     {
-        strncpy(out_tc->calls[0].name, "inspect_code", sizeof(out_tc->calls[0].name) - 1);
-        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                 "{\"file\":\"%s\",\"start_line\":1,\"end_line\":100}", target_file);
+        if (HasDeclaredTool(sess, "inspect_code"))
+        {
+            strncpy(out_tc->calls[0].name, "inspect_code", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"file\":\"%s\",\"start_line\":1,\"end_line\":100}", target_file);
+        }
+        else if (HasDeclaredTool(sess, "read"))
+        {
+            strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\"}", target_file);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "inspect_code", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"file\":\"%s\",\"start_line\":1,\"end_line\":100}", target_file);
+        }
     }
     else if (strcmp(op->name, "diagnose_error") == 0)
     {
-        strncpy(out_tc->calls[0].name, "diagnose_error", sizeof(out_tc->calls[0].name) - 1);
-        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                 "{\"issue\":\"%.120s\"}", issue);
+        if (HasDeclaredTool(sess, "diagnose_error"))
+        {
+            strncpy(out_tc->calls[0].name, "diagnose_error", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"issue\":\"%.120s\"}", issue);
+        }
+        else if (HasDeclaredTool(sess, "bash"))
+        {
+            strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].arguments, "{\"command\":\"ctest --output-on-failure\"}",
+                    sizeof(out_tc->calls[0].arguments) - 1);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "diagnose_error", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"issue\":\"%.120s\"}", issue);
+        }
     }
     else if (strcmp(op->name, "apply_patch") == 0)
     {
-        strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
-        snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                 "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
-                 target_file);
+        if (HasDeclaredTool(sess, "apply_patch"))
+        {
+            strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
+                     target_file);
+        }
+        else if (HasDeclaredTool(sess, "edit"))
+        {
+            strncpy(out_tc->calls[0].name, "edit", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"filePath\":\"%s\"}", target_file);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
+                     target_file);
+        }
     }
     else if (strcmp(op->name, "verify_build") == 0)
     {
-        strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
-        strncpy(out_tc->calls[0].arguments,
-                "{\"command\":\"cmake --build .\"}",
-                sizeof(out_tc->calls[0].arguments) - 1);
+        const char *cmd = "cmake --build .";
+        if (HasDeclaredTool(sess, "execute_command"))
+        {
+            strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
+        else if (HasDeclaredTool(sess, "bash"))
+        {
+            strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
     }
     else if (strcmp(op->name, "run_regression_tests") == 0)
     {
-        strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
-        strncpy(out_tc->calls[0].arguments,
-                "{\"command\":\"ctest --output-on-failure\"}",
-                sizeof(out_tc->calls[0].arguments) - 1);
+        const char *cmd = "ctest --output-on-failure";
+        if (HasDeclaredTool(sess, "execute_command"))
+        {
+            strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
+        else if (HasDeclaredTool(sess, "bash"))
+        {
+            strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
+        else
+        {
+            strncpy(out_tc->calls[0].name, "execute_command", sizeof(out_tc->calls[0].name) - 1);
+            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                     "{\"command\":\"%s\"}", cmd);
+        }
     }
     else
     {
@@ -400,7 +513,7 @@ static void HandleCompletions(socket_t s, const char *body,
                 sess->had_error = 0; /* Reset for curative retry */
                 const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[0].op;
                 OPENAI_TOOL_CALLS tc;
-                FormatOperatorToolCall(next_op, sess->current_issue, ++g_seq, &tc);
+                FormatOperatorToolCall(sess, next_op, sess->current_issue, ++g_seq, &tc);
 
                 char thought[256];
                 snprintf(thought, sizeof(thought),
@@ -430,7 +543,7 @@ static void HandleCompletions(socket_t s, const char *body,
             /* Dispatch next tool call in the active STRIPS plan */
             const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[sess->current_step_idx].op;
             OPENAI_TOOL_CALLS tc;
-            FormatOperatorToolCall(next_op, sess->current_issue, ++g_seq, &tc);
+            FormatOperatorToolCall(sess, next_op, sess->current_issue, ++g_seq, &tc);
 
             if (ServerWantsStream(body))
             {
@@ -544,8 +657,15 @@ static void HandleCompletions(socket_t s, const char *body,
     int num_declared = ServerExtractToolsDeclared(body, declared_tools, 8);
     int is_coding = ServerIsCodingTask(query);
 
-    /* 3. INITIATE AGENTIC CODING TASK IF CODING INTENT OR TOOLS ARE DECLARED */
-    if (is_coding || num_declared > 0)
+    sess->declared_tools_count = num_declared;
+    for (int i = 0; i < num_declared; i++)
+    {
+        strncpy(sess->declared_tools[i], declared_tools[i], sizeof(sess->declared_tools[i]) - 1);
+        sess->declared_tools[i][sizeof(sess->declared_tools[i]) - 1] = '\0';
+    }
+
+    /* 3. INITIATE AGENTIC CODING TASK ONLY IF CODING INTENT AND TOOLS ARE DECLARED */
+    if (is_coding && num_declared > 0)
     {
         sess->agent_active = 1;
         sess->current_step_idx = 0;
@@ -565,7 +685,7 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             const STRIPS_OPERATOR *first_op = &sess->current_plan.steps[0].op;
             OPENAI_TOOL_CALLS tc;
-            FormatOperatorToolCall(first_op, sess->current_issue, ++g_seq, &tc);
+            FormatOperatorToolCall(sess, first_op, sess->current_issue, ++g_seq, &tc);
 
             if (ServerWantsStream(body))
             {

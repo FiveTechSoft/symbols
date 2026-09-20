@@ -2,12 +2,12 @@
 .SYNOPSIS
     Starts the Symbolic LLM Copilot Server for OpenCode / Editor.
 .PARAMETER Port
-    HTTP port to bind (default: 8080).
+    HTTP port to bind (default: 8099).
 .PARAMETER RepoDir
     Root repository path to index for AST and Blast Radius (default: current directory).
 #>
 param(
-    [int]$Port = 8080,
+    [int]$Port = 8099,
     [string]$RepoDir = "."
 )
 
