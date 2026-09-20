@@ -118,4 +118,5 @@ Provide in-context persona and rhetorical adaptation without stochastic prompt i
 | **Pillar 2** | Generative Grammar | C11 CCG / Dependency Realizer | $0.66\ \mu\text{s}$ per sentence (1.5M sent/s) | **VERIFIED (100% PASS in `test_ccg_realizer`)** |
 | **Pillar 3** | Commonsense KB | ConceptNet / WordNet & mmap Ingestion | strictly 32 bytes/rel (< 1 ms binary load) | **VERIFIED (100% PASS in `test_commonsense`)** |
 | **Pillar 4** | Persona / Pragmatics | Graph Activation Masking ($\Pi_{\text{style}}$) | $0.58\ \mu\text{s}$ per projection (1.7M proj/s) | **VERIFIED (100% PASS in `test_persona`)** |
+| **Copilot / IDE** | OpenCode Integration | OpenAI Wire Tool-Calling & Resident KB | $< 1\ \text{ms}$ cold start / 8192 ctx | **VERIFIED (100% PASS in `test_opencode_copilot_e2e.py`)** |
 

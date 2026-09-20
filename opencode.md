@@ -22,21 +22,25 @@ OpenCode is designed for autonomous coding, project exploration, and agentic wor
 Symbolic LLM includes an embedded HTTP server ([`symbols_server`](file:///C:/symbols/src/symbols_server.c)) that implements the standard OpenAI `/v1/chat/completions` API.
 
 #### 1. Start the Server
-Compile and run `symbols_server` on port `8080` (or any preferred port), pointing to your project's knowledge texts:
+Compile and run `symbols-server` on port `8080` (or any preferred port), pointing to your repository and knowledge corpora:
 
 ```bash
-# Compile (if not already built)
-cmake --build build-gcc --target symbols_server --config Release
+# Windows Batch:
+scripts\run_symbols_server.bat 8080 .
 
-# Run server with one or more plain text files
-./build-gcc/symbols_server 8080 data/texts/bible.txt data/texts/jung.txt
+# PowerShell:
+.\scripts\run_symbols_server.ps1 -Port 8080 -RepoDir .
+
+# Linux / macOS:
+./scripts/run_symbols_server.sh 8080 .
 ```
 
 #### 2. Configure OpenCode
-In your OpenCode configuration (e.g., `~/.config/opencode/config.json`, or the project-level `opencode.json`), configure an OpenAI-compatible custom model provider:
+A pre-configured [`opencode.json`](file:///C:/symbols/opencode.json) is already provided in the repository root. When OpenCode opens this workspace, it automatically attaches to the local provider:
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.schema.json",
   "providers": {
     "symbolic_local": {
       "type": "openai",
@@ -44,15 +48,22 @@ In your OpenCode configuration (e.g., `~/.config/opencode/config.json`, or the p
       "apiKey": "local-symbolic-token",
       "models": [
         {
-          "id": "symbolic-llm-c11",
-          "name": "Symbolic LLM (C11)",
-          "contextWindow": 4096,
-          "supportsStreaming": false
+          "id": "symbols",
+          "name": "Symbolic LLM Copilot (C11)",
+          "contextWindow": 8192,
+          "supportsStreaming": true,
+          "supportsToolCalling": true
         }
       ]
     }
   },
-  "defaultModel": "symbolic-llm-c11"
+  "defaultModel": "symbols",
+  "tools": {
+    "locate_symbol": true,
+    "inspect_code": true,
+    "apply_patch": true,
+    "execute_command": true
+  }
 }
 ```
 
@@ -64,7 +75,7 @@ curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer local-symbolic-token" \
   -d '{
-    "model": "symbolic-llm-c11",
+    "model": "symbols",
     "messages": [
       {"role": "user", "content": "what areas do you know?"}
     ]
@@ -77,7 +88,7 @@ The response will be formatted as a standard OpenAI chat completion:
   "id": "chatcmpl-symbolic-1",
   "object": "chat.completion",
   "created": 1742410000,
-  "model": "symbolic-llm-c11",
+  "model": "symbols",
   "choices": [
     {
       "index": 0,
@@ -306,10 +317,10 @@ mkdir -p build-gcc && cd build-gcc
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 
-# Verify test suite (62/62 PASS)
+# Verify test suite (75/75 PASS)
 ctest --output-on-failure
 
-# Verify OpenCode server end-to-end integration test
+# Verify OpenCode copilot end-to-end integration test
 cd ..
-python tools/test_server_multicorpus.py
+python tools/test_opencode_copilot_e2e.py
 ```

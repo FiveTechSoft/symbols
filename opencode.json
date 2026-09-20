@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.schema.json",
+  "providers": {
+    "symbolic_local": {
+      "type": "openai",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "apiKey": "local-symbolic-token",
+      "models": [
+        {
+          "id": "symbols",
+          "name": "Symbolic LLM Copilot (C11)",
+          "contextWindow": 8192,
+          "supportsStreaming": true,
+          "supportsToolCalling": true
+        }
+      ]
+    }
+  },
+  "defaultModel": "symbols",
+  "tools": {
+    "locate_symbol": true,
+    "inspect_code": true,
+    "apply_patch": true,
+    "execute_command": true
+  }
+}
