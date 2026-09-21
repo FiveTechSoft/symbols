@@ -469,6 +469,7 @@ int CommonsenseBenchmarkScale(uint32_t count, CS_STATS *stats)
 
 /* Built-in curated foundational seed */
 static const char *g_commonsense_seed_data =
+    /* === Spatial Location (seed fallback for missing CN edges) === */
     "kitchen\tPART_OF\thouse\t2.0\n"
     "refrigerator\tAT_LOCATION\tkitchen\t2.0\n"
     "milk\tAT_LOCATION\trefrigerator\t2.0\n"
@@ -477,27 +478,80 @@ static const char *g_commonsense_seed_data =
     "bedroom\tPART_OF\thouse\t2.0\n"
     "car\tAT_LOCATION\tgarage\t2.0\n"
     "garage\tPART_OF\thouse\t2.0\n"
+    "dog\tAT_LOCATION\thouse\t2.0\n"
+    "cat\tAT_LOCATION\thouse\t2.0\n"
+    "book\tAT_LOCATION\tshelf\t2.0\n"
+    "book\tAT_LOCATION\tlibrary\t2.0\n"
+    "chair\tAT_LOCATION\troom\t2.0\n"
+    "pencil\tAT_LOCATION\tdesk\t2.0\n"
+    "plate\tAT_LOCATION\tkitchen\t2.0\n"
+    "cup\tAT_LOCATION\tkitchen\t2.0\n"
+
+    /* === Material / Physical Properties === */
     "glass\tMADE_OF\tbrittle_material\t2.0\n"
     "concrete\tHAS_PROPERTY\thard_surface\t2.0\n"
     "floor\tHAS_PROPERTY\thard_surface\t2.0\n"
     "ground\tHAS_PROPERTY\thard_surface\t2.0\n"
-    "brittle_material\tCAUSES\tshatter\t2.0\n"
 
+    /* === Causality (physical consequences) === */
+    "brittle_material\tCAUSES\tshatter\t2.0\n"
+    "fire\tCAUSES\tburn\t2.0\n"
+    "fire\tCAUSES\theat\t2.0\n"
+    "water\tCAUSES\twet\t2.0\n"
+    "hunger\tCAUSES\tweakness\t2.0\n"
+    "hunger\tCAUSES\tfatigue\t2.0\n"
+    "heat\tCAUSES\tboil\t2.0\n"
+    "impact\tCAUSES\tbreak\t2.0\n"
+    "rust\tCAUSES\tcorrosion\t2.0\n"
+
+    /* === Properties === */
     "ice\tMADE_OF\twater\t2.0\n"
     "ice\tHAS_PROPERTY\tcold\t2.0\n"
     "fire\tHAS_PROPERTY\thot\t2.0\n"
     "paper\tHAS_PROPERTY\tflammable\t2.0\n"
+    "water\tHAS_PROPERTY\tliquid\t2.0\n"
+    "sun\tHAS_PROPERTY\thot\t2.0\n"
+    "sun\tHAS_PROPERTY\tbright\t2.0\n"
+
+    /* === Affordances (functional uses) === */
     "knife\tUSED_FOR\tcut\t2.0\n"
     "fork\tUSED_FOR\teat\t2.0\n"
     "pen\tUSED_FOR\twrite\t2.0\n"
+    "pencil\tUSED_FOR\twrite\t2.0\n"
+    "hammer\tUSED_FOR\thit\t2.0\n"
+    "hammer\tUSED_FOR\tnail\t2.0\n"
+    "pan\tUSED_FOR\tcook\t2.0\n"
+    "pan\tUSED_FOR\tfry\t2.0\n"
+    "scissors\tUSED_FOR\tcut\t2.0\n"
+    "ruler\tUSED_FOR\tmeasure\t2.0\n"
+
+    /* === Capabilities === */
     "bird\tCAPABLE_OF\tfly\t2.0\n"
     "fish\tCAPABLE_OF\tswim\t2.0\n"
     "dog\tCAPABLE_OF\tbark\t2.0\n"
+    "cat\tCAPABLE_OF\tpurr\t2.0\n"
+
+    /* === Taxonomy (IS_A closure) === */
     "dog\tIS_A\tcanine\t2.0\n"
     "canine\tIS_A\tmammal\t2.0\n"
     "mammal\tIS_A\tanimal\t2.0\n"
     "dog\tIS_A\tmammal\t2.0\n"
-    "canine\tIS_A\tanimal\t2.0\n"
+    "cat\tIS_A\tfeline\t2.0\n"
+    "feline\tIS_A\tmammal\t2.0\n"
+    "cat\tIS_A\tmammal\t2.0\n"
+    "fish\tIS_A\tanimal\t2.0\n"
+    "bird\tIS_A\tanimal\t2.0\n"
+    "sun\tIS_A\tstar\t2.0\n"
+    "earth\tIS_A\tplanet\t2.0\n"
+    "mercury\tIS_A\tplanet\t2.0\n"
+    "venus\tIS_A\tplanet\t2.0\n"
+    "mars\tIS_A\tplanet\t2.0\n"
+    "jupiter\tIS_A\tplanet\t2.0\n"
+    "water\tIS_A\tliquid\t2.0\n"
+    "ice\tIS_A\tsolid\t2.0\n"
+    "steam\tIS_A\tgas\t2.0\n"
+
+    /* === Quantum (existing) === */
     "quantum_system\tCAPABLE_OF\tsuperposition\t2.0\n"
     "quantum_particle\tHAS_PROPERTY\twave_particle_duality\t2.0\n"
     "wave_function\tCAUSES\twave_function_collapse\t2.0\n"
