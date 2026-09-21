@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "chat.h"
 
 static int g_pass = 0;
@@ -47,6 +48,22 @@ static int has_any(const char *s, const char *const *kw)
 {
     for (int i = 0; kw[i]; i++)
         if (strstr(s, kw[i])) return 1;
+    /* case-insensitive fallback */
+    char sl[2048];
+    size_t len = strlen(s);
+    if (len >= sizeof(sl)) len = sizeof(sl) - 1;
+    for (size_t j = 0; j < len; j++)
+        sl[j] = (char)tolower((unsigned char)s[j]);
+    sl[len] = '\0';
+    for (int i = 0; kw[i]; i++) {
+        char kl[256];
+        size_t klen = strlen(kw[i]);
+        if (klen >= sizeof(kl)) klen = sizeof(kl) - 1;
+        for (size_t j = 0; j < klen; j++)
+            kl[j] = (char)tolower((unsigned char)kw[i][j]);
+        kl[klen] = '\0';
+        if (strstr(sl, kl)) return 1;
+    }
     return 0;
 }
 

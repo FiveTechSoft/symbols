@@ -23,7 +23,7 @@
 #include <stddef.h>
 #include "graph.h"
 
-#define MAX_MINED_RULES 128
+#define MAX_MINED_RULES 512
 #define MAX_ABDUCTIVE_HYPS 32
 #define MAX_RULE_NAME 64
 

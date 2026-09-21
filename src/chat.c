@@ -727,7 +727,7 @@ static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
     size_t len = strlen(norm_rel);
     if (len > 3 && (strcmp(norm_rel + len - 3, "_de") == 0 || strcmp(norm_rel + len - 3, "_of") == 0))
         len -= 3;
-    else if (len > 2 && strcmp(norm_rel + len - 2, "_a") == 0)
+    else if (len > 4 && strcmp(norm_rel + len - 2, "_a") == 0)
         len -= 2;
     else if (len > 3 && strcmp(norm_rel + len - 3, "_to") == 0)
         len -= 3;
@@ -752,11 +752,13 @@ static void KwdRecord(CHAT *ch, const char *rel, const char *conn)
     es[len] = '\0';
 
     /* EN stem: the connective minus a trailing "_of" suffix
-       (generic string rule, no word list) */
+       (generic string rule, no word list).  The result must be
+       at least 3 chars — "is_of" → "is" collides with the English
+       copula and poisons keyword matching. */
     char en[CHAT_TOKEN_MAX];
     snprintf(en, sizeof(en), "%s", conn);
     size_t elen = strlen(en);
-    if (elen > 3 && (strcmp(en + elen - 3, "_of") == 0 || strcmp(en + elen - 3, "_OF") == 0))
+    if (elen > 5 && (strcmp(en + elen - 3, "_of") == 0 || strcmp(en + elen - 3, "_OF") == 0))
         en[elen - 3] = '\0';
 
     uint32_t i;
@@ -1948,6 +1950,9 @@ static const struct
 #define CHAT_EN_SURFACE_N \
     (sizeof(CHAT_EN_SURFACE) / sizeof(CHAT_EN_SURFACE[0]))
 
+/* forward declaration — copula guard in MatchKwSpan */
+static int IsCopulaTok(const char *tok);
+
 /* span-restricted deduced-relation match (Fase A): the ParseIntent
    scan over absolute token indices in [start,end) — shared table,
    MorphFold rules and the son/sons wh-guard intact. */
@@ -1962,6 +1967,11 @@ static void MatchKwSpan(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
     int kwpos = -1; /* token position of that keyword */
     for (uint32_t i = start; i < end && kwx < 0; i++)
     {
+        /* Copulas (is/es/are/was/were) are structural particles,
+           not relation keywords — skip to prevent IS_A "is" collision */
+        if (IsCopulaTok(toks[i]))
+            continue;
+
         /* morphological fold of the raw token (rules, not word
            lists); a candidate only survives if it equals a DEDUCED
            stem, so folds of ordinary words are inert unless the KB
@@ -2543,6 +2553,14 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
         {
             for (uint32_t fi = 0; fi < n && !has_frozen_kw; fi++)
             {
+                /* Copulas (is/es/are/was...) must not trigger the
+                   frozen-keyword pre-scan: they are structural particles,
+                   not relational vocabulary.  The IS_A keyword stem "is"
+                   collides with the English copula, blocking
+                   DetectQuestionType and degrading EN "what is X?"
+                   queries from INT_QA_WHAT to INT_REL_QUERY. */
+                if (IsCopulaTok(toks[fi]))
+                    continue;
                 for (uint32_t ki = 0; ki < ch->num_kws; ki++)
                 {
                     if (strcmp(toks[fi], ch->kws[ki].es_stem) == 0 ||

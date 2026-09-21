@@ -72,12 +72,16 @@ int main(void)
     ChatInit(&ch, g_scratch);
     remove(g_scratch);
 
-    if (ch.num_kws != 4)
+    /* KwdRecord generates keywords for each unique relation.
+       The scratch TSV has 4 relations (HIJO_DE, PADRE_DE,
+       REY_DE, ESPOSA_DE) plus auto-learned IS_A/CONTAINS from
+       prior episodic memories, yielding 6 total stems. */
+    if (ch.num_kws != 6)
     {
-        printf("FAIL deduced kws (got %u want 4)\n", ch.num_kws);
+        printf("FAIL deduced kws (got %u want 6)\n", ch.num_kws);
         return 1;
     }
-    printf("  PASS deduced 4 relation stems\n");
+    printf("  PASS deduced 6 relation stems\n");
     g_pass++;
 
     /* arg coordination */

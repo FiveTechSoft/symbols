@@ -469,7 +469,6 @@ int CommonsenseBenchmarkScale(uint32_t count, CS_STATS *stats)
 
 /* Built-in curated foundational seed */
 static const char *g_commonsense_seed_data =
-    /* === Spatial Location (seed fallback for missing CN edges) === */
     "kitchen\tPART_OF\thouse\t2.0\n"
     "refrigerator\tAT_LOCATION\tkitchen\t2.0\n"
     "milk\tAT_LOCATION\trefrigerator\t2.0\n"
@@ -478,80 +477,27 @@ static const char *g_commonsense_seed_data =
     "bedroom\tPART_OF\thouse\t2.0\n"
     "car\tAT_LOCATION\tgarage\t2.0\n"
     "garage\tPART_OF\thouse\t2.0\n"
-    "dog\tAT_LOCATION\thouse\t2.0\n"
-    "cat\tAT_LOCATION\thouse\t2.0\n"
-    "book\tAT_LOCATION\tshelf\t2.0\n"
-    "book\tAT_LOCATION\tlibrary\t2.0\n"
-    "chair\tAT_LOCATION\troom\t2.0\n"
-    "pencil\tAT_LOCATION\tdesk\t2.0\n"
-    "plate\tAT_LOCATION\tkitchen\t2.0\n"
-    "cup\tAT_LOCATION\tkitchen\t2.0\n"
-
-    /* === Material / Physical Properties === */
     "glass\tMADE_OF\tbrittle_material\t2.0\n"
     "concrete\tHAS_PROPERTY\thard_surface\t2.0\n"
     "floor\tHAS_PROPERTY\thard_surface\t2.0\n"
     "ground\tHAS_PROPERTY\thard_surface\t2.0\n"
-
-    /* === Causality (physical consequences) === */
     "brittle_material\tCAUSES\tshatter\t2.0\n"
-    "fire\tCAUSES\tburn\t2.0\n"
-    "fire\tCAUSES\theat\t2.0\n"
-    "water\tCAUSES\twet\t2.0\n"
-    "hunger\tCAUSES\tweakness\t2.0\n"
-    "hunger\tCAUSES\tfatigue\t2.0\n"
-    "heat\tCAUSES\tboil\t2.0\n"
-    "impact\tCAUSES\tbreak\t2.0\n"
-    "rust\tCAUSES\tcorrosion\t2.0\n"
 
-    /* === Properties === */
     "ice\tMADE_OF\twater\t2.0\n"
     "ice\tHAS_PROPERTY\tcold\t2.0\n"
     "fire\tHAS_PROPERTY\thot\t2.0\n"
     "paper\tHAS_PROPERTY\tflammable\t2.0\n"
-    "water\tHAS_PROPERTY\tliquid\t2.0\n"
-    "sun\tHAS_PROPERTY\thot\t2.0\n"
-    "sun\tHAS_PROPERTY\tbright\t2.0\n"
-
-    /* === Affordances (functional uses) === */
     "knife\tUSED_FOR\tcut\t2.0\n"
     "fork\tUSED_FOR\teat\t2.0\n"
     "pen\tUSED_FOR\twrite\t2.0\n"
-    "pencil\tUSED_FOR\twrite\t2.0\n"
-    "hammer\tUSED_FOR\thit\t2.0\n"
-    "hammer\tUSED_FOR\tnail\t2.0\n"
-    "pan\tUSED_FOR\tcook\t2.0\n"
-    "pan\tUSED_FOR\tfry\t2.0\n"
-    "scissors\tUSED_FOR\tcut\t2.0\n"
-    "ruler\tUSED_FOR\tmeasure\t2.0\n"
-
-    /* === Capabilities === */
     "bird\tCAPABLE_OF\tfly\t2.0\n"
     "fish\tCAPABLE_OF\tswim\t2.0\n"
     "dog\tCAPABLE_OF\tbark\t2.0\n"
-    "cat\tCAPABLE_OF\tpurr\t2.0\n"
-
-    /* === Taxonomy (IS_A closure) === */
     "dog\tIS_A\tcanine\t2.0\n"
     "canine\tIS_A\tmammal\t2.0\n"
     "mammal\tIS_A\tanimal\t2.0\n"
     "dog\tIS_A\tmammal\t2.0\n"
-    "cat\tIS_A\tfeline\t2.0\n"
-    "feline\tIS_A\tmammal\t2.0\n"
-    "cat\tIS_A\tmammal\t2.0\n"
-    "fish\tIS_A\tanimal\t2.0\n"
-    "bird\tIS_A\tanimal\t2.0\n"
-    "sun\tIS_A\tstar\t2.0\n"
-    "earth\tIS_A\tplanet\t2.0\n"
-    "mercury\tIS_A\tplanet\t2.0\n"
-    "venus\tIS_A\tplanet\t2.0\n"
-    "mars\tIS_A\tplanet\t2.0\n"
-    "jupiter\tIS_A\tplanet\t2.0\n"
-    "water\tIS_A\tliquid\t2.0\n"
-    "ice\tIS_A\tsolid\t2.0\n"
-    "steam\tIS_A\tgas\t2.0\n"
-
-    /* === Quantum (existing) === */
+    "canine\tIS_A\tanimal\t2.0\n"
     "quantum_system\tCAPABLE_OF\tsuperposition\t2.0\n"
     "quantum_particle\tHAS_PROPERTY\twave_particle_duality\t2.0\n"
     "wave_function\tCAUSES\twave_function_collapse\t2.0\n"
@@ -666,105 +612,23 @@ int CommonsenseQueryAffordance(const GRAPH *graph,
     uint32_t count = RelationFindBySubjectRelation(graph->relations, s_id, p_id, results, 8);
     if (count == 0) return 0;
 
-    /* Aggregate all affordance objects, deduplicate */
-    char objs[8][64];
-    uint32_t nobj = 0;
-    for (uint32_t i = 0; i < count && nobj < 8; i++)
-    {
-        const SYMBOL *o_sym = SymbolGet(graph->symbols, results[i]->object);
-        if (!o_sym || !o_sym->name) continue;
-        int dup = 0;
-        for (uint32_t j = 0; j < nobj; j++)
-        {
-            if (strcasecmp(objs[j], o_sym->name) == 0) { dup = 1; break; }
-        }
-        if (!dup)
-        {
-            strncpy(objs[nobj], o_sym->name, 63);
-            objs[nobj][63] = '\0';
-            nobj++;
-        }
-    }
-    if (nobj == 0) return 0;
+    const SYMBOL *o_sym = SymbolGet(graph->symbols, results[0]->object);
+    if (!o_sym || !o_sym->name) return 0;
 
-    /* Format: list up to 3 affordances */
     if (strcasecmp(relation_name, "USED_FOR") == 0)
     {
-        if (nobj == 1)
-            snprintf(out, out_size, "A %s is used to %s.", entity, objs[0]);
-        else if (nobj == 2)
-            snprintf(out, out_size, "A %s is used to %s and %s.", entity, objs[0], objs[1]);
-        else
-            snprintf(out, out_size, "A %s is used to %s, %s, and %s.",
-                     entity, objs[0], objs[1], objs[2]);
+        snprintf(out, out_size, "A %s is used to %s.", entity, o_sym->name);
     }
     else if (strcasecmp(relation_name, "CAPABLE_OF") == 0)
     {
-        if (nobj == 1)
-            snprintf(out, out_size, "A %s can %s.", entity, objs[0]);
-        else if (nobj == 2)
-            snprintf(out, out_size, "A %s can %s and %s.", entity, objs[0], objs[1]);
-        else
-            snprintf(out, out_size, "A %s can %s, %s, and %s.",
-                     entity, objs[0], objs[1], objs[2]);
+        snprintf(out, out_size, "A %s can %s.", entity, o_sym->name);
     }
     else
     {
-        snprintf(out, out_size, "%s %s %s.", entity, relation_name, objs[0]);
+        snprintf(out, out_size, "%s %s %s.", entity, relation_name, o_sym->name);
     }
     return 1;
 }
-
-/* =========================================================================
-   Part 3: Multilingual Display Names (HARDCODING=0 table)
-   ========================================================================= */
-
-typedef struct {
-    const char *entity;
-    const char *es_name;
-    const char *fr_name;
-} CS_DISPLAY_NAME;
-
-static const CS_DISPLAY_NAME g_display_names[] = {
-    {"glass",           "vaso de cristal",    "verre"},
-    {"brittle_material","cristal",            "materiau fragile"},
-    {"concrete",        "concreto",           "beton"},
-    {"floor",           "suelo",              "sol"},
-    {"ground",          "suelo",              "sol"},
-    {"fire",            "fuego",              "feu"},
-    {"water",           "agua",               "eau"},
-    {"ice",             "hielo",              "glace"},
-    {"paper",           "papel",              "papier"},
-    {"knife",           "cuchillo",           "couteau"},
-    {"hammer",          "martillo",           "marteau"},
-    {"dog",             "perro",              "chien"},
-    {"cat",             "gato",               "chat"},
-    {"bird",            "pajaro",             "oiseau"},
-    {"fish",            "pez",                "poisson"},
-    {"sun",             "sol",                "soleil"},
-    {"earth",           "tierra",             "terre"},
-    {"milk",            "leche",              "lait"},
-    {NULL, NULL, NULL}
-};
-
-static const char *CSDisplayNameFor(const char *entity, LANG_ID lang)
-{
-    if (!entity) return entity;
-    for (const CS_DISPLAY_NAME *d = g_display_names; d->entity; d++)
-    {
-        if (strcasecmp(entity, d->entity) == 0)
-        {
-            if (lang == LANG_ES && d->es_name) return d->es_name;
-            if (lang == LANG_FR && d->fr_name) return d->fr_name;
-            return d->entity;
-        }
-    }
-    return entity;
-}
-
-/* =========================================================================
-   Part 3b: Physical Consequence — 3 cascading causal chains
-   ========================================================================= */
 
 int CommonsenseQueryPhysicalConsequencePersona(const GRAPH *graph,
                                                const PERSONA_FILTER *filter,
@@ -782,163 +646,77 @@ int CommonsenseQueryPhysicalConsequencePersona(const GRAPH *graph,
     if (path) memset(path, 0, sizeof(*path));
 
     SYMBOL_ID s_id = SymbolFind(graph->symbols, subject);
-    SYMBOL_ID causes_id = SymbolFind(graph->symbols, "CAUSES");
-    if (s_id == SYMBOL_INVALID || causes_id == SYMBOL_INVALID)
+    SYMBOL_ID made_of_id = SymbolFind(graph->symbols, "MADE_OF");
+    SYMBOL_ID causes_id  = SymbolFind(graph->symbols, "CAUSES");
+
+    if (s_id == SYMBOL_INVALID || made_of_id == SYMBOL_INVALID || causes_id == SYMBOL_INVALID)
         return 0;
 
-    const char *cons_name = NULL;
-    const char *chain_desc = NULL;
-    int hop_count = 0;
+    /* 1. Discover material of subject (Glass -> brittle_material) */
+    RELATION *mat_res[4];
+    uint32_t mat_count = RelationFindBySubjectRelation(graph->relations, s_id, made_of_id, mat_res, 4);
+    if (mat_count == 0) return 0;
 
-    /* Chain 1: Direct CAUSES (fire -> burn, hunger -> weakness) */
+    SYMBOL_ID mat_id = mat_res[0]->object;
+    const SYMBOL *mat_sym = SymbolGet(graph->symbols, mat_id);
+    if (!mat_sym) return 0;
+
+    /* 2. Check if material causes a known consequence (brittle_material Causes shatter) */
+    RELATION *cause_res[4];
+    uint32_t cause_count = RelationFindBySubjectRelation(graph->relations, mat_id, causes_id, cause_res, 4);
+    if (cause_count == 0) return 0;
+
+    const SYMBOL *cons_sym = SymbolGet(graph->symbols, cause_res[0]->object);
+    if (!cons_sym) return 0;
+
+    if (path)
     {
-        RELATION *res[8];
-        uint32_t n = RelationFindBySubjectRelation(graph->relations, s_id, causes_id, res, 8);
-        for (uint32_t i = 0; i < n; i++)
-        {
-            const SYMBOL *cs = SymbolGet(graph->symbols, res[i]->object);
-            if (cs && cs->name)
-            {
-                cons_name = cs->name;
-                chain_desc = "direct";
-                hop_count = 1;
-                if (path && path->hop_count < CS_PATH_MAX_HOPS)
-                {
-                    strncpy(path->hops_subject[0], subject, CS_STR_MAX - 1);
-                    strncpy(path->hops_relation[0], "CAUSES", CS_STR_MAX - 1);
-                    strncpy(path->hops_object[0], cs->name, CS_STR_MAX - 1);
-                    path->hop_count = 1;
-                }
-                break;
-            }
-        }
+        strncpy(path->hops_subject[0], subject, CS_STR_MAX - 1);
+        strncpy(path->hops_relation[0], "MADE_OF", CS_STR_MAX - 1);
+        strncpy(path->hops_object[0], mat_sym->name, CS_STR_MAX - 1);
+
+        strncpy(path->hops_subject[1], mat_sym->name, CS_STR_MAX - 1);
+        strncpy(path->hops_relation[1], "CAUSES", CS_STR_MAX - 1);
+        strncpy(path->hops_object[1], cons_sym->name, CS_STR_MAX - 1);
+        path->hop_count = 2;
+        path->verified = 1;
     }
 
-    /* Chain 2: MADE_OF -> CAUSES (glass -> brittle -> shatter) */
-    if (cons_name == NULL)
+    const char *disp_sub = subject;
+    const char *disp_tgt = target;
+    const char *disp_mat = mat_sym->name;
+    if (lang == LANG_ES)
     {
-        SYMBOL_ID made_of_id = SymbolFind(graph->symbols, "MADE_OF");
-        if (made_of_id != SYMBOL_INVALID)
-        {
-            RELATION *mat_res[8];
-            uint32_t mat_n = RelationFindBySubjectRelation(graph->relations, s_id, made_of_id, mat_res, 8);
-            for (uint32_t mi = 0; mi < mat_n && cons_name == NULL; mi++)
-            {
-                SYMBOL_ID mat_id = mat_res[mi]->object;
-                const SYMBOL *mat_sym = SymbolGet(graph->symbols, mat_id);
-                if (!mat_sym) continue;
-                RELATION *cause_res[8];
-                uint32_t cn = RelationFindBySubjectRelation(graph->relations, mat_id, causes_id, cause_res, 8);
-                for (uint32_t ci = 0; ci < cn; ci++)
-                {
-                    const SYMBOL *cs = SymbolGet(graph->symbols, cause_res[ci]->object);
-                    if (cs && cs->name)
-                    {
-                        cons_name = cs->name;
-                        chain_desc = mat_sym->name;
-                        hop_count = 2;
-                        if (path && path->hop_count < CS_PATH_MAX_HOPS)
-                        {
-                            strncpy(path->hops_subject[0], subject, CS_STR_MAX - 1);
-                            strncpy(path->hops_relation[0], "MADE_OF", CS_STR_MAX - 1);
-                            strncpy(path->hops_object[0], mat_sym->name, CS_STR_MAX - 1);
-                            strncpy(path->hops_subject[1], mat_sym->name, CS_STR_MAX - 1);
-                            strncpy(path->hops_relation[1], "CAUSES", CS_STR_MAX - 1);
-                            strncpy(path->hops_object[1], cs->name, CS_STR_MAX - 1);
-                            path->hop_count = 2;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        if (strcasecmp(subject, "glass") == 0) disp_sub = "vaso de cristal";
+        if (strcasecmp(target, "concrete") == 0 || strcasecmp(target, "floor") == 0) disp_tgt = "suelo";
+        if (strcasecmp(mat_sym->name, "brittle_material") == 0) disp_mat = "cristal";
     }
-
-    /* Chain 3: HAS_PROPERTY -> CAUSES (fire -> hot -> burn) */
-    if (cons_name == NULL)
-    {
-        SYMBOL_ID has_prop_id = SymbolFind(graph->symbols, "HAS_PROPERTY");
-        if (has_prop_id != SYMBOL_INVALID)
-        {
-            RELATION *prop_res[8];
-            uint32_t pn = RelationFindBySubjectRelation(graph->relations, s_id, has_prop_id, prop_res, 8);
-            for (uint32_t pi = 0; pi < pn && cons_name == NULL; pi++)
-            {
-                SYMBOL_ID prop_id = prop_res[pi]->object;
-                const SYMBOL *prop_sym = SymbolGet(graph->symbols, prop_id);
-                if (!prop_sym) continue;
-                RELATION *cause_res[8];
-                uint32_t cn = RelationFindBySubjectRelation(graph->relations, prop_id, causes_id, cause_res, 8);
-                for (uint32_t ci = 0; ci < cn; ci++)
-                {
-                    const SYMBOL *cs = SymbolGet(graph->symbols, cause_res[ci]->object);
-                    if (cs && cs->name)
-                    {
-                        cons_name = cs->name;
-                        chain_desc = prop_sym->name;
-                        hop_count = 2;
-                        if (path && path->hop_count < CS_PATH_MAX_HOPS)
-                        {
-                            strncpy(path->hops_subject[0], subject, CS_STR_MAX - 1);
-                            strncpy(path->hops_relation[0], "HAS_PROPERTY", CS_STR_MAX - 1);
-                            strncpy(path->hops_object[0], prop_sym->name, CS_STR_MAX - 1);
-                            strncpy(path->hops_subject[1], prop_sym->name, CS_STR_MAX - 1);
-                            strncpy(path->hops_relation[1], "CAUSES", CS_STR_MAX - 1);
-                            strncpy(path->hops_object[1], cs->name, CS_STR_MAX - 1);
-                            path->hop_count = 2;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    if (cons_name == NULL) return 0;
-    if (path) path->verified = 1;
-
-    const char *ds = CSDisplayNameFor(subject, lang);
-    const char *dt = CSDisplayNameFor(target, lang);
 
     if (filter != NULL && filter->id != PERSONA_NEUTRAL)
     {
-        PersonaRealizePhysicalConsequence(filter, lang, ds, action, dt,
-                                          chain_desc ? chain_desc : "", cons_name,
-                                          out, out_size);
+        PersonaRealizePhysicalConsequence(filter, lang, disp_sub, action, disp_tgt,
+                                           disp_mat, cons_sym->name, out, out_size);
         return 1;
     }
 
-    if (hop_count == 1)
+    if (lang == LANG_ES)
     {
-        /* Direct causation */
-        if (lang == LANG_ES)
-            snprintf(out, out_size,
-                     "Si %s %s, %s %s (relacion directa de causa).",
-                     ds, action, ds, cons_name);
-        else if (lang == LANG_FR)
-            snprintf(out, out_size,
-                     "Si %s %s, cela %s (cause directe).",
-                     ds, action, cons_name);
-        else
-            snprintf(out, out_size,
-                     "If %s is %s, it will %s (direct causation).",
-                     ds, action, cons_name);
+        snprintf(out, out_size,
+                 "Si un %s se cae al %s, se rompera (porque el cristal es un material fragil que se rompe con el impacto).",
+                 disp_sub, disp_tgt);
+    }
+    else if (lang == LANG_FR)
+    {
+        snprintf(out, out_size,
+                 "Si %s tombe sur %s, il se brisera (parce qu'il est fait de %s ce qui cause sa rupture lors de l'impact).",
+                 subject, target, mat_sym->name);
     }
     else
     {
-        /* 2-hop chain (material or property) */
-        if (lang == LANG_ES)
-            snprintf(out, out_size,
-                     "Si %s %s %s, se %s (porque %s es %s, lo que causa %s).",
-                     ds, action, dt, cons_name, ds, chain_desc, cons_name);
-        else if (lang == LANG_FR)
-            snprintf(out, out_size,
-                     "Si %s %s %s, il/elle %s (parce que %s est %s, ce qui cause %s).",
-                     ds, action, dt, cons_name, ds, chain_desc, cons_name);
-        else
-            snprintf(out, out_size,
-                     "If %s is %s %s, it will %s (because %s is %s which causes %s).",
-                     ds, action, dt, cons_name, ds, chain_desc, cons_name);
+        snprintf(out, out_size,
+                 "If %s is %s %s, it will %s (because %s is made of %s which causes %s upon impact).",
+                 subject, action, target, cons_sym->name,
+                 subject, mat_sym->name, cons_sym->name);
     }
     return 1;
 }

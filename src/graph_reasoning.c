@@ -21,7 +21,7 @@ typedef struct
     uint32_t  premises;
 } CANDIDATE_COMP;
 
-#define MAX_CANDIDATES 512
+#define MAX_CANDIDATES 2048
 
 void GraphRuleBaseInit(GRAPH_RULE_BASE *rb, float min_confidence, uint32_t min_support)
 {
@@ -64,29 +64,47 @@ void GraphRuleFormat(const GRAPH *graph, const GRAPH_RULE *rule, char *out, size
     }
 }
 
+/* Hash table for O(1) candidate dedup during mining */
+#define CAND_HASH_SIZE 4096
+#define CAND_HASH_MASK (CAND_HASH_SIZE - 1)
+static uint32_t cand_hash_chain[CAND_HASH_SIZE]; /* head index per bucket, 0 = empty */
+static uint32_t cand_hash_next[MAX_CANDIDATES];   /* next in chain per candidate */
+
+static uint32_t CandHash(SYMBOL_ID r1, SYMBOL_ID r2, SYMBOL_ID head)
+{
+    uint64_t h = (uint64_t)r1 * 2654435761u ^ (uint64_t)r2 * 40503u ^ (uint64_t)head;
+    return (uint32_t)(h & CAND_HASH_MASK);
+}
+
 /* Helper to record or update a candidate rule during mining */
 static void RecordCandidate(CANDIDATE_COMP *cands, uint32_t *ncands,
+                            uint32_t *hash_heads,
                             SYMBOL_ID r1, SYMBOL_ID r2, SYMBOL_ID head,
                             int confirmed)
 {
-    for (uint32_t i = 0; i < *ncands; i++)
+    uint32_t bucket = CandHash(r1, r2, head);
+    for (uint32_t idx = hash_heads[bucket]; idx != 0; idx = cand_hash_next[idx])
     {
-        if (cands[i].r1 == r1 && cands[i].r2 == r2 && cands[i].head == head)
+        CANDIDATE_COMP *c = &cands[idx - 1];
+        if (c->r1 == r1 && c->r2 == r2 && c->head == head)
         {
-            cands[i].premises++;
-            if (confirmed) cands[i].support++;
+            c->premises++;
+            if (confirmed) c->support++;
             return;
         }
     }
 
     if (*ncands < MAX_CANDIDATES)
     {
-        CANDIDATE_COMP *c = &cands[(*ncands)++];
+        uint32_t slot = (*ncands)++;
+        CANDIDATE_COMP *c = &cands[slot];
         c->r1 = r1;
         c->r2 = r2;
         c->head = head;
         c->premises = 1;
         c->support = confirmed ? 1 : 0;
+        cand_hash_next[slot] = hash_heads[bucket];
+        hash_heads[bucket] = slot + 1; /* 1-indexed so 0 = empty */
     }
 }
 
@@ -102,6 +120,7 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
 
     CANDIDATE_COMP candidates[MAX_CANDIDATES];
     uint32_t ncands = 0;
+    memset(cand_hash_chain, 0, sizeof(cand_hash_chain));
 
     /* 1. Mine Compositions & Transitivity: Path length 2 (A -> B -> C) */
     for (uint32_t i = 0; i < total_rel; i++)
@@ -135,7 +154,7 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
                 if (direct_ac[k]->object == c)
                 {
                     SYMBOL_ID head = direct_ac[k]->relation;
-                    RecordCandidate(candidates, &ncands, r1, r2, head, 1);
+                    RecordCandidate(candidates, &ncands, cand_hash_chain, r1, r2, head, 1);
                     confirmed_any = 1;
                 }
             }
@@ -143,7 +162,7 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
             /* If no edge (A -> C) exists at all, count as unconfirmed premise for (r1, r2) */
             if (!confirmed_any)
             {
-                RecordCandidate(candidates, &ncands, r1, r2, SYMBOL_INVALID, 0);
+                RecordCandidate(candidates, &ncands, cand_hash_chain, r1, r2, SYMBOL_INVALID, 0);
             }
         }
     }
@@ -176,6 +195,12 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
     }
 
     /* 2. Mine Inverses and Symmetry: (A -> B) vs (B -> A) */
+    /* Hash for symmetric rule dedup: r1 -> rule index (1-indexed, 0 = empty) */
+    #define SYM_HASH_SIZE 1024
+    #define SYM_HASH_MASK (SYM_HASH_SIZE - 1)
+    uint32_t sym_hash[SYM_HASH_SIZE];
+    memset(sym_hash, 0, sizeof(sym_hash));
+
     for (uint32_t i = 0; i < total_rel; i++)
     {
         const RELATION *rel = &graph->relations->items[i];
@@ -191,20 +216,18 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
         {
             if (rev[k]->object == a)
             {
-                /* Check if already added as symmetric */
-                int already = 0;
-                for (uint32_t r = 0; r < rb->num_rules; r++)
+                /* Check if already added as symmetric via hash */
+                uint32_t bucket = (uint32_t)((uint64_t)r1 * 2654435761u & SYM_HASH_MASK);
+                uint32_t existing = sym_hash[bucket];
+                if (existing > 0 && rb->rules[existing - 1].r1 == r1 &&
+                    rb->rules[existing - 1].type == RULE_TYPE_SYMMETRIC)
                 {
-                    if (rb->rules[r].type == RULE_TYPE_SYMMETRIC && rb->rules[r].r1 == r1)
-                    {
-                        rb->rules[r].support++;
-                        already = 1;
-                        break;
-                    }
+                    rb->rules[existing - 1].support++;
                 }
-                if (!already && rb->num_rules < MAX_MINED_RULES)
+                else if (rb->num_rules < MAX_MINED_RULES)
                 {
-                    GRAPH_RULE *r = &rb->rules[rb->num_rules++];
+                    uint32_t idx = rb->num_rules++;
+                    GRAPH_RULE *r = &rb->rules[idx];
                     r->type = RULE_TYPE_SYMMETRIC;
                     r->r1 = r1;
                     r->r2 = SYMBOL_INVALID;
@@ -213,10 +236,13 @@ uint32_t GraphMineRules(const GRAPH *graph, GRAPH_RULE_BASE *rb)
                     r->premises = 1;
                     r->confidence = 1.0f;
                     GraphRuleFormat(graph, r, r->name, sizeof(r->name));
+                    sym_hash[bucket] = idx + 1;
                 }
             }
         }
     }
+    #undef SYM_HASH_SIZE
+    #undef SYM_HASH_MASK
 
     return rb->num_rules;
 }

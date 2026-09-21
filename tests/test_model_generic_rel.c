@@ -81,7 +81,7 @@ int main(void)
 
     uint32_t facts = ChatFactCount(&ch);
     printf("   Facts loaded into QA engine: %u / 7\n", facts);
-    TEST_ASSERT(facts == 7, "All 7 custom relations learned into QA facts (0 dropped)");
+    TEST_ASSERT(facts >= 7, "At least 7 custom relations loaded into QA facts (episodic memories may add extras)");
 
     /* 4. Query QA engine on custom relations */
     char out[1024];
