@@ -1848,15 +1848,73 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
     }
     if (tool == NULL)
         return 0;
-    /* For edit without replacement text: dispatch write with a placeholder
-       line so the file actually gets content. */
+    /* For edit without replacement text: check if it's an append/add intent.
+       Append intents (anade, agrega, escribe, add, insert) dispatch bash >>;
+       generic edit intents (modifica, edita, cambia) dispatch read for inspection. */
     if (strcmp(tool, "edit") == 0 && !has_rep)
     {
-        strncpy(out->name, "write", sizeof(out->name) - 1);
-        snprintf(out->arguments, sizeof(out->arguments),
-                 "{\"filePath\":\"%s\",\"content\":\"Line added.\\n\"}",
-                 esc_file);
-        return 1;
+        char lq_lower[1024];
+        size_t qi = 0;
+        while (query[qi] != '\0' && qi < sizeof(lq_lower) - 1)
+        {
+            lq_lower[qi] = (char)tolower((unsigned char)query[qi]);
+            qi++;
+        }
+        lq_lower[qi] = '\0';
+        /* Check if it's an append/add intent */
+        if (strstr(lq_lower, "anade") == lq_lower || strstr(lq_lower, "añade") == lq_lower ||
+            strstr(lq_lower, "add ") == lq_lower ||
+            strstr(lq_lower, "agrega") == lq_lower ||
+            strstr(lq_lower, "escribe") == lq_lower || strstr(lq_lower, "write ") == lq_lower ||
+            strstr(lq_lower, "inserta") == lq_lower || strstr(lq_lower, "insert ") == lq_lower)
+        {
+            char bash_cmd[512];
+            const char *content = "Line added";
+            const char *p = NULL;
+            if (strstr(lq_lower, "escribe ") == lq_lower || strstr(lq_lower, "write ") == lq_lower)
+                p = query + 7;
+            else if (strstr(lq_lower, "anade ") == lq_lower || strstr(lq_lower, "add ") == lq_lower)
+                p = query + (lq_lower[0] == 'a' && lq_lower[1] == 'n' ? 5 : 4);
+            else if (strstr(lq_lower, "agrega ") == lq_lower)
+                p = query + 7;
+            else if (strstr(lq_lower, "inserta ") == lq_lower || strstr(lq_lower, "insert ") == lq_lower)
+                p = query + 8;
+            if (p)
+            {
+                while (*p == ' ') p++;
+                if (*p)
+                {
+                    const char *suffix;
+                    suffix = strstr(p, " a ");
+                    if (suffix == NULL) suffix = strstr(p, " to ");
+                    if (suffix == NULL) suffix = strstr(p, " en ");
+                    if (suffix == NULL) suffix = strstr(p, " in ");
+                    if (suffix != NULL)
+                    {
+                        static char content_buf[256];
+                        size_t clen = (size_t)(suffix - p);
+                        if (clen >= sizeof(content_buf)) clen = sizeof(content_buf) - 1;
+                        memcpy(content_buf, p, clen);
+                        content_buf[clen] = '\0';
+                        content = content_buf;
+                    }
+                    else
+                        content = p;
+                }
+            }
+            {
+                char esc_content[256];
+                JsonEscapeArg(content, esc_content, sizeof(esc_content));
+                strncpy(out->name, "bash", sizeof(out->name) - 1);
+                snprintf(bash_cmd, sizeof(bash_cmd),
+                         "echo '%s' >> %s", esc_content, esc_file);
+                snprintf(out->arguments, sizeof(out->arguments),
+                         "{\"command\":\"%s\"}", bash_cmd);
+            }
+            return 1;
+        }
+        /* Generic edit without replacement: dispatch read for inspection */
+        tool = has_read ? "read" : "edit";
     }
     strncpy(out->name, tool, sizeof(out->name) - 1);
     if (has_rep)
