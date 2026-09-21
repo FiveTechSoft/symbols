@@ -87,11 +87,27 @@ int main(void)
     ChatHandleToBuf(&ch, "que es un perro?", out, sizeof(out));
     printf("  [INFO] perro -> %s", out);
     check(strstr(out, "sentido comun") != NULL, "WHAT dog is commonsense");
-    check(strstr(out, "CANINE") != NULL || strstr(out, "Canine") != NULL ||
-          strstr(out, "MAMMAL") != NULL || strstr(out, "ANIMAL") != NULL ||
-          strstr(out, "canine") != NULL || strstr(out, "mammal") != NULL ||
+    check(strstr(out, "IS_A") == NULL, "CS fact is realized, not dumped as IS_A");
+    check(strstr(out, "canine") != NULL || strstr(out, "mammal") != NULL ||
           strstr(out, "animal") != NULL,
           "dog describes as canine/mammal/animal");
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "es un perro un animal?", out, sizeof(out));
+    printf("  [INFO] perro animal -> %s", out);
+    check(strstr(out, "Si,") != NULL, "dog is an animal via IS_A closure");
+    check(strstr(out, "No tengo") == NULL, "dog-animal is not UNKNOWN");
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "es un perro un refrigerador?", out, sizeof(out));
+    check(strstr(out, "No tengo") != NULL, "dog is not a refrigerator");
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que es un pajaro?", out, sizeof(out));
+    printf("  [INFO] pajaro -> %s", out);
+    check(strstr(out, "fly") != NULL || strstr(out, "volar") != NULL ||
+          strstr(out, "puede") != NULL || strstr(out, "can ") != NULL,
+          "bird capability from commonsense");
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "para que sirve un cuchillo?", out, sizeof(out));
@@ -116,5 +132,5 @@ int main(void)
     ChatDestroy(&ch);
 
     printf("\n=== RESULTS %d passed, %d failed ===\n", g_pass, g_fail);
-    return (g_fail == 0 && g_pass >= 10) ? 0 : 1;
+    return (g_fail == 0 && g_pass >= 14) ? 0 : 1;
 }

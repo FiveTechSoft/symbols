@@ -910,7 +910,6 @@ static void ChatCsNormEntity(const CHAT *ch, const char *raw, char *out,
                              size_t out_sz)
 {
     const char *p;
-    const char *tr;
     char tmp[CHAT_TOKEN_MAX];
     if (out == NULL || out_sz == 0)
         return;
@@ -931,9 +930,17 @@ static void ChatCsNormEntity(const CHAT *ch, const char *raw, char *out,
     else if (strncmp(p, "an ", 3) == 0)
         p += 3;
     ChatNormTok(p, tmp, sizeof(tmp));
-    tr = (ch != NULL) ? DictTranslate(&ch->dict, tmp) : NULL;
-    strncpy(out, (tr && tr[0]) ? tr : tmp, out_sz - 1);
+    strncpy(out, tmp, out_sz - 1);
     out[out_sz - 1] = '\0';
+}
+
+static const char *ChatCsLookup(const CHAT *ch, const char *surface)
+{
+    const char *tr;
+    if (surface == NULL || surface[0] == '\0')
+        return surface;
+    tr = (ch != NULL) ? DictTranslate(&ch->dict, surface) : NULL;
+    return (tr != NULL && tr[0] != '\0') ? tr : surface;
 }
 
 static int ChatCsEdge(const GRAPH *g, const char *s, const char *rel,
@@ -954,29 +961,123 @@ static int ChatCsEdge(const GRAPH *g, const char *s, const char *rel,
 static int ChatCsWalk(const GRAPH *g, const char *s, const char *rel,
                       const char *dst, uint32_t max_hops)
 {
-    SYMBOL_ID cur, rid, goal;
-    uint32_t hops;
+    SYMBOL_ID q[24], vis[24];
+    uint8_t depth[24];
+    uint32_t nq = 0, nvis = 0, i, j, k;
+    SYMBOL_ID rid, goal, start;
     if (g == NULL || s == NULL || rel == NULL || dst == NULL)
         return 0;
     if (ChatCsEdge(g, s, rel, dst))
         return 1;
-    cur = SymbolFind(g->symbols, s);
+    start = SymbolFind(g->symbols, s);
     rid = SymbolFind(g->symbols, rel);
     goal = SymbolFind(g->symbols, dst);
-    if (cur == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
+    if (start == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
         goal == SYMBOL_INVALID)
         return 0;
-    for (hops = 0; hops < max_hops; hops++)
+    q[nq] = start;
+    depth[nq] = 0;
+    vis[nvis++] = start;
+    nq++;
+    for (i = 0; i < nq; i++)
     {
         RELATION *res[8];
-        uint32_t n = GraphQuerySubjectRelation(g, cur, rid, res, 8);
-        if (n == 0)
-            return 0;
-        if (res[0]->object == goal)
+        uint32_t n;
+        if (depth[i] >= max_hops)
+            continue;
+        n = GraphQuerySubjectRelation(g, q[i], rid, res, 8);
+        for (j = 0; j < n; j++)
+        {
+            SYMBOL_ID nxt = res[j]->object;
+            int seen = 0;
+            if (nxt == SYMBOL_INVALID)
+                continue;
+            if (nxt == goal)
+                return 1;
+            for (k = 0; k < nvis; k++)
+                if (vis[k] == nxt)
+                    seen = 1;
+            if (seen || nq >= 24)
+                continue;
+            vis[nvis++] = nxt;
+            q[nq] = nxt;
+            depth[nq] = (uint8_t)(depth[i] + 1);
+            nq++;
+        }
+    }
+    return 0;
+}
+
+static void ChatCsPretty(const char *name, char *out, size_t n)
+{
+    size_t i;
+    if (out == NULL || n == 0)
+        return;
+    out[0] = '\0';
+    if (name == NULL)
+        return;
+    for (i = 0; name[i] != '\0' && i + 1 < n; i++)
+        out[i] = (name[i] == '_') ? ' ' : (char)tolower((unsigned char)name[i]);
+    out[i] = '\0';
+}
+
+static int ChatCsRealize(int es, const char *ent, const char *rel,
+                         const char *obj, char *out, size_t n)
+{
+    char e[CHAT_TOKEN_MAX], o[CHAT_TOKEN_MAX];
+    if (out == NULL || n == 0 || rel == NULL)
+        return 0;
+    ChatCsPretty(ent, e, sizeof(e));
+    ChatCsPretty(obj, o, sizeof(o));
+    if (e[0] == '\0' || o[0] == '\0')
+        return 0;
+    if (strcmp(rel, "IS_A") == 0)
+        snprintf(out, n, es ? "Un %s es un %s (sentido comun).\n"
+                            : "A %s is a %s.\n", e, o);
+    else if (strcmp(rel, "USED_FOR") == 0)
+        snprintf(out, n, es ? "%s sirve para %s (sentido comun).\n"
+                            : "A %s is used to %s.\n", e, o);
+    else if (strcmp(rel, "CAPABLE_OF") == 0)
+        snprintf(out, n, es ? "%s puede %s (sentido comun).\n"
+                            : "A %s can %s.\n", e, o);
+    else if (strcmp(rel, "HAS_PROPERTY") == 0)
+        snprintf(out, n, es ? "%s es %s (sentido comun).\n"
+                            : "%s is %s.\n", e, o);
+    else if (strcmp(rel, "AT_LOCATION") == 0)
+        snprintf(out, n, es ? "%s esta en %s (sentido comun).\n"
+                            : "%s is in the %s.\n", e, o);
+    else if (strcmp(rel, "PART_OF") == 0)
+        snprintf(out, n, es ? "%s forma parte de %s (sentido comun).\n"
+                            : "%s is part of %s.\n", e, o);
+    else if (strcmp(rel, "MADE_OF") == 0)
+        snprintf(out, n, es ? "%s esta hecho de %s (sentido comun).\n"
+                            : "%s is made of %s.\n", e, o);
+    else if (strcmp(rel, "CAUSES") == 0)
+        snprintf(out, n, es ? "%s causa %s (sentido comun).\n"
+                            : "%s causes %s.\n", e, o);
+    else
+        snprintf(out, n, "%s %s %s.\n", e, rel, o);
+    if (out[0] >= 'a' && out[0] <= 'z')
+        out[0] = (char)(out[0] - 32);
+    return 1;
+}
+
+static int ChatLineIsSpanishToks(const char toks[][CHAT_TOKEN_MAX],
+                                 uint32_t n)
+{
+    uint32_t i;
+    if (toks == NULL)
+        return 0;
+    for (i = 0; i < n; i++)
+    {
+        const char *t = toks[i];
+        if (strcmp(t, "que") == 0 || strcmp(t, "quien") == 0 ||
+            strcmp(t, "donde") == 0 || strcmp(t, "para") == 0 ||
+            strcmp(t, "un") == 0 || strcmp(t, "una") == 0 ||
+            strcmp(t, "el") == 0 || strcmp(t, "la") == 0 ||
+            strcmp(t, "es") == 0 || strcmp(t, "esta") == 0 ||
+            strcmp(t, "sirve") == 0)
             return 1;
-        cur = res[0]->object;
-        if (cur == SYMBOL_INVALID)
-            return 0;
     }
     return 0;
 }
@@ -2071,7 +2172,8 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
             if (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY ||
                 whole.intent == INT_QA_CONSEQUENCE || whole.intent == INT_QA_AFFORDANCE ||
                 whole.intent == INT_QA_WHERE || whole.intent == INT_QA_WHAT ||
-                whole.intent == INT_QA_ENTITY || whole.intent == INT_QA_COUNT)
+                whole.intent == INT_QA_ENTITY || whole.intent == INT_QA_COUNT ||
+                whole.intent == INT_IS_PARENT || whole.intent == INT_REL_BOOL)
                 return EmitGoal(ch, toks, 0, n, -1, plan);
 
             /* If session has loaded text corpora and the whole line parses as
@@ -2864,6 +2966,49 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                     return 1;
                 }
             }
+        }
+    }
+
+    /* Copula + two content nouns, no relation kw: "es un perro un animal" */
+    if (kw_is >= 0 && kw_child < 0 && kw_parent < 0 && kw_grand < 0 &&
+        kw_desc < 0 && kwx < 0)
+    {
+        char n0[CHAT_TOKEN_MAX], n1[CHAT_TOKEN_MAX];
+        uint32_t got = 0;
+        uint32_t i;
+        n0[0] = '\0';
+        n1[0] = '\0';
+        for (i = (uint32_t)kw_is + 1; i < n; i++)
+        {
+            if (IsStopTok(toks[i]) || IsCopulaTok(toks[i]))
+                continue;
+            if (got == 0)
+            {
+                strncpy(n0, toks[i], CHAT_TOKEN_MAX - 1);
+                n0[CHAT_TOKEN_MAX - 1] = '\0';
+                got = 1;
+            }
+            else if (got == 1)
+            {
+                strncpy(n1, toks[i], CHAT_TOKEN_MAX - 1);
+                n1[CHAT_TOKEN_MAX - 1] = '\0';
+                got = 2;
+            }
+            else
+            {
+                got = 3;
+                break;
+            }
+        }
+        if (got == 2 && SlotOk(n0) && SlotOk(n1))
+        {
+            strncpy(p->a, n0, CHAT_TOKEN_MAX - 1);
+            p->a[CHAT_TOKEN_MAX - 1] = '\0';
+            strncpy(p->b, n1, CHAT_TOKEN_MAX - 1);
+            p->b[CHAT_TOKEN_MAX - 1] = '\0';
+            p->has_b = 1;
+            p->intent = INT_IS_PARENT;
+            return 1;
         }
     }
 
@@ -4066,16 +4211,11 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
     {
         RememberFocus2(ch, p->a, p->b);
         const char *stem = ChatFamStem(ch, "taxonomy");
-        if (stem == NULL)
-        {
-            EMIT("No entendi la pregunta.\n");
-            break;
-        }
         int yes = ChatDirect(ch, p->a, p->b);
         char mid[CHAT_TOKEN_MAX];
+        char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
         if (!yes)
             yes = ChatChain(ch, p->a, p->b, mid, sizeof(mid));
-        char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
         if (!yes)
             yes = ChatBfsPath(ch, p->a, p->b, path) > 0;
         if (!yes)
@@ -4084,13 +4224,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             char sa[CHAT_TOKEN_MAX], sb[CHAT_TOKEN_MAX];
             ChatCsNormEntity(ch, p->a, sa, sizeof(sa));
             ChatCsNormEntity(ch, p->b, sb, sizeof(sb));
-            yes = ChatCsWalk(cs, sa, "IS_A", sb, 6);
+            yes = ChatCsWalk(cs, ChatCsLookup(ch, sa), "IS_A",
+                             ChatCsLookup(ch, sb), 6) ||
+                  ChatCsWalk(cs, ChatCsLookup(ch, sa), "AT_LOCATION",
+                             ChatCsLookup(ch, sb), 6) ||
+                  ChatCsWalk(cs, ChatCsLookup(ch, sa), "PART_OF",
+                             ChatCsLookup(ch, sb), 6);
         }
-        if (yes)
+        if (yes && stem != NULL)
             EMIT_OK("Si, %s es %s de %s.\n", capA, stem, capB);
-        else
+        else if (yes)
+            EMIT_OK("Si, %s es un %s.\n", capA, capB);
+        else if (stem != NULL)
             EMIT("No tengo constancia de que %s sea %s de %s.\n", capA,
                    stem, capB);
+        else
+            EMIT("No tengo constancia de que %s sea un %s.\n", capA, capB);
         break;
     }
     case INT_GRANDPARENT:
@@ -4887,12 +5036,18 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 char sa[CHAT_TOKEN_MAX], sb[CHAT_TOKEN_MAX];
                 ChatCsNormEntity(ch, p->a, sa, sizeof(sa));
                 ChatCsNormEntity(ch, p->b, sb, sizeof(sb));
-                yes = ChatCsEdge(cs, sa, "IS_A", sb) ||
-                      ChatCsWalk(cs, sa, "IS_A", sb, 6) ||
-                      ChatCsEdge(cs, sa, "AT_LOCATION", sb) ||
-                      ChatCsWalk(cs, sa, "AT_LOCATION", sb, 6) ||
-                      ChatCsWalk(cs, sa, "PART_OF", sb, 6) ||
-                      ChatCsEdge(cs, sa, fam, sb);
+                yes = ChatCsEdge(cs, ChatCsLookup(ch, sa), "IS_A",
+                                 ChatCsLookup(ch, sb)) ||
+                      ChatCsWalk(cs, ChatCsLookup(ch, sa), "IS_A",
+                                 ChatCsLookup(ch, sb), 6) ||
+                      ChatCsEdge(cs, ChatCsLookup(ch, sa), "AT_LOCATION",
+                                 ChatCsLookup(ch, sb)) ||
+                      ChatCsWalk(cs, ChatCsLookup(ch, sa), "AT_LOCATION",
+                                 ChatCsLookup(ch, sb), 6) ||
+                      ChatCsWalk(cs, ChatCsLookup(ch, sa), "PART_OF",
+                                 ChatCsLookup(ch, sb), 6) ||
+                      ChatCsEdge(cs, ChatCsLookup(ch, sa), fam,
+                                 ChatCsLookup(ch, sb));
             }
         }
         if (yes)
@@ -5165,14 +5320,18 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
             char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
             ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
-            if (cs != NULL && ChatCsDescribe(cs, ent, reln, sizeof(reln),
+            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
+                                             reln, sizeof(reln),
                                              objn, sizeof(objn)))
             {
-                char capO[CHAT_TOKEN_MAX];
-                Cap(objn, capO, sizeof(capO));
-                st = GOAL_ANSWER;
-                found = 1;
-                EMIT_OK("%s %s %s (sentido comun).\n", capE, reln, capO);
+                char line[512];
+                if (ChatCsRealize(ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    found = 1;
+                    EMIT_OK("%s", line);
+                }
             }
         }
 
@@ -5649,14 +5808,18 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
             char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
             ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
-            if (cs != NULL && ChatCsDescribe(cs, ent, reln, sizeof(reln),
+            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
+                                             reln, sizeof(reln),
                                              objn, sizeof(objn)))
             {
-                char capO[CHAT_TOKEN_MAX];
-                Cap(objn, capO, sizeof(capO));
-                st = GOAL_ANSWER;
-                found = 1;
-                EMIT_OK("%s %s %s (sentido comun).\n", capE, reln, capO);
+                char line[512];
+                if (ChatCsRealize(ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    found = 1;
+                    EMIT_OK("%s", line);
+                }
             }
         }
 
