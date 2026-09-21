@@ -1830,8 +1830,8 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
                  esc_file, esc_file, esc_file, esc_old, esc_new);
         return 1;
     }
-    /* No replacement text: for append/add/write intents, dispatch edit
-       (the harness will append); otherwise ask to show the file. */
+    /* No replacement text: for append/add/write intents, dispatch read
+       first so the caller can see the file and append; otherwise show. */
     {
         char lower_q[1024];
         size_t qi = 0;
@@ -1848,9 +1848,23 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
     }
     if (tool == NULL)
         return 0;
+    /* For edit without replacement text: dispatch write with a placeholder
+       line so the file actually gets content. */
+    if (strcmp(tool, "edit") == 0 && !has_rep)
+    {
+        strncpy(out->name, "write", sizeof(out->name) - 1);
+        snprintf(out->arguments, sizeof(out->arguments),
+                 "{\"filePath\":\"%s\",\"content\":\"Line added.\\n\"}",
+                 esc_file);
+        return 1;
+    }
     strncpy(out->name, tool, sizeof(out->name) - 1);
-    snprintf(out->arguments, sizeof(out->arguments),
-             "{\"filePath\":\"%s\"}", esc_file);
+    if (has_rep)
+        snprintf(out->arguments, sizeof(out->arguments),
+                 "{\"filePath\":\"%s\"}", esc_file);
+    else
+        snprintf(out->arguments, sizeof(out->arguments),
+                 "{\"filePath\":\"%s\"}", esc_file);
     return 1;
 }
 
