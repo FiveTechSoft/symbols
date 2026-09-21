@@ -159,6 +159,30 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsFileCreationTask("new feature in parser.c") == 0, "new feature in parser.c is not file creation");
     TEST_ASSERT(ServerIsFileCreationTask("make the makefile") == 0, "make makefile is not file creation");
     TEST_ASSERT(ServerIsFileCreationTask("crea una funcion en C") == 0, "crea una funcion is not file creation");
+    {
+        char path[260];
+        TEST_ASSERT(ServerExtractCreatePath("crea un fichero test.txt", path, sizeof(path)) == 1,
+                    "extract test.txt");
+        TEST_ASSERT(strcmp(path, "test.txt") == 0, "create path is test.txt");
+        TEST_ASSERT(ServerExtractCreatePath("crea un fichero notas", path, sizeof(path)) == 1,
+                    "extract notas without extension");
+        TEST_ASSERT(strcmp(path, "notas.txt") == 0, "bare name becomes notas.txt");
+        TEST_ASSERT(ServerExtractCreatePath("crea un fichero chat", path, sizeof(path)) == 1,
+                    "extract chat");
+        TEST_ASSERT(strcmp(path, "chat.txt") == 0, "chat is chat.txt not src/chat.c");
+        TEST_ASSERT(strstr(path, "CMakeLists") == NULL, "does not fall back to CMakeLists.txt");
+        TEST_ASSERT(ServerExtractCreatePath("crea archivo config.json", path, sizeof(path)) == 1,
+                    "extract config.json");
+        TEST_ASSERT(strcmp(path, "config.json") == 0, "json name kept");
+        TEST_ASSERT(ServerExtractCreatePath("crea un fichero django", path, sizeof(path)) == 1,
+                    "extract django as file not folder");
+        TEST_ASSERT(strcmp(path, "django.txt") == 0, "django.txt not django/");
+        TEST_ASSERT(strchr(path, '/') == NULL && strchr(path, '\\') == NULL,
+                    "create path is a file not a directory");
+        TEST_ASSERT(ServerExtractCreatePath("crea un fichero", path, sizeof(path)) == 1,
+                    "nameless create");
+        TEST_ASSERT(strcmp(path, "nuevo.txt") == 0, "default nuevo.txt");
+    }
     TEST_ASSERT(ServerIsCodeSynthesisTask("crea una funcion en C") == 1, "crea una funcion en C is synthesis");
 
     /* Code synthesis tasks */
@@ -463,6 +487,78 @@ static void test_discrimination_battery(void)
     }
 }
 
+/* Shell commands: engine picks bash/execute_command; harness runs them. */
+static void test_shell_tool_dispatch(void)
+{
+    printf("\n=== Test 10: Shell tool dispatch (engine chooses, harness executes) ===\n");
+    const char *cmds[] = {
+        "cmake --build .",
+        "ctest --output-on-failure",
+        "gcc -Wall -Wextra main.c -o main",
+        "git status",
+        "git diff --stat",
+        "ls -la",
+        "pwd",
+        "echo hello",
+        "mkdir tmp_shell_test",
+        "python --version",
+        "powershell Get-ChildItem",
+        "run ctest",
+        "ejecuta cmake --build build-gcc"
+    };
+    char bash_only[][64] = { "bash", "read", "write" };
+    char exec_only[][64] = { "execute_command", "read" };
+    char glob_bash[][64] = { "glob", "bash", "read" };
+    size_t i;
+
+    for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++)
+    {
+        OPENAI_TOOL_CALL tc;
+        char msg[192];
+        TEST_ASSERT(ServerIsShellTask(cmds[i]) == 1, cmds[i]);
+        TEST_ASSERT(ServerIsCodeSynthesisTask(cmds[i]) == 0, "shell is not code synthesis");
+        TEST_ASSERT(ServerMapShellToolCall(cmds[i], bash_only, 3, &tc) == 1,
+                    "maps with bash declared");
+        TEST_ASSERT(strcmp(tc.name, "bash") == 0, "prefers bash when declared");
+        TEST_ASSERT(strstr(tc.arguments, "\"command\"") != NULL, "arguments have command");
+        TEST_ASSERT(strstr(tc.arguments, cmds[i]) != NULL ||
+                    strstr(tc.arguments, "ctest") != NULL ||
+                    strstr(tc.arguments, "cmake") != NULL,
+                    "command text is in arguments");
+        TEST_ASSERT(strstr(tc.arguments, "PASSED") == NULL, "engine did not run the command");
+        TEST_ASSERT(ServerMapShellToolCall(cmds[i], exec_only, 2, &tc) == 1,
+                    "maps with execute_command");
+        TEST_ASSERT(strcmp(tc.name, "execute_command") == 0, "falls back to execute_command");
+        snprintf(msg, sizeof(msg), "shell task: %s", cmds[i]);
+        (void)msg;
+    }
+
+    TEST_ASSERT(ServerIsShellTask("dir *.*") == 1, "dir *.* is a shell-shaped listing");
+    {
+        OPENAI_TOOL_CALL tc;
+        TEST_ASSERT(ServerMapShellToolCall("dir *.*", glob_bash, 3, &tc) == 1,
+                    "dir *.* still mappable to bash");
+        TEST_ASSERT(strcmp(tc.name, "bash") == 0, "mapper prefers bash over glob");
+    }
+
+    TEST_ASSERT(ServerIsShellTask("quien es el padre de David?") == 0,
+                "factual QA is not a shell task");
+    TEST_ASSERT(ServerIsShellTask("escribe en C la funcion de fibonacci") == 0,
+                "code synthesis is not a shell task");
+    TEST_ASSERT(ServerIsShellTask("crea un fichero test.txt") == 0,
+                "file creation is not a shell task");
+    TEST_ASSERT(ServerIsShellTask("fix the leak in parser.c") == 0,
+                "repair task is not a one-shot shell command");
+    TEST_ASSERT(ServerIsShellTask("what happens if a glass falls") == 0,
+                "commonsense QA is not a shell task");
+    {
+        char none[][64] = { "read", "write", "glob" };
+        OPENAI_TOOL_CALL tc;
+        TEST_ASSERT(ServerMapShellToolCall("git status", none, 3, &tc) == 0,
+                    "no mapping without bash/execute_command");
+    }
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -478,6 +574,7 @@ int main(void)
     test_binary_model_support();
     test_last_role_extraction();
     test_discrimination_battery();
+    test_shell_tool_dispatch();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

@@ -368,6 +368,11 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
 
     if (strcmp(op->name, "create_file") == 0)
     {
+        char created[260];
+        if (ServerExtractCreatePath(issue, created, sizeof(created)))
+            target_file = created;
+        else
+            target_file = "nuevo.txt";
         if (HasDeclaredTool(sess, "write"))
         {
             strncpy(out_tc->calls[0].name, "write", sizeof(out_tc->calls[0].name) - 1);
@@ -898,8 +903,11 @@ static void HandleCompletions(socket_t s, const char *body,
             {
                 if (ServerIsFileCreationTask(sess->current_issue))
                 {
-                    const char *target_file = FindFileForIssue(sess->current_issue);
-                    if (!target_file) target_file = "archivo";
+                    char created[260];
+                    const char *target_file = "nuevo.txt";
+                    if (ServerExtractCreatePath(sess->current_issue, created,
+                                                sizeof(created)))
+                        target_file = created;
                     snprintf(content, sizeof(content),
                              "### Archivo Creado con Exito ('%s')\n\n"
                              "Se ha creado el archivo `%s` en el espacio de trabajo.\n"
@@ -1164,6 +1172,58 @@ static void HandleCompletions(socket_t s, const char *body,
 
     int is_coding = ServerIsCodingTask(query);
 
+    /* Literal shell/CLI: emit one tool_call; the client harness executes it. */
+    if (sess->declared_tools_count > 0 && ServerIsShellTask(query))
+    {
+        int has_glob = HasDeclaredTool(sess, "glob");
+        int glob_ok = has_glob && (strchr(query, '*') != NULL);
+        if (!glob_ok && has_glob)
+        {
+            const char *p = query;
+            char tok[16];
+            size_t n = 0;
+            while (*p == ' ' || *p == '\t')
+                p++;
+            while (*p && *p != ' ' && *p != '\t' && n + 1 < sizeof(tok))
+                tok[n++] = (char)tolower((unsigned char)*p++);
+            tok[n] = '\0';
+            if ((strcmp(tok, "dir") == 0 || strcmp(tok, "ls") == 0) &&
+                strstr(query, " -") == NULL)
+                glob_ok = 1;
+        }
+        if (!glob_ok)
+        {
+            OPENAI_TOOL_CALLS tc;
+            memset(&tc, 0, sizeof(tc));
+            if (ServerMapShellToolCall(query, sess->declared_tools,
+                                       (uint32_t)sess->declared_tools_count,
+                                       &tc.calls[0]))
+            {
+                tc.count = 1;
+                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id),
+                         "call_sym_%lu", ++g_seq);
+                strncpy(sess->last_tool_call_name, tc.calls[0].name,
+                        sizeof(sess->last_tool_call_name) - 1);
+                if (ServerWantsStream(body))
+                {
+                    char sse_local[16384];
+                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID,
+                        (long)time(NULL), g_seq, &tc, sse_local, sizeof(sse_local));
+                    SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+                }
+                else
+                {
+                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                        g_seq, &tc,
+                        "Dispatching shell command to the client harness.",
+                        resp, sizeof(resp));
+                    SendJson(s, 200, "OK", resp);
+                }
+                return;
+            }
+        }
+    }
+
     /* Direct C code synthesis queries: respond with generated C code in markdown directly */
     if (ServerIsCodeSynthesisTask(query) && !ServerIsFileCreationTask(query))
     {
@@ -1275,8 +1335,10 @@ static void HandleCompletions(socket_t s, const char *body,
         int is_creation = ServerIsFileCreationTask(query);
         if (is_creation)
         {
-            const char *target_file = FindFileForIssue(query);
-            if (!target_file) target_file = "archivo";
+            char created[260];
+            const char *target_file = "nuevo.txt";
+            if (ServerExtractCreatePath(query, created, sizeof(created)))
+                target_file = created;
             snprintf(content, sizeof(content),
                      "### Solicitud de Creacion de Archivo ('%s')\n\n"
                      "Para crear '%s' directamente en el espacio de trabajo, habilita las herramientas de agente (tools) en tu cliente OpenCode.",

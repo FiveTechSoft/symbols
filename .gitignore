@@ -26,6 +26,14 @@ out/
 shard_*.tsv
 
 
+# SWE-bench harness leftover workspace trees
+/django/
+/flask/
+/sklearn/
+/sympy/
+/trap/
+/src/_pytest/
+
 # Test scratch files generated at repo root
 test_corpus.tsv
 test_*.txt

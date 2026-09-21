@@ -124,6 +124,15 @@ int ServerBuildToolCallStreamResponse(const char *model, long created,
 /* Classify whether a prompt represents a coding/software engineering task */
 int ServerIsCodingTask(const char *text);
 
+/* 1 when the prompt is a literal shell/CLI command (cmake, gcc, git, ls…).
+   The engine must emit a tool_call; the harness runs it. */
+int ServerIsShellTask(const char *text);
+
+/* Map a shell prompt to bash or execute_command among declared tools.
+   Fills out (name + arguments JSON). Returns 1 if a shell tool is available. */
+int ServerMapShellToolCall(const char *query, const char names[][64],
+                           uint32_t nnames, OPENAI_TOOL_CALL *out);
+
 /* Classify whether a prompt represents a read-only code/workspace inspection task */
 int ServerIsInspectionTask(const char *text);
 
@@ -132,6 +141,11 @@ int ServerIsCodeSynthesisTask(const char *text);
 
 /* Classify whether a prompt asks to create a new file in the workspace */
 int ServerIsFileCreationTask(const char *text);
+
+/* Filename for a create-file prompt. Never a directory, never CMakeLists.txt
+   unless the user named it. Adds .txt when the user omitted an extension.
+   Returns 1 and writes out on success. */
+int ServerExtractCreatePath(const char *text, char *out, size_t n);
 
 /* Emit a canned C11 sample for a classified synthesis prompt.
    out is always NUL-terminated when out_sz > 0. */

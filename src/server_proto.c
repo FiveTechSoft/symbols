@@ -1322,6 +1322,105 @@ int ServerIsFileCreationTask(const char *text)
     return (has_verb && has_noun);
 }
 
+int ServerExtractCreatePath(const char *text, char *out, size_t n)
+{
+    static const char *skip[] = {
+        "crea", "crear", "create", "touch", "haz", "hacer", "make",
+        "un", "una", "el", "la", "los", "las", "the", "a", "an",
+        "new", "nuevo", "nueva", "fichero", "archivo", "file", "files",
+        "llamado", "llamada", "named", "called", "por", "favor", "please",
+        "me", "con", "contenido", "vacio", "vacia", "empty", "en", "in",
+        "carpeta", "directorio", "folder", "directory", "dir", "workspace",
+        "repo", "repositorio", "proyecto", "project", "src", "include",
+        "tests", "docs", "data", "build"
+    };
+    static const char *exts[] = {
+        ".c", ".h", ".cpp", ".hpp", ".py", ".ts", ".js", ".md", ".txt",
+        ".json", ".yml", ".yaml", ".toml", ".sh", ".bat", ".ps1", ".csv",
+        ".ini", ".cfg", ".xml", ".html", ".css", ".rs", ".go", ".java"
+    };
+    char buf[512];
+    char best_ext[260];
+    char best_bare[260];
+    char *tok;
+    size_t i;
+    if (text == NULL || out == NULL || n < 2)
+        return 0;
+    strncpy(buf, text, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    best_ext[0] = '\0';
+    best_bare[0] = '\0';
+    tok = strtok(buf, " \t\r\n,;:\"'()<>{}`¿?");
+    while (tok)
+    {
+        size_t tlen = strlen(tok);
+        int skipped = 0;
+        const char *dot;
+        while (tlen > 0 && (tok[tlen - 1] == '.' || tok[tlen - 1] == ',' ||
+                            tok[tlen - 1] == '!' || tok[tlen - 1] == ')'))
+            tok[--tlen] = '\0';
+        for (i = 0; i < sizeof(skip) / sizeof(skip[0]); i++)
+        {
+            if (strcmp(tok, skip[i]) == 0)
+            {
+                skipped = 1;
+                break;
+            }
+        }
+        if (!skipped && tlen > 0)
+        {
+            dot = strrchr(tok, '.');
+            if (dot && dot != tok)
+            {
+                int ok_ext = 0;
+                for (i = 0; i < sizeof(exts) / sizeof(exts[0]); i++)
+                {
+                    if (strcmp(dot, exts[i]) == 0)
+                    {
+                        ok_ext = 1;
+                        break;
+                    }
+                }
+                if (ok_ext)
+                {
+                    strncpy(best_ext, tok, sizeof(best_ext) - 1);
+                    best_ext[sizeof(best_ext) - 1] = '\0';
+                }
+            }
+            else if (tlen < sizeof(best_bare) - 5)
+            {
+                int alnum = 1;
+                for (i = 0; i < tlen; i++)
+                {
+                    unsigned char c = (unsigned char)tok[i];
+                    if (!isalnum(c) && c != '_' && c != '-' && c != '/')
+                        alnum = 0;
+                }
+                if (alnum)
+                {
+                    strncpy(best_bare, tok, sizeof(best_bare) - 1);
+                    best_bare[sizeof(best_bare) - 1] = '\0';
+                }
+            }
+        }
+        tok = strtok(NULL, " \t\r\n,;:\"'()<>{}`¿?");
+    }
+    if (best_ext[0] != '\0')
+    {
+        strncpy(out, best_ext, n - 1);
+        out[n - 1] = '\0';
+        return 1;
+    }
+    if (best_bare[0] != '\0')
+    {
+        snprintf(out, n, "%s.txt", best_bare);
+        return 1;
+    }
+    strncpy(out, "nuevo.txt", n - 1);
+    out[n - 1] = '\0';
+    return 1;
+}
+
 static int LooksLikeDefinitionQuestion(const char *lower)
 {
     if (!lower)
@@ -1489,6 +1588,126 @@ static int MatchesAlgorithmKeyword(const char *text)
         tok = strtok(NULL, " \t\r\n,;\"'¿?.!():");
     }
     return 0;
+}
+
+int ServerIsShellTask(const char *text)
+{
+    static const char *cmds[] = {
+        "cmake", "gcc", "g++", "clang", "cl", "ctest", "git", "make",
+        "ninja", "cargo", "npm", "npx", "pip", "python", "py", "node",
+        "go", "rustc", "dotnet", "powershell", "pwsh", "cmd",
+        "dir", "ls", "pwd", "echo", "mkdir", "rmdir", "rm", "cp",
+        "mv", "curl", "wget", "tar", "zip", "unzip"
+    };
+    char tok[64];
+    size_t i = 0, t = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    if (ServerIsFileCreationTask(text))
+        return 0;
+    if (LooksLikeDefinitionQuestion(text))
+        return 0;
+    while (text[i] != '\0' && (text[i] == ' ' || text[i] == '\t'))
+        i++;
+    while (text[i] != '\0' && t + 1 < sizeof(tok) &&
+           text[i] != ' ' && text[i] != '\t')
+    {
+        tok[t++] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    tok[t] = '\0';
+    if (strcmp(tok, "run") == 0 || strcmp(tok, "ejecuta") == 0 ||
+        strcmp(tok, "ejecutar") == 0 || strcmp(tok, "corre") == 0)
+    {
+        t = 0;
+        while (text[i] != '\0' && (text[i] == ' ' || text[i] == '\t'))
+            i++;
+        while (text[i] != '\0' && t + 1 < sizeof(tok) &&
+               text[i] != ' ' && text[i] != '\t')
+        {
+            tok[t++] = (char)tolower((unsigned char)text[i]);
+            i++;
+        }
+        tok[t] = '\0';
+    }
+    if (tok[0] == '\0')
+        return 0;
+    for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++)
+    {
+        if (strcmp(tok, cmds[i]) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+int ServerMapShellToolCall(const char *query, const char names[][64],
+                           uint32_t nnames, OPENAI_TOOL_CALL *out)
+{
+    const char *tool = NULL;
+    uint32_t k;
+    char esc[SERVER_ARG_JSON_MAX];
+    size_t o = 0;
+    const char *p;
+    if (query == NULL || out == NULL)
+        return 0;
+    for (k = 0; k < nnames; k++)
+    {
+        if (strcmp(names[k], "bash") == 0)
+        {
+            tool = "bash";
+            break;
+        }
+    }
+    if (tool == NULL)
+    {
+        for (k = 0; k < nnames; k++)
+        {
+            if (strcmp(names[k], "execute_command") == 0)
+            {
+                tool = "execute_command";
+                break;
+            }
+        }
+    }
+    if (tool == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    strncpy(out->name, tool, sizeof(out->name) - 1);
+    strncpy(out->id, "call_shell_1", sizeof(out->id) - 1);
+    p = query;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    {
+        const char *q = p;
+        char lead[32];
+        size_t n = 0;
+        while (*q && *q != ' ' && *q != '\t' && n + 1 < sizeof(lead))
+            lead[n++] = (char)tolower((unsigned char)*q++);
+        lead[n] = '\0';
+        if (strcmp(lead, "run") == 0 || strcmp(lead, "ejecuta") == 0 ||
+            strcmp(lead, "ejecutar") == 0 || strcmp(lead, "corre") == 0)
+        {
+            while (*q == ' ' || *q == '\t')
+                q++;
+            p = q;
+        }
+    }
+    for (; *p != '\0' && o + 2 < sizeof(esc); p++)
+    {
+        if (*p == '\\' || *p == '"')
+        {
+            if (o + 3 >= sizeof(esc))
+                break;
+            esc[o++] = '\\';
+        }
+        if (*p == '\n' || *p == '\r')
+            continue;
+        esc[o++] = *p;
+    }
+    esc[o] = '\0';
+    snprintf(out->arguments, sizeof(out->arguments),
+             "{\"command\":\"%s\"}", esc);
+    return 1;
 }
 
 int ServerIsCodeSynthesisTask(const char *text)

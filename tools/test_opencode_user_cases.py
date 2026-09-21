@@ -63,7 +63,31 @@ def test_file_creation_flow():
     print(f"  [PASS] Summary message: {content2.splitlines()[0] if content2 else ''}")
     assert fr2 == "stop", f"Expected stop, got {fr2}"
     assert "test.txt" in content2, f"Expected 'test.txt' in summary, got: {content2}"
-    assert "creado" in content2.lower() or "creación" in content2.lower(), f"Expected created confirmation: {content2}"
+    assert "creado" in content2.lower() or "creación" in content2.lower() or "creacion" in content2.lower(), f"Expected created confirmation: {content2}"
+
+def test_create_file_not_folder():
+    print("\n--- Test 1b: 'crea un fichero notas' must be a file, not a folder ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "crea un fichero notas"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    assert fr == "tool_calls", f"Expected tool_calls, got {fr}"
+    tool_name = tc[0]["function"]["name"]
+    tool_args = json.loads(tc[0]["function"]["arguments"])
+    print(f"  [PASS] dispatched {tool_name} {tool_args}")
+    assert tool_name == "write", f"Expected write, got {tool_name}"
+    path = tool_args.get("filePath") or ""
+    assert path == "notas.txt", f"Expected notas.txt, got {path}"
+    assert not path.endswith("/") and "\\" not in path
+    assert "CMakeLists" not in path
+    assert "django" not in path and "flask" not in path
 
 def test_subfolder_inspection():
     print("\n--- Test 2: 'lista las subcarpetas' ---")
@@ -281,6 +305,38 @@ def test_greeting_natural():
     assert "hold" not in content.lower() and "behold" not in content.lower(), f"Unexpected bible text in greeting: {content}"
     assert any(g in content.lower() for g in ["hola", "saludos", "hello", "ayud"]), f"Expected greeting response: {content}"
 
+def test_shell_tool_calls():
+    print("\n--- Test shell: engine selects bash, harness would execute ---")
+    cases = [
+        ("cmake --build .", "cmake"),
+        ("ctest --output-on-failure", "ctest"),
+        ("git status", "git"),
+        ("ls -la", "ls"),
+        ("gcc -Wall main.c -o main", "gcc"),
+        ("python --version", "python"),
+        ("pwd", "pwd"),
+        ("echo hello-from-harness", "echo"),
+    ]
+    for cmd, needle in cases:
+        payload = {
+            "model": "symbols",
+            "tools": OPENCODE_TOOLS,
+            "messages": [{"role": "user", "content": cmd}],
+        }
+        res = query(payload)
+        choice = res["choices"][0]
+        fr = choice.get("finish_reason")
+        content = choice.get("message", {}).get("content") or ""
+        tc = choice.get("message", {}).get("tool_calls", [])
+        assert fr == "tool_calls", f"{cmd}: expected tool_calls, got {fr} content={content[:120]}"
+        assert len(tc) == 1, f"{cmd}: expected 1 tool call, got {len(tc)}"
+        name = tc[0]["function"]["name"]
+        args = json.loads(tc[0]["function"]["arguments"])
+        print(f"  [PASS] '{cmd}' -> {name} {args}")
+        assert name == "bash", f"{cmd}: expected bash, got {name}"
+        assert needle in args.get("command", ""), f"{cmd}: command missing {needle}: {args}"
+        assert "PASSED" not in content, f"{cmd}: engine must not execute the shell"
+
 def test_dir_wildcard_flow():
     print("\n--- Test 6: 'dir *.*' Wildcard Inspection Flow ---")
     payload = {
@@ -399,6 +455,7 @@ if __name__ == "__main__":
 
     try:
         test_file_creation_flow()
+        test_create_file_not_folder()
         test_subfolder_inspection()
         test_large_body_payload()
         test_fibonacci_synthesis()
@@ -410,6 +467,7 @@ if __name__ == "__main__":
         test_queue_synthesis()
         test_read_file_workspace_not_synthesis()
         test_greeting_natural()
+        test_shell_tool_calls()
         test_dir_wildcard_flow()
         test_dir_dot_flow()
         print("\n" + "=" * 60)
