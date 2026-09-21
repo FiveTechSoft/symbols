@@ -791,7 +791,8 @@ static void HandleCompletions(socket_t s, const char *body,
             }
         }
 
-        /* Pending append: read result arrived, now dispatch write with old+new */
+        /* Pending append: read result arrived, now append via bash.
+           Use PowerShell Add-Content for correct UTF-16 handling. */
         if (sess->pending_append && sess->last_tool_call_name[0] != '\0' &&
             (strcmp(tool_resp.name, "read") == 0 ||
              strcmp(sess->last_tool_call_name, "read") == 0))
@@ -800,43 +801,53 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             OPENAI_TOOL_CALLS tc;
             memset(&tc, 0, sizeof(tc));
-            /* Construct write: old content + newline + new content */
+            /* Use bash: powershell Add-Content handles UTF-16 correctly */
+            strncpy(tc.calls[0].name, "bash", sizeof(tc.calls[0].name) - 1);
             {
-                char write_content[16800];
-                const char *old = tool_resp.content;
-                const char *add = sess->pending_append_content;
-                if (old && old[0])
-                    snprintf(write_content, sizeof(write_content),
-                             "%s\n%s", old, add);
-                else
-                    snprintf(write_content, sizeof(write_content),
-                             "%s\n", add);
-                strncpy(tc.calls[0].name, "write", sizeof(tc.calls[0].name) - 1);
+                char ps_cmd[1024];
+                char esc_file[320];
+                ServerJsonEscape(sess->pending_append_file, esc_file, sizeof(esc_file));
+                /* Escape single quotes in content for PowerShell */
+                char safe_content[260];
+                const char *src = sess->pending_append_content;
+                size_t di = 0;
+                while (*src && di + 1 < sizeof(safe_content))
                 {
-                    char esc_file[320], esc_content[16600];
-                    ServerJsonEscape(sess->pending_append_file, esc_file, sizeof(esc_file));
-                    ServerJsonEscape(write_content, esc_content, sizeof(esc_content));
-                    snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
-                             "{\"filePath\":\"%s\",\"content\":\"%s\"}",
-                             esc_file, esc_content);
+                    if (*src == '\'')
+                    {
+                        if (di + 2 < sizeof(safe_content))
+                        {
+                            safe_content[di++] = '\'';
+                            safe_content[di++] = '\'';
+                        }
+                    }
+                    else
+                        safe_content[di++] = *src;
+                    src++;
                 }
-                tc.count = 1;
-                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
-                strncpy(sess->last_tool_call_name, "write", sizeof(sess->last_tool_call_name) - 1);
-                sess->had_edit = 1;
-                if (ServerWantsStream(body))
-                {
-                    char sse_local[16384];
-                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
-                        g_seq, &tc, sse_local, sizeof(sse_local));
-                    SendRaw(s, 200, "OK", "text/event-stream", sse_local);
-                }
-                else
-                {
-                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
-                        g_seq, &tc, "Appending content to file.", resp, sizeof(resp));
-                    SendJson(s, 200, "OK", resp);
-                }
+                safe_content[di] = '\0';
+                snprintf(ps_cmd, sizeof(ps_cmd),
+                         "powershell -Command \"Add-Content -Path '%s' -Value '%s'\"",
+                         esc_file, safe_content);
+                snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                         "{\"command\":\"%s\"}", ps_cmd);
+            }
+            tc.count = 1;
+            snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+            strncpy(sess->last_tool_call_name, "bash", sizeof(sess->last_tool_call_name) - 1);
+            sess->had_edit = 0;
+            if (ServerWantsStream(body))
+            {
+                char sse_local[16384];
+                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc, sse_local, sizeof(sse_local));
+                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+            }
+            else
+            {
+                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc, "Appending content to file.", resp, sizeof(resp));
+                SendJson(s, 200, "OK", resp);
             }
             return;
         }
@@ -1372,6 +1383,10 @@ static void HandleCompletions(socket_t s, const char *body,
         }
     }
 
+    /* Enclitic resolution and edit dispatch: ONLY for fresh user messages,
+       NOT for tool responses (which would re-trigger the same edit loop). */
+    if (!has_tool_resp)
+    {
     /* Enclitic resolution: if query has edit verb but no file,
        inject last_target (e.g. "añadele una linea" → "añadele una linea a test.txt") */
     if (!ServerIsEditTask(query) &&
@@ -1485,6 +1500,7 @@ static void HandleCompletions(socket_t s, const char *body,
             return;
         }
     }
+    } /* end !has_tool_resp guard */
 
     /* Direct C code synthesis queries: respond with generated C code in markdown directly */
     if (ServerIsCodeSynthesisTask(query) && !ServerIsFileCreationTask(query))
