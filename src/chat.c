@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
@@ -1021,14 +1022,30 @@ static void ChatCsPretty(const char *name, char *out, size_t n)
     out[i] = '\0';
 }
 
-static int ChatCsRealize(int es, const char *ent, const char *rel,
-                         const char *obj, char *out, size_t n)
+static void ChatCsPrettyLang(const CHAT *ch, int es, const char *name,
+                             char *out, size_t n)
+{
+    const char *loc;
+    ChatCsPretty(name, out, n);
+    if (!es || ch == NULL || name == NULL)
+        return;
+    loc = DictReverse(&ch->dict, name);
+    if (loc != NULL && loc[0] != '\0')
+    {
+        strncpy(out, loc, n - 1);
+        out[n - 1] = '\0';
+    }
+}
+
+static int ChatCsRealize(const CHAT *ch, int es, const char *ent,
+                         const char *rel, const char *obj, char *out,
+                         size_t n)
 {
     char e[CHAT_TOKEN_MAX], o[CHAT_TOKEN_MAX];
     if (out == NULL || n == 0 || rel == NULL)
         return 0;
-    ChatCsPretty(ent, e, sizeof(e));
-    ChatCsPretty(obj, o, sizeof(o));
+    ChatCsPrettyLang(ch, es, ent, e, sizeof(e));
+    ChatCsPrettyLang(ch, es, obj, o, sizeof(o));
     if (e[0] == '\0' || o[0] == '\0')
         return 0;
     if (strcmp(rel, "IS_A") == 0)
@@ -1057,6 +1074,41 @@ static int ChatCsRealize(int es, const char *ent, const char *rel,
                             : "%s causes %s.\n", e, o);
     else
         snprintf(out, n, "%s %s %s.\n", e, rel, o);
+    if (out[0] >= 'a' && out[0] <= 'z')
+        out[0] = (char)(out[0] - 32);
+    return 1;
+}
+
+static int ChatCsRealizePath(const CHAT *ch, int es,
+                             const CS_INFERENCE_PATH *path,
+                             char *out, size_t n)
+{
+    char a[64], b[64], c[64], d[64];
+    if (ch == NULL || path == NULL || out == NULL || n == 0 ||
+        path->hop_count == 0)
+        return 0;
+    ChatCsPrettyLang(ch, es, path->hops_subject[0], a, sizeof(a));
+    ChatCsPrettyLang(ch, es, path->hops_object[0], b, sizeof(b));
+    if (path->hop_count == 1)
+        snprintf(out, n, es ? "%s esta en %s.\n" : "%s is in the %s.\n",
+                 a, b);
+    else if (path->hop_count == 2)
+    {
+        ChatCsPrettyLang(ch, es, path->hops_object[1], c, sizeof(c));
+        snprintf(out, n,
+                 es ? "%s esta en %s, en %s.\n"
+                    : "%s is in the %s, located in the %s.\n",
+                 a, b, c);
+    }
+    else
+    {
+        ChatCsPrettyLang(ch, es, path->hops_object[1], c, sizeof(c));
+        ChatCsPrettyLang(ch, es, path->hops_object[2], d, sizeof(d));
+        snprintf(out, n,
+                 es ? "%s esta en %s, en %s, parte de %s.\n"
+                    : "%s is in the %s, located in the %s, part of the %s.\n",
+                 a, b, c, d);
+    }
     if (out[0] >= 'a' && out[0] <= 'z')
         out[0] = (char)(out[0] - 32);
     return 1;
@@ -5051,7 +5103,18 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
         if (yes)
-            EMIT_OK("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
+        {
+            if (strcmp(fam, "in") == 0 || strcmp(kw->es_stem, "in") == 0)
+            {
+                char locb[CHAT_TOKEN_MAX];
+                ChatCsPrettyLang(ch, 1, p->b, locb, sizeof(locb));
+                if (locb[0] >= 'a' && locb[0] <= 'z')
+                    locb[0] = (char)(locb[0] - 32);
+                EMIT_OK("Si, %s esta en %s.\n", capA, locb[0] ? locb : capB);
+            }
+            else
+                EMIT_OK("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
+        }
         else
             EMIT("No tengo constancia de que %s %s de %s.\n", capA,
                    kw->es_stem, capB);
@@ -5325,7 +5388,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                                              objn, sizeof(objn)))
             {
                 char line[512];
-                if (ChatCsRealize(ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
                                   line, sizeof(line)))
                 {
                     st = GOAL_ANSWER;
@@ -5547,8 +5610,13 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             char cs_out[256];
             if (CommonsenseQueryLocation(cs, ent, &cs_path, cs_out, sizeof(cs_out)))
             {
+                char loc[512];
+                int es = ChatLineIsSpanishToks(p->toks, p->ntoks);
                 st = GOAL_ANSWER;
-                EMIT_OK("%s\n", cs_out);
+                if (es && ChatCsRealizePath(ch, 1, &cs_path, loc, sizeof(loc)))
+                    EMIT_OK("%s", loc);
+                else
+                    EMIT_OK("%s\n", cs_out);
                 break;
             }
         }
@@ -5813,7 +5881,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                                              objn, sizeof(objn)))
             {
                 char line[512];
-                if (ChatCsRealize(ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
                                   line, sizeof(line)))
                 {
                     st = GOAL_ANSWER;
@@ -5966,7 +6034,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         if (cs != NULL)
         {
             char cs_out[256];
+            char reln[64], objn[CHAT_TOKEN_MAX];
             const char *rel = p->b[0] ? p->b : "USED_FOR";
+            if (ChatLineIsSpanishToks(p->toks, p->ntoks) &&
+                ChatCsDescribe(cs, ent, reln, sizeof(reln), objn,
+                               sizeof(objn)))
+            {
+                char line[512], disp[CHAT_TOKEN_MAX];
+                ChatCsNormEntity(ch, p->a, disp, sizeof(disp));
+                if (ChatCsRealize(ch, 1, disp[0] ? disp : ent, reln, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("%s", line);
+                    break;
+                }
+            }
             if (CommonsenseQueryAffordance(cs, ent, rel, cs_out, sizeof(cs_out)))
             {
                 st = GOAL_ANSWER;

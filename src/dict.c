@@ -116,6 +116,19 @@ const char *DictTranslate(const DICT *dict, const char *entity)
     return NULL;
 }
 
+const char *DictReverse(const DICT *dict, const char *canonical)
+{
+    uint32_t i;
+    if (dict == NULL || canonical == NULL || canonical[0] == '\0')
+        return NULL;
+    for (i = 0; i < dict->count; i++)
+    {
+        if (strieq(dict->entries[i].canonical, canonical))
+            return dict->entries[i].alias;
+    }
+    return NULL;
+}
+
 int DictLooksForeign(const char *entity)
 {
     const char *p;

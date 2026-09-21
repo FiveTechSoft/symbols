@@ -37,6 +37,9 @@ uint32_t DictLoad(DICT *dict, const char *filepath);
    NULL if no translation exists. */
 const char *DictTranslate(const DICT *dict, const char *entity);
 
+/* Inverse: canonical (corpus EN) -> first alias (typically ES). */
+const char *DictReverse(const DICT *dict, const char *canonical);
+
 /* Check if a string is likely non-English (contains accented chars,
    common Spanish suffixes, etc.). Used to decide when to try translation. */
 int DictLooksForeign(const char *entity);

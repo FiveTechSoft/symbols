@@ -61,6 +61,7 @@ int main(void)
     printf("  [INFO] toledo in europe -> %s", out);
     check(strstr(out, "Si,") != NULL && strstr(out, "Toledo") != NULL,
           "deduced toledo in europe (not in KB, inferred by in o in => in)");
+    check(strstr(out, "esta en") != NULL, "location yes uses 'esta en', not 'in de'");
     check(strstr(out, "No tengo") == NULL,
           "deduction is a fact, not an abstention");
 
@@ -80,17 +81,20 @@ int main(void)
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "donde esta la leche?", out, sizeof(out));
     printf("  [INFO] leche -> %s", out);
-    check(strstr(out, "refrigerator") != NULL || strstr(out, "kitchen") != NULL,
+    check(strstr(out, "esta en") != NULL, "WHERE milk is Spanish");
+    check(strstr(out, "nevera") != NULL || strstr(out, "refrigerator") != NULL ||
+          strstr(out, "cocina") != NULL || strstr(out, "kitchen") != NULL,
           "WHERE milk uses commonsense, not bible");
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "que es un perro?", out, sizeof(out));
     printf("  [INFO] perro -> %s", out);
     check(strstr(out, "sentido comun") != NULL, "WHAT dog is commonsense");
+    check(strstr(out, "perro") != NULL, "Spanish query keeps perro, not dog");
     check(strstr(out, "IS_A") == NULL, "CS fact is realized, not dumped as IS_A");
-    check(strstr(out, "canine") != NULL || strstr(out, "mammal") != NULL ||
+    check(strstr(out, "canino") != NULL || strstr(out, "mamifero") != NULL ||
           strstr(out, "animal") != NULL,
-          "dog describes as canine/mammal/animal");
+          "dog describes in Spanish (canino/mamifero/animal)");
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "es un perro un animal?", out, sizeof(out));
@@ -105,15 +109,14 @@ int main(void)
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "que es un pajaro?", out, sizeof(out));
     printf("  [INFO] pajaro -> %s", out);
-    check(strstr(out, "fly") != NULL || strstr(out, "volar") != NULL ||
-          strstr(out, "puede") != NULL || strstr(out, "can ") != NULL,
-          "bird capability from commonsense");
+    check(strstr(out, "volar") != NULL || strstr(out, "puede") != NULL,
+          "bird capability in Spanish");
 
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "para que sirve un cuchillo?", out, sizeof(out));
     printf("  [INFO] cuchillo -> %s", out);
-    check(strstr(out, "cut") != NULL || strstr(out, "cort") != NULL,
-          "AFFORDANCE knife from commonsense");
+    check(strstr(out, "sirve") != NULL || strstr(out, "cort") != NULL,
+          "AFFORDANCE knife in Spanish");
 
     ChatDestroy(&ch);
 
@@ -132,5 +135,5 @@ int main(void)
     ChatDestroy(&ch);
 
     printf("\n=== RESULTS %d passed, %d failed ===\n", g_pass, g_fail);
-    return (g_fail == 0 && g_pass >= 14) ? 0 : 1;
+    return (g_fail == 0 && g_pass >= 16) ? 0 : 1;
 }
