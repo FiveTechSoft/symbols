@@ -1,0 +1,86 @@
+name: Apply validated patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Commit message
+        required: true
+        type: string
+      expected_head:
+        description: Expected master SHA before applying
+        required: true
+        type: string
+      patch:
+        description: Unified diff to apply
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-validated-patch-master
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Validate request and patch
+        env:
+          PATCH_INPUT: ${{ inputs.patch }}
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+          COMMIT_MESSAGE: ${{ inputs.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${COMMIT_MESSAGE//[[:space:]]/}" || { echo 'Commit message is empty'; exit 1; }
+          test "$EXPECTED_HEAD" = "$(git rev-parse HEAD)" || { echo 'master moved; refusing stale patch'; exit 1; }
+          test -n "${PATCH_INPUT//[[:space:]]/}" || { echo 'Patch is empty'; exit 1; }
+          printf '%s\n' "$PATCH_INPUT" > "$RUNNER_TEMP/change.patch"
+          grep -q '^diff --git a/.* b/.*$' "$RUNNER_TEMP/change.patch" || { echo 'Not a unified git diff'; exit 1; }
+          git apply --numstat "$RUNNER_TEMP/change.patch" > "$RUNNER_TEMP/numstat"
+          test -s "$RUNNER_TEMP/numstat" || { echo 'Patch changes no files'; exit 1; }
+          test "$(wc -l < "$RUNNER_TEMP/numstat")" -le 20 || { echo 'Patch changes more than 20 files'; exit 1; }
+          while IFS=$'\t' read -r added deleted path; do
+            case "$path" in
+              src/*|include/*|tests/*|tools/*|CMakeLists.txt) ;;
+              *) echo "Disallowed path: $path"; exit 1 ;;
+            esac
+          done < "$RUNNER_TEMP/numstat"
+          git apply --check "$RUNNER_TEMP/change.patch"
+
+      - name: Apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply "$RUNNER_TEMP/change.patch"
+          git diff --check
+          test -n "$(git status --porcelain)" || { echo 'Patch produced no changes'; exit 1; }
+
+      - name: Configure and build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Commit and update master
+        env:
+          COMMIT_MESSAGE: ${{ inputs.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src include tests tools CMakeLists.txt
+          git diff --cached --quiet && { echo 'Nothing to commit'; exit 1; }
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:master
