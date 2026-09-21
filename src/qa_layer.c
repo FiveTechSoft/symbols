@@ -18,7 +18,8 @@
 static int IsCopula(const char *tok)
 {
     return strcmp(tok, "es") == 0 || strcmp(tok, "era") == 0 ||
-           strcmp(tok, "fue") == 0 || strcmp(tok, "is") == 0 ||
+           strcmp(tok, "fue") == 0 || strcmp(tok, "son") == 0 ||
+           strcmp(tok, "is") == 0 ||
            strcmp(tok, "was") == 0 || strcmp(tok, "are") == 0;
 }
 
@@ -692,7 +693,15 @@ static int TextFindRaw(CHAT *ch, const char *entity,
             }
             if (!match)
                 continue;
-            /* Found substring — find which sentence contains it */
+            /* Word-boundary guard: a bare substring ("que" inside
+               "requested") is not an entity mention. Structural,
+               no vocabulary. */
+            if (pos > 0 && isalnum((unsigned char)tl->image[pos - 1]))
+                continue;
+            if (pos + elen < tl->imagelen &&
+                isalnum((unsigned char)tl->image[pos + elen]))
+                continue;
+            /* Found mention — find which sentence contains it */
             for (uint32_t s = 0; s < tl->nsent; s++)
             {
                 TL_SENT *st = &tl->sents[s];

@@ -35,6 +35,7 @@
 #include "commonsense.h"
 #include "persona.h"
 #include "ingest.h"
+#include "stem.h"
 
 
 #define CHAT_MAX_TOKS 16
@@ -5920,14 +5921,55 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
             if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
             {
-                char sent[2048];
-                if (TextLexSentenceText(&ch->tlex[bestf], best,
-                                        ch->tlex[bestf].image,
-                                        ch->tlex[bestf].imagelen, sent,
-                                        sizeof(sent)) > 0)
+                /* Fail-closed grounding: the winning sentence must
+                   contain at least one content token of the question
+                   (upper + stem lookup, same symbol space as the
+                   sentence ids). Otherwise a topic-less query
+                   ("que son los xyzq?") echoes the top-attention
+                   sentence. Structural, no vocabulary. */
+                int anchored = 0;
+                if (best < ch->tlex[bestf].nsent)
                 {
-                    st = GOAL_ANSWER;
-                    EMIT_OK("Segun el texto: %s\n", sent);
+                    TL_SENT *bst = &ch->tlex[bestf].sents[best];
+                    for (uint32_t ti = 0; ti < p->ntoks && !anchored; ti++)
+                    {
+                        char up[CHAT_TOKEN_MAX];
+                        uint32_t ui = 0;
+                        SYMBOL_ID qid;
+                        if (IsStopTok(p->toks[ti]) || IsCopulaTok(p->toks[ti]))
+                            continue;
+                        while (p->toks[ti][ui] != '\0' && ui < sizeof(up) - 1)
+                        {
+                            up[ui] = (char)toupper((unsigned char)p->toks[ti][ui]);
+                            ui++;
+                        }
+                        up[ui] = '\0';
+                        if (ui == 0)
+                            continue;
+                        qid = StemFindSymbol(ch->tgraph->symbols, up);
+                        if (qid == SYMBOL_INVALID)
+                            continue;
+                        for (uint32_t t = 0; t < bst->ntok; t++)
+                        {
+                            if (bst->ids[t] == qid)
+                            {
+                                anchored = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (anchored)
+                {
+                    char sent[2048];
+                    if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                            ch->tlex[bestf].image,
+                                            ch->tlex[bestf].imagelen, sent,
+                                            sizeof(sent)) > 0)
+                    {
+                        st = GOAL_ANSWER;
+                        EMIT_OK("Segun el texto: %s\n", sent);
+                    }
                 }
             }
         }

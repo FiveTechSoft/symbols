@@ -75,6 +75,19 @@ static int check_not(const char *a, const char *banned, const char *label,
     return !bad;
 }
 
+static int check_unknown(const char *a, const char *label, int *wrong)
+{
+    int unk = is_unknown(a);
+    printf("  [%s] %s\n", unk ? "PASS" : "WRONG", label);
+    if (!unk)
+    {
+        printf("    A: %.200s\n", a);
+        if (wrong)
+            (*wrong)++;
+    }
+    return unk;
+}
+
 int main(void)
 {
     CHAT ch;
@@ -168,6 +181,38 @@ int main(void)
     ChatHandleToBuf(&ch, "que es el ello?", out, sizeof(out));
     total++;
     passed += check_not(out, "Ibid", "WHAT: ello/id is not Ibid", &wrong);
+    ChatDestroy(&ch);
+
+    memset(&ch, 0, sizeof(ch));
+    printf("Loading c_corpus.txt...\n");
+    ChatInit(&ch, "data/c_lang/c_corpus.txt");
+
+    /* "que son los X": son is the plural copula, X is the entity.
+       arquetipos has no corpus sentence; the dict bridge grounds it
+       on prototype (same as quienes-path), never on heap. */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que son los arquetipos?", out, sizeof(out));
+    total++;
+    need[0] = "prototype"; need[1] = NULL;
+    passed += check_any("que son los arquetipos?", out, need,
+                        "PLURAL-COPULA: arquetipos grounded via dict", &wrong);
+    total++;
+    passed += check_not(out, "heap segment",
+                        "PLURAL-COPULA: arquetipos is not heap", &wrong);
+
+    /* nonce plural: zero overlap must abstain, not echo top-attention */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que son los xyzq?", out, sizeof(out));
+    total++;
+    passed += check_unknown(out, "PLURAL-COPULA: xyzq abstains", &wrong);
+
+    /* legit plural still answers (no over-abstention) */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que son los heap?", out, sizeof(out));
+    total++;
+    need[0] = "heap"; need[1] = NULL;
+    passed += check_any("que son los heap?", out, need,
+                        "PLURAL-COPULA: heap still answers", &wrong);
     ChatDestroy(&ch);
 
     printf("\n=== OPEN QA ===\nPassed: %d / %d\nWRONG: %d\n",
