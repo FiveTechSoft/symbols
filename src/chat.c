@@ -3406,7 +3406,18 @@ static int FindParentName(CHAT *ch, const char *entity,
                                         parent_size);
         }
         if (parent[0] != '\0')
+        {
+            char pn[CHAT_TOKEN_MAX];
+            char en[CHAT_TOKEN_MAX];
+            ChatNormTok(parent, pn, sizeof(pn));
+            ChatNormTok(entity, en, sizeof(en));
+            if (pn[0] == '\0' || IsStopTok(pn) || strcmp(pn, en) == 0)
+            {
+                parent[0] = '\0';
+                continue;
+            }
             return 1;
+        }
     }
     return 0;
 }
@@ -5187,6 +5198,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
     case INT_QA_CONSEQUENCE:
     {
         /* "what happens if X..." / "que pasa si X..." → physical causal consequence */
+        int found = 0;
         GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
         if (cs != NULL)
         {
@@ -5217,17 +5229,35 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 break;
             }
         }
-        EMIT("No tengo constancia de las consecuencias fisicas de esa accion.\n");
+        /* Named technical objects (malloc/free) are in the text store,
+           not the physical-consequence graph. Fail closed if neither hits. */
+        if (p->a[0] != '\0')
+            RAW_SEARCH(p->a);
+        if (!found && p->cc[0] != '\0')
+            RAW_SEARCH(p->cc);
+        if (!found)
+        {
+            uint32_t ti;
+            for (ti = 0; ti < p->ntoks && !found; ti++)
+            {
+                if (IsStopTok(p->toks[ti]))
+                    continue;
+                RAW_SEARCH(p->toks[ti]);
+            }
+        }
+        if (!found)
+            EMIT("No tengo constancia de las consecuencias fisicas de esa accion.\n");
         break;
     }
 
     case INT_QA_AFFORDANCE:
     {
+        int found = 0;
         GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+        const char *canon = DictTranslate(&ch->dict, p->a);
+        const char *ent = (canon && canon[0]) ? canon : p->a;
         if (cs != NULL)
         {
-            const char *canon = DictTranslate(&ch->dict, p->a);
-            const char *ent = canon ? canon : p->a;
             char cs_out[256];
             const char *rel = p->b[0] ? p->b : "USED_FOR";
             if (CommonsenseQueryAffordance(cs, ent, rel, cs_out, sizeof(cs_out)))
@@ -5237,7 +5267,12 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 break;
             }
         }
-        EMIT("No tengo constancia del uso de %s.\n", p->a);
+        if (ent != NULL && ent[0] != '\0')
+            RAW_SEARCH(ent);
+        if (!found && p->a[0] != '\0' && (ent == NULL || strcmp(ent, p->a) != 0))
+            RAW_SEARCH(p->a);
+        if (!found)
+            EMIT("No tengo constancia del uso de %s.\n", p->a);
         break;
     }
 
@@ -5312,6 +5347,66 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
     if (wh_pos >= n || entity_out == NULL || entity_size == 0)
         return INT_NONE;
     entity_out[0] = '\0';
+
+    /* Affordance before generic "… que …" WHY: "para que sirve X",
+       "what is X used for". Commonsense may still miss; the answer
+       path falls back to the loaded text store. */
+    if (n >= 4 &&
+        strcmp(toks[wh_pos], "para") == 0 &&
+        wh_pos + 2 < n &&
+        strcmp(toks[wh_pos + 1], "que") == 0 &&
+        (strcmp(toks[wh_pos + 2], "sirve") == 0 ||
+         strcmp(toks[wh_pos + 2], "sirven") == 0))
+    {
+        uint32_t start = wh_pos + 3;
+        size_t pos = 0;
+        while (start < n && IsStopTok(toks[start]))
+            start++;
+        for (i = start; i < n; i++)
+        {
+            if (i > start && pos + 1 < entity_size)
+                entity_out[pos++] = ' ';
+            {
+                size_t tl = strlen(toks[i]);
+                if (pos + tl >= entity_size)
+                    tl = entity_size - pos - 1;
+                memcpy(entity_out + pos, toks[i], tl);
+                pos += tl;
+            }
+        }
+        entity_out[pos] = '\0';
+        if (entity_out[0] != '\0')
+            return INT_QA_AFFORDANCE;
+    }
+    if (n >= 5 && strcmp(toks[wh_pos], "what") == 0 &&
+        strcmp(toks[n - 2], "used") == 0 &&
+        strcmp(toks[n - 1], "for") == 0)
+    {
+        uint32_t start = wh_pos + 1;
+        uint32_t end = n - 2;
+        size_t pos = 0;
+        if (start < end && (IsCopulaTok(toks[start]) ||
+                            strcmp(toks[start], "is") == 0 ||
+                            strcmp(toks[start], "are") == 0))
+            start++;
+        while (start < end && IsStopTok(toks[start]))
+            start++;
+        for (i = start; i < end; i++)
+        {
+            if (i > start && pos + 1 < entity_size)
+                entity_out[pos++] = ' ';
+            {
+                size_t tl = strlen(toks[i]);
+                if (pos + tl >= entity_size)
+                    tl = entity_size - pos - 1;
+                memcpy(entity_out + pos, toks[i], tl);
+                pos += tl;
+            }
+        }
+        entity_out[pos] = '\0';
+        if (entity_out[0] != '\0')
+            return INT_QA_AFFORDANCE;
+    }
 
     /* Pattern 1: <wh> [noun...] <copula/aux> <entity...> → ENTITY or WHAT
        "who is David" / "what is pipe flow" / "what sport did Afanasenkov play" /

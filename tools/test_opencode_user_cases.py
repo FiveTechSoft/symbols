@@ -147,6 +147,8 @@ def test_fibinacci_typo_synthesis():
     assert "fibonacci" in content.lower() or "fibinacci" in content.lower()
     assert "uint64_t" in content or "int" in content
     assert "```c" in content
+    assert "FAILED" not in content
+    assert "Verification Failed" not in content
 
 def test_quicksort_synthesis():
     print("\n--- Test 4c: 'quicksort en C' Synthesis ---")
@@ -189,6 +191,55 @@ def test_linked_list_synthesis():
     assert "node" in content.lower()
     assert "next" in content.lower()
     assert "```c" in content
+
+def test_qsort_synthesis():
+    print("\n--- Test 4f: 'ordenar con qsort en C' must emit qsort not Quicksort ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "ordenar con qsort en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    content = choice.get("message", {}).get("content", "")
+    assert fr == "stop"
+    assert "qsort(" in content
+    assert "Partition" not in content
+
+def test_queue_synthesis():
+    print("\n--- Test 4g: 'cola en C' must emit FIFO not a stack ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "cola en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    content = choice.get("message", {}).get("content", "")
+    assert choice.get("finish_reason") == "stop"
+    assert "Enqueue" in content and "Dequeue" in content
+    assert "StackPop" not in content
+
+def test_read_file_workspace_not_synthesis():
+    print("\n--- Test 4h: 'read file src/chat.c' stays inspection ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "read file src/chat.c"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    content = choice.get("message", {}).get("content", "") or ""
+    assert fr == "tool_calls", f"Expected tool_calls for workspace read, got {fr}"
+    assert "fopen" not in content.lower()
 
 def test_read_file_synthesis():
     print("\n--- Test 4e: 'leer archivo en C' Synthesis ---")
@@ -355,6 +406,9 @@ if __name__ == "__main__":
         test_quicksort_synthesis()
         test_linked_list_synthesis()
         test_read_file_synthesis()
+        test_qsort_synthesis()
+        test_queue_synthesis()
+        test_read_file_workspace_not_synthesis()
         test_greeting_natural()
         test_dir_wildcard_flow()
         test_dir_dot_flow()

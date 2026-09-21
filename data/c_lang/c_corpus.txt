@@ -125,6 +125,10 @@ A function pointer type signature specifies the return type and parameter types 
 Passing function pointers enables generic sorting algorithms and event-driven architectures.
 Recursion occurs when a function calls itself to solve a smaller instance of the same problem.
 Every recursive function requires a base case to terminate execution and prevent call stack overflow.
+Control flow in C uses if and else branches, switch case selection, and while, for, and do-while loops.
+The break statement exits the nearest enclosing loop or switch; continue skips to the next loop iteration.
+The switch statement selects a labeled case from an integer controlling expression and should include a default arm.
+Loop bounds must be checked against array capacity to prevent off-by-one reads and writes.
 
 # Section 8: Standard Input Output and File System Operations
 The stdio header provides stream-based input and output abstractions for terminal and file communication.

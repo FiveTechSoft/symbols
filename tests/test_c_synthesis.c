@@ -14,6 +14,7 @@
 #include "agent_diagnose.h"
 #include "agent_patch.h"
 #include "embedding.h"
+#include "chat.h"
 
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
@@ -310,6 +311,32 @@ static void test_closed_loop_c_abductive_repair(void)
     remove(exe_file);
 }
 
+static void test_c_corpus_chat_fallback(void)
+{
+    CHAT ch;
+    char out[2048];
+    printf("\n=== Test 5: Chat fallback from commonsense miss onto C corpus ===\n");
+    memset(&ch, 0, sizeof(ch));
+    ChatInit(&ch, "data/c_lang/c_corpus.txt");
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "para que sirve malloc?", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "malloc") != NULL, "'para que sirve malloc?' cites malloc");
+    TEST_ASSERT(strstr(out, "No tengo constancia de la razon") == NULL,
+                "malloc affordance is not misclassified as WHY");
+    TEST_ASSERT(strstr(out, "heap") != NULL || strstr(out, "allocat") != NULL ||
+                strstr(out, "free") != NULL,
+                "malloc answer mentions allocation/heap/free");
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que pasa si se llama free dos veces?", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "free") != NULL, "double-free question cites free");
+    TEST_ASSERT(strstr(out, "consecuencias fisicas") == NULL,
+                "double-free is not a physical-consequence abstention");
+
+    ChatDestroy(&ch);
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -320,6 +347,7 @@ int main(void)
     test_code_graph_c_stdlib();
     test_autonomous_c_synthesis_and_gcc_execution();
     test_closed_loop_c_abductive_repair();
+    test_c_corpus_chat_fallback();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

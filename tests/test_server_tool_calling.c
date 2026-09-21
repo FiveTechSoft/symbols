@@ -153,6 +153,13 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodingTask("crea un fichero test.txt") == 1, "Detects 'crea un fichero test.txt'");
     TEST_ASSERT(ServerIsInspectionTask("crea un fichero test.txt") == 0, "File creation is not read-only inspection");
     TEST_ASSERT(ServerIsCodeSynthesisTask("crea un fichero test.txt") == 0, "File creation is not pure code synthesis");
+    TEST_ASSERT(ServerIsFileCreationTask("crea un fichero test.txt") == 1, "crea un fichero is file creation");
+    TEST_ASSERT(ServerIsFileCreationTask("create file config.json") == 1, "create file is file creation");
+    TEST_ASSERT(ServerIsFileCreationTask("nuevo archivo notes.md") == 1, "nuevo archivo is file creation");
+    TEST_ASSERT(ServerIsFileCreationTask("new feature in parser.c") == 0, "new feature in parser.c is not file creation");
+    TEST_ASSERT(ServerIsFileCreationTask("make the makefile") == 0, "make makefile is not file creation");
+    TEST_ASSERT(ServerIsFileCreationTask("crea una funcion en C") == 0, "crea una funcion is not file creation");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("crea una funcion en C") == 1, "crea una funcion en C is synthesis");
 
     /* Code synthesis tasks */
     TEST_ASSERT(ServerIsCodingTask("escribe en C la funcion de fibonacci") == 1, "Detects 'escribe en C la funcion de fibonacci'");
@@ -171,6 +178,46 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodeSynthesisTask("leer archivo en C") == 1, "Classifies 'leer archivo en C' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("pila en C") == 1, "Classifies 'pila en C' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("ordenar con qsort en C") == 1, "Classifies 'ordenar con qsort en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("implementa una lista en C") == 1, "Classifies 'implementa una lista en C' as code synthesis");
+    TEST_ASSERT(ServerIsInspectionTask("implementa una lista en C") == 0, "List implementation is not workspace inspection");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("cola en C") == 1, "Classifies 'cola en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("mergesort en C") == 1, "Classifies 'mergesort en C' as code synthesis");
+
+    /* Workspace reads must not become canned fopen samples */
+    TEST_ASSERT(ServerIsCodeSynthesisTask("read file src/chat.c") == 0, "'read file src/chat.c' is not synthesis");
+    TEST_ASSERT(ServerIsInspectionTask("read file src/chat.c") == 1, "'read file src/chat.c' is inspection");
+    TEST_ASSERT(ServerIsInspectionTask("cat src/chat.c") == 1, "'cat src/chat.c' is inspection");
+    TEST_ASSERT(ServerIsInspectionTask("open src/main.c") == 1, "'open src/main.c' is inspection");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("cat src/chat.c") == 0, "'cat src/chat.c' is not synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("leer archivo src/chat.c") == 0, "'leer archivo src/chat.c' is not synthesis");
+    TEST_ASSERT(ServerIsInspectionTask("leer archivo src/chat.c") == 1, "'leer archivo src/chat.c' is inspection");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("fiber in C") == 0, "'fiber' is not Fibonacci synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("What is a FILE in C") == 0, "Definitional FILE question is not synthesis");
+
+    char synth[8192];
+    ServerSynthesizeCode("ordenar con qsort en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "qsort(") != NULL, "qsort prompt emits qsort(");
+    TEST_ASSERT(strstr(synth, "Partition") == NULL, "qsort prompt does not emit Quicksort Partition");
+    ServerSynthesizeCode("mergesort en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "Merge") != NULL, "mergesort prompt emits Merge");
+    TEST_ASSERT(strstr(synth, "Partition") == NULL, "mergesort prompt does not emit Quicksort Partition");
+    ServerSynthesizeCode("cola en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "Enqueue") != NULL, "cola prompt emits Enqueue");
+    TEST_ASSERT(strstr(synth, "Dequeue") != NULL, "cola prompt emits Dequeue");
+    TEST_ASSERT(strstr(synth, "StackPop") == NULL, "cola prompt does not emit a stack");
+    ServerSynthesizeCode("funcion fibinacci en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "fibonacci") != NULL, "fibinacci typo still emits fibonacci");
+    ServerSynthesizeCode("leer archivo en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "fopen") != NULL, "'leer archivo en C' emits fopen");
+    TEST_ASSERT(strstr(synth, "fgets") != NULL, "'leer archivo en C' emits fgets");
+    ServerSynthesizeCode("pila en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "StackPush") != NULL, "pila prompt emits StackPush");
+    TEST_ASSERT(strstr(synth, "Enqueue") == NULL, "pila prompt is not a queue");
+    ServerSynthesizeCode("array dinamico en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "VectorPush") != NULL, "vector prompt emits VectorPush");
+    ServerSynthesizeCode("invertir cadena en C", synth, sizeof(synth));
+    TEST_ASSERT(strstr(synth, "ReverseString") != NULL, "invertir prompt emits ReverseString");
+    TEST_ASSERT(strstr(synth, "strlen") != NULL, "invertir prompt has a real body");
 
     /* Conversational greetings and identity queries */
     TEST_ASSERT(ServerIsGreeting("hola") == 1, "Detects 'hola' as greeting");

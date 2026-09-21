@@ -130,6 +130,13 @@ int ServerIsInspectionTask(const char *text);
 /* Classify whether a prompt represents a direct code generation or synthesis task */
 int ServerIsCodeSynthesisTask(const char *text);
 
+/* Classify whether a prompt asks to create a new file in the workspace */
+int ServerIsFileCreationTask(const char *text);
+
+/* Emit a canned C11 sample for a classified synthesis prompt.
+   out is always NUL-terminated when out_sz > 0. */
+void ServerSynthesizeCode(const char *query, char *out, size_t out_sz);
+
 /* Classify whether a prompt represents a conversational greeting or identity question */
 int ServerIsGreeting(const char *text);
 

@@ -87,6 +87,27 @@ int main(void)
                     "El padre de Isaac es Abraham",
                     "1-hop: father of Isaac = Abraham (named)", &wrong);
 
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "quien es el padre de Abraham?", out, sizeof(out));
+    total++;
+    if (strstr(out, "Your") != NULL || strstr(out, "your") != NULL)
+    {
+        printf("  [WRONG] 1-hop: father of Abraham must not be a pronoun\n");
+        printf("    A: %s\n", out);
+        wrong++;
+    }
+    else if (strstr(out, "Terah") != NULL || strstr(out, "Tare") != NULL)
+    {
+        passed += check("quien es el padre de Abraham?", out, "Tera",
+                        "1-hop: father of Abraham = Terah (named)", &wrong);
+    }
+    else
+    {
+        passed += check_unk("quien es el padre de Abraham?", out,
+                            "1-hop: father of Abraham UNKNOWN (no unique named parent)",
+                            &wrong);
+    }
+
     /* begat Pattern C, named */
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el padre de Obed?", out, sizeof(out));
@@ -229,6 +250,6 @@ int main(void)
     printf("WRONG:    %d\n", wrong);
     printf("KB pairs (bible): %u\n", ch.kb.num_pairs);
 
-    /* named 1-hop + promote + 3-hop + taxonomy 2-hop. WRONG = 0. */
-    return (passed >= 16 && wrong == 0) ? 0 : 1;
+    /* named 1-hop + Abraham fail-closed + promote + 3-hop + taxonomy 2-hop. WRONG = 0. */
+    return (passed >= 17 && wrong == 0) ? 0 : 1;
 }

@@ -1218,6 +1218,126 @@ static int MatchWordBoundary(const char *text, const char *kw)
     return 0;
 }
 
+static int HasLangMarker(const char *lower)
+{
+    static const char *langs[] = {
+        "en c11", "in c11", "c code", "codigo c", "código c",
+        "lenguaje c", "c language", "en python", "in python",
+        "en javascript", "in javascript", "en typescript", "in typescript",
+        "en js", "in js", "en c", "in c"
+    };
+    if (!lower)
+        return 0;
+    for (size_t k = 0; k < sizeof(langs) / sizeof(langs[0]); k++)
+    {
+        size_t n = strlen(langs[k]);
+        const char *p = lower;
+        while ((p = strstr(p, langs[k])) != NULL)
+        {
+            char after = p[n];
+            int after_ok = (after == '\0' ||
+                            (!isalnum((unsigned char)after) && after != '_'));
+            int before_ok = (p == lower ||
+                             (!isalnum((unsigned char)*(p - 1)) && *(p - 1) != '_'));
+            if (before_ok && after_ok)
+                return 1;
+            p++;
+        }
+    }
+    return 0;
+}
+
+static int HasWorkspaceToken(const char *lower)
+{
+    static const char *ws[] = {
+        "folder", "directory", "carpeta", "directorio", "files",
+        "archivos", "ficheros", "workspace", "repo", "repository",
+        "repositorio", "subcarpetas", "subcarpeta", "subfolders",
+        "subdirectories", "subdirectorio", "codebase", "project",
+        "proyecto", "dir", "ls", "pwd", "tree"
+    };
+    if (!lower)
+        return 0;
+    for (size_t k = 0; k < sizeof(ws) / sizeof(ws[0]); k++)
+    {
+        if (MatchWordBoundary(lower, ws[k]))
+            return 1;
+    }
+    return (strchr(lower, '*') != NULL);
+}
+
+static int HasFilenameToken(const char *lower)
+{
+    const char *p;
+    if (!lower)
+        return 0;
+    p = lower;
+    while ((p = strchr(p, '.')) != NULL)
+    {
+        if (p != lower && isalnum((unsigned char)*(p - 1)) &&
+            p[1] != '\0' && isalnum((unsigned char)p[1]))
+            return 1;
+        p++;
+    }
+    return 0;
+}
+
+int ServerIsFileCreationTask(const char *text)
+{
+    char lower[1024];
+    size_t i = 0;
+    int has_verb = 0;
+    int has_noun = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    if (strchr(lower, '?') != NULL || strstr(lower, "\xC2\xBF") != NULL)
+        return 0;
+
+    if (MatchWordBoundary(lower, "crea") ||
+        MatchWordBoundary(lower, "crear") ||
+        MatchWordBoundary(lower, "create") ||
+        MatchWordBoundary(lower, "touch"))
+        has_verb = 1;
+    if (MatchWordBoundary(lower, "haz") || MatchWordBoundary(lower, "hacer"))
+        has_verb = 1;
+    if (strstr(lower, "nuevo archivo") != NULL ||
+        strstr(lower, "nuevo fichero") != NULL ||
+        strstr(lower, "new file") != NULL)
+        has_verb = 1;
+
+    if (MatchWordBoundary(lower, "fichero") ||
+        MatchWordBoundary(lower, "archivo") ||
+        MatchWordBoundary(lower, "file"))
+        has_noun = 1;
+    if (HasFilenameToken(lower))
+        has_noun = 1;
+
+    return (has_verb && has_noun);
+}
+
+static int LooksLikeDefinitionQuestion(const char *lower)
+{
+    if (!lower)
+        return 0;
+    if (strstr(lower, "what is a") != NULL ||
+        strstr(lower, "what is the") != NULL ||
+        strstr(lower, "que es un") != NULL ||
+        strstr(lower, "que es una") != NULL ||
+        strstr(lower, "qué es un") != NULL ||
+        strstr(lower, "qué es una") != NULL ||
+        strstr(lower, "que es el") != NULL ||
+        strstr(lower, "qué es el") != NULL)
+        return 1;
+    return 0;
+}
+
 int ServerIsInspectionTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
@@ -1242,6 +1362,30 @@ int ServerIsInspectionTask(const char *text)
     {
         if (MatchWordBoundary(lower, action_keywords[k]))
             return 0;
+    }
+
+    /* Implementation prompts ("lista en C") are not workspace listing.
+       Folder/glob tokens still win so "lista las subcarpetas" stays inspection. */
+    if (HasLangMarker(lower) && !HasWorkspaceToken(lower))
+        return 0;
+
+    /* Workspace reads without a language marker are inspection, not fopen samples. */
+    if (!HasLangMarker(lower))
+    {
+        if (MatchWordBoundary(lower, "read") &&
+            (MatchWordBoundary(lower, "file") ||
+             MatchWordBoundary(lower, "archivo") ||
+             MatchWordBoundary(lower, "fichero")))
+            return 1;
+        if (strstr(lower, "leer archivo") != NULL ||
+            strstr(lower, "leer fichero") != NULL)
+            return 1;
+        if (HasFilenameToken(lower) &&
+            (MatchWordBoundary(lower, "cat") ||
+             MatchWordBoundary(lower, "open") ||
+             MatchWordBoundary(lower, "type") ||
+             MatchWordBoundary(lower, "view")))
+            return 1;
     }
 
     /* Data structures are not workspace or filesystem inspections */
@@ -1310,14 +1454,23 @@ static int EditDistance(const char *s1, const char *s2)
 
 static int MatchesAlgorithmKeyword(const char *text)
 {
-    if (!text) return 0;
-    if (strstr(text, "fibonacci") != NULL || strstr(text, "fib") != NULL ||
-        strstr(text, "factorial") != NULL || strstr(text, "quicksort") != NULL ||
-        strstr(text, "mergesort") != NULL || strstr(text, "bubblesort") != NULL ||
-        strstr(text, "lista enlazada") != NULL || strstr(text, "linked list") != NULL ||
-        strstr(text, "array dinamico") != NULL || strstr(text, "dynamic array") != NULL ||
-        strstr(text, "leer archivo") != NULL || strstr(text, "leer fichero") != NULL ||
-        strstr(text, "read file") != NULL || strstr(text, "qsort") != NULL)
+    static const char *names[] = {
+        "fibonacci", "factorial", "quicksort", "mergesort", "bubblesort", "qsort"
+    };
+    if (!text)
+        return 0;
+    for (size_t k = 0; k < sizeof(names) / sizeof(names[0]); k++)
+    {
+        if (MatchWordBoundary(text, names[k]))
+            return 1;
+    }
+    if (strstr(text, "lista enlazada") != NULL ||
+        strstr(text, "linked list") != NULL ||
+        strstr(text, "array dinamico") != NULL ||
+        strstr(text, "dynamic array") != NULL ||
+        strstr(text, "binary search") != NULL ||
+        strstr(text, "busqueda binaria") != NULL ||
+        strstr(text, "búsqueda binaria") != NULL)
         return 1;
 
     char buf[512];
@@ -1326,11 +1479,12 @@ static int MatchesAlgorithmKeyword(const char *text)
     char *tok = strtok(buf, " \t\r\n,;\"'¿?.!():");
     while (tok)
     {
-        if (strlen(tok) >= 4)
+        if (strlen(tok) >= 6)
         {
             if (EditDistance(tok, "fibonacci") <= 2) return 1;
             if (EditDistance(tok, "factorial") <= 2) return 1;
             if (EditDistance(tok, "quicksort") <= 2) return 1;
+            if (EditDistance(tok, "mergesort") <= 2) return 1;
         }
         tok = strtok(NULL, " \t\r\n,;\"'¿?.!():");
     }
@@ -1351,6 +1505,12 @@ int ServerIsCodeSynthesisTask(const char *text)
     }
     lower[i] = '\0';
 
+    if (LooksLikeDefinitionQuestion(lower))
+        return 0;
+
+    if (ServerIsFileCreationTask(text))
+        return 0;
+
     /* If it contains repository action/mutation keywords on existing files, it's a bugfix/action task */
     static const char *repo_actions[] = {
         "fix", "bug", "patch", "refactor", "compile", "build", "test",
@@ -1363,18 +1523,19 @@ int ServerIsCodeSynthesisTask(const char *text)
             return 0;
     }
 
-    /* Standalone algorithm / coding prompt keywords (including typo tolerance) */
-    if (MatchesAlgorithmKeyword(lower))
-        return 1;
-
+    /* Inspection (workspace read/list) beats synthesis unless the prompt
+       is an algorithm name or an "en C" implementation request. */
     if (ServerIsInspectionTask(text))
         return 0;
+
+    if (MatchesAlgorithmKeyword(lower))
+        return 1;
 
     static const char *synth_verbs[] = {
         "escribe", "escribir", "crea", "crear", "genera", "generar",
         "haz", "hacer", "programa", "programar", "implementa", "implementar",
         "desarrolla", "desarrollar", "write", "generate", "implement", "code",
-        "dame", "give", "muestra", "mostrar"
+        "dame", "give", "muestra", "mostrar", "leer", "read"
     };
     int has_verb = 0;
     for (size_t k = 0; k < sizeof(synth_verbs) / sizeof(synth_verbs[0]); k++)
@@ -1390,7 +1551,7 @@ int ServerIsCodeSynthesisTask(const char *text)
         "funcion", "función", "funciones", "function", "functions",
         "metodo", "método", "method", "methods", "algoritmo", "algorithm",
         "programa", "program", "codigo", "código", "code",
-        "quicksort", "sort", "ordenar", "ordenamiento",
+        "quicksort", "ordenar", "ordenamiento",
         "busqueda", "búsqueda", "puntero", "punteros", "pointer", "pointers",
         "invertir", "reverse", "ejemplo", "example",
         "lista", "list", "nodo", "node", "vector", "pila", "stack", "cola", "queue",
@@ -1399,27 +1560,14 @@ int ServerIsCodeSynthesisTask(const char *text)
     int has_noun = 0;
     for (size_t k = 0; k < sizeof(synth_nouns) / sizeof(synth_nouns[0]); k++)
     {
-        if (strstr(lower, synth_nouns[k]) != NULL)
+        if (MatchWordBoundary(lower, synth_nouns[k]))
         {
             has_noun = 1;
             break;
         }
     }
 
-    static const char *synth_langs[] = {
-        "en c", "en c11", "in c", "in c11", "c code", "codigo c", "código c",
-        "lenguaje c", "c language", "en python", "in python", "en js", "in js",
-        "en javascript", "in javascript", "en typescript"
-    };
-    int has_lang = 0;
-    for (size_t k = 0; k < sizeof(synth_langs) / sizeof(synth_langs[0]); k++)
-    {
-        if (strstr(lower, synth_langs[k]) != NULL)
-        {
-            has_lang = 1;
-            break;
-        }
-    }
+    int has_lang = HasLangMarker(lower);
 
     if (has_noun && has_lang)
         return 1;
@@ -1428,6 +1576,474 @@ int ServerIsCodeSynthesisTask(const char *text)
         return 1;
 
     return 0;
+}
+
+static int TokenEditClose(const char *lower, const char *name)
+{
+    char buf[512];
+    char *tok;
+    if (!lower || !name)
+        return 0;
+    strncpy(buf, lower, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    tok = strtok(buf, " \t\r\n,;\"'¿?.!():");
+    while (tok)
+    {
+        if (strlen(tok) >= 6 && EditDistance(tok, name) <= 2)
+            return 1;
+        tok = strtok(NULL, " \t\r\n,;\"'¿?.!():");
+    }
+    return 0;
+}
+
+void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
+{
+    char lower[1024];
+    size_t i = 0;
+    if (!query || !out || out_sz == 0)
+        return;
+
+    while (query[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)query[i]);
+        i++;
+    }
+    lower[i] = '\0';
+
+    if (MatchWordBoundary(lower, "fibonacci") ||
+        MatchWordBoundary(lower, "fibinacci") ||
+        TokenEditClose(lower, "fibonacci"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de la funcion de Fibonacci en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdint.h>\n\n"
+            "/**\n"
+            " * Calcula el n-esimo termino de la sucesion de Fibonacci de forma iterativa.\n"
+            " * Complejidad: O(n) tiempo, O(1) memoria auxiliar.\n"
+            " * Utiliza uint64_t para soportar hasta F(93) sin desbordamiento de 64 bits.\n"
+            " */\n"
+            "uint64_t fibonacci(uint32_t n)\n"
+            "{\n"
+            "    if (n == 0)\n"
+            "        return 0;\n"
+            "    if (n == 1)\n"
+            "        return 1;\n\n"
+            "    uint64_t prev = 0;\n"
+            "    uint64_t curr = 1;\n"
+            "    for (uint32_t i = 2; i <= n; i++)\n"
+            "    {\n"
+            "        uint64_t next = prev + curr;\n"
+            "        prev = curr;\n"
+            "        curr = next;\n"
+            "    }\n"
+            "    return curr;\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    printf(\"--- Sucesion de Fibonacci (0 a 10) ---\\n\");\n"
+            "    for (uint32_t i = 0; i <= 10; i++)\n"
+            "    {\n"
+            "        printf(\"F(%%u) = %%llu\\n\", i, (unsigned long long)fibonacci(i));\n"
+            "    }\n"
+            "    return 0;\n"
+            "}\n"
+            "```\n\n"
+            "- **Rendimiento**: Ejecucion en tiempo lineal O(n) sin la sobrecarga exponencial de la recursion ingenua.\n"
+            "- **Invariantes**: Seguro ante desbordamiento para terminos basicos y compilable con `gcc -Wall -Wextra -Werror`.");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "factorial") || TokenEditClose(lower, "factorial"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de la funcion factorial en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdint.h>\n\n"
+            "uint64_t factorial(uint32_t n)\n"
+            "{\n"
+            "    if (n > 20)\n"
+            "        return 0;\n"
+            "    uint64_t res = 1;\n"
+            "    for (uint32_t i = 2; i <= n; i++)\n"
+            "        res *= i;\n"
+            "    return res;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (strstr(lower, "binary search") != NULL ||
+        strstr(lower, "busqueda binaria") != NULL ||
+        strstr(lower, "búsqueda binaria") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de busqueda binaria en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n\n"
+            "int BinarySearch(const int *arr, int len, int target)\n"
+            "{\n"
+            "    int left = 0;\n"
+            "    int right = len - 1;\n"
+            "    while (left <= right)\n"
+            "    {\n"
+            "        int mid = left + (right - left) / 2;\n"
+            "        if (arr[mid] == target)\n"
+            "            return mid;\n"
+            "        if (arr[mid] < target)\n"
+            "            left = mid + 1;\n"
+            "        else\n"
+            "            right = mid - 1;\n"
+            "    }\n"
+            "    return -1;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "qsort"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes el uso de qsort de la biblioteca estandar de C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n\n"
+            "static int CompareInts(const void *a, const void *b)\n"
+            "{\n"
+            "    int arg1 = *(const int *)a;\n"
+            "    int arg2 = *(const int *)b;\n"
+            "    if (arg1 < arg2) return -1;\n"
+            "    if (arg1 > arg2) return 1;\n"
+            "    return 0;\n"
+            "}\n\n"
+            "int main(void)\n"
+            "{\n"
+            "    int values[] = {40, 10, 100, 90, 20, 25};\n"
+            "    size_t count = sizeof(values) / sizeof(values[0]);\n"
+            "    qsort(values, count, sizeof(int), CompareInts);\n"
+            "    return 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "mergesort") || strstr(lower, "merge sort") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de Mergesort en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n\n"
+            "static void Merge(int arr[], int tmp[], int left, int mid, int right)\n"
+            "{\n"
+            "    int i = left, j = mid + 1, k = left;\n"
+            "    while (i <= mid && j <= right)\n"
+            "        tmp[k++] = (arr[i] <= arr[j]) ? arr[i++] : arr[j++];\n"
+            "    while (i <= mid) tmp[k++] = arr[i++];\n"
+            "    while (j <= right) tmp[k++] = arr[j++];\n"
+            "    for (i = left; i <= right; i++) arr[i] = tmp[i];\n"
+            "}\n\n"
+            "void MergeSort(int arr[], int tmp[], int left, int right)\n"
+            "{\n"
+            "    if (left >= right)\n"
+            "        return;\n"
+            "    int mid = left + (right - left) / 2;\n"
+            "    MergeSort(arr, tmp, left, mid);\n"
+            "    MergeSort(arr, tmp, mid + 1, right);\n"
+            "    Merge(arr, tmp, left, mid, right);\n"
+            "}\n"
+            "```\n\n"
+            "- Complejidad: O(n log n) tiempo, O(n) memoria auxiliar.");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "bubblesort") || strstr(lower, "bubble sort") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de Bubble Sort en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n\n"
+            "void BubbleSort(int arr[], int n)\n"
+            "{\n"
+            "    for (int i = 0; i < n - 1; i++)\n"
+            "        for (int j = 0; j < n - 1 - i; j++)\n"
+            "            if (arr[j] > arr[j + 1])\n"
+            "            {\n"
+            "                int tmp = arr[j];\n"
+            "                arr[j] = arr[j + 1];\n"
+            "                arr[j + 1] = tmp;\n"
+            "            }\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "quicksort") ||
+        MatchWordBoundary(lower, "ordenar") ||
+        MatchWordBoundary(lower, "ordenamiento"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de Quicksort en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n\n"
+            "static void Swap(int *a, int *b)\n"
+            "{\n"
+            "    int tmp = *a;\n"
+            "    *a = *b;\n"
+            "    *b = tmp;\n"
+            "}\n\n"
+            "static int Partition(int arr[], int low, int high)\n"
+            "{\n"
+            "    int pivot = arr[high];\n"
+            "    int i = low - 1;\n"
+            "    for (int j = low; j < high; j++)\n"
+            "    {\n"
+            "        if (arr[j] <= pivot)\n"
+            "        {\n"
+            "            i++;\n"
+            "            Swap(&arr[i], &arr[j]);\n"
+            "        }\n"
+            "    }\n"
+            "    Swap(&arr[i + 1], &arr[high]);\n"
+            "    return i + 1;\n"
+            "}\n\n"
+            "void QuickSort(int arr[], int low, int high)\n"
+            "{\n"
+            "    if (low < high)\n"
+            "    {\n"
+            "        int pi = Partition(arr, low, high);\n"
+            "        QuickSort(arr, low, pi - 1);\n"
+            "        QuickSort(arr, pi + 1, high);\n"
+            "    }\n"
+            "}\n"
+            "```\n\n"
+            "- Complejidad: O(n log n) promedio, O(n^2) peor caso.\n"
+            "- Memoria auxiliar: O(log n) promedio / O(n) peor caso en la pila de llamadas (no O(1)).");
+        return;
+    }
+
+    if (strstr(lower, "lista enlazada") != NULL ||
+        strstr(lower, "linked list") != NULL ||
+        MatchWordBoundary(lower, "nodo") ||
+        MatchWordBoundary(lower, "node") ||
+        MatchWordBoundary(lower, "lista") ||
+        MatchWordBoundary(lower, "list"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de una lista enlazada simple en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n\n"
+            "typedef struct Node\n"
+            "{\n"
+            "    int data;\n"
+            "    struct Node *next;\n"
+            "} Node;\n\n"
+            "Node *InsertHead(Node *head, int value)\n"
+            "{\n"
+            "    Node *newNode = (Node *)malloc(sizeof(Node));\n"
+            "    if (newNode == NULL)\n"
+            "        return head;\n"
+            "    newNode->data = value;\n"
+            "    newNode->next = head;\n"
+            "    return newNode;\n"
+            "}\n\n"
+            "void FreeList(Node *head)\n"
+            "{\n"
+            "    while (head != NULL)\n"
+            "    {\n"
+            "        Node *next = head->next;\n"
+            "        free(head);\n"
+            "        head = next;\n"
+            "    }\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "vector") ||
+        strstr(lower, "array dinamico") != NULL ||
+        strstr(lower, "dynamic array") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de un array dinamico (vector) en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n"
+            "#include <stdbool.h>\n\n"
+            "typedef struct\n"
+            "{\n"
+            "    int *items;\n"
+            "    size_t size;\n"
+            "    size_t capacity;\n"
+            "} Vector;\n\n"
+            "bool VectorInit(Vector *vec, size_t initial_cap)\n"
+            "{\n"
+            "    vec->items = (int *)malloc(initial_cap * sizeof(int));\n"
+            "    if (vec->items == NULL)\n"
+            "        return false;\n"
+            "    vec->size = 0;\n"
+            "    vec->capacity = initial_cap;\n"
+            "    return true;\n"
+            "}\n\n"
+            "bool VectorPush(Vector *vec, int value)\n"
+            "{\n"
+            "    if (vec->size >= vec->capacity)\n"
+            "    {\n"
+            "        int *grown = (int *)realloc(vec->items, vec->capacity * 2 * sizeof(int));\n"
+            "        if (grown == NULL)\n"
+            "            return false;\n"
+            "        vec->items = grown;\n"
+            "        vec->capacity *= 2;\n"
+            "    }\n"
+            "    vec->items[vec->size++] = value;\n"
+            "    return true;\n"
+            "}\n\n"
+            "void VectorFree(Vector *vec)\n"
+            "{\n"
+            "    free(vec->items);\n"
+            "    vec->items = NULL;\n"
+            "    vec->size = 0;\n"
+            "    vec->capacity = 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (strstr(lower, "leer archivo") != NULL ||
+        strstr(lower, "leer fichero") != NULL ||
+        strstr(lower, "read file") != NULL)
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la funcion para leer un archivo linea por linea en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <string.h>\n\n"
+            "int ReadFileLineByLine(const char *filepath)\n"
+            "{\n"
+            "    FILE *file = fopen(filepath, \"r\");\n"
+            "    if (file == NULL)\n"
+            "        return -1;\n"
+            "    char buffer[512];\n"
+            "    while (fgets(buffer, sizeof(buffer), file) != NULL)\n"
+            "        printf(\"%%s\", buffer);\n"
+            "    fclose(file);\n"
+            "    return 0;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "cola") ||
+        MatchWordBoundary(lower, "queue") ||
+        MatchWordBoundary(lower, "fifo"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de una Cola (Queue FIFO) en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdbool.h>\n\n"
+            "#define QUEUE_CAPACITY 64\n\n"
+            "typedef struct\n"
+            "{\n"
+            "    int data[QUEUE_CAPACITY];\n"
+            "    int head;\n"
+            "    int tail;\n"
+            "    int count;\n"
+            "} Queue;\n\n"
+            "void QueueInit(Queue *q) { q->head = 0; q->tail = 0; q->count = 0; }\n"
+            "bool QueueIsEmpty(const Queue *q) { return q->count == 0; }\n"
+            "bool QueueIsFull(const Queue *q) { return q->count == QUEUE_CAPACITY; }\n\n"
+            "bool Enqueue(Queue *q, int val)\n"
+            "{\n"
+            "    if (QueueIsFull(q)) return false;\n"
+            "    q->data[q->tail] = val;\n"
+            "    q->tail = (q->tail + 1) % QUEUE_CAPACITY;\n"
+            "    q->count++;\n"
+            "    return true;\n"
+            "}\n\n"
+            "bool Dequeue(Queue *q, int *out_val)\n"
+            "{\n"
+            "    if (QueueIsEmpty(q)) return false;\n"
+            "    *out_val = q->data[q->head];\n"
+            "    q->head = (q->head + 1) % QUEUE_CAPACITY;\n"
+            "    q->count--;\n"
+            "    return true;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "pila") ||
+        MatchWordBoundary(lower, "stack") ||
+        MatchWordBoundary(lower, "lifo"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la implementacion de una Pila (Stack LIFO) en C (C11):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <stdbool.h>\n\n"
+            "#define STACK_CAPACITY 64\n\n"
+            "typedef struct\n"
+            "{\n"
+            "    int data[STACK_CAPACITY];\n"
+            "    int top;\n"
+            "} Stack;\n\n"
+            "void StackInit(Stack *s) { s->top = -1; }\n"
+            "bool StackIsEmpty(const Stack *s) { return s->top == -1; }\n"
+            "bool StackIsFull(const Stack *s) { return s->top == STACK_CAPACITY - 1; }\n\n"
+            "bool StackPush(Stack *s, int val)\n"
+            "{\n"
+            "    if (StackIsFull(s)) return false;\n"
+            "    s->data[++s->top] = val;\n"
+            "    return true;\n"
+            "}\n\n"
+            "bool StackPop(Stack *s, int *out_val)\n"
+            "{\n"
+            "    if (StackIsEmpty(s)) return false;\n"
+            "    *out_val = s->data[s->top--];\n"
+            "    return true;\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    if (MatchWordBoundary(lower, "invertir") || MatchWordBoundary(lower, "reverse"))
+    {
+        snprintf(out, out_sz,
+            "Aqui tienes la funcion para invertir una cadena de texto en C (in-place):\n\n"
+            "```c\n"
+            "#include <stdio.h>\n"
+            "#include <string.h>\n\n"
+            "void ReverseString(char *str)\n"
+            "{\n"
+            "    size_t i, j;\n"
+            "    if (str == NULL)\n"
+            "        return;\n"
+            "    j = strlen(str);\n"
+            "    if (j == 0)\n"
+            "        return;\n"
+            "    j--;\n"
+            "    for (i = 0; i < j; i++, j--)\n"
+            "    {\n"
+            "        char tmp = str[i];\n"
+            "        str[i] = str[j];\n"
+            "        str[j] = tmp;\n"
+            "    }\n"
+            "}\n"
+            "```");
+        return;
+    }
+
+    snprintf(out, out_sz,
+        "Aqui tienes la estructura en C (C11) para tu solicitud ('%s'):\n\n"
+        "```c\n"
+        "#include <stdio.h>\n"
+        "int main(void) { return 0; }\n"
+        "```\n",
+        query);
 }
 
 int ServerIsCodingTask(const char *text)

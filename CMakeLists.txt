@@ -244,8 +244,7 @@ add_executable(test_battery100 tests/test_battery100.c)
 target_link_libraries(test_battery100 symbolic)
 
 # test_multi_hop: reasoning depth (1-hop, 2-hop, negative, cross-domain)
-add_executable(test_multi_hop tests/test_multi_hop.c)
-target_link_libraries(test_multi_hop symbolic)
+sllm_test(test_multi_hop tests/test_multi_hop.c)
 
 # Pillar 1: Vector Symbolic Architecture (VSA / HDC)
 sllm_test(test_vsa tests/test_vsa.c)

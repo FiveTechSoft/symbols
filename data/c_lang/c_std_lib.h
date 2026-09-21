@@ -10,6 +10,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef long time_t;
+typedef long clock_t;
+typedef void *c_va_list;
+
 /* Standard file stream handle structure */
 typedef struct
 {
@@ -73,9 +77,9 @@ void abort(void) { }
 int abs(int n) { return n < 0 ? -n : n; }
 
 /* Extended Standard I/O and File System */
-int    fprintf(C_FILE *stream, const char *format) { (void)stream; (void)format; return 0; }
-int    sprintf(char *str, const char *format) { (void)str; (void)format; return 0; }
-int    vsnprintf(char *str, size_t size, const char *format) { (void)str; (void)size; (void)format; return 0; }
+int    fprintf(C_FILE *stream, const char *format, ...) { (void)stream; (void)format; return 0; }
+int    sprintf(char *str, const char *format, ...) { (void)str; (void)format; return 0; }
+int    vsnprintf(char *str, size_t size, const char *format, c_va_list ap) { (void)str; (void)size; (void)format; (void)ap; return 0; }
 int    fseek(C_FILE *stream, long offset, int whence) { (void)stream; (void)offset; (void)whence; return 0; }
 long   ftell(C_FILE *stream) { (void)stream; return 0L; }
 void   rewind(C_FILE *stream) { (void)stream; }
@@ -134,9 +138,9 @@ double log(double x) { (void)x; return 0.0; }
 double exp(double x) { (void)x; return 0.0; }
 
 /* Time Utilities */
-uint64_t time(uint64_t *timer) { (void)timer; return 0; }
-uint64_t clock(void) { return 0; }
-double   difftime(uint64_t end, uint64_t beginning) { (void)end; (void)beginning; return 0.0; }
+time_t time(time_t *timer) { (void)timer; return (time_t)0; }
+clock_t clock(void) { return (clock_t)0; }
+double  difftime(time_t end, time_t beginning) { (void)end; (void)beginning; return 0.0; }
 
 /* Diagnostics & Error Handling */
 void   perror(const char *str) { (void)str; }
