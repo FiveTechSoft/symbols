@@ -1849,8 +1849,8 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
     if (tool == NULL)
         return 0;
     /* For edit without replacement text: check if it's an append/add intent.
-       Append intents (anade, agrega, escribe, add, insert) dispatch bash >>;
-       generic edit intents (modifica, edita, cambia) dispatch read for inspection. */
+       Append intents dispatch write with content extracted from query;
+       generic edit intents dispatch read for inspection. */
     if (strcmp(tool, "edit") == 0 && !has_rep)
     {
         char lq_lower[1024];
@@ -1861,14 +1861,13 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
             qi++;
         }
         lq_lower[qi] = '\0';
-        /* Check if it's an append/add intent */
+        /* Check if it's an append/add/write intent */
         if (strstr(lq_lower, "anade") == lq_lower || strstr(lq_lower, "añade") == lq_lower ||
             strstr(lq_lower, "add ") == lq_lower ||
             strstr(lq_lower, "agrega") == lq_lower ||
             strstr(lq_lower, "escribe") == lq_lower || strstr(lq_lower, "write ") == lq_lower ||
             strstr(lq_lower, "inserta") == lq_lower || strstr(lq_lower, "insert ") == lq_lower)
         {
-            char bash_cmd[512];
             const char *content = "Line added";
             const char *p = NULL;
             if (strstr(lq_lower, "escribe ") == lq_lower || strstr(lq_lower, "write ") == lq_lower)
@@ -1902,14 +1901,15 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
                         content = p;
                 }
             }
+            /* Use write tool: OpenCode handles encoding correctly (UTF-8/UTF-16).
+               bash echo corrupts UTF-16 files created by OpenCode. */
+            strncpy(out->name, "write", sizeof(out->name) - 1);
             {
                 char esc_content[256];
                 JsonEscapeArg(content, esc_content, sizeof(esc_content));
-                strncpy(out->name, "bash", sizeof(out->name) - 1);
-                snprintf(bash_cmd, sizeof(bash_cmd),
-                         "echo '%s' >> %s", esc_content, esc_file);
                 snprintf(out->arguments, sizeof(out->arguments),
-                         "{\"command\":\"%s\"}", bash_cmd);
+                         "{\"filePath\":\"%s\",\"content\":\"%s\\n\"}",
+                         esc_file, esc_content);
             }
             return 1;
         }
@@ -2736,7 +2736,7 @@ void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
             "{\n"
             "    if (QueueIsFull(q)) return false;\n"
             "    q->data[q->tail] = val;\n"
-            "    q->tail = (q->tail + 1) % QUEUE_CAPACITY;\n"
+            "    q->tail = (q->tail + 1) %% QUEUE_CAPACITY;\n"
             "    q->count++;\n"
             "    return true;\n"
             "}\n\n"
@@ -2744,7 +2744,7 @@ void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
             "{\n"
             "    if (QueueIsEmpty(q)) return false;\n"
             "    *out_val = q->data[q->head];\n"
-            "    q->head = (q->head + 1) % QUEUE_CAPACITY;\n"
+            "    q->head = (q->head + 1) %% QUEUE_CAPACITY;\n"
             "    q->count--;\n"
             "    return true;\n"
             "}\n"
