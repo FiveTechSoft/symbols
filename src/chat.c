@@ -1913,6 +1913,9 @@ static int PlanRange(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
    - over-coordination or empty input refuses (count = 0).
    No vetoes here (G1/G2/G5 run per goal in step 3). */
 static int HasWh(const char toks[][CHAT_TOKEN_MAX], uint32_t n);
+static uint32_t ConstraintQuestionOff(const char toks[][CHAT_TOKEN_MAX],
+                                      uint32_t n);
+
 uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
                        char toks[][CHAT_TOKEN_MAX], uint32_t *ntok,
                        SURFACE_FLAGS *sfout)
@@ -1932,6 +1935,12 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
            never split, intent-detected not word-detected. */
         PARSED whole;
         int force_q = sf.question || HasWh(toks, n);
+        /* Constraint wrappers ("si …, quien …") are one logic-layer
+           query: do not comma-split the premise off the inner WH. */
+        if (ConstraintQuestionOff(toks, n) > 0 &&
+            TrialParseGoal(ch, toks, 0, n, -1, force_q, sf.genitive,
+                           &whole))
+            return EmitGoal(ch, toks, 0, n, -1, plan);
         if (TrialParseGoal(ch, toks, 0, n, -1, force_q, sf.genitive,
                            &whole))
         {
@@ -2092,13 +2101,68 @@ static int ParseConsequenceCondition(const DICT *dict,
    over caller-provided canonical tokens. q_force/gen_force/comma_veto
    are the plan-level surface signals; single-intent callers pass the
    line-level ones (behavior identical). */
+/* Inner WH of a constraint wrapper ("si …, quien …"). "que" of
+   "dado que" is skipped by starting after the prefix. Physical
+   "que pasa si" is not a wrapper. */
+static uint32_t ConstraintQuestionOff(const char toks[][CHAT_TOKEN_MAX],
+                                      uint32_t n)
+{
+    uint32_t from = 0;
+    uint32_t i;
+    if (n < 3)
+        return 0;
+    if (strcmp(toks[0], "que") == 0 &&
+        (strcmp(toks[1], "pasa") == 0 ||
+         strcmp(toks[1], "ocurre") == 0 ||
+         strcmp(toks[1], "sucede") == 0) &&
+        strcmp(toks[2], "si") == 0)
+        return 0;
+    if (strcmp(toks[0], "what") == 0 &&
+        strcmp(toks[1], "happens") == 0 &&
+        (strcmp(toks[2], "if") == 0 || strcmp(toks[2], "when") == 0))
+        return 0;
+    if (strcmp(toks[0], "dado") == 0 && strcmp(toks[1], "que") == 0)
+        from = 2;
+    else if (strcmp(toks[0], "given") == 0 && strcmp(toks[1], "that") == 0)
+        from = 2;
+    else if (strcmp(toks[0], "si") == 0 || strcmp(toks[0], "if") == 0)
+        from = 1;
+    else
+        return 0;
+    for (i = from; i < n; i++)
+    {
+        if (strcmp(toks[i], "quien") == 0 ||
+            strcmp(toks[i], "quienes") == 0 ||
+            strcmp(toks[i], "who") == 0 ||
+            strcmp(toks[i], "whom") == 0 ||
+            strcmp(toks[i], "donde") == 0 ||
+            strcmp(toks[i], "where") == 0 ||
+            strcmp(toks[i], "cuantos") == 0 ||
+            strcmp(toks[i], "cuantas") == 0 ||
+            strcmp(toks[i], "what") == 0 ||
+            strcmp(toks[i], "how") == 0 ||
+            strcmp(toks[i], "cual") == 0 ||
+            strcmp(toks[i], "cuales") == 0 ||
+            strcmp(toks[i], "que") == 0)
+            return i;
+    }
+    return 0;
+}
+
 static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                            uint32_t n, int q_force, int gen_force,
                            int comma_veto, PARSED *p)
 {
+    uint32_t off;
     memset(p, 0, sizeof(*p));
     if (n == 0)
         return 0;
+    off = ConstraintQuestionOff(toks, n);
+    if (off > 0 && off < n)
+        /* The comma split a premise from the inner WH; it is not a
+           G5 apposition on the inner parent/child frame. */
+        return ParseIntentToks(ch, toks + off, n - off,
+                               q_force, gen_force, 0, p);
 
     /* ---- Structural QA intercept (top priority) ----
        Detect question patterns BEFORE stop-word filtering.
@@ -5566,8 +5630,11 @@ static int LooksLikeQuestionWord(const char *tok, uint32_t pos,
     L = strlen(tok);
     if (L < 2 || L > 8)
         return 0;
-    /* Heuristic: question words often end in specific patterns
-       but we detect by position + structure, not suffix */
+    /* Discourse particles that open a constraint clause are not WH. */
+    if (pos == 0 &&
+        (strcmp(tok, "si") == 0 || strcmp(tok, "if") == 0 ||
+         strcmp(tok, "dado") == 0 || strcmp(tok, "given") == 0))
+        return 0;
     /* Must be at position 0 or before a copula */
     if (pos == 0)
         return 1;

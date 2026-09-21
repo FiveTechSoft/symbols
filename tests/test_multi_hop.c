@@ -141,6 +141,41 @@ int main(void)
                     "El padre de David es Jesse",
                     "1-hop replay from KB: still named Jesse", &wrong);
 
+    printf("\n--- CONSTRAINT WRAPPER: inner question uses logic layer ---\n");
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch,
+                    "dado que jesse es el padre de david, quien es el padre de solomon?",
+                    out, sizeof(out));
+    total++;
+    passed += check("dado que jesse es el padre de david, quien es el padre de solomon?",
+                    out, "El padre de Solomon es David",
+                    "L3: dado que … inner 1-hop Solomon=David", &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch,
+                    "si david es hijo de jesse, quien es el abuelo de david?",
+                    out, sizeof(out));
+    total++;
+    passed += check("si david es hijo de jesse, quien es el abuelo de david?",
+                    out, "El abuelo de David es Obed",
+                    "L3: si … inner 2-hop grandfather=Obed", &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que pasa si se cae un vaso de cristal al suelo?",
+                    out, sizeof(out));
+    total++;
+    if (strstr(out, "padre de") != NULL || strstr(out, "abuelo de") != NULL)
+    {
+        printf("  [WRONG] consequence wrapper must not strip to kinship\n    A: %s\n",
+               out);
+        wrong++;
+    }
+    else
+    {
+        printf("  [PASS] consequence 'que pasa si' is not a constraint prefix\n");
+        passed++;
+    }
+
     printf("\n--- 2-HOP: Grandfather (father->father chain) ---\n");
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "quien es el abuelo de David?", out, sizeof(out));
@@ -250,6 +285,6 @@ int main(void)
     printf("WRONG:    %d\n", wrong);
     printf("KB pairs (bible): %u\n", ch.kb.num_pairs);
 
-    /* named 1-hop + Abraham fail-closed + promote + 3-hop + taxonomy 2-hop. WRONG = 0. */
-    return (passed >= 17 && wrong == 0) ? 0 : 1;
+    /* named 1-hop + constraint wrappers + 3-hop + taxonomy. WRONG = 0. */
+    return (passed >= 20 && wrong == 0) ? 0 : 1;
 }
