@@ -127,6 +127,28 @@ int main(void)
     passed += check_any("quien es el padre de David?", out, need,
                         "1-hop father still Jesse", &wrong);
 
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "quien bautizo a Jesus?", out, sizeof(out));
+    total++;
+    need[0] = "John"; need[1] = "Baptist"; need[2] = NULL;
+    passed += check_any("quien bautizo a Jesus?", out, need,
+                        "WHO: baptized Jesus → John", &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que es el mal?", out, sizeof(out));
+    total++;
+    passed += check_not(out, "Malachi", "WHAT: mal is not Malachi", &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que es la fe?", out, sizeof(out));
+    total++;
+    passed += check_not(out, "Fear God", "WHAT: fe is not Fear God", &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que es el yo?", out, sizeof(out));
+    total++;
+    passed += check_not(out, "YORK", "WHAT: yo is not YORK", &wrong);
+
     ChatDestroy(&ch);
 
     memset(&ch, 0, sizeof(ch));
@@ -138,9 +160,17 @@ int main(void)
     need[0] = "unconscious"; need[1] = "inconsciente"; need[2] = NULL;
     passed += check_any("que es el inconsciente?", out, need,
                         "WHAT: inconsciente → unconscious", &wrong);
+    total++;
+    passed += check_not(out, "197", "WHAT: unconscious is not a page index",
+                        &wrong);
+
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "que es el ello?", out, sizeof(out));
+    total++;
+    passed += check_not(out, "Ibid", "WHAT: ello/id is not Ibid", &wrong);
     ChatDestroy(&ch);
 
     printf("\n=== OPEN QA ===\nPassed: %d / %d\nWRONG: %d\n",
            passed, total, wrong);
-    return (passed >= 6 && wrong == 0) ? 0 : 1;
+    return (wrong == 0 && passed >= 8) ? 0 : 1;
 }

@@ -3526,7 +3526,16 @@ static int TextAncestor(CHAT *ch, const char *entity, int hops,
     return 1;
 }
 
-static int ChatIstristr(const char *hay, const char *need)
+static int ChatIsWordChar(unsigned char c)
+{
+    return (c >= '0' && c <= '9') ||
+           (c >= 'A' && c <= 'Z') ||
+           (c >= 'a' && c <= 'z') ||
+           c == '\'' || c >= 0x80;
+}
+
+/* Whole-token match: "yo" is not YORK, "id" is not Ibid, "fe" is not Fear. */
+static int ChatHasWord(const char *hay, const char *need)
 {
     size_t nlen, hlen, i, j;
     if (hay == NULL || need == NULL || need[0] == '\0')
@@ -3537,6 +3546,10 @@ static int ChatIstristr(const char *hay, const char *need)
         return 0;
     for (i = 0; i + nlen <= hlen; i++)
     {
+        if (i > 0 && ChatIsWordChar((unsigned char)hay[i - 1]))
+            continue;
+        if (i + nlen < hlen && ChatIsWordChar((unsigned char)hay[i + nlen]))
+            continue;
         for (j = 0; j < nlen; j++)
         {
             char h = hay[i + j];
@@ -3550,6 +3563,79 @@ static int ChatIstristr(const char *hay, const char *need)
             return 1;
     }
     return 0;
+}
+
+/* TOC / page-index lines: "Unconscious , 197", "JUNG ." */
+static int ChatLooksLikeIndexLine(const char *sent)
+{
+    size_t i, n, letters = 0, digits = 0, lower = 0;
+    const char *p;
+    if (sent == NULL)
+        return 1;
+    p = sent;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    if (*p == ' ' && p[1] == ':' && p[2] == ' ')
+        p += 3;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    n = strlen(p);
+    if (n < 8)
+        return 1;
+    for (i = 0; p[i] != '\0'; i++)
+    {
+        unsigned char c = (unsigned char)p[i];
+        if (c >= '0' && c <= '9')
+            digits++;
+        else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c >= 0x80)
+        {
+            letters++;
+            if (c >= 'a' && c <= 'z')
+                lower++;
+        }
+    }
+    if (lower == 0 && n < 24)
+        return 1;
+    if (digits >= 2 && letters > 0 && digits * 3 >= letters && n < 80)
+        return 1;
+    return 0;
+}
+
+static int ChatCountExtraNames(const char *sent, const char *key)
+{
+    int n = 0;
+    size_t i = 0, slen;
+    if (sent == NULL)
+        return 0;
+    slen = strlen(sent);
+    while (i < slen)
+    {
+        while (i < slen && !ChatIsWordChar((unsigned char)sent[i]))
+            i++;
+        if (i >= slen)
+            break;
+        {
+            size_t start = i, len;
+            char buf[CHAT_TOKEN_MAX];
+            while (i < slen && ChatIsWordChar((unsigned char)sent[i]))
+                i++;
+            len = i - start;
+            if (len < 3 || len >= CHAT_TOKEN_MAX)
+                continue;
+            if (sent[start] < 'A' || sent[start] > 'Z')
+                continue;
+            memcpy(buf, sent + start, len);
+            buf[len] = '\0';
+            if (key != NULL && ChatHasWord(buf, key))
+                continue;
+            n++;
+        }
+    }
+    return n;
 }
 
 /* Sentence that contains `need` (or its dict canonical). Prefers
@@ -3567,6 +3653,7 @@ static int ChatFindGroundedSentence(const CHAT *ch, const char *need,
     int have = 0;
     uint32_t best = 0, bestf = 0;
     int best_pref = -1;
+    int best_names = -1;
     size_t bestlen = (size_t)-1;
     float bestsc = -1.0f;
     if (ch == NULL || need == NULL || need[0] == '\0' ||
@@ -3602,25 +3689,35 @@ static int ChatFindGroundedSentence(const CHAT *ch, const char *need,
             char sent[2048];
             int ph = 0;
             uint32_t pi;
+            size_t slen;
             if (TextLexSentenceText(tl, s, tl->image, tl->imagelen,
                                     sent, sizeof(sent)) <= 0)
                 continue;
-            if (!ChatIstristr(sent, key) && !ChatIstristr(sent, need))
+            if (ChatLooksLikeIndexLine(sent))
+                continue;
+            slen = strlen(sent);
+            /* Dual-corpus dumps (Gutenberg catalogues, chapter
+               summaries) drown a short grounded verse. */
+            if (slen > 480)
+                continue;
+            if (!ChatHasWord(sent, key) && !ChatHasWord(sent, need))
                 continue;
             for (pi = 1; pi < nw; pi++)
             {
-                if (ChatIstristr(sent, words[pi]))
+                if (ChatHasWord(sent, words[pi]))
                     ph++;
             }
             {
-                size_t slen = strlen(sent);
+                int names = ChatCountExtraNames(sent, key);
                 if (!have || ph > best_pref ||
-                    (ph == best_pref && slen < bestlen))
+                    (ph == best_pref && names > best_names) ||
+                    (ph == best_pref && names == best_names && slen < bestlen))
                 {
                     have = 1;
                     best = s;
                     bestf = f;
                     best_pref = ph;
+                    best_names = names;
                     bestlen = slen;
                     bestsc = (float)ph;
                 }
