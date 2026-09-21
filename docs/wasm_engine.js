@@ -168,11 +168,15 @@ class WASMSymbolicEngine {
       status = 'UNKNOWN_FAIL_CLOSED';
     }
 
-    /* Improve UNKNOWN messages with actionable guidance */
+    /* Improve UNKNOWN messages with actionable guidance + corpus suggestion */
     if (status === 'UNKNOWN_FAIL_CLOSED') {
+      const q = inputQuery.toLowerCase();
+      const suggestion = this._suggestCorpus(q);
       const hasCorpus = this.sentences.length > 0;
       if (!hasCorpus) {
         response = 'No tengo informacion suficiente para responder. Selecciona un corpus en el sidebar izquierdo (Biblia, Jung, Quantum, Code) o ingresa un archivo .txt.';
+      } else if (suggestion) {
+        response = `No tengo constancia de eso en el corpus cargado. Para esta pregunta te conviene usar el corpus "${suggestion.name}" (${suggestion.hint}). Cambialo en el sidebar izquierdo.`;
       } else {
         response = 'No tengo constancia suficiente en el corpus cargado para responder esa pregunta. Prueba con otro corpus o ingresa mas texto.';
       }
@@ -189,6 +193,65 @@ class WASMSymbolicEngine {
     });
 
     return { response, proofTrace, citation, status, elapsedMs, focus: this.episodic.activeFocus };
+  }
+
+  /* ---- Corpus suggestion based on query keywords ---- */
+  _suggestCorpus(query) {
+    const corpusHints = [
+      {
+        name: 'Biblia Canonica',
+        hint: 'genealogias, reyes, libros biblicos',
+        keywords: ['david', 'solomon', 'jonah', 'jonas', 'abraham', 'jacob', 'judah', 'isaac',
+                   'bible', 'biblia', 'king', 'rey', 'queen', 'reina', 'lord', 'señor',
+                   'proverbs', 'proverbios', 'psalms', 'salmos', 'genesis', 'exodus', 'exodo',
+                   'samuel', 'saul', 'oboed', 'boaz', 'jesse', 'rehoboam', 'abijah',
+                   'padre', 'hijo', 'begat', 'engendro', 'anointed', 'uncio',
+                   'testament', 'testamento', 'apocalipsis', 'revelation']
+      },
+      {
+        name: 'C.G. Jung: Unconscious',
+        hint: 'arquetipos, simbolos, inconsciente, libido',
+        keywords: ['jung', 'arquetipo', 'archetype', 'libido', 'inconscient', 'unconscious',
+                   'dreams', 'suenos', 'simbolo', 'symbol', 'faust', 'mephistopheles',
+                   'dios', 'madre', 'mother', 'tree', 'arbol', 'sun', 'sol',
+                   'psyche', 'psique', 'collective', 'colectivo', 'primordial',
+                   'golden bough', 'rama dorada', 'pact', 'pacto']
+      },
+      {
+        name: 'Quantum Information Theory',
+        hint: 'qubits, entrelazamiento, superposicion',
+        keywords: ['qubit', 'quantum', 'cuantic', 'entangle', 'entrelaz', 'superposition',
+                   'superposicion', 'shor', 'grover', 'decoherence', 'decoherencia',
+                   'teleportation', 'teleportacion', 'algorithm', 'algoritmo',
+                   'processor', 'procesador', 'circuit', 'circuito', 'ion', 'photon', 'foton']
+      },
+      {
+        name: 'SWE-bench & Code Graph',
+        hint: 'AST, blast radius, STRIPS planner, Django',
+        keywords: ['django', 'flask', 'sympy', 'scikit', 'pytest', 'blast radius',
+                   'strips', 'planner', 'planificador', 'code graph', 'grafo',
+                   'function', 'funcion', 'class', 'clase', 'module', 'modulo',
+                   'compile', 'compilar', 'linker', 'debug', 'memory leak',
+                   'fuga de memoria', 'buffer overflow', 'pointer', 'puntero']
+      }
+    ];
+
+    const q = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const corpus of corpusHints) {
+      let score = 0;
+      for (const kw of corpus.keywords) {
+        if (q.includes(kw)) score++;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = corpus;
+      }
+    }
+
+    return bestScore >= 1 ? bestMatch : null;
   }
 
   /* ---- Stats ---- */
