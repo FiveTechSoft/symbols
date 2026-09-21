@@ -147,6 +147,25 @@ int ServerIsFileCreationTask(const char *text);
    Returns 1 and writes out on success. */
 int ServerExtractCreatePath(const char *text, char *out, size_t n);
 
+/* 1 when the user asks to display a diff (git diff / muestra el diff). */
+int ServerIsDiffTask(const char *text);
+
+/* 1 when the user asks to modify a named file (cambia X por Y en f.c). */
+int ServerIsEditTask(const char *text);
+
+/* Parse "cambia OLD por NEW en FILE". has_replace is 1 when both strings exist. */
+int ServerExtractEditSpec(const char *text, char *file, size_t fn,
+                          char *old_s, size_t on, char *new_s, size_t nn,
+                          int *has_replace);
+
+/* bash/execute_command with "git diff". Returns 1 if a shell tool is declared. */
+int ServerMapDiffToolCall(const char *query, const char names[][64],
+                          uint32_t nnames, OPENAI_TOOL_CALL *out);
+
+/* edit with oldString/newString, or read if the replacement is unknown. */
+int ServerMapEditToolCall(const char *query, const char names[][64],
+                          uint32_t nnames, OPENAI_TOOL_CALL *out);
+
 /* Emit a canned C11 sample for a classified synthesis prompt.
    out is always NUL-terminated when out_sz > 0. */
 void ServerSynthesizeCode(const char *query, char *out, size_t out_sz);

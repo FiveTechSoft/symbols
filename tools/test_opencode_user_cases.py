@@ -337,6 +337,60 @@ def test_shell_tool_calls():
         assert needle in args.get("command", ""), f"{cmd}: command missing {needle}: {args}"
         assert "PASSED" not in content, f"{cmd}: engine must not execute the shell"
 
+def test_show_diff_and_edit():
+    print("\n--- Test diff: 'muestra el diff' -> bash git diff ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [{"role": "user", "content": "muestra el diff"}],
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    assert fr == "tool_calls", f"Expected tool_calls, got {fr}"
+    name = tc[0]["function"]["name"]
+    args = json.loads(tc[0]["function"]["arguments"])
+    print(f"  [PASS] muestra el diff -> {name} {args}")
+    assert name == "bash"
+    assert "git diff" in args.get("command", "")
+    assert "buggy line" not in args.get("command", "")
+
+    print("\n--- Test edit: 'cambia foo por bar en notas.txt' -> edit ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [{"role": "user", "content": "cambia foo por bar en notas.txt"}],
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    assert fr == "tool_calls", f"Expected tool_calls, got {fr}"
+    name = tc[0]["function"]["name"]
+    args = json.loads(tc[0]["function"]["arguments"])
+    print(f"  [PASS] cambia foo por bar -> {name} {args}")
+    assert name == "edit", f"Expected edit, got {name}"
+    assert args.get("filePath") == "notas.txt"
+    assert args.get("oldString") == "foo"
+    assert args.get("newString") == "bar"
+
+    print("\n--- Test edit: 'modifica README.md' -> read (no invented hunk) ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [{"role": "user", "content": "modifica README.md"}],
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    tc = choice.get("message", {}).get("tool_calls", [])
+    name = tc[0]["function"]["name"]
+    args = json.loads(tc[0]["function"]["arguments"])
+    print(f"  [PASS] modifica README.md -> {name} {args}")
+    assert name == "read"
+    assert "README.md" in args.get("filePath", "")
+    assert "buggy line" not in str(args)
+
 def test_dir_wildcard_flow():
     print("\n--- Test 6: 'dir *.*' Wildcard Inspection Flow ---")
     payload = {
@@ -468,6 +522,7 @@ if __name__ == "__main__":
         test_read_file_workspace_not_synthesis()
         test_greeting_natural()
         test_shell_tool_calls()
+        test_show_diff_and_edit()
         test_dir_wildcard_flow()
         test_dir_dot_flow()
         print("\n" + "=" * 60)

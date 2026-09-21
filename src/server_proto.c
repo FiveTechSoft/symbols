@@ -1421,6 +1421,263 @@ int ServerExtractCreatePath(const char *text, char *out, size_t n)
     return 1;
 }
 
+static const char *FindIstr(const char *hay, const char *needle)
+{
+    size_t nlen, i, j;
+    if (hay == NULL || needle == NULL || needle[0] == '\0')
+        return NULL;
+    nlen = strlen(needle);
+    for (i = 0; hay[i] != '\0'; i++)
+    {
+        for (j = 0; j < nlen; j++)
+        {
+            char h = hay[i + j];
+            char n = needle[j];
+            if (h >= 'A' && h <= 'Z') h = (char)(h + 32);
+            if (n >= 'A' && n <= 'Z') n = (char)(n + 32);
+            if (h == '\0' || h != n)
+                break;
+        }
+        if (j == nlen)
+            return hay + i;
+    }
+    return NULL;
+}
+
+static void JsonEscapeArg(const char *in, char *out, size_t n)
+{
+    size_t o = 0;
+    if (out == NULL || n == 0)
+        return;
+    out[0] = '\0';
+    if (in == NULL)
+        return;
+    for (; *in != '\0' && o + 2 < n; in++)
+    {
+        if (*in == '\\' || *in == '"')
+        {
+            if (o + 3 >= n)
+                break;
+            out[o++] = '\\';
+        }
+        if (*in == '\n' || *in == '\r')
+            continue;
+        out[o++] = *in;
+    }
+    out[o] = '\0';
+}
+
+int ServerIsDiffTask(const char *text)
+{
+    char lower[1024];
+    size_t i = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    if (ServerIsFileCreationTask(text))
+        return 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+    if (MatchWordBoundary(lower, "aplica") || MatchWordBoundary(lower, "apply") ||
+        strstr(lower, "apply_patch") != NULL)
+        return 0;
+    if (strstr(lower, "git diff") != NULL)
+        return 1;
+    if ((MatchWordBoundary(lower, "muestra") || MatchWordBoundary(lower, "mostrar") ||
+         MatchWordBoundary(lower, "show") || MatchWordBoundary(lower, "ver") ||
+         MatchWordBoundary(lower, "dame") || MatchWordBoundary(lower, "display")) &&
+        (MatchWordBoundary(lower, "diff") || MatchWordBoundary(lower, "cambios") ||
+         MatchWordBoundary(lower, "changes")))
+        return 1;
+    return 0;
+}
+
+int ServerExtractEditSpec(const char *text, char *file, size_t fn,
+                          char *old_s, size_t on, char *new_s, size_t nn,
+                          int *has_replace)
+{
+    const char *sep;
+    const char *orig_old;
+    const char *orig_new;
+    size_t ol, nl;
+    if (has_replace)
+        *has_replace = 0;
+    if (file && fn)
+        file[0] = '\0';
+    if (old_s && on)
+        old_s[0] = '\0';
+    if (new_s && nn)
+        new_s[0] = '\0';
+    if (text == NULL)
+        return 0;
+    if (file && fn)
+        ServerExtractCreatePath(text, file, fn);
+    sep = FindIstr(text, " por ");
+    if (sep == NULL)
+        sep = FindIstr(text, " with ");
+    if (sep == NULL)
+        return (file && file[0] != '\0');
+    orig_old = sep;
+    while (orig_old > text && orig_old[-1] != ' ' && orig_old[-1] != '\t')
+        orig_old--;
+    ol = (size_t)(sep - orig_old);
+    orig_new = sep;
+    while (*orig_new == ' ' || *orig_new == '\t')
+        orig_new++;
+    while (*orig_new && *orig_new != ' ' && *orig_new != '\t')
+        orig_new++;
+    while (*orig_new == ' ' || *orig_new == '\t')
+        orig_new++;
+    nl = 0;
+    while (orig_new[nl] && orig_new[nl] != ' ' && orig_new[nl] != '\t')
+        nl++;
+    if (ol == 0 || nl == 0)
+        return (file && file[0] != '\0');
+    if (old_s && on)
+    {
+        if (ol >= on)
+            ol = on - 1;
+        memcpy(old_s, orig_old, ol);
+        old_s[ol] = '\0';
+    }
+    if (new_s && nn)
+    {
+        if (nl >= nn)
+            nl = nn - 1;
+        memcpy(new_s, orig_new, nl);
+        new_s[nl] = '\0';
+    }
+    if (has_replace)
+        *has_replace = 1;
+    return 1;
+}
+
+int ServerIsEditTask(const char *text)
+{
+    char lower[1024];
+    char file[260], old_s[256], new_s[256];
+    int has_rep = 0;
+    size_t i = 0;
+    int has_verb = 0;
+    int has_file = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    if (ServerIsFileCreationTask(text) || ServerIsDiffTask(text))
+        return 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+    if (MatchWordBoundary(lower, "modifica") || MatchWordBoundary(lower, "modificar") ||
+        MatchWordBoundary(lower, "edita") || MatchWordBoundary(lower, "editar") ||
+        MatchWordBoundary(lower, "edit") || MatchWordBoundary(lower, "cambia") ||
+        MatchWordBoundary(lower, "cambiar") || MatchWordBoundary(lower, "reemplaza") ||
+        MatchWordBoundary(lower, "reemplazar") || MatchWordBoundary(lower, "replace") ||
+        MatchWordBoundary(lower, "actualiza") || MatchWordBoundary(lower, "actualizar"))
+        has_verb = 1;
+    if (!has_verb)
+        return 0;
+    ServerExtractEditSpec(text, file, sizeof(file), old_s, sizeof(old_s),
+                          new_s, sizeof(new_s), &has_rep);
+    if (file[0] != '\0' && strchr(file, '.') != NULL &&
+        strcmp(file, "nuevo.txt") != 0)
+        has_file = 1;
+    if (has_rep && has_file)
+        return 1;
+    if (has_file &&
+        (MatchWordBoundary(lower, "modifica") || MatchWordBoundary(lower, "edita") ||
+         MatchWordBoundary(lower, "edit") || MatchWordBoundary(lower, "modificar") ||
+         MatchWordBoundary(lower, "editar")))
+        return 1;
+    return 0;
+}
+
+int ServerMapDiffToolCall(const char *query, const char names[][64],
+                          uint32_t nnames, OPENAI_TOOL_CALL *out)
+{
+    const char *cmd = "git diff";
+    char tmp_names[8][64];
+    uint32_t i, n = 0;
+    if (query != NULL && FindIstr(query, "git diff") != NULL)
+        cmd = query;
+    if (nnames > 8)
+        nnames = 8;
+    for (i = 0; i < nnames; i++)
+    {
+        strncpy(tmp_names[n], names[i], 63);
+        tmp_names[n][63] = '\0';
+        n++;
+    }
+    if (!ServerMapShellToolCall(cmd, tmp_names, n, out))
+        return 0;
+    if (FindIstr(out->arguments, "git diff") == NULL)
+    {
+        strncpy(out->arguments, "{\"command\":\"git diff\"}",
+                sizeof(out->arguments) - 1);
+    }
+    return 1;
+}
+
+int ServerMapEditToolCall(const char *query, const char names[][64],
+                          uint32_t nnames, OPENAI_TOOL_CALL *out)
+{
+    char file[260], old_s[256], new_s[256];
+    char esc_file[320], esc_old[320], esc_new[320];
+    int has_rep = 0;
+    int has_edit = 0, has_read = 0, has_patch = 0;
+    uint32_t i;
+    const char *tool;
+    if (query == NULL || out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    ServerExtractEditSpec(query, file, sizeof(file), old_s, sizeof(old_s),
+                          new_s, sizeof(new_s), &has_rep);
+    if (file[0] == '\0')
+        strncpy(file, "nuevo.txt", sizeof(file) - 1);
+    for (i = 0; i < nnames; i++)
+    {
+        if (strcmp(names[i], "edit") == 0)
+            has_edit = 1;
+        if (strcmp(names[i], "read") == 0)
+            has_read = 1;
+        if (strcmp(names[i], "apply_patch") == 0)
+            has_patch = 1;
+    }
+    JsonEscapeArg(file, esc_file, sizeof(esc_file));
+    JsonEscapeArg(old_s, esc_old, sizeof(esc_old));
+    JsonEscapeArg(new_s, esc_new, sizeof(esc_new));
+    strncpy(out->id, "call_edit_1", sizeof(out->id) - 1);
+    if (has_rep && has_edit)
+    {
+        strncpy(out->name, "edit", sizeof(out->name) - 1);
+        snprintf(out->arguments, sizeof(out->arguments),
+                 "{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                 esc_file, esc_old, esc_new);
+        return 1;
+    }
+    if (has_rep && has_patch)
+    {
+        strncpy(out->name, "apply_patch", sizeof(out->name) - 1);
+        snprintf(out->arguments, sizeof(out->arguments),
+                 "{\"file\":\"%s\",\"diff\":\"--- a/%s\\n+++ b/%s\\n@@ -1 +1 @@\\n-%s\\n+%s\\n\"}",
+                 esc_file, esc_file, esc_file, esc_old, esc_new);
+        return 1;
+    }
+    /* No replacement text: ask the harness to show the file, do not invent a hunk. */
+    tool = has_read ? "read" : (has_edit ? "edit" : NULL);
+    if (tool == NULL)
+        return 0;
+    strncpy(out->name, tool, sizeof(out->name) - 1);
+    snprintf(out->arguments, sizeof(out->arguments),
+             "{\"filePath\":\"%s\"}", esc_file);
+    return 1;
+}
+
 static int LooksLikeDefinitionQuestion(const char *lower)
 {
     if (!lower)

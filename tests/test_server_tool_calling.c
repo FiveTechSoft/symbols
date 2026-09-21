@@ -559,6 +559,59 @@ static void test_shell_tool_dispatch(void)
     }
 }
 
+static void test_edit_and_diff_dispatch(void)
+{
+    printf("\n=== Test 11: Edit file and show diff (harness executes) ===\n");
+    char bash_edit[][64] = { "bash", "edit", "read", "glob" };
+    char edit_only[][64] = { "edit", "read" };
+    OPENAI_TOOL_CALL tc;
+    char file[260], old_s[64], new_s[64];
+    int has_rep = 0;
+
+    TEST_ASSERT(ServerIsDiffTask("muestra el diff") == 1, "muestra el diff");
+    TEST_ASSERT(ServerIsDiffTask("show the diff") == 1, "show the diff");
+    TEST_ASSERT(ServerIsDiffTask("ver los cambios") == 1, "ver los cambios");
+    TEST_ASSERT(ServerIsDiffTask("git diff") == 1, "git diff");
+    TEST_ASSERT(ServerIsDiffTask("apply this patch to main.c") == 0, "apply patch is not show-diff");
+    TEST_ASSERT(ServerIsDiffTask("quien es el padre de David?") == 0, "QA is not a diff task");
+    TEST_ASSERT(ServerMapDiffToolCall("muestra el diff", bash_edit, 4, &tc) == 1,
+                "maps diff to a shell tool");
+    TEST_ASSERT(strcmp(tc.name, "bash") == 0, "diff uses bash");
+    TEST_ASSERT(strstr(tc.arguments, "git diff") != NULL, "command is git diff");
+    TEST_ASSERT(strstr(tc.arguments, "buggy line") == NULL, "diff is not a fake hunk");
+
+    TEST_ASSERT(ServerIsEditTask("cambia foo por bar en main.c") == 1,
+                "cambia X por Y en file");
+    TEST_ASSERT(ServerIsEditTask("replace foo with bar in notes.txt") == 1,
+                "replace X with Y in file");
+    TEST_ASSERT(ServerIsEditTask("modifica README.md") == 1, "modifica FILE");
+    TEST_ASSERT(ServerIsEditTask("crea un fichero notas.txt") == 0, "create is not edit");
+    TEST_ASSERT(ServerIsEditTask("fix the leak in parser.c") == 0, "fix stays STRIPS");
+
+    TEST_ASSERT(ServerExtractEditSpec("cambia foo por bar en main.c",
+                                      file, sizeof(file), old_s, sizeof(old_s),
+                                      new_s, sizeof(new_s), &has_rep) == 1,
+                "extract edit spec");
+    TEST_ASSERT(strcmp(file, "main.c") == 0, "edit file is main.c");
+    TEST_ASSERT(has_rep == 1 && strcmp(old_s, "foo") == 0 && strcmp(new_s, "bar") == 0,
+                "old=foo new=bar");
+
+    TEST_ASSERT(ServerMapEditToolCall("cambia foo por bar en main.c",
+                                      edit_only, 2, &tc) == 1, "maps explicit replace");
+    TEST_ASSERT(strcmp(tc.name, "edit") == 0, "uses edit tool");
+    TEST_ASSERT(strstr(tc.arguments, "main.c") != NULL, "edit targets main.c");
+    TEST_ASSERT(strstr(tc.arguments, "oldString") != NULL &&
+                strstr(tc.arguments, "foo") != NULL, "oldString foo");
+    TEST_ASSERT(strstr(tc.arguments, "newString") != NULL &&
+                strstr(tc.arguments, "bar") != NULL, "newString bar");
+    TEST_ASSERT(strstr(tc.arguments, "buggy line") == NULL, "no dummy hunk");
+
+    TEST_ASSERT(ServerMapEditToolCall("modifica README.md", edit_only, 2, &tc) == 1,
+                "modifica FILE without replacement");
+    TEST_ASSERT(strcmp(tc.name, "read") == 0, "without old/new, ask harness to read");
+    TEST_ASSERT(strstr(tc.arguments, "README.md") != NULL, "read README.md");
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -575,6 +628,7 @@ int main(void)
     test_last_role_extraction();
     test_discrimination_battery();
     test_shell_tool_dispatch();
+    test_edit_and_diff_dispatch();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

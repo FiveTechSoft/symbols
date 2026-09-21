@@ -521,24 +521,26 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
     }
     else if (strcmp(op->name, "apply_patch") == 0)
     {
-        if (HasDeclaredTool(sess, "edit"))
+        OPENAI_TOOL_CALL mapped;
+        if (sess && ServerMapEditToolCall(issue, sess->declared_tools,
+                                          (uint32_t)sess->declared_tools_count,
+                                          &mapped))
+        {
+            strncpy(out_tc->calls[0].name, mapped.name, sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].arguments, mapped.arguments,
+                    sizeof(out_tc->calls[0].arguments) - 1);
+        }
+        else if (HasDeclaredTool(sess, "edit"))
         {
             strncpy(out_tc->calls[0].name, "edit", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
                      "{\"filePath\":\"%s\"}", target_file);
         }
-        else if (HasDeclaredTool(sess, "apply_patch"))
+        else if (HasDeclaredTool(sess, "read"))
         {
-            strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                     "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
-                     target_file);
-        }
-        else if (HasDeclaredTool(sess, "write"))
-        {
-            strncpy(out_tc->calls[0].name, "write", sizeof(out_tc->calls[0].name) - 1);
-            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                     "{\"filePath\":\"%s\",\"content\":\"\"}", target_file);
+                     "{\"filePath\":\"%s\"}", target_file);
         }
         else if (sess && sess->declared_tools_count > 0)
         {
@@ -547,10 +549,9 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
         }
         else
         {
-            strncpy(out_tc->calls[0].name, "apply_patch", sizeof(out_tc->calls[0].name) - 1);
+            strncpy(out_tc->calls[0].name, "read", sizeof(out_tc->calls[0].name) - 1);
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                     "{\"file\":\"%s\",\"diff\":\"@@ -1,3 +1,3 @@\\n- // buggy line\\n+ // fixed line\"}",
-                     target_file);
+                     "{\"filePath\":\"%s\"}", target_file);
         }
     }
     else if (strcmp(op->name, "verify_build") == 0)
@@ -1221,6 +1222,66 @@ static void HandleCompletions(socket_t s, const char *body,
                 }
                 return;
             }
+        }
+    }
+
+    if (sess->declared_tools_count > 0 && ServerIsDiffTask(query))
+    {
+        OPENAI_TOOL_CALLS tc;
+        memset(&tc, 0, sizeof(tc));
+        if (ServerMapDiffToolCall(query, sess->declared_tools,
+                                  (uint32_t)sess->declared_tools_count,
+                                  &tc.calls[0]))
+        {
+            tc.count = 1;
+            snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+            strncpy(sess->last_tool_call_name, tc.calls[0].name,
+                    sizeof(sess->last_tool_call_name) - 1);
+            if (ServerWantsStream(body))
+            {
+                char sse_local[16384];
+                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc, sse_local, sizeof(sse_local));
+                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+            }
+            else
+            {
+                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
+                    "Asking the harness to show the working-tree diff.",
+                    resp, sizeof(resp));
+                SendJson(s, 200, "OK", resp);
+            }
+            return;
+        }
+    }
+
+    if (sess->declared_tools_count > 0 && ServerIsEditTask(query))
+    {
+        OPENAI_TOOL_CALLS tc;
+        memset(&tc, 0, sizeof(tc));
+        if (ServerMapEditToolCall(query, sess->declared_tools,
+                                  (uint32_t)sess->declared_tools_count,
+                                  &tc.calls[0]))
+        {
+            tc.count = 1;
+            snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+            strncpy(sess->last_tool_call_name, tc.calls[0].name,
+                    sizeof(sess->last_tool_call_name) - 1);
+            if (ServerWantsStream(body))
+            {
+                char sse_local[16384];
+                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc, sse_local, sizeof(sse_local));
+                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+            }
+            else
+            {
+                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
+                    "Dispatching file edit to the client harness.",
+                    resp, sizeof(resp));
+                SendJson(s, 200, "OK", resp);
+            }
+            return;
         }
     }
 
