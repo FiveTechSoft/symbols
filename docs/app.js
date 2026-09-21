@@ -14,6 +14,13 @@ let graphEdges = [];
 let isDragging = false;
 let draggedNode = null;
 let activeHighlightedNode = null;
+let graphZoom = 1;
+let graphPanX = 0;
+let graphPanY = 0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let selectedNode = null;
 
 // Preset Quick Prompts Table
 const PRESET_PROMPTS = {
@@ -751,42 +758,117 @@ function initCanvas() {
   window.addEventListener("resize", resize);
   resize();
 
-  // Mouse drag events
+  /* Convert screen coords to graph coords (accounting for zoom + pan) */
+  function screenToGraph(sx, sy) {
+    return {
+      x: (sx - graphPanX) / graphZoom,
+      y: (sy - graphPanY) / graphZoom
+    };
+  }
+
+  /* Find node under screen coords */
+  function nodeAtScreen(sx, sy) {
+    const g = screenToGraph(sx, sy);
+    for (let i = graphNodes.length - 1; i >= 0; i--) {
+      const n = graphNodes[i];
+      const dx = n.x - g.x;
+      const dy = n.y - g.y;
+      if (Math.sqrt(dx * dx + dy * dy) < n.radius + 6) return n;
+    }
+    return null;
+  }
+
+  /* Hover cursor */
+  canvas.addEventListener("mousemove", (e) => {
+    if (isPanning) {
+      graphPanX += e.movementX;
+      graphPanY += e.movementY;
+      return;
+    }
+    if (isDragging && draggedNode) {
+      const rect = canvas.getBoundingClientRect();
+      const g = screenToGraph(e.clientX - rect.left, e.clientY - rect.top);
+      draggedNode.x = g.x;
+      draggedNode.y = g.y;
+      draggedNode.fx = g.x;
+      draggedNode.fy = g.y;
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const hovered = nodeAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+    canvas.style.cursor = hovered ? "pointer" : "grab";
+  });
+
+  /* Mouse down: start drag node, start pan, or click node */
   canvas.addEventListener("mousedown", (e) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    for (const node of graphNodes) {
-      const dx = node.x - mx;
-      const dy = node.y - my;
-      if (Math.sqrt(dx * dx + dy * dy) < node.radius + 4) {
-        isDragging = true;
-        draggedNode = node;
-        node.fx = mx;
-        node.fy = my;
-        break;
+    const hit = nodeAtScreen(mx, my);
+
+    if (hit) {
+      /* Drag node */
+      isDragging = true;
+      draggedNode = hit;
+      const g = screenToGraph(mx, my);
+      hit.fx = g.x;
+      hit.fy = g.y;
+      canvas.style.cursor = "grabbing";
+    } else {
+      /* Pan background */
+      isPanning = true;
+      panStartX = mx;
+      panStartY = my;
+      canvas.style.cursor = "grabbing";
+    }
+  });
+
+  /* Mouse up: release drag/pan, detect click on node */
+  canvas.addEventListener("mouseup", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    if (isDragging && draggedNode) {
+      /* Was a drag — check if it was actually a click (minimal movement) */
+      const dx = mx - panStartX;
+      const dy = my - panStartY;
+      if (Math.sqrt(dx * dx + dy * dy) < 5) {
+        /* Click on node → select it */
+        selectGraphNode(draggedNode);
       }
-    }
-  });
-
-  canvas.addEventListener("mousemove", (e) => {
-    if (isDragging && draggedNode) {
-      const rect = canvas.getBoundingClientRect();
-      draggedNode.x = e.clientX - rect.left;
-      draggedNode.y = e.clientY - rect.top;
-      draggedNode.fx = draggedNode.x;
-      draggedNode.fy = draggedNode.y;
-    }
-  });
-
-  window.addEventListener("mouseup", () => {
-    if (isDragging && draggedNode) {
       draggedNode.fx = null;
       draggedNode.fy = null;
       isDragging = false;
       draggedNode = null;
     }
+
+    if (isPanning) {
+      isPanning = false;
+    }
+    canvas.style.cursor = "grab";
   });
+
+  /* Double-click: reset zoom and pan */
+  canvas.addEventListener("dblclick", () => {
+    graphZoom = 1;
+    graphPanX = 0;
+    graphPanY = 0;
+  });
+
+  /* Mouse wheel: zoom in/out */
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.max(0.2, Math.min(5, graphZoom * delta));
+    /* Zoom toward cursor position */
+    graphPanX = mx - (mx - graphPanX) * (newZoom / graphZoom);
+    graphPanY = my - (my - graphPanY) * (newZoom / graphZoom);
+    graphZoom = newZoom;
+  }, { passive: false });
 }
 
 function rebuildGraphVisualizer() {
@@ -835,6 +917,44 @@ function highlightGraphNode(name) {
   graphNodes.forEach(n => {
     n.isHighlighted = (n.id === canon);
   });
+}
+
+function selectGraphNode(node) {
+  selectedNode = (selectedNode === node) ? null : node;
+  if (!selectedNode) {
+    updatePromptPills("code");
+    return;
+  }
+
+  /* Find connected relations for the selected node */
+  const name = selectedNode.id;
+  const related = [];
+  for (const rel of engine.relations) {
+    if (rel.subject === name && related.length < 4) {
+      related.push({ label: `${rel.predicate} ${rel.object}`, query: `What is the relation between ${rel.subject} and ${rel.object}?` });
+    } else if (rel.object === name && related.length < 6) {
+      related.push({ label: `who/what ${rel.predicate} ${rel.subject}?`, query: `Who or what relates to ${rel.subject} via ${rel.predicate}?` });
+    }
+  }
+
+  /* Add node frequency as context */
+  const concepts = engine.getTopConcepts(50);
+  const entry = concepts.find(c => c.name === name);
+  if (entry) {
+    related.push({ label: `${name} (freq: ${entry.frequency})`, query: `Tell me about ${name}` });
+  }
+
+  if (related.length === 0) {
+    related.push({ label: `Explore ${name}`, query: `Tell me about ${name}` });
+  }
+
+  /* Update pills with related prompts */
+  const container = document.querySelector(".pills-grid");
+  if (container) {
+    container.innerHTML = related.slice(0, 6).map(p =>
+      `<button class="prompt-pill" onclick="sendPrompt(${JSON.stringify(p.query)})">${p.label}</button>`
+    ).join("");
+  }
 }
 
 function startCanvasLoop() {
@@ -896,6 +1016,9 @@ function updatePhysics() {
 
 function renderGraph() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(graphPanX, graphPanY);
+  ctx.scale(graphZoom, graphZoom);
 
   // Draw edges
   ctx.lineWidth = 1;
@@ -912,7 +1035,11 @@ function renderGraph() {
     ctx.beginPath();
     ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
 
-    if (node.isHighlighted) {
+    if (node === selectedNode) {
+      ctx.fillStyle = "#ffcc00";
+      ctx.shadowColor = "#ffcc00";
+      ctx.shadowBlur = 18;
+    } else if (node.isHighlighted) {
       ctx.fillStyle = "#00ff88";
       ctx.shadowColor = "#00ff88";
       ctx.shadowBlur = 15;
@@ -930,6 +1057,8 @@ function renderGraph() {
     ctx.textAlign = "center";
     ctx.fillText(node.label, node.x, node.y + node.radius + 11);
   }
+
+  ctx.restore();
 }
 
 function escapeHtml(text) {
