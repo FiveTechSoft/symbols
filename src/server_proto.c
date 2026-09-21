@@ -1894,6 +1894,31 @@ int ServerIsShellTask(const char *text)
         if (strcmp(tok, cmds[i]) == 0)
             return 1;
     }
+
+    /* Natural language shell intent: "list files", "show directories",
+       "lista archivos", "muestra subcarpetas", etc. */
+    {
+        char lower[1024];
+        size_t j = 0;
+        while (text[j] != '\0' && j < sizeof(lower) - 1)
+        {
+            lower[j] = (char)tolower((unsigned char)text[j]);
+            j++;
+        }
+        lower[j] = '\0';
+        if (strstr(lower, "list ") != NULL || strstr(lower, "lista ") != NULL ||
+            strstr(lower, "show ") != NULL || strstr(lower, "muestra ") != NULL ||
+            strstr(lower, "explore ") != NULL || strstr(lower, "explora ") != NULL)
+        {
+            if (strstr(lower, "file") != NULL || strstr(lower, "archivo") != NULL ||
+                strstr(lower, "fichero") != NULL || strstr(lower, "folder") != NULL ||
+                strstr(lower, "carpeta") != NULL || strstr(lower, "director") != NULL ||
+                strstr(lower, "subcarpet") != NULL || strstr(lower, "subfolder") != NULL ||
+                strstr(lower, "content") != NULL || strstr(lower, "contenido") != NULL)
+                return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -1931,6 +1956,33 @@ int ServerMapShellToolCall(const char *query, const char names[][64],
     memset(out, 0, sizeof(*out));
     strncpy(out->name, tool, sizeof(out->name) - 1);
     strncpy(out->id, "call_shell_1", sizeof(out->id) - 1);
+    /* Natural language file listing: translate to dir/ls */
+    {
+        char lower_q[1024];
+        size_t j = 0;
+        while (query[j] != '\0' && j < sizeof(lower_q) - 1)
+        {
+            lower_q[j] = (char)tolower((unsigned char)query[j]);
+            j++;
+        }
+        lower_q[j] = '\0';
+        if ((strstr(lower_q, "list ") != NULL || strstr(lower_q, "lista ") != NULL ||
+             strstr(lower_q, "show ") != NULL || strstr(lower_q, "muestra ") != NULL ||
+             strstr(lower_q, "explore ") != NULL || strstr(lower_q, "explora ") != NULL) &&
+            (strstr(lower_q, "file") != NULL || strstr(lower_q, "archivo") != NULL ||
+             strstr(lower_q, "folder") != NULL || strstr(lower_q, "carpeta") != NULL ||
+             strstr(lower_q, "director") != NULL || strstr(lower_q, "contenido") != NULL ||
+             strstr(lower_q, "content") != NULL))
+        {
+            memset(out, 0, sizeof(*out));
+            strncpy(out->name, tool, sizeof(out->name) - 1);
+            strncpy(out->id, "call_shell_1", sizeof(out->id) - 1);
+            snprintf(out->arguments, sizeof(out->arguments),
+                     "{\"command\":\"dir *.*\"}");
+            return 1;
+        }
+    }
+
     p = query;
     while (*p == ' ' || *p == '\t')
         p++;

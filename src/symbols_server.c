@@ -414,11 +414,22 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
             snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
                      "{\"pattern\":\"%s\"}", pattern);
         }
-        else if (is_folder && HasDeclaredTool(sess, "bash") && (strncmp(issue, "dir", 3) == 0 || strncmp(issue, "ls", 2) == 0))
+        else if (is_folder && HasDeclaredTool(sess, "bash") &&
+                 (strncmp(issue, "dir", 3) == 0 || strncmp(issue, "ls", 2) == 0 ||
+                  strstr(issue, "list ") != NULL || strstr(issue, "lista ") != NULL ||
+                  strstr(issue, "show ") != NULL || strstr(issue, "muestra ") != NULL ||
+                  strstr(issue, "explore ") != NULL || strstr(issue, "explora ") != NULL))
         {
             strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
-            snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
-                     "{\"command\":\"%.120s\"}", issue);
+            /* Map natural language to a concrete shell command */
+            if (strstr(issue, "list ") != NULL || strstr(issue, "lista ") != NULL ||
+                strstr(issue, "show ") != NULL || strstr(issue, "muestra ") != NULL ||
+                strstr(issue, "explore ") != NULL || strstr(issue, "explora ") != NULL)
+                snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                         "{\"command\":\"dir *.*\"}");
+            else
+                snprintf(out_tc->calls[0].arguments, sizeof(out_tc->calls[0].arguments),
+                         "{\"command\":\"%.120s\"}", issue);
         }
         else if (HasDeclaredTool(sess, "read") && target_file && strchr(issue, '.'))
         {
