@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# run_symbols_server.sh: Starts Symbolic LLM Copilot Server
+# run_symbols_server.sh: Starts Symbolic LLM Server
 # ============================================================
 
 PORT=${1:-8099}
@@ -19,7 +19,7 @@ else
 fi
 
 echo "======================================================================"
-echo "  STARTING SYMBOLIC LLM LOCAL COPILOT SERVER ON PORT ${PORT}"
+echo "  STARTING SYMBOLIC LLM LOCAL SERVER ON PORT ${PORT}"
 echo "======================================================================"
 echo "  Repository Graph: ${REPO_DIR}"
 echo "  Corpora:          ${CORPORA}"

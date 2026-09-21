@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM run_symbols_server.bat: Starts Symbolic LLM Copilot Server
+REM run_symbols_server.bat: Starts Symbolic LLM Server
 REM Port: 8099 (default)
 REM Repo: Current directory (AST & Blast Radius Knowledge Graph)
 REM Corpora: C Language Standard (C11), AST & Code Knowledge Graph
@@ -15,7 +15,7 @@ if "%REPO_DIR%"=="" set REPO_DIR=.
 set CORPORA=data/c_lang/c_corpus.txt
 
 echo ======================================================================
-echo   STARTING SYMBOLIC LLM LOCAL COPILOT SERVER ON PORT %PORT%
+echo   STARTING SYMBOLIC LLM LOCAL SERVER ON PORT %PORT%
 echo ======================================================================
 echo   Repository Graph: %REPO_DIR%
 echo   Corpora:          %CORPORA%

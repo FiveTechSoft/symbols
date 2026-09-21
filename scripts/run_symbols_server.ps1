@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Starts the Symbolic LLM Copilot Server for OpenCode / Editor.
+    Starts the Symbolic LLM Server for OpenCode / Editor.
 .PARAMETER Port
     HTTP port to bind (default: 8099).
 .PARAMETER RepoDir
@@ -20,7 +20,7 @@ if (-not $ExePath) {
 }
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "  STARTING SYMBOLIC LLM LOCAL COPILOT SERVER ON PORT $Port" -ForegroundColor Green
+Write-Host "  STARTING SYMBOLIC LLM LOCAL SERVER ON PORT $Port" -ForegroundColor Green
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "  Repository Graph: $RepoDir"
 Write-Host "  Corpora:          $Corpora"

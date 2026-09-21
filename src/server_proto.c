@@ -2712,7 +2712,7 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
         if (is_identity)
         {
             snprintf(out, out_sz,
-                "I am Symbols, a local symbolic AI assistant and development copilot. "
+                "I am Symbols, a local symbolic AI assistant for software development. "
                 "I can help you inspect the repository, write and edit C, Python, and JavaScript code, "
                 "analyze functions and dependencies, and answer queries from the indexed knowledge base without GPU or cloud dependencies.");
         }
@@ -2728,14 +2728,14 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
         if (is_identity)
         {
             snprintf(out, out_sz,
-                "Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. "
+                "Soy Symbols, un asistente y motor de inteligencia artificial simbólica local. "
                 "Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, "
                 "analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado sin dependencias externas ni GPUs.");
         }
         else
         {
             snprintf(out, out_sz,
-                "¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. "
+                "¡Hola! Soy Symbols, tu asistente local de IA y desarrollo. "
                 "¿En qué puedo ayudarte hoy con tu proyecto o código?");
         }
     }

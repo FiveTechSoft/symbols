@@ -50,10 +50,10 @@ static const FixturePersonRow COMPILED_PERSON[] = {
 };
 
 static const char COMPILED_SELF_SCOPE[] =
-    "Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.";
+    "Soy Symbols, un asistente y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.";
 
 static const char COMPILED_SELF_GREET[] =
-    "¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?";
+    "¡Hola! Soy Symbols, tu asistente local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?";
 
 typedef struct {
     const char *trigger;

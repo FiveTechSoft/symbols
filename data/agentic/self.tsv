@@ -2,8 +2,8 @@
 # scope: KEY=lang, VALUE=reply text.
 # greeting: KEY=lang, VALUE=reply text.
 # trigger: normalized input line -> "scope" or "greeting".
-scope	es	Soy Symbols, un copiloto y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.
-greeting	es	¡Hola! Soy Symbols, tu copiloto local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?
+scope	es	Soy Symbols, un asistente y motor de inteligencia artificial simbólica local. Puedo ayudarte a explorar el repositorio, generar y modificar código en C, Python y JavaScript, analizar funciones y dependencias, y responder consultas sobre el conocimiento indexado.
+greeting	es	¡Hola! Soy Symbols, tu asistente local de IA y desarrollo. ¿En qué puedo ayudarte hoy con tu proyecto o código?
 trigger	quien eres	scope
 trigger	quien eres tu	scope
 trigger	who are you	scope
