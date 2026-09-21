@@ -11,8 +11,8 @@ on:
         description: Expected master SHA before applying
         required: true
         type: string
-      patch:
-        description: Unified diff to apply
+      patch_base64:
+        description: Base64-encoded unified diff to apply
         required: true
         type: string
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: Validate request and patch
         env:
-          PATCH_INPUT: ${{ inputs.patch }}
+          PATCH_BASE64: ${{ inputs.patch_base64 }}
           EXPECTED_HEAD: ${{ inputs.expected_head }}
           COMMIT_MESSAGE: ${{ inputs.message }}
         shell: bash
@@ -44,8 +44,8 @@ jobs:
           set -euo pipefail
           test -n "${COMMIT_MESSAGE//[[:space:]]/}" || { echo 'Commit message is empty'; exit 1; }
           test "$EXPECTED_HEAD" = "$(git rev-parse HEAD)" || { echo 'master moved; refusing stale patch'; exit 1; }
-          test -n "${PATCH_INPUT//[[:space:]]/}" || { echo 'Patch is empty'; exit 1; }
-          printf '%s\n' "$PATCH_INPUT" > "$RUNNER_TEMP/change.patch"
+          test -n "${PATCH_BASE64//[[:space:]]/}" || { echo 'Patch is empty'; exit 1; }
+          printf '%s' "$PATCH_BASE64" | base64 --decode > "$RUNNER_TEMP/change.patch"
           grep -q '^diff --git a/.* b/.*$' "$RUNNER_TEMP/change.patch" || { echo 'Not a unified git diff'; exit 1; }
           git apply --numstat "$RUNNER_TEMP/change.patch" > "$RUNNER_TEMP/numstat"
           test -s "$RUNNER_TEMP/numstat" || { echo 'Patch changes no files'; exit 1; }
