@@ -31,6 +31,8 @@
 #define MAX_TASK_DESC    512
 #define MAX_CMD_LEN      256
 #define MAX_REPORT_SIZE  32768
+#define MAX_REFLECTIONS  8
+#define MAX_REFLECTION_LEN 512
 
 /* Full definition of a software engineering task (SWE-bench benchmark unit) */
 typedef struct
@@ -55,6 +57,11 @@ typedef struct
     bool              is_solved;
     uint32_t          total_tool_calls;
     uint32_t          replans_triggered;
+    uint32_t          attempts_executed;
+    uint32_t          reflection_count;
+    char              reflections[MAX_REFLECTIONS][MAX_REFLECTION_LEN];
+    uint32_t          repairs_applied;
+    char              last_repair_operator[64];
     uint32_t          affected_callers_count;
     uint32_t          affected_files_count;
     char              risk_level[16];
