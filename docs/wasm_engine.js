@@ -168,6 +168,16 @@ class WASMSymbolicEngine {
       status = 'UNKNOWN_FAIL_CLOSED';
     }
 
+    /* Improve UNKNOWN messages with actionable guidance */
+    if (status === 'UNKNOWN_FAIL_CLOSED') {
+      const hasCorpus = this.sentences.length > 0;
+      if (!hasCorpus) {
+        response = 'No tengo informacion suficiente para responder. Selecciona un corpus en el sidebar izquierdo (Biblia, Jung, Quantum, Code) o ingresa un archivo .txt.';
+      } else {
+        response = 'No tengo constancia suficiente en el corpus cargado para responder esa pregunta. Prueba con otro corpus o ingresa mas texto.';
+      }
+    }
+
     /* Register turn */
     this.episodic.turns.push({
       id: this.episodic.turns.length + 1,
