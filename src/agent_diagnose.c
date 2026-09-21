@@ -181,7 +181,10 @@ static bool ParseCompilerLine(const char *line, DIAGNOSTIC_ITEM *item)
         ExtractQuotedIdentifier(p, "has no member named", item->offending_symbol, sizeof(item->offending_symbol));
         ExtractDidYouMean(p, item->suggested_fix, sizeof(item->suggested_fix));
     }
-    else if (strstr(p, "undeclared") != NULL || strstr(p, "undefined reference") != NULL)
+    else if (strstr(p, "undeclared") != NULL ||
+             strstr(p, "undefined reference") != NULL ||
+             strstr(p, "implicit declaration of function") != NULL ||
+             strstr(p, "unknown type name") != NULL)
     {
         item->type = DIAG_ERR_UNDECLARED_SYMBOL;
         ExtractQuotedIdentifier(p, NULL, item->offending_symbol, sizeof(item->offending_symbol));

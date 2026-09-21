@@ -8,6 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#endif
 #include "agent_runner.h"
 
 /* ============================================================
@@ -162,6 +169,155 @@ static bool build_did_you_mean_repair(const SWE_BENCH_TASK *task,
                                      diag->root_symbol,
                                      diag->root_suggestion,
                                      out_replacement, out_size);
+}
+
+
+/* A header is a candidate only when it contains a declaration-like line for
+   the exact compiler-reported identifier. This deliberately ignores macros,
+   comments, definitions and mere uses. The independent compiler run remains
+   the final authority after synthesis. */
+static bool header_has_declaration(const char *path, const char *symbol)
+{
+    FILE *f;
+    char line[2048];
+    uint32_t matches = 0;
+    if (!path || !symbol || !(f = fopen(path, "rb")))
+        return false;
+    while (fgets(line, sizeof(line), f))
+    {
+        char *p = line;
+        while (isspace((unsigned char)*p)) p++;
+        if (*p == '#' || (p[0] == '/' && (p[1] == '/' || p[1] == '*')))
+            continue;
+        for (char *hit = strstr(p, symbol); hit; hit = strstr(hit + 1, symbol))
+        {
+            size_t n = strlen(symbol);
+            bool left = (hit == p) || !(isalnum((unsigned char)hit[-1]) || hit[-1] == '_');
+            bool right = !(isalnum((unsigned char)hit[n]) || hit[n] == '_');
+            char *semi = strchr(hit + n, ';');
+            char *brace = strchr(hit + n, '{');
+            if (left && right && semi && (!brace || semi < brace))
+                matches++;
+        }
+    }
+    fclose(f);
+    return matches == 1;
+}
+
+static bool has_header_extension(const char *path)
+{
+    size_t n = path ? strlen(path) : 0;
+    return n > 2 && (!strcmp(path + n - 2, ".h") ||
+                     (n > 4 && !strcmp(path + n - 4, ".hpp")));
+}
+
+/* Recursive discovery returns exactly one declaration-bearing header. More
+   than one candidate is ambiguity, including duplicate declarations. */
+static void find_header_candidates(const char *dir, const char *symbol,
+                                   char *only, size_t only_size, uint32_t *count)
+{
+    if (!dir || !symbol || !only || !count || *count > 1)
+        return;
+#ifdef _WIN32
+    char pattern[MAX_PATCH_PATH * 2];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, "..") ||
+            CodeGraphShouldIgnoreName(fd.cFileName)) continue;
+        char path[MAX_PATCH_PATH * 2];
+        snprintf(path, sizeof(path), "%s\\%s", dir, fd.cFileName);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            find_header_candidates(path, symbol, only, only_size, count);
+        else if (has_header_extension(path) && header_has_declaration(path, symbol)) {
+            (*count)++; if (*count == 1) strncpy(only, path, only_size - 1);
+        }
+    } while (*count <= 1 && FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    DIR *d = opendir(dir);
+    if (!d) return;
+    struct dirent *ent;
+    while (*count <= 1 && (ent = readdir(d)) != NULL) {
+        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..") ||
+            CodeGraphShouldIgnoreName(ent->d_name)) continue;
+        char path[MAX_PATCH_PATH * 2];
+        struct stat st;
+        snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
+        if (stat(path, &st) != 0) continue;
+        if (S_ISDIR(st.st_mode))
+            find_header_candidates(path, symbol, only, only_size, count);
+        else if (S_ISREG(st.st_mode) && has_header_extension(path) &&
+                 header_has_declaration(path, symbol)) {
+            (*count)++; if (*count == 1) strncpy(only, path, only_size - 1);
+        }
+    }
+    closedir(d);
+#endif
+}
+
+static bool read_first_line(const char *path, char *line, size_t size)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f || !fgets(line, (int)size, f)) { if (f) fclose(f); return false; }
+    fclose(f);
+    return line[0] != '\0';
+}
+
+static bool file_contains_include(const char *path, const char *header)
+{
+    FILE *f = fopen(path, "rb");
+    char line[2048];
+    if (!f) return true; /* fail closed */
+    while (fgets(line, sizeof(line), f))
+        if (strstr(line, "#include") && strstr(line, header)) { fclose(f); return true; }
+    fclose(f);
+    return false;
+}
+
+/* Second deterministic operator. Preconditions: build failure in the exact
+   target, exact identifier, one declaration-bearing repo header, no existing
+   include, and a unique insertion anchor. The caller independently preflights
+   the complete two-hunk PATCH_PLAN against the rolled-back file. */
+static bool add_missing_header_hunk(const AGENT_RUNNER *runner,
+                                    const SWE_BENCH_TASK *task,
+                                    const DIAGNOSTIC_REPORT *diag,
+                                    PATCH_PLAN *candidate)
+{
+    char header[MAX_PATCH_PATH * 2] = {0};
+    char include_name[MAX_PATCH_PATH * 2];
+    char first_line[MAX_HUNK_TEXT] = {0};
+    char replacement[MAX_HUNK_TEXT] = {0};
+    uint32_t count = 0;
+    if (!runner || !task || !diag || !candidate || diag->error_count == 0 ||
+        !diagnostic_targets_task(diag, task) ||
+        diag->root_type != DIAG_ERR_UNDECLARED_SYMBOL ||
+        !is_c_identifier(diag->root_symbol) || diag->root_suggestion[0])
+        return false;
+
+    find_header_candidates(runner->workspace_dir, diag->root_symbol,
+                           header, sizeof(header), &count);
+    if (count != 1)
+        return false;
+
+    const char *root = runner->workspace_dir;
+    size_t root_len = strlen(root);
+    const char *rel = header;
+    if (root_len && !strncmp(header, root, root_len) &&
+        (header[root_len] == '/' || header[root_len] == '\\'))
+        rel = header + root_len + 1;
+    strncpy(include_name, rel, sizeof(include_name) - 1);
+    for (char *p = include_name; *p; p++) if (*p == '\\') *p = '/';
+    if (!include_name[0] || file_contains_include(task->target_file, include_name) ||
+        !read_first_line(task->target_file, first_line, sizeof(first_line)))
+        return false;
+
+    if ((size_t)snprintf(replacement, sizeof(replacement),
+                         "#include \"%s\"\n%s", include_name, first_line) >= sizeof(replacement))
+        return false;
+    return PatchPlanAddHunk(candidate, 1, "", first_line, replacement, "") != 0;
 }
 
 static void format_reflection(const DIAGNOSTIC_REPORT *diag,
@@ -335,6 +491,32 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
             {
                 PatchPlanFree(&candidate);
             }
+        }
+
+        if (!repaired && build_rc != 0 && out_result->repairs_applied == 0)
+        {
+            PATCH_PLAN candidate;
+            PATCH_VERIFY_REPORT candidate_rep;
+            PatchPlanInit(&candidate, task->target_file);
+            /* Header insertion comes first so applying it preserves the task
+               hunk's original target for the following sequential hunk. */
+            if (add_missing_header_hunk(runner, task, &diag, &candidate) &&
+                PatchPlanAddHunk(&candidate, task->target_line,
+                                 task->context_before, task->buggy_snippet,
+                                 task->fixed_snippet, task->context_after) &&
+                PatchVerifyPlan(&candidate, &candidate_rep) &&
+                candidate_rep.is_applicable)
+            {
+                PatchPlanFree(&patch);
+                patch = candidate;
+                rep = candidate_rep;
+                repaired = true;
+                out_result->repairs_applied++;
+                strncpy(out_result->last_repair_operator, "missing-header",
+                        sizeof(out_result->last_repair_operator) - 1);
+            }
+            else
+                PatchPlanFree(&candidate);
         }
 
         if (!repaired && previous_reflection[0] &&
