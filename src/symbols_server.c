@@ -1333,6 +1333,46 @@ static void HandleCompletions(socket_t s, const char *body,
         int is_inspection = ServerIsInspectionTask(query);
         int is_folder_glob = IsFolderOrGlobQuery(query);
 
+        /* Non-code file edits (.txt, .md, .json, etc.) skip build+test */
+        int is_noncode_edit = 0;
+        {
+            char lower_q[1024];
+            size_t j = 0;
+            while (query[j] != '\0' && j < sizeof(lower_q) - 1)
+            {
+                lower_q[j] = (char)tolower((unsigned char)query[j]);
+                j++;
+            }
+            lower_q[j] = '\0';
+            static const char *noncode_exts[] = {
+                ".txt", ".md", ".json", ".yml", ".yaml", ".toml",
+                ".csv", ".tsv", ".xml", ".html", ".css", ".log"
+            };
+            for (size_t e = 0; e < sizeof(noncode_exts) / sizeof(noncode_exts[0]); e++)
+            {
+                if (strstr(lower_q, noncode_exts[e]) != NULL)
+                {
+                    is_noncode_edit = 1;
+                    break;
+                }
+            }
+            /* Also detect "añade/agrega/add" + file pattern */
+            if (!is_noncode_edit &&
+                (strstr(lower_q, "añade") != NULL || strstr(lower_q, "agrega") != NULL ||
+                 strstr(lower_q, "add ") != NULL || strstr(lower_q, "escribe") != NULL ||
+                 strstr(lower_q, "write ") != NULL))
+            {
+                for (size_t e = 0; e < sizeof(noncode_exts) / sizeof(noncode_exts[0]); e++)
+                {
+                    if (strstr(lower_q, noncode_exts[e]) != NULL)
+                    {
+                        is_noncode_edit = 1;
+                        break;
+                    }
+                }
+            }
+        }
+
         if (is_creation)
         {
             sess->current_plan.step_count = 1;
@@ -1353,7 +1393,8 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
                             (is_inspection ? PRED_CODE_INSPECTED :
-                            (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED));
+                            (is_noncode_edit ? (PRED_PATCH_APPLIED | PRED_TASK_COMPLETED) :
+                            (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED)));
 
             AGENT_PLANNER planner;
             AgentPlannerInit(&planner);
