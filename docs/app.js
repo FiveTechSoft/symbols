@@ -4,6 +4,8 @@ let engine = null;
 let currentMode = "browser"; // "browser" or "server"
 let serverUrl = "http://127.0.0.1:8080/v1";
 let isAgenticWebSearchEnabled = true; // Auto-fallback when local graph has no ground truth
+let queryHistory = []; // arrow up/down navigation
+let queryHistoryIdx = -1;
 
 // Canvas Graph State
 let canvas, ctx;
@@ -121,7 +123,24 @@ function setupEventListeners() {
 
   sendBtn.addEventListener("click", () => handleUserSend());
   chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleUserSend();
+    if (e.key === "Enter") {
+      handleUserSend();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (queryHistory.length > 0) {
+        if (queryHistoryIdx < queryHistory.length - 1) queryHistoryIdx++;
+        chatInput.value = queryHistory[queryHistory.length - 1 - queryHistoryIdx];
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (queryHistoryIdx > 0) {
+        queryHistoryIdx--;
+        chatInput.value = queryHistory[queryHistory.length - 1 - queryHistoryIdx];
+      } else if (queryHistoryIdx === 0) {
+        queryHistoryIdx = -1;
+        chatInput.value = "";
+      }
+    }
   });
 
   // Dropzone file upload
@@ -255,6 +274,8 @@ async function handleUserSend() {
   if (!query) return;
 
   chatInput.value = "";
+  queryHistory.push(query);
+  queryHistoryIdx = -1;
   appendMessage("user", query);
 
   // Live HUD animation
