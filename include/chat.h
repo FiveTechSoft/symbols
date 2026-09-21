@@ -18,6 +18,7 @@
 #include "dict.h"
 #include "persona.h"
 #include "episodic_memory.h"
+#include "graph_reasoning.h"
 
 /* Relation keyword, DEDUCED from the corpus at ingest (never
    hardcoded): for each distinct TSV relation REL the stem is
@@ -88,6 +89,10 @@ typedef struct CHAT_
     PERSONA_FILTER  persona;
     /* persistent continuous episodic memory store */
     EPISODIC_STORE  episodic;
+    /* L3: inductive/deductive graph over session KB pairs.
+       Separate from tgraph (text lex). Rebuilt from kb.pairs. */
+    GRAPH           *rgraph;
+    GRAPH_RULE_BASE rbase;
 } CHAT;
 
 

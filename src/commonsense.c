@@ -496,6 +496,8 @@ static const char *g_commonsense_seed_data =
     "dog\tIS_A\tcanine\t2.0\n"
     "canine\tIS_A\tmammal\t2.0\n"
     "mammal\tIS_A\tanimal\t2.0\n"
+    "dog\tIS_A\tmammal\t2.0\n"
+    "canine\tIS_A\tanimal\t2.0\n"
     "quantum_system\tCAPABLE_OF\tsuperposition\t2.0\n"
     "quantum_particle\tHAS_PROPERTY\twave_particle_duality\t2.0\n"
     "wave_function\tCAUSES\twave_function_collapse\t2.0\n"

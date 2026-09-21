@@ -38,6 +38,10 @@
 
 #define CHAT_MAX_TOKS 16
 
+static void ChatReasonSync(CHAT *ch);
+static int ChatReasonHas(const CHAT *ch, const char *s, const char *rel,
+                         const char *o);
+
 /* struct CHAT_ is defined in chat.h (shared with tests) */
 
 /* ASCII-fold one character in place: Latin-1 accents and UTF-8
@@ -884,15 +888,135 @@ static GRAPH *ChatGetCommonsenseGraph(CHAT *ch)
     GRAPH *g = CommonsenseLoadBinary("data/commonsense.bin");
     if (g == NULL)
     {
-        /* Fallback: Create and ingest seed */
         g = GraphCreate(32768, 65536);
         if (g == NULL)
             return NULL;
+    }
+    {
         CS_STATS stats;
         CommonsenseIngestSeed(g, &stats);
     }
+    {
+        GRAPH_RULE_BASE rb;
+        GraphRuleBaseInit(&rb, 0.80f, 2);
+        GraphMineRules(g, &rb);
+        GraphApplyRules(g, &rb);
+    }
     ch->cs_graph = g;
     return ch->cs_graph;
+}
+
+static void ChatCsNormEntity(const CHAT *ch, const char *raw, char *out,
+                             size_t out_sz)
+{
+    const char *p;
+    const char *tr;
+    char tmp[CHAT_TOKEN_MAX];
+    if (out == NULL || out_sz == 0)
+        return;
+    out[0] = '\0';
+    if (raw == NULL)
+        return;
+    p = raw;
+    while (*p == ' ')
+        p++;
+    if ((strncmp(p, "un ", 3) == 0) || (strncmp(p, "el ", 3) == 0) ||
+        (strncmp(p, "la ", 3) == 0) || (strncmp(p, "the ", 4) == 0))
+        p += (p[1] == 'h' ? 4 : 3);
+    else if (strncmp(p, "una ", 4) == 0 || strncmp(p, "los ", 4) == 0 ||
+             strncmp(p, "las ", 4) == 0)
+        p += 4;
+    else if (p[0] == 'a' && p[1] == ' ' )
+        p += 2;
+    else if (strncmp(p, "an ", 3) == 0)
+        p += 3;
+    ChatNormTok(p, tmp, sizeof(tmp));
+    tr = (ch != NULL) ? DictTranslate(&ch->dict, tmp) : NULL;
+    strncpy(out, (tr && tr[0]) ? tr : tmp, out_sz - 1);
+    out[out_sz - 1] = '\0';
+}
+
+static int ChatCsEdge(const GRAPH *g, const char *s, const char *rel,
+                      const char *o)
+{
+    SYMBOL_ID sid, rid, oid;
+    if (g == NULL || s == NULL || rel == NULL || o == NULL)
+        return 0;
+    sid = SymbolFind(g->symbols, s);
+    rid = SymbolFind(g->symbols, rel);
+    oid = SymbolFind(g->symbols, o);
+    if (sid == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
+        oid == SYMBOL_INVALID)
+        return 0;
+    return GraphFindRelation((GRAPH *)g, sid, rid, oid) != NULL;
+}
+
+static int ChatCsWalk(const GRAPH *g, const char *s, const char *rel,
+                      const char *dst, uint32_t max_hops)
+{
+    SYMBOL_ID cur, rid, goal;
+    uint32_t hops;
+    if (g == NULL || s == NULL || rel == NULL || dst == NULL)
+        return 0;
+    if (ChatCsEdge(g, s, rel, dst))
+        return 1;
+    cur = SymbolFind(g->symbols, s);
+    rid = SymbolFind(g->symbols, rel);
+    goal = SymbolFind(g->symbols, dst);
+    if (cur == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
+        goal == SYMBOL_INVALID)
+        return 0;
+    for (hops = 0; hops < max_hops; hops++)
+    {
+        RELATION *res[8];
+        uint32_t n = GraphQuerySubjectRelation(g, cur, rid, res, 8);
+        if (n == 0)
+            return 0;
+        if (res[0]->object == goal)
+            return 1;
+        cur = res[0]->object;
+        if (cur == SYMBOL_INVALID)
+            return 0;
+    }
+    return 0;
+}
+
+static int ChatCsDescribe(const GRAPH *g, const char *ent, char *rel_out,
+                          size_t rel_sz, char *obj_out, size_t obj_sz)
+{
+    static const char *rels[] = {
+        "IS_A", "USED_FOR", "CAPABLE_OF", "HAS_PROPERTY", "MADE_OF",
+        "AT_LOCATION", "PART_OF", "CAUSES"
+    };
+    SYMBOL_ID sid;
+    uint32_t i;
+    if (g == NULL || ent == NULL || ent[0] == '\0' ||
+        rel_out == NULL || obj_out == NULL)
+        return 0;
+    sid = SymbolFind(g->symbols, ent);
+    if (sid == SYMBOL_INVALID)
+        return 0;
+    for (i = 0; i < sizeof(rels) / sizeof(rels[0]); i++)
+    {
+        SYMBOL_ID rid = SymbolFind(g->symbols, rels[i]);
+        RELATION *res[4];
+        uint32_t n;
+        const SYMBOL *os;
+        if (rid == SYMBOL_INVALID)
+            continue;
+        n = GraphQuerySubjectRelation(g, sid, rid, res, 4);
+        if (n == 0)
+            continue;
+        os = SymbolGet(g->symbols, res[0]->object);
+        if (os == NULL || os->name == NULL)
+            continue;
+        strncpy(rel_out, rels[i], rel_sz - 1);
+        rel_out[rel_sz - 1] = '\0';
+        strncpy(obj_out, os->name, obj_sz - 1);
+        obj_out[obj_sz - 1] = '\0';
+        return 1;
+    }
+    return 0;
 }
 
 
@@ -1945,7 +2069,9 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
                            &whole))
         {
             if (whole.intent == INT_WHY || whole.intent == INT_COMPOSE_WHY ||
-                whole.intent == INT_QA_CONSEQUENCE || whole.intent == INT_QA_AFFORDANCE)
+                whole.intent == INT_QA_CONSEQUENCE || whole.intent == INT_QA_AFFORDANCE ||
+                whole.intent == INT_QA_WHERE || whole.intent == INT_QA_WHAT ||
+                whole.intent == INT_QA_ENTITY || whole.intent == INT_QA_COUNT)
                 return EmitGoal(ch, toks, 0, n, -1, plan);
 
             /* If session has loaded text corpora and the whole line parses as
@@ -3505,6 +3631,58 @@ static int FindParentName(CHAT *ch, const char *entity,
     return 0;
 }
 
+/* Rebuild L3 reasoning graph from session KB pairs, mine Horn rules,
+   and close under deduction. Observed pairs stay the KB; inferred
+   edges live only on rgraph. */
+static void ChatReasonSync(CHAT *ch)
+{
+    uint32_t i;
+    if (ch == NULL)
+        return;
+    if (ch->rgraph != NULL)
+    {
+        GraphDestroy(ch->rgraph);
+        ch->rgraph = NULL;
+    }
+    ch->rgraph = GraphCreate(2048, 8192);
+    if (ch->rgraph == NULL)
+        return;
+    GraphRuleBaseInit(&ch->rbase, 0.80f, 2);
+    for (i = 0; i < ch->kb.num_pairs; i++)
+    {
+        const PAIR_EVID *p = &ch->kb.pairs[i];
+        SYMBOL_ID s, r, o;
+        if (p->subject[0] == '\0' || p->object[0] == '\0' ||
+            p->family[0] == '\0')
+            continue;
+        s = GraphAddSymbol(ch->rgraph, p->subject);
+        r = GraphAddSymbol(ch->rgraph, p->family);
+        o = GraphAddSymbol(ch->rgraph, p->object);
+        if (s == SYMBOL_INVALID || r == SYMBOL_INVALID ||
+            o == SYMBOL_INVALID)
+            continue;
+        GraphAddRelation(ch->rgraph, s, r, o);
+    }
+    GraphMineRules(ch->rgraph, &ch->rbase);
+    GraphApplyRules(ch->rgraph, &ch->rbase);
+}
+
+static int ChatReasonHas(const CHAT *ch, const char *s, const char *rel,
+                         const char *o)
+{
+    SYMBOL_ID sid, rid, oid;
+    if (ch == NULL || ch->rgraph == NULL || s == NULL || rel == NULL ||
+        o == NULL || s[0] == '\0' || rel[0] == '\0' || o[0] == '\0')
+        return 0;
+    sid = SymbolFind(ch->rgraph->symbols, s);
+    rid = SymbolFind(ch->rgraph->symbols, rel);
+    oid = SymbolFind(ch->rgraph->symbols, o);
+    if (sid == SYMBOL_INVALID || rid == SYMBOL_INVALID ||
+        oid == SYMBOL_INVALID)
+        return 0;
+    return GraphFindRelation(ch->rgraph, sid, rid, oid) != NULL;
+}
+
 /* Write a verified (parent, child) father pair into the session KB.
    Learns the family on first evidence; later pairs are idempotent
    presents. Does NOT run meta-discovery: father is not a true
@@ -3524,7 +3702,10 @@ static int PromoteFatherPair(CHAT *ch, const char *parent,
     snprintf(line, sizeof(line), "%s father_of %s", p, c);
     if (!LearnerLearnLine(&ch->lr, line))
         return 0;
-    return LearnerPresentPair(&ch->lr, "father", p, c);
+    if (!LearnerPresentPair(&ch->lr, "father", p, c))
+        return 0;
+    ChatReasonSync(ch);
+    return 1;
 }
 
 /* KB parent if unique, else text extract + promote. Ambiguous KB
@@ -3897,6 +4078,14 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         char path[CHAT_BFS_PATH_MAX][CHAT_TOKEN_MAX];
         if (!yes)
             yes = ChatBfsPath(ch, p->a, p->b, path) > 0;
+        if (!yes)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            char sa[CHAT_TOKEN_MAX], sb[CHAT_TOKEN_MAX];
+            ChatCsNormEntity(ch, p->a, sa, sizeof(sa));
+            ChatCsNormEntity(ch, p->b, sb, sizeof(sb));
+            yes = ChatCsWalk(cs, sa, "IS_A", sb, 6);
+        }
         if (yes)
             EMIT_OK("Si, %s es %s de %s.\n", capA, stem, capB);
         else
@@ -4690,6 +4879,21 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                   TransferDerive(&ch->kb, &ch->mk, fam, p->b, p->a, out,
                                  sizeof(out)) ||
                   ChatChainFam(ch, fam, p->a, p->b, mid, sizeof(mid));
+            if (!yes)
+                yes = ChatReasonHas(ch, p->a, fam, p->b);
+            if (!yes)
+            {
+                GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+                char sa[CHAT_TOKEN_MAX], sb[CHAT_TOKEN_MAX];
+                ChatCsNormEntity(ch, p->a, sa, sizeof(sa));
+                ChatCsNormEntity(ch, p->b, sb, sizeof(sb));
+                yes = ChatCsEdge(cs, sa, "IS_A", sb) ||
+                      ChatCsWalk(cs, sa, "IS_A", sb, 6) ||
+                      ChatCsEdge(cs, sa, "AT_LOCATION", sb) ||
+                      ChatCsWalk(cs, sa, "AT_LOCATION", sb, 6) ||
+                      ChatCsWalk(cs, sa, "PART_OF", sb, 6) ||
+                      ChatCsEdge(cs, sa, fam, sb);
+            }
         }
         if (yes)
             EMIT_OK("Si, %s %s de %s.\n", capA, kw->es_stem, capB);
@@ -4953,6 +5157,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 EMIT_OK("%s %s %s (segun registros estructurados).\n",
                         capS, q->family, capO);
                 found = 1;
+            }
+        }
+
+        if (!found)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
+            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
+            if (cs != NULL && ChatCsDescribe(cs, ent, reln, sizeof(reln),
+                                             objn, sizeof(objn)))
+            {
+                char capO[CHAT_TOKEN_MAX];
+                Cap(objn, capO, sizeof(capO));
+                st = GOAL_ANSWER;
+                found = 1;
+                EMIT_OK("%s %s %s (sentido comun).\n", capE, reln, capO);
             }
         }
 
@@ -5424,6 +5644,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        if (!found)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
+            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
+            if (cs != NULL && ChatCsDescribe(cs, ent, reln, sizeof(reln),
+                                             objn, sizeof(objn)))
+            {
+                char capO[CHAT_TOKEN_MAX];
+                Cap(objn, capO, sizeof(capO));
+                st = GOAL_ANSWER;
+                found = 1;
+                EMIT_OK("%s %s %s (sentido comun).\n", capE, reln, capO);
+            }
+        }
+
         /* Second: try text search */
         if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
         {
@@ -5794,8 +6030,12 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
         int last = -1;
         for (i = wh_pos + 1; i < n; i++)
         {
-            if (!IsStopTok(toks[i]) && !IsCopulaTok(toks[i]))
-                last = (int)i;
+            if (IsStopTok(toks[i]) || IsCopulaTok(toks[i]))
+                continue;
+            if (strcmp(toks[i], "esta") == 0 || strcmp(toks[i], "estan") == 0 ||
+                strcmp(toks[i], "estoy") == 0 || strcmp(toks[i], "estamos") == 0)
+                continue;
+            last = (int)i;
         }
         if (last >= 0)
         {
@@ -6586,6 +6826,7 @@ void ChatInit(CHAT *ch, const char *corpus_path)
     else
         printf("[chat] corpus: %u facts, %u vocab, metas=%u, rules=%u\n", total_facts,
                ch->kb.num_vocab, MetaCount(&ch->mk), MetaRuleCount(&ch->mk));
+    ChatReasonSync(ch);
 
     if (epi_loaded > 0)
         printf("[chat] episodic memory: %u persistent memories active\n", epi_loaded);
@@ -6636,6 +6877,7 @@ int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const c
             MetaRuleDiscover(&ch->mk);
         }
     }
+    ChatReasonSync(ch);
 
     /* 3. Ingest into session text graph if active */
     if (ch->tgraph != NULL)
@@ -6681,6 +6923,11 @@ void ChatDestroy(CHAT *ch)
     {
         GraphDestroy(ch->cs_graph);
         ch->cs_graph = NULL;
+    }
+    if (ch->rgraph != NULL)
+    {
+        GraphDestroy(ch->rgraph);
+        ch->rgraph = NULL;
     }
 }
 
