@@ -25,6 +25,14 @@
 #include "agent_planner.h"
 #include "agent_runner.h"
 
+#ifdef _WIN32
+#define HARD_GCC_EXE "hard_gcc_target.exe"
+#define HARD_GCC_RUN ".\\hard_gcc_target.exe"
+#else
+#define HARD_GCC_EXE "hard_gcc_target"
+#define HARD_GCC_RUN "./hard_gcc_target"
+#endif
+
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
 
@@ -282,7 +290,7 @@ static void test_challenge_4_real_gcc_compilation_and_execution(void)
     printf("\n=== Challenge 4: Real GCC Compilation & Execution Loop ===\n");
 
     const char *c_file = "hard_gcc_target.c";
-    const char *exe_file = "hard_gcc_target.exe";
+    const char *exe_file = HARD_GCC_EXE;
 
     /* Program that fails assertion: expected 50, but returns 0 */
     const char *buggy_c_code =
@@ -307,10 +315,10 @@ static void test_challenge_4_real_gcc_compilation_and_execution(void)
     fclose(f);
 
     /* 1. Compile buggy program with GCC and verify it returns failure */
-    int comp_rc1 = system("gcc -O2 hard_gcc_target.c -o hard_gcc_target.exe");
+    int comp_rc1 = system("gcc -O2 hard_gcc_target.c -o " HARD_GCC_EXE);
     TEST_ASSERT(comp_rc1 == 0, "GCC compiles buggy program");
 
-    int run_rc1 = system(".\\hard_gcc_target.exe");
+    int run_rc1 = system(HARD_GCC_RUN);
     TEST_ASSERT(run_rc1 != 0, "Buggy executable fails with non-zero exit code");
 
     /* 2. Run Autonomous Agent to fix the bug */
@@ -329,8 +337,8 @@ static void test_challenge_4_real_gcc_compilation_and_execution(void)
     strncpy(task.fixed_snippet, "    int result = 50; /* FIXED */\n", sizeof(task.fixed_snippet) - 1);
     strncpy(task.context_after, "    return result;\n", sizeof(task.context_after) - 1);
 
-    strncpy(task.build_command, "gcc -O2 hard_gcc_target.c -o hard_gcc_target.exe", sizeof(task.build_command) - 1);
-    strncpy(task.test_command, ".\\hard_gcc_target.exe", sizeof(task.test_command) - 1);
+    strncpy(task.build_command, "gcc -O2 hard_gcc_target.c -o " HARD_GCC_EXE, sizeof(task.build_command) - 1);
+    strncpy(task.test_command, HARD_GCC_RUN, sizeof(task.test_command) - 1);
 
     SWE_BENCH_RESULT result;
     int ok_solve = AgentRunnerSolveTask(runner, &task, &result);
@@ -341,7 +349,7 @@ static void test_challenge_4_real_gcc_compilation_and_execution(void)
                 "Unified diff shows fix");
 
     /* 3. Run the patched binary independently to confirm exit code 0 */
-    int run_rc2 = system(".\\hard_gcc_target.exe");
+    int run_rc2 = system(HARD_GCC_RUN);
     TEST_ASSERT(run_rc2 == 0, "Patched binary executes with exit code 0 (100% verified)");
 
     AgentRunnerDestroy(runner);

@@ -202,14 +202,14 @@ static void test_real_project_ingestion(void)
     CODE_GRAPH *cg = CodeGraphCreate(4096, 8192);
 
     /* Ingest actual project file from repository */
-    int rc1 = CodeGraphIngestFile(cg, "C:/symbols/include/agent_core.h");
-    TEST_ASSERT(rc1 == 1, "Ingested C:/symbols/include/agent_core.h");
+    int rc1 = CodeGraphIngestFile(cg, "include/agent_core.h");
+    TEST_ASSERT(rc1 == 1, "Ingested include/agent_core.h");
 
-    int rc2 = CodeGraphIngestFile(cg, "C:/symbols/src/agent_core.c");
-    TEST_ASSERT(rc2 == 1, "Ingested C:/symbols/src/agent_core.c");
+    int rc2 = CodeGraphIngestFile(cg, "src/agent_core.c");
+    TEST_ASSERT(rc2 == 1, "Ingested src/agent_core.c");
 
-    int rc3 = CodeGraphIngestFile(cg, "C:/symbols/tests/test_agent_core.c");
-    TEST_ASSERT(rc3 == 1, "Ingested C:/symbols/tests/test_agent_core.c");
+    int rc3 = CodeGraphIngestFile(cg, "tests/test_agent_core.c");
+    TEST_ASSERT(rc3 == 1, "Ingested tests/test_agent_core.c");
 
     /* Verify functions detected in agent_core.c */
     TEST_ASSERT(CodeGraphHasSymbol(cg, "AgentSessionInit"), "AgentSessionInit symbol present");

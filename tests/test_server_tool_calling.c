@@ -228,6 +228,7 @@ static void test_coding_task_intent(void)
     ServerSynthesizeCode("cola en C", synth, sizeof(synth));
     TEST_ASSERT(strstr(synth, "Enqueue") != NULL, "cola prompt emits Enqueue");
     TEST_ASSERT(strstr(synth, "Dequeue") != NULL, "cola prompt emits Dequeue");
+    TEST_ASSERT(strstr(synth, "% QUEUE_CAPACITY") != NULL, "cola prompt preserves modulo operators");
     TEST_ASSERT(strstr(synth, "StackPop") == NULL, "cola prompt does not emit a stack");
     ServerSynthesizeCode("funcion fibinacci en C", synth, sizeof(synth));
     TEST_ASSERT(strstr(synth, "fibonacci") != NULL, "fibinacci typo still emits fibonacci");

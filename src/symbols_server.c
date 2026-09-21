@@ -240,6 +240,11 @@ typedef struct
     char              last_tool_call_name[64];
     char              last_target[260];  /* last file/entity mentioned for pronoun resolution */
 
+    /* Pending append state: after read, dispatch write with old+new content */
+    int               pending_append;
+    char              pending_append_content[256];
+    char              pending_append_file[260];
+
     /* Persona conditioning */
     PERSONA_ID        persona_id;
 
@@ -784,6 +789,56 @@ static void HandleCompletions(socket_t s, const char *body,
                     strncat(sess->last_tool_output, tool_resp.content, sizeof(sess->last_tool_output) - strlen(sess->last_tool_output) - 1);
                 }
             }
+        }
+
+        /* Pending append: read result arrived, now dispatch write with old+new */
+        if (sess->pending_append && sess->last_tool_call_name[0] != '\0' &&
+            (strcmp(tool_resp.name, "read") == 0 ||
+             strcmp(sess->last_tool_call_name, "read") == 0))
+        {
+            sess->pending_append = 0;
+            sess->agent_active = 0;
+            OPENAI_TOOL_CALLS tc;
+            memset(&tc, 0, sizeof(tc));
+            /* Construct write: old content + newline + new content */
+            {
+                char write_content[16800];
+                const char *old = tool_resp.content;
+                const char *add = sess->pending_append_content;
+                if (old && old[0])
+                    snprintf(write_content, sizeof(write_content),
+                             "%s\n%s", old, add);
+                else
+                    snprintf(write_content, sizeof(write_content),
+                             "%s\n", add);
+                strncpy(tc.calls[0].name, "write", sizeof(tc.calls[0].name) - 1);
+                {
+                    char esc_file[320], esc_content[16600];
+                    ServerJsonEscape(sess->pending_append_file, esc_file, sizeof(esc_file));
+                    ServerJsonEscape(write_content, esc_content, sizeof(esc_content));
+                    snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                             "{\"filePath\":\"%s\",\"content\":\"%s\"}",
+                             esc_file, esc_content);
+                }
+                tc.count = 1;
+                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                strncpy(sess->last_tool_call_name, "write", sizeof(sess->last_tool_call_name) - 1);
+                sess->had_edit = 1;
+                if (ServerWantsStream(body))
+                {
+                    char sse_local[16384];
+                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                        g_seq, &tc, sse_local, sizeof(sse_local));
+                    SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+                }
+                else
+                {
+                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                        g_seq, &tc, "Appending content to file.", resp, sizeof(resp));
+                    SendJson(s, 200, "OK", resp);
+                }
+            }
+            return;
         }
 
         /* Direct-edit auto-diff: DISABLED.
@@ -1347,6 +1402,71 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->current_step_idx = 0;
             sess->replan_count = 0;
             strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
+            /* If this is a read (append intent), set pending_append
+               so the agentic loop will dispatch write with old+new content */
+            if (strcmp(tc.calls[0].name, "read") == 0)
+            {
+                char lcq[1024];
+                size_t qi = 0;
+                while (query[qi] != '\0' && qi < sizeof(lcq) - 1)
+                {
+                    lcq[qi] = (char)tolower((unsigned char)query[qi]);
+                    qi++;
+                }
+                lcq[qi] = '\0';
+                /* Extract file from arguments */
+                const char *fp = strstr(tc.calls[0].arguments, "\"filePath\":\"");
+                if (fp)
+                {
+                    fp += 12;
+                    const char *fe = strchr(fp, '"');
+                    if (fe && (size_t)(fe - fp) < sizeof(sess->pending_append_file))
+                    {
+                        memcpy(sess->pending_append_file, fp, (size_t)(fe - fp));
+                        sess->pending_append_file[(size_t)(fe - fp)] = '\0';
+                    }
+                }
+                /* Extract content from query (after verb, before " a/en FILE") */
+                {
+                    const char *content = "Line added";
+                    const char *p = NULL;
+                    if (strstr(lcq, "anade ") == lcq || strstr(lcq, "add ") == lcq)
+                        p = query + (lcq[0] == 'a' && lcq[1] == 'n' ? 5 : 4);
+                    else if (strstr(lcq, "añade ") == lcq)
+                        p = query + 5;
+                    else if (strstr(lcq, "agrega ") == lcq)
+                        p = query + 7;
+                    else if (strstr(lcq, "escribe ") == lcq || strstr(lcq, "write ") == lcq)
+                        p = query + (lcq[0] == 'e' ? 7 : 5);
+                    else if (strstr(lcq, "inserta ") == lcq || strstr(lcq, "insert ") == lcq)
+                        p = query + 8;
+                    if (p)
+                    {
+                        while (*p == ' ') p++;
+                        if (*p)
+                        {
+                            const char *sfx = strstr(p, " a ");
+                            if (sfx == NULL) sfx = strstr(p, " to ");
+                            if (sfx == NULL) sfx = strstr(p, " en ");
+                            if (sfx == NULL) sfx = strstr(p, " in ");
+                            if (sfx != NULL)
+                            {
+                                static char cbuf[256];
+                                size_t cl = (size_t)(sfx - p);
+                                if (cl >= sizeof(cbuf)) cl = sizeof(cbuf) - 1;
+                                memcpy(cbuf, p, cl);
+                                cbuf[cl] = '\0';
+                                content = cbuf;
+                            }
+                            else
+                                content = p;
+                        }
+                    }
+                    strncpy(sess->pending_append_content, content,
+                            sizeof(sess->pending_append_content) - 1);
+                }
+                sess->pending_append = 1;
+            }
             if (ServerWantsStream(body))
             {
                 char sse_local[16384];

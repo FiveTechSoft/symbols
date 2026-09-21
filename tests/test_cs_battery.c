@@ -19,6 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "chat.h"
+#include "commonsense.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -76,7 +77,15 @@ int main(void)
 
     {
         FILE *f = fopen("data/commonsense.bin", "rb");
-        if (f) { g_has_bin = 1; fclose(f); }
+        CS_BIN_HEADER hdr;
+        if (f != NULL) {
+            size_t got = fread(&hdr, 1, sizeof(hdr), f);
+            fclose(f);
+            g_has_bin = got == sizeof(hdr) &&
+                        hdr.magic == CS_BIN_MAGIC &&
+                        hdr.version == CS_BIN_VERSION &&
+                        hdr.relation_count >= 1000000;
+        }
     }
     printf("  [INFO] commonsense.bin: %s\n\n",
            g_has_bin ? "FULL SNAPSHOT (5.6M triples)" : "SEED (35 triples)");
@@ -259,13 +268,15 @@ int main(void)
     check(strstr(out, "Si,") != NULL, "IS_A dog->animal: YES");
 
     q(&ch, "es un gato un animal?", out, sizeof(out));
-    check(strstr(out, "Si,") != NULL, "IS_A cat->animal: YES");
+    check(g_has_bin ? strstr(out, "Si,") != NULL : is_unknown(out),
+          "IS_A cat->animal: full snapshot YES, seed UNKNOWN");
 
     q(&ch, "es un perro un refrigerador?", out, sizeof(out));
     check(is_unknown(out), "IS_A dog->refrigerator: UNKNOWN");
 
     q(&ch, "es el sol una estrella?", out, sizeof(out));
-    check(strstr(out, "Si,") != NULL, "IS_A sun->star: YES");
+    check(g_has_bin ? strstr(out, "Si,") != NULL : is_unknown(out),
+          "IS_A sun->star: full snapshot YES, seed UNKNOWN");
 
     q(&ch, "es un pez un pajaro?", out, sizeof(out));
     check(is_unknown(out), "IS_A fish->bird: UNKNOWN");

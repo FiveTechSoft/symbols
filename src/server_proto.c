@@ -1901,16 +1901,12 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
                         content = p;
                 }
             }
-            /* Use write tool: OpenCode handles encoding correctly (UTF-8/UTF-16).
-               bash echo corrupts UTF-16 files created by OpenCode. */
-            strncpy(out->name, "write", sizeof(out->name) - 1);
-            {
-                char esc_content[256];
-                JsonEscapeArg(content, esc_content, sizeof(esc_content));
-                snprintf(out->arguments, sizeof(out->arguments),
-                         "{\"filePath\":\"%s\",\"content\":\"%s\\n\"}",
-                         esc_file, esc_content);
-            }
+            /* First step: dispatch read so we can see current content.
+               Second step (in agentic loop) will dispatch write with
+               old content + new line appended. */
+            strncpy(out->name, "read", sizeof(out->name) - 1);
+            snprintf(out->arguments, sizeof(out->arguments),
+                     "{\"filePath\":\"%s\"}", esc_file);
             return 1;
         }
         /* Generic edit without replacement: dispatch read for inspection */
