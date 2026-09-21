@@ -1393,7 +1393,7 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
                             (is_inspection ? PRED_CODE_INSPECTED :
-                            (is_noncode_edit ? (PRED_PATCH_APPLIED | PRED_TASK_COMPLETED) :
+                            (is_noncode_edit ? PRED_PATCH_APPLIED :
                             (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED)));
 
             AGENT_PLANNER planner;
