@@ -174,6 +174,59 @@ static void test_strips_projection_and_reporting(void)
     TEST_ASSERT(strstr(report_md, "SYNTAX_ERROR") != NULL, "Classified as SYNTAX_ERROR");
 }
 
+/* Test 8: GCC diagnostic emitted under a UTF-8 locale (curly single quotes) */
+static void test_gcc_utf8_curly_quotes(void)
+{
+    printf("\n=== Test 8: GCC UTF-8 Locale Curly Quotes (real GCC message) ===\n");
+    /* Real GCC stderr under LC_ALL=C.UTF-8: identifiers are wrapped in
+       U+2018/U+2019 curly single quotes instead of ASCII quotes:
+       src/matrix.c:42:15: error: <U+2018>matrix_t<U+2019> has no member named <U+2018>column<U+2019>; did you mean <U+2018>columns<U+2019>? */
+    const char *err =
+        "src/matrix.c:42:15: error: \xE2\x80\x98matrix_t\xE2\x80\x99 has no member named "
+        "\xE2\x80\x98" "column" "\xE2\x80\x99; did you mean \xE2\x80\x98" "columns" "\xE2\x80\x99?\n"
+        "   42 |     int w = m->column;\n"
+        "      |                ^~~~~~\n";
+
+    DIAGNOSTIC_REPORT report;
+    int ok = DiagnosticParseOutput(err, &report);
+    TEST_ASSERT(ok == 1, "DiagnosticParseOutput parses UTF-8 GCC error");
+    TEST_ASSERT(report.error_count == 1, "Found exactly 1 error");
+    TEST_ASSERT(report.root_type == DIAG_ERR_MISSING_MEMBER, "Error type is DIAG_ERR_MISSING_MEMBER");
+    TEST_ASSERT(strcmp(report.root_symbol, "column") == 0, "Offending symbol is 'column'");
+    TEST_ASSERT(strcmp(report.root_suggestion, "columns") == 0, "Did-you-mean suggestion is 'columns'");
+
+    char remedy[256];
+    DiagnosticAbduceRemedy(&report, NULL, remedy, sizeof(remedy));
+    TEST_ASSERT(strstr(remedy, "replace invalid member 'column' with 'columns'") != NULL,
+                "Remedy prescribes exact replacement of column with columns");
+}
+
+/* Test 9: UTF-8 curly double quotes and fail-closed behavior */
+static void test_utf8_curly_double_quotes_and_fail_closed(void)
+{
+    printf("\n=== Test 9: UTF-8 Curly Double Quotes & Fail-Closed Parsing ===\n");
+    /* Identifiers wrapped in U+201C/U+201D curly double quotes */
+    const char *err =
+        "src/network.c:108:9: error: use of undeclared identifier \xE2\x80\x9C" "buff_size" "\xE2\x80\x9D\n";
+
+    DIAGNOSTIC_REPORT report;
+    int ok = DiagnosticParseOutput(err, &report);
+    TEST_ASSERT(ok == 1, "Parses error with curly double quotes");
+    TEST_ASSERT(report.root_type == DIAG_ERR_UNDECLARED_SYMBOL, "Type is DIAG_ERR_UNDECLARED_SYMBOL");
+    TEST_ASSERT(strcmp(report.root_symbol, "buff_size") == 0, "Symbol extracted from curly double quotes");
+
+    /* An opening curly quote with no matching closing quote must extract
+       no symbol (fail-closed), while the error type is still classified. */
+    const char *bad =
+        "src/matrix.c:42:15: error: \xE2\x80\x98matrix_t\xE2\x80\x99 has no member named \xE2\x80\x98" "column\n";
+
+    DIAGNOSTIC_REPORT bad_report;
+    int bad_ok = DiagnosticParseOutput(bad, &bad_report);
+    TEST_ASSERT(bad_ok == 1, "Unterminated quote still parses the line");
+    TEST_ASSERT(bad_report.root_type == DIAG_ERR_MISSING_MEMBER, "Type still classified as MISSING_MEMBER");
+    TEST_ASSERT(bad_report.root_symbol[0] == '\0', "No symbol extracted from unterminated quote (fail-closed)");
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -187,6 +240,8 @@ int main(void)
     test_msvc_format();
     test_codegraph_abductive_linking();
     test_strips_projection_and_reporting();
+    test_gcc_utf8_curly_quotes();
+    test_utf8_curly_double_quotes_and_fail_closed();
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);

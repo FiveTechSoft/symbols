@@ -9,7 +9,26 @@
 #include <ctype.h>
 #include "agent_diagnose.h"
 
-/* Helper: extract single-quoted or double-quoted identifier e.g. 'foo' or "foo" */
+/* Quote pairs recognized around identifiers in compiler diagnostics.
+   GCC and Clang wrap identifiers in ASCII quotes under the C locale and in
+   UTF-8 curly quotes under UTF-8 locales (e.g. LC_ALL=C.UTF-8 on CI). */
+typedef struct
+{
+    const char *open_seq;  /* Opening quote byte sequence */
+    const char *close_seq; /* Matching closing quote byte sequence */
+    size_t seq_len;        /* Byte length of each sequence */
+} QUOTE_PAIR;
+
+static const QUOTE_PAIR k_QuotePairs[] = {
+    { "'",            "'",            1 }, /* ASCII single quote ' */
+    { "\"",           "\"",           1 }, /* ASCII double quote " */
+    { "\xE2\x80\x98", "\xE2\x80\x99", 3 }, /* U+2018/U+2019 curly single quotes */
+    { "\xE2\x80\x9C", "\xE2\x80\x9D", 3 }, /* U+201C/U+201D curly double quotes */
+};
+
+/* Helper: extract a quoted identifier e.g. 'foo', "foo" or the UTF-8 curly
+   quote forms above. Fail-closed: without a matching closing quote of the
+   same pair, out stays empty and 0 is returned. */
 static int ExtractQuotedIdentifier(const char *msg, const char *after_prefix, char *out, size_t out_size)
 {
     if (!msg || !out || out_size == 0) return 0;
@@ -23,31 +42,24 @@ static int ExtractQuotedIdentifier(const char *msg, const char *after_prefix, ch
         start += strlen(after_prefix);
     }
 
-    const char *q1 = strchr(start, '\'');
-    const char *q2 = strchr(start, '"');
+    /* Find the earliest opening quote among the supported pairs */
     const char *q_start = NULL;
-    char quote_char = '\'';
-
-    if (q1 && q2)
+    const QUOTE_PAIR *pair = NULL;
+    size_t i;
+    for (i = 0; i < sizeof(k_QuotePairs) / sizeof(k_QuotePairs[0]); i++)
     {
-        if (q1 < q2) { q_start = q1; quote_char = '\''; }
-        else         { q_start = q2; quote_char = '"'; }
-    }
-    else if (q1)
-    {
-        q_start = q1;
-        quote_char = '\'';
-    }
-    else if (q2)
-    {
-        q_start = q2;
-        quote_char = '"';
+        const char *q = strstr(start, k_QuotePairs[i].open_seq);
+        if (q && (!q_start || q < q_start))
+        {
+            q_start = q;
+            pair = &k_QuotePairs[i];
+        }
     }
 
-    if (!q_start) return 0;
-    q_start++; /* Move past opening quote */
+    if (!q_start || !pair) return 0;
+    q_start += pair->seq_len; /* Move past opening quote */
 
-    const char *q_end = strchr(q_start, quote_char);
+    const char *q_end = strstr(q_start, pair->close_seq);
     if (!q_end) return 0;
 
     size_t len = (size_t)(q_end - q_start);
