@@ -1835,7 +1835,8 @@ typedef enum
     INT_QA_WHY_QA,    /* structural: <wh_cause> <entity> <relation> → cause lookup */
     INT_QA_WHAT,      /* structural: <wh> <copula> <entity> → definition/role lookup */
     INT_QA_CONSEQUENCE, /* structural: <wh_consequence> <condition...> → causal consequence */
-    INT_QA_AFFORDANCE   /* structural: <wh_affordance> <entity...> → used_for / capable_of */
+    INT_QA_AFFORDANCE,  /* structural: <wh_affordance> <entity...> → used_for / capable_of */
+    INT_SUMMARIZE       /* resume / summarize / cuéntame sobre → top-K extractive */
 } INTENT;
 
 
@@ -2262,7 +2263,8 @@ uint32_t ChatBuildPlan(const CHAT *ch, const char *line, QueryPlan *plan,
                 whole.intent == INT_QA_CONSEQUENCE || whole.intent == INT_QA_AFFORDANCE ||
                 whole.intent == INT_QA_WHERE || whole.intent == INT_QA_WHAT ||
                 whole.intent == INT_QA_ENTITY || whole.intent == INT_QA_COUNT ||
-                whole.intent == INT_IS_PARENT || whole.intent == INT_REL_BOOL)
+                whole.intent == INT_IS_PARENT || whole.intent == INT_REL_BOOL ||
+                whole.intent == INT_SUMMARIZE)
                 return EmitGoal(ch, toks, 0, n, -1, plan);
 
             /* If session has loaded text corpora and the whole line parses as
@@ -3306,6 +3308,74 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
             }
         }
         return 0;
+    }
+
+    /* ---- INT_SUMMARIZE trigger: resume / summarize / cuéntame sobre ----
+       Fires BEFORE family handlers. Detects summarize-like keywords and
+       extracts the topic entity for top-K extractive retrieval. Takes
+       priority over other intent families when a summarize keyword is
+       present (user explicitly asked to summarize, not to query). */
+    if (ch->ntfiles > 0 && ch->tgraph != NULL)
+    {
+        static const char *sum_kw[] = {
+            "resume", "resumir", "resumen", "synopsis",
+            "summarize", "summary", "summarise",
+            "cuentame", "cuéntame", "cuente", "hable",
+            "hablame", "explique", "explicame",
+            "que_dice", "que dice", "que menciona",
+            "que_information", "que informacion",
+            "que_sabes", "que sabes",
+            NULL
+        };
+        int si;
+        int sum_hit = -1;
+        for (si = 0; sum_kw[si] != NULL; si++)
+        {
+            int ti;
+            for (ti = 0; ti < (int)n; ti++)
+            {
+                if (strcasecmp(toks[ti], sum_kw[si]) == 0)
+                {
+                    sum_hit = ti;
+                    break;
+                }
+            }
+            if (sum_hit >= 0) break;
+        }
+        if (sum_hit >= 0)
+        {
+            /* Extract topic entity: first non-stop, non-keyword content token */
+            int ti;
+            for (ti = 0; ti < (int)n; ti++)
+            {
+                if (ti == sum_hit) continue;
+                if (IsStopTok(toks[ti])) continue;
+                if (strcasecmp(toks[ti], "el") == 0 || strcasecmp(toks[ti], "la") == 0 ||
+                    strcasecmp(toks[ti], "los") == 0 || strcasecmp(toks[ti], "las") == 0 ||
+                    strcasecmp(toks[ti], "un") == 0 || strcasecmp(toks[ti], "una") == 0 ||
+                    strcasecmp(toks[ti], "the") == 0 || strcasecmp(toks[ti], "a") == 0 ||
+                    strcasecmp(toks[ti], "an") == 0 || strcasecmp(toks[ti], "de") == 0 ||
+                    strcasecmp(toks[ti], "del") == 0 || strcasecmp(toks[ti], "en") == 0 ||
+                    strcasecmp(toks[ti], "sobre") == 0 || strcasecmp(toks[ti], "about") == 0 ||
+                    strcasecmp(toks[ti], "que") == 0 || strcasecmp(toks[ti], "what") == 0 ||
+                    strcasecmp(toks[ti], "how") == 0 || strcasecmp(toks[ti], "como") == 0)
+                    continue;
+                strncpy(p->a, toks[ti], CHAT_TOKEN_MAX - 1);
+                p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                break;
+            }
+            /* Store all tokens for top-K retrieval */
+            for (ti = 0; ti < (int)n && p->ntoks < 8; ti++)
+            {
+                if (IsStopTok(toks[ti])) continue;
+                strncpy(p->toks[p->ntoks], toks[ti], CHAT_TOKEN_MAX - 1);
+                p->toks[p->ntoks][CHAT_TOKEN_MAX - 1] = '\0';
+                p->ntoks++;
+            }
+            p->intent = INT_SUMMARIZE;
+            p->t_following = 0;
+            return 1;
+        }
     }
 
     /* TEXTQ fallback: content line over session text graphs.
@@ -4828,6 +4898,126 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         else
             EMIT("No entendi la pregunta.\n");
         }
+        break;
+    }
+    case INT_SUMMARIZE:
+    {
+        /* Extractive summarization: retrieve top-K sentences by attention,
+           present in document order for coherence. */
+        if (ch->ntfiles == 0 || ch->tgraph == NULL)
+        {
+            EMIT_OK("No tengo ningun texto cargado para resumir.\n");
+            break;
+        }
+        const char *words[CHAT_TEXT_WORDS_MAX];
+        uint32_t nw = 0;
+        uint32_t i, f, r, k;
+        /* Build query words from tokens (same as INT_TEXTQ) */
+        for (i = 0; i < p->ntoks && nw < CHAT_TEXT_WORDS_MAX; i++)
+        {
+            char w[CHAT_TOKEN_MAX];
+            const char *tr = DictTranslate(&ch->dict, p->toks[i]);
+            strncpy(w, (tr && tr[0]) ? tr : p->toks[i], CHAT_TOKEN_MAX - 1);
+            w[CHAT_TOKEN_MAX - 1] = '\0';
+            if (IsStopTok(w)) continue;
+            words[nw++] = w;
+        }
+        if (nw == 0)
+        {
+            EMIT_OK("No entendi que tema resumir.\n");
+            break;
+        }
+        /* Retrieve top-K (K=5) sentences across all files */
+        #define SUM_K 5
+        uint32_t all_idx[64];
+        float   all_sc[64];
+        uint32_t all_n = 0;
+        uint32_t all_f[64]; /* file index per result */
+        for (f = 0; f < ch->ntfiles && all_n < 64; f++)
+        {
+            uint32_t idx[16];
+            float   sc[16];
+            uint32_t nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
+                                            ch->temb, words, nw,
+                                            idx, sc, 16);
+            for (r = 0; r < nret && all_n < 64; r++)
+            {
+                all_idx[all_n] = idx[r];
+                all_sc[all_n]  = sc[r];
+                all_f[all_n]   = f;
+                all_n++;
+            }
+        }
+        if (all_n == 0)
+        {
+            EMIT_OK("No encontre informacion sobre ese tema en los textos.\n");
+            break;
+        }
+        /* Sort by score descending (simple insertion sort, K small) */
+        for (i = 1; i < all_n; i++)
+        {
+            uint32_t ti = all_idx[i]; float ts = all_sc[i]; uint32_t tf = all_f[i];
+            uint32_t j = i;
+            while (j > 0 && all_sc[j - 1] < ts)
+            {
+                all_idx[j] = all_idx[j - 1];
+                all_sc[j]  = all_sc[j - 1];
+                all_f[j]   = all_f[j - 1];
+                j--;
+            }
+            all_idx[j] = ti; all_sc[j] = ts; all_f[j] = tf;
+        }
+        /* Select top-SUM_K, then re-sort by document position for coherence */
+        uint32_t top_idx[SUM_K], top_f[SUM_K];
+        uint32_t ntop = (all_n < SUM_K) ? all_n : SUM_K;
+        for (i = 0; i < ntop; i++)
+        {
+            top_idx[i] = all_idx[i];
+            top_f[i]   = all_f[i];
+        }
+        /* Sort by file then sentence index (document order) */
+        for (i = 1; i < ntop; i++)
+        {
+            uint32_t ti = top_idx[i], tf = top_f[i];
+            uint32_t j = i;
+            while (j > 0 && (top_f[j - 1] > tf ||
+                   (top_f[j - 1] == tf && top_idx[j - 1] > ti)))
+            {
+                top_idx[j] = top_idx[j - 1];
+                top_f[j]   = top_f[j - 1];
+                j--;
+            }
+            top_idx[j] = ti; top_f[j] = tf;
+        }
+        /* Present */
+        {
+            char cap_topic[CHAT_TOKEN_MAX];
+            Cap(p->a, cap_topic, sizeof(cap_topic));
+            st = GOAL_ANSWER;
+            if (ntop == 1)
+            {
+                char sent[2048];
+                if (TextLexSentenceText(&ch->tlex[top_f[0]], top_idx[0],
+                        ch->tlex[top_f[0]].image, ch->tlex[top_f[0]].imagelen,
+                        sent, sizeof(sent)) > 0)
+                    EMIT_OK("Resumen de '%s': %s\n", cap_topic, sent);
+                else
+                    EMIT("No pude generar el resumen.\n");
+            }
+            else
+            {
+                EMIT_OK("Resumen de '%s' (%u puntos clave):\n", cap_topic, ntop);
+                for (i = 0; i < ntop; i++)
+                {
+                    char sent[2048];
+                    if (TextLexSentenceText(&ch->tlex[top_f[i]], top_idx[i],
+                            ch->tlex[top_f[i]].image, ch->tlex[top_f[i]].imagelen,
+                            sent, sizeof(sent)) > 0)
+                        EMIT_OK("  %u. %s\n", i + 1, sent);
+                }
+            }
+        }
+        #undef SUM_K
         break;
     }
     case INT_TEXTSTATUS:
@@ -7368,6 +7558,8 @@ static const char *IntentName(int intent)
         return "CONSEQUENCE";
     case INT_QA_AFFORDANCE:
         return "AFFORDANCE";
+    case INT_SUMMARIZE:
+        return "SUMMARIZE";
     default:
         return "NONE";
 

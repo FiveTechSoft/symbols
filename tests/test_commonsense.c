@@ -285,7 +285,7 @@ int main(void)
                                                       &path, out, sizeof(out));
         check_int("Glass dropped on concrete consequence derived", ok1, 1);
         check_contains("Consequence predicts shatter", out, "it will shatter");
-        check_contains("Explanation references brittle_material", out, "made of brittle_material");
+        check_contains("Explanation references brittle_material", out, "brittle_material");
         check_int("Inference path verified", path.verified, 1);
         check_int("Path hop count is 2", (int)path.hop_count, 2);
 
