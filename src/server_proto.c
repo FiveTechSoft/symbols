@@ -1244,6 +1244,10 @@ int ServerIsInspectionTask(const char *text)
             return 0;
     }
 
+    /* Data structures are not workspace or filesystem inspections */
+    if (strstr(lower, "lista enlazada") != NULL || strstr(lower, "linked list") != NULL)
+        return 0;
+
     static const char *inspect_keywords[] = {
         "review", "inspect", "folder", "directory", "codebase", "repo",
         "repository", "files", "workspace", "list", "explore", "project",
@@ -1309,7 +1313,11 @@ static int MatchesAlgorithmKeyword(const char *text)
     if (!text) return 0;
     if (strstr(text, "fibonacci") != NULL || strstr(text, "fib") != NULL ||
         strstr(text, "factorial") != NULL || strstr(text, "quicksort") != NULL ||
-        strstr(text, "mergesort") != NULL || strstr(text, "bubblesort") != NULL)
+        strstr(text, "mergesort") != NULL || strstr(text, "bubblesort") != NULL ||
+        strstr(text, "lista enlazada") != NULL || strstr(text, "linked list") != NULL ||
+        strstr(text, "array dinamico") != NULL || strstr(text, "dynamic array") != NULL ||
+        strstr(text, "leer archivo") != NULL || strstr(text, "leer fichero") != NULL ||
+        strstr(text, "read file") != NULL || strstr(text, "qsort") != NULL)
         return 1;
 
     char buf[512];
@@ -1355,12 +1363,12 @@ int ServerIsCodeSynthesisTask(const char *text)
             return 0;
     }
 
-    if (ServerIsInspectionTask(text))
-        return 0;
-
     /* Standalone algorithm / coding prompt keywords (including typo tolerance) */
     if (MatchesAlgorithmKeyword(lower))
         return 1;
+
+    if (ServerIsInspectionTask(text))
+        return 0;
 
     static const char *synth_verbs[] = {
         "escribe", "escribir", "crea", "crear", "genera", "generar",
@@ -1384,7 +1392,9 @@ int ServerIsCodeSynthesisTask(const char *text)
         "programa", "program", "codigo", "código", "code",
         "quicksort", "sort", "ordenar", "ordenamiento",
         "busqueda", "búsqueda", "puntero", "punteros", "pointer", "pointers",
-        "invertir", "reverse", "ejemplo", "example"
+        "invertir", "reverse", "ejemplo", "example",
+        "lista", "list", "nodo", "node", "vector", "pila", "stack", "cola", "queue",
+        "archivo", "fichero", "file", "lectura", "qsort"
     };
     int has_noun = 0;
     for (size_t k = 0; k < sizeof(synth_nouns) / sizeof(synth_nouns[0]); k++)

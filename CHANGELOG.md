@@ -4,6 +4,26 @@ Todas las novedades, mejoras y correcciones notables de **Symbolic LLM / symbols
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Phase 26] - 2026-09-21
+- **Expansión del Corpus Técnico C11, Grafo de Biblioteca Estándar y Síntesis Directa de Estructuras Canónicas**:
+  - **Vocabulario Técnico Dual y Alineación Conceptual (`data/c_lang/c_corpus.txt`)**:
+    - Sección 15 formalizada con alineación bidireccional ES/EN de conceptos esenciales: puntero/pointer, memoria dinámica/dynamic memory, fuga de memoria/memory leak, desbordamiento de buffer/buffer overflow, lista enlazada/linked list, vector redimensionable/dynamic array, pila/stack LIFO, cola/queue FIFO, lectura y escritura de archivos/file I/O, quicksort, búsqueda binaria/binary search, operaciones a nivel de bits, preprocesador, estructuras/structs y parámetros de compilación.
+    - Conocimiento técnico indexado sobre herramientas de desarrollo y diagnóstico: AddressSanitizer, UndefinedBehaviorSanitizer, Valgrind, GDB y CMake.
+  - **Modelo de Grafo y Tipos de la Biblioteca Estándar C11 (`data/c_lang/c_std_lib.h`)**:
+    - Estructuras canónicas indexadas en el Grafo de Código AST: `C_NODE` (nodo para listas enlazadas) y `C_VECTOR` (array dinámico geométrico).
+    - Incorporación de firmas libc: operaciones de archivo (`fopen`, `fgets`, `fseek`, etc.), utilidades (`qsort`, `bsearch`, conversiones numéricas, `system`), manipulación de cadenas y memoria, clasificación de caracteres (`ctype.h`), matemáticas (`math.h`), tiempo (`time.h`) y diagnósticos (`perror`, `strerror`).
+  - **Discriminación de Intenciones y Priorización de Síntesis (`src/server_proto.c`)**:
+    - `ServerIsInspectionTask`: blindaje para no clasificar estructuras como `lista enlazada` / `linked list` como comandos de inspección del sistema de archivos (`dir`/`ls`).
+    - `MatchesAlgorithmKeyword` y `ServerIsCodeSynthesisTask`: priorización de algoritmos y estructuras (`lista enlazada`, `array dinamico`, `leer archivo`, `qsort`, `pila`, `cola`) antes de inspección, evitando derivaciones erróneas al planificador STRIPS.
+  - **Catálogo de Síntesis Directa de Código C11 (`src/symbols_server.c`)**:
+    - Generadores deterministas de código modular C11 para quicksort con partición de Lomuto, lista enlazada simple, array dinámico con crecimiento $\times 2$, lectura segura de archivos con `fgets`, pila LIFO con verificación de límites y ordenamiento canónico con `qsort`.
+  - **Verificación Completa**:
+    - Pruebas unitarias de discriminación en `tests/test_server_tool_calling.c` ampliadas a 232/232 PASS.
+    - Harness E2E `tools/test_opencode_user_cases.py` con 3 nuevos casos de prueba y autoarranque del servidor (11/11 PASS).
+    - Suite global CTest 76/76 verde (67 Passed, 9 Skipped, 0 Failed).
+
+---
+
 ## [Phase 25] - 2026-09-21
 - **Tolerancia a Errores Tipográficos y Sintagmas Nominales en Síntesis de Código (`ServerIsCodeSynthesisTask`)**:
   - **Detección Difusa / Levenshtein de Algoritmos (`EditDistance`, `MatchesAlgorithmKeyword`)**:

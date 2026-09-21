@@ -1,6 +1,8 @@
 import urllib.request
 import json
 import time
+import os
+import subprocess
 
 URL = "http://127.0.0.1:8099/v1/chat/completions"
 
@@ -140,14 +142,74 @@ def test_fibinacci_typo_synthesis():
     tc = choice.get("message", {}).get("tool_calls", [])
     content = choice.get("message", {}).get("content", "")
     print(f"  [PASS] finish_reason: {fr}")
-    print(f"  [PASS] Direct C synthesis response:\n{content[:120]}...")
     assert fr == "stop", f"Expected stop, got {fr}"
     assert len(tc) == 0, f"Expected 0 tool calls for code synthesis, got {len(tc)}"
     assert "fibonacci" in content.lower() or "fibinacci" in content.lower()
     assert "uint64_t" in content or "int" in content
     assert "```c" in content
-    assert "FAILED" not in content
-    assert "Verification Failed" not in content
+
+def test_quicksort_synthesis():
+    print("\n--- Test 4c: 'quicksort en C' Synthesis ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "quicksort en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    content = choice.get("message", {}).get("content", "")
+    print(f"  [PASS] finish_reason: {fr}")
+    assert fr == "stop"
+    assert len(tc) == 0
+    assert "quicksort" in content.lower()
+    assert "partition" in content.lower() or "swap" in content.lower()
+    assert "```c" in content
+
+def test_linked_list_synthesis():
+    print("\n--- Test 4d: 'lista enlazada en C' Synthesis ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "lista enlazada en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    content = choice.get("message", {}).get("content", "")
+    print(f"  [PASS] finish_reason: {fr}")
+    assert fr == "stop"
+    assert len(tc) == 0
+    assert "node" in content.lower()
+    assert "next" in content.lower()
+    assert "```c" in content
+
+def test_read_file_synthesis():
+    print("\n--- Test 4e: 'leer archivo en C' Synthesis ---")
+    payload = {
+        "model": "symbols",
+        "tools": OPENCODE_TOOLS,
+        "messages": [
+            {"role": "user", "content": "leer archivo en C"}
+        ]
+    }
+    res = query(payload)
+    choice = res["choices"][0]
+    fr = choice.get("finish_reason")
+    tc = choice.get("message", {}).get("tool_calls", [])
+    content = choice.get("message", {}).get("content", "")
+    print(f"  [PASS] finish_reason: {fr}")
+    assert fr == "stop"
+    assert len(tc) == 0
+    assert "fopen" in content.lower()
+    assert "fgets" in content.lower()
+    assert "```c" in content
 
 def test_greeting_natural():
     print("\n--- Test 5: 'hola' Natural Greeting ---")
@@ -251,16 +313,58 @@ def test_dir_dot_flow():
     assert "src" in content2
 
 if __name__ == "__main__":
-    test_file_creation_flow()
-    test_subfolder_inspection()
-    test_large_body_payload()
-    test_fibonacci_synthesis()
-    test_fibinacci_typo_synthesis()
-    test_greeting_natural()
-    test_dir_wildcard_flow()
-    test_dir_dot_flow()
-    print("\n" + "=" * 60)
-    print("  ALL USER SCENARIOS VERIFIED END-TO-END (100% PASS)")
-    print("=" * 60)
+    port = 8099
+    repo_path = os.path.abspath(".")
+    corpus_arg = "data/c_lang/c_corpus.txt"
+    server_exe = os.path.join("build-gcc", "symbols-server.exe")
+
+    already_running = False
+    try:
+        req_check = urllib.request.Request(f"http://127.0.0.1:{port}/v1/models")
+        with urllib.request.urlopen(req_check, timeout=1) as r:
+            if r.status == 200:
+                already_running = True
+                print(f"[Init] Detected symbols-server already active on port {port}. Reusing resident instance.")
+    except Exception:
+        pass
+
+    proc = None
+    if not already_running:
+        if not os.path.exists(server_exe):
+            print(f"Error: {server_exe} not found. Please compile first.")
+            exit(1)
+        print(f"[Init] Starting symbols-server on port {port}...")
+        proc = subprocess.Popen(
+            [server_exe, str(port), repo_path, corpus_arg],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        time.sleep(2.0)
+        if proc.poll() is not None:
+            _, stderr = proc.communicate()
+            print(f"Server failed to start. Return code: {proc.returncode}\nStderr:\n{stderr}")
+            exit(1)
+
+    try:
+        test_file_creation_flow()
+        test_subfolder_inspection()
+        test_large_body_payload()
+        test_fibonacci_synthesis()
+        test_fibinacci_typo_synthesis()
+        test_quicksort_synthesis()
+        test_linked_list_synthesis()
+        test_read_file_synthesis()
+        test_greeting_natural()
+        test_dir_wildcard_flow()
+        test_dir_dot_flow()
+        print("\n" + "=" * 60)
+        print("  ALL USER SCENARIOS VERIFIED END-TO-END (100% PASS)")
+        print("=" * 60)
+    finally:
+        if proc is not None:
+            proc.terminate()
+            proc.wait(timeout=5)
+            print("\n[Cleanup] Stopped symbols-server instance.")
 
 

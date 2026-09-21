@@ -438,3 +438,23 @@ Regla arquitectónica:
      - Batería de discriminación en `tests/test_server_tool_calling.c` (226/226 PASS).
      - Prueba E2E `test_fibinacci_typo_synthesis` en `tools/test_opencode_user_cases.py` (100% PASS).
      - Suite global CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests), 2026-09-21.
+
+## Expansión del Corpus C11, Grafo de Biblioteca Estándar y Síntesis Directa de Estructuras (Fase 26)
+
+- Consolidación del conocimiento técnico y generación determinista de estructuras de datos canónicas (`data/c_lang/c_corpus.txt`, `data/c_lang/c_std_lib.h`, `src/server_proto.c`, `src/symbols_server.c`):
+  1. **Sección 15 del Corpus C11: Vocabulario Dual ES/EN y Conceptos Fundamentales**:
+     - Alineación formal bidireccional de conceptos y nomenclatura técnica en español e inglés: puntero/pointer, memoria dinámica/dynamic memory, fuga de memoria/memory leak, desbordamiento de buffer/buffer overflow, lista enlazada/linked list, vector redimensionable/dynamic array, pila/stack LIFO, cola/queue FIFO, lectura y escritura de archivos/file I/O, quicksort/ordenamiento rápido, búsqueda binaria/binary search, operaciones a nivel de bits/bit manipulation, preprocesador/preprocessor, estructuras/structs y parámetros de compilación/compilation flags.
+     - Documentación indexada de herramientas de diagnóstico y calidad: AddressSanitizer, UndefinedBehaviorSanitizer, Valgrind, GDB y CMake.
+  2. **Modelado AST de Biblioteca Estándar C11 en RAM**:
+     - Declaración de tipos dinámicos canónicos (`C_NODE`, `C_VECTOR`) para navegación y verificación estructural.
+     - Ingesta de firmas estándar: operaciones de archivo (`fopen`, `fgets`, `fseek`, etc.), algoritmos (`qsort`, `bsearch`, conversiones), funciones de cadena, clasificación (`ctype.h`), matemáticas (`math.h`), tiempo (`time.h`) y diagnósticos (`perror`, `strerror`).
+  3. **Protección de Estructuras de Datos y Priorización de Síntesis**:
+     - Exclusión explícita en `ServerIsInspectionTask`: consultas como `lista enlazada` / `linked list` no se confunden con inspecciones de archivos (`dir`/`ls`).
+     - Priorización de `MatchesAlgorithmKeyword` en `ServerIsCodeSynthesisTask`: despacha directamente antes de la verificación de inspección, evitando planes STRIPS erróneos.
+  4. **Catálogo de Síntesis Directa en C11**:
+     - Generadores modulares, limpios y autocontenidos con `main()` para quicksort recursivo (partición de Lomuto), lista enlazada simple (`Node`, `InsertHead`, `PrintList`, `FreeList`), array dinámico redimensionable (`Vector`), lectura de archivos con `fgets`, pila (Stack LIFO) acotada y ordenamiento canónico con `qsort` y comparador estricto.
+  5. **Verificación y Suites Automatizadas**:
+     - Suite `tests/test_server_tool_calling.c` ampliada a 232/232 PASS.
+     - Harness E2E `tools/test_opencode_user_cases.py` ampliado con 3 nuevas pruebas de síntesis y gestión de ciclo de vida del servidor (11/11 PASS).
+     - Suite global CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests), 2026-09-21.
+

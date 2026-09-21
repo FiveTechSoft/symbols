@@ -1,47 +1,87 @@
 # C Language Knowledge Corpus (ISO/IEC 9899 C11 Standard)
-# Structured conceptual and practical guide for symbolic AI programming.
+# Structured conceptual, normative, and practical guide for symbolic AI programming.
 
+# Section 1: C11 Standard Overview and Program Execution Model
 The C programming language is a procedural, statically typed language specified by the ISO/IEC 9899 standard.
 C provides low-level memory access, a small set of keywords, and clean structural abstraction.
+The compilation pipeline translates C source code through preprocessing, compilation, assembly, and linking phases.
+The preprocessor handles header inclusions, macro expansions, and conditional compilation before parsing begins.
+The compiler translates preprocessed C code into assembly instructions specific to the target machine architecture.
+The assembler converts assembly instructions into relocatable object code files.
+The linker combines multiple object files and standard library archives into an executable binary.
 Every C program begins execution in the entry point function named main.
 The main function returns an integer status code to the operating system where zero indicates success.
+Returning a non-zero integer from main indicates an error code or abnormal program termination.
+Translation units in C consist of a source file together with all included header files.
+Internal linkage restricts symbol visibility to the current translation unit using the static keyword.
+External linkage exposes function and global variable symbols across translation units using the extern keyword.
 
-Data types in C define the size and representation of values stored in computer memory.
+# Section 2: Data Types, Sizes, and Numeric Representation
+Data types in C define the byte size, alignment, and representation of values stored in computer memory.
 Fundamental integer types include char, short, int, long, and long long.
-Unsigned integer variants store non-negative values and never produce undefined behavior on overflow.
-Floating point types include float, double, and long double for IEEE 754 representations.
-The stdint header defines fixed-width integers such as int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, and uint64_t.
+The char type occupies exactly one byte and can represent signed or unsigned character values.
+Unsigned integer variants store non-negative values and never produce undefined behavior on arithmetic overflow.
+Signed integer overflow invokes undefined behavior according to the ISO C standard and must be prevented.
+Floating point types include float, double, and long double conforming to IEEE 754 representations.
+The stdint header defines exact-width integer types including int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t, and uint64_t.
 The size_t type is an unsigned integer representing the byte size of any object in memory.
-The bool type with true and false literals is defined in the stdbool header.
+The ptrdiff_t type is a signed integer representing the difference between two pointers in the same array.
+The bool type along with true and false boolean literals is defined in the stdbool header.
+The limits header defines platform-specific implementation limits including INT_MAX, INT_MIN, and UINT_MAX.
+The float header specifies limits and precision parameters for floating point calculations.
+Type casting converts an expression from one data type to another either implicitly or explicitly.
+Explicit casts should be used deliberately to avoid unintended truncation or signedness conversions.
+Endianness describes the byte order of multi-byte data types where little-endian stores the least significant byte first.
 
+# Section 3: Pointers, Memory Addresses, and Memory Layout
 Pointers are variables that store the memory addresses of other objects.
 The address-of operator & returns the memory address of a variable.
 The dereference operator * accesses the value stored at the memory address held by a pointer.
 A null pointer points to no valid memory address and is represented by the macro NULL in stddef.
-Dereferencing a null pointer causes undefined behavior and typically crashes with a segmentation fault.
+Dereferencing a null pointer causes undefined behavior and typically crashes the process with a segmentation fault.
 Pointer arithmetic calculates addresses based on the byte size of the pointed-to type.
+Adding an integer n to a pointer advances the memory address by n times the size of the underlying type.
 A void pointer is a generic pointer type that can hold the address of any data object without type inspection.
-Const pointers protect data from unintended modification and enforce interface safety.
+Void pointers cannot be dereferenced directly without casting to a concrete data pointer type.
+Const pointers protect data from unintended modification and enforce interface safety contracts.
+A pointer to const prevents modifying the pointed-to value while allowing the pointer itself to change.
+A const pointer prevents the pointer variable from pointing to a different address while allowing modification of the value.
+Double pointers store the memory address of another pointer variable.
+Double pointers are used to modify pointer values inside functions and to allocate two-dimensional dynamic matrices.
+Process memory layout is organized into text, initialized data, uninitialized BSS, heap, and call stack segments.
+The text segment stores the executable machine instructions and is typically marked read-only.
+The data segment stores initialized global and static variables.
+The BSS segment stores uninitialized global and static variables and is cleared to zero at program startup.
+The call stack segment grows dynamically to manage function call frames, local variables, and return addresses.
+The heap segment manages dynamically allocated memory requested at runtime.
 
+# Section 4: Dynamic Memory Management and Safety Invariants
 Memory management in C distinguishes between automatic, static, and dynamic storage durations.
 Automatic variables are allocated on the call stack and are deallocated automatically when execution exits their scope.
 Static variables retain their values throughout the entire execution lifetime of the program.
 Dynamic memory is allocated on the system heap at runtime using functions declared in the stdlib header.
 The malloc function allocates an uninitialized block of memory with a specified byte size.
-The calloc function allocates memory and initializes all bytes to zero.
-The realloc function resizes an existing heap allocation while preserving its existing contents.
+The calloc function allocates memory for an array of elements and initializes all bytes to zero.
+The realloc function resizes an existing heap allocation while preserving its existing contents up to the minimum size.
+When realloc fails to expand memory it returns NULL while leaving the original allocation intact without deallocation.
+Always store the return value of realloc in a temporary pointer to prevent leaking the original memory block on failure.
 The free function releases dynamically allocated heap memory back to the operating system.
 Failing to free allocated memory causes memory leaks that exhaust available system resources.
 Accessing memory after it has been freed produces dangling pointers and use-after-free vulnerabilities.
-Calling free twice on the exact same pointer leads to double free corruption and crashes.
+Calling free twice on the exact same pointer leads to double free heap corruption and severe security exploits.
+Setting pointers to NULL immediately after calling free prevents accidental dangling pointer dereferences.
+Always verify that dynamic allocation functions do not return NULL before attempting to access the allocated block.
+Memory alignment requires data objects to be stored at memory addresses that are multiples of their natural byte size.
 
+# Section 5: Arrays, Strings, and Buffer Protection
 Arrays in C are contiguous blocks of elements of identical type stored sequentially in memory.
-Array indexing is zero-based where the first element is at index zero.
+Array indexing is zero-based where the first element is located at index zero.
 Buffer overflow occurs when a program writes data beyond the allocated boundaries of an array or buffer.
 Buffer overflows corrupt adjacent stack or heap memory and represent critical security flaws.
 Off-by-one errors occur when loop bounds incorrectly access an index equal to the array capacity.
 Always verify array indices against buffer capacity guards before reading or writing elements.
-
+Arrays decay into pointers to their first element when passed as function arguments.
+Because array size is not preserved across function calls arrays must be accompanied by explicit length parameters.
 Strings in C are null-terminated arrays of characters ending with the null byte zero.
 The string header provides standard string manipulation and memory inspection functions.
 The strlen function computes the number of characters in a string excluding the terminating null byte.
@@ -49,42 +89,192 @@ The strcpy and strcat functions do not perform bounds checking and should be avo
 The strncpy function copies at most n characters from source to destination buffer.
 The snprintf function securely formats text into a bounded destination buffer preventing buffer overflow.
 The strcmp function compares two strings lexicographically and returns zero when strings are identical.
+The strncmp function compares at most n characters of two strings and returns zero when the prefix is identical.
+The strchr function searches for the first occurrence of a specific character in a string.
+The strstr function searches for the first occurrence of a substring within another string.
+The strtok function tokenizes a string into discrete components separated by specified delimiter characters.
 The memcpy function copies a specified count of bytes between non-overlapping memory buffers.
 The memmove function copies bytes safely even when source and destination buffers overlap.
 The memset function fills a block of memory with a specified byte value.
+The memcmp function compares two blocks of memory byte by byte.
 
+# Section 6: Composite Data Types, Structs, Unions, and Enums
 Structures in C are user-defined composite types that group related variables of different types under a single name.
 The struct keyword defines a composite structure type with named member fields.
 Members of a structure variable are accessed using the dot operator.
 Members of a structure pointed to by a pointer are accessed using the arrow operator.
 The typedef keyword creates convenient type aliases for complex structure declarations.
 Structures can be nested inside other structures to represent hierarchical data models.
+Compiler padding inserts unused bytes between structure members to satisfy hardware alignment requirements.
+Arranging structure members in descending order of size minimizes padding overhead and optimizes memory layout.
 Bit-fields allow packing integer members into specified numbers of bits to conserve memory.
-Unions allow storing different data types in the same shared memory location.
+Unions allow storing different data types in the same shared memory location where only one member is active at a time.
+The byte size of a union is determined by the size of its largest member.
 Enumerations defined with the enum keyword assign symbolic names to integer constants.
+Flexible array members allow a structure to end with an unsized array whose memory is allocated dynamically at runtime.
 
+# Section 7: Functions, Linkage, and Modularity
 Functions encapsulate reusable logic and enforce modular programming architecture.
 A function prototype declares the function name, return type, and parameter types before its definition.
 Header files with extension h declare public function prototypes and data structures for external consumers.
 Source files with extension c implement the actual logic and internal helper functions.
 Static functions have internal linkage and are visible only within the translation unit where they are defined.
 Inline functions suggest that the compiler replace function calls with the actual function body to reduce call overhead.
-Function pointers store addresses of functions enabling callbacks, event tables, and polymorphism.
+Function pointers store addresses of functions enabling callbacks, event tables, and runtime polymorphism.
+A function pointer type signature specifies the return type and parameter types of functions it can point to.
+Passing function pointers enables generic sorting algorithms and event-driven architectures.
+Recursion occurs when a function calls itself to solve a smaller instance of the same problem.
+Every recursive function requires a base case to terminate execution and prevent call stack overflow.
 
-Control flow statements guide execution paths based on boolean evaluations and loop conditions.
-The if and else statements perform conditional execution based on non-zero truth values.
-The switch statement dispatches execution to matching constant case labels.
-The while loop repeats execution as long as the condition expression evaluates to non-zero.
-The for loop provides concise initialization, condition evaluation, and increment operations.
-The do-while loop guarantees that the loop body executes at least once before evaluating the condition.
-The break statement exits the innermost enclosing loop or switch block immediately.
-The continue statement skips the remainder of the current loop iteration and proceeds to the next iteration.
+# Section 8: Standard Input Output and File System Operations
+The stdio header provides stream-based input and output abstractions for terminal and file communication.
+File operations in C rely on the FILE stream pointer type to represent open file descriptors and buffers.
+The fopen function opens a file specified by path and access mode returning a FILE pointer or NULL on error.
+Access modes for fopen include r for reading, w for writing, a for appending, and b for binary mode.
+Opening a file in w mode truncates any existing file contents to zero bytes immediately.
+Opening a file in a mode appends new data to the end of the file without altering existing contents.
+The fclose function flushes remaining stream buffers and closes the underlying file handle.
+Failing to call fclose on open files causes resource descriptor leaks in the operating system.
+The fread function reads a specified number of binary objects of given size from a file stream.
+The fwrite function writes binary objects directly from memory to a file stream.
+The fgets function securely reads a single line of text into a character buffer up to a specified maximum size.
+Unlike gets which is deprecated and unsafe fgets prevents buffer overflow by enforcing buffer length limits.
+The fputs function writes a string of text to a file stream without appending an automatic newline.
+The fprintf function writes formatted text directly to an open file stream or standard error.
+The fscanf and sscanf functions parse formatted values from file streams and character buffers.
+The fseek function repositions the file position indicator to a specified offset from SEEK_SET, SEEK_CUR, or SEEK_END.
+The ftell function returns the current byte position in a file stream enabling file size determination.
+The rewind function resets the file position indicator back to the beginning of the file.
+The feof function returns non-zero when the file stream has reached end-of-file.
+The ferror function tests whether an error indicator has been set on a file stream.
+The fflush function forces any buffered output data to be written to the underlying file or device.
+The remove function deletes a file from the filesystem by its path name.
+The rename function renames or moves a file to a new path name.
+The errno variable stores error numbers indicating failure causes for system calls and library functions.
+The perror function prints a descriptive error message corresponding to the current errno value to stderr.
+The strerror function returns a human-readable string explaining the error code stored in errno.
 
+# Section 9: The C Preprocessor, Macros, and Conditional Compilation
+The C preprocessor modifies source code text before compilation according to preprocessor directives starting with hash.
+The define directive creates object-like and function-like macros for symbolic constants and text substitutions.
+Function-like macros should enclose all parameters and expressions in parentheses to avoid operator precedence errors.
+Do-while-zero idiom encapsulates multi-statement macros safely inside conditional statements without dangling else bugs.
+The include directive inserts the contents of external header files into the current translation unit.
+Angle brackets in include directives search system and standard library include directories.
+Double quotes in include directives search the local directory before checking system include paths.
+Include guards using ifndef, define, and endif directives prevent multiple inclusions of the same header file.
+The pragma once directive is widely supported by modern compilers to prevent duplicate header inclusion.
+Conditional compilation directives include if, ifdef, ifndef, elif, else, and endif to configure platform-specific code.
+The stringizing operator hash converts macro arguments into string literals during preprocessing.
+The token-pasting operator double-hash concatenates two preprocessor tokens into a single syntactic token.
+The Static_assert feature in C11 validates assertions at compile time without incurring any runtime performance cost.
+
+# Section 10: Canonical Data Structures in C
+A linked list is a linear data structure where each node contains data and a pointer to the next node in sequence.
+A singly linked list allows forward traversal where each node links only to its immediate successor.
+A doubly linked list stores both next and previous pointers in each node enabling bidirectional traversal.
+Inserting a node at the head of a linked list executes in constant O(1) time.
+Searching for an element in an unsorted linked list requires linear O(n) time traversal.
+Traversing a linked list requires following pointer links until encountering a NULL pointer marking the list termination.
+Freeing a linked list requires saving the next pointer in a temporary variable before deallocating the current node.
+A dynamic array or vector manages a contiguous memory buffer that resizes dynamically using geometric growth.
+Geometric growth by a factor of two provides amortized constant O(1) time complexity for push operations.
+A stack is a last-in first-out LIFO data structure supporting push, pop, and peek operations.
+A queue is a first-in first-out FIFO data structure supporting enqueue and dequeue operations.
+A binary search tree is a hierarchical tree data structure where each node has at most two children.
+In a binary search tree the left child contains values smaller than the parent and the right child contains larger values.
+Searching, inserting, and deleting in a balanced binary search tree operates in logarithmic O(log n) time.
+A hash table maps keys to values using a hash function that computes an index into an array of buckets.
+Hash collisions occur when distinct keys produce identical hash indices and can be resolved using chaining or open addressing.
+Popular hash functions for string keys in C include djb2 and FNV-1a.
+
+# Section 11: Classical Algorithms and Sorting
+Sorting algorithms rearrange elements of an array into non-decreasing or non-increasing order.
+The quicksort algorithm uses a divide-and-conquer strategy to sort elements by partitioning around a chosen pivot.
+Partitioning in quicksort rearranges elements so values smaller than the pivot precede it and larger values follow it.
+Quicksort has average-case time complexity of O(n log n) and worst-case time complexity of O(n^2).
+The mergesort algorithm recursively divides an array into halves, sorts them, and merges the sorted halves in O(n log n) time.
+Mergesort requires O(n) auxiliary memory to perform the merge step but guarantees stable sorting order.
+The bubble sort algorithm repeatedly swaps adjacent elements if they are out of order with O(n^2) time complexity.
+The insertion sort algorithm builds the sorted array one element at a time and is efficient for small or nearly sorted arrays.
+The standard library qsort function in stdlib sorts arrays using a generic comparator callback function.
+A qsort comparator returns a negative integer if the first element is smaller, positive if larger, and zero if equal.
+The binary search algorithm finds the index of a target value within a sorted array in logarithmic O(log n) time.
+Binary search maintains left and right boundary indices and compares the target against the middle element in each iteration.
+Computing the midpoint in binary search as left plus right minus left divided by two prevents integer overflow.
+The standard library bsearch function searches a sorted array for a matching key using a comparator callback.
+
+# Section 12: Bit Manipulation and Low-Level Programming
+Bitwise operators manipulate individual binary bits within integer data types directly in hardware registers.
+The bitwise AND operator & yields one only if both corresponding operand bits are set to one.
+The bitwise OR operator | yields one if either corresponding operand bit is set to one.
+The bitwise XOR operator ^ yields one if exactly one operand bit is set to one and zero if both bits match.
+The bitwise NOT operator ~ inverts all bits of its operand converting zeros to ones and ones to zeros.
+The left shift operator << shifts bits to the left filling vacated positions with zero and multiplying by powers of two.
+The right shift operator >> shifts bits to the right dividing by powers of two where unsigned shifts fill with zeros.
+A bit mask is a binary value used to select, inspect, set, or clear specific bit positions within an integer.
+Setting a bit at position k is performed by bitwise OR with one shifted left by k.
+Clearing a bit at position k is performed by bitwise AND with the bitwise NOT of one shifted left by k.
+Toggling a bit at position k is performed by bitwise XOR with one shifted left by k.
+Testing whether a bit at position k is set is performed by bitwise AND with one shifted left by k.
+An integer x is a power of two if x is greater than zero and x bitwise AND x minus one equals zero.
+The population count or popcount operation counts the number of bits set to one in an integer.
+
+# Section 13: Standard C Library Headers and Utilities
+The stdlib header provides memory allocation, random numbers, process termination, conversions, and sorting utilities.
+The atoi, atol, and atof functions convert character strings to integers, longs, and floating point values.
+The strtol and strtod functions provide robust string-to-number conversions with error reporting and base selection.
+The rand function generates pseudo-random numbers between zero and RAND_MAX seeded by srand.
+The getenv function retrieves the string value of an environment variable from the host operating system.
+The system function passes a command string to the host operating system command interpreter for execution.
+The exit function terminates the calling process gracefully closing open streams and running atexit callbacks.
+The abort function terminates the calling process abnormally and produces a core dump or crash report.
+The math header declares mathematical functions operating on floating point values such as sqrt, pow, sin, cos, and log.
+The fabs function computes the absolute value of a floating point number.
+The ceil function rounds a floating point number up to the nearest integer value.
+The floor function rounds a floating point number down to the nearest integer value.
+The ctype header declares character classification and case-mapping functions such as isalpha, isdigit, and tolower.
+The isalpha function checks whether a character is an alphabetic letter.
+The isdigit function checks whether a character is a decimal digit between zero and nine.
+The isalnum function checks whether a character is alphanumeric.
+The isspace function checks whether a character is a whitespace character such as space, tab, or newline.
+The toupper function converts a lowercase letter to its uppercase equivalent.
+The tolower function converts an uppercase letter to its lowercase equivalent.
+The time header provides types and functions for clock timing, calendar time, and date formatting.
+The time function returns the current calendar time as a time_t value representing seconds since the Unix epoch.
+The clock function returns processor time consumed by the program as clock_t ticks since process start.
+The difftime function computes the difference in seconds between two time_t timestamps.
+The assert header defines the assert macro which evaluates an expression and aborts execution if the condition is false.
+The stdarg header enables variadic functions accepting variable numbers of arguments using va_list, va_start, va_arg, and va_end.
+
+# Section 14: Defensive Programming, Diagnostics, and Compiler Tooling
 Defensive programming principles protect C software from runtime crashes and unexpected failures.
 Every function must validate its pointer arguments and capacity limits before performing operations.
 Return status codes should explicitly communicate operation success or failure to calling code.
-Always check the return value of dynamic allocation functions because malloc returns NULL on exhaustion.
+Always check the return value of dynamic allocation functions because malloc returns NULL on memory exhaustion.
 Use the assert macro from assert header to document invariants and catch logic bugs during development.
 Compiling with strict flags such as Wall, Wextra, and Werror helps catch subtle bugs before deployment.
 Clean modular C code minimizes global state and relies on pure functions and opaque handles.
 The GCC, Clang, and MSVC compilers translate C source code into high-performance native machine instructions.
+AddressSanitizer detects out-of-bounds accesses, use-after-free, and stack corruption at runtime.
+UndefinedBehaviorSanitizer identifies undefined behavior conditions such as signed integer overflow and null pointer dereference.
+Valgrind detects memory leaks, invalid heap reads, invalid heap writes, and uninitialized memory usage.
+The GDB debugger allows setting breakpoints, stepping through execution lines, inspecting variables, and analyzing backtraces.
+The CMake build system generates platform-native build files such as Makefiles or Visual Studio solutions.
+
+# Section 15: Dual Technical Vocabulary and Concept Alignment
+In C programming a pointer or puntero is a variable storing the physical memory address of another object.
+Dynamic memory or memoria dinamica is managed on the heap using malloc, calloc, realloc, and free.
+A memory leak or fuga de memoria occurs when allocated heap memory is not freed before losing its reference.
+A buffer overflow or desbordamiento de buffer occurs when data writes exceed the allocated bounds of an array.
+A linked list or lista enlazada stores items in dynamic nodes chained together with next pointers.
+A dynamic array or vector redimensionable expands its capacity geometrically when elements exceed current size.
+A stack or pila operates as a last-in first-out LIFO structure with push and pop operations.
+A queue or cola operates as a first-in first-out FIFO structure with enqueue and dequeue operations.
+File input and output or lectura y escritura de archivos uses fopen, fgets, fread, fwrite, and fclose.
+The quicksort algorithm or algoritmo de ordenamiento rapido partitions elements around a pivot to sort in O(n log n).
+Binary search or busqueda binaria locates target elements in sorted arrays in logarithmic O(log n) time.
+Bit manipulation or operaciones a nivel de bits uses masks and shifts to manipulate binary data directly.
+The preprocessor or preprocesador handles macros, header inclusion with include, and conditional compilation.
+Structures or estructuras defined with struct group heterogeneous fields into cohesive aggregate data models.
+Compilation flags or parametros de compilacion like Wall and Wextra enforce rigorous compiler verification.

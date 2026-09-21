@@ -165,6 +165,12 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodeSynthesisTask("funcion fibonacci en C") == 1, "Classifies 'funcion fibonacci en C' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("funcion para ordenar un array en C") == 1, "Classifies 'funcion para ordenar un array en C' as code synthesis");
     TEST_ASSERT(ServerIsCodeSynthesisTask("busqueda binaria en c") == 1, "Classifies 'busqueda binaria en c' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("quicksort en C") == 1, "Classifies 'quicksort en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("lista enlazada en C") == 1, "Classifies 'lista enlazada en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("array dinamico en C") == 1, "Classifies 'array dinamico en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("leer archivo en C") == 1, "Classifies 'leer archivo en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("pila en C") == 1, "Classifies 'pila en C' as code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("ordenar con qsort en C") == 1, "Classifies 'ordenar con qsort en C' as code synthesis");
 
     /* Conversational greetings and identity queries */
     TEST_ASSERT(ServerIsGreeting("hola") == 1, "Detects 'hola' as greeting");
