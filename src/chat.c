@@ -252,6 +252,7 @@ static int IsStopTok(const char *tok)
         "who", "what", "where", "when", "why", "how", "which", "whom", "whose",
         /* Possessives and pronouns */
         "su", "sus", "his", "her", "its", "their", "mi", "my", "tu", "your",
+        "hay", "there", "hubo", "hubieron",
         /* Copulas and auxiliaries */
         "es", "era", "fue", "son", "is", "was", "are", "were", "be", "been",
         "do", "did", "does",
@@ -2948,6 +2949,24 @@ static int ParseIntentToks(const CHAT *ch, const char toks[][CHAT_TOKEN_MAX],
                 uint32_t k;
                 if (IsStopTok(toks[i]) || IsGreetingTok(toks[i]))
                     continue;
+                /* Short tokens (mato/mate, creo/crew) are false friends.
+                   Dict hits are exact; LevNearest stays for long stems
+                   (psique~psyche). */
+                {
+                    const char *tr = DictTranslate(&ch->dict, toks[i]);
+                    if (tr != NULL &&
+                        TextLexFindSymbol(ch->tgraph, tr) != SYMBOL_INVALID)
+                    {
+                        strncpy(p->a, tr, CHAT_TOKEN_MAX - 1);
+                        p->a[CHAT_TOKEN_MAX - 1] = '\0';
+                        strncpy(p->t_sub, tr, CHAT_TOKEN_MAX - 1);
+                        p->t_sub[CHAT_TOKEN_MAX - 1] = '\0';
+                        p->intent = INT_TEXTQ;
+                        return 1;
+                    }
+                }
+                if (strlen(toks[i]) < 6)
+                    continue;
                 sub = LevNearest(ch->tgraph, toks[i], 3, &dd);
                 if (sub == SYMBOL_INVALID)
                     continue;
@@ -3507,6 +3526,119 @@ static int TextAncestor(CHAT *ch, const char *entity, int hops,
     return 1;
 }
 
+static int ChatIstristr(const char *hay, const char *need)
+{
+    size_t nlen, hlen, i, j;
+    if (hay == NULL || need == NULL || need[0] == '\0')
+        return 0;
+    nlen = strlen(need);
+    hlen = strlen(hay);
+    if (nlen > hlen)
+        return 0;
+    for (i = 0; i + nlen <= hlen; i++)
+    {
+        for (j = 0; j < nlen; j++)
+        {
+            char h = hay[i + j];
+            char n = need[j];
+            if (h >= 'A' && h <= 'Z') h = (char)(h + 32);
+            if (n >= 'A' && n <= 'Z') n = (char)(n + 32);
+            if (h != n)
+                break;
+        }
+        if (j == nlen)
+            return 1;
+    }
+    return 0;
+}
+
+/* Sentence that contains `need` (or its dict canonical). Prefers
+   candidates that also contain any prefer[] token. Fail-closed: 0
+   if the name never appears. */
+static int ChatFindGroundedSentence(const CHAT *ch, const char *need,
+                                    const char *const *prefer, uint32_t npref,
+                                    char *out, size_t out_sz)
+{
+    const char *canon;
+    const char *key;
+    const char *words[8];
+    uint32_t nw = 0;
+    uint32_t f;
+    int have = 0;
+    uint32_t best = 0, bestf = 0;
+    int best_pref = -1;
+    size_t bestlen = (size_t)-1;
+    float bestsc = -1.0f;
+    if (ch == NULL || need == NULL || need[0] == '\0' ||
+        out == NULL || out_sz < 2 || ch->ntfiles == 0 ||
+        ch->tgraph == NULL)
+        return 0;
+    canon = DictTranslate(&ch->dict, need);
+    key = (canon != NULL && canon[0] != '\0') ? canon : need;
+    words[nw++] = key;
+    for (f = 0; f < npref && nw < 8; f++)
+    {
+        const char *pr = prefer[f];
+        const char *pt;
+        if (pr == NULL || pr[0] == '\0' || IsStopTok(pr))
+            continue;
+        if (strcmp(pr, need) == 0 || strcmp(pr, key) == 0)
+            continue;
+        pt = DictTranslate(&ch->dict, pr);
+        words[nw++] = (pt != NULL && pt[0] != '\0') ? pt : pr;
+    }
+    /* Exhaustive over sentences that contain the name. Rank by how
+       many query/dict cues also occur (born+Jesus beats a random
+       Jesus verse). Attention top-K misses rare joint hits. */
+    for (f = 0; f < ch->ntfiles; f++)
+    {
+        uint32_t s, ns;
+        const TEXTLEX *tl = &ch->tlex[f];
+        if (tl->image == NULL)
+            continue;
+        ns = tl->nsent;
+        for (s = 0; s < ns; s++)
+        {
+            char sent[2048];
+            int ph = 0;
+            uint32_t pi;
+            if (TextLexSentenceText(tl, s, tl->image, tl->imagelen,
+                                    sent, sizeof(sent)) <= 0)
+                continue;
+            if (!ChatIstristr(sent, key) && !ChatIstristr(sent, need))
+                continue;
+            for (pi = 1; pi < nw; pi++)
+            {
+                if (ChatIstristr(sent, words[pi]))
+                    ph++;
+            }
+            {
+                size_t slen = strlen(sent);
+                if (!have || ph > best_pref ||
+                    (ph == best_pref && slen < bestlen))
+                {
+                    have = 1;
+                    best = s;
+                    bestf = f;
+                    best_pref = ph;
+                    bestlen = slen;
+                    bestsc = (float)ph;
+                }
+            }
+        }
+    }
+    if (have && nw > 1 && best_pref <= 0)
+        have = 0;
+    if (!have)
+        return 0;
+    if (TextLexSentenceText(&ch->tlex[bestf], best,
+                            ch->tlex[bestf].image,
+                            ch->tlex[bestf].imagelen,
+                            out, out_sz) <= 0)
+        return 0;
+    return 1;
+}
+
 /* buffered answer: byte-identical text to the former ChatAnswer,
    plus the per-goal status for the composite dispatcher. */
 static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
@@ -3939,11 +4071,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                everywhere and drown the entity. Frequency threshold
                deduced from corpus, never hardcoded vocabulary. */
             uint32_t total_freq = 0;
+            char qcanon[CHAT_TEXT_WORDS_MAX][CHAT_TOKEN_MAX];
             for (i = 0; i < ch->tgraph->symbols->count; i++)
                 total_freq += ch->tgraph->symbols->items[i].frequency;
             for (i = 0; i < p->ntoks && nw < CHAT_TEXT_WORDS_MAX; i++)
             {
-                SYMBOL_ID sid = TextLexFindSymbol(ch->tgraph, p->toks[i]);
+                const char *w = p->toks[i];
+                const char *tr = DictTranslate(&ch->dict, p->toks[i]);
+                if (tr != NULL && tr[0] != '\0')
+                {
+                    strncpy(qcanon[nw], tr, CHAT_TOKEN_MAX - 1);
+                    qcanon[nw][CHAT_TOKEN_MAX - 1] = '\0';
+                    w = qcanon[nw];
+                }
+                if (IsStopTok(p->toks[i]) || IsStopTok(w))
+                    continue;
+                SYMBOL_ID sid = TextLexFindSymbol(ch->tgraph, w);
                 if (sid != SYMBOL_INVALID)
                 {
                     const SYMBOL *sym = SymbolGet(ch->tgraph->symbols, sid);
@@ -3954,7 +4097,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                             continue;
                     }
                 }
-                words[nw++] = p->toks[i];
+                words[nw++] = w;
             }
         }
         /* interpretation layer: topic key (cached words on
@@ -4652,6 +4795,22 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        if (!found)
+        {
+            const char *pref[CHAT_TEXT_WORDS_MAX];
+            uint32_t np = 0;
+            char gsent[2048];
+            uint32_t ti;
+            for (ti = 0; ti < p->ntoks && np < CHAT_TEXT_WORDS_MAX; ti++)
+                pref[np++] = p->toks[ti];
+            if (ChatFindGroundedSentence(ch, p->a, pref, np, gsent, sizeof(gsent)))
+            {
+                st = GOAL_ANSWER;
+                found = 1;
+                EMIT_OK("Segun el texto: %s\n", gsent);
+            }
+        }
+
         /* Second: try text search if KB had no results */
         if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
         {
@@ -4856,44 +5015,18 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
 
         /* Try text search with location keywords */
         if (ch->ntfiles > 0 && ch->tgraph != NULL)
-
         {
-            const char *words[8];
-            uint32_t nw = 0;
-            words[nw++] = p->a;
-            /* Add location-related words from the text itself */
-            uint32_t best = 0, bestf = 0;
-            float bestsc = 0.0f;
-            int have = 0;
-            for (uint32_t f = 0; f < ch->ntfiles; f++)
+            const char *pref[CHAT_TEXT_WORDS_MAX];
+            uint32_t np = 0;
+            char gsent[2048];
+            uint32_t ti;
+            for (ti = 0; ti < p->ntoks && np < CHAT_TEXT_WORDS_MAX; ti++)
+                pref[np++] = p->toks[ti];
+            if (ChatFindGroundedSentence(ch, p->a, pref, np, gsent, sizeof(gsent)))
             {
-                uint32_t idx[16];
-                float sc[16];
-                uint32_t r = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
-                                             ch->temb, words, nw,
-                                             idx, sc, 16);
-                for (uint32_t j = 0; j < r; j++)
-                {
-                    if (!have || sc[j] > bestsc)
-                    {
-                        best = idx[j];
-                        bestf = f;
-                        bestsc = sc[j];
-                        have = 1;
-                    }
-                }
-            }
-            if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
-            {
-                char sent[2048];
-                if (TextLexSentenceText(&ch->tlex[bestf], best,
-                                        ch->tlex[bestf].image,
-                                        ch->tlex[bestf].imagelen, sent,
-                                        sizeof(sent)) > 0)
-                {
-                    st = GOAL_ANSWER;
-                    EMIT_OK("Segun el texto: %s\n", sent);
-                }
+                st = GOAL_ANSWER;
+                found = 1;
+                EMIT_OK("Segun el texto: %s\n", gsent);
             }
         }
 
@@ -4944,7 +5077,21 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             st = GOAL_ANSWER;
             EMIT_OK("Hay %u registros relacionados con %s.\n", count, capE);
         }
-        else if (ch->ntfiles > 0 && ch->tgraph != NULL)
+        if (st != GOAL_ANSWER && ch->ntfiles > 0)
+        {
+            const char *pref[CHAT_TEXT_WORDS_MAX];
+            uint32_t np = 0;
+            char gsent[2048];
+            uint32_t ti;
+            for (ti = 0; ti < p->ntoks && np < CHAT_TEXT_WORDS_MAX; ti++)
+                pref[np++] = p->toks[ti];
+            if (ChatFindGroundedSentence(ch, p->a, pref, np, gsent, sizeof(gsent)))
+            {
+                st = GOAL_ANSWER;
+                EMIT_OK("Segun el texto: %s\n", gsent);
+            }
+        }
+        else if (st != GOAL_ANSWER && ch->ntfiles > 0 && ch->tgraph != NULL)
         {
             /* Count sentences mentioning the entity */
             const char *words[4];
@@ -5475,6 +5622,46 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
         }
     }
 
+    /* WH token itself is the location/count cue (Spanish "donde X",
+       "cuantos X"), not the token after it. */
+    if (strcmp(toks[wh_pos], "donde") == 0 ||
+        strcmp(toks[wh_pos], "where") == 0)
+    {
+        int last = -1;
+        for (i = wh_pos + 1; i < n; i++)
+        {
+            if (!IsStopTok(toks[i]) && !IsCopulaTok(toks[i]))
+                last = (int)i;
+        }
+        if (last >= 0)
+        {
+            strncpy(entity_out, toks[last], entity_size - 1);
+            entity_out[entity_size - 1] = '\0';
+            return INT_QA_WHERE;
+        }
+    }
+    if (strcmp(toks[wh_pos], "cuantos") == 0 ||
+        strcmp(toks[wh_pos], "cuantas") == 0 ||
+        (strcmp(toks[wh_pos], "how") == 0 && wh_pos + 1 < n &&
+         strcmp(toks[wh_pos + 1], "many") == 0))
+    {
+        uint32_t start = wh_pos + 1;
+        int last = -1;
+        if (strcmp(toks[wh_pos], "how") == 0)
+            start = wh_pos + 2;
+        for (i = start; i < n; i++)
+        {
+            if (!IsStopTok(toks[i]) && !IsCopulaTok(toks[i]))
+                last = (int)i;
+        }
+        if (last >= 0)
+        {
+            strncpy(entity_out, toks[last], entity_size - 1);
+            entity_out[entity_size - 1] = '\0';
+            return INT_QA_COUNT;
+        }
+    }
+
     /* Pattern 2: <wh> <location_prep> <entity> → WHERE
        "where is David" / "donde esta David" */
     if (wh_pos + 1 < n)
@@ -5540,6 +5727,26 @@ static INTENT DetectQuestionType(const char toks[][CHAT_TOKEN_MAX],
                         return INT_QA_COUNT;
                 }
             }
+        }
+    }
+
+    /* <quien|who> <verb> <name> without copula: search key is the
+       last content token (Goliat, cielo), not a Levenshtein false friend. */
+    if (strcmp(toks[wh_pos], "quien") == 0 ||
+        strcmp(toks[wh_pos], "quienes") == 0 ||
+        strcmp(toks[wh_pos], "who") == 0)
+    {
+        int last = -1;
+        for (i = wh_pos + 1; i < n; i++)
+        {
+            if (!IsStopTok(toks[i]) && !IsCopulaTok(toks[i]))
+                last = (int)i;
+        }
+        if (last >= 0)
+        {
+            strncpy(entity_out, toks[last], entity_size - 1);
+            entity_out[entity_size - 1] = '\0';
+            return INT_QA_ENTITY;
         }
     }
 

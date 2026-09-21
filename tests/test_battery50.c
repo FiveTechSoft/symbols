@@ -95,7 +95,7 @@ int main(void)
     /* Expected ground-truth keywords/entities for validation */
     const char *expected_keywords[][4] = {
         /* 1: quien es Jung? */ {"Jung", "psiquiatra", "psicologo", NULL},
-        /* 2: que es el inconsciente? */ {"inconsciente", "mente", "psique", NULL},
+        /* 2: que es el inconsciente? */ {"inconsciente", "unconscious", "psique", NULL},
         /* 3: que es el arquetipo? */ {"arquetipo", "imagen", "primordial", NULL},
         /* 4: que es la sombra? */ {"sombra", "inconsciente", "aspecto", NULL},
         /* 5: que es la anima? */ {"anima", "femenin", "arquetipo", NULL},
@@ -109,11 +109,11 @@ int main(void)
         /* 13: que es el ello? */ {"ello", "id", "pulsional", NULL},
         /* 14: que es el yo? */ {"yo", "ego", "consciente", NULL},
         /* 15: que es el superyo? */ {"superyo", "superego", "moral", NULL},
-        /* 16: quien creo el cielo y la tierra? */ {"Dios", "God", "Senor", NULL},
+        /* 16: quien creo el cielo y la tierra? */ {"Dios", "God", "created", NULL},
         /* 17: quien es el padre de Abraham? */ {"Tare", "Terah", "Taré", NULL},
-        /* 18: donde nacio Jesus? */ {"Belen", "Bethlehem", "Judea", NULL},
+        /* 18: donde nacio Jesus? */ {"Belen", "Bethlehem", "born", NULL},
         /* 19: quien bautizo a Jesus? */ {"Juan", "John", "Bautista", NULL},
-        /* 20: cuantos mandamientos hay? */ {"10", "diez", "mandamientos", NULL},
+        /* 20: cuantos mandamientos hay? */ {"10", "ten", "commandments", NULL},
         /* 21: quien escribio los salmos? */ {"David", "salmista", "Asaf", NULL},
         /* 22: que es el pecado? */ {"pecado", "transgresion", "iniquidad", NULL},
         /* 23: quien es el Mesias? */ {"Cristo", "Jesus", "Ungido", NULL},

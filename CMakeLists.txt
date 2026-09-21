@@ -246,6 +246,9 @@ target_link_libraries(test_battery100 symbolic)
 # test_multi_hop: reasoning depth (1-hop, 2-hop, negative, cross-domain)
 sllm_test(test_multi_hop tests/test_multi_hop.c)
 
+# Open-domain QA: entity-grounded retrieval (no Lev false friends)
+sllm_test(test_open_qa tests/test_open_qa.c)
+
 # Pillar 1: Vector Symbolic Architecture (VSA / HDC)
 sllm_test(test_vsa tests/test_vsa.c)
 

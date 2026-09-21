@@ -10,7 +10,7 @@
    is corpus language). Linear scan over ~100 entries — fast enough. */
 
 #define DICT_TOKEN_MAX 64
-#define DICT_MAX 256
+#define DICT_MAX 512
 
 typedef struct
 {
