@@ -827,7 +827,9 @@ static void HandleCompletions(socket_t s, const char *body,
             /* Diff unavailable: fall through to completion message */
         }
 
-        /* Determine whether this step was an inspection tool or task */
+        /* Determine whether this step was an inspection tool or task.
+           Also treat as inspection any standalone tool call outside a STRIPS plan
+           (step_count == 0, agent_active == 0) — e.g. auto-diff after edit. */
         int is_inspection = ServerIsInspectionTask(sess->current_issue) ||
                             IsFolderOrGlobQuery(sess->current_issue) ||
                             (strcmp(tool_resp.name, "glob") == 0) ||
@@ -835,7 +837,8 @@ static void HandleCompletions(socket_t s, const char *body,
                             (strcmp(tool_resp.name, "grep") == 0) ||
                             (strcmp(sess->last_tool_call_name, "glob") == 0) ||
                             (strcmp(sess->last_tool_call_name, "read") == 0) ||
-                            (strcmp(sess->last_tool_call_name, "grep") == 0);
+                            (strcmp(sess->last_tool_call_name, "grep") == 0) ||
+                            (sess->current_plan.step_count == 0 && !sess->agent_active);
 
         DIAGNOSTIC_REPORT diag;
         memset(&diag, 0, sizeof(diag));
