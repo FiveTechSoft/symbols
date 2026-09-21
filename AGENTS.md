@@ -458,3 +458,7 @@ Regla arquitectónica:
      - Harness E2E `tools/test_opencode_user_cases.py` ampliado con 3 nuevas pruebas de síntesis y gestión de ciclo de vida del servidor (11/11 PASS).
      - Suite global CTest 100% verde (67 Passed, 9 Skipped, 0 Failed de 76 tests), 2026-09-21.
 
+## Snapshot de Sentido Común a Escala (Fase 27)
+
+- `data/commonsense.bin` es artefacto local gitignorado (`*.bin`): ingesta ConceptNet 5.7.0 (5.8 sin dump publicado, 404) prefiltrada en/es → 5.643.493 tripletas, 2,73M símbolos, 5,36M relaciones, 251 MB. `ChatGetCommonsenseGraph` (`src/chat.c`) mina reglas solo en fallback seed — minar 5M+ cuelga en runtime (>10 min) y offline (>30 min); el snapshot va sin minar (las queries son edge-walks). `tests/test_commonsense.c` nunca pisa un bin existente (solo escribe el seed si falta). Con bin presente 3 suites caen por ruido cs sobre hechos de corpus (jesus→protester, pecado→deed, milk/bird/knife) — pendiente regla de prioridad corpus > cs. Verificado por ejecución, 2026-09-21.
+

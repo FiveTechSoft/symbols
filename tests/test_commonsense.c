@@ -352,12 +352,19 @@ int main(void)
             fclose(fp);
         }
 
-        /* Also export the default production snapshot to data/commonsense.bin if in repo root */
+        /* Also export the default production snapshot to data/commonsense.bin
+           if in repo root AND no snapshot exists yet (never clobber a full
+           ConceptNet ingest: seed snapshot is fallback-only) */
         FILE *fp_check = fopen("data/english-spanish.txt", "rb");
+        FILE *fp_bin = NULL;
         if (fp_check)
         {
             fclose(fp_check);
-            CommonsenseSaveBinary(g, "data/commonsense.bin");
+            fp_bin = fopen("data/commonsense.bin", "rb");
+            if (fp_bin)
+                fclose(fp_bin);
+            else
+                CommonsenseSaveBinary(g, "data/commonsense.bin");
         }
 
         GraphDestroy(g);

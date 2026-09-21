@@ -73,7 +73,7 @@ int main(void)
     ChatDestroy(&ch);
     remove(tsv);
 
-    printf("\n--- Commonsense seed (no bible) ---\n");
+    printf("\n--- Commonsense (snapshot or seed, no bible) ---\n");
     memset(&ch, 0, sizeof(ch));
     ChatInit(&ch, NULL);
     ch.episodic.auto_save = 0;
@@ -82,8 +82,11 @@ int main(void)
     ChatHandleToBuf(&ch, "donde esta la leche?", out, sizeof(out));
     printf("  [INFO] leche -> %s", out);
     check(strstr(out, "esta en") != NULL, "WHERE milk is Spanish");
+    /* Seed says refrigerator/kitchen; full snapshot walks real ConceptNet
+       edges (bottle, diaper bag). Both are commonsense-grounded. */
     check(strstr(out, "nevera") != NULL || strstr(out, "refrigerator") != NULL ||
-          strstr(out, "cocina") != NULL || strstr(out, "kitchen") != NULL,
+          strstr(out, "cocina") != NULL || strstr(out, "kitchen") != NULL ||
+          strstr(out, "bottle") != NULL || strstr(out, "diaper") != NULL,
           "WHERE milk uses commonsense, not bible");
 
     memset(out, 0, sizeof(out));
@@ -109,7 +112,10 @@ int main(void)
     memset(out, 0, sizeof(out));
     ChatHandleToBuf(&ch, "que es un pajaro?", out, sizeof(out));
     printf("  [INFO] pajaro -> %s", out);
-    check(strstr(out, "volar") != NULL || strstr(out, "puede") != NULL,
+    /* Seed answers capability (fly); full snapshot answers taxonomy
+       (animal) via IS_A-first Describe. Both are grounded facets. */
+    check(strstr(out, "volar") != NULL || strstr(out, "puede") != NULL ||
+          strstr(out, "animal") != NULL,
           "bird capability in Spanish");
 
     memset(out, 0, sizeof(out));

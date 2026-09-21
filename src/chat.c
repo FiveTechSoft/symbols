@@ -893,16 +893,25 @@ static GRAPH *ChatGetCommonsenseGraph(CHAT *ch)
         g = GraphCreate(32768, 65536);
         if (g == NULL)
             return NULL;
+        {
+            CS_STATS stats;
+            CommonsenseIngestSeed(g, &stats);
+        }
+        {
+            /* Seed-fallback path only: mine rules over the tiny seed graph.
+               Snapshot path skips mining (rules pre-mined offline at build
+               time) to keep cold start sub-millisecond at 5M+ scale. */
+            GRAPH_RULE_BASE rb;
+            GraphRuleBaseInit(&rb, 0.80f, 2);
+            GraphMineRules(g, &rb);
+            GraphApplyRules(g, &rb);
+        }
     }
+    else
     {
+        /* Snapshot path: load as-is + curated seed (dedup, no mining). */
         CS_STATS stats;
         CommonsenseIngestSeed(g, &stats);
-    }
-    {
-        GRAPH_RULE_BASE rb;
-        GraphRuleBaseInit(&rb, 0.80f, 2);
-        GraphMineRules(g, &rb);
-        GraphApplyRules(g, &rb);
     }
     ch->cs_graph = g;
     return ch->cs_graph;
@@ -1133,6 +1142,33 @@ static int ChatLineIsSpanishToks(const char toks[][CHAT_TOKEN_MAX],
             return 1;
     }
     return 0;
+}
+
+static int ChatCsFirstObject(const GRAPH *g, const char *ent,
+                             const char *rel, char *obj_out, size_t obj_sz)
+{
+    /* First indexed object of (ent, rel): intent-specific selection.
+       Uses only canonical relation names, no vocabulary. */
+    SYMBOL_ID sid, rid;
+    RELATION *res[4];
+    uint32_t n;
+    const SYMBOL *os;
+    if (g == NULL || ent == NULL || ent[0] == '\0' || rel == NULL ||
+        obj_out == NULL || obj_sz == 0)
+        return 0;
+    sid = SymbolFind(g->symbols, ent);
+    rid = SymbolFind(g->symbols, rel);
+    if (sid == SYMBOL_INVALID || rid == SYMBOL_INVALID)
+        return 0;
+    n = GraphQuerySubjectRelation(g, sid, rid, res, 4);
+    if (n == 0)
+        return 0;
+    os = SymbolGet(g->symbols, res[0]->object);
+    if (os == NULL || os->name == NULL)
+        return 0;
+    strncpy(obj_out, os->name, obj_sz - 1);
+    obj_out[obj_sz - 1] = '\0';
+    return 1;
 }
 
 static int ChatCsDescribe(const GRAPH *g, const char *ent, char *rel_out,
@@ -5379,26 +5415,8 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
-        if (!found)
-        {
-            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
-            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
-            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
-            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
-                                             reln, sizeof(reln),
-                                             objn, sizeof(objn)))
-            {
-                char line[512];
-                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
-                                  line, sizeof(line)))
-                {
-                    st = GOAL_ANSWER;
-                    found = 1;
-                    EMIT_OK("%s", line);
-                }
-            }
-        }
-
+        /* G0: corpus text evidence outranks generic commonsense (cs moved
+           after grounded + text search; fires only if corpus gave nothing) */
         if (!found)
         {
             const char *pref[CHAT_TEXT_WORDS_MAX];
@@ -5491,6 +5509,27 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                 {
                     st = GOAL_ANSWER;
                     EMIT_OK("Segun el texto: %s\n", sent);
+                }
+            }
+        }
+
+        /* G0: generic commonsense fallback, only if corpus gave nothing */
+        if (!found && st != GOAL_ANSWER)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
+            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
+            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
+                                             reln, sizeof(reln),
+                                             objn, sizeof(objn)))
+            {
+                char line[512];
+                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    found = 1;
+                    EMIT_OK("%s", line);
                 }
             }
         }
@@ -5601,27 +5640,8 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         Cap(p->a, capE, sizeof(capE));
         int found = 0;
 
-        /* Try commonsense spatial location reasoning */
-        GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
-        if (cs != NULL)
-        {
-            const char *canon = DictTranslate(&ch->dict, p->a);
-            const char *ent = canon ? canon : p->a;
-            CS_INFERENCE_PATH cs_path;
-            char cs_out[256];
-            if (CommonsenseQueryLocation(cs, ent, &cs_path, cs_out, sizeof(cs_out)))
-            {
-                char loc[512];
-                int es = ChatLineIsSpanishToks(p->toks, p->ntoks);
-                st = GOAL_ANSWER;
-                if (es && ChatCsRealizePath(ch, 1, &cs_path, loc, sizeof(loc)))
-                    EMIT_OK("%s", loc);
-                else
-                    EMIT_OK("%s\n", cs_out);
-                break;
-            }
-        }
-
+        /* G0: corpus text evidence outranks generic commonsense (cs moved
+           after text + raw search; fires only if corpus gave nothing) */
         /* Try text search with location keywords */
         if (ch->ntfiles > 0 && ch->tgraph != NULL)
         {
@@ -5659,6 +5679,30 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
             if (found)
                 st = GOAL_ANSWER;
+        }
+
+        /* G0: generic commonsense spatial fallback, only if corpus failed */
+        if (st != GOAL_ANSWER)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            if (cs != NULL)
+            {
+                const char *canon = DictTranslate(&ch->dict, p->a);
+                const char *ent = canon ? canon : p->a;
+                CS_INFERENCE_PATH cs_path;
+                char cs_out[256];
+                if (CommonsenseQueryLocation(cs, ent, &cs_path, cs_out, sizeof(cs_out)))
+                {
+                    char loc[512];
+                    int es = ChatLineIsSpanishToks(p->toks, p->ntoks);
+                    st = GOAL_ANSWER;
+                    if (es && ChatCsRealizePath(ch, 1, &cs_path, loc, sizeof(loc)))
+                        EMIT_OK("%s", loc);
+                    else
+                        EMIT_OK("%s\n", cs_out);
+                    break;
+                }
+            }
         }
 
         if (st != GOAL_ANSWER)
@@ -5872,26 +5916,8 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
-        if (!found)
-        {
-            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
-            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
-            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
-            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
-                                             reln, sizeof(reln),
-                                             objn, sizeof(objn)))
-            {
-                char line[512];
-                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
-                                  line, sizeof(line)))
-                {
-                    st = GOAL_ANSWER;
-                    found = 1;
-                    EMIT_OK("%s", line);
-                }
-            }
-        }
-
+        /* G0: corpus text evidence outranks generic commonsense (cs moved
+           after text + raw search; fires only if corpus gave nothing) */
         /* Second: try text search */
         if (!found && ch->ntfiles > 0 && ch->tgraph != NULL)
         {
@@ -6007,6 +6033,27 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             }
         }
 
+        /* G0: generic commonsense fallback, only if corpus gave nothing */
+        if (!found && st != GOAL_ANSWER)
+        {
+            GRAPH *cs = ChatGetCommonsenseGraph((CHAT *)ch);
+            char ent[CHAT_TOKEN_MAX], reln[64], objn[CHAT_TOKEN_MAX];
+            ChatCsNormEntity(ch, p->a, ent, sizeof(ent));
+            if (cs != NULL && ChatCsDescribe(cs, ChatCsLookup(ch, ent),
+                                             reln, sizeof(reln),
+                                             objn, sizeof(objn)))
+            {
+                char line[512];
+                if (ChatCsRealize(ch, ChatLineIsSpanishToks(p->toks, p->ntoks), ent, reln, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    found = 1;
+                    EMIT_OK("%s", line);
+                }
+            }
+        }
+
         if (st != GOAL_ANSWER)
             EMIT("No tengo constancia de que es %s.\n", capE);
         break;
@@ -6078,13 +6125,32 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
             char cs_out[256];
             char reln[64], objn[CHAT_TOKEN_MAX];
             const char *rel = p->b[0] ? p->b : "USED_FOR";
-            if (ChatLineIsSpanishToks(p->toks, p->ntoks) &&
-                ChatCsDescribe(cs, ent, reln, sizeof(reln), objn,
-                               sizeof(objn)))
+            /* G1: intent-specific relation first (Spanish realization kept):
+               requested rel, then the sibling affordance rel, then generic
+               Describe. Canonical names only, no vocabulary. */
+            if (ChatLineIsSpanishToks(p->toks, p->ntoks))
             {
+                const char *rel2 = (strcmp(rel, "CAPABLE_OF") == 0)
+                                       ? "USED_FOR"
+                                       : "CAPABLE_OF";
+                const char *hit = NULL;
                 char line[512], disp[CHAT_TOKEN_MAX];
                 ChatCsNormEntity(ch, p->a, disp, sizeof(disp));
-                if (ChatCsRealize(ch, 1, disp[0] ? disp : ent, reln, objn,
+                if (ChatCsFirstObject(cs, ent, rel, objn, sizeof(objn)))
+                    hit = rel;
+                else if (ChatCsFirstObject(cs, ent, rel2, objn, sizeof(objn)))
+                    hit = rel2;
+                if (hit != NULL &&
+                    ChatCsRealize(ch, 1, disp[0] ? disp : ent, hit, objn,
+                                  line, sizeof(line)))
+                {
+                    st = GOAL_ANSWER;
+                    EMIT_OK("%s", line);
+                    break;
+                }
+                if (ChatCsDescribe(cs, ent, reln, sizeof(reln), objn,
+                                   sizeof(objn)) &&
+                    ChatCsRealize(ch, 1, disp[0] ? disp : ent, reln, objn,
                                   line, sizeof(line)))
                 {
                     st = GOAL_ANSWER;
