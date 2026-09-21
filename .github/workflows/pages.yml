@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -23,6 +23,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ── WASM rebuild (only if engine sources exist) ──
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+          /tmp/emsdk/emsdk install latest
+          /tmp/emsdk/emsdk activate latest
+          echo "/tmp/emsdk/upstream/emscripten" >> $GITHUB_PATH
+
+      - name: Build WASM engine
+        run: |
+          emcc -O2 \
+            -s WASM=1 \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s MODULARIZE=1 \
+            -s EXPORT_NAME="SymbolicLLM" \
+            -s "EXPORTED_FUNCTIONS=['_wasm_init','_wasm_load_corpus','_wasm_load_model','_wasm_fact_count','_wasm_symbol_count','_wasm_relation_count','_wasm_turn_count','_wasm_sentence_count','_wasm_query','_wasm_learn','_wasm_episodic_count','_wasm_reset','_wasm_set_persona','_wasm_get_persona','_malloc','_free']" \
+            -s "EXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','FS']" \
+            -s ASSERTIONS=1 \
+            -s FORCE_FILESYSTEM=1 \
+            -Wno-pointer-sign \
+            -I include \
+            src/schema.c src/metaschema.c src/meta_graph.c src/graph.c \
+            src/relation.c src/symbol.c src/model.c src/graph_reasoning.c \
+            src/learning.c src/learn.c src/cognitive_learning.c src/transfer.c \
+            src/transfer_legacy.c src/neuro_prolog.c src/neuro_rules.c src/c_rules.c \
+            src/tokenizer.c src/parser.c src/stem.c src/i18n.c src/text_lex.c \
+            src/ingest.c src/chat.c src/chat_clarify.c src/dialog.c src/context.c \
+            src/nlg.c src/deep_nlg.c src/stochastic_nlg.c src/passage_nlg.c src/generator.c \
+            src/vsa.c src/ccg_realizer.c src/commonsense.c src/persona.c src/episodic_memory.c \
+            src/embedding.c src/dict.c src/qa_layer.c src/export.c src/numeric.c \
+            src/prune.c src/stats.c src/server_proto.c src/tool_config.c src/tool_executor.c \
+            docs/symbolic_wasm.c \
+            -lm \
+            -o docs/symbolic_wasm.js
+          echo "WASM built: $(du -h docs/symbolic_wasm.wasm | cut -f1)"
+
+      # ── Deploy to GitHub Pages ──
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:

@@ -1,25 +1,22 @@
-name: Rebuild WASM Engine
+name: WASM Build Check
 
 on:
-  push:
-    branches: [master]
+  pull_request:
     paths:
       - 'src/**/*.c'
       - 'include/**/*.h'
-      - 'docs/wasm_engine.js'
       - 'docs/symbolic_wasm.c'
-      - '.github/workflows/wasm-rebuild.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: wasm-rebuild
+  group: wasm-check-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-wasm:
+  verify-wasm-compiles:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,12 +28,8 @@ jobs:
           /tmp/emsdk/emsdk install latest
           /tmp/emsdk/emsdk activate latest
           echo "/tmp/emsdk/upstream/emscripten" >> $GITHUB_PATH
-          echo "EMSDK=/tmp/emsdk" >> $GITHUB_ENV
 
-      - name: Verify emcc
-        run: emcc --version
-
-      - name: Build WASM
+      - name: Build WASM (verify compilation)
         run: |
           emcc -O2 \
             -s WASM=1 \
@@ -61,21 +54,5 @@ jobs:
             src/prune.c src/stats.c src/server_proto.c src/tool_config.c src/tool_executor.c \
             docs/symbolic_wasm.c \
             -lm \
-            -o docs/symbolic_wasm.js
-
-      - name: Verify WASM
-        run: |
-          ls -lh docs/symbolic_wasm.wasm docs/symbolic_wasm.js
-          echo "WASM size: $(du -h docs/symbolic_wasm.wasm | cut -f1)"
-
-      - name: Commit updated WASM binaries
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/symbolic_wasm.wasm docs/symbolic_wasm.js
-          if git diff --cached --quiet; then
-            echo "No WASM changes to commit"
-          else
-            git commit -m "chore(wasm): rebuild C11 engine to WASM [skip ci]"
-            git push
-          fi
+            -o /tmp/symbolic_wasm.js
+          echo "WASM compilation OK ($(du -h /tmp/symbolic_wasm.wasm | cut -f1))"
