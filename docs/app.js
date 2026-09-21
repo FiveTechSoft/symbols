@@ -68,10 +68,26 @@ function resetChatHistoryUI(presetKey = "code") {
   updatePromptPills(presetKey);
 }
 
-// Initialize Web Application
+// Initialize Web Application (WASM C11 engine)
 if (typeof document !== "undefined") {
-  document.addEventListener("DOMContentLoaded", () => {
-    engine = new SymbolicEngine();
+  document.addEventListener("DOMContentLoaded", async () => {
+    /* Show loading state */
+    const sendBtn = document.getElementById("sendBtn");
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.innerText = "Loading WASM..."; }
+
+    try {
+      engine = new WASMSymbolicEngine();
+      await engine.init("symbolic_wasm.js", "symbolic_wasm.wasm");
+      addSystemMessage("C11 WASM engine loaded (226 KB binary, 44 source modules).");
+    } catch (e) {
+      /* Fallback to JS engine if WASM fails */
+      console.warn("WASM init failed, falling back to JS engine:", e);
+      engine = new SymbolicEngine();
+      addSystemMessage("WASM unavailable, using JS engine fallback.");
+    }
+
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = "Execute"; }
+
     fetch("english-spanish.txt")
       .then(r => r.ok ? r.text() : null)
       .then(txt => { if (txt) engine.loadTranslationTable(txt); })
@@ -680,7 +696,19 @@ function importMemorySession(e) {
 function clearMemorySession() {
   if (confirm("Reset and clear episodic memory and active knowledge base?")) {
     localStorage.removeItem("symbolic_llm_state");
-    engine = new SymbolicEngine();
+    if (engine instanceof WASMSymbolicEngine) {
+      engine._module._wasm_reset();
+      engine._module._wasm_init(0);
+      engine.sentences = [];
+      engine.relations = [];
+      engine.relMap.clear();
+      engine.subMap.clear();
+      engine.objMap.clear();
+      engine.symbols.clear();
+      engine.episodic = { turns: [], activeFocus: null, citedSentIds: new Set(), learnedFacts: [], lastQueryTimeMs: 0 };
+    } else {
+      engine = new SymbolicEngine();
+    }
     const currentPreset = localStorage.getItem("symbolic_active_preset") || "code";
     loadPresetCorpus(currentPreset);
     resetChatHistoryUI(currentPreset);
