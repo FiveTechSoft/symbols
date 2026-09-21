@@ -153,6 +153,13 @@ int ServerIsDiffTask(const char *text);
 /* 1 when the user asks to modify a named file (cambia X por Y en f.c). */
 int ServerIsEditTask(const char *text);
 
+/* Detect edit verbs (with or without enclitics) — no file check */
+int ServerHasEditVerb(const char *text);
+
+/* Extract only tokens with recognized file extensions (for last_target tracking).
+   Returns 1 if a file reference was found, 0 otherwise. */
+int ServerExtractFileRef(const char *text, char *out, size_t n);
+
 /* Parse "cambia OLD por NEW en FILE". has_replace is 1 when both strings exist. */
 int ServerExtractEditSpec(const char *text, char *file, size_t fn,
                           char *old_s, size_t on, char *new_s, size_t nn,

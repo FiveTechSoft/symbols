@@ -175,6 +175,35 @@ static void BuildProvArray(CHAT *ch, char *out, size_t size)
 
 static unsigned long g_seq = 0;
 
+/* Strip Spanish enclitic pronouns from verb stems:
+   añadele → añade, agregale → agrega, escribeme → escribe, etc.
+   Returns the stem length (written to out). */
+static size_t StripEnclitic(const char *verb, char *out, size_t out_size)
+{
+    static const char *enclitics[] = {
+        "mos", "dle", "dla", "dlo", "dles", "dlas", "dlos",
+        "le", "la", "lo", "les", "las", "los",
+        "me", "te", "nos", "os"
+    };
+    size_t vlen = strlen(verb);
+    for (size_t e = 0; e < sizeof(enclitics) / sizeof(enclitics[0]); e++)
+    {
+        size_t elen = strlen(enclitics[e]);
+        if (vlen > elen && strcmp(verb + vlen - elen, enclitics[e]) == 0)
+        {
+            size_t stem_len = vlen - elen;
+            if (stem_len >= out_size) stem_len = out_size - 1;
+            memcpy(out, verb, stem_len);
+            out[stem_len] = '\0';
+            return stem_len;
+        }
+    }
+    size_t copy = vlen < out_size - 1 ? vlen : out_size - 1;
+    memcpy(out, verb, copy);
+    out[copy] = '\0';
+    return copy;
+}
+
 /* session state: master CHAT for the process lifetime (the accept
    loop is single-threaded). Dynamic corpus loads (load X.txt)
    persist across requests; the base corpus ingests once. */
@@ -203,11 +232,13 @@ typedef struct
 
     /* Verification telemetry & self-healing state */
     int               had_error;
+    int               had_edit;
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
     char              last_error_summary[512];
     char              last_tool_output[16384];
     char              last_tool_call_name[64];
+    char              last_target[260];  /* last file/entity mentioned for pronoun resolution */
 
     /* Persona conditioning */
     PERSONA_ID        persona_id;
@@ -755,6 +786,47 @@ static void HandleCompletions(socket_t s, const char *body,
             }
         }
 
+        /* Direct-edit auto-diff: when a direct edit tool result comes back
+           and no STRIPS plan is active, emit git diff immediately */
+        if (sess->had_edit && sess->current_plan.step_count == 0 &&
+            sess->declared_tools_count > 0 &&
+            (strcmp(tool_resp.name, "edit") == 0 ||
+             strcmp(tool_resp.name, "write") == 0 ||
+             strcmp(sess->last_tool_call_name, "edit") == 0 ||
+             strcmp(sess->last_tool_call_name, "write") == 0))
+        {
+            sess->had_edit = 0;  /* one-shot */
+            sess->agent_active = 0;
+            OPENAI_TOOL_CALLS tc;
+            memset(&tc, 0, sizeof(tc));
+            if (ServerMapDiffToolCall("git diff", sess->declared_tools,
+                                      (uint32_t)sess->declared_tools_count,
+                                      &tc.calls[0]))
+            {
+                tc.count = 1;
+                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                strncpy(sess->last_tool_call_name, tc.calls[0].name,
+                        sizeof(sess->last_tool_call_name) - 1);
+                if (ServerWantsStream(body))
+                {
+                    char sse_local[16384];
+                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                        g_seq, &tc, sse_local, sizeof(sse_local));
+                    SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+                }
+                else
+                {
+                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                        g_seq, &tc,
+                        "Auto-diff: showing changes made by the edit.",
+                        resp, sizeof(resp));
+                    SendJson(s, 200, "OK", resp);
+                }
+                return;
+            }
+            /* Diff unavailable: fall through to completion message */
+        }
+
         /* Determine whether this step was an inspection tool or task */
         int is_inspection = ServerIsInspectionTask(sess->current_issue) ||
                             IsFolderOrGlobQuery(sess->current_issue) ||
@@ -832,11 +904,14 @@ static void HandleCompletions(socket_t s, const char *body,
                     const STRIPS_OPERATOR *next_op = &sess->current_plan.steps[sess->current_step_idx].op;
                     OPENAI_TOOL_CALLS tc;
                     FormatOperatorToolCall(sess, next_op, sess->current_issue, ++g_seq, &tc);
-                    if (tc.count > 0)
-                    {
-                        strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
-                        sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
-                    }
+            if (tc.count > 0)
+            {
+                strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
+                sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
+                if (strcmp(tc.calls[0].name, "edit") == 0 ||
+                    strcmp(tc.calls[0].name, "write") == 0)
+                    sess->had_edit = 1;
+            }
 
                     char thought[256];
                     snprintf(thought, sizeof(thought),
@@ -964,6 +1039,46 @@ static void HandleCompletions(socket_t s, const char *body,
                 }
             }
 
+            /* Auto-diff: after successful STRIPS plan edits, emit git diff
+               so the user can see what changed without asking.
+               Only for STRIPS plans (step_count > 0), not direct edits. */
+            if (!sess->had_error && sess->declared_tools_count > 0 &&
+                sess->current_plan.step_count > 0 &&
+                !ServerIsFileCreationTask(sess->current_issue) &&
+                !ServerIsInspectionTask(sess->current_issue) &&
+                !IsFolderOrGlobQuery(sess->current_issue) &&
+                sess->had_edit)
+            {
+                sess->had_edit = 0;  /* one-shot: prevent re-emission on diff result */
+                OPENAI_TOOL_CALLS tc;
+                memset(&tc, 0, sizeof(tc));
+                if (ServerMapDiffToolCall("git diff", sess->declared_tools,
+                                          (uint32_t)sess->declared_tools_count,
+                                          &tc.calls[0]))
+                {
+                    tc.count = 1;
+                    snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                    strncpy(sess->last_tool_call_name, tc.calls[0].name,
+                            sizeof(sess->last_tool_call_name) - 1);
+                    if (ServerWantsStream(body))
+                    {
+                        char sse_local[16384];
+                        ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                            g_seq, &tc, sse_local, sizeof(sse_local));
+                        SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+                    }
+                    else
+                    {
+                        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                            g_seq, &tc,
+                            "Auto-diff: showing changes made by the edit.",
+                            resp, sizeof(resp));
+                        SendJson(s, 200, "OK", resp);
+                    }
+                    return;
+                }
+            }
+
             if (ServerWantsStream(body))
             {
                 char sse[16384];
@@ -984,6 +1099,13 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         SendError(s, 400, "Bad Request", "no user message found");
         return;
+    }
+
+    /* Track last file/entity mentioned for enclitic pronoun resolution */
+    {
+        char extracted_file[260];
+        if (ServerExtractFileRef(query, extracted_file, sizeof(extracted_file)))
+            strncpy(sess->last_target, extracted_file, sizeof(sess->last_target) - 1);
     }
 
     /* Ensure session knowledge graph is initialized */
@@ -1266,6 +1388,17 @@ static void HandleCompletions(socket_t s, const char *body,
         }
     }
 
+    /* Enclitic resolution: if query has edit verb but no file,
+       inject last_target (e.g. "añadele una linea" → "añadele una linea a test.txt") */
+    if (!ServerIsEditTask(query) &&
+        ServerHasEditVerb(query) && sess->last_target[0] != '\0')
+    {
+        char resolved[2048];
+        snprintf(resolved, sizeof(resolved), "%s a %s", query, sess->last_target);
+        strncpy(query, resolved, sizeof(query) - 1);
+        query[sizeof(query) - 1] = '\0';
+    }
+
     if (sess->declared_tools_count > 0 && ServerIsEditTask(query))
     {
         OPENAI_TOOL_CALLS tc;
@@ -1278,6 +1411,13 @@ static void HandleCompletions(socket_t s, const char *body,
             snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
             strncpy(sess->last_tool_call_name, tc.calls[0].name,
                     sizeof(sess->last_tool_call_name) - 1);
+            /* Enable agentic resumption so auto-diff fires after edit */
+            sess->agent_active = 1;
+            sess->had_edit = 1;
+            sess->had_error = 0;
+            sess->current_step_idx = 0;
+            sess->replan_count = 0;
+            strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
             if (ServerWantsStream(body))
             {
                 char sse_local[16384];
@@ -1287,7 +1427,8 @@ static void HandleCompletions(socket_t s, const char *body,
             }
             else
             {
-                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
+                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc,
                     "Dispatching file edit to the client harness.",
                     resp, sizeof(resp));
                 SendJson(s, 200, "OK", resp);
@@ -1322,6 +1463,7 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->agent_active = 1;
         sess->current_step_idx = 0;
         sess->had_error = 0;
+        sess->had_edit = 0;
         sess->replan_count = 0;
         sess->last_error_summary[0] = '\0';
         sess->last_tool_output[0] = '\0';

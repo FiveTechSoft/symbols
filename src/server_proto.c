@@ -10,6 +10,107 @@
 #include "server_proto.h"
 #include "agent_diagnose.h"
 
+/* --- Enclitic pronoun stripping + declarative edit-verb table --- */
+
+static size_t StripEnclitic(const char *verb, char *out, size_t out_size)
+{
+    static const char *enclitics[] = {
+        "mos", "dle", "dla", "dlo", "dles", "dlas", "dlos",
+        "le", "la", "lo", "les", "las", "los",
+        "me", "te", "nos", "os"
+    };
+    size_t vlen = strlen(verb);
+    for (size_t e = 0; e < sizeof(enclitics) / sizeof(enclitics[0]); e++)
+    {
+        size_t elen = strlen(enclitics[e]);
+        if (vlen > elen && strcmp(verb + vlen - elen, enclitics[e]) == 0)
+        {
+            size_t stem_len = vlen - elen;
+            if (stem_len >= out_size) stem_len = out_size - 1;
+            memcpy(out, verb, stem_len);
+            out[stem_len] = '\0';
+            return stem_len;
+        }
+    }
+    size_t copy = vlen < out_size - 1 ? vlen : out_size - 1;
+    memcpy(out, verb, copy);
+    out[copy] = '\0';
+    return copy;
+}
+
+static const struct { const char *es; const char *en; } EDIT_VERBS[] = {
+    {"modifica",  "edit"},   {"modificar", "edit"},
+    {"edita",     "edit"},   {"editar",    "edit"},
+    {"cambia",    "edit"},   {"cambiar",   "edit"},
+    {"reemplaza", "replace"}, {"reemplazar", "replace"},
+    {"actualiza", "update"},  {"actualizar", "update"},
+    {"añade",     "add"},    {"anade",      "add"},
+    {"agrega",    "add"},    {"escribe",    "write"},
+    {"insert",    "insert"},
+};
+#define EDIT_VERBS_N (sizeof(EDIT_VERBS) / sizeof(EDIT_VERBS[0]))
+
+/* Strip Spanish/Portuguese diacritics: á→a, é→e, í→i, ó→o, ú→u, ñ→n, ü→u */
+static void FoldAccent(const char *in, char *out, size_t n)
+{
+    size_t o = 0;
+    if (in == NULL || out == NULL || n < 1) { if (out && n > 0) out[0] = '\0'; return; }
+    while (*in && o + 1 < n)
+    {
+        unsigned char c = (unsigned char)*in;
+        if (c == 0xC3) { /* UTF-8 2-byte: á=0xA1, é=0xA9, í=0xAD, ó=0xB3, ú=0xBA, ñ=0xB1, ü=0xBC */
+            unsigned char next = (unsigned char)in[1];
+            switch (next) {
+                case 0xA1: out[o++] = 'a'; in += 2; continue;
+                case 0xA9: out[o++] = 'e'; in += 2; continue;
+                case 0xAD: out[o++] = 'i'; in += 2; continue;
+                case 0xB3: out[o++] = 'o'; in += 2; continue;
+                case 0xBA: out[o++] = 'u'; in += 2; continue;
+                case 0xB1: out[o++] = 'n'; in += 2; continue;
+                case 0xBC: out[o++] = 'u'; in += 2; continue;
+                default: break;
+            }
+        }
+        out[o++] = *in++;
+    }
+    out[o] = '\0';
+}
+
+static int MatchEditVerb(const char *lower)
+{
+    char buf[1024];
+    char *tok;
+    strncpy(buf, lower, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    tok = strtok(buf, " \t\r\n,.;:!?");
+    while (tok)
+    {
+        char stem[256];
+        char folded[256];
+        char folded_stem[256];
+        size_t tlen = strlen(tok);
+        StripEnclitic(tok, stem, sizeof(stem));
+        FoldAccent(tok, folded, sizeof(folded));
+        FoldAccent(stem, folded_stem, sizeof(folded_stem));
+        for (size_t i = 0; i < EDIT_VERBS_N; i++)
+        {
+            char tbl_folded[256];
+            FoldAccent(EDIT_VERBS[i].es, tbl_folded, sizeof(tbl_folded));
+            if (strcmp(tok, EDIT_VERBS[i].es) == 0 ||
+                strcmp(tok, EDIT_VERBS[i].en) == 0 ||
+                strcmp(stem, EDIT_VERBS[i].es) == 0 ||
+                strcmp(stem, EDIT_VERBS[i].en) == 0 ||
+                strcmp(folded, tbl_folded) == 0 ||
+                strcmp(folded, EDIT_VERBS[i].en) == 0 ||
+                strcmp(folded_stem, tbl_folded) == 0 ||
+                strcmp(folded_stem, EDIT_VERBS[i].en) == 0)
+                return 1;
+        }
+        tok = strtok(NULL, " \t\r\n,.;:!?");
+    }
+    return 0;
+}
+
 int ServerJsonEscape(const char *in, char *out, size_t size)
 {
     size_t o = 0;
@@ -1421,6 +1522,49 @@ int ServerExtractCreatePath(const char *text, char *out, size_t n)
     return 1;
 }
 
+/* Extract only tokens with recognized file extensions (for last_target tracking).
+   Returns 1 if a file reference was found, 0 otherwise. */
+int ServerExtractFileRef(const char *text, char *out, size_t n)
+{
+    static const char *exts[] = {
+        ".c", ".h", ".cpp", ".hpp", ".py", ".ts", ".js", ".md", ".txt",
+        ".json", ".yml", ".yaml", ".toml", ".sh", ".bat", ".ps1", ".csv",
+        ".ini", ".cfg", ".xml", ".html", ".css", ".rs", ".go", ".java"
+    };
+    char buf[512];
+    char *tok;
+    size_t i;
+    if (text == NULL || out == NULL || n < 2)
+        return 0;
+    strncpy(buf, text, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    out[0] = '\0';
+    tok = strtok(buf, " \t\r\n,;:\"'()<>{}`¿?");
+    while (tok)
+    {
+        size_t tlen = strlen(tok);
+        const char *dot;
+        while (tlen > 0 && (tok[tlen - 1] == '.' || tok[tlen - 1] == ',' ||
+                            tok[tlen - 1] == '!' || tok[tlen - 1] == ')'))
+            tok[--tlen] = '\0';
+        dot = strrchr(tok, '.');
+        if (dot && dot != tok)
+        {
+            for (i = 0; i < sizeof(exts) / sizeof(exts[0]); i++)
+            {
+                if (strcmp(dot, exts[i]) == 0)
+                {
+                    strncpy(out, tok, n - 1);
+                    out[n - 1] = '\0';
+                    return 1;
+                }
+            }
+        }
+        tok = strtok(NULL, " \t\r\n,;:\"'()<>{}`¿?");
+    }
+    return 0;
+}
+
 static const char *FindIstr(const char *hay, const char *needle)
 {
     size_t nlen, i, j;
@@ -1488,9 +1632,14 @@ int ServerIsDiffTask(const char *text)
         return 1;
     if ((MatchWordBoundary(lower, "muestra") || MatchWordBoundary(lower, "mostrar") ||
          MatchWordBoundary(lower, "show") || MatchWordBoundary(lower, "ver") ||
-         MatchWordBoundary(lower, "dame") || MatchWordBoundary(lower, "display")) &&
+         MatchWordBoundary(lower, "dame") || MatchWordBoundary(lower, "display") ||
+         MatchWordBoundary(lower, "qué") || MatchWordBoundary(lower, "que")) &&
         (MatchWordBoundary(lower, "diff") || MatchWordBoundary(lower, "cambios") ||
-         MatchWordBoundary(lower, "changes")))
+         MatchWordBoundary(lower, "changes") || MatchWordBoundary(lower, "cambió") ||
+         MatchWordBoundary(lower, "cambio")))
+        return 1;
+    if (strstr(lower, "qué cambió") != NULL || strstr(lower, "que cambio") != NULL ||
+        strstr(lower, "qué cambia") != NULL || strstr(lower, "que cambia") != NULL)
         return 1;
     return 0;
 }
@@ -1514,7 +1663,12 @@ int ServerExtractEditSpec(const char *text, char *file, size_t fn,
     if (text == NULL)
         return 0;
     if (file && fn)
-        ServerExtractCreatePath(text, file, fn);
+    {
+        /* Use ServerExtractFileRef for strict extension-only matching
+           to avoid false positives like "linea.txt" from best_bare fallback */
+        if (!ServerExtractFileRef(text, file, fn))
+            file[0] = '\0';
+    }
     sep = FindIstr(text, " por ");
     if (sep == NULL)
         sep = FindIstr(text, " with ");
@@ -1555,6 +1709,22 @@ int ServerExtractEditSpec(const char *text, char *file, size_t fn,
     return 1;
 }
 
+/* Detect edit verbs (with or without enclitics) — no file check */
+int ServerHasEditVerb(const char *text)
+{
+    char lower[1024];
+    size_t i = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+    return MatchEditVerb(lower);
+}
+
 int ServerIsEditTask(const char *text)
 {
     char lower[1024];
@@ -1573,12 +1743,7 @@ int ServerIsEditTask(const char *text)
         i++;
     }
     lower[i] = '\0';
-    if (MatchWordBoundary(lower, "modifica") || MatchWordBoundary(lower, "modificar") ||
-        MatchWordBoundary(lower, "edita") || MatchWordBoundary(lower, "editar") ||
-        MatchWordBoundary(lower, "edit") || MatchWordBoundary(lower, "cambia") ||
-        MatchWordBoundary(lower, "cambiar") || MatchWordBoundary(lower, "reemplaza") ||
-        MatchWordBoundary(lower, "reemplazar") || MatchWordBoundary(lower, "replace") ||
-        MatchWordBoundary(lower, "actualiza") || MatchWordBoundary(lower, "actualizar"))
+    if (MatchEditVerb(lower))
         has_verb = 1;
     if (!has_verb)
         return 0;
@@ -1589,10 +1754,7 @@ int ServerIsEditTask(const char *text)
         has_file = 1;
     if (has_rep && has_file)
         return 1;
-    if (has_file &&
-        (MatchWordBoundary(lower, "modifica") || MatchWordBoundary(lower, "edita") ||
-         MatchWordBoundary(lower, "edit") || MatchWordBoundary(lower, "modificar") ||
-         MatchWordBoundary(lower, "editar")))
+    if (has_file && MatchEditVerb(lower))
         return 1;
     return 0;
 }
@@ -1668,8 +1830,22 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
                  esc_file, esc_file, esc_file, esc_old, esc_new);
         return 1;
     }
-    /* No replacement text: ask the harness to show the file, do not invent a hunk. */
-    tool = has_read ? "read" : (has_edit ? "edit" : NULL);
+    /* No replacement text: for append/add/write intents, dispatch edit
+       (the harness will append); otherwise ask to show the file. */
+    {
+        char lower_q[1024];
+        size_t qi = 0;
+        while (query[qi] != '\0' && qi < sizeof(lower_q) - 1)
+        {
+            lower_q[qi] = (char)tolower((unsigned char)query[qi]);
+            qi++;
+        }
+        lower_q[qi] = '\0';
+        if (MatchEditVerb(lower_q))
+            tool = has_edit ? "edit" : (has_read ? "read" : NULL);
+        else
+            tool = has_read ? "read" : (has_edit ? "edit" : NULL);
+    }
     if (tool == NULL)
         return 0;
     strncpy(out->name, tool, sizeof(out->name) - 1);
