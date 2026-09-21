@@ -786,46 +786,8 @@ static void HandleCompletions(socket_t s, const char *body,
             }
         }
 
-        /* Direct-edit auto-diff: when a direct edit tool result comes back
-           and no STRIPS plan is active, emit git diff immediately */
-        if (sess->had_edit && sess->current_plan.step_count == 0 &&
-            sess->declared_tools_count > 0 &&
-            (strcmp(tool_resp.name, "edit") == 0 ||
-             strcmp(tool_resp.name, "write") == 0 ||
-             strcmp(sess->last_tool_call_name, "edit") == 0 ||
-             strcmp(sess->last_tool_call_name, "write") == 0))
-        {
-            sess->had_edit = 0;  /* one-shot */
-            sess->agent_active = 0;
-            OPENAI_TOOL_CALLS tc;
-            memset(&tc, 0, sizeof(tc));
-            if (ServerMapDiffToolCall("git diff", sess->declared_tools,
-                                      (uint32_t)sess->declared_tools_count,
-                                      &tc.calls[0]))
-            {
-                tc.count = 1;
-                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
-                strncpy(sess->last_tool_call_name, tc.calls[0].name,
-                        sizeof(sess->last_tool_call_name) - 1);
-                if (ServerWantsStream(body))
-                {
-                    char sse_local[16384];
-                    ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
-                        g_seq, &tc, sse_local, sizeof(sse_local));
-                    SendRaw(s, 200, "OK", "text/event-stream", sse_local);
-                }
-                else
-                {
-                    ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
-                        g_seq, &tc,
-                        "Auto-diff: showing changes made by the edit.",
-                        resp, sizeof(resp));
-                    SendJson(s, 200, "OK", resp);
-                }
-                return;
-            }
-            /* Diff unavailable: fall through to completion message */
-        }
+        /* Direct-edit auto-diff: DISABLED — git diff fails outside repos
+           and causes infinite replan loops. User can request diff explicitly. */
 
         /* Determine whether this step was an inspection tool or task.
            Also treat as inspection any standalone tool call outside a STRIPS plan
@@ -1042,45 +1004,8 @@ static void HandleCompletions(socket_t s, const char *body,
                 }
             }
 
-            /* Auto-diff: after successful STRIPS plan edits, emit git diff
-               so the user can see what changed without asking.
-               Only for STRIPS plans (step_count > 0), not direct edits. */
-            if (!sess->had_error && sess->declared_tools_count > 0 &&
-                sess->current_plan.step_count > 0 &&
-                !ServerIsFileCreationTask(sess->current_issue) &&
-                !ServerIsInspectionTask(sess->current_issue) &&
-                !IsFolderOrGlobQuery(sess->current_issue) &&
-                sess->had_edit)
-            {
-                sess->had_edit = 0;  /* one-shot: prevent re-emission on diff result */
-                OPENAI_TOOL_CALLS tc;
-                memset(&tc, 0, sizeof(tc));
-                if (ServerMapDiffToolCall("git diff", sess->declared_tools,
-                                          (uint32_t)sess->declared_tools_count,
-                                          &tc.calls[0]))
-                {
-                    tc.count = 1;
-                    snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
-                    strncpy(sess->last_tool_call_name, tc.calls[0].name,
-                            sizeof(sess->last_tool_call_name) - 1);
-                    if (ServerWantsStream(body))
-                    {
-                        char sse_local[16384];
-                        ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
-                            g_seq, &tc, sse_local, sizeof(sse_local));
-                        SendRaw(s, 200, "OK", "text/event-stream", sse_local);
-                    }
-                    else
-                    {
-                        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL),
-                            g_seq, &tc,
-                            "Auto-diff: showing changes made by the edit.",
-                            resp, sizeof(resp));
-                        SendJson(s, 200, "OK", resp);
-                    }
-                    return;
-                }
-            }
+            /* Auto-diff after STRIPS plans: DISABLED — git diff fails
+               outside repos and causes infinite replan loops. */
 
             if (ServerWantsStream(body))
             {
