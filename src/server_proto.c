@@ -3600,8 +3600,7 @@ int ServerDeriveSingleCCommand(const char *issue, const char *path,
     if (strpbrk(path, " ;|&`$<>\\\n\r\t") != NULL || path[0] == '/')
         return 0;
     GitLowerCopy(issue ? issue : "", lower, sizeof(lower));
-    if (strstr(lower, "sanitize=address") || strstr(lower, "asan") ||
-        strstr(lower, "fallo de memoria") || strstr(lower, "memory"))
+    if (ServerIssueRequestsSanitizer(issue))
         snprintf(out, size,
                  "gcc -Wall -Wextra -std=c11 -fsanitize=address -g %s -o /tmp/symbols-c-check && /tmp/symbols-c-check 1 2 3 4 5 6 7 8",
                  path);
