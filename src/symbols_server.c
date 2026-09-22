@@ -736,6 +736,11 @@ static void HandleCompletions(socket_t s, const char *body,
     FILE *log;
 
     ServerExtractSession(body, session_id, sizeof(session_id));
+    if (session_id[0] == '\0')
+        ServerDeriveSessionKey(body, session_id, sizeof(session_id));
+    /* OpenCode 1.18.x sends no session identifier, so explicit fields
+       win first and the derived stable-prefix key above isolates
+       independent client sessions sharing this process. */
     sess = GetOrCreateSession(session_id);
     /* OpenCode does not send our custom session_id. Recover the small,
        explicit edit context from its replayed message history instead of

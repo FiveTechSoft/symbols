@@ -17,6 +17,12 @@ int ServerExtractQuery(const char *body, char *out, size_t size);
    from chat-completions body. Returns 1 if found, 0 if absent. */
 int ServerExtractSession(const char *body, char *out, size_t size);
 
+/* Fallback session key for clients that send no explicit identifier:
+   FNV-1a over the stable request prefix (first system message content,
+   first user message content), rendered "auto-<16 hex>". Returns 1 on
+   success, 0 when neither span exists (caller keeps "default"). */
+int ServerDeriveSessionKey(const char *body, char *out, size_t size);
+
 /* Full chat.completion JSON for content (already mapped). */
 int ServerBuildResponse(const char *model, long created,
                         unsigned long seq, const char *content,

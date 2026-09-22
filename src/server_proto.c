@@ -404,6 +404,138 @@ int ServerExtractQuery(const char *body, char *out, size_t size)
     return 1;
 }
 
+/* Derive a stable session key for clients (OpenCode 1.18.x) that send
+   no explicit session identifier. The key hashes the two request spans
+   that are byte-stable across every request of one session and differ
+   across independent sessions: the first system message content (it
+   carries the client working directory in its env block) and the first
+   user message content. Spans are hashed as raw JSON string-token bytes,
+   so no decoding buffer limits apply. Two sessions opened in the same
+   directory with the same opening prompt are indistinguishable on the
+   wire; that is a client protocol limitation, not extra sharing. */
+static uint64_t FnvaUpdate(uint64_t h, const char *p, const char *end)
+{
+    while (p < end)
+    {
+        h ^= (unsigned char)*p;
+        h *= 1099511628211ULL;
+        p++;
+    }
+    return h;
+}
+
+/* Find the raw byte span of a JSON string token starting at the opening
+   quote. Returns 1 and sets [start,end) when the token is complete. */
+static int JsonStringSpan(const char *open, const char **start, const char **end)
+{
+    const char *p;
+    if (open == NULL || *open != '"')
+        return 0;
+    p = open + 1;
+    while (*p != '\0')
+    {
+        if (*p == '\\')
+        {
+            if (*(p + 1) == '\0')
+                return 0;
+            p += 2;
+            continue;
+        }
+        if (*p == '"')
+        {
+            *start = open + 1;
+            *end = p;
+            return 1;
+        }
+        p++;
+    }
+    return 0;
+}
+
+int ServerDeriveSessionKey(const char *body, char *out, size_t size)
+{
+    const char *p;
+    const char *sys_start = NULL, *sys_end = NULL;
+    const char *usr_start = NULL, *usr_end = NULL;
+    char pending_role[32];
+    uint64_t h = 1469598103934665603ULL;
+    if (body == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    pending_role[0] = '\0';
+    p = body;
+    while (*p != '\0')
+    {
+        if (*p == '"' && strncmp(p, "\"role\"", 6) == 0)
+        {
+            const char *q = p + 6;
+            while (IsWs(*q)) q++;
+            if (*q == ':')
+            {
+                q++;
+                while (IsWs(*q)) q++;
+                if (*q == '"')
+                {
+                    const char *rs, *re;
+                    if (JsonStringSpan(q, &rs, &re) &&
+                        (size_t)(re - rs) < sizeof(pending_role))
+                    {
+                        memcpy(pending_role, rs, (size_t)(re - rs));
+                        pending_role[re - rs] = '\0';
+                        p = re + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        else if (*p == '"' && strncmp(p, "\"content\"", 9) == 0 &&
+                 pending_role[0] != '\0')
+        {
+            const char *q = p + 9;
+            while (IsWs(*q)) q++;
+            if (*q == ':')
+            {
+                q++;
+                while (IsWs(*q)) q++;
+                if (*q == '"')
+                {
+                    const char *cs, *ce;
+                    if (JsonStringSpan(q, &cs, &ce))
+                    {
+                        if (strcmp(pending_role, "system") == 0 &&
+                            sys_start == NULL)
+                        {
+                            sys_start = cs;
+                            sys_end = ce;
+                        }
+                        else if (strcmp(pending_role, "user") == 0 &&
+                                 usr_start == NULL)
+                        {
+                            usr_start = cs;
+                            usr_end = ce;
+                        }
+                        pending_role[0] = '\0';
+                        p = ce + 1;
+                        if (usr_start != NULL)
+                            break; /* first user message ends the stable prefix */
+                        continue;
+                    }
+                }
+            }
+        }
+        p++;
+    }
+    if (sys_start == NULL && usr_start == NULL)
+        return 0;
+    if (sys_start != NULL)
+        h = FnvaUpdate(h, sys_start, sys_end);
+    h = FnvaUpdate(h, "\xff", "\xff" + 1);
+    if (usr_start != NULL)
+        h = FnvaUpdate(h, usr_start, usr_end);
+    snprintf(out, size, "auto-%016llx", (unsigned long long)h);
+    return 1;
+}
+
 int ServerExtractSession(const char *body, char *out, size_t size)
 {
     const char *p;

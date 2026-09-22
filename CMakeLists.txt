@@ -158,6 +158,13 @@ sllm_test(test_stochastic_nlg tests/test_stochastic_nlg.c)
 sllm_test(test_metacognition tests/test_metacognition.c)
 sllm_test(test_passage_nlg tests/test_passage_nlg.c)
 sllm_test(test_agent_core tests/test_agent_core.c)
+sllm_test(test_server_session tests/test_server_session.c)
+if(UNIX)
+    add_test(NAME test_session_isolation_e2e
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_session_isolation.sh
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_session_isolation_e2e PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 sllm_test(test_code_graph tests/test_code_graph.c)
 sllm_test(test_agent_patch tests/test_agent_patch.c)
 sllm_test(test_agent_planner tests/test_agent_planner.c)
