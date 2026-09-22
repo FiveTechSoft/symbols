@@ -1739,6 +1739,7 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    int is_repository_task = ServerIsRepositoryTask(query);
     int is_coding = ServerIsCodingTask(query);
 
     /* Literal shell/CLI: emit one tool_call; the client harness executes it. */
@@ -2083,7 +2084,8 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
-    if (!has_tool_resp && ServerIsAmbiguousCodingTask(query))
+    if (!has_tool_resp && is_repository_task &&
+        ServerIsAmbiguousCodingTask(query))
     {
         snprintf(content, sizeof(content),
                  "Necesito concretar qué significa `optimizar`: objetivo medible (tiempo, memoria u otro), entrada representativa y criterio de aceptación. No voy a sustituir el programa por una plantilla ni modificar archivos sin esa evidencia.");
@@ -2094,7 +2096,8 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* Direct C code synthesis queries: respond with generated C code in markdown directly */
-    if (ServerIsCodeSynthesisTask(query) && !ServerIsFileCreationTask(query))
+    if (!is_repository_task && ServerIsCodeSynthesisTask(query) &&
+        !ServerIsFileCreationTask(query))
     {
         char code_resp[16384];
         ServerSynthesizeCode(query, code_resp, sizeof(code_resp));
@@ -2114,8 +2117,7 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* 3. INITIATE AGENTIC CODING TASK ONLY IF CODING INTENT AND TOOLS ARE DECLARED */
-    if (is_coding && sess->declared_tools_count > 0 &&
-        !ServerIsFileCreationTask(query))
+    if (is_repository_task && sess->declared_tools_count > 0)
     {
         char workdir[260];
         OPENAI_TOOL_CALLS tc;

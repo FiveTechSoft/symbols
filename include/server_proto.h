@@ -137,6 +137,10 @@ int ServerBuildToolCallStreamResponse(const char *model, long created,
 /* Classify whether a prompt represents a coding/software engineering task */
 int ServerIsCodingTask(const char *text);
 
+/* Existing-workspace change/fix/implement/optimize intent. This route wins
+   over standalone code synthesis and requires client workspace evidence. */
+int ServerIsRepositoryTask(const char *text);
+
 /* 1 when the prompt is a literal shell/CLI command (cmake, gcc, git, ls…).
    The engine must emit a tool_call; the harness runs it. */
 int ServerIsShellTask(const char *text);

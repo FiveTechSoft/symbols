@@ -3023,10 +3023,47 @@ void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
         query);
 }
 
+int ServerIsRepositoryTask(const char *text)
+{
+    char lower[1024];
+    size_t i;
+    static const char *actions[] = {
+        "fix", "repair", "implement", "update", "modify", "change",
+        "optimize", "arregla", "corrige", "implementa", "actualiza",
+        "modifica", "cambia", "optimiza", "ptim", "compila", "falla"
+    };
+    static const char *context[] = {
+        "program", "project", "repository", "repo", "codebase", "function",
+        "tests", "test", "file", "source", "compiler", "asan", "programa",
+        "proyecto", "repositorio", "funcion", "función", "archivos",
+        "fichero", "compilarlo", "usuarios", "users", "inventario", "main"
+    };
+    int has_action = 0, has_context = 0;
+    if (text == NULL || text[0] == '\0') return 0;
+    for (i = 0; text[i] != '\0' && i + 1 < sizeof(lower); i++)
+        lower[i] = (char)tolower((unsigned char)text[i]);
+    lower[i] = '\0';
+    if (ServerIsFileCreationTask(text) || ServerIsShellTask(text) ||
+        ServerIsDiffTask(text) || ServerIsGitInquiryTask(text))
+        return 0;
+    for (i = 0; i < sizeof(actions) / sizeof(actions[0]); i++)
+        if (MatchWordBoundary(lower, actions[i]) || strstr(lower, actions[i]) != NULL)
+            { has_action = 1; break; }
+    for (i = 0; i < sizeof(context) / sizeof(context[0]); i++)
+        if (MatchWordBoundary(lower, context[i]) || strstr(lower, context[i]) != NULL)
+            { has_context = 1; break; }
+    if (!has_context && ServerExtractFileRef(text, lower, sizeof(lower)))
+        has_context = 1;
+    return has_action && has_context;
+}
+
 int ServerIsCodingTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
         return 0;
+
+    if (ServerIsRepositoryTask(text))
+        return 1;
 
     if (ServerIsCodeSynthesisTask(text))
         return 1;

@@ -735,6 +735,21 @@ static void TestWorkspacePlanningEvidence(void)
     TEST_ASSERT(ServerIsAmbiguousCodingTask(
                     "Los usuarios dicen que este programa tarda demasiado. Optimízalo.") == 1,
                 "case 5 clarifies or abstains instead of synthesizing a template");
+    TEST_ASSERT(ServerIsRepositoryTask(
+                    "Este programa en C no compila. Arréglalo para que compile y funcione. No cambies lo que calcula."),
+                "case 1 enters repository route");
+    TEST_ASSERT(ServerIsRepositoryTask(
+                    "En este proyecto hay tests que fallan porque la función de texto.c está sin implementar. Implementa la función para que los tests pasen. No modifiques los tests."),
+                "case 2 enters repository route before synthesis");
+    TEST_ASSERT(ServerIsRepositoryTask(
+                    "Al compilarlo con -fsanitize=address y ejecutarlo con varios números como argumentos, falla. Encuentra y corrige el fallo de memoria. El programa debe seguir calculando lo mismo."),
+                "case 3 enters repository route");
+    TEST_ASSERT(ServerIsRepositoryTask(
+                    "Añade un campo stock al producto, con stock 4 para el teclado, 10 para el ratón y 2 para el monitor, y una función que devuelva el valor total del inventario (precio multiplicado por stock de cada producto). Actualiza el main para que muestre ese total."),
+                "case 4 enters repository route");
+    TEST_ASSERT(ServerIsRepositoryTask(
+                    "Los usuarios dicen que este programa tarda demasiado. Optimízalo."),
+                "case 5 enters repository route for clarification");
 }
 
 int main(void)
