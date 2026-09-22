@@ -49,6 +49,10 @@ These operators are useful primitives. Their presence does not yet prove reliabl
 
 `.github/workflows/apply-patch.yml` currently provides a guarded patch path: exact-base validation, patch validation, application, Ubuntu build and CTest, commit, and push. This gives changes a reproducible transaction boundary.
 
+### Persistent episodic fact memory
+
+Commit `1c9dd550241b8cd0aaebac118d8bdaa04bde6615` lands the atomic fact-memory substrate: crash-safe atomic replacement of the on-disk store, selective forgetting of individual facts, and honest failure reporting when persistence fails. A failed save never claims success and leaves the previous store byte-identical. Evidence: the guarded apply workflow plus the full Linux, MSVC, and MSVC-ASan matrix on the final SHA, and a live end-to-end proof covering learn, query, server restart, query, selective forget, immediate absence, second restart, continued absence, and read-only-filesystem failure honesty. This substrate is what Phase 7 stores its episodes through.
+
 The shell hardening at commit `ba90e1d4ba648e844c3e975ad8e870df38877c89` adds three important invariants:
 
 - an invalid working directory fails without running the command;
@@ -83,6 +87,9 @@ persistent workflows
     |
     v
 verified episodic memory
+    |
+    v
+reflexion learning loop
 ```
 
 Security capabilities, provenance, metrics, and cross-platform CI cut across every phase. Later phases may be prototyped early, but they do not exit before their dependencies.
@@ -241,6 +248,33 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 - An incompatible or stale episode cannot silently authorize or satisfy a current gate.
 - On a held-out repair corpus, memory improves median steps or time without reducing success rate, safety-gate recall, or determinism.
 - Deleting or rebuilding memory changes efficiency only, never the truth of repository facts or verification results.
+
+## Phase 7: Verified Reflexion-style learning loop
+
+**Goal:** implement the complete learning loop from *Reflexion: Language Agents with Verbal Reinforcement Learning* (Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik Narasimhan, Shunyu Yao, 2023; arXiv:2303.11366; https://arxiv.org/abs/2303.11366) with deterministic components: the agent attempts a task, the environment returns feedback, the agent writes a verbal reflection, stores it in episodic memory, retrieves it on the next attempt, and measurably improves. No weight updates anywhere, and nothing consolidates without external evidence.
+
+**Mechanisms:** all five, in one loop. Perceive the task and workspace, test each attempt against the real toolchain, correct from the feedback, consolidate only verified episodes, abstain when no verified experience applies.
+
+**Relation to the paper.** Reflexion reinforces a language agent through linguistic feedback kept in an episodic memory buffer instead of gradient updates. Symbols keeps that loop shape and replaces the probabilistic actor with the deterministic planner and operators; the evaluator is always the real toolchain: compiler, tests, sanitizers, and tools. This adaptation is a deliberate difference from the paper, not a claim of equivalence.
+
+### Deliverables
+
+- Bounded attempt loop: each task runs a capped number of attempts, and every attempt yields a candidate patch plus captured external feedback (compiler diagnostics, test results, sanitizer output, tool exit codes). Self-evaluation never substitutes for a real toolchain signal.
+- Deterministic verbal reflection: each attempt is summarized from its diagnostics into structured text - what was tried, what the environment reported, why it failed, what to change on the next attempt.
+- Persistent episodic record: every attempt stores task, attempt number, feedback, reflection, patch hash, outcome, and provenance (repository SHA, toolchain, fixture version) through the atomic fact-memory substrate, keeping its crash-safety and persistence-failure honesty guarantees.
+- Bounded retrieval: the next attempt receives the most relevant prior episodes for the same task, plus explicit warnings when the context differs, with a hard cap on how much history may enter a decision.
+- Negative episodes: failed approaches stay recorded as failures so they are not retried blindly; they inform avoidance, never authorization.
+- Correction and forgetting: correcting or forgetting an episode stops its influence immediately and across restarts, reusing the selective-forgetting machinery.
+- Abstention: when no episode passes its evidence gate, the loop reports that it has no verified experience instead of guessing.
+
+### Exit criteria
+
+- End-to-end run on the external C benchmark: attempt, compiler/test/ASan feedback, reflection, persisted episode, retrieval on the next attempt, verified live against the server and across a process restart.
+- Measured improvement against a no-memory baseline: on a held-out benchmark split, the memory-enabled runner beats the same runner with memory disabled on success rate or median attempts, with no regression in safety-gate recall or determinism. Results are published with fixture versions and the final SHA.
+- No consolidation without external evidence: an episode may influence a later attempt only if its feedback came from a real compiler, test, sanitizer, or tool run; internally generated confidence never promotes an episode.
+- Forgetting restores the baseline: after a selective forget, behavior for that task matches the no-memory runner, immediately and after a restart.
+- Honest abstention: with an empty or invalidated store, the runner states that it has no verified experience rather than fabricating recall.
+- No weight updates: the implementation stores and retrieves episodes only; it changes no model parameters.
 
 ## Cross-cutting release gates
 
