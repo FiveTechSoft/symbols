@@ -502,6 +502,7 @@ static void test_shell_tool_dispatch(void)
         "git diff --stat",
         "ls -la",
         "pwd",
+        "uname -a",
         "echo hello",
         "mkdir tmp_shell_test",
         "python --version",
@@ -537,6 +538,12 @@ static void test_shell_tool_dispatch(void)
     }
 
     TEST_ASSERT(ServerIsShellTask("dir *.*") == 1, "dir *.* is a shell-shaped listing");
+    TEST_ASSERT(ServerIsShellTask("uname -a") == 1,
+                "authentic OpenCode TUI uname request is shell-shaped");
+    TEST_ASSERT(ServerIsShellTask("uname is a Unix utility") == 0,
+                "ordinary prose beginning with uname is not executed");
+    TEST_ASSERT(ServerIsShellTask("uname explained") == 0,
+                "uname plus a non-option argument is not executed");
     {
         OPENAI_TOOL_CALL tc;
         TEST_ASSERT(ServerMapShellToolCall("dir *.*", glob_bash, 3, &tc) == 1,

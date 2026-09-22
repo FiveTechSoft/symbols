@@ -2230,7 +2230,7 @@ int ServerIsShellTask(const char *text)
         "ninja", "cargo", "npm", "npx", "pip", "python", "py", "node",
         "go", "rustc", "dotnet", "powershell", "pwsh", "cmd",
         "dir", "ls", "pwd", "echo", "mkdir", "rmdir", "rm", "cp",
-        "mv", "curl", "wget", "tar", "zip", "unzip"
+        "mv", "curl", "wget", "tar", "zip", "unzip", "uname"
     };
     char tok[64];
     size_t i = 0, t = 0;
@@ -2265,10 +2265,25 @@ int ServerIsShellTask(const char *text)
     }
     if (tok[0] == '\0')
         return 0;
+    {
+    size_t arg_pos = i;
     for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++)
     {
         if (strcmp(tok, cmds[i]) == 0)
+        {
+            /* uname is accepted only as the literal command plus option
+               tokens.  This covers real CLI intent such as `uname -a`
+               without executing ordinary prose beginning with "uname". */
+            if (strcmp(tok, "uname") == 0)
+            {
+                while (text[arg_pos] == ' ' || text[arg_pos] == '\t')
+                    arg_pos++;
+                if (text[arg_pos] != '\0' && text[arg_pos] != '-')
+                    return 0;
+            }
             return 1;
+        }
+    }
     }
 
     /* Natural language shell intent: "list files", "show directories",

@@ -869,6 +869,37 @@ static void HandleCompletions(socket_t s, const char *body,
         SendJson(s, 200, "OK", resp);
         return;
     }
+    /* A literal shell request is a bounded one-tool transaction.  Relay
+       only the observed tool output and exit status; never synthesize build
+       or regression claims from a successful command. */
+    if (has_tool_resp && sess->agent_active &&
+        (strcmp(tool_resp.name, "bash") == 0 ||
+         strcmp(tool_resp.name, "execute_command") == 0) &&
+        ServerIsShellTask(sess->current_issue))
+    {
+        sess->agent_active = 0;
+        if (tool_resp.content[0] != '\0')
+        {
+            if (tool_resp.has_exit_code)
+                snprintf(content, sizeof(content),
+                         "```text\n%s\n```\nExit status: %d",
+                         tool_resp.content, tool_resp.exit_code);
+            else
+                snprintf(content, sizeof(content),
+                         "```text\n%s\n```\nExit status was not reported by the shell tool.",
+                         tool_resp.content);
+        }
+        else if (tool_resp.has_exit_code)
+            snprintf(content, sizeof(content), "Exit status: %d", tool_resp.exit_code);
+        else
+            snprintf(content, sizeof(content),
+                     "The shell tool returned no output or exit status.");
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                            content, sess->current_issue, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
     /* 1. AGENTIC RESUMPTION: Client returned output of previous tool call */
     if (has_tool_resp && sess->agent_active)
     {
@@ -1418,6 +1449,10 @@ static void HandleCompletions(socket_t s, const char *body,
                          "call_sym_%lu", ++g_seq);
                 strncpy(sess->last_tool_call_name, tc.calls[0].name,
                         sizeof(sess->last_tool_call_name) - 1);
+                sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
+                sess->agent_active = 1;
+                strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
+                sess->current_issue[sizeof(sess->current_issue) - 1] = '\0';
                 if (ServerWantsStream(body))
                 {
                     char sse_local[16384];
