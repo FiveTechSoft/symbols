@@ -257,9 +257,11 @@ static void test_coding_task_intent(void)
 
     char gbuf[512];
     TEST_ASSERT(ServerAnswerGreeting("hola", 0, gbuf, sizeof(gbuf)) == 1, "Answers 'hola'");
-    TEST_ASSERT(strstr(gbuf, "Symbols") != NULL, "'hola' response contains Symbols");
+    TEST_ASSERT(strcmp(gbuf, "Hola. ¿Qué quieres hacer?") == 0,
+                "'hola' response is direct, not a canned self-introduction");
     TEST_ASSERT(ServerAnswerGreeting("hello", 0, gbuf, sizeof(gbuf)) == 1, "Answers 'hello'");
-    TEST_ASSERT(strstr(gbuf, "Symbols") != NULL, "'hello' response contains Symbols");
+    TEST_ASSERT(strcmp(gbuf, "Hello. What would you like to do?") == 0,
+                "'hello' response is direct, not a canned self-introduction");
 
     /* Factual questions should NOT be detected as coding tasks */
     TEST_ASSERT(ServerIsCodingTask("Who is the father of Solomon?") == 0, "Factual query is not coding task");

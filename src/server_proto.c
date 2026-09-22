@@ -3015,8 +3015,7 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
         else
         {
             snprintf(out, out_sz,
-                "Hello! I am Symbols, your local AI coding assistant. "
-                "How can I help you today with your project or code?");
+                "Hello. What would you like to do?");
         }
     }
     else
@@ -3031,8 +3030,7 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
         else
         {
             snprintf(out, out_sz,
-                "¡Hola! Soy Symbols, tu asistente local de IA y desarrollo. "
-                "¿En qué puedo ayudarte hoy con tu proyecto o código?");
+                "Hola. ¿Qué quieres hacer?");
         }
     }
 
