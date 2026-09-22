@@ -27,6 +27,8 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      committed_sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Check out master
         uses: actions/checkout@v4
@@ -73,6 +75,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       - name: Commit and update master
+        id: commit
         env:
           COMMIT_MESSAGE: ${{ inputs.message }}
         shell: bash
@@ -83,4 +86,13 @@ jobs:
           git add -- src include tests tools CMakeLists.txt
           git diff --cached --quiet && { echo 'Nothing to commit'; exit 1; }
           git commit -m "$COMMIT_MESSAGE"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git push origin HEAD:master
+
+  ci:
+    needs: apply
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      target_sha: ${{ needs.apply.outputs.committed_sha }}
