@@ -726,6 +726,19 @@ static void TestWorkspacePlanningEvidence(void)
         TEST_ASSERT(ServerDeriveSingleCCommand("fix", "main.c;rm", command,
                                                sizeof(command)) == 0,
                     "unsafe path never becomes a command");
+        TEST_ASSERT(ServerIssueRequestsSanitizer("AddressSanitizer falla al crecer") == 1,
+                    "explicit sanitizer intent wins over a plain compile");
+        TEST_ASSERT(ServerIssueRequestsTests("implementa para que los tests pasen") == 1,
+                    "explicit test intent selects an evidenced test target");
+        TEST_ASSERT(ServerSelectWorkspaceTestFile("texto.c\ntest_texto.c\nMakefile\n", "texto.c", file, sizeof(file)) == 1 &&
+                    strcmp(file, "test_texto.c") == 0,
+                    "failing test route inspects observed test source");
+        TEST_ASSERT(ServerPlanTestObservedCRepair(
+                        "char *repeat(const char *s,int n){(void)s;(void)n;return 0;}",
+                        "int main(){char *x=repeat(\"ab\",3);assert(x);free(x);}",
+                        old_text, sizeof(old_text), new_text, sizeof(new_text)) == 1 &&
+                    strstr(new_text, "malloc") != NULL && strstr(new_text, "for(int i=0;i<veces;i++)") != NULL,
+                    "source and inspected tests can establish a bounded repeat implementation");
         TEST_ASSERT(ServerPlanObservedCRepair(typo_source, gcc_diag,
                                               old_text, sizeof(old_text),
                                               new_text, sizeof(new_text)) == 1 &&
@@ -750,6 +763,8 @@ static void TestWorkspacePlanningEvidence(void)
                 "consequentially ambiguous optimization requires clarification");
     TEST_ASSERT(ServerIsAmbiguousCodingTask("Optimiza parser.c para reducir memoria") == 0,
                 "named target and metric are actionable");
+    TEST_ASSERT(ServerIsAmbiguousCodingTask("Arregla este proyecto en C para que haga lo que necesito.") == 1,
+                "missing requested behavior requires clarification even when compilation passes");
 
     /* Authentic five-case envelopes: assert grounding/abstention protocol,
        never encode the repair. */

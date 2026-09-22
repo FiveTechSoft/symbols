@@ -215,6 +215,10 @@ int ServerExtractWorkingDir(const char *body, char *out, size_t size);
    client workspace; these functions never inspect the server repository. */
 int ServerSelectWorkspaceFile(const char *issue, const char *listing,
                               char *out, size_t size);
+int ServerIssueRequestsSanitizer(const char *issue);
+int ServerIssueRequestsTests(const char *issue);
+int ServerSelectWorkspaceTestFile(const char *listing, const char *target, char *out, size_t size);
+int ServerPlanTestObservedCRepair(const char *source, const char *test_source, char *old_text, size_t old_size, char *new_text, size_t new_size);
 int ServerInferWorkspaceCommands(const char *listing,
                                  char *build, size_t build_size,
                                  char *test, size_t test_size);

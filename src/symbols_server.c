@@ -273,6 +273,10 @@ typedef struct
     char              workspace_test[256];
     char              workspace_command[512];
     char              workspace_source[8192];
+    char              workspace_listing[8192];
+    char              workspace_diagnostic[8192];
+    char              workspace_test_source[8192];
+    char              workspace_test_file[260];
     int               workspace_phase; /* 1=discover, 2=inspect, 3=verify, 4=edit, 5=reverify */
 } ServerSession;
 
@@ -1075,6 +1079,7 @@ static void HandleCompletions(socket_t s, const char *body,
                                   resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
+        snprintf(sess->workspace_listing, sizeof(sess->workspace_listing), "%s", tool_resp.content);
         ServerInferWorkspaceCommands(tool_resp.content,
                                      sess->workspace_build, sizeof(sess->workspace_build),
                                      sess->workspace_test, sizeof(sess->workspace_test));
@@ -1139,9 +1144,16 @@ static void HandleCompletions(socket_t s, const char *body,
         }
         snprintf(sess->workspace_source, sizeof(sess->workspace_source), "%s",
                  tool_resp.content);
-        if (sess->workspace_test[0] != '\0')
-            snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s",
-                     sess->workspace_test);
+        if (ServerIssueRequestsSanitizer(sess->current_issue))
+        {
+            if (!ServerDeriveSingleCCommand(sess->current_issue, sess->workspace_target,
+                                            sess->workspace_command, sizeof(sess->workspace_command)))
+                sess->workspace_command[0] = '\0';
+        }
+        else if (ServerIssueRequestsTests(sess->current_issue) && sess->workspace_test[0] != '\0')
+            snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s", sess->workspace_test);
+        else if (sess->workspace_build[0] != '\0')
+            snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s", sess->workspace_build);
         else if (!ServerDeriveSingleCCommand(sess->current_issue,
                                              sess->workspace_target,
                                              sess->workspace_command,
@@ -1193,17 +1205,38 @@ static void HandleCompletions(socket_t s, const char *body,
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
-        if (!HasDeclaredTool(sess, "edit") ||
-            !ServerPlanObservedCRepair(sess->workspace_source, tool_resp.content,
-                                       old_text, sizeof(old_text),
-                                       new_text, sizeof(new_text)))
+        if (!ServerPlanObservedCRepair(sess->workspace_source, tool_resp.content,
+                                       old_text, sizeof(old_text), new_text, sizeof(new_text)))
         {
+            snprintf(sess->workspace_diagnostic, sizeof(sess->workspace_diagnostic), "%s", tool_resp.content);
+            if (HasDeclaredTool(sess, "read") &&
+                ServerSelectWorkspaceTestFile(sess->workspace_listing, sess->workspace_target,
+                                              sess->workspace_test_file, sizeof(sess->workspace_test_file)))
+            {
+                memset(&tc, 0, sizeof(tc)); tc.count = 1;
+                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "read");
+                snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                         "{\"filePath\":\"%s\"}", sess->workspace_test_file);
+                snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "read");
+                sess->workspace_phase = 6;
+                SendToolCallsForRequest(s, body, g_seq, &tc,
+                    "Inspecting the relevant test source after the failing test command.",
+                    resp, sizeof(resp), sse, sizeof(sse));
+                return;
+            }
             sess->agent_active = 0; sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
                      "La verificación falló, pero el diagnóstico observado no permite un parche mínimo inequívoco en `%s`. No he modificado archivos.",
                      sess->workspace_target);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        if (!HasDeclaredTool(sess, "edit"))
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            SendContentForRequest(s, body, ++g_seq, "OpenCode no declaró `edit`; no puedo aplicar el parche observado.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
         memset(&tc, 0, sizeof(tc)); tc.count = 1;
@@ -1217,6 +1250,34 @@ static void HandleCompletions(socket_t s, const char *body,
         SendToolCallsForRequest(s, body, g_seq, &tc,
                                 "Applying one minimal edit derived from the observed diagnostic.",
                                 resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 6)
+    {
+        OPENAI_TOOL_CALLS tc; char old_text[1024], new_text[4096], old_esc[2048], new_esc[6144];
+        if (tool_resp.is_error || tool_resp.content[0] == '\0' || !HasDeclaredTool(sess, "edit") ||
+            !ServerPlanTestObservedCRepair(sess->workspace_source, tool_resp.content,
+                                           old_text, sizeof(old_text), new_text, sizeof(new_text)))
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            SendContentForRequest(s, body, ++g_seq,
+                "Inspeccioné el test relevante, pero no demuestra un parche mínimo inequívoco. No he modificado archivos.",
+                sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        ServerJsonEscape(old_text, old_esc, sizeof(old_esc));
+        ServerJsonEscape(new_text, new_esc, sizeof(new_esc));
+        memset(&tc, 0, sizeof(tc)); tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "edit");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                 sess->workspace_dir, sess->workspace_target, old_esc, new_esc);
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "edit");
+        sess->workspace_phase = 4;
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+            "Applying one implementation derived from inspected source and tests.",
+            resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 4)
@@ -2312,6 +2373,7 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->workspace_target[0] = '\0';
         sess->workspace_build[0] = '\0';
         sess->workspace_test[0] = '\0';
+        sess->workspace_listing[0] = sess->workspace_diagnostic[0] = sess->workspace_test_source[0] = sess->workspace_test_file[0] = '\0';
         sess->workspace_phase = 1;
         memset(&tc, 0, sizeof(tc));
         tc.count = 1;
