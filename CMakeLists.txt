@@ -65,6 +65,12 @@ add_library(symbolic STATIC
 )
 
 target_include_directories(symbolic PUBLIC include)
+if(MSVC)
+    target_compile_definitions(symbolic PUBLIC
+        strcasecmp=_stricmp
+        strncasecmp=_strnicmp
+    )
+endif()
 if(NOT MSVC)
     target_link_libraries(symbolic PUBLIC m)
 endif()

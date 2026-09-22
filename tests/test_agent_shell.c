@@ -157,6 +157,19 @@ static void test_timeout_termination(void)
     TEST_ASSERT(res.wall_clock_ms < 2000.0, "Terminated well before slow command completion");
 
     printf("  [INFO] Timed out after %.2f ms (exit_code=%d)\n", res.wall_clock_ms, res.exit_code);
+
+#ifdef _WIN32
+    slow_cmd = "echo PARTIAL_OUT & echo PARTIAL_ERR 1>&2 & ping 127.0.0.1 -n 4 >nul";
+#else
+    slow_cmd = "printf PARTIAL_OUT; printf PARTIAL_ERR >&2; sleep 3";
+#endif
+    ok = AgentShellExec(slow_cmd, ".", 150, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124,
+                "Timeout after partial output keeps timeout semantics");
+    TEST_ASSERT(strstr(res.stdout_buf, "PARTIAL_OUT") != NULL,
+                "Stdout emitted before timeout is preserved");
+    TEST_ASSERT(strstr(res.stderr_buf, "PARTIAL_ERR") != NULL,
+                "Stderr emitted before timeout is preserved");
 }
 
 /* ============================================================

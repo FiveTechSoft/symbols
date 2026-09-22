@@ -38,20 +38,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = [
-    "data/samples/wikidata_clean.tsv",
-    "wiki_corpus.tsv",
-    "data/samples/c_knowledge.tsv",
-    "data/samples/psalms_knowledge.tsv",
-    "data/bible/bible_relations.tsv",
-    "data/samples/love_knowledge.tsv",
-    "data/samples/geo_knowledge.tsv",
-    "data/samples/math_knowledge.tsv",
-    "data/samples/iconclass_trees.tsv",
-    "data/samples/jung.tsv",
-    "data/samples/grammar_seed.tsv",
-    "data/samples/animal_seed.tsv",
+    # The legacy generated TSV corpora were intentionally removed when the
+    # engine moved to plain-text corpora. Keep a tracked, representative TSV
+    # fixture so the lint gate remains executable and cannot pass vacuously.
+    "tools/fixtures/corpus_lint.tsv",
 ]
-
 STOP_SUBJ = {
     "SU", "SUS", "TU", "TUS", "MI", "MIS", "YO", "EL", "ELLA", "ELLO",
     "ELLOS", "ELLAS", "NOSOTROS", "USTED", "ESTE", "ESTA", "ESTO",

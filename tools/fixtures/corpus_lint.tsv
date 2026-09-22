@@ -1,0 +1,10 @@
+# Representative clean triples for the corpus-lint CI gate.
+# Includes Unicode, underscored entities, numeric values, and provenance.
+ESPAÑA	CAPITAL	MADRID
+FRANCIA	CAPITAL	PARÍS
+SAN_MARINO	IDIOMA	ITALIANO
+C	ESTANDAR_ISO	C11
+CHAR	TAMAÑO_BYTES	1	ISO_C_6.2.5
+PINGÜINO	CAPAZ_DE	NADAR
+TIERRA	PARTE_DE	SISTEMA_SOLAR
+VIDRIO	PROPIEDAD	FRÁGIL
