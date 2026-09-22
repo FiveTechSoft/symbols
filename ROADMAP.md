@@ -4,12 +4,20 @@ This roadmap turns the current native C11 engine into a dependable engineering a
 
 ## Operating principles
 
+This roadmap does not encode one behavior per situation. It builds mechanisms: **perceive** the repository and its context, **test** candidate changes against the world, **correct** without hiding failure, **consolidate** only verified experience, and **abstain** when evidence is insufficient. Each phase below strengthens specific mechanisms; each gate exists to prove them.
+
 1. **Deterministic core.** Repository state, plans, actions, and verification are explicit data. A probabilistic model may propose work at the boundary, but it is never the source of truth for permissions, invariants, or success.
 2. **Fail closed.** Unknown state, ambiguous paths, stale preconditions, unsupported syntax, and incomplete verification stop the affected action without partial side effects.
 3. **Structured operations before shell commands.** Shell execution remains an escape hatch. Filesystem, Git, build, test, and code operations gain typed contracts and narrower capabilities.
 4. **Evidence over claims.** Every milestone names its fixture, benchmark, invariant, or CI job. Local success is progress; cross-platform CI on the final SHA is the release gate.
 5. **Reversible changes.** Mutations use dry runs, precondition checks, atomic replacement where possible, and explicit rollback or compensation.
 6. **Facts and derived knowledge stay separate.** Source facts carry provenance. Heuristics, scores, diagnoses, and prior experiences are marked as derived and can be invalidated.
+
+## Domain orientation
+
+- **North star: any language.** The long-term target is a language-agnostic core that can support any programming language. Adding a language means supplying its toolchain, semantics, diagnostics, corpus, and evaluations behind the same contracts, never rewriting the engine.
+- **Harbour is the first reference implementation.** The primary initial audience is Harbour programmers, with `harbour/core` (https://github.com/harbour/core) as the reference codebase. Harbour is the first complete, demanding domain: corpus, code graph, diagnostics, build and test tooling, and repair fixtures. It is the stress test that proves the contracts, not an architectural boundary. Initial Harbour semantics ride the real toolchain: `hbmk2` builds, preprocessed `.ppo` sources, `harbour -s` diagnostics, and generated C feeding the Clang pipeline; Harbour acceptance evidence comes only from real `hbmk2` builds and tests.
+- **C/C++ remains the substrate.** The engine, the Harbour runtime, and C extensions stay on the C pipeline; its portability and memory-safety gates remain mandatory.
 
 ## Verified foundation
 
@@ -82,6 +90,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 
 **Goal:** make subprocess execution a bounded, observable primitive rather than an implicit source of repository state.
 
+**Mechanisms:** test. Bounded, observable execution is what makes trying a candidate against reality safe.
+
 ### Deliverables
 
 - Complete POSIX and Windows process-tree termination semantics.
@@ -103,6 +113,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 
 **Goal:** remove routine file mutation from ad hoc shell strings and enforce workspace boundaries as data.
 
+**Mechanisms:** correct. Reversible, journaled mutation replaces destructive, ad hoc edits.
+
 ### Deliverables
 
 - Typed operations for stat, list, read, create, replace, move, copy, and remove.
@@ -122,6 +134,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 ## Phase 2: Safe Git
 
 **Goal:** make repository inspection and change delivery explicit, race-aware, and reversible.
+
+**Mechanisms:** correct. Changes become atomic, reviewable, and attributable commits guarded by race-aware preconditions.
 
 ### Deliverables
 
@@ -143,6 +157,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 
 **Goal:** understand what to build and test, then preserve complete evidence for the decision and result.
 
+**Mechanisms:** perceive and test. Build and test structure becomes data, and every result becomes evidence with provenance.
+
 ### Deliverables
 
 - CMake File API and CTest metadata ingestion for targets, sources, generated files, configurations, tests, labels, and dependencies.
@@ -162,6 +178,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 ## Phase 4: Clang AST and `compile_commands.json`
 
 **Goal:** replace lightweight C scanning with compiler-grounded semantics for C and C++ while keeping the graph auditable.
+
+**Mechanisms:** perceive. Compiler-grounded semantics replace guessing about code structure.
 
 ### Deliverables
 
@@ -183,6 +201,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 
 **Goal:** execute long engineering tasks as resumable state machines with durable evidence and compensation.
 
+**Mechanisms:** correct. Interruption and recovery leave no partial or duplicated effects.
+
 ### Deliverables
 
 - Versioned workflow schema for steps, inputs, outputs, preconditions, capabilities, retries, timeouts, approvals, and compensation.
@@ -202,6 +222,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 ## Phase 6: Verified episodic memory
 
 **Goal:** reuse prior engineering experience without converting past guesses into current facts.
+
+**Mechanisms:** consolidate and abstain. Verified experience becomes reusable knowledge; unverified experience never authorizes an action.
 
 ### Deliverables
 
@@ -253,7 +275,7 @@ Benchmark thresholds belong beside versioned fixtures and should be tightened on
 - Autonomous force push, history rewriting, secret handling, privilege escalation, or destructive cleanup by default.
 - Treating a lexical scanner as compiler-equivalent C/C++ semantics.
 - Claiming full SWE-bench issue resolution from candidate-patch verification results.
-- Expanding to more languages before C/C++ semantics, build/test evidence, and workflow recovery meet their gates.
+- Expanding to additional languages beyond Harbour and the C/C++ substrate before their semantics, build/test evidence, and workflow recovery meet their gates.
 - Maximizing conversational breadth at the expense of engineering reliability.
 
 ## Next gate
