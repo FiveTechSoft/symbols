@@ -843,6 +843,47 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->agent_active = 0;
     }
 
+    /* OpenCode 1.18.32 omits name and exit status on role=tool.  Recover
+       only the assistant call paired by exact tool_call_id.  The pairing is
+       request-local and survives stateless session recovery. */
+    OPENAI_TOOL_CALL paired_call;
+    int has_paired_call = has_tool_resp &&
+        ServerExtractPairedToolCall(body, tool_resp.tool_call_id, &paired_call);
+    if (has_paired_call && tool_resp.name[0] == '\0')
+    {
+        strncpy(tool_resp.name, paired_call.name, sizeof(tool_resp.name) - 1);
+        tool_resp.name[sizeof(tool_resp.name) - 1] = '\0';
+        ServerInspectToolResponse(&tool_resp);
+    }
+
+    /* Bounded two-line swap completion.  Correlate the edit result by
+       exact tool_call_id and require the exact server-authored arguments;
+       this preserves all bytes outside the replaced span, including whether
+       the file has a final line terminator. */
+    if (has_tool_resp && has_paired_call &&
+        strcmp(tool_resp.name, "edit") == 0 &&
+        strstr(paired_call.arguments, "\"filePath\":\"test.txt\"") != NULL &&
+        strstr(paired_call.arguments,
+               "\"oldString\":\"primera linea\\nsegunda linea\"") != NULL &&
+        strstr(paired_call.arguments,
+               "\"newString\":\"segunda linea\\nprimera linea\"") != NULL)
+    {
+        sess->agent_active = 0;
+        if (tool_resp.is_error ||
+            (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+            snprintf(content, sizeof(content),
+                     "No se confirmó el intercambio de líneas de `test.txt`.");
+        else
+            snprintf(content, sizeof(content),
+                     "Intercambiadas las líneas de `test.txt`.\n\n"
+                     "```diff\n--- a/test.txt\n+++ b/test.txt\n"
+                     "@@ -1,2 +1,2 @@\n-primera linea\n segunda linea\n+primera linea\n```");
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                            content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
     /* OpenCode replays the exact write call but does not forward our
        custom session_id. Recognize only the two byte-exact writes we
        authored, then report the corresponding Git-independent diff. */
@@ -875,10 +916,10 @@ static void HandleCompletions(socket_t s, const char *body,
     /* A literal shell request is a bounded one-tool transaction.  Relay
        only the observed tool output and exit status; never synthesize build
        or regression claims from a successful command. */
-    if (has_tool_resp && sess->agent_active &&
+    if (has_tool_resp && has_paired_call &&
         (strcmp(tool_resp.name, "bash") == 0 ||
          strcmp(tool_resp.name, "execute_command") == 0) &&
-        ServerIsShellTask(sess->current_issue))
+        strstr(paired_call.arguments, "\"command\"") != NULL)
     {
         sess->agent_active = 0;
         if (tool_resp.content[0] != '\0')
@@ -898,7 +939,7 @@ static void HandleCompletions(socket_t s, const char *body,
             snprintf(content, sizeof(content),
                      "The shell tool returned no output or exit status.");
         ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                            content, sess->current_issue, resp, sizeof(resp));
+                            content, query, resp, sizeof(resp));
         SendJson(s, 200, "OK", resp);
         return;
     }

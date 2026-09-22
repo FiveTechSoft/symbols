@@ -110,6 +110,12 @@ void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp);
 /* Extract the most recent {"role":"tool", ...} message from the body */
 int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out);
 
+/* Recover the assistant tool call paired with a tool response.  OpenCode
+   1.18.32 omits the tool name from role=tool messages, so correlation uses
+   the exact tool_call_id from request history. */
+int ServerExtractPairedToolCall(const char *body, const char *tool_call_id,
+                                OPENAI_TOOL_CALL *out);
+
 /* Format raw inspection tool output (JSON matches/files or plain text) into clean readable lines */
 int ServerFormatInspectionOutput(const char *in, char *out, size_t size);
 

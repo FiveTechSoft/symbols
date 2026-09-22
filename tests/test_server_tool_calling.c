@@ -62,6 +62,47 @@ static void test_tool_response_extraction(void)
     TEST_ASSERT(strcmp(resp.tool_call_id, "call_001") == 0, "tool_call_id is call_001");
     TEST_ASSERT(strcmp(resp.name, "apply_patch") == 0, "tool name is apply_patch");
     TEST_ASSERT(strstr(resp.content, "applied") != NULL, "content contains 'applied'");
+
+
+    /* Authentic OpenCode 1.18.32 continuation omits name on role=tool. */
+    const char *oc_cont =
+        "{\"messages\":["
+        "{\"role\":\"user\",\"content\":\"uname -a\"},"
+        "{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{"
+        "\"id\":\"call_sym_real\",\"type\":\"function\",\"function\":{"
+        "\"name\":\"bash\",\"arguments\":\"{\\\"command\\\":\\\"uname -a\\\"}\"}}]},"
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_sym_real\","
+        "\"content\":\"Linux e2b.local GNU/Linux\\n\"}]}";
+    OPENAI_TOOL_RESPONSE oc_resp;
+    OPENAI_TOOL_CALL oc_call;
+    TEST_ASSERT(ServerExtractLastToolResponse(oc_cont, &oc_resp) == 1,
+                "extracts authentic nameless OpenCode tool response");
+    TEST_ASSERT(oc_resp.name[0] == '\0', "authentic tool response has no name");
+    TEST_ASSERT(ServerExtractPairedToolCall(oc_cont, oc_resp.tool_call_id, &oc_call) == 1,
+                "recovers paired assistant tool call by id");
+    TEST_ASSERT(strcmp(oc_call.name, "bash") == 0, "paired tool is bash");
+    TEST_ASSERT(strstr(oc_call.arguments, "uname -a") != NULL,
+                "paired call preserves exact command");
+    TEST_ASSERT(ServerExtractPairedToolCall(oc_cont, "call_other", &oc_call) == 0,
+                "mismatched tool id does not recover a call");
+
+    const char *swap_cont =
+        "{\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{"
+        "\"id\":\"call_swap\",\"type\":\"function\",\"function\":{"
+        "\"name\":\"edit\",\"arguments\":\"{\\\"filePath\\\":\\\"test.txt\\\","
+        "\\\"oldString\\\":\\\"primera linea\\\\nsegunda linea\\\","
+        "\\\"newString\\\":\\\"segunda linea\\\\nprimera linea\\\"}\"}}]},"
+        "{\"role\":\"tool\",\"tool_call_id\":\"call_swap\","
+        "\"content\":\"Edit applied successfully.\"}]}";
+    TEST_ASSERT(ServerExtractLastToolResponse(swap_cont, &oc_resp) == 1,
+                "extracts authentic nameless edit response");
+    TEST_ASSERT(ServerExtractPairedToolCall(swap_cont, oc_resp.tool_call_id, &oc_call) == 1,
+                "recovers paired edit call by exact id");
+    TEST_ASSERT(strcmp(oc_call.name, "edit") == 0, "paired swap tool is edit");
+    TEST_ASSERT(strstr(oc_call.arguments, "primera linea\\nsegunda linea") != NULL,
+                "paired edit preserves old two-line span without final terminator");
+    TEST_ASSERT(strstr(oc_call.arguments, "segunda linea\\nprimera linea") != NULL,
+                "paired edit preserves new two-line span without final terminator");
 }
 
 /* 3. Test Tool Call Response Building */

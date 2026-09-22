@@ -1299,6 +1299,44 @@ int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
     return found;
 }
 
+
+int ServerExtractPairedToolCall(const char *body, const char *tool_call_id,
+                                OPENAI_TOOL_CALL *out)
+{
+    const char *p;
+    if (body == NULL || tool_call_id == NULL || tool_call_id[0] == '\0' ||
+        out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    p = body;
+    while ((p = strstr(p, "\"id\"")) != NULL)
+    {
+        const char *v = p + 4;
+        char id[64];
+        while (IsWs(*v)) v++;
+        if (*v++ != ':') { p += 4; continue; }
+        while (IsWs(*v)) v++;
+        if (!TakeJsonString(&v, id, sizeof(id)) || strcmp(id, tool_call_id) != 0)
+        { p += 4; continue; }
+        const char *fn = strstr(v, "\"function\"");
+        const char *limit = strstr(v, "\"role\"");
+        if (fn == NULL || (limit != NULL && fn > limit)) return 0;
+        const char *name = strstr(fn, "\"name\"");
+        const char *args = strstr(fn, "\"arguments\"");
+        if (name == NULL || args == NULL || (limit != NULL && (name > limit || args > limit)))
+            return 0;
+        v = name + 6; while (IsWs(*v)) v++; if (*v++ != ':') return 0;
+        while (IsWs(*v)) v++;
+        if (!TakeJsonString(&v, out->name, sizeof(out->name))) return 0;
+        v = args + 11; while (IsWs(*v)) v++; if (*v++ != ':') return 0;
+        while (IsWs(*v)) v++;
+        if (!TakeJsonString(&v, out->arguments, sizeof(out->arguments))) return 0;
+        strncpy(out->id, id, sizeof(out->id) - 1);
+        return 1;
+    }
+    return 0;
+}
+
 int ServerExtractLastRole(const char *body, char *out, size_t size)
 {
     if (body == NULL || out == NULL || size == 0)

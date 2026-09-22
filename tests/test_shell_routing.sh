@@ -14,15 +14,11 @@ JSON
 curl -sf -X POST "http://127.0.0.1:$PORT/v1/chat/completions" -H 'Content-Type: application/json' --data-binary @"$TMPD/user.json" >"$TMPD/first.json"
 grep -q '"name":"bash"' "$TMPD/first.json" || { echo "FAIL: bash tool not selected"; exit 1; }
 grep -q '\\"command\\":\\"uname -a\\"' "$TMPD/first.json" || { echo "FAIL: exact command not emitted"; exit 1; }
-python3 - "$TMPD/user.json" "$TMPD/tool.json" <<'PY'
-import json,sys
-x=json.load(open(sys.argv[1])); x['messages'] += [
- {'role':'assistant','content':'','tool_calls':[{'id':'call_shell_test','type':'function','function':{'name':'bash','arguments':'{"command":"uname -a"}'}}]},
- {'role':'tool','tool_call_id':'call_shell_test','name':'bash','content':'{"exit_code":0,"stdout":"Linux e2b.local TEST GNU/Linux\\n","stderr":""}'}]
-json.dump(x,open(sys.argv[2],'w'))
-PY
+cp "$ROOT/tests/fixtures/opencode_sessions/uname_tool_continuation.json" "$TMPD/tool.json"
 curl -sf -X POST "http://127.0.0.1:$PORT/v1/chat/completions" -H 'Content-Type: application/json' --data-binary @"$TMPD/tool.json" >"$TMPD/second.json"
-grep -q 'Linux e2b.local TEST GNU/Linux' "$TMPD/second.json" || { echo "FAIL: stdout not relayed"; cat "$TMPD/second.json"; exit 1; }
-grep -q 'Exit status: 0' "$TMPD/second.json" || { echo "FAIL: exit status not relayed"; exit 1; }
+grep -q 'Linux e2b.local 6.1.158+' "$TMPD/second.json" || { echo "FAIL: stdout not relayed"; cat "$TMPD/second.json"; exit 1; }
+grep -q 'Exit status was not reported' "$TMPD/second.json" || { echo "FAIL: honest missing exit status not reported"; exit 1; }
+[ "$(grep -o '"finish_reason":"tool_calls"' "$TMPD/first.json" | wc -l)" -eq 1 ] || { echo "FAIL: user request did not produce exactly one tool call"; exit 1; }
+[ "$(grep -o '"finish_reason":"tool_calls"' "$TMPD/second.json" | wc -l)" -eq 0 ] || { echo "FAIL: tool continuation redispatched command"; exit 1; }
 if grep -Eqi 'tests passed|regression|compiled successfully|build succeeded' "$TMPD/second.json"; then echo "FAIL: unsupported claim"; exit 1; fi
 echo "OpenCode uname shell routing passed"
