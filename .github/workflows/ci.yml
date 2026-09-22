@@ -4,12 +4,29 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA to validate
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      target_sha:
+        description: Commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   build-test-msvc:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
       - name: Configure (MSVC)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build
@@ -23,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
       - name: Dependencies
         run: |
           sudo apt-get update
@@ -40,6 +59,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
       - name: Configure (MSVC + ASan)
         run: cmake -S . -B build-asan -DCMAKE_C_FLAGS="/fsanitize=address"
       - name: Build
