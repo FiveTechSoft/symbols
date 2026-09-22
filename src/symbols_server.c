@@ -277,8 +277,32 @@ typedef struct
     char              workspace_diagnostic[8192];
     char              workspace_test_source[8192];
     char              workspace_test_file[260];
+    char              workspace_feature_impl[260];
+    char              workspace_feature_main[260];
+    char              workspace_feature_header_source[8192];
+    char              workspace_feature_impl_source[8192];
     int               workspace_phase; /* 1=discover, 2=inspect, 3=verify, 4=edit, 5=reverify */
 } ServerSession;
+
+static void WorkspaceReadContent(const char *input, char *out, size_t size)
+{
+    const char *p=input,*e; size_t used=0;
+    if(!out||size==0)return; out[0]='\0'; if(!input)return;
+    p=strstr(input,"<content>\n");
+    if(!p){snprintf(out,size,"%s",input);return;}
+    p+=10; e=strstr(p,"\n(End of file"); if(!e)e=strstr(p,"\n</content>"); if(!e)e=p+strlen(p);
+    while(p<e && used+1<size){
+        const char *nl=memchr(p,'\n',(size_t)(e-p)),*q=p; size_t n;
+        if(!nl)nl=e;
+        while(q<nl && *q>='0'&&*q<='9')q++;
+        if(q>p && q+1<nl && q[0]==':' && q[1]==' ')q+=2; else q=p;
+        n=(size_t)(nl-q); if(n>size-used-1)n=size-used-1;
+        memcpy(out+used,q,n); used+=n;
+        if(nl<e && used+1<size)out[used++]='\n';
+        p=nl<e?nl+1:e;
+    }
+    out[used]='\0';
+}
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
 static uint32_t g_num_sessions = 0;
@@ -1142,8 +1166,15 @@ static void HandleCompletions(socket_t s, const char *body,
                                   resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
-        snprintf(sess->workspace_source, sizeof(sess->workspace_source), "%s",
-                 tool_resp.content);
+        snprintf(sess->workspace_source, sizeof(sess->workspace_source), "%s", tool_resp.content);
+        if (ServerIsExplicitStockTotalFeature(sess->current_issue) &&
+            ServerSelectFeatureFiles(sess->workspace_listing, sess->workspace_target,
+                                     sess->workspace_feature_impl, sizeof(sess->workspace_feature_impl),
+                                     sess->workspace_feature_main, sizeof(sess->workspace_feature_main)))
+        {
+            WorkspaceReadContent(tool_resp.content, sess->workspace_feature_header_source, sizeof(sess->workspace_feature_header_source));
+            memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"read");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\"}",sess->workspace_feature_impl);sess->workspace_phase=7;SendToolCallsForRequest(s,body,g_seq,&tc,"Inspecting feature implementation source.",resp,sizeof(resp),sse,sizeof(sse));return;
+        }
         if (ServerIssueRequestsSanitizer(sess->current_issue))
         {
             if (!ServerDeriveSingleCCommand(sess->current_issue, sess->workspace_target,
@@ -1189,6 +1220,29 @@ static void HandleCompletions(socket_t s, const char *body,
                                 resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 7)
+    {
+        OPENAI_TOOL_CALLS tc;if(tool_resp.is_error){sess->agent_active=0;return;}WorkspaceReadContent(tool_resp.content,sess->workspace_feature_impl_source,sizeof(sess->workspace_feature_impl_source));
+        memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"read");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\"}",sess->workspace_feature_main);sess->workspace_phase=8;SendToolCallsForRequest(s,body,g_seq,&tc,"Inspecting feature call site.",resp,sizeof(resp),sse,sizeof(sse));return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 8)
+    {
+        OPENAI_TOOL_CALLS tc;char new_text[8192],esc[12288];if(tool_resp.is_error||!ServerPlanStockHeader(sess->workspace_feature_header_source,new_text,sizeof(new_text))){sess->agent_active=0;SendContentForRequest(s,body,++g_seq,"No pude derivar una declaración coherente desde los archivos observados.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return;}WorkspaceReadContent(tool_resp.content,sess->workspace_source,sizeof(sess->workspace_source));ServerJsonEscape(sess->workspace_feature_header_source,sess->workspace_diagnostic,sizeof(sess->workspace_diagnostic));ServerJsonEscape(new_text,esc,sizeof(esc));memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",sess->workspace_dir,sess->workspace_target,sess->workspace_diagnostic,esc);sess->workspace_phase=9;SendToolCallsForRequest(s,body,g_seq,&tc,"Updating the observed declaration coherently.",resp,sizeof(resp),sse,sizeof(sse));return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 9)
+    {
+        OPENAI_TOOL_CALLS tc;char new_text[8192],old_esc[12288],new_esc[12288];if(tool_resp.is_error||!ServerPlanStockImplementation(sess->workspace_feature_impl_source,new_text,sizeof(new_text))){sess->agent_active=0;return;}ServerJsonEscape(sess->workspace_feature_impl_source,old_esc,sizeof(old_esc));ServerJsonEscape(new_text,new_esc,sizeof(new_esc));memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",sess->workspace_feature_impl,old_esc,new_esc);sess->workspace_phase=10;SendToolCallsForRequest(s,body,g_seq,&tc,"Implementing the requested behavior from observed structure.",resp,sizeof(resp),sse,sizeof(sse));return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 10)
+    {
+        OPENAI_TOOL_CALLS tc;char new_text[8192],old_esc[12288],new_esc[12288];if(tool_resp.is_error||!ServerPlanStockMain(sess->current_issue,sess->workspace_source,new_text,sizeof(new_text))){sess->agent_active=0;return;}ServerJsonEscape(sess->workspace_source,old_esc,sizeof(old_esc));ServerJsonEscape(new_text,new_esc,sizeof(new_esc));memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",sess->workspace_feature_main,old_esc,new_esc);sess->workspace_phase=11;SendToolCallsForRequest(s,body,g_seq,&tc,"Updating the observed call site with requested constants.",resp,sizeof(resp),sse,sizeof(sse));return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 11)
+    {
+        OPENAI_TOOL_CALLS tc;if(tool_resp.is_error){sess->agent_active=0;return;}snprintf(sess->workspace_command,sizeof(sess->workspace_command),"%s && ./app",sess->workspace_build);memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"bash");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"command\":\"%s\"}",sess->workspace_command);sess->workspace_phase=12;SendToolCallsForRequest(s,body,g_seq,&tc,"Building and running the changed project for behavior evidence.",resp,sizeof(resp),sse,sizeof(sse));return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 12)
+    { int failed=tool_resp.is_error||(tool_resp.has_exit_code&&tool_resp.exit_code!=0)||strstr(tool_resp.content,"total")==NULL;sess->agent_active=0;sess->workspace_phase=0;SendContentForRequest(s,body,++g_seq,failed?"El proyecto modificado no produjo evidencia de comportamiento suficiente.":"Función solicitada implementada coherentemente; el build y la ejecución observada pasaron.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return; }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 3)
     {
         OPENAI_TOOL_CALLS tc; char old_text[512], new_text[512];

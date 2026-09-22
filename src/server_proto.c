@@ -3483,6 +3483,57 @@ int ServerSelectWorkspaceFile(const char *issue, const char *listing,
     return 0;
 }
 
+int ServerIsExplicitStockTotalFeature(const char *issue)
+{
+    char lower[2048]; GitLowerCopy(issue ? issue : "", lower, sizeof(lower));
+    return strstr(lower, "campo stock") && strstr(lower, "precio") &&
+           strstr(lower, "stock") && strstr(lower, "total") && strstr(lower, "main");
+}
+
+int ServerSelectFeatureFiles(const char *listing, const char *first,
+                             char *implementation, size_t implementation_size,
+                             char *main_file, size_t main_size)
+{
+    const char *p=listing; if(!listing||!implementation||!main_file)return 0;
+    implementation[0]=main_file[0]='\0';
+    while(*p){const char *a,*e;size_t n;while(*p==' '||*p=='\n'||*p=='\r'||*p=='\t')p++;a=p;while(*p&&*p!='\n'&&*p!='\r'&&*p!=' ')p++;e=p;n=(size_t)(e-a);
+      if(n>2&&n<260&&n+1<implementation_size){char q[260],l[260];memcpy(q,a,n);q[n]='\0';GitLowerCopy(q,l,sizeof(l));
+        if(strstr(l,"main.c")){snprintf(main_file,main_size,"%s",q);} else if(strstr(l,".c")&&(!first||strcmp(q,first)!=0)&&implementation[0]=='\0')snprintf(implementation,implementation_size,"%s",q);}
+      if(*p)p++;}
+    return implementation[0]&&main_file[0];
+}
+
+int ServerPlanStockHeader(const char *source,char *out,size_t size)
+{
+    const char *r;if(!source||!out||size==0||strstr(source,"stock"))return 0;
+    r=strstr(source,"} Producto;");if(!r)return 0;
+    if(strlen(source)+80>=size)return 0;snprintf(out,size,"%.*sint stock; %s\ndouble valor_total_inventario(void);\n",(int)(r-source),source,r);
+    return 1;
+}
+int ServerPlanStockImplementation(const char *source,char *out,size_t size)
+{
+    if(!source||!out||size==0||strstr(source,"valor_total_inventario"))return 0;
+    if(!strstr(source,"Producto")||!strstr(source,"items")||!strstr(source," n"))return 0;
+    if(strlen(source)+180>=size)return 0;snprintf(out,size,"%s\ndouble valor_total_inventario(void){double total=0;for(int i=0;i<n;i++)total+=items[i].precio*items[i].stock;return total;}\n",source);return 1;
+}
+static int AccentFoldCopy(const char *in,char *out,size_t size)
+{
+ size_t i=0,o=0;while(in&&in[i]&&o+1<size){unsigned char c=(unsigned char)in[i];if(c==0xc3&&in[i+1]){unsigned char d=(unsigned char)in[i+1];if(d==0xb3||d==0x93)out[o++]='o';else if(d==0xb1||d==0x91)out[o++]='n';else out[o++]=(char)d;i+=2;}else{out[o++]=(char)tolower(c);i++;}}out[o]='\0';return o>0;
+}
+static int PromptStockForName(const char *issue,const char *name,int *value)
+{
+ char lower[4096],fold[256],needle[320];const char *p,*b;AccentFoldCopy(issue?issue:"",lower,sizeof(lower));AccentFoldCopy(name,fold,sizeof(fold));snprintf(needle,sizeof(needle),"para el %s",fold);p=strstr(lower,needle);if(!p){snprintf(needle,sizeof(needle),"para la %s",fold);p=strstr(lower,needle);}if(!p)return 0;b=p;while(b>lower&&p-b<40){b--;if(isdigit((unsigned char)*b)){const char *d=b;while(d>lower&&isdigit((unsigned char)d[-1]))d--;*value=atoi(d);return 1;}}return 0;
+}
+
+int ServerPlanStockMain(const char *issue,const char *source,char *out,size_t size)
+{
+    const char *p=source;size_t o=0;int changed=0;if(!issue||!source||!out||size==0||strstr(source,"valor_total_inventario"))return 0;
+    while(*p&&o+1<size){const char *q=strstr(p,"(Producto){\"");if(!q){snprintf(out+o,size-o,"%s",p);break;}size_t pre=(size_t)(q-p);if(o+pre>=size)return 0;memcpy(out+o,p,pre);o+=pre;
+      const char *name=q+12,*qe=strchr(name,'\"'),*close=qe?strchr(qe,'}'):NULL;char nm[128];int v;if(!qe||!close||(size_t)(qe-name)>=sizeof(nm))return 0;memcpy(nm,name,(size_t)(qe-name));nm[qe-name]='\0';
+      if(!PromptStockForName(issue,nm,&v))return 0;size_t seg=(size_t)(close-q);if(o+seg+32>=size)return 0;memcpy(out+o,q,seg);o+=seg;o+=snprintf(out+o,size-o,",%d}",v);p=close+1;changed=1;}
+    if(!changed)return 0;{char *ret=strstr(out,"return 0;");if(!ret)return 0;char tail[4096];snprintf(tail,sizeof(tail),"%s",ret);snprintf(ret,size-(size_t)(ret-out),"printf(\"total %%.2f\\n\",valor_total_inventario());%s",tail);}return 1;
+}
+
 int ServerIssueRequestsSanitizer(const char *issue)
 {
     char lower[1024]; GitLowerCopy(issue ? issue : "", lower, sizeof(lower));

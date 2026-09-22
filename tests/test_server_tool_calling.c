@@ -765,6 +765,19 @@ static void TestWorkspacePlanningEvidence(void)
                 "named target and metric are actionable");
     TEST_ASSERT(ServerIsAmbiguousCodingTask("Arregla este proyecto en C para que haga lo que necesito.") == 1,
                 "missing requested behavior requires clarification even when compilation passes");
+    {
+        char a[2048], b[2048], c[4096];
+        TEST_ASSERT(ServerIsExplicitStockTotalFeature("Añade un campo stock, calcula precio por stock, total y actualiza main") == 1,
+                    "explicit field, formula, and call-site request enables coherent feature route");
+        TEST_ASSERT(ServerSelectFeatureFiles("item.h\nitem.c\nmain.c\nMakefile\n", "item.h", file, sizeof(file), a, sizeof(a)) == 1 && strcmp(file,"item.c")==0 && strcmp(a,"main.c")==0,
+                    "feature route discovers implementation and call site from listing");
+        TEST_ASSERT(ServerPlanStockHeader("typedef struct {const char *nombre; double precio;} Producto;", b, sizeof(b)) == 1 && strstr(b,"int stock") && strstr(b,"valor_total_inventario"),
+                    "header edit derives field and declaration from observed type");
+        TEST_ASSERT(ServerPlanStockImplementation("static Producto items[4]; static int n;", b, sizeof(b)) == 1 && strstr(b,"precio*items[i].stock"),
+                    "implementation follows explicit price-times-stock formula");
+        TEST_ASSERT(ServerPlanStockMain("stock 3 para el alpha y 5 para el beta; actualiza main", "int main(){add((Producto){\"alpha\",2});add((Producto){\"beta\",4});return 0;}", c, sizeof(c)) == 1 && strstr(c,",3}") && strstr(c,",5}") && strstr(c,"valor_total_inventario"),
+                    "call-site constants come from request, not fixture routing");
+    }
 
     /* Authentic five-case envelopes: assert grounding/abstention protocol,
        never encode the repair. */
