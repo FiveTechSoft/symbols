@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 #include "chat.h"
+#include "agent_git.h"
 
 /* Last {"role":"user","content":"..."} in a chat-completions body.
    Returns 1 on success (unescaped UTF-8 in out). */
@@ -198,5 +199,37 @@ int ServerIsGreeting(const char *text);
 /* Generate a friendly response for greetings and identity queries */
 int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t out_sz);
 
-#endif
+/* --- Native read-only Git integration (agent_git) ------------------- */
 
+/* Client working directory from the first system message <env> block
+   ("Working directory: <path>"). Bound to the request prefix: the same
+   literal after the first user message is client content, not env.
+   JSON backslash pairs collapse (Windows paths). Returns 1 on success. */
+int ServerExtractWorkingDir(const char *body, char *out, size_t size);
+
+/* 1 when the prompt asks, in natural language, about read-only Git
+   repository state (branch, HEAD, dirty vs ignored paths, status).
+   Literal commands ("git status") stay on the shell route; mutation
+   intents (commit, push, nueva rama...) never match. */
+int ServerIsGitInquiryTask(const char *text);
+
+/* 1 when the prompt asks whether the repository is ready/safe to work
+   on. Answered through AgentGitPreflight: abstain and say why on
+   dirty, stale, detached or conflicted states. */
+int ServerIsGitPreflightTask(const char *text);
+
+/* Natural, bounded answers from one fresh inspection snapshot. Every
+   path fails closed: failures and unsafe states are stated plainly,
+   never guessed. Short HEAD is the first 8 chars. */
+void ServerComposeGitStatusAnswer(const GIT_REPOSITORY_STATE *st,
+                                  char *out, size_t size);
+void ServerComposeGitInspectFailure(GIT_INSPECT_STATUS status,
+                                    const char *error,
+                                    const char *working_dir,
+                                    char *out, size_t size);
+void ServerComposeGitPreflightAnswer(GIT_PREFLIGHT_STATUS status,
+                                     const GIT_REPOSITORY_STATE *observed,
+                                     const char *expected_head,
+                                     char *out, size_t size);
+
+#endif

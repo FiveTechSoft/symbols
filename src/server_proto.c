@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include "compat.h"
 #include "chat.h"
 #include "server_proto.h"
@@ -3241,5 +3242,357 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
     return 1;
 }
 
+/* ------------------------------------------------------------------ */
+/* Native read-only Git inquiry routing                                */
+/*                                                                     */
+/* Natural-language repository state questions are answered from one   */
+/* fresh AgentGitInspect snapshot of the client working directory, and  */
+/* readiness questions from AgentGitPreflight. Literal commands stay   */
+/* on the shell route; mutation phrasing never matches here. Every     */
+/* answer fails closed: unsafe states are stated, never guessed.       */
+/* ------------------------------------------------------------------ */
 
+static void GitLowerCopy(const char *text, char *out, size_t size)
+{
+    size_t i = 0;
+    if (out == NULL || size == 0)
+        return;
+    if (text == NULL)
+    {
+        out[0] = '\0';
+        return;
+    }
+    while (text[i] != '\0' && i + 1 < size)
+    {
+        out[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    out[i] = '\0';
+}
 
+/* Mutation phrasing that must never be read as a state question. */
+static int HasGitMutationIntent(const char *lower)
+{
+    static const char *mut[] = {
+        "git commit", "git push", "git pull", "git checkout",
+        "git merge", "git rebase", "git clone", "git add",
+        "git stash", "git reset", "git revert",
+        "haz commit", "hacer commit", "realiza commit",
+        "commitea", "commitear",
+        "haz push", "haz pull", "haz merge", "haz checkout",
+        "crea una rama", "crear una rama", "crea rama", "crear rama",
+        "nueva rama", "new branch", "create branch",
+        "cambia de rama", "cambiar de rama", "switch branch",
+        "confirma los cambios", "confirmar los cambios"
+    };
+    size_t k;
+    for (k = 0; k < sizeof(mut) / sizeof(mut[0]); k++)
+    {
+        if (strstr(lower, mut[k]) != NULL)
+            return 1;
+    }
+    return 0;
+}
+
+/* The prompt must talk about the repository, not about files or code
+   that merely share vocabulary with Git. */
+static int HasGitRepoContext(const char *lower)
+{
+    if (strstr(lower, "git") != NULL || strstr(lower, "repo") != NULL)
+        return 1;
+    return MatchWordBoundary(lower, "rama") ||
+           MatchWordBoundary(lower, "branch") ||
+           MatchWordBoundary(lower, "head") ||
+           MatchWordBoundary(lower, "commit") ||
+           strstr(lower, "working tree") != NULL ||
+           strstr(lower, "árbol") != NULL ||
+           strstr(lower, "arbol") != NULL;
+}
+
+int ServerIsGitInquiryTask(const char *text)
+{
+    static const char *phrases[] = {
+        "estado del repo", "estado de git", "status del repo",
+        "repo status", "repository status", "status of the repo",
+        "en qué rama", "en que rama", "qué rama", "que rama",
+        "rama actual", "current branch", "which branch", "what branch",
+        "head actual", "current head",
+        "último commit", "ultimo commit", "last commit",
+        "cambios sin confirmar", "cambios sin commitear", "uncommitted",
+        "archivos ignorados", "rutas ignoradas",
+        "ignored files", "ignored paths",
+        "working tree", "árbol de trabajo", "arbol de trabajo",
+        "repo limpio", "git limpio", "repositorio limpio",
+        "clean repo", "clean tree",
+        "hay cambios", "cambios pendientes", "pending changes",
+        "dirty", "sucio"
+    };
+    char lower[1024];
+    size_t k;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    GitLowerCopy(text, lower, sizeof(lower));
+    if (HasGitMutationIntent(lower))
+        return 0;
+    if (!HasGitRepoContext(lower))
+        return 0;
+    for (k = 0; k < sizeof(phrases) / sizeof(phrases[0]); k++)
+    {
+        if (strstr(lower, phrases[k]) != NULL)
+            return 1;
+    }
+    return 0;
+}
+
+int ServerIsGitPreflightTask(const char *text)
+{
+    static const char *phrases[] = {
+        "puedo trabajar", "puedo hacer cambios", "puedo aplicar",
+        "puedo editar", "puedo modificar", "puedo seguir",
+        "puedo continuar", "podemos seguir", "podemos continuar",
+        "podemos trabajar", "podemos hacer cambios",
+        "está listo", "esta listo", "listo para trabajar",
+        "listo para cambios", "listo para aplicar",
+        "ready to work", "ready for changes", "safe to edit",
+        "safe to apply", "can i apply", "can i edit", "can i work",
+        "can i continue", "is the repo ready", "is it safe"
+    };
+    char lower[1024];
+    size_t k;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    GitLowerCopy(text, lower, sizeof(lower));
+    if (HasGitMutationIntent(lower))
+        return 0;
+    if (!HasGitRepoContext(lower))
+        return 0;
+    for (k = 0; k < sizeof(phrases) / sizeof(phrases[0]); k++)
+    {
+        if (strstr(lower, phrases[k]) != NULL)
+            return 1;
+    }
+    return 0;
+}
+
+int ServerExtractWorkingDir(const char *body, char *out, size_t size)
+{
+    static const char key[] = "Working directory:";
+    const char *first_user;
+    const char *p;
+    size_t o = 0;
+    if (body == NULL || out == NULL || size == 0)
+        return 0;
+    out[0] = '\0';
+    p = strstr(body, key);
+    if (p == NULL)
+        return 0;
+    /* The env block belongs to the first system message. The same
+       literal after the first user message is client content, not a
+       directory the client declared. */
+    first_user = strstr(body, "{\"role\":\"user\"");
+    if (first_user != NULL && p > first_user)
+        return 0;
+    p += sizeof(key) - 1;
+    while (*p == ' ')
+        p++;
+    while (*p != '\0' && o + 1 < size)
+    {
+        if (*p == '"')
+            break;
+        if (*p == '\\')
+        {
+            char n = p[1];
+            if (n == 'n' || n == 'r')
+                break; /* end of the env line inside the JSON string */
+            if (n == '\\')
+            {
+                out[o++] = '\\';
+                p += 2;
+                continue;
+            }
+            if (n == '/')
+            {
+                out[o++] = '/';
+                p += 2;
+                continue;
+            }
+            break; /* unknown escape: stop instead of guessing */
+        }
+        if (*p == '\n' || *p == '\r')
+            break;
+        out[o++] = *p++;
+    }
+    out[o] = '\0';
+    while (o > 0 && out[o - 1] == ' ')
+        out[--o] = '\0';
+    return o > 0;
+}
+
+static void GitAppend(char *out, size_t size, size_t *w, const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+    if (*w >= size - 1)
+        return;
+    va_start(ap, fmt);
+    n = vsnprintf(out + *w, size - *w, fmt, ap);
+    va_end(ap);
+    if (n < 0)
+        return;
+    if ((size_t)n >= size - *w)
+        *w = size - 1;
+    else
+        *w += (size_t)n;
+}
+
+static void GitShortHead(const char *head, char *out, size_t size)
+{
+    size_t n;
+    if (out == NULL || size == 0)
+        return;
+    out[0] = '\0';
+    if (head == NULL)
+        return;
+    n = strlen(head);
+    if (n > 8)
+        n = 8;
+    if (n >= size)
+        n = size - 1;
+    memcpy(out, head, n);
+    out[n] = '\0';
+}
+
+void ServerComposeGitStatusAnswer(const GIT_REPOSITORY_STATE *st,
+                                  char *out, size_t size)
+{
+    char short_head[16];
+    size_t w = 0;
+    if (out == NULL || size == 0)
+        return;
+    out[0] = '\0';
+    if (st == NULL)
+        return;
+    GitShortHead(st->head, short_head, sizeof(short_head));
+    if (st->detached_head)
+        GitAppend(out, size, &w,
+                  "HEAD desacoplado en `%s` (sin rama activa).", short_head);
+    else
+        GitAppend(out, size, &w,
+                  "Rama `%s`, HEAD `%s`.", st->branch, short_head);
+    if (st->conflicted_paths > 0)
+        GitAppend(out, size, &w,
+                  " %u ruta(s) con conflictos de merge sin resolver;"
+                  " conviene resolverlos antes de seguir.",
+                  st->conflicted_paths);
+    if (st->staged_paths == 0 && st->unstaged_paths == 0 &&
+        st->untracked_paths == 0)
+        GitAppend(out, size, &w,
+                  " Árbol limpio: sin cambios staged, unstaged ni untracked.");
+    else
+        GitAppend(out, size, &w,
+                  " Cambios: %u staged, %u unstaged, %u untracked.",
+                  st->staged_paths, st->unstaged_paths, st->untracked_paths);
+    GitAppend(out, size, &w,
+              " %u ruta(s) ignorada(s) (no cuentan como cambio).",
+              st->ignored_paths);
+}
+
+void ServerComposeGitInspectFailure(GIT_INSPECT_STATUS status,
+                                    const char *error,
+                                    const char *working_dir,
+                                    char *out, size_t size)
+{
+    const char *dir = (working_dir != NULL) ? working_dir : "";
+    const char *err = (error != NULL && error[0] != '\0') ? error
+                                                          : "salida inválida";
+    if (out == NULL || size == 0)
+        return;
+    out[0] = '\0';
+    switch (status)
+    {
+    case GIT_INSPECT_NOT_REPOSITORY:
+        snprintf(out, size,
+                 "`%s` no está dentro de un repositorio Git;"
+                 " no hay estado que inspeccionar.", dir);
+        break;
+    case GIT_INSPECT_OUTPUT_TRUNCATED:
+    case GIT_INSPECT_MALFORMED_OUTPUT:
+        snprintf(out, size,
+                 "La inspección Git de `%s` no devolvió una salida fiable"
+                 " (%s); prefiero no adivinar el estado.", dir, err);
+        break;
+    default:
+        snprintf(out, size,
+                 "No pude inspeccionar el repositorio en `%s`: %s.", dir, err);
+        break;
+    }
+}
+
+void ServerComposeGitPreflightAnswer(GIT_PREFLIGHT_STATUS status,
+                                     const GIT_REPOSITORY_STATE *observed,
+                                     const char *expected_head,
+                                     char *out, size_t size)
+{
+    char short_obs[16], short_exp[16];
+    if (out == NULL || size == 0)
+        return;
+    out[0] = '\0';
+    short_obs[0] = '\0';
+    short_exp[0] = '\0';
+    if (observed != NULL)
+        GitShortHead(observed->head, short_obs, sizeof(short_obs));
+    if (expected_head != NULL)
+        GitShortHead(expected_head, short_exp, sizeof(short_exp));
+    switch (status)
+    {
+    case GIT_PREFLIGHT_READY:
+        snprintf(out, size,
+                 "Listo para trabajar: rama `%s`, HEAD `%s`,"
+                 " árbol limpio y sin conflictos.",
+                 observed->branch, short_obs);
+        break;
+    case GIT_PREFLIGHT_NOT_REPOSITORY:
+        snprintf(out, size,
+                 "Me abstengo: el directorio de trabajo no es"
+                 " un repositorio Git.");
+        break;
+    case GIT_PREFLIGHT_INSPECTION_FAILED:
+        snprintf(out, size,
+                 "Me abstengo: no pude inspeccionar el repositorio"
+                 " de forma fiable.");
+        break;
+    case GIT_PREFLIGHT_STALE_HEAD:
+        snprintf(out, size,
+                 "Me abstengo: HEAD cambió desde la última inspección de"
+                 " esta sesión (era `%s`, ahora es `%s`). Algo movió el"
+                 " repo; mejor revisar antes de tocar nada.",
+                 short_exp, short_obs);
+        break;
+    case GIT_PREFLIGHT_WRONG_BRANCH:
+        snprintf(out, size,
+                 "Me abstengo: la rama activa es `%s` y no la esperada.",
+                 observed->branch);
+        break;
+    case GIT_PREFLIGHT_DETACHED_HEAD:
+        snprintf(out, size,
+                 "Me abstengo: HEAD desacoplado en `%s` (sin rama activa).",
+                 short_obs);
+        break;
+    case GIT_PREFLIGHT_CONFLICTS:
+        snprintf(out, size,
+                 "Me abstengo: hay %u ruta(s) con conflictos de merge"
+                 " sin resolver.", observed->conflicted_paths);
+        break;
+    case GIT_PREFLIGHT_DIRTY_TREE:
+        snprintf(out, size,
+                 "Me abstengo: el árbol tiene cambios sin confirmar"
+                 " (%u staged, %u unstaged, %u untracked).",
+                 observed->staged_paths, observed->unstaged_paths,
+                 observed->untracked_paths);
+        break;
+    default:
+        snprintf(out, size,
+                 "Me abstengo: estado del repositorio desconocido.");
+        break;
+    }
+}

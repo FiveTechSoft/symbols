@@ -16,6 +16,7 @@
 #include "learn.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "agent_git.h"
 #include "agent_planner.h"
 #include "agent_runner.h"
 #include "agent_diagnose.h"
@@ -257,6 +258,11 @@ typedef struct
     /* Declared tools by client in current turn */
     int               declared_tools_count;
     char              declared_tools[SERVER_MAX_DECLARED_TOOLS][64];
+
+    /* Last repository HEAD this session reported to the user through
+       the native Git inquiry route. AgentGitPreflight compares against
+       it so a moved base is a stale-head abstention, not a surprise. */
+    char              git_reported_head[GIT_HEAD_MAX];
 } ServerSession;
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
@@ -1495,6 +1501,73 @@ static void HandleCompletions(socket_t s, const char *body,
         else
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, greet_resp, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
+    }
+
+    /* Native read-only Git integration: repository state questions are
+       answered from one fresh agent_git inspection of the client working
+       directory; readiness questions go through AgentGitPreflight and
+       abstain plainly on dirty, stale, detached or conflicted states.
+       Never dispatched on tool-continuation turns, and never on literal
+       commands (those stay on the shell route below). */
+    if (!has_tool_resp &&
+        (ServerIsGitPreflightTask(query) || ServerIsGitInquiryTask(query)))
+    {
+        char workdir[260];
+        if (!ServerExtractWorkingDir(body, workdir, sizeof(workdir)))
+        {
+            snprintf(content, sizeof(content),
+                     "No puedo inspeccionar el repositorio: esta sesión no "
+                     "declaró el directorio de trabajo del cliente.");
+        }
+        else
+        {
+            GIT_REPOSITORY_STATE st;
+            char gerror[GIT_ERROR_MAX];
+            GIT_INSPECT_STATUS ist =
+                AgentGitInspect(workdir, &st, gerror, sizeof(gerror));
+            if (ist != GIT_INSPECT_OK)
+            {
+                ServerComposeGitInspectFailure(ist, gerror, workdir,
+                                               content, sizeof(content));
+            }
+            else if (ServerIsGitPreflightTask(query))
+            {
+                GIT_PRECONDITIONS req;
+                GIT_REPOSITORY_STATE obs;
+                GIT_PREFLIGHT_STATUS pst;
+                memset(&req, 0, sizeof(req));
+                req.expected_head = sess->git_reported_head[0] != '\0'
+                                        ? sess->git_reported_head : NULL;
+                req.require_clean = true;
+                req.allow_detached_head = false;
+                pst = AgentGitPreflight(workdir, &req, &obs,
+                                        gerror, sizeof(gerror));
+                ServerComposeGitPreflightAnswer(pst, &obs, req.expected_head,
+                                                content, sizeof(content));
+                if (pst == GIT_PREFLIGHT_READY)
+                    snprintf(sess->git_reported_head,
+                             sizeof(sess->git_reported_head), "%s", obs.head);
+            }
+            else
+            {
+                ServerComposeGitStatusAnswer(&st, content, sizeof(content));
+                snprintf(sess->git_reported_head,
+                         sizeof(sess->git_reported_head), "%s", st.head);
+            }
+        }
+        if (ServerWantsStream(body))
+        {
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                                      ++g_seq, content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
         }
         return;

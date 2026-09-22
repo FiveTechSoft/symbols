@@ -169,6 +169,10 @@ if(UNIX)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_shell_routing.sh
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_shell_routing_e2e PROPERTIES SKIP_RETURN_CODE 77)
+    add_test(NAME test_git_inquiry_e2e
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_git_inquiry_e2e.sh
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_git_inquiry_e2e PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 sllm_test(test_code_graph tests/test_code_graph.c)
 sllm_test(test_agent_patch tests/test_agent_patch.c)
@@ -185,6 +189,7 @@ sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
 sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 sllm_test(test_agent_shell tests/test_agent_shell.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
+sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)
 
 # chat REPL: CLI conversacional (no es test)
