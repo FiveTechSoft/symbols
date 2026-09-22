@@ -1,200 +1,263 @@
-# Symbolic LLM: A Deterministic, Non-Parametric Language Engine in Native C11 with Zero Hallucination and Microsecond Latency
+# Symbols: a deterministic symbolic engine and verified-change experiment
 
-**Antonio Linares (FiveTech Software)**  
-*Project Repository: [FiveTechSoft/symbols](https://github.com/FiveTechSoft/symbols)*  
-*Live Interactive Web Agent: [fivetechsoft.github.io/symbols](https://fivetechsoft.github.io/symbols/)*  
-*Version: 1.0-RC (September 2026)*
+**Antonio Linares, FiveTech Software**
 
----
+Repository: <https://github.com/FiveTechSoft/symbols>
 
-### Abstract
+Status: research prototype, active development
 
-Large Language Models (LLMs) based on the Transformer architecture rely on dense, non-transparent floating-point parameter matrices trained via gradient descent. While remarkably capable at syntactic continuation, they suffer from fundamental systemic limitations: stochastic hallucination ($P(\text{hallucination}) > 0$), catastrophic forgetting, absence of causal proof provenance, and massive computational and memory footprints.
+Canonical status source: this paper plus [`ROADMAP.md`](ROADMAP.md)
 
-We introduce **Symbolic LLM**, a deterministic, non-parametric language and reasoning engine engineered entirely in **pure ISO C11** without external dependencies, neural weights, backpropagation, or GPU acceleration. Symbolic LLM decouples factual memory, distributional semantics, and causal problem-solving into discrete, inspectable native mathematical structures:
-1. An open-addressing **Symbolic Knowledge Graph** operating with strictly $O(1)$ lookup time (MurmurMix64 dispersion) requiring strictly **32 bytes per relation** in memory.
-2. An ultra-lightweight **32-dimensional Distributional Semantic Vector Substrate** constructed via Random Indexing and Hebbian co-occurrence accumulation, enabling nanosecond-scale fuzzy synonymy without matrix multiplications.
-3. A **First-Order Literal Sentence Store** indexed directly from raw text streams with byte-level offset provenance, enforcing an axiomatic **fail-closed truth contract** (verbatim source citation with $P(\text{unanchored fabrication}) = 0$).
-4. A **Second-Order Reflexive Meta-Graph** ($\mathcal{M}$) modeling meta-knowledge and discourse focus shifts in $O(1)$.
-5. An unsupervised **Concept Concentration Metric** ($\kappa = \frac{\max_d \mathbf{v}[d]}{\sum_d \mathbf{v}[d]} \cdot \log(1 + f)$) that extracts fundamental thematic centroids in linear time without stopword lists.
-6. A **Polyglot Code Knowledge Graph** with native C, Python, and TypeScript/JavaScript AST parsing, supporting bidirectional call graph navigation and transitive impact analysis (Blast Radius).
-7. A **Goal-Directed STRIPS Task Planner** operating over propositional bitmask states ($\mathbb{B}^m$) that synthesizes provably optimal software engineering action sequences in $< 10\ \mu\text{s}$, coupled with pre-flight AST verification and sub-millisecond atomic rollback.
-8. A **Cross-Platform Subprocess & Autocurative Shell Engine** supporting native Windows/POSIX execution with non-blocking pipe drainage, millisecond timeouts, and closed-loop abductive self-healing over compiler/linter diagnostics.
-9. A **Deterministic Open-Domain QA Engine** featuring structural question decomposition, auxiliary resolution, multi-word entity tokenization, and functional canonicalization, achieving **61.0% exact ground-truth accuracy** over 41,431 multi-corpus sentences while guaranteeing strictly **0% unanchored token fabrication** (fail-closed verbatim extraction).
-10. **The Four Cognitive Pillars in Pure C11**: 256-bit AVX2 SIMD Hyperdimensional Computing (VSA/HDC) at 166.7 Mops/s; dynamic CCG Combinatory Categorial Grammar sentence realization at 1.5M sent/s; resident ConceptNet 5.8 commonsense and physical causality reasoning (~305 MB for 10M triples); and deterministic persona projection filters ($\Pi_{\text{persona}}$) at 2.19M proj/s with mathematical non-interference ($\text{Facts}(\Pi_P(Q)) \equiv \text{Facts}(Q)$).
+## Abstract
 
-Empirical evaluations establish an ingestion throughput of **5.4 million triples per second** (1,000,000 relations populated in 0.185 s within 32.00 MB RAM), random query latency of **72 nanoseconds**, and end-to-end question answering in **< 1 millisecond** on a single commodity CPU core. Evaluated on candidate patch hunks from representative SWE-bench Lite benchmark tasks (Django, Flask, SymPy, Scikit-learn, Pytest), the engine achieves 100% pre-flight AST verification and atomic application with an average verification latency of **1.50 ms per task**, operating dynamically within **~28 MB RAM** (0 GPU) and strictly **0.00% patch corruption** under fail-closed AST invariant checking, proving that deterministic code safety, blast radius analysis, and atomic rollback can be executed at microsecond scales.
+Symbols studies how far a native C engine can go when knowledge, inference, plans, edits, and verification are represented as explicit data instead of hidden model weights. Its core is deterministic: a probabilistic model may propose a candidate at the boundary, but it does not authorize or validate a change. Compilers, tests, contracts, and repository invariants decide whether a candidate is accepted.
 
+The repository already contains graph storage and reasoning, text retrieval, natural-language realization, a bounded coding-agent loop, safe patch operators, shell execution, and a small persistent fact store. The strongest coding evidence is narrow rather than general: two compiler-guided C repair operators have been evaluated on separated development and evaluation fixtures. Work outside those operators must abstain.
 
----
+This paper distinguishes four statuses:
 
-## 1. Introduction and Theoretical Foundations
+- **Implemented**: code exists in `master`.
+- **Demonstrated**: a named test or fixture exercises the behavior.
+- **Planned**: specified in [`ROADMAP.md`](ROADMAP.md), but not implemented.
+- **Hypothesis**: a research direction that has not passed a release gate.
 
-### 1.1 The Transformer Dilemma
+No statement in this paper should be read as a guarantee of general intelligence, zero hallucination, constant latency, or correctness outside the cited evidence.
 
-Contemporary Natural Language Processing is predominantly anchored on autoregressive Transformer decoders ($p(w_t \mid w_{<t})$). Knowledge in these architectures is implicitly and diffusely distributed across billions of parameters $\theta \in \mathbb{R}^N$. This architectural paradigm imposes severe structural limitations:
+## 1. Research question and governing principle
 
-- **Epistemic Indeterminacy and Hallucination**: Output tokens are sampled stochastically from a probability distribution over the vocabulary. The network cannot verify whether a generated sequence corresponds to factual ground truth or a statistically probable confabulation.
-- **Catastrophic Forgetting & Opaque Editing**: Incorporating a new fact or deleting an erroneous one requires expensive fine-tuning (LoRA, full retraining) or fragile prompt-context injection. True machine unlearning remains an unsolved research dilemma.
-- **Extreme Computational Footprint**: Serving a modern 7B–70B parameter model requires 8 GB to 140+ GB of high-bandwidth GPU VRAM, high electrical power, and massive runtime dependencies (PyTorch, CUDA, Triton, BLAS).
-- **Zero Proof Trace**: Attention weights over self-attention heads $\text{softmax}(QK^T / \sqrt{d_k})$ represent correlation patterns across positional tokens, not deductive validity or verifiable provenance.
+Symbols asks whether a useful engineering assistant can be built from mechanisms that **perceive, test, correct, consolidate, and abstain**:
 
-### 1.2 The Symbolic LLM Proposition
+> No deberíamos codificar cada conducta. Deberíamos codificar mecanismos para percibir, probar, corregir, consolidar y abstenerse.
 
-Symbolic LLM investigates whether linguistic comprehension, question answering, deductive reasoning, and topical introspection can be achieved **without dense matrix multiplications**. 
+The authority path stays deterministic. Candidate generation may be heuristic or probabilistic, but a state change is accepted only after deterministic checks. This makes Symbols closer to a verifier, corrector, and repository guardian than to a general-purpose language model.
 
-```
-                               ┌─────────────────────────────────────────┐
-                               │           RAW TEXT CORPUS (.txt)        │
-                               └────────────────────┬────────────────────┘
-                                                    │ Streaming Ingest
-                                                    ▼
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       SYMBOLIC LLM ENGINE (C11)                                        │
-│                                                                                                        │
-│  ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐   ┌─────────────────┐  │
-│  │    SYMBOL TABLE      │   │    RELATION GRAPH    │   │    32D EMBEDDINGS    │   │  LITERAL STORE  │  │
-│  │ O(1) DJB2a Hash      │   │ O(1) MurmurMix64     │   │ Hebbian Window       │   │ Byte Offsets    │  │
-│  │ Concept Unique IDs   │   │ <S, P, O> Triples    │   │ LayerNorm + Cosine   │   │ Verbatim Source │  │
-│  └──────────┬───────────┘   └──────────┬───────────┘   └──────────┬───────────┘   └────────┬────────┘  │
-│             │                          │                          │                        │           │
-│             └──────────────────────────┼──────────────────────────┴────────────────────────┘           │
-│                                        ▼                                                               │
-│                     ┌───────────────────────────────────────┐                                          │
-│                     │  INVERTED INDEX (QKV Keys)           │                                          │
-│                     │  Symbol → Sentence + Novelty Cache   │                                          │
-│                     └──────────────────┬────────────────────┘                                          │
-│                                        ▼                                                               │
-│                     ┌───────────────────────────────────────┐                                          │
-│                     │  SPARSE ATTENTION + CROSS-ATTENTION   │                                          │
-│                     │  Window + Global Anchors + XA Dice    │                                          │
-│                     └──────────────────┬────────────────────┘                                          │
-│                     ┌───────────────────────────────────────┐                                          │
-│                     │  CONCEPT CONCENTRATION METRIC (κ)     │                                          │
-│                     │  Unsupervised Thematic Discovery      │                                          │
-│                     └──────────────────┬────────────────────┘                                          │
-│                                        ▼                                                               │
-│                     ┌───────────────────────────────────────┐                                          │
-│                     │  SECOND-ORDER REFLEXIVE META-GRAPH (M)│                                          │
-│                     │  Knowledge-about-Knowledge & Dialogue │                                          │
-│                     └──────────────────┬────────────────────┘                                          │
-│                                        ▼                                                               │
-│                     ┌───────────────────────────────────────┐                                          │
-│                     │  SYMBOLIC ATTENTION & INFERENCE       │                                          │
-│                     │  Backward Chaining DFS + Proof Chains │                                          │
-│                     └──────────────────┬────────────────────┘                                          │
-└────────────────────────────────────────┼───────────────────────────────────────────────────────────────┘
-                                         │
-                                         ▼
-                     ┌───────────────────────────────────────┐
-                     │    DETERMINISTIC VERIFIED RESPONSE    │
-                     │    Trace: S ──P──> O [Source Cited]   │
-                     └───────────────────────────────────────┘
-```
+Harbour is the first reference domain in the roadmap. C and C++ remain the substrate for the engine, Harbour runtime, extensions, and portability tests.
 
-The system is founded on three axiomatic design principles:
+## 2. Current status
 
-1. **Fail-Closed Truth Preservation**: If an assertion cannot be proven by direct retrieval or a verified deduction chain over explicit relations, the model outputs an honest `UNKNOWN`. It never fabricates facts.
-2. **Deterministic $O(1)$ Mechanics**: Core operations—symbol resolution, relation verification, anaphoric focus shift, and vector comparison—are strictly bounded in constant time.
-3. **Hardware Sovereignty**: The entire system is implemented in standard C11 using standard POSIX/Win32 primitives, compiling into an executable of a few hundred kilobytes with zero external runtime requirements.
+| Area | Status | Evidence | Boundary |
+|---|---|---|---|
+| Symbol, relation, numeric, and embedding stores | Implemented and unit-tested | `include/{symbol,relation,numeric,embedding}.h`; graph/model tests | Hash operations are expected-average time, not a worst-case constant-time proof |
+| Relation representation | Demonstrated as 32 bytes on current tested ABIs | `RELATION` in `include/relation.h`; benchmark builds | ABI-dependent; indexes and strings add memory beyond the struct |
+| Rule and graph reasoning | Implemented and fixture-tested | `graph_reasoning`, `neuro_prolog`, `neuro_rules`, multi-hop and reasoning tests | Closed-world fixtures do not establish open-domain correctness |
+| Literal text retrieval and symbolic attention | Implemented and tested | `src/text_lex.c`; `test_textlex`, `test_open_qa` | Ranking quality is corpus-dependent; no universal QA guarantee |
+| CCG/VSA/commonsense/persona layers | Implemented and unit-tested | dedicated modules and CTest targets | Optional large data snapshots are not bundled in every run |
+| Patch preflight, apply, diff, and rollback | Implemented and tested | `agent_patch`; `test_agent_patch`, `test_agent_hard_tasks` | Process-local rollback is not a substitute for transactional filesystem/Git operations |
+| Shell execution, timeout handling, and explicit shell routing | Implemented and tested | `agent_shell`, `test_agent_shell`, `test_shell_routing_e2e` | Shell remains an escape hatch; structured operations are preferred |
+| Bounded planner/runner loop | Implemented and tested | `agent_planner`, `agent_runner`; runner tests | It is not a general autonomous programmer |
+| OpenCode session isolation and contextual active-file line swap | Implemented and demonstrated | server protocol/session tests and authentic OpenCode runs | Bounded active-file operation, not arbitrary semantic editing |
+| Native Git status and repository preflight | Implemented and demonstrated | `agent_git`, server Git inquiry tests, authentic OpenCode run | Read-only inspection and preflight only; mutation remains planned |
+| Compiler `did-you-mean` repair | Demonstrated on separated C fixtures | `test_agent_runner_external` | Requires a compiler-confirmed suggestion and narrow preconditions |
+| Missing-header repair | Demonstrated on separated C fixtures | same fixture suite | Requires one unambiguous repository-local declaration source |
+| Persistent conversational facts | Implemented and restart-tested | `episodic_memory`; `test_episodic_memory` | Flat TSV triples only; see Section 6 |
+| Structured filesystem, safe Git, build/test intelligence, Clang AST | Planned | Roadmap Phases 1-4 | Not release-ready capabilities |
+| Persistent workflows and verified engineering memory | Planned | Roadmap Phases 5-6 | Not implemented |
+| Harbour end-to-end adapter | Planned | roadmap domain orientation | No Harbour release gate has passed |
 
----
+## 3. Architecture
 
-## 2. Architecture and Data Representations
+### 3.1 Base structures
 
-### 2.1 The Symbolic Knowledge Graph: $O(1)$ Hash Table Architecture
+Symbols uses two structural implementations:
 
-The backbone of factual memory is partitioned into two dual-indexed hash structures: the `SYMBOL_TABLE` and the `RELATION_TABLE`.
+1. **`GRAPH`** for symbols, relations, embeddings, numeric values, reasoning, and domain-specific graphs.
+2. **`META_GRAPH`** for conversational emphasis and continuity over transferred truth.
 
-#### Symbol Representation
-Symbols are canonicalized lexical tokens mapped to unique integer identifiers:
+`CODE_GRAPH` is a specialization for code relations such as declarations, calls, includes, types, and inheritance. It is not a third general graph implementation.
+
+A relation records subject, relation, object, polarity, evidence count, weight, and source:
+
 ```c
 typedef struct {
-    uint32_t id;
-    uint32_t name_len;
-    char    *name;
-    uint32_t frequency;
-} SYMBOL;
-```
-Hashing is governed by the modified DJB2a algorithm formulated as a first-order recurrence with bitwise XOR dispersion:
-
-$$
-\begin{aligned}
-h_0 &= 5381 \\
-h_i &= ((h_{i-1} \ll 5) + h_{i-1}) \oplus s_i = (33 \cdot h_{i-1}) \oplus s_i, \quad 1 \le i \le |s| \\
-h_{\text{sym}}(s) &= h_{|s|} \land (2^k - 1)
-\end{aligned}
-$$
-
-where $k$ represents the log-capacity of the table ($N = 2^k$).
-
-#### Relational Triples
-Knowledge is stored as discrete relational triples $\langle \text{Subject}, \text{Predicate}, \text{Object} \rangle$:
-```c
-typedef struct {
-    uint32_t subject;     // Symbol ID
-    uint32_t predicate;   // Symbol ID
-    uint32_t object;      // Symbol ID
-    uint32_t count;       // Co-occurrence counter
-    float    weight;      // Normalized probabilistic weight
+    SYMBOL_ID         subject;
+    SYMBOL_ID         relation;
+    SYMBOL_ID         object;
+    RELATION_POLARITY polarity;
+    uint64_t          count;
+    float             weight;
+    SYMBOL_ID         source;
 } RELATION;
 ```
-Each relation struct occupies **strictly 32 bytes** in RAM. Indexing uses a 64-bit integer mixing function (MurmurMix64) combining subject, predicate, and object into a high-dispersion hash bucket:
 
-$$
-\begin{aligned}
-k_0 &= (\text{subject} \ll 32) \oplus (\text{predicate} \ll 16) \oplus \text{object} \\
-k_1 &= (k_0 \oplus (k_0 \gg 33)) \cdot \text{0xff51afd7ed558ccd} \\
-k_2 &= (k_1 \oplus (k_1 \gg 33)) \cdot \text{0xc4ceb9fe1a85ec53} \\
-h_{\text{rel}}(\text{subject}, \text{predicate}, \text{object}) &= (k_2 \oplus (k_2 \gg 33)) \land (2^m - 1)
-\end{aligned}
-$$
+The current embedding substrate uses 32 floating-point dimensions. It supports deterministic initialization, co-occurrence updates, normalization, cosine similarity, and relation composition. These vectors are a retrieval aid, not proof of semantic understanding.
 
-Using power-of-two table capacities ($2^m$), bitwise masking replaces costly modulo division, and open addressing with linear probing guarantees cache-line locality. Automatic rehashing occurs when the load factor exceeds 70%.
+### 3.2 Text and provenance
 
-### 2.2 32-Dimensional Distributional Semantic Substrate
+`text_lex` preserves a corpus byte image and sentence offsets for literal retrieval. It also builds indexes and ranking signals used by question answering. A retrieved sentence can therefore be tied back to source text, while inferred answers can carry relation sources or proof steps.
 
-To overcome the brittle discreteness of classical symbolic systems (e.g., failing to equate *feline* with *cat*), Symbolic LLM embeds every symbol into a compact **32-dimensional continuous vector space** $\mathbf{v} \in \mathbb{R}^{32}$.
+Provenance coverage is not yet uniform across every subsystem. Source-backed retrieval and selected reasoning paths have trace data; generated conversational text does not have a system-wide proof that every phrase is anchored.
 
-#### Vector Construction (Random Indexing & Online Hebbian Accumulation)
-Instead of gradient descent over large corpora, vectors are updated online via streaming Random Indexing (Kanerva, 1988) and Hebbian co-occurrence windows:
-1. Each symbol $w \in V$ is assigned an ultra-sparse static ternary index vector $\mathbf{r}_w \in \{-1, 0, 1\}^{32}$ where non-zero components satisfy quasi-orthogonality ($\mathbb{E}[\langle \mathbf{r}_u, \mathbf{r}_v \rangle] = 0$ for $u \neq v$).
-2. When word $w$ co-occurs with word $u$ within a sliding context window $\mathcal{W}(w)$, online vector accumulation occurs with distance attenuation:
-   $$\mathbf{v}_w^{(t+1)} = \mathbf{v}_w^{(t)} + \sum_{u \in \mathcal{W}(w)} \frac{1}{|pos(w) - pos(u)|} \mathbf{r}_u$$
-3. Vectors are normalized to unit Euclidean length:
-   $$\hat{\mathbf{v}}_w = \frac{\mathbf{v}_w}{\|\mathbf{v}_w\|_2}$$
+### 3.3 Reasoning and realization
 
-Semantic similarity is evaluated via cosine similarity:
+The repository contains exact relation queries, polarity and contradiction handling, transitive and rule-based inference, bounded proof search, CCG realization, VSA operations, commonsense lookup, personas, and passage generation.
 
-$$
-\text{Sim}(u, w) = \langle \hat{\mathbf{v}}_u, \hat{\mathbf{v}}_w \rangle = \sum_{d=0}^{31} \hat{\mathbf{v}}_u[d] \cdot \hat{\mathbf{v}}_w[d]
-$$
+These components are deterministic for fixed inputs and configuration. Their tests demonstrate named fixtures, not complete natural-language coverage. When a parser, rule family, corpus fact, or repair operator does not cover a request, the correct result is `UNKNOWN`, failure, or abstention.
 
-On modern x86/ARM hardware, this 32-dimensional dot product executes in **~2 nanoseconds** via SIMD vectorization.
+### 3.4 Coding-agent path
 
-### 2.3 First-Order Literal Sentence Store and Exact Provenance
+The current engineering path is:
 
-When ingesting unstructured natural language (e.g., `.txt` files), the engine constructs an in-memory literal sentence store:
-- **Streaming Parser**: Tokenizes text into sentences and normalized symbols on-the-fly with 64 KB buffering.
-- **Provenance Inverted Index**: For each extracted symbol, a compact posting list registers the literal sentence offsets: $\text{Posting}(w) = \{ \text{id}_1, \text{id}_2, \dots, \text{id}_m \}$.
-- **Verbatim Citation Retrieval**: When answering a natural language question over unstructured text, the engine retrieves the exact original sentence from which the fact was cited, appending the source text verbatim (zero unanchored text fabrication). If no matching ground truth exists, the model safely outputs an honest `UNKNOWN`.
+1. index repository text and code relations;
+2. form a bounded plan;
+3. execute through explicit tool contracts;
+4. parse diagnostics;
+5. propose a patch only when an operator's preconditions match;
+6. apply with a retained backup;
+7. run the evaluator;
+8. keep the patch on success or roll it back and replan within a fixed budget.
 
-### 2.4 Second-Order Reflexive Meta-Graph ($\mathcal{M}$)
+The validated repair operators are intentionally narrow:
 
-Beyond first-order textual facts, the engine constructs a dynamic meta-graph $\mathcal{M} = (V_{\mathcal{M}}, E_{\mathcal{M}})$ representing **knowledge acquired about the knowledge**:
-- **Dialogue-Driven Associations**: If concepts $A$ and $B$ are repeatedly queried together, co-activated in reasoning chains, or linked through discourse, an edge $e(A, B)$ is materialized in $\mathcal{M}$ with an interaction weight $w_{AB}$.
-- **Associative Memory Traversal**: When an entity is queried, the engine consults $\mathcal{M}$ to present adjacent topics that contextualize the response.
+- **compiler-confirmed identifier typo** (`did-you-mean`);
+- **unambiguous missing local header**.
 
-### 2.5 Concept Concentration Metric ($\kappa$) and Thematic Introspection
+A syntax error, ambiguous header, unsupported diagnostic, or unverified candidate is out of coverage and must not be reported as solved.
 
-A central challenge in unsupervised language understanding is discovering what a text is about without relying on hand-crafted stopword lists or pre-trained neural tokenizers.
+## 4. Reproducible evidence
 
-We introduce the **Concept Concentration Metric** $\kappa(w)$:
+### 4.1 Build and core suite
 
-$$
-\kappa(w) = \frac{\max_{d \in [0, 31]} \mathbf{v}_w[d]}{\sum_{d=0}^{31} \mathbf{v}_w[d]} \cdot \log(1 + f_w)
-$$
+Requirements are CMake 3.10 or newer and a C11 compiler. Some targets also rely on platform APIs and external commands such as the system compiler and shell.
 
-where $\mathbf{v}_w[d] \ge 0$ is the accumulated co-occurrence mass along dimension $d$, and $f_w$ is the corpus term frequency.
+```bash
+git clone https://github.com/FiveTechSoft/symbols.git
+cd symbols
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j4
+ctest --test-dir build --output-on-failure
+```
 
-#### Thematic Discriminability Principle
+At commit `26d0de4ad7f969171c2f121e7f5a4307f42ffff2`, a clean local Linux Release run registered 88 CTest tests: 76 passed, 12 were skipped because optional external data or an enabled end-to-end server configuration was absent, and none failed. This is a reproducible audit observation, not a cross-platform release claim.
+
+### 4.2 External C repair fixture
+
+Run:
+
+```bash
+./build/test_agent_runner_external
+```
+
+The fixture is documented in [`tests/fixtures/agent_runner_external/MANIFEST.md`](tests/fixtures/agent_runner_external/MANIFEST.md). Its development and evaluation cases are separated.
+
+At the audited commit:
+
+| Split | Cases | Expected repairs resolved | Correct abstentions | False positives |
+|---|---:|---:|---:|---:|
+| Development | 4 | 2 | 2 | 0 |
+| Evaluation | 25 | 12 | 13 | 0 |
+
+The 12 resolved evaluation cases cover only the two operators above. The 13 abstentions include negative, ambiguous, and out-of-coverage cases. This benchmark does not measure general bug fixing.
+
+### 4.3 OpenCode integration evidence
+
+The deployed model was exercised through the authentic OpenCode interface rather than a recreated screen:
+
+- an explicit shell request executed `uname` and returned the host result;
+- a contextual two-line swap succeeded outside a Git repository;
+- inside a Git repository, native status inspection and repository preflight succeeded, while an unsupported or unsafe action abstained.
+
+These runs demonstrate the named paths only. They do not turn shell access into a structured repository API, prove arbitrary editing, or authorize Git mutation. The corresponding committed tests are `test_shell_routing_e2e`, the session/context fixtures, and `test_git_inquiry_e2e`.
+
+### 4.4 CI status and release rule
+
+The CI workflow builds normal MSVC and GCC configurations and includes Windows sanitizer jobs and corpus linting. The release rule is stricter than a local green run: evidence must belong to the exact SHA under discussion.
+
+Durable run [#27](https://github.com/FiveTechSoft/symbols/actions/runs/35703732949) validated the integration sequence leading to this paper: Linux and MSVC Release passed. The sanitizer job remained red on two pre-existing performance thresholds under sanitizer instrumentation; its AgentShell memory-safety test passed and reported no AddressSanitizer memory error. This is partial cross-platform evidence, not a fully green release matrix.
+
+### 4.5 Performance numbers
+
+The repository includes relation and embedding stress benchmarks, but their timings depend on compiler, build type, operating system, and hardware. They are development measurements, not latency guarantees.
+
+The current `bench_1m` report also has an internally inconsistent summary counter. Until that harness is corrected and CI records the environment, this paper does not publish its timing or memory figures as canonical results.
+
+## 5. Interfaces
+
+The CMake build exposes, among others:
+
+- `chat_main`: interactive conversation over configured corpora;
+- `symbols-server`: HTTP server with a `/v1/chat/completions`-style compatibility endpoint;
+- `symbols-agent`: repository indexing, diagnosis, blast-radius, and bounded task commands;
+- `symbolic-learn`: persistence and learning experiments;
+- benchmark and test executables.
+
+Example:
+
+```bash
+./build/chat_main data/texts/jung.txt
+./build/symbols-server 8080 data/texts/bible.txt data/texts/jung.txt
+./build/symbols-agent --help
+```
+
+"Compatibility" here means the implemented request/response subset. It does not claim complete behavioral compatibility with every OpenAI client or API feature.
+
+A browser demo is hosted at <https://fivetechsoft.github.io/symbols/>. It is a separate WebAssembly/browser surface and should not be used as evidence that every native feature is present in the browser build.
+
+## 6. Persistent memory: implemented behavior and limits
+
+The current episodic store persists records of:
+
+```text
+(subject, relation, object, source, timestamp)
+```
+
+It loads them at startup, deduplicates triples case-insensitively, grows dynamically, and can rewrite or clear a TSV file. `test_episodic_memory` exercises initialization, append, duplicate handling, save/load into a second store, attributes, timestamps, accumulation, and clear.
+
+It is a prototype, not the verified episodic memory specified in Roadmap Phase 6:
+
+- lookup is a linear scan;
+- records do not contain repository SHA, problem signature, diagnosis, chosen operator, patch hash, evaluator evidence, outcome, or negative episode;
+- there is no confidence model, contradiction resolution, selective correction, or invalidation policy;
+- save rewrites the destination directly rather than using atomic replacement and durability checks;
+- an auto-save failure is not currently propagated by append;
+- clearing the store does not prove that an already injected fact stops influencing the live graph in the same process.
+
+These are active correctness gaps. A message saying that a fact was learned must not be treated as durable evidence until write errors are propagated and tested.
+
+## 7. Boundaries
+
+Symbols does **not** currently claim:
+
+- zero hallucination for arbitrary input;
+- a worst-case constant-time system;
+- universal or open-domain question answering;
+- general autonomous software engineering;
+- native semantic ASTs for every advertised language;
+- upstream SWE-bench resolution results;
+- production-grade Git mutation or filesystem transactions;
+- verified engineering-episode memory;
+- a completed Harbour adapter;
+- a green cross-platform release matrix on the current final SHA.
+
+The project also does not remove the need for compilers, tests, corpora, operating-system services, or human decisions. Its purpose is to make those sources of truth explicit and to refuse changes it cannot verify.
+
+## 8. Roadmap
+
+[`ROADMAP.md`](ROADMAP.md) is ordered by dependency and evidence gates:
+
+0. safe shell execution;
+1. structured filesystem operations;
+2. safe Git operations;
+3. build and test intelligence;
+4. Clang AST and `compile_commands.json`;
+5. persistent workflows;
+6. verified episodic memory.
+
+A phase is complete only when its named fixtures and the full CI matrix pass on the final SHA. Planned work must stay labeled as planned until that gate closes.
+
+## 9. How to cite results from this repository
+
+A result should name:
+
+- the exact commit SHA;
+- the executable or test target;
+- the fixture or corpus and whether it was development or held out;
+- compiler, build type, OS, and hardware for performance claims;
+- pass, failure, skip, and abstention counts;
+- the CI run URL for release claims;
+- known unsupported cases.
+
+Do not convert a synthetic fixture, local run, generated report, or demo into a broader product claim.
+
+## License
+
+See [`LICENSE`](LICENSE).
