@@ -220,6 +220,19 @@ int ServerInferWorkspaceCommands(const char *listing,
                                  char *test, size_t test_size);
 int ServerIsAmbiguousCodingTask(const char *text);
 
+/* Derive a bounded single-source C verification command only from an observed
+   .c path and explicit task requirements. Returns 0 rather than inventing a
+   command for other languages or ambiguous paths. */
+int ServerDeriveSingleCCommand(const char *issue, const char *path,
+                               char *out, size_t size);
+
+/* Plan one conservative edit from observed C source plus an actual compiler or
+   sanitizer diagnostic. Supports identifier suggestions and allocation-size
+   mismatches; exact old/new strings are returned for the client's edit tool. */
+int ServerPlanObservedCRepair(const char *source, const char *diagnostic,
+                              char *old_text, size_t old_size,
+                              char *new_text, size_t new_size);
+
 /* 1 when the prompt asks, in natural language, about read-only Git
    repository state (branch, HEAD, dirty vs ignored paths, status).
    Literal commands ("git status") stay on the shell route; mutation

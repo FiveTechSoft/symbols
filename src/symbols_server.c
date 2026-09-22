@@ -271,7 +271,9 @@ typedef struct
     char              workspace_target[260];
     char              workspace_build[256];
     char              workspace_test[256];
-    int               workspace_phase; /* 1=discover, 2=inspect */
+    char              workspace_command[512];
+    char              workspace_source[8192];
+    int               workspace_phase; /* 1=discover, 2=inspect, 3=verify, 4=edit, 5=reverify */
 } ServerSession;
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
@@ -991,7 +993,7 @@ static void HandleCompletions(socket_t s, const char *body,
     /* A literal shell request is a bounded one-tool transaction.  Relay
        only the observed tool output and exit status; never synthesize build
        or regression claims from a successful command. */
-    if (has_tool_resp && has_paired_call &&
+    if (has_tool_resp && has_paired_call && sess->workspace_phase == 0 &&
         (strcmp(tool_resp.name, "bash") == 0 ||
          strcmp(tool_resp.name, "execute_command") == 0) &&
         strstr(paired_call.arguments, "\"command\"") != NULL)
@@ -1089,6 +1091,13 @@ static void HandleCompletions(socket_t s, const char *body,
                                   resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
+        {
+            size_t wlen = strlen(sess->workspace_dir);
+            if (wlen > 0 && strncmp(sess->workspace_target, sess->workspace_dir, wlen) == 0 &&
+                (sess->workspace_target[wlen] == '/' || sess->workspace_target[wlen] == '\\'))
+                memmove(sess->workspace_target, sess->workspace_target + wlen + 1,
+                        strlen(sess->workspace_target + wlen + 1) + 1);
+        }
         if (!HasDeclaredTool(sess, "read"))
         {
             sess->agent_active = 0;
@@ -1114,22 +1123,141 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 2)
     {
-        sess->agent_active = 0;
-        sess->workspace_phase = 0;
+        OPENAI_TOOL_CALLS tc;
         if (tool_resp.is_error ||
-            (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+            (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
+            tool_resp.content[0] == '\0')
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
                      "No se pudo leer `%s` en el workspace `%s`. No he modificado archivos.",
                      sess->workspace_target, sess->workspace_dir);
-        else if (sess->workspace_build[0] == '\0')
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        snprintf(sess->workspace_source, sizeof(sess->workspace_source), "%s",
+                 tool_resp.content);
+        if (sess->workspace_test[0] != '\0')
+            snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s",
+                     sess->workspace_test);
+        else if (!ServerDeriveSingleCCommand(sess->current_issue,
+                                             sess->workspace_target,
+                                             sess->workspace_command,
+                                             sizeof(sess->workspace_command)))
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "He inspeccionado `%s` en `%s`, pero el workspace no aporta evidencia de cómo compilar o probar el proyecto. Me abstengo de inventar comandos o un parche.",
+                     "He inspeccionado `%s` en `%s`, pero el workspace no aporta un comando de verificación acotado. Me abstengo de inventarlo.",
                      sess->workspace_target, sess->workspace_dir);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        if (!HasDeclaredTool(sess, "bash"))
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
+            SendContentForRequest(s, body, ++g_seq,
+                "OpenCode no declaró `bash`; no puedo ejecutar la verificación observada ni editar con seguridad.",
+                sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        memset(&tc, 0, sizeof(tc)); tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "bash");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"command\":\"%s\"}", sess->workspace_command);
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "bash");
+        sess->workspace_phase = 3;
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                "Running the workspace-evidenced verification before editing.",
+                                resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 3)
+    {
+        OPENAI_TOOL_CALLS tc; char old_text[512], new_text[512];
+        int failed = tool_resp.is_error ||
+                     (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
+                     strstr(tool_resp.content, "error:") != NULL ||
+                     strstr(tool_resp.content, "AddressSanitizer") != NULL ||
+                     strstr(tool_resp.content, "Assertion") != NULL;
+        if (!failed)
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            SendContentForRequest(s, body, ++g_seq,
+                "La verificación observada ya pasa; no he aplicado un cambio innecesario.",
+                sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        if (!HasDeclaredTool(sess, "edit") ||
+            !ServerPlanObservedCRepair(sess->workspace_source, tool_resp.content,
+                                       old_text, sizeof(old_text),
+                                       new_text, sizeof(new_text)))
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            snprintf(content, sizeof(content),
+                     "La verificación falló, pero el diagnóstico observado no permite un parche mínimo inequívoco en `%s`. No he modificado archivos.",
+                     sess->workspace_target);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        memset(&tc, 0, sizeof(tc)); tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "edit");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                 sess->workspace_dir, sess->workspace_target, old_text, new_text);
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "edit");
+        sess->workspace_phase = 4;
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                "Applying one minimal edit derived from the observed diagnostic.",
+                                resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 4)
+    {
+        OPENAI_TOOL_CALLS tc;
+        if (tool_resp.is_error || (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            SendContentForRequest(s, body, ++g_seq,
+                "La edición mínima falló; no puedo certificar cambios.",
+                sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        memset(&tc, 0, sizeof(tc)); tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "bash");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"command\":\"%s\"}", sess->workspace_command);
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "bash");
+        sess->workspace_phase = 5;
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                "Re-running the same evidenced verification after the edit.",
+                                resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 5)
+    {
+        int failed = tool_resp.is_error ||
+                     (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
+                     strstr(tool_resp.content, "error:") != NULL ||
+                     strstr(tool_resp.content, "AddressSanitizer") != NULL ||
+                     strstr(tool_resp.content, "Assertion") != NULL;
+        sess->agent_active = 0; sess->workspace_phase = 0;
+        if (failed)
+            snprintf(content, sizeof(content),
+                     "Apliqué un cambio mínimo en `%s`, pero la misma verificación sigue fallando. El cambio no queda certificado.",
+                     sess->workspace_target);
         else
             snprintf(content, sizeof(content),
-                     "He ligado la tarea al workspace `%s`, inspeccionado `%s` e inferido `%s` desde sus archivos. Aún no hay evidencia suficiente para producir un parche general seguro; no he modificado archivos.",
-                     sess->workspace_dir, sess->workspace_target,
-                     sess->workspace_build);
+                     "Corregido `%s`. La misma verificación observada pasó después del cambio.",
+                     sess->workspace_target);
         SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                               resp, sizeof(resp), sse, sizeof(sse));
         return;

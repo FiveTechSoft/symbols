@@ -706,6 +706,46 @@ static void TestWorkspacePlanningEvidence(void)
     TEST_ASSERT(build[0] == '\0' && test[0] == '\0',
                 "unknown build system fails closed");
 
+    {
+        char command[512], old_text[256], new_text[256];
+        const char *typo_source =
+            "int main(void){double fahrenheit=32;printf(\"%f\",fahrenhiet);}";
+        const char *gcc_diag =
+            "main.c:1: error: ‘fahrenhiet’ undeclared; did you mean ‘fahrenheit’?";
+        const char *heap_source =
+            "double *datos=0; size_t cap=4; datos=realloc(datos,cap);";
+        TEST_ASSERT(ServerDeriveSingleCCommand("no compila", "src/main.c",
+                                               command, sizeof(command)) == 1 &&
+                    strstr(command, "gcc -Wall -Wextra -std=c11 src/main.c") != NULL,
+                    "single observed C source gets bounded compiler command");
+        TEST_ASSERT(ServerDeriveSingleCCommand("fallo de memoria", "acum.c",
+                                               command, sizeof(command)) == 1 &&
+                    strstr(command, "-fsanitize=address") != NULL &&
+                    strstr(command, "1 2 3 4 5 6 7 8") != NULL,
+                    "memory task gets bounded ASan command with several arguments");
+        TEST_ASSERT(ServerDeriveSingleCCommand("fix", "main.c;rm", command,
+                                               sizeof(command)) == 0,
+                    "unsafe path never becomes a command");
+        TEST_ASSERT(ServerPlanObservedCRepair(typo_source, gcc_diag,
+                                              old_text, sizeof(old_text),
+                                              new_text, sizeof(new_text)) == 1 &&
+                    strcmp(old_text, "fahrenhiet") == 0 &&
+                    strcmp(new_text, "fahrenheit") == 0,
+                    "compiler suggestion yields exact identifier edit");
+        TEST_ASSERT(ServerPlanObservedCRepair(
+                        heap_source,
+                        "ERROR: AddressSanitizer: heap-buffer-overflow",
+                        old_text, sizeof(old_text), new_text, sizeof(new_text)) == 1 &&
+                    strcmp(old_text, "realloc(datos,cap)") == 0 &&
+                    strcmp(new_text, "realloc(datos,cap*sizeof *datos)") == 0,
+                    "ASan overflow plus realloc count yields allocation-size edit");
+        TEST_ASSERT(ServerPlanObservedCRepair(
+                        "datos=realloc(datos,cap*sizeof *datos);",
+                        "ERROR: AddressSanitizer: heap-buffer-overflow",
+                        old_text, sizeof(old_text), new_text, sizeof(new_text)) == 0,
+                    "already byte-sized allocation is not edited blindly");
+    }
+
     TEST_ASSERT(ServerIsAmbiguousCodingTask("Optimiza este programa") == 1,
                 "consequentially ambiguous optimization requires clarification");
     TEST_ASSERT(ServerIsAmbiguousCodingTask("Optimiza parser.c para reducir memoria") == 0,

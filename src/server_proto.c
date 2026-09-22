@@ -3420,7 +3420,8 @@ static int ListingHasPath(const char *listing, const char *path)
     for (p = listing; (p = strstr(p, path)) != NULL; p++)
     {
         int left = (p == listing || p[-1] == '\n' || p[-1] == '\r' ||
-                    p[-1] == ' ' || p[-1] == '`' || p[-1] == '"');
+                    p[-1] == ' ' || p[-1] == '/' || p[-1] == '\\' ||
+                    p[-1] == '`' || p[-1] == '"');
         char c = p[n];
         int right = (c == '\0' || c == '\n' || c == '\r' || c == ' ' ||
                      c == '`' || c == '"' || c == ':' || c == ')');
@@ -3513,6 +3514,83 @@ int ServerInferWorkspaceCommands(const char *listing,
         snprintf(test, test_size, "ninja test");
     }
     return build[0] != '\0';
+}
+
+int ServerDeriveSingleCCommand(const char *issue, const char *path,
+                               char *out, size_t size)
+{
+    size_t n;
+    char lower[1024];
+    if (!out || size == 0) return 0;
+    out[0] = '\0';
+    if (!path || (n = strlen(path)) < 3 || strcmp(path + n - 2, ".c") != 0)
+        return 0;
+    if (strpbrk(path, " ;|&`$<>\\\n\r\t") != NULL || path[0] == '/')
+        return 0;
+    GitLowerCopy(issue ? issue : "", lower, sizeof(lower));
+    if (strstr(lower, "sanitize=address") || strstr(lower, "asan") ||
+        strstr(lower, "fallo de memoria") || strstr(lower, "memory"))
+        snprintf(out, size,
+                 "gcc -Wall -Wextra -std=c11 -fsanitize=address -g %s -o /tmp/symbols-c-check && /tmp/symbols-c-check 1 2 3 4 5 6 7 8",
+                 path);
+    else
+        snprintf(out, size,
+                 "gcc -Wall -Wextra -std=c11 %s -o /tmp/symbols-c-check",
+                 path);
+    return out[0] != '\0';
+}
+
+static int CopyDiagnosticIdentifier(const char *text, const char *needle,
+                                    char *out, size_t size)
+{
+    const char *p, *e;
+    if (!text || !needle || !out || size == 0) return 0;
+    out[0] = '\0';
+    p = strstr(text, needle); if (!p) return 0;
+    p += strlen(needle);
+    while (*p && !isalnum((unsigned char)*p) && *p != '_') p++;
+    e = p; while (*e && (isalnum((unsigned char)*e) || *e == '_')) e++;
+    if (e == p || (size_t)(e - p) >= size) return 0;
+    memcpy(out, p, (size_t)(e - p)); out[e - p] = '\0';
+    return 1;
+}
+
+int ServerPlanObservedCRepair(const char *source, const char *diagnostic,
+                              char *old_text, size_t old_size,
+                              char *new_text, size_t new_size)
+{
+    char bad[128], good[128];
+    const char *r, *lp, *comma, *rp, *var, *vend;
+    if (!old_text || !new_text || old_size == 0 || new_size == 0) return 0;
+    old_text[0] = new_text[0] = '\0';
+    if (!source || !diagnostic) return 0;
+    if (CopyDiagnosticIdentifier(diagnostic, "error:", bad, sizeof(bad)) &&
+        CopyDiagnosticIdentifier(diagnostic, "did you mean", good, sizeof(good)) &&
+        strcmp(bad, good) != 0 && strstr(source, bad) != NULL)
+    {
+        snprintf(old_text, old_size, "%s", bad);
+        snprintf(new_text, new_size, "%s", good);
+        return 1;
+    }
+    if (strstr(diagnostic, "AddressSanitizer") == NULL &&
+        strstr(diagnostic, "heap-buffer-overflow") == NULL)
+        return 0;
+    r = strstr(source, "realloc(");
+    if (!r) return 0;
+    lp = r + strlen("realloc(");
+    comma = strchr(lp, ',');
+    rp = comma ? strchr(comma + 1, ')') : NULL;
+    if (!comma || !rp) return 0;
+    { const char *sz = strstr(comma, "sizeof"); if (sz && sz < rp) return 0; }
+    var = comma + 1; while (var < rp && isspace((unsigned char)*var)) var++;
+    vend = var; while (vend < rp && (isalnum((unsigned char)*vend) || *vend == '_')) vend++;
+    if (vend == var || vend != rp) return 0;
+    if ((size_t)(rp + 1 - r) >= old_size) return 0;
+    memcpy(old_text, r, (size_t)(rp + 1 - r)); old_text[rp + 1 - r] = '\0';
+    snprintf(new_text, new_size, "realloc(%.*s,%.*s*sizeof *%.*s)",
+             (int)(comma - lp), lp, (int)(vend - var), var,
+             (int)(comma - lp), lp);
+    return 1;
 }
 
 int ServerIsAmbiguousCodingTask(const char *text)
