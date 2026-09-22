@@ -207,6 +207,15 @@ int ServerAnswerGreeting(const char *query, int persona_id, char *out, size_t ou
    JSON backslash pairs collapse (Windows paths). Returns 1 on success. */
 int ServerExtractWorkingDir(const char *body, char *out, size_t size);
 
+/* Evidence-driven workspace planning helpers. The listing must come from the
+   client workspace; these functions never inspect the server repository. */
+int ServerSelectWorkspaceFile(const char *issue, const char *listing,
+                              char *out, size_t size);
+int ServerInferWorkspaceCommands(const char *listing,
+                                 char *build, size_t build_size,
+                                 char *test, size_t test_size);
+int ServerIsAmbiguousCodingTask(const char *text);
+
 /* 1 when the prompt asks, in natural language, about read-only Git
    repository state (branch, HEAD, dirty vs ignored paths, status).
    Literal commands ("git status") stay on the shell route; mutation

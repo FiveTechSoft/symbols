@@ -3374,6 +3374,133 @@ int ServerIsGitPreflightTask(const char *text)
     return 0;
 }
 
+static int ListingHasPath(const char *listing, const char *path)
+{
+    const char *p;
+    size_t n;
+    if (listing == NULL || path == NULL || path[0] == '\0') return 0;
+    n = strlen(path);
+    for (p = listing; (p = strstr(p, path)) != NULL; p++)
+    {
+        int left = (p == listing || p[-1] == '\n' || p[-1] == '\r' ||
+                    p[-1] == ' ' || p[-1] == '`' || p[-1] == '"');
+        char c = p[n];
+        int right = (c == '\0' || c == '\n' || c == '\r' || c == ' ' ||
+                     c == '`' || c == '"' || c == ':' || c == ')');
+        if (left && right) return 1;
+    }
+    return 0;
+}
+
+int ServerSelectWorkspaceFile(const char *issue, const char *listing,
+                              char *out, size_t size)
+{
+    char named[260];
+    const char *p;
+    if (out == NULL || size == 0) return 0;
+    out[0] = '\0';
+    if (issue != NULL && ServerExtractFileRef(issue, named, sizeof(named)))
+    {
+        if (ListingHasPath(listing, named))
+        {
+            snprintf(out, size, "%s", named);
+            return 1;
+        }
+        return 0; /* an explicit but absent target is consequential */
+    }
+    if (listing == NULL) return 0;
+    p = listing;
+    while (*p != '\0')
+    {
+        const char *start, *end, *dot;
+        size_t n;
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' ||
+               *p == '`' || *p == '"') p++;
+        start = p;
+        while (*p != '\0' && *p != '\r' && *p != '\n' && *p != ' ' &&
+               *p != '`' && *p != '"') p++;
+        end = p;
+        while (end > start && (end[-1] == ':' || end[-1] == ',' || end[-1] == ')')) end--;
+        dot = end;
+        while (dot > start && dot[-1] != '.') dot--;
+        n = (size_t)(end - start);
+        if (dot > start && n > 2 && n < size)
+        {
+            size_t ext_len = (size_t)(end - dot);
+            int source_ext =
+                (ext_len == 1 && (dot[0] == 'c' || dot[0] == 'C' ||
+                                  dot[0] == 'h' || dot[0] == 'H')) ||
+                (ext_len == 2 && strncasecmp(dot, "cc", 2) == 0) ||
+                (ext_len == 3 && (strncasecmp(dot, "cpp", 3) == 0 ||
+                                  strncasecmp(dot, "hpp", 3) == 0));
+            if (source_ext)
+            {
+                memcpy(out, start, n);
+                out[n] = '\0';
+                return 1;
+            }
+        }
+        if (*p != '\0') p++;
+    }
+    return 0;
+}
+
+int ServerInferWorkspaceCommands(const char *listing,
+                                 char *build, size_t build_size,
+                                 char *test, size_t test_size)
+{
+    if (build == NULL || build_size == 0 || test == NULL || test_size == 0)
+        return 0;
+    build[0] = '\0';
+    test[0] = '\0';
+    if (listing == NULL) return 0;
+    if (strstr(listing, "CMakeLists.txt") != NULL)
+    {
+        snprintf(build, build_size, "cmake -S . -B build && cmake --build build");
+        snprintf(test, test_size, "ctest --test-dir build --output-on-failure");
+    }
+    else if (strstr(listing, "Makefile") != NULL || strstr(listing, "makefile") != NULL)
+    {
+        snprintf(build, build_size, "make");
+        if (strstr(listing, "test") != NULL || strstr(listing, "check") != NULL)
+            snprintf(test, test_size, "make test");
+    }
+    else if (strstr(listing, "meson.build") != NULL)
+    {
+        snprintf(build, build_size, "meson setup build && meson compile -C build");
+        snprintf(test, test_size, "meson test -C build");
+    }
+    else if (strstr(listing, "build.ninja") != NULL)
+    {
+        snprintf(build, build_size, "ninja");
+        snprintf(test, test_size, "ninja test");
+    }
+    return build[0] != '\0';
+}
+
+int ServerIsAmbiguousCodingTask(const char *text)
+{
+    char lower[1024];
+    size_t i;
+    int broad;
+    if (text == NULL) return 0;
+    for (i = 0; text[i] != '\0' && i + 1 < sizeof(lower); i++)
+        lower[i] = (char)tolower((unsigned char)text[i]);
+    lower[i] = '\0';
+    broad = strstr(lower, "optimiza") != NULL || strstr(lower, "optimize") != NULL ||
+            (strstr(lower, "ptim") != NULL && strstr(lower, "zalo") != NULL) ||
+            strstr(lower, "mejora este programa") != NULL ||
+            strstr(lower, "improve this program") != NULL;
+    if (!broad) return 0;
+    if (ServerExtractFileRef(text, lower, sizeof(lower))) return 0;
+    if (strstr(text, "%") != NULL || strstr(text, "asan") != NULL ||
+        strstr(text, "test") != NULL || strstr(text, "benchmark") != NULL ||
+        strstr(text, "memoria") != NULL || strstr(text, "memory") != NULL ||
+        strstr(text, "tiempo") != NULL || strstr(text, "speed") != NULL)
+        return 0;
+    return 1;
+}
+
 int ServerExtractWorkingDir(const char *body, char *out, size_t size)
 {
     static const char key[] = "Working directory:";

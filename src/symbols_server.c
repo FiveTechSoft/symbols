@@ -263,6 +263,15 @@ typedef struct
        the native Git inquiry route. AgentGitPreflight compares against
        it so a moved base is a stale-head abstention, not a surprise. */
     char              git_reported_head[GIT_HEAD_MAX];
+
+    /* Coding tasks are bound to the cwd declared by the OpenCode request.
+       Repository evidence comes back through the client tools, never from
+       the server process cwd. */
+    char              workspace_dir[260];
+    char              workspace_target[260];
+    char              workspace_build[256];
+    char              workspace_test[256];
+    int               workspace_phase; /* 1=discover, 2=inspect */
 } ServerSession;
 
 static ServerSession g_sessions[SERVER_MAX_SESSIONS];
@@ -408,9 +417,15 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
     out_tc->count = 1;
     snprintf(out_tc->calls[0].id, sizeof(out_tc->calls[0].id), "call_sym_%lu", seq);
 
-    const char *target_file = FindFileForIssue(issue);
-    if (!target_file)
-        target_file = "CMakeLists.txt";
+    const char *target_file = (sess && sess->workspace_target[0] != '\0')
+                                  ? sess->workspace_target
+                                  : FindFileForIssue(issue);
+
+    if (strcmp(op->name, "create_file") != 0 && target_file == NULL)
+    {
+        out_tc->count = 0;
+        return;
+    }
 
     if (strcmp(op->name, "create_file") == 0)
     {
@@ -418,7 +433,10 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
         if (ServerExtractCreatePath(issue, created, sizeof(created)))
             target_file = created;
         else
-            target_file = "nuevo.txt";
+        {
+            out_tc->count = 0;
+            return;
+        }
         if (HasDeclaredTool(sess, "write"))
         {
             strncpy(out_tc->calls[0].name, "write", sizeof(out_tc->calls[0].name) - 1);
@@ -613,7 +631,9 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
     }
     else if (strcmp(op->name, "verify_build") == 0)
     {
-        const char *cmd = "cmake --build .";
+        const char *cmd = (sess && sess->workspace_build[0] != '\0')
+                              ? sess->workspace_build : NULL;
+        if (cmd == NULL) { out_tc->count = 0; return; }
         if (HasDeclaredTool(sess, "bash"))
         {
             strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
@@ -640,7 +660,9 @@ static void FormatOperatorToolCall(const ServerSession *sess, const STRIPS_OPERA
     }
     else if (strcmp(op->name, "run_regression_tests") == 0)
     {
-        const char *cmd = "ctest --output-on-failure";
+        const char *cmd = (sess && sess->workspace_test[0] != '\0')
+                              ? sess->workspace_test : NULL;
+        if (cmd == NULL) { out_tc->count = 0; return; }
         if (HasDeclaredTool(sess, "bash"))
         {
             strncpy(out_tc->calls[0].name, "bash", sizeof(out_tc->calls[0].name) - 1);
@@ -965,6 +987,118 @@ static void HandleCompletions(socket_t s, const char *body,
                                 content, query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
         }
+        return;
+    }
+
+    if (has_tool_resp && has_paired_call &&
+        strcmp(paired_call.name, "write") == 0 &&
+        sess->last_target_is_new_empty && sess->last_target[0] != '\0')
+    {
+        sess->last_target_is_new_empty = 0;
+        if (tool_resp.is_error ||
+            (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+            snprintf(content, sizeof(content),
+                     "No se confirmó la creación de `%s`.", sess->last_target);
+        else
+            snprintf(content, sizeof(content), "Creado `%s`.", sess->last_target);
+        if (ServerWantsStream(body))
+        {
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                      content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
+    }
+
+    /* Mandatory evidence-first workspace binding for coding tasks. The glob
+       executes in OpenCode's own cwd. Its result is the only input used to
+       choose a source or build system; the server repository is irrelevant. */
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 1)
+    {
+        OPENAI_TOOL_CALLS tc;
+        if (tool_resp.is_error ||
+            (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
+            tool_resp.content[0] == '\0')
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
+            snprintf(content, sizeof(content),
+                     "No puedo planificar el cambio: no se pudo descubrir el workspace de OpenCode (%s). No he modificado archivos.",
+                     sess->workspace_dir[0] ? sess->workspace_dir : "cwd desconocido");
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, sess->current_issue, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        ServerInferWorkspaceCommands(tool_resp.content,
+                                     sess->workspace_build, sizeof(sess->workspace_build),
+                                     sess->workspace_test, sizeof(sess->workspace_test));
+        if (!ServerSelectWorkspaceFile(sess->current_issue, tool_resp.content,
+                                       sess->workspace_target,
+                                       sizeof(sess->workspace_target)))
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
+            snprintf(content, sizeof(content),
+                     "He descubierto el workspace `%s`, pero la evidencia no identifica un archivo fuente inequívoco para esta tarea. No he inventado una ruta ni modificado archivos.",
+                     sess->workspace_dir);
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, sess->current_issue, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        if (!HasDeclaredTool(sess, "read"))
+        {
+            sess->agent_active = 0;
+            sess->workspace_phase = 0;
+            snprintf(content, sizeof(content),
+                     "El workspace se descubrió, pero OpenCode no declaró una herramienta de lectura. No he modificado archivos.");
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, sess->current_issue, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        memset(&tc, 0, sizeof(tc));
+        tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "read");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"filePath\":\"%s\"}", sess->workspace_target);
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "read");
+        sess->workspace_phase = 2;
+        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq,
+                                    &tc, "Inspecting source selected from workspace evidence.",
+                                    resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 2)
+    {
+        sess->agent_active = 0;
+        sess->workspace_phase = 0;
+        if (tool_resp.is_error ||
+            (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+            snprintf(content, sizeof(content),
+                     "No se pudo leer `%s` en el workspace `%s`. No he modificado archivos.",
+                     sess->workspace_target, sess->workspace_dir);
+        else if (sess->workspace_build[0] == '\0')
+            snprintf(content, sizeof(content),
+                     "He inspeccionado `%s` en `%s`, pero el workspace no aporta evidencia de cómo compilar o probar el proyecto. Me abstengo de inventar comandos o un parche.",
+                     sess->workspace_target, sess->workspace_dir);
+        else
+            snprintf(content, sizeof(content),
+                     "He ligado la tarea al workspace `%s`, inspeccionado `%s` e inferido `%s` desde sus archivos. Aún no hay evidencia suficiente para producir un parche general seguro; no he modificado archivos.",
+                     sess->workspace_dir, sess->workspace_target,
+                     sess->workspace_build);
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                            content, sess->current_issue, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
         return;
     }
 
@@ -1908,6 +2042,57 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     } /* end !has_tool_resp guard */
 
+    /* Preserve the established exact create-file transaction. It is not a
+       repository coding task and therefore does not need workspace discovery. */
+    if (!has_tool_resp && ServerIsFileCreationTask(query) &&
+        sess->declared_tools_count > 0)
+    {
+        char created[260], esc[320];
+        OPENAI_TOOL_CALLS tc;
+        if (!ServerExtractCreatePath(query, created, sizeof(created)))
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No he creado ningún archivo: falta un nombre de archivo inequívoco.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        if (!HasDeclaredTool(sess, "write"))
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No he creado el archivo: el cliente no declaró la herramienta `write`.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        ServerJsonEscape(created, esc, sizeof(esc));
+        memset(&tc, 0, sizeof(tc));
+        tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "write");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"filePath\":\"%s\",\"content\":\"\"}", esc);
+        snprintf(sess->last_target, sizeof(sess->last_target), "%s", created);
+        sess->last_target_is_new_empty = 1;
+        sess->last_target_default_lines = 0;
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "write");
+        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq,
+                                    &tc, "Creating the exact requested file.",
+                                    resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
+    if (!has_tool_resp && ServerIsAmbiguousCodingTask(query))
+    {
+        snprintf(content, sizeof(content),
+                 "Necesito concretar qué significa `optimizar`: objetivo medible (tiempo, memoria u otro), entrada representativa y criterio de aceptación. No voy a sustituir el programa por una plantilla ni modificar archivos sin esa evidencia.");
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                            content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
     /* Direct C code synthesis queries: respond with generated C code in markdown directly */
     if (ServerIsCodeSynthesisTask(query) && !ServerIsFileCreationTask(query))
     {
@@ -1929,8 +2114,27 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* 3. INITIATE AGENTIC CODING TASK ONLY IF CODING INTENT AND TOOLS ARE DECLARED */
-    if (is_coding && sess->declared_tools_count > 0)
+    if (is_coding && sess->declared_tools_count > 0 &&
+        !ServerIsFileCreationTask(query))
     {
+        char workdir[260];
+        OPENAI_TOOL_CALLS tc;
+        if (!ServerExtractWorkingDir(body, workdir, sizeof(workdir)))
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No puedo iniciar una tarea de código: OpenCode no declaró su directorio de trabajo. No he modificado archivos.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        if (!HasDeclaredTool(sess, "glob"))
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No puedo descubrir el workspace: OpenCode no declaró la herramienta `glob`. No he modificado archivos.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
         sess->agent_active = 1;
         sess->current_step_idx = 0;
         sess->had_error = 0;
@@ -1941,120 +2145,25 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->last_tool_call_name[0] = '\0';
         memset(&sess->last_diagnostic, 0, sizeof(sess->last_diagnostic));
         strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
+        sess->current_issue[sizeof(sess->current_issue) - 1] = '\0';
+        snprintf(sess->workspace_dir, sizeof(sess->workspace_dir), "%s", workdir);
+        sess->workspace_target[0] = '\0';
+        sess->workspace_build[0] = '\0';
+        sess->workspace_test[0] = '\0';
+        sess->workspace_phase = 1;
+        memset(&tc, 0, sizeof(tc));
+        tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "glob");
+        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                 "{\"pattern\":\"**/*\"}");
+        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "glob");
+        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq,
+                                    &tc, "Discovering the OpenCode workspace before planning.",
+                                    resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
 
-        int is_creation = ServerIsFileCreationTask(query);
-        int is_inspection = ServerIsInspectionTask(query);
-        int is_folder_glob = IsFolderOrGlobQuery(query);
-
-        /* Non-code file edits (.txt, .md, .json, etc.) skip build+test */
-        int is_noncode_edit = 0;
-        {
-            char lower_q[1024];
-            size_t j = 0;
-            while (query[j] != '\0' && j < sizeof(lower_q) - 1)
-            {
-                lower_q[j] = (char)tolower((unsigned char)query[j]);
-                j++;
-            }
-            lower_q[j] = '\0';
-            static const char *noncode_exts[] = {
-                ".txt", ".md", ".json", ".yml", ".yaml", ".toml",
-                ".csv", ".tsv", ".xml", ".html", ".css", ".log"
-            };
-            for (size_t e = 0; e < sizeof(noncode_exts) / sizeof(noncode_exts[0]); e++)
-            {
-                if (strstr(lower_q, noncode_exts[e]) != NULL)
-                {
-                    is_noncode_edit = 1;
-                    break;
-                }
-            }
-            /* Also detect "añade/agrega/add" + file pattern */
-            if (!is_noncode_edit &&
-                (strstr(lower_q, "añade") != NULL || strstr(lower_q, "agrega") != NULL ||
-                 strstr(lower_q, "add ") != NULL || strstr(lower_q, "escribe") != NULL ||
-                 strstr(lower_q, "write ") != NULL))
-            {
-                for (size_t e = 0; e < sizeof(noncode_exts) / sizeof(noncode_exts[0]); e++)
-                {
-                    if (strstr(lower_q, noncode_exts[e]) != NULL)
-                    {
-                        is_noncode_edit = 1;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (is_creation)
-        {
-            sess->current_plan.step_count = 1;
-            strncpy(sess->current_plan.goal_description, query, sizeof(sess->current_plan.goal_description) - 1);
-            sess->current_plan.initial_state = PRED_SYMBOL_KNOWN;
-            sess->current_plan.goal_state = PRED_PATCH_APPLIED;
-            sess->current_plan.steps[0].op = (STRIPS_OPERATOR){
-                .tool_id = OP_TOOL_REPLACE_CONTENT,
-                .preconditions = PRED_SYMBOL_KNOWN,
-                .add_effects = PRED_PATCH_APPLIED,
-                .del_effects = 0,
-                .cost = 1
-            };
-            strncpy(sess->current_plan.steps[0].op.name, "create_file", sizeof(sess->current_plan.steps[0].op.name) - 1);
-            strncpy(sess->current_plan.steps[0].op.description, "Create new file in workspace", sizeof(sess->current_plan.steps[0].op.description) - 1);
-        }
-        else
-        {
-            uint32_t goal = is_folder_glob ? PRED_FILE_LOCATED :
-                            (is_inspection ? PRED_CODE_INSPECTED :
-                            (is_noncode_edit ? PRED_PATCH_APPLIED :
-                            (PRED_BUILD_VERIFIED | PRED_TESTS_VERIFIED | PRED_TASK_COMPLETED)));
-
-            AGENT_PLANNER planner;
-            AgentPlannerInit(&planner);
-            AgentPlannerFormulate(&planner, query, PRED_SYMBOL_KNOWN,
-                                  goal,
-                                  &sess->current_plan);
-        }
-
-        /* Advance past any internal OP_TOOL_NONE operators */
-        while (sess->current_step_idx < sess->current_plan.step_count &&
-               sess->current_plan.steps[sess->current_step_idx].op.tool_id == OP_TOOL_NONE)
-        {
-            sess->current_step_idx++;
-        }
-
-        if (sess->current_step_idx < sess->current_plan.step_count)
-        {
-            const STRIPS_OPERATOR *first_op = &sess->current_plan.steps[sess->current_step_idx].op;
-            OPENAI_TOOL_CALLS tc;
-            FormatOperatorToolCall(sess, first_op, sess->current_issue, ++g_seq, &tc);
-            if (tc.count > 0)
-            {
-                strncpy(sess->last_tool_call_name, tc.calls[0].name, sizeof(sess->last_tool_call_name) - 1);
-                sess->last_tool_call_name[sizeof(sess->last_tool_call_name) - 1] = '\0';
-            }
-
-            const char *thought = is_creation ?
-                "Formulated file creation plan for workspace. Initiating write step." :
-                (is_inspection ?
-                "Formulated inspection plan for workspace. Initiating exploration." :
-                "Formulated STRIPS plan to resolve coding task. Initiating first step.");
-
-            if (ServerWantsStream(body))
-            {
-                char sse_local[16384];
-                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc, sse_local, sizeof(sse_local));
-                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
-            }
-            else
-            {
-                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
-                                            thought,
-                                            resp, sizeof(resp));
-                SendJson(s, 200, "OK", resp);
-            }
-            return;
-        }
     }
     else if (is_coding && sess->declared_tools_count == 0)
     {

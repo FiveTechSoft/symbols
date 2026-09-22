@@ -669,8 +669,77 @@ static void test_edit_and_diff_dispatch(void)
     TEST_ASSERT(strstr(tc.arguments, "README.md") != NULL, "read README.md");
 }
 
+
+static void TestWorkspacePlanningEvidence(void)
+{
+    char file[260], build[256], test[256];
+    const char *make_listing = "temp_conv.c\nMakefile\ntests/test_temp.c\n";
+    const char *cmake_listing = "src/main.c\nCMakeLists.txt\ntests/unit.c\n";
+
+    TEST_ASSERT(ServerSelectWorkspaceFile("corrige temp_conv.c", make_listing,
+                                          file, sizeof(file)) == 1,
+                "named source selected only from workspace listing");
+    TEST_ASSERT(strcmp(file, "temp_conv.c") == 0,
+                "selected named source is exact");
+    TEST_ASSERT(ServerSelectWorkspaceFile("corrige missing.c", make_listing,
+                                          file, sizeof(file)) == 0,
+                "missing named source fails closed");
+    TEST_ASSERT(file[0] == '\0',
+                "missing named source is never substituted silently");
+    TEST_ASSERT(ServerSelectWorkspaceFile("corrige el fallo", "Makefile\nREADME.md\n",
+                                          file, sizeof(file)) == 0,
+                "no invented source when listing has none");
+
+    TEST_ASSERT(ServerInferWorkspaceCommands(make_listing, build, sizeof(build),
+                                              test, sizeof(test)) == 1,
+                "Makefile build inferred from evidence");
+    TEST_ASSERT(strcmp(build, "make") == 0, "Makefile uses make, not CMake");
+    TEST_ASSERT(strcmp(test, "make test") == 0, "observed tests enable make test");
+    TEST_ASSERT(ServerInferWorkspaceCommands(cmake_listing, build, sizeof(build),
+                                              test, sizeof(test)) == 1,
+                "CMake commands inferred from CMake marker");
+    TEST_ASSERT(strstr(build, "cmake -S . -B build") != NULL,
+                "CMake configures explicit build directory");
+    TEST_ASSERT(ServerInferWorkspaceCommands("main.c\nREADME.md\n", build, sizeof(build),
+                                              test, sizeof(test)) == 0,
+                "no build command invented without build marker");
+    TEST_ASSERT(build[0] == '\0' && test[0] == '\0',
+                "unknown build system fails closed");
+
+    TEST_ASSERT(ServerIsAmbiguousCodingTask("Optimiza este programa") == 1,
+                "consequentially ambiguous optimization requires clarification");
+    TEST_ASSERT(ServerIsAmbiguousCodingTask("Optimiza parser.c para reducir memoria") == 0,
+                "named target and metric are actionable");
+
+    /* Authentic five-case envelopes: assert grounding/abstention protocol,
+       never encode the repair. */
+    TEST_ASSERT(ServerSelectWorkspaceFile(
+                    "Este programa en C no compila. Arréglalo para que compile y funcione. No cambies lo que calcula.",
+                    "temp_conv.c\n", file, sizeof(file)) == 1 &&
+                strcmp(file, "temp_conv.c") == 0,
+                "case 1 discovers its only observed source");
+    TEST_ASSERT(ServerSelectWorkspaceFile(
+                    "En este proyecto hay tests que fallan porque la función de texto.c está sin implementar. Implementa la función para que los tests pasen. No modifiques los tests.",
+                    "texto.c\ntexto.h\ntest_texto.c\nMakefile\n", file, sizeof(file)) == 1 &&
+                strcmp(file, "texto.c") == 0,
+                "case 2 binds the named implementation, not tests");
+    TEST_ASSERT(ServerSelectWorkspaceFile(
+                    "Al compilarlo con -fsanitize=address y ejecutarlo con varios números como argumentos, falla. Encuentra y corrige el fallo de memoria. El programa debe seguir calculando lo mismo.",
+                    "acumulador.c\n", file, sizeof(file)) == 1 &&
+                strcmp(file, "acumulador.c") == 0,
+                "case 3 discovers the ASan fixture without a leaked solution");
+    TEST_ASSERT(ServerSelectWorkspaceFile(
+                    "Añade un campo stock al producto, con stock 4 para el teclado, 10 para el ratón y 2 para el monitor, y una función que devuelva el valor total del inventario (precio multiplicado por stock de cada producto). Actualiza el main para que muestre ese total.",
+                    "inventario.h\ninventario.c\nmain.c\nMakefile\n", file, sizeof(file)) == 1,
+                "case 4 starts from an observed project source");
+    TEST_ASSERT(ServerIsAmbiguousCodingTask(
+                    "Los usuarios dicen que este programa tarda demasiado. Optimízalo.") == 1,
+                "case 5 clarifies or abstains instead of synthesizing a template");
+}
+
 int main(void)
 {
+    TestWorkspacePlanningEvidence();
     printf("======================================================================\n");
     printf("  TEST SUITE: OPENAI TOOL CALLING WIRE PROTOCOL (OPENCODE INTEGRATION)\n");
     printf("======================================================================\n");
