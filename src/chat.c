@@ -7394,19 +7394,13 @@ void ChatInit(CHAT *ch, const char *corpus_path)
         printf("[chat] episodic memory: %u persistent memories active\n", epi_loaded);
 }
 
-int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source)
+/* Normalize a learned relation token the same way learn does:
+   lowercase plus the canonical _de/_of suffixes. Forget must address
+   the exact relation form that learn persisted. */
+static void ChatNormRelation(const char *relation, char *rel_buf, size_t size)
 {
-    if (!ch || !subject || !relation || !object) return 0;
-
-    char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
-    ChatNormTok(subject, norm_s, sizeof(norm_s));
-    ChatNormTok(object, norm_o, sizeof(norm_o));
-    if (norm_s[0] == '\0' || norm_o[0] == '\0') return 0;
-    if (strcmp(norm_s, norm_o) == 0) return 0;
-
-    char rel_buf[CHAT_TOKEN_MAX];
-    strncpy(rel_buf, relation, sizeof(rel_buf) - 1);
-    rel_buf[sizeof(rel_buf) - 1] = '\0';
+    strncpy(rel_buf, relation, size - 1);
+    rel_buf[size - 1] = '\0';
     for (char *p = rel_buf; *p; p++)
     {
         *p = (char)tolower((unsigned char)*p);
@@ -7420,6 +7414,82 @@ int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const c
     else if (strcmp(rel_buf, "father") == 0) strcpy(rel_buf, "father_of");
     else if (strcmp(rel_buf, "brother") == 0) strcpy(rel_buf, "brother_of");
     else if (strcmp(rel_buf, "wife") == 0) strcpy(rel_buf, "wife_of");
+}
+
+static void ChatToLowerTok(const char *in, char *out, size_t size)
+{
+    size_t o = 0;
+    if (size == 0) return;
+    for (size_t i = 0; in[i] != '\0' && o + 1 < size; i++)
+    {
+        out[o++] = (char)tolower((unsigned char)in[i]);
+    }
+    out[o] = '\0';
+}
+
+static void ChatToUpperTok(const char *in, char *out, size_t size)
+{
+    size_t o = 0;
+    if (size == 0) return;
+    for (size_t i = 0; in[i] != '\0' && o + 1 < size; i++)
+    {
+        out[o++] = (char)toupper((unsigned char)in[i]);
+    }
+    out[o] = '\0';
+}
+
+/* Undo the session-side effects of one learned triple: the schema KB
+   pair evidence and the session text-graph edge. Vocabulary, schemas
+   and provenance stay (they record that learning happened). Caller
+   rebuilds the reasoning graph afterwards. */
+static void ChatScrubLearnedTriple(CHAT *ch, const char *norm_s,
+                                   const char *rel, const char *norm_o)
+{
+    char conn_buf[LEARN_MAX_LINE];
+    const char *conn = GenericRelToConn(rel, conn_buf, sizeof(conn_buf));
+    if (conn != NULL)
+    {
+        const char *family = LearnerConnFamily(conn);
+        char fam_buf[SCHEMA_TOKEN_MAX];
+        if (family != NULL)
+        {
+            char low_s[CHAT_TOKEN_MAX], low_o[CHAT_TOKEN_MAX];
+            strncpy(fam_buf, family, sizeof(fam_buf) - 1);
+            fam_buf[sizeof(fam_buf) - 1] = '\0';
+            ChatToLowerTok(norm_s, low_s, sizeof(low_s));
+            ChatToLowerTok(norm_o, low_o, sizeof(low_o));
+            SchemaRemovePair(&ch->kb, fam_buf, low_s, low_o);
+        }
+    }
+
+    if (ch->tgraph != NULL)
+    {
+        char up_s[128], up_r[128], up_o[128];
+        ChatToUpperTok(norm_s, up_s, sizeof(up_s));
+        ChatToUpperTok(rel, up_r, sizeof(up_r));
+        ChatToUpperTok(norm_o, up_o, sizeof(up_o));
+        SYMBOL_ID sid = SymbolFind(ch->tgraph->symbols, up_s);
+        SYMBOL_ID rid = SymbolFind(ch->tgraph->symbols, up_r);
+        SYMBOL_ID oid = SymbolFind(ch->tgraph->symbols, up_o);
+        if (sid != SYMBOL_INVALID && rid != SYMBOL_INVALID && oid != SYMBOL_INVALID)
+        {
+            GraphRemoveRelation(ch->tgraph, sid, rid, oid);
+        }
+    }
+}
+
+int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source)
+{
+    if (!ch || !subject || !relation || !object) return 0;
+
+    char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
+    ChatNormTok(subject, norm_s, sizeof(norm_s));
+    ChatNormTok(object, norm_o, sizeof(norm_o));
+    if (norm_s[0] == '\0' || norm_o[0] == '\0') return 0;
+    if (strcmp(norm_s, norm_o) == 0) return 0;
+
+    char rel_buf[CHAT_TOKEN_MAX];
+    ChatNormRelation(relation, rel_buf, sizeof(rel_buf));
 
     /* 1. Append to episodic store (auto-persists to disk) */
     int rc = EpisodicStoreAppend(&ch->episodic, norm_s, rel_buf, norm_o, source ? source : "user");
@@ -7455,10 +7525,63 @@ uint32_t ChatEpisodicCount(const CHAT *ch)
     return ch ? EpisodicStoreCount(&ch->episodic) : 0;
 }
 
-void ChatEpisodicClear(CHAT *ch)
+int ChatForgetTriple(CHAT *ch, const char *subject, const char *relation, const char *object)
 {
-    if (!ch) return;
-    EpisodicStoreClear(&ch->episodic);
+    if (!ch || !subject || !relation || !object) return 0;
+
+    char norm_s[CHAT_TOKEN_MAX], norm_o[CHAT_TOKEN_MAX];
+    ChatNormTok(subject, norm_s, sizeof(norm_s));
+    ChatNormTok(object, norm_o, sizeof(norm_o));
+    if (norm_s[0] == '\0' || norm_o[0] == '\0') return 0;
+
+    char rel_buf[CHAT_TOKEN_MAX];
+    ChatNormRelation(relation, rel_buf, sizeof(rel_buf));
+
+    /* Persistent store first: a forget that cannot reach disk changes
+       nothing, so the session never diverges from the saved memory. */
+    int rc = EpisodicStoreForget(&ch->episodic, norm_s, rel_buf, norm_o);
+    if (rc == 0) return -1; /* persistence failure; session untouched */
+    if (rc == 2) return 0;  /* not present in episodic memory */
+
+    ChatScrubLearnedTriple(ch, norm_s, rel_buf, norm_o);
+    ChatReasonSync(ch);
+    return 1;
+}
+
+int ChatEpisodicClear(CHAT *ch)
+{
+    if (!ch) return 0;
+
+    uint32_t n = EpisodicStoreCount(&ch->episodic);
+    EPISODIC_RECORD *snap = NULL;
+    if (n > 0)
+    {
+        snap = (EPISODIC_RECORD *)malloc(n * sizeof(EPISODIC_RECORD));
+        if (snap == NULL) return 0;
+        for (uint32_t i = 0; i < n; i++)
+        {
+            const EPISODIC_RECORD *rec = EpisodicStoreGet(&ch->episodic, i);
+            snap[i] = *rec;
+        }
+    }
+
+    /* Disk first: the session is scrubbed only after the empty store
+       is confirmed persisted. */
+    if (!EpisodicStoreClear(&ch->episodic))
+    {
+        free(snap);
+        return 0;
+    }
+
+    for (uint32_t i = 0; i < n; i++)
+    {
+        char rel_buf[CHAT_TOKEN_MAX];
+        ChatNormRelation(snap[i].relation, rel_buf, sizeof(rel_buf));
+        ChatScrubLearnedTriple(ch, snap[i].subject, rel_buf, snap[i].object);
+    }
+    free(snap);
+    ChatReasonSync(ch);
+    return 1;
 }
 
 const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx)

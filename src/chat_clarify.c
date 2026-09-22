@@ -257,11 +257,37 @@ void ClarifyHandle(CLARIFY *w, const char *line)
         return;
     }
 
+    /* Selective forgetting: /forget SUJETO RELACION OBJETO */
+    if (strncmp(line, "/forget ", 8) == 0 || strncmp(line, "/olvida ", 8) == 0 ||
+        strncmp(line, ":forget ", 8) == 0)
+    {
+        const char *p = strchr(line, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s_tok[64], r_tok[64], o_tok[64];
+        if (p && sscanf(p, "%63s %63s %63s", s_tok, r_tok, o_tok) == 3)
+        {
+            int rc = ChatForgetTriple(&w->ch, s_tok, r_tok, o_tok);
+            if (rc == 1)
+                printf("[memoria] Hecho olvidado: %s --%s--> %s (eliminado de la sesion y del disco).\n", s_tok, r_tok, o_tok);
+            else if (rc == 0)
+                printf("[memoria] Ese hecho no estaba en la memoria episodica: %s --%s--> %s.\n", s_tok, r_tok, o_tok);
+            else
+                printf("[memoria] No se pudo escribir la memoria en disco; el hecho sigue intacto.\n");
+        }
+        else
+        {
+            printf("Uso: /forget SUJETO RELACION OBJETO  (ej: /forget Juan hermano_de Pedro)\n");
+        }
+        return;
+    }
+
     if (strcmp(line, "/forget") == 0 || strcmp(line, "/olvida") == 0 ||
         strcmp(line, ":forget") == 0 || strcmp(line, "/clear-memory") == 0)
     {
-        ChatEpisodicClear(&w->ch);
-        printf("[memoria] Memoria episodica borrada tanto de la sesion como de disco.\n");
+        if (ChatEpisodicClear(&w->ch))
+            printf("[memoria] Memoria episodica borrada tanto de la sesion como de disco.\n");
+        else
+            printf("[memoria] No se pudo escribir la memoria en disco; sigue intacta.\n");
         return;
     }
 
@@ -287,6 +313,8 @@ void ClarifyHandle(CLARIFY *w, const char *line)
                 printf("[memoria] Hecho registrado: %s es %s de %s (guardado en memoria continua).\n", s, r, o);
                 return;
             }
+            printf("[memoria] No se pudo guardar el hecho de forma persistente; no quedo registrado.\n");
+            return;
         }
     }
 

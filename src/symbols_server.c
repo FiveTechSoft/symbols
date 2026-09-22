@@ -1439,10 +1439,14 @@ static void HandleCompletions(socket_t s, const char *body,
             if (rc)
             {
                 snprintf(content, sizeof(content), "[memoria] Hecho registrado: %s es %s de %s (guardado en memoria continua).", s_tok, r_tok, o_tok);
-                ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
-                SendJson(s, 200, "OK", resp);
-                return;
             }
+            else
+            {
+                snprintf(content, sizeof(content), "[memoria] No se pudo guardar el hecho de forma persistente; no quedo registrado.");
+            }
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
         }
     }
 
@@ -1475,12 +1479,40 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    /* Selective forgetting: /forget SUJETO RELACION OBJETO */
+    if (strncmp(query, "/forget ", 8) == 0 || strncmp(query, "/olvida ", 8) == 0 ||
+        strncmp(query, ":forget ", 8) == 0)
+    {
+        const char *p = strchr(query, ' ');
+        while (p && isspace((unsigned char)*p)) p++;
+        char s_tok[64], r_tok[64], o_tok[64];
+        if (p && sscanf(p, "%63s %63s %63s", s_tok, r_tok, o_tok) == 3)
+        {
+            int rc = ChatForgetTriple(&g_session, s_tok, r_tok, o_tok);
+            if (rc == 1)
+                snprintf(content, sizeof(content), "[memoria] Hecho olvidado: %s --%s--> %s (eliminado de la sesion y del disco).", s_tok, r_tok, o_tok);
+            else if (rc == 0)
+                snprintf(content, sizeof(content), "[memoria] Ese hecho no estaba en la memoria episodica: %s --%s--> %s.", s_tok, r_tok, o_tok);
+            else
+                snprintf(content, sizeof(content), "[memoria] No se pudo escribir la memoria en disco; el hecho sigue intacto.");
+        }
+        else
+        {
+            snprintf(content, sizeof(content), "Uso: /forget SUJETO RELACION OBJETO  (ej: /forget Juan hermano_de Pedro)");
+        }
+        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+        SendJson(s, 200, "OK", resp);
+        return;
+    }
+
     /* Episodic memory purge: /forget, /olvida */
     if (strcmp(query, "/forget") == 0 || strcmp(query, "/olvida") == 0 ||
         strcmp(query, ":forget") == 0 || strcmp(query, "/clear-memory") == 0)
     {
-        ChatEpisodicClear(&g_session);
-        snprintf(content, sizeof(content), "[memoria] Memoria episodica borrada tanto de la sesion como de disco.");
+        if (ChatEpisodicClear(&g_session))
+            snprintf(content, sizeof(content), "[memoria] Memoria episodica borrada tanto de la sesion como de disco.");
+        else
+            snprintf(content, sizeof(content), "[memoria] No se pudo escribir la memoria en disco; sigue intacta.");
         ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
         SendJson(s, 200, "OK", resp);
         return;

@@ -68,6 +68,13 @@ RELATION *GraphFindRelation(GRAPH *graph,
                             SYMBOL_ID relation,
                             SYMBOL_ID object);
 
+/* Remove one exact positive edge. Returns 1 when removed, 0 when
+   absent. Symbols stay (shared vocabulary); only the edge dies. */
+int GraphRemoveRelation(GRAPH *graph,
+                        SYMBOL_ID subject,
+                        SYMBOL_ID relation,
+                        SYMBOL_ID object);
+
 uint32_t GraphQuerySubject(const GRAPH *graph, SYMBOL_ID subject,
                            RELATION **results, uint32_t max_results);
 

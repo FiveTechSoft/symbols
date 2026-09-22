@@ -200,6 +200,50 @@ RELATION *RelationFindOpposite(RELATION_TABLE *table, SYMBOL_ID subject,
     return RelationFindPolar(table, subject, relation, object, opp);
 }
 
+static void RelationIndexReinsertAll(RELATION_INDEX *idx, const RELATION *items,
+                                     uint32_t count)
+{
+    memset(idx->buckets, 0xFF, idx->capacity * sizeof(uint32_t));
+    for (uint32_t i = 0; i < count; i++)
+    {
+        const RELATION *r = &items[i];
+        uint32_t h = HashTripletPolar(r->subject, r->relation, r->object, r->polarity) & idx->mask;
+        while (idx->buckets[h] != EMPTY_BUCKET)
+        {
+            h = (h + 1) & idx->mask;
+        }
+        idx->buckets[h] = i;
+    }
+}
+
+int RelationRemovePolar(RELATION_TABLE *table,
+                        SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
+                        RELATION_POLARITY polarity)
+{
+    if (!table || !table->idx || table->count == 0)
+        return 0;
+
+    RELATION *found = RelationFindPolar(table, subject, relation, object, polarity);
+    if (!found)
+        return 0;
+
+    uint32_t idx = (uint32_t)(found - table->items);
+    uint32_t last = table->count - 1;
+    if (idx != last)
+        table->items[idx] = table->items[last];
+    table->count--;
+
+    RelationIndexReinsertAll(table->idx, table->items, table->count);
+    SubjectIndexRebuild(table);
+    return 1;
+}
+
+int RelationRemove(RELATION_TABLE *table,
+                   SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object)
+{
+    return RelationRemovePolar(table, subject, relation, object, POLARITY_POSITIVE);
+}
+
 void RelationStrengthen(RELATION *relation, float amount)
 {
     if (!relation) return;

@@ -59,6 +59,17 @@ RELATION *RelationFindOpposite(RELATION_TABLE *table,
                                SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
                                RELATION_POLARITY polarity);
 
+/* Remove one exact (subject, relation, object) edge of one polarity.
+   Returns 1 when an edge was removed, 0 when it was absent. The hash
+   and subject indexes are rebuilt, so later finds stay exact. */
+int RelationRemovePolar(RELATION_TABLE *table,
+                        SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object,
+                        RELATION_POLARITY polarity);
+
+/* Remove the positive edge, mirroring RelationAdd. */
+int RelationRemove(RELATION_TABLE *table,
+                   SYMBOL_ID subject, SYMBOL_ID relation, SYMBOL_ID object);
+
 uint32_t RelationFindBySubject(const RELATION_TABLE *table, SYMBOL_ID subject,
                                RELATION **results, uint32_t max_results);
 

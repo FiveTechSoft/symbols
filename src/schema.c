@@ -317,6 +317,27 @@ int SchemaPresentPair(SCHEMA_KB *kb, const char *family,
     return 1;
 }
 
+int SchemaRemovePair(SCHEMA_KB *kb, const char *family,
+                     const char *subject, const char *object)
+{
+    if (kb == NULL || family == NULL || subject == NULL || object == NULL)
+        return 0;
+    for (uint32_t i = 0; i < kb->num_pairs; i++)
+    {
+        const PAIR_EVID *p = &kb->pairs[i];
+        if (strcmp(p->family, family) == 0 &&
+            strcmp(p->subject, subject) == 0 &&
+            strcmp(p->object, object) == 0)
+        {
+            memmove(&kb->pairs[i], &kb->pairs[i + 1],
+                    (kb->num_pairs - i - 1) * sizeof(PAIR_EVID));
+            kb->num_pairs--;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* ---- order check, two modes ---- */
 
 static int PairEvidence(const SCHEMA_KB *kb, const char *family,

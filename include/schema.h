@@ -106,6 +106,13 @@ int SchemaObserveExemplar(SCHEMA_KB *kb, const char *exemplar_id,
 int SchemaPresentPair(SCHEMA_KB *kb, const char *family,
                       const char *subject, const char *object);
 
+/* Remove one exact pair evidence (forgetting). Only the pair dies:
+   vocabulary stays (shared words), schemas and provenance stay (they
+   record that learning happened, never that the fact is believed).
+   Returns 1 when removed, 0 when the pair was not present. */
+int SchemaRemovePair(SCHEMA_KB *kb, const char *family,
+                     const char *subject, const char *object);
+
 /* ---- role lexicon (derivation rule, never asserted) ---- */
 void SchemaDeclareRole(SCHEMA_KB *kb, const char *token,
                        int dependent, int independent,

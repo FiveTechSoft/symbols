@@ -11,6 +11,7 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
+#include <windows.h>
 #define MKDIR(d) _mkdir(d)
 #else
 #include <sys/stat.h>
@@ -167,30 +168,127 @@ int EpisodicStoreAppend(EPISODIC_STORE *store, const char *subject, const char *
 
     if (store->auto_save)
     {
-        EpisodicStoreSave(store);
+        if (!EpisodicStoreSave(store))
+        {
+            /* Roll the append back: RAM must never claim more than disk. */
+            store->count--;
+            return 0;
+        }
     }
+    return 1;
+}
+
+/* Write one full store image to a sibling temporary file and rename it
+   over the target. The target is replaced in one atomic step, so a
+   crash or I/O error mid-write can never leave a truncated store
+   behind. Any failure removes the temporary file, leaves the previous
+   target untouched and returns 0. */
+static int WriteStoreAtomic(const char *filepath, const char *header,
+                            const EPISODIC_RECORD *records, uint32_t count)
+{
+    char tmp_path[520];
+    int ok = 1;
+
+    if (!filepath || filepath[0] == '\0') return 0;
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
+    tmp_path[sizeof(tmp_path) - 1] = '\0';
+
+    EnsureParentDir(filepath);
+
+    FILE *f = fopen(tmp_path, "w");
+    if (!f) return 0;
+
+    if (fprintf(f, "%s", header) < 0) ok = 0;
+    for (uint32_t i = 0; ok && i < count; i++)
+    {
+        const EPISODIC_RECORD *rec = &records[i];
+        if (fprintf(f, "%s\t%s\t%s\t%s\t%llu\n",
+                    rec->subject, rec->relation, rec->object,
+                    rec->source[0] ? rec->source : "user",
+                    (unsigned long long)rec->timestamp) < 0)
+        {
+            ok = 0;
+        }
+    }
+    if (ok && fflush(f) != 0) ok = 0;
+    if (fclose(f) != 0) ok = 0;
+
+    if (!ok)
+    {
+        remove(tmp_path);
+        return 0;
+    }
+
+#ifdef _WIN32
+    if (!MoveFileExA(tmp_path, filepath,
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    {
+        remove(tmp_path);
+        return 0;
+    }
+#else
+    if (rename(tmp_path, filepath) != 0)
+    {
+        remove(tmp_path);
+        return 0;
+    }
+#endif
     return 1;
 }
 
 int EpisodicStoreSave(const EPISODIC_STORE *store)
 {
     if (!store || store->filepath[0] == '\0') return 0;
-    EnsureParentDir(store->filepath);
+    return WriteStoreAtomic(store->filepath,
+                            "# symbols episodic memory store (TSV: subject \\t relation \\t object \\t source \\t timestamp)\n",
+                            store->records, store->count);
+}
 
-    FILE *f = fopen(store->filepath, "w");
-    if (!f) return 0;
+int EpisodicStoreForget(EPISODIC_STORE *store, const char *subject, const char *relation, const char *object)
+{
+    if (!store || !store->records || !subject || !relation || !object) return 0;
+    if (!EpisodicStoreExists(store, subject, relation, object)) return 2;
 
-    fprintf(f, "# symbols episodic memory store (TSV: subject \\t relation \\t object \\t source \\t timestamp)\n");
+    char s_low[EPISODIC_STR_MAX], r_low[EPISODIC_STR_MAX], o_low[EPISODIC_STR_MAX];
+    strncpy(s_low, subject, sizeof(s_low) - 1); s_low[sizeof(s_low) - 1] = '\0'; ToLowerStr(s_low);
+    strncpy(r_low, relation, sizeof(r_low) - 1); r_low[sizeof(r_low) - 1] = '\0'; ToLowerStr(r_low);
+    strncpy(o_low, object, sizeof(o_low) - 1); o_low[sizeof(o_low) - 1] = '\0'; ToLowerStr(o_low);
+
+    /* Append and Load deduplicate through EpisodicStoreExists, so at
+       most one record can match. */
+    uint32_t pos = store->count;
     for (uint32_t i = 0; i < store->count; i++)
     {
-        const EPISODIC_RECORD *rec = &store->records[i];
-        fprintf(f, "%s\t%s\t%s\t%s\t%llu\n",
-                rec->subject, rec->relation, rec->object,
-                rec->source[0] ? rec->source : "user",
-                (unsigned long long)rec->timestamp);
-    }
+        char cur_s[EPISODIC_STR_MAX], cur_r[EPISODIC_STR_MAX], cur_o[EPISODIC_STR_MAX];
+        strncpy(cur_s, store->records[i].subject, sizeof(cur_s) - 1); cur_s[sizeof(cur_s) - 1] = '\0'; ToLowerStr(cur_s);
+        strncpy(cur_r, store->records[i].relation, sizeof(cur_r) - 1); cur_r[sizeof(cur_r) - 1] = '\0'; ToLowerStr(cur_r);
+        strncpy(cur_o, store->records[i].object, sizeof(cur_o) - 1); cur_o[sizeof(cur_o) - 1] = '\0'; ToLowerStr(cur_o);
 
-    fclose(f);
+        if (strcmp(s_low, cur_s) == 0 && strcmp(r_low, cur_r) == 0 && strcmp(o_low, cur_o) == 0)
+        {
+            pos = i;
+            break;
+        }
+    }
+    if (pos >= store->count) return 2;
+
+    EPISODIC_RECORD removed = store->records[pos];
+    memmove(&store->records[pos], &store->records[pos + 1],
+            (store->count - pos - 1) * sizeof(EPISODIC_RECORD));
+    store->count--;
+
+    if (store->auto_save && !EpisodicStoreSave(store))
+    {
+        /* Persistence failed: restore the record so RAM matches disk. */
+        if (EnsureCapacity(store))
+        {
+            memmove(&store->records[pos + 1], &store->records[pos],
+                    (store->count - pos) * sizeof(EPISODIC_RECORD));
+            store->records[pos] = removed;
+            store->count++;
+        }
+        return 0;
+    }
     return 1;
 }
 
@@ -270,15 +368,15 @@ uint32_t EpisodicStoreLoad(EPISODIC_STORE *store)
 int EpisodicStoreClear(EPISODIC_STORE *store)
 {
     if (!store) return 0;
-    store->count = 0;
     if (store->filepath[0] != '\0')
     {
-        FILE *f = fopen(store->filepath, "w");
-        if (f)
+        if (!WriteStoreAtomic(store->filepath,
+                              "# symbols episodic memory store (cleared)\n",
+                              NULL, 0))
         {
-            fprintf(f, "# symbols episodic memory store (cleared)\n");
-            fclose(f);
+            return 0;
         }
     }
+    store->count = 0;
     return 1;
 }

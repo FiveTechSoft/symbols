@@ -101,8 +101,16 @@ void ChatDestroy(CHAT *ch);
 void ChatSetPersona(CHAT *ch, PERSONA_ID id);
 PERSONA_ID ChatGetPersona(const CHAT *ch);
 int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source);
+/* Forget one learned triple: removed from the persistent store
+   atomically first, then from the live session (schema pair, text
+   graph, rebuilt reasoning graph). Returns 1 forgotten, 0 not present,
+   -1 persistence failure (nothing changed). */
+int ChatForgetTriple(CHAT *ch, const char *subject, const char *relation, const char *object);
 uint32_t ChatEpisodicCount(const CHAT *ch);
-void ChatEpisodicClear(CHAT *ch);
+/* Clear all episodic memory: the empty store is persisted first, then
+   every learned fact is scrubbed from the live session. Returns 1 on
+   success, 0 on persistence failure (nothing changed). */
+int ChatEpisodicClear(CHAT *ch);
 const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);
 int ChatIsBinaryModel(const char *path);

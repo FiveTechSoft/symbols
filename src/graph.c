@@ -213,6 +213,25 @@ RELATION *GraphFindRelation(
     return RelationFind(graph->relations, subject, relation, object);
 }
 
+int GraphRemoveRelation(
+    GRAPH *graph,
+    SYMBOL_ID subject,
+    SYMBOL_ID relation,
+    SYMBOL_ID object)
+{
+    if (graph == NULL)
+        return 0;
+
+    if (subject == SYMBOL_INVALID ||
+        relation == SYMBOL_INVALID ||
+        object == SYMBOL_INVALID)
+    {
+        return 0;
+    }
+
+    return RelationRemove(graph->relations, subject, relation, object);
+}
+
 
 /* ============================================================
    Query: subject --?--> ?
