@@ -162,6 +162,9 @@ int ServerIsEditTask(const char *text);
 /* Detect edit verbs (with or without enclitics) — no file check */
 int ServerHasEditVerb(const char *text);
 
+/* Exact bounded intent: swap the two lines of the active file. */
+int ServerIsSwapLinesTask(const char *text);
+
 /* Extract only tokens with recognized file extensions (for last_target tracking).
    Returns 1 if a file reference was found, 0 otherwise. */
 int ServerExtractFileRef(const char *text, char *out, size_t n);

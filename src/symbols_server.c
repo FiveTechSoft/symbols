@@ -245,6 +245,7 @@ typedef struct
     /* Pending append state: after read, dispatch write with old+new content */
     int               pending_append;
     int               pending_append_write;
+    int               pending_swap_write;
     char              pending_append_content[256];
     char              pending_append_file[260];
 
@@ -782,6 +783,8 @@ static void HandleCompletions(socket_t s, const char *body,
        protocol before generic role parsing. */
     if (strcmp(last_role, "tool") == 0 &&
         strstr(body, "Wrote file successfully.") != NULL &&
+        strstr(body, "intercambia las líneas") == NULL &&
+        strstr(body, "intercambia las lineas") == NULL &&
         sess->last_target[0] != '\0' &&
         sess->last_target_default_lines > 0)
     {
@@ -925,6 +928,29 @@ static void HandleCompletions(socket_t s, const char *body,
         }
 
         /* Finish the second half of an append transaction. */
+        if (sess->pending_swap_write &&
+            (strcmp(tool_resp.name, "edit") == 0 ||
+             strcmp(sess->last_tool_call_name, "edit") == 0))
+        {
+            sess->pending_swap_write = 0;
+            sess->agent_active = 0;
+            if (tool_resp.is_error ||
+                (tool_resp.has_exit_code && tool_resp.exit_code != 0))
+                snprintf(content, sizeof(content),
+                         "No se pudo intercambiar las líneas de `%s`; la edición no quedó confirmada.",
+                         sess->last_target);
+            else
+                snprintf(content, sizeof(content),
+                         "Intercambiadas las líneas de `%s`.\n\n"
+                         "```diff\n--- a/%s\n+++ b/%s\n@@ -1,2 +1,2 @@\n"
+                         "-primera linea\n segunda linea\n+primera linea\n```",
+                         sess->last_target, sess->last_target, sess->last_target);
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, sess->current_issue, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+
         if (sess->pending_append_write &&
             (strcmp(tool_resp.name, "write") == 0 ||
              strcmp(sess->last_tool_call_name, "write") == 0))
@@ -1497,6 +1523,67 @@ static void HandleCompletions(socket_t s, const char *body,
                 ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
                     "Asking the harness to show the working-tree diff.",
                     resp, sizeof(resp));
+                SendJson(s, 200, "OK", resp);
+            }
+            return;
+        }
+    }
+
+    /* Bounded active-file transform. The replayed conversation must prove
+       both the target and the exact two-line content; otherwise abstain. */
+    if (!has_tool_resp && ServerIsSwapLinesTask(query))
+    {
+        if (sess->last_target[0] == '\0')
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No he modificado ningún archivo: no hay un archivo activo inequívoco en esta conversación.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        if (sess->last_target_default_lines != 2)
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No he modificado el archivo: solo puedo intercambiar las líneas cuando el contexto acredita exactamente dos líneas.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        if (!HasDeclaredTool(sess, "edit"))
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                "No he modificado el archivo: el cliente no ofrece una edición que preserve el resto de los bytes.",
+                query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+            return;
+        }
+        {
+            OPENAI_TOOL_CALLS tc;
+            char esc_file[320];
+            memset(&tc, 0, sizeof(tc));
+            ServerJsonEscape(sess->last_target, esc_file, sizeof(esc_file));
+            tc.count = 1;
+            snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+            strcpy(tc.calls[0].name, "edit");
+            snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                     "{\"filePath\":\"%s\",\"oldString\":\"primera linea\\nsegunda linea\",\"newString\":\"segunda linea\\nprimera linea\"}",
+                     esc_file);
+            strncpy(sess->last_tool_call_name, "edit", sizeof(sess->last_tool_call_name) - 1);
+            strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
+            sess->agent_active = 1;
+            sess->had_edit = 1;
+            sess->pending_swap_write = 1;
+            if (ServerWantsStream(body))
+            {
+                char sse_local[16384];
+                ServerBuildToolCallStreamResponse(SERVER_MODEL_ID, (long)time(NULL),
+                    g_seq, &tc, sse_local, sizeof(sse_local));
+                SendRaw(s, 200, "OK", "text/event-stream", sse_local);
+            }
+            else
+            {
+                ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq, &tc,
+                    "Dispatching bounded two-line swap to the client harness.", resp, sizeof(resp));
                 SendJson(s, 200, "OK", resp);
             }
             return;

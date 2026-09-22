@@ -1857,6 +1857,25 @@ int ServerHasEditVerb(const char *text)
     return MatchEditVerb(lower);
 }
 
+int ServerIsSwapLinesTask(const char *text)
+{
+    char lower[1024];
+    size_t i = 0;
+    if (text == NULL || text[0] == '\0')
+        return 0;
+    while (text[i] != '\0' && i < sizeof(lower) - 1)
+    {
+        lower[i] = (char)tolower((unsigned char)text[i]);
+        i++;
+    }
+    lower[i] = '\0';
+    return strstr(lower, "intercambia las líneas") != NULL ||
+           strstr(lower, "intercambia las lineas") != NULL ||
+           strstr(lower, "intercambiar las líneas") != NULL ||
+           strstr(lower, "intercambiar las lineas") != NULL ||
+           strstr(lower, "swap the lines") != NULL;
+}
+
 int ServerIsEditTask(const char *text)
 {
     char lower[1024];

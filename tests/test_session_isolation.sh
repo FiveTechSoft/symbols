@@ -69,6 +69,13 @@ post a6_append2_tool.json >"$TMPD/a6.out"
 assert_contains a2 'Creado' 'session A turn 1 creates test.txt'
 assert_contains a4 'primera linea' 'session A turn 2 appends primera linea'
 assert_contains a6 'segunda linea' 'session A turn 3 appends segunda linea'
+post a7_swap_user.json    >"$TMPD/a7.out"
+post a8_swap_tool.json    >"$TMPD/a8.out"
+assert_contains a7 '"name":"edit"' 'authentic swap prompt dispatches edit instead of corpus QA'
+assert_contains a7 'primera linea\\nsegunda linea' 'swap requires the exact known two-line sequence'
+assert_contains a7 'segunda linea\\nprimera linea' 'swap reverses only the two lines'
+assert_contains a8 'Intercambiadas las líneas' 'confirmed swap gets a bounded conversational result'
+assert_contains a8 '@@ -1,2 +1,2 @@' 'confirmed swap gets a bounded two-line diff'
 
 # Session B: independent client, same server process, afterwards
 post b1_create_user.json  >"$TMPD/b1.out"

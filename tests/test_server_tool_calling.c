@@ -597,6 +597,12 @@ static void test_edit_and_diff_dispatch(void)
     TEST_ASSERT(ServerIsEditTask("modifica README.md") == 1, "modifica FILE");
     TEST_ASSERT(ServerIsEditTask("crea un fichero notas.txt") == 0, "create is not edit");
     TEST_ASSERT(ServerIsEditTask("fix the leak in parser.c") == 0, "fix stays STRIPS");
+    TEST_ASSERT(ServerIsSwapLinesTask("intercambia las líneas") == 1,
+                "authentic Spanish swap intent");
+    TEST_ASSERT(ServerIsSwapLinesTask("swap the lines") == 1,
+                "English swap intent");
+    TEST_ASSERT(ServerIsSwapLinesTask("intercambia columnas") == 0,
+                "unbounded interchange is not a line swap");
 
     TEST_ASSERT(ServerExtractEditSpec("cambia foo por bar en main.c",
                                       file, sizeof(file), old_s, sizeof(old_s),
