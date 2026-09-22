@@ -320,7 +320,7 @@ static void test_large_and_interleaved_output(void)
     const char *large_cmd =
         "powershell.exe -NoProfile -Command \"[Console]::Out.Write('O'*100000); [Console]::Error.Write('E'*100000)\"";
     const char *mixed_cmd =
-        "powershell.exe -NoProfile -Command \"1..5000 | %% { [Console]::Out.WriteLine('OUT'); [Console]::Error.WriteLine('ERR') }\"";
+        "powershell.exe -NoProfile -Command \"1..5000 | ForEach-Object { [Console]::Out.WriteLine('OUT'); [Console]::Error.WriteLine('ERR') }\"";
 #else
     const char *large_cmd =
         "head -c 100000 /dev/zero | tr '\\0' O; head -c 100000 /dev/zero | tr '\\0' E >&2";
