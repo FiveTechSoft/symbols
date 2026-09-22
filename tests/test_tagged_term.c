@@ -196,12 +196,13 @@ static void test_trail_semantics(void)
                                                 su efecto secundario */
     assert(init_ok == 1);
     uint32_t ok = 0;
+    Term cells[5];
     for (uint32_t i = 0; i < 5; i++)
     {
-        Term cell;
-        Term v = tt_var(&cell);
+        Term v = tt_var(&cells[i]);
         Term av = tt_atom(100 + i);
-        /* unify en dos pasos: var libre en su propia pila */
+        /* The trail retains cell addresses until restore: keep every cell in
+           scope for the complete backtracking transaction. */
         if (tt_unify(v, av, &tiny))
             ok++;
     }

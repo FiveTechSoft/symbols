@@ -70,6 +70,10 @@ if(MSVC)
         strcasecmp=_stricmp
         strncasecmp=_strnicmp
     )
+    # Core value types intentionally carry bounded arenas (CHAT, PATCH_PLAN,
+    # SWE_BENCH_RESULT). Propagate an explicit stack reserve to every MSVC
+    # executable instead of relying on the 1 MiB linker default.
+    target_link_options(symbolic INTERFACE "/STACK:8388608")
 endif()
 if(NOT MSVC)
     target_link_libraries(symbolic PUBLIC m)
