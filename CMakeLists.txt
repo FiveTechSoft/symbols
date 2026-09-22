@@ -169,6 +169,10 @@ if(UNIX)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_shell_routing.sh
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_shell_routing_e2e PROPERTIES SKIP_RETURN_CODE 77)
+    add_test(NAME test_opencode_repository_stream_e2e
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_opencode_repository_stream.sh
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_opencode_repository_stream_e2e PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME test_git_inquiry_e2e
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_git_inquiry_e2e.sh
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

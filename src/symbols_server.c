@@ -747,6 +747,44 @@ static ServerSession *GetOrCreateSession(const char *session_id)
     return &g_sessions[oldest_idx];
 }
 
+static int SendToolCallsForRequest(socket_t s, const char *body,
+                                   unsigned long seq,
+                                   const OPENAI_TOOL_CALLS *calls,
+                                   const char *content, char *json, size_t jsonsz,
+                                   char *sse, size_t ssesz)
+{
+    if (ServerWantsStream(body))
+    {
+        if (!ServerBuildToolCallStreamResponse(SERVER_MODEL_ID,
+                                               (long)time(NULL), seq, calls,
+                                               sse, ssesz))
+            return 0;
+        return SendRaw(s, 200, "OK", "text/event-stream", sse);
+    }
+    if (!ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), seq,
+                                     calls, content, json, jsonsz))
+        return 0;
+    return SendJson(s, 200, "OK", json);
+}
+
+static int SendContentForRequest(socket_t s, const char *body,
+                                 unsigned long seq, const char *content,
+                                 const char *query, char *json, size_t jsonsz,
+                                 char *sse, size_t ssesz)
+{
+    if (ServerWantsStream(body))
+    {
+        if (!ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), seq,
+                                       content, sse, ssesz))
+            return 0;
+        return SendRaw(s, 200, "OK", "text/event-stream", sse);
+    }
+    if (!ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), seq, content,
+                             query, json, jsonsz))
+        return 0;
+    return SendJson(s, 200, "OK", json);
+}
+
 static void HandleCompletions(socket_t s, const char *body,
                               const char *corpus)
 {
@@ -1031,9 +1069,8 @@ static void HandleCompletions(socket_t s, const char *body,
             snprintf(content, sizeof(content),
                      "No puedo planificar el cambio: no se pudo descubrir el workspace de OpenCode (%s). No he modificado archivos.",
                      sess->workspace_dir[0] ? sess->workspace_dir : "cwd desconocido");
-            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                                content, sess->current_issue, resp, sizeof(resp));
-            SendJson(s, 200, "OK", resp);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
         ServerInferWorkspaceCommands(tool_resp.content,
@@ -1048,9 +1085,8 @@ static void HandleCompletions(socket_t s, const char *body,
             snprintf(content, sizeof(content),
                      "He descubierto el workspace `%s`, pero la evidencia no identifica un archivo fuente inequívoco para esta tarea. No he inventado una ruta ni modificado archivos.",
                      sess->workspace_dir);
-            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                                content, sess->current_issue, resp, sizeof(resp));
-            SendJson(s, 200, "OK", resp);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
         if (!HasDeclaredTool(sess, "read"))
@@ -1059,9 +1095,8 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
                      "El workspace se descubrió, pero OpenCode no declaró una herramienta de lectura. No he modificado archivos.");
-            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                                content, sess->current_issue, resp, sizeof(resp));
-            SendJson(s, 200, "OK", resp);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                                  resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
         memset(&tc, 0, sizeof(tc));
@@ -1072,10 +1107,9 @@ static void HandleCompletions(socket_t s, const char *body,
                  "{\"filePath\":\"%s\"}", sess->workspace_target);
         snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "read");
         sess->workspace_phase = 2;
-        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq,
-                                    &tc, "Inspecting source selected from workspace evidence.",
-                                    resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                "Inspecting source selected from workspace evidence.",
+                                resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 2)
@@ -1096,9 +1130,8 @@ static void HandleCompletions(socket_t s, const char *body,
                      "He ligado la tarea al workspace `%s`, inspeccionado `%s` e inferido `%s` desde sus archivos. Aún no hay evidencia suficiente para producir un parche general seguro; no he modificado archivos.",
                      sess->workspace_dir, sess->workspace_target,
                      sess->workspace_build);
-        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                            content, sess->current_issue, resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
+                              resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
 
@@ -2089,9 +2122,8 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         snprintf(content, sizeof(content),
                  "Necesito concretar qué significa `optimizar`: objetivo medible (tiempo, memoria u otro), entrada representativa y criterio de aceptación. No voy a sustituir el programa por una plantilla ni modificar archivos sin esa evidencia.");
-        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                            content, query, resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        SendContentForRequest(s, body, ++g_seq, content, query,
+                              resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
 
@@ -2160,10 +2192,9 @@ static void HandleCompletions(socket_t s, const char *body,
         snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
                  "{\"pattern\":\"**/*\"}");
         snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "glob");
-        ServerBuildToolCallResponse(SERVER_MODEL_ID, (long)time(NULL), g_seq,
-                                    &tc, "Discovering the OpenCode workspace before planning.",
-                                    resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                "Discovering the OpenCode workspace before planning.",
+                                resp, sizeof(resp), sse, sizeof(sse));
         return;
 
     }
