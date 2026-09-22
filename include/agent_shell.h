@@ -9,7 +9,7 @@
      2. Hard Timeout Protection: Microsecond-precision timer with guaranteed
         process termination (prevents infinite loops in test runners).
      3. Dual Stream Capture: Discrete stdout and stderr buffers (up to 64KB)
-        for surgical abductive compiler diagnostic parsing.
+        with continuous drainage, total-byte counts, and truncation flags.
      4. High-Precision Telemetry: Nanosecond/microsecond wall-clock tracking.
    ============================================================ */
 
@@ -46,6 +46,11 @@ typedef struct
     bool     timed_out;
     bool     execution_failed;
     char     backend_name[32];
+    /* Full stream sizes can exceed the fixed capture buffers. */
+    size_t   stdout_total_len;
+    size_t   stderr_total_len;
+    bool     stdout_truncated;
+    bool     stderr_truncated;
 } SHELL_EXEC_RESULT;
 
 /* Initialize an execution result structure */

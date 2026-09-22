@@ -8,6 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#ifndef _WIN32
+#include <errno.h>
+#include <signal.h>
+#include <unistd.h>
+#endif
 #include "agent_shell.h"
 #include "agent_diagnose.h"
 #include "agent_runner.h"
@@ -271,6 +276,118 @@ static void test_swe_bench_shell_integration(void)
     remove(target_file);
 }
 
+
+/* ============================================================
+   Adversarial process-control regression tests
+   ============================================================ */
+static void test_invalid_working_directory_fails_closed(void)
+{
+    SHELL_EXEC_RESULT res;
+    const char *effect = "agent_shell_invalid_cwd_effect.tmp";
+    int ok;
+    remove(effect);
+#ifdef _WIN32
+    ok = AgentShellExec("echo SHOULD_NOT_RUN>agent_shell_invalid_cwd_effect.tmp",
+                        "agent_shell_cwd_that_does_not_exist", 1000, &res);
+#else
+    ok = AgentShellExec("printf SHOULD_NOT_RUN > agent_shell_invalid_cwd_effect.tmp",
+                        "agent_shell_cwd_that_does_not_exist", 1000, &res);
+#endif
+    TEST_ASSERT(ok == 0, "Invalid cwd is rejected before process launch");
+    TEST_ASSERT(res.execution_failed, "Invalid cwd marks execution_failed");
+    TEST_ASSERT(fopen(effect, "rb") == NULL, "Invalid cwd command produced no side effect");
+    remove(effect);
+}
+
+static void test_large_and_interleaved_output(void)
+{
+    SHELL_EXEC_RESULT res;
+    int ok;
+#ifdef _WIN32
+    const char *large_cmd =
+        "powershell.exe -NoProfile -Command \"[Console]::Out.Write('O'*100000); [Console]::Error.Write('E'*100000)\"";
+    const char *mixed_cmd =
+        "powershell.exe -NoProfile -Command \"1..5000 | %% { [Console]::Out.WriteLine('OUT'); [Console]::Error.WriteLine('ERR') }\"";
+#else
+    const char *large_cmd =
+        "head -c 100000 /dev/zero | tr '\\0' O; head -c 100000 /dev/zero | tr '\\0' E >&2";
+    const char *mixed_cmd =
+        "i=0; while [ $i -lt 5000 ]; do echo OUT; echo ERR >&2; i=$((i+1)); done";
+#endif
+    ok = AgentShellExec(large_cmd, ".", 10000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out,
+                "Large dual-stream output completes without false timeout");
+    TEST_ASSERT(res.stdout_len == SHELL_BUFFER_MAX - 1 && res.stderr_len == SHELL_BUFFER_MAX - 1,
+                "Large output fills bounded capture buffers");
+    TEST_ASSERT(res.stdout_total_len == 100000 && res.stderr_total_len == 100000,
+                "Large output reports exact total byte counts");
+    TEST_ASSERT(res.stdout_truncated && res.stderr_truncated,
+                "Large output explicitly signals both stream truncations");
+
+    ok = AgentShellExec(mixed_cmd, ".", 10000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out,
+                "Interleaved stdout/stderr completes without deadlock");
+    TEST_ASSERT(res.stdout_total_len >= 20000 && res.stderr_total_len >= 20000,
+                "Interleaved output drains both streams");
+    TEST_ASSERT(strstr(res.stdout_buf, "OUT") != NULL && strstr(res.stderr_buf, "ERR") != NULL,
+                "Interleaved output remains separated by stream");
+}
+
+static void test_timeout_terminates_process_tree(void)
+{
+    SHELL_EXEC_RESULT res;
+#ifdef _WIN32
+    int ok = AgentShellExec(
+        "start /b powershell.exe -NoProfile -Command \"Start-Sleep -Seconds 30\" & ping 127.0.0.1 -n 30 >nul",
+        ".", 200, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124,
+                "Windows timeout terminates the assigned Job Object");
+#else
+    const char *pid_file = "agent_shell_background.pid";
+    FILE *f;
+    long child_pid = -1;
+    int alive;
+    int ok;
+    remove(pid_file);
+    ok = AgentShellExec("sleep 30 & echo $! > agent_shell_background.pid; wait",
+                        ".", 200, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124,
+                "POSIX timeout marks process tree termination");
+    f = fopen(pid_file, "rb");
+    if (f)
+    {
+        (void)fscanf(f, "%ld", &child_pid);
+        fclose(f);
+    }
+    alive = child_pid > 0 && (kill((pid_t)child_pid, 0) == 0 || errno != ESRCH);
+#if defined(__linux__)
+    /* A killed orphan can briefly remain as a zombie until init reaps it. */
+    if (alive)
+    {
+        char proc_path[64];
+        char proc_line[256];
+        char state = '\0';
+        FILE *proc;
+        snprintf(proc_path, sizeof(proc_path), "/proc/%ld/stat", child_pid);
+        proc = fopen(proc_path, "rb");
+        if (proc && fgets(proc_line, sizeof(proc_line), proc))
+        {
+            char *after_name = strrchr(proc_line, ')');
+            if (after_name && after_name[1] == ' ')
+                state = after_name[2];
+        }
+        if (proc)
+            fclose(proc);
+        if (state == 'Z')
+            alive = 0;
+    }
+#endif
+    TEST_ASSERT(child_pid > 0, "Background child PID was recorded before timeout");
+    TEST_ASSERT(!alive, "Background child does not survive process-group timeout");
+    remove(pid_file);
+#endif
+}
+
 int main(void)
 {
     printf("======================================================================\n");
@@ -282,6 +399,9 @@ int main(void)
     test_stderr_and_exit_code();
     test_timeout_termination();
     test_working_directory();
+    test_invalid_working_directory_fails_closed();
+    test_large_and_interleaved_output();
+    test_timeout_terminates_process_tree();
     test_abductive_diagnostic_integration();
     test_swe_bench_shell_integration();
 
