@@ -74,10 +74,13 @@ post a8_swap_tool.json    >"$TMPD/a8.out"
 assert_contains a7 '"name":"edit"' 'authentic swap prompt dispatches edit instead of corpus QA'
 assert_contains a7 'primera linea\\nsegunda linea' 'swap requires the exact known two-line sequence'
 assert_contains a7 'segunda linea\\nprimera linea' 'swap reverses only the two lines'
+[ "$(grep -o '"finish_reason":"tool_calls"' "$TMPD/a7.out" | wc -l)" -eq 1 ] || { echo "FAIL: swap prompt must produce exactly one edit tool call"; fail=1; }
 assert_contains a8 'Intercambiadas las líneas' 'confirmed swap gets a bounded conversational result'
 assert_contains a8 '@@ -1,2 +1,2 @@' 'confirmed swap gets a bounded two-line diff'
 assert_not_contains a8 '"finish_reason":"tool_calls"' 'swap continuation never redispatches edit'
 [ "$(grep -o 'Intercambiadas las líneas' "$TMPD/a8.out" | wc -l)" -eq 1 ] || { echo "FAIL: swap continuation must have exactly one final confirmation"; fail=1; }
+[ "$(grep -o '"finish_reason":"stop"' "$TMPD/a8.out" | wc -l)" -eq 1 ] || { echo "FAIL: swap continuation must have exactly one final SSE stop"; fail=1; }
+[ "$(grep -o 'data: \[DONE\]' "$TMPD/a8.out" | wc -l)" -eq 1 ] || { echo "FAIL: swap continuation must terminate one SSE stream"; fail=1; }
 
 # Session B: independent client, same server process, afterwards
 post b1_create_user.json  >"$TMPD/b1.out"

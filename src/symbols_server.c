@@ -878,9 +878,18 @@ static void HandleCompletions(socket_t s, const char *body,
                      "Intercambiadas las líneas de `test.txt`.\n\n"
                      "```diff\n--- a/test.txt\n+++ b/test.txt\n"
                      "@@ -1,2 +1,2 @@\n-primera linea\n segunda linea\n+primera linea\n```");
-        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                            content, query, resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        if (ServerWantsStream(body))
+        {
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                      content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
         return;
     }
 
@@ -938,9 +947,18 @@ static void HandleCompletions(socket_t s, const char *body,
         else
             snprintf(content, sizeof(content),
                      "The shell tool returned no output or exit status.");
-        ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                            content, query, resp, sizeof(resp));
-        SendJson(s, 200, "OK", resp);
+        if (ServerWantsStream(body))
+        {
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                      content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
         return;
     }
 
