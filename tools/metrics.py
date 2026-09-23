@@ -206,6 +206,29 @@ def m_rules():
     return {"rules": rows, "rules_stale": stale, "tables": tables}
 
 
+# 5b. Engineering task bank -------------------------------------------------------
+def m_bank():
+    """Engineering bank through tools/bank_harness.py (agent run + self-test)."""
+    h = ROOT / "tools" / "bank_harness.py"
+    if not (ROOT / "tests" / "fixtures" / "engineering_bank" / "index.tsv").is_file():
+        return {"bank_note": "not measured (bank missing)"}
+    agent = BUILD / ("symbols-agent.exe" if os.name == "nt" else "symbols-agent")
+    if not agent.is_file():
+        return {"bank_note": "not measured (`symbols-agent` not built)"}
+    rc, out = run([sys.executable, str(h), "--agent", f"{agent} -w {{workdir}} {{task}}"], timeout=1800)
+    try:
+        res = json.loads(next(l for l in out.splitlines() if l.startswith("{")))
+    except (ValueError, StopIteration):
+        return {"bank_note": "not measured (harness output unreadable)"}
+    rc2, out2 = run([sys.executable, str(h), "--self-test"], timeout=1800)
+    try:
+        st = json.loads(next(l for l in out2.splitlines() if l.startswith("{")))
+        res["self_test"] = f"self-test {st['tasks_passed']}/{st['tasks_total']}"
+    except (ValueError, StopIteration, KeyError):
+        res["self_test"] = "self-test unreadable"
+    return res
+
+
 # 6. GitHub CI for the commit -----------------------------------------------------
 def m_ci(sha):
     try:
@@ -260,7 +283,16 @@ def render(m):
     e = m.get("edit", {})
     if e:
         L.append(f"| C edit operator (OpenCode) | {e['edit_asserts_passed']} asserts pass, {e['edit_asserts_failed']} fail | `test_c_edit_ops` |")
-    L.append("| Varied engineering task bank (bug fix, rename, multi-file...) | not measured | does not exist yet; see ROADMAP |")
+    b = m.get("bank")
+    if b and "tasks_total" in b:
+        cats = ", ".join(f"{k} {v}" for k, v in b["passed_by_category"].items())
+        L.append(f"| Engineering task bank ({b['tasks_total']} tasks, {len(b['passed_by_category'])} categories) | "
+                 f"`symbols-agent`: {b['tasks_passed']}/{b['tasks_total']} pass ({pct(b['pass_rate'])}), "
+                 f"{b['wrong_edits']} wrong edits, {b['untouched']} untouched; by category: {cats} | "
+                 f"`tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, "
+                 f"{b.get('self_test', 'not run')}) |")
+    else:
+        L.append(f"| Engineering task bank | {(b or {}).get('bank_note', 'not measured')} | `tools/bank_harness.py` |")
     L.append("| Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |")
     ci = m.get("ci", {})
     if "ci_jobs" in ci:
@@ -293,6 +325,7 @@ def main():
         finally:
             srv.kill(); srv.wait()
     shutil.rmtree(tmp, ignore_errors=True)
+    m["bank"] = m_bank()
     m["rules"] = m_rules()
     if "--ci" in sys.argv:
         m["ci"] = m_ci(sha)
