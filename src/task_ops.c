@@ -2011,9 +2011,32 @@ typedef struct
 
 static int write_file(const char *root, const char *rel, const char *data);
 
-static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, RELOP_HIT *hit)
+/* Anchors: identifiers the task names that the workspace knows (code-shaped
+   or a defined function). A swap is only tried on a line holding an anchor;
+   no anchor = abstain. The mutation corpus showed that exit 0 alone picks a
+   wrong swap about half the time (phase 2). */
+static int line_has_anchor(const char *line, size_t ll, const TASK_TOKEN *an, int na)
+{
+    for (int a = 0; a < na; a++) {
+        size_t al = strlen(an[a].text);
+        for (size_t i = 0; i + al <= ll; i++)
+            if (!strncmp(line + i, an[a].text, al) && (i == 0 || !ident_char((unsigned char)line[i - 1])) &&
+                (i + al == ll || !ident_char((unsigned char)line[i + al])))
+                return 1;
+    }
+    return 0;
+}
+
+static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, RELOP_HIT *hit)
 {
     int builds = 0;
+    TASK_TOKEN an[64];
+    int na = 0, nt = lex_code_tokens_g(task ? task : "", an, 64, ws);
+    for (int k = 0; k < nt; k++)
+        if (TaskOpsCountToken(ws, an[k].text) > 0)
+            an[na++] = an[k];
+    if (na == 0)
+        return 0;
     for (int tier = 1; tier <= 3; tier++) {
         int found = 0;
         for (int f = 0; f < ws->count; f++) {
@@ -2021,13 +2044,22 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, RELOP_H
             if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test"))
                 continue;   /* never flip a test's own comparison to make it pass */
             const char *line = F->data;
+            int depth = 0, in_fn = 0;   /* inside the body of a function whose head holds an anchor */
             while (line && *line) {
                 const char *nl = strchr(line, '\n');
                 size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+                int anchored = line_has_anchor(line, ll, an, na);
+                if (depth == 0)
+                    in_fn = anchored;
+                for (size_t q = 0; q < ll; q++)
+                    depth += line[q] == '{' ? 1 : line[q] == '}' ? -1 : 0;
+                if (depth < 0) depth = 0;
+                int eligible = anchored || in_fn;
+                if (depth == 0 && !anchored) in_fn = 0;
                 const char *t0 = line;
                 while (t0 < line + ll && isspace((unsigned char)*t0)) t0++;
                 CTOK t[256];
-                int n = (*t0 == '#' || (t0[0] == '/' && (t0[1] == '/' || t0[1] == '*'))) ? 0 : ctok_lex(line, ll, t, 256);
+                int n = !eligible ? 0 : (*t0 == '#' || (t0[0] == '/' && (t0[1] == '/' || t0[1] == '*'))) ? 0 : ctok_lex(line, ll, t, 256);
                 for (int k = 0; k < n; k++) {
                     int is_rel = 0;
                     for (int r = 0; r < 4; r++) is_rel |= !strcmp(t[k].text, relops[r]);
@@ -2369,7 +2401,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
             }
         } else if (op == OP_RELOP && rep->compile_before == 1 && rep->run_before != 0 && rep->run_before != 124 &&
-                   (relops_found = relop_search(ws, flags, &rhit)) == 1) {
+                   (relops_found = relop_search(ws, flags, task, &rhit)) == 1) {
             const TASK_OPS_FILE *F = &ws->files[rhit.file];
             size_t tl = strlen(rhit.to);
             char *out = (char *)malloc(F->len - rhit.len + tl + 1);

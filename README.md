@@ -59,7 +59,7 @@ Harbour is the first reference domain in the roadmap. C and C++ remain the subst
 Every number in this table comes from a real run of `python3 tools/metrics.py --write --ci` on the stated commit; nothing is filled in by hand. Anything that cannot be measured yet is shown as "not measured". The per-commit history is in [`tools/metrics_history.csv`](tools/metrics_history.csv), and the per-phase targets are in [`ROADMAP.md`](ROADMAP.md#measurable-targets-per-phase). The fixed task bank has its own per-commit JSONL report and CI gate in [`scripts/bank_report.py`](scripts/bank_report.py) (workflow `bank`); this table reads the same runner output.
 
 <!-- METRICS:BEGIN -->
-Measured on commit `e7d4620` on 2026-09-23 (linux, build) with `python3 tools/metrics.py`.
+Measured on commit `5516e17` on 2026-09-23 (linux, build) with `python3 tools/metrics.py`.
 
 | Metric | Value | How it is measured |
 |---|---|---|
@@ -76,7 +76,7 @@ Measured on commit `e7d4620` on 2026-09-23 (linux, build) with `python3 tools/me
 | Engineering task bank (56 tasks, 8 categories) | `symbols-agent`: 27/56 pass (48%; dev 19/32, retired held-out 8/24 (seen since fa230f4; blind: none yet)), 0 wrong edits, 29 untouched; by category: build_ci 0/7, compiler_repair 6/7, debug 4/7, docs 3/7, multi_file 5/7, refactor 4/7, shell 0/7, test_authoring 5/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 56/56) |
 | Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |
 | CI per platform | not measured (HTTPError) | |
-| Hand-written rules (declared) | 43 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
+| Hand-written rules (declared) | 45 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
 <!-- METRICS:END -->
 
 ## 3. Architecture

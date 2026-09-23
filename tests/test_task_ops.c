@@ -516,9 +516,9 @@ int main(void)
     /* relop_search: exits 1, one boundary swap makes it exit 0 */
     {
         char d[512]; make_dir(d, sizeof(d), "relop");
-        put(d, "main.c", "static int ok(int v) { return v >= 0 && v < 9; }\nint main(void) { return ok(9) ? 0 : 1; }\n");
+        put(d, "main.c", "static int in_range(int v) { return v >= 0 && v < 9; }\nint main(void) { return in_range(9) ? 0 : 1; }\n");
         TASK_OPS_REPORT r;
-        int kept = TaskOpsSolve(d, "The range check is wrong; fix it.", &r);
+        int kept = TaskOpsSolve(d, "The range check in in_range is wrong; fix it.", &r);
         printf("    %s %s | %s | run %d->%d\n", r.op, r.detail, r.reason, r.run_before, r.run_after);
         if (r.compile_before == -1) CHECK(1, "no compiler: relop skipped");
         else CHECK(kept && strstr(get(d, "main.c"), "v <= 9"), "relop_search: boundary swap kept");
@@ -527,12 +527,12 @@ int main(void)
     /* induction phase 1: SYMBOLS_TRACE appends one observed-state line per attempt */
     {
         char d[512]; make_dir(d, sizeof(d), "trace");
-        put(d, "main.c", "static int ok(int v) { return v >= 0 && v < 9; }\nint main(void) { return ok(9) ? 0 : 1; }\n");
+        put(d, "main.c", "static int in_range(int v) { return v >= 0 && v < 9; }\nint main(void) { return in_range(9) ? 0 : 1; }\n");
         char tp[600]; snprintf(tp, sizeof(tp), "%s/../trace_%s.tsv", d, "t1");
         remove(tp);
         set_trace(tp);
         TASK_OPS_REPORT r;
-        TaskOpsSolve(d, "The range check is wrong; fix it.", &r);
+        TaskOpsSolve(d, "The range check in in_range is wrong; fix it.", &r);
         set_trace(NULL);
         FILE *f = fopen(tp, "r");
         char line[1024] = {0};

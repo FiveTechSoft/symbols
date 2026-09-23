@@ -15,6 +15,8 @@ A mutant is kept as a training case only when the self-check catches it:
 the build fails or the exit code becomes non-zero ("caught"). Uncaught
 mutants are recorded but not used.
 
+With --anchor the task also names the function that holds the mutation
+(the site region a bug report would give, never the primitive or the line).
 With --repair, symbols-agent is run on each caught mutant with a neutral
 task text (no hint of the primitive or site), and the result is
 recorded: did the program build and exit 0 again? Set SYMBOLS_TRACE to
@@ -70,6 +72,20 @@ def mutants(text):
             yield prim, toks[i], new, lines_of[i], "".join(out)
 
 
+FN_HEAD = re.compile(r"^[A-Za-z_][\w \t\*]*?\b([A-Za-z_]\w*)\s*\([^;]*$")
+
+
+def enclosing_function(text, line):
+    """Name of the function whose head is the nearest column-0 definition
+    line at or above `line` (1-based), or ''."""
+    lines = text.split("\n")
+    for i in range(min(line, len(lines)) - 1, -1, -1):
+        m = FN_HEAD.match(lines[i])
+        if m and m.group(1) not in ("if", "for", "while", "switch", "return"):
+            return m.group(1)
+    return ""
+
+
 def build_run(d, timeout=10):
     srcs = sorted(p.name for p in Path(d).glob("*.c"))
     if not srcs:
@@ -104,6 +120,8 @@ def main():
     ap.add_argument("--bank", default=str(BANK))
     ap.add_argument("--per-source", type=int, default=12)
     ap.add_argument("--repair", action="store_true")
+    ap.add_argument("--anchor", action="store_true",
+                    help="task text also names the enclosing function (site region, not the primitive)")
     ap.add_argument("--agent", default=str(ROOT / "build" / "symbols-agent"))
     ap.add_argument("--keep", help="directory to keep caught mutant workspaces")
     ap.add_argument("--out")
@@ -130,7 +148,9 @@ def main():
                 repaired, exact = "", 0
                 if caught and a.repair:
                     try:
-                        subprocess.run([a.agent, "-w", w, NEUTRAL_TASK], capture_output=True, timeout=120)
+                        fn = enclosing_function(text, line) if a.anchor else ""
+                        task = NEUTRAL_TASK + (f" The problem is in {fn}()." if fn else "")
+                        subprocess.run([a.agent, "-w", w, task], capture_output=True, timeout=120)
                     except subprocess.TimeoutExpired:
                         pass
                     rc2, rrc = build_run(w)
