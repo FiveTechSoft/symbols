@@ -72,7 +72,7 @@ def mutants(text):
             yield prim, toks[i], new, lines_of[i], "".join(out)
 
 
-FN_HEAD = re.compile(r"^[A-Za-z_][\w \t\*]*?\b([A-Za-z_]\w*)\s*\([^;]*$")
+FN_HEAD = re.compile(r"^[A-Za-z_][\w \t\*]*?\b([A-Za-z_]\w*)\s*\([^;{)]*(\)\s*(\{.*)?)?$")
 
 
 def enclosing_function(text, line):

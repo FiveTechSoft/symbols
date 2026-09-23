@@ -552,6 +552,27 @@ int main(void)
         CHECK(!strcmp(get(d, "test_sq.c"), t), "relop_search: test file untouched");
     }
 
+    /* phase 3b: arithmetic swap repairs the anchored function, never main's own check */
+    {
+        char d[512]; make_dir(d, sizeof(d), "primarith");
+        put(d, "main.c", "static int helper(int x) { return x - 1; }\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "helper() is wrong; fix it.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        if (r.compile_before == -1) CHECK(1, "no compiler: primitive search skipped");
+        else CHECK(kept && strstr(get(d, "main.c"), "x + 1") && strstr(get(d, "main.c"), "? 0 : 1"), "primitive search: x - 1 -> x + 1, main's check untouched");
+    }
+
+    /* phase 3b: a bug only reachable by editing main's check is left alone */
+    {
+        char d[512]; make_dir(d, sizeof(d), "primmain");
+        const char *t = "static int helper(int x) { return x * 2; }\nint main(void) { return helper(1) == 3 ? 0 : 1; }\n";
+        put(d, "main.c", t);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "helper() is wrong; fix it.", &r);
+        CHECK(strstr(get(d, "main.c"), "== 3 ? 0 : 1") != NULL, "primitive search: main's check never edited");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

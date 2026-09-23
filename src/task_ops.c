@@ -2153,8 +2153,54 @@ typedef struct
 {
     int    file;
     size_t at, len;
-    char   to[4];
+    char   to[24];
 } RELOP_HIT;
+
+/* Phase 3b: the same search widened to the other single-token primitives,
+   tried only after every relational tier found nothing, smallest change
+   first: tier 4 a decimal integer literal +1 / -1, tier 5 binary + <-> -,
+   tier 6 && <-> ||.
+   A +/- is binary only when the token before it is a name, a number or a
+   closing bracket. Same anchors, same oracle, same 64-build budget. */
+static int prim_cands(const CTOK *t, int k, int tier, char out[2][24])
+{
+    const char *x = t[k].text;
+    if (tier <= 3) {
+        int is_rel = 0, n = 0;
+        for (int r = 0; r < 4; r++) is_rel |= !strcmp(x, relops[r]);
+        if (!is_rel) return 0;
+        for (int r = 0; r < 4 && n < 2; r++)
+            if (relop_tier(x, relops[r]) == tier) snprintf(out[n++], 24, "%s", relops[r]);
+        return n;
+    }
+    if (tier == 6) {
+        if (!strcmp(x, "&&")) { snprintf(out[0], 24, "||"); return 1; }
+        if (!strcmp(x, "||")) { snprintf(out[0], 24, "&&"); return 1; }
+        return 0;
+    }
+    if (tier == 5) {
+        if ((!strcmp(x, "+") || !strcmp(x, "-")) && k > 0) {
+            const char *p = t[k - 1].text;
+            if (ident_char((unsigned char)p[0]) || p[0] == ')' || p[0] == ']') {
+                snprintf(out[0], 24, "%s", x[0] == '+' ? "-" : "+");
+                return 1;
+            }
+        }
+        return 0;
+    }
+    if (tier == 4) {
+        size_t l = strlen(x);
+        if (l == 0 || l > 9) return 0;
+        for (size_t i = 0; i < l; i++) if (!isdigit((unsigned char)x[i])) return 0;
+        if (l > 1 && x[0] == '0') return 0;   /* octal or odd spelling: leave it */
+        long v = strtol(x, NULL, 10);
+        int n = 0;
+        snprintf(out[n++], 24, "%ld", v + 1);
+        if (v > 0) snprintf(out[n++], 24, "%ld", v - 1);
+        return n;
+    }
+    return 0;
+}
 
 static int write_file(const char *root, const char *rel, const char *data);
 
@@ -2171,6 +2217,19 @@ static int line_has_anchor(const char *line, size_t ll, const TASK_TOKEN *an, in
                 (i + al == ll || !ident_char((unsigned char)line[i + al])))
                 return 1;
     }
+    return 0;
+}
+
+/* main is the oracle when the program's own exit code is checked: its
+   lines are never edited (the corpus caught "? 0 : 1" -> "? 0 : 0"). */
+static int line_defines_main(const char *line, size_t ll)
+{
+    for (size_t i = 0; i + 4 <= ll; i++)
+        if (!strncmp(line + i, "main", 4) && (i == 0 || !ident_char((unsigned char)line[i - 1]))) {
+            size_t j = i + 4;
+            while (j < ll && isspace((unsigned char)line[j])) j++;
+            if (j < ll && line[j] == '(') return 1;
+        }
     return 0;
 }
 
@@ -2198,41 +2257,42 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
             an[na++] = an[k];
     if (na == 0)
         return 0;
-    for (int tier = 1; tier <= 3; tier++) {
+    for (int tier = 1; tier <= 6; tier++) {
         int found = 0;
         for (int f = 0; f < ws->count; f++) {
             const TASK_OPS_FILE *F = &ws->files[f];
             if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test"))
                 continue;   /* never flip a test's own comparison to make it pass */
             const char *line = F->data;
-            int depth = 0, in_fn = 0;   /* inside the body of a function whose head holds an anchor */
+            int depth = 0, in_fn = 0, in_main = 0;   /* inside the body of a function whose head holds an anchor / of main */
             while (line && *line) {
                 const char *nl = strchr(line, '\n');
                 size_t ll = nl ? (size_t)(nl - line) : strlen(line);
                 int anchored = line_has_anchor(line, ll, an, na);
-                if (depth == 0)
+                if (depth == 0) {
                     in_fn = anchored;
+                    in_main = line_defines_main(line, ll);
+                }
                 for (size_t q = 0; q < ll; q++)
                     depth += line[q] == '{' ? 1 : line[q] == '}' ? -1 : 0;
                 if (depth < 0) depth = 0;
-                int eligible = anchored || in_fn;
+                int eligible = (anchored || in_fn) && !(has_main && in_main);
                 if (depth == 0 && !anchored) in_fn = 0;
+                if (depth == 0) in_main = 0;
                 const char *t0 = line;
                 while (t0 < line + ll && isspace((unsigned char)*t0)) t0++;
                 CTOK t[256];
                 int n = !eligible ? 0 : (*t0 == '#' || (t0[0] == '/' && (t0[1] == '/' || t0[1] == '*'))) ? 0 : ctok_lex(line, ll, t, 256);
                 for (int k = 0; k < n; k++) {
-                    int is_rel = 0;
-                    for (int r = 0; r < 4; r++) is_rel |= !strcmp(t[k].text, relops[r]);
-                    if (!is_rel) continue;
-                    for (int r = 0; r < 4; r++) {
-                        if (relop_tier(t[k].text, relops[r]) != tier) continue;
+                    char cands[2][24];
+                    int nc = prim_cands(t, k, tier, cands);
+                    for (int r = 0; r < nc; r++) {
                         if (++builds > 64) return 0;
-                        size_t at = (size_t)(line - F->data) + t[k].start, ol = strlen(t[k].text), nl2 = strlen(relops[r]);
+                        size_t at = (size_t)(line - F->data) + t[k].start, ol = strlen(t[k].text), nl2 = strlen(cands[r]);
                         char *cand = (char *)malloc(F->len - ol + nl2 + 1);
                         if (!cand) return 0;
                         memcpy(cand, F->data, at);
-                        memcpy(cand + at, relops[r], nl2);
+                        memcpy(cand + at, cands[r], nl2);
                         memcpy(cand + at + nl2, F->data + at + ol, F->len - at - ol + 1);
                         int c = -1, run = -1, exok = 1;
                         if (write_file(ws->root, F->rel, cand)) {
@@ -2247,7 +2307,7 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
                             hit->file = f;
                             hit->at = at;
                             hit->len = ol;
-                            snprintf(hit->to, sizeof(hit->to), "%s", relops[r]);
+                            snprintf(hit->to, sizeof(hit->to), "%s", cands[r]);
                         }
                     }
                 }
