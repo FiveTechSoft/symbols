@@ -187,7 +187,28 @@ typedef struct
 
 /* Code-shaped identifiers in order of appearance. Tokens glued to '-' or '='
    are compiler flags, not names. */
+static int c_keyword(const char *w)
+{
+    static const char *kw[] = {"int", "char", "void", "long", "short", "float", "double", "return", "if", "else",
+                               "for", "while", "do", "const", "static", "struct", "enum", "union", "unsigned",
+                               "signed", "sizeof", "switch", "case", "break", "continue", "goto", "main", NULL};
+    for (int i = 0; kw[i]; i++)
+        if (!strcmp(kw[i], w))
+            return 1;
+    return 0;
+}
+
+/* ground (optional): a plain word also counts as code when the workspace
+   defines it as a file-level function (length >= 3, not a C keyword or main).
+   Declared rule: workspace-grounded identifier. */
+static int lex_code_tokens_g(const char *task, TASK_TOKEN *out, int max, const TASK_OPS_WORKSPACE *ground);
+static int file_has_define(const TASK_OPS_WORKSPACE *ws, const char *name);
 static int lex_code_tokens(const char *task, TASK_TOKEN *out, int max)
+{
+    return lex_code_tokens_g(task, out, max, NULL);
+}
+
+static int lex_code_tokens_g(const char *task, TASK_TOKEN *out, int max, const TASK_OPS_WORKSPACE *ground)
 {
     int n = 0;
     size_t i = 0, len = strlen(task);
@@ -209,7 +230,8 @@ static int lex_code_tokens(const char *task, TASK_TOKEN *out, int max)
         char word[128];
         memcpy(word, task + s, e - s);
         word[e - s] = '\0';
-        if (!code_shaped(word, quoted))
+        if (!code_shaped(word, quoted) &&
+            !(ground && e - s >= 3 && !c_keyword(word) && file_has_define(ground, word)))
             continue;
         snprintf(out[n].text, sizeof(out[n].text), "%s", word);
         out[n].start = s;
@@ -223,7 +245,7 @@ int TaskOpsFindRename(const TASK_OPS_WORKSPACE *ws, const char *task,
                       char *a, size_t a_size, char *b, size_t b_size)
 {
     TASK_TOKEN tok[64];
-    int n = lex_code_tokens(task ? task : "", tok, 64);
+    int n = lex_code_tokens_g(task ? task : "", tok, 64, ws);
     int found = 0;
     char fa[128] = {0}, fb[128] = {0};
     for (int i = 0; i + 1 < n; i++) {
@@ -775,7 +797,34 @@ typedef struct
 {
     int  file;            /* file that uses the name */
     char name[128];
+    char sys[64];         /* "<hdr.h>" when gcc's note names the standard header */
 } IMPLICIT_USE;
+
+/* gcc: "note: include '<string.h>' or provide a declaration of 'strlen'".
+   Observed compiler state, not task wording. Declared rule (note shape). */
+static void note_header(const char *err, const char *name, char *out, size_t size)
+{
+    out[0] = '\0';
+    const char *key = "provide a declaration of ";
+    for (const char *p = strstr(err, key); p; p = strstr(p + 1, key)) {
+        const char *q = p + strlen(key);
+        while (*q && !ident_start((unsigned char)*q) && *q != '\n') q++;
+        size_t nl = strlen(name);
+        if (strncmp(q, name, nl) != 0 || ident_char((unsigned char)q[nl]))
+            continue;
+        const char *ls = p;
+        while (ls > err && ls[-1] != '\n') ls--;
+        const char *lt = strchr(ls, '<'), *gt = lt ? strchr(lt, '>') : NULL;
+        if (!lt || !gt || gt > p || (size_t)(gt - lt + 1) >= size)
+            continue;
+        for (const char *c = lt + 1; c < gt; c++)
+            if (!(isalnum((unsigned char)*c) || *c == '.' || *c == '_' || *c == '/'))
+                return;
+        memcpy(out, lt, (size_t)(gt - lt + 1));
+        out[gt - lt + 1] = '\0';
+        return;
+    }
+}
 
 static int implicit_uses(const TASK_OPS_WORKSPACE *ws, const char *flags, IMPLICIT_USE *out, int max)
 {
@@ -818,6 +867,7 @@ static int implicit_uses(const TASK_OPS_WORKSPACE *ws, const char *flags, IMPLIC
             out[n].file = fi;
             memcpy(out[n].name, q, nl);
             out[n].name[nl] = '\0';
+            note_header(r->stderr_buf, out[n].name, out[n].sys, sizeof(out[n].sys));
             n++;
         }
     }
@@ -933,6 +983,16 @@ static int new_header_add(NEW_FILE *nf, const char *proto)
 /* Fills next[] for every implicit use it can ground; returns files touched.
    When no header fits and the task names exactly one header file that does
    not exist, the prototype goes into that new header (nf). */
+static int file_has_define(const TASK_OPS_WORKSPACE *ws, const char *name)
+{
+    for (int i = 0; i < ws->count; i++) {
+        size_t ll;
+        if (file_level_decl(ws->files[i].data, name, 1, &ll) >= 0)
+            return 1;
+    }
+    return 0;
+}
+
 static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, char **next,
                             NEW_FILE *nf, char *detail, size_t detail_size, int *uses_before)
 {
@@ -1038,6 +1098,14 @@ static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, con
                 files++;
             }
         }
+        /* no workspace declaration or definition: the standard header the
+           compiler's own note names */
+        if (!text[0] && headers == 0 && use[k].sys[0] && !file_has_define(ws, use[k].name)) {
+            char inc[96];
+            snprintf(inc, sizeof(inc), "#include %s", use[k].sys);
+            if (!strstr(f->data, inc))
+                snprintf(text, sizeof(text), "%s\n", inc);
+        }
         if (!text[0])
             continue;
         next[use[k].file] = insert_at(f->data, f->len, after_includes(f->data), text);
@@ -1061,7 +1129,8 @@ static int next_named_file(const char *task, size_t *pos, char *name, size_t nam
     size_t len = strlen(task);
     for (size_t i = *pos; i < len; i++) {
         if (!ident_start((unsigned char)task[i]) || (i > 0 && (ident_char((unsigned char)task[i - 1]) ||
-                                                            task[i - 1] == '.' || task[i - 1] == '/')))
+                                                            task[i - 1] == '.' || task[i - 1] == '/' ||
+                                                            task[i - 1] == '<')))   /* <hdr.h>: system header */
             continue;
         size_t e = i;
         while (e < len && (ident_char((unsigned char)task[e]) || task[e] == '/' || task[e] == '-')) e++;
@@ -1911,9 +1980,93 @@ static int run_test_plan(const TASK_OPS_WORKSPACE *ws, const TEST_PLAN *tp, cons
     return ok;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_COUNT };
+
+/* ------------------------------------------ relational operator search */
+
+/* Observed state: the program builds but exits non-zero. Try one
+   relational-operator swap at a time (in C sources, not preprocessor
+   lines) and keep the swap that makes it exit 0. Tiers from the smallest
+   change: 1 boundary (< <=, > >=), 2 direction (< >, <= >=), 3 the rest.
+   Equality (== !=) is never swapped and test files (test*) are never
+   edited: negating an assertion would "pass" by cheating. The first tier with exactly one working swap wins; two in the
+   same tier = abstain. No task wording. Declared rule (tiers, 64 builds). */
+static const char *const relops[] = {"<", "<=", ">", ">="};
+
+static int relop_tier(const char *a, const char *b)
+{
+    if (!strcmp(a, b)) return 0;
+    if (a[0] == b[0] && (a[0] == '<' || a[0] == '>')) return 1;
+    if ((a[0] == '<' && b[0] == '>') || (a[0] == '>' && b[0] == '<'))
+        return strlen(a) == strlen(b) ? 2 : 3;
+    if ((!strcmp(a, "==") && !strcmp(b, "!=")) || (!strcmp(a, "!=") && !strcmp(b, "=="))) return 2;
+    return 3;
+}
+
+typedef struct
+{
+    int    file;
+    size_t at, len;
+    char   to[4];
+} RELOP_HIT;
+
+static int write_file(const char *root, const char *rel, const char *data);
+
+static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, RELOP_HIT *hit)
+{
+    int builds = 0;
+    for (int tier = 1; tier <= 3; tier++) {
+        int found = 0;
+        for (int f = 0; f < ws->count; f++) {
+            const TASK_OPS_FILE *F = &ws->files[f];
+            if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test"))
+                continue;   /* never flip a test's own comparison to make it pass */
+            const char *line = F->data;
+            while (line && *line) {
+                const char *nl = strchr(line, '\n');
+                size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+                const char *t0 = line;
+                while (t0 < line + ll && isspace((unsigned char)*t0)) t0++;
+                CTOK t[256];
+                int n = (*t0 == '#' || (t0[0] == '/' && (t0[1] == '/' || t0[1] == '*'))) ? 0 : ctok_lex(line, ll, t, 256);
+                for (int k = 0; k < n; k++) {
+                    int is_rel = 0;
+                    for (int r = 0; r < 4; r++) is_rel |= !strcmp(t[k].text, relops[r]);
+                    if (!is_rel) continue;
+                    for (int r = 0; r < 4; r++) {
+                        if (relop_tier(t[k].text, relops[r]) != tier) continue;
+                        if (++builds > 64) return 0;
+                        size_t at = (size_t)(line - F->data) + t[k].start, ol = strlen(t[k].text), nl2 = strlen(relops[r]);
+                        char *cand = (char *)malloc(F->len - ol + nl2 + 1);
+                        if (!cand) return 0;
+                        memcpy(cand, F->data, at);
+                        memcpy(cand + at, relops[r], nl2);
+                        memcpy(cand + at + nl2, F->data + at + ol, F->len - at - ol + 1);
+                        int c = -1, run = -1;
+                        if (write_file(ws->root, F->rel, cand))
+                            probe_out(ws, flags, &c, &run, NULL);
+                        write_file(ws->root, F->rel, F->data);
+                        free(cand);
+                        if (c == 1 && run == 0) {
+                            found++;
+                            hit->file = f;
+                            hit->at = at;
+                            hit->len = ol;
+                            snprintf(hit->to, sizeof(hit->to), "%s", relops[r]);
+                        }
+                    }
+                }
+                line = nl ? nl + 1 : NULL;
+            }
+        }
+        if (found)
+            return found;
+    }
+    return 0;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search"
 };
 
 static int mem_enabled(void)
@@ -2045,7 +2198,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     char y_text[128] = {0};
     int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
     char da[128] = {0}, db[128] = {0}, dead[128] = {0};
-    int deads = 0;
+    int deads = 0, relops_found = 0;
+    RELOP_HIT rhit;
     TEST_PLAN tplan;
     LIT_PLAN lit;
     char *lit_out = NULL;
@@ -2134,6 +2288,22 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->op, sizeof(rep->op), "author_test");
                 snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
             }
+        } else if (op == OP_RELOP && rep->compile_before == 1 && rep->run_before != 0 && rep->run_before != 124 &&
+                   (relops_found = relop_search(ws, flags, &rhit)) == 1) {
+            const TASK_OPS_FILE *F = &ws->files[rhit.file];
+            size_t tl = strlen(rhit.to);
+            char *out = (char *)malloc(F->len - rhit.len + tl + 1);
+            if (out) {
+                memcpy(out, F->data, rhit.at);
+                memcpy(out + rhit.at, rhit.to, tl);
+                memcpy(out + rhit.at + tl, F->data + rhit.at + rhit.len, F->len - rhit.at - rhit.len + 1);
+                next[rhit.file] = out;
+                touched = 1;
+                rep->candidates = 1;
+                snprintf(rep->op, sizeof(rep->op), "relop_search");
+                snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%s' in %.100s", (int)rhit.len, F->data + rhit.at,
+                         rhit.to, F->rel);
+            }
         } else if (op == OP_BRACE && rep->compile_before == 0) {
             int bf = -1;
             size_t bat = 0;
@@ -2146,7 +2316,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         }
     }
     if (!touched) {
-        if (frags > 1)
+        if (relops_found > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d relational swaps make it exit 0", relops_found);
+        else if (frags > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d places fit the stated fragment", frags);
         else if (deads > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d dead functions named", deads);
@@ -2196,6 +2368,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "doc_sync")) {
             int sh = ds_shape(da);
             intent = ds_in(after, da, sh, 1) == 0 && ds_in(after, db, sh, 1) > 0;
+        } else if (!strcmp(rep->op, "relop_search")) {
+            intent = rep->compile_after == 1 && rep->run_after == 0;
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;

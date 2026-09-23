@@ -159,7 +159,8 @@ int main(void)
         if (r.compile_before == -1) {
             CHECK(1, "no compiler: fix-it case skipped");
         } else {
-            CHECK(kept && !strcmp(r.op, "compiler_fixit"), "fix-it applied and verified (build fail -> ok)");
+            CHECK(kept && (!strcmp(r.op, "compiler_fixit") || !strcmp(r.op, "declare_implicit")),
+                  "compiler-driven header fix applied and verified (build fail -> ok)");
             CHECK(strstr(get(d, "calc.c"), "#include <string.h>") != NULL, "header inserted by the compiler's fix-it");
             CHECK(r.run_after == 0, "own probe: program exits 0 after");
         }
@@ -477,6 +478,48 @@ int main(void)
         put(d3, "m.h", "int twice(int v);\n");
         CHECK(!TaskOpsSolve(d3, "Add t2.c asserting twice(2) == 5.", &r) && !file_exists(d3, "t2.c"),
               "author_test: a test that fails on the current code is rolled back");
+    }
+
+    /* declare_implicit: warning only (default std), the note names the header */
+    {
+        char d[512]; make_dir(d, sizeof(d), "sysnote");
+        put(d, "main.c", "#include <stddef.h>\nint main(void) { const char *s = \"abc\"; return (int)strlen(s) - 3; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Add the right header for the string function.", &r);
+        printf("    %s %s | %s | compile %d->%d\n", r.op, r.detail, r.reason, r.compile_before, r.compile_after);
+        if (r.compile_before == -1) CHECK(1, "no compiler: sysnote skipped");
+        else CHECK(kept && strstr(get(d, "main.c"), "#include <string.h>"), "header from the compiler note inserted");
+    }
+
+    /* rename: a plain-word function name grounded in the workspace */
+    {
+        char d[512]; make_dir(d, sizeof(d), "grename");
+        put(d, "main.c", "int compute(int x) { return x + 1; }\nint main(void) { return compute(1) == 2 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Rename the function compute to compute_total everywhere.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        CHECK(kept && !strcmp(r.op, "rename_symbol") && strstr(get(d, "main.c"), "compute_total(1)"), "grounded plain-word rename");
+    }
+
+    /* relop_search: exits 1, one boundary swap makes it exit 0 */
+    {
+        char d[512]; make_dir(d, sizeof(d), "relop");
+        put(d, "main.c", "static int ok(int v) { return v >= 0 && v < 9; }\nint main(void) { return ok(9) ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "The range check is wrong; fix it.", &r);
+        printf("    %s %s | %s | run %d->%d\n", r.op, r.detail, r.reason, r.run_before, r.run_after);
+        if (r.compile_before == -1) CHECK(1, "no compiler: relop skipped");
+        else CHECK(kept && strstr(get(d, "main.c"), "v <= 9"), "relop_search: boundary swap kept");
+    }
+
+    /* relop_search never edits a test file */
+    {
+        char d[512]; make_dir(d, sizeof(d), "reloptest");
+        const char *t = "static int sq(int x) { return x * x; }\nint main(void) { return sq(3) > 9 ? 0 : 1; }\n";
+        put(d, "test_sq.c", t);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "Make the test pass.", &r);
+        CHECK(!strcmp(get(d, "test_sq.c"), t), "relop_search: test file untouched");
     }
 
     /* nothing applicable: untouched */
