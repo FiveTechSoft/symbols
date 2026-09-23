@@ -1,1 +1,1 @@
-Two headers define the same macro LIMIT differently. Unify them: both must define LIMIT as 5 (exact token '5').
+Two headers define the same macro LIMIT differently. Unify them: both a.h and b.h must define LIMIT as 5 (exact token '5'). The program links one check TU per header and must exit 0 only when both are 5.

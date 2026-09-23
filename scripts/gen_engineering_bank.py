@@ -48,6 +48,28 @@ if r.returncode != 0:
 sys.exit(r.returncode)
 '''
 
+# Compile every *.c in CWD and run the binary; exit 0 only if the program exits 0.
+# Used where before/ deterministically exits non-zero and after/ exits 0.
+CHECK_RUN = r'''#!/usr/bin/env python3
+import subprocess, sys, glob
+from pathlib import Path
+files = sorted(glob.glob("*.c"))
+if not files:
+    sys.exit(2)
+r = subprocess.run(
+    ["gcc", "-std=c11", "-Werror=implicit-function-declaration", "-o", "eb_bin"] + files,
+    capture_output=True, text=True)
+if r.returncode != 0:
+    sys.stderr.write(r.stderr)
+    sys.exit(1)
+bin_path = Path("eb_bin.exe") if Path("eb_bin.exe").is_file() else Path("eb_bin")
+if not bin_path.is_file():
+    sys.exit(1)
+r2 = subprocess.run([str(bin_path)], capture_output=True, text=True)
+sys.exit(r2.returncode)
+'''
+
+
 
 def write_task(tid: str, category: str, prompt: str,
                before: dict[str, str], after: dict[str, str],
@@ -653,14 +675,18 @@ sys.exit(0 if pat.search(t) else 1)
           "main.c": "#include \"process.h\"\n\nint main(void) {\n    return process(1) == 2 ? 0 : 1;\n}\n"},
          files_check(("process.c", "process.h"))),
         ("eb_mf_006",
-         "Two headers define the same macro LIMIT differently. Unify them: both must define LIMIT as 5 (exact token '5').",
+         "Two headers define the same macro LIMIT differently. Unify them: both a.h and b.h must define LIMIT as 5 (exact token '5'). The program links one check TU per header and must exit 0 only when both are 5.",
          {"a.h": "#define LIMIT 3\n",
           "b.h": "#define LIMIT 4\n",
-          "main.c": "#include \"a.h\"\nint main(void) { return LIMIT == 5 ? 0 : 1; }\n"},
+          "a_check.c": "#include \"a.h\"\nint a_ok(void) { return LIMIT == 5 ? 1 : 0; }\n",
+          "b_check.c": "#include \"b.h\"\nint b_ok(void) { return LIMIT == 5 ? 1 : 0; }\n",
+          "main.c": "int a_ok(void);\nint b_ok(void);\nint main(void) { return (a_ok() && b_ok()) ? 0 : 1; }\n"},
          {"a.h": "#define LIMIT 5\n",
           "b.h": "#define LIMIT 5\n",
-          "main.c": "#include \"a.h\"\nint main(void) { return LIMIT == 5 ? 0 : 1; }\n"},
-         contains_check("#define LIMIT 5", forbid=("#define LIMIT 3", "#define LIMIT 4"))),
+          "a_check.c": "#include \"a.h\"\nint a_ok(void) { return LIMIT == 5 ? 1 : 0; }\n",
+          "b_check.c": "#include \"b.h\"\nint b_ok(void) { return LIMIT == 5 ? 1 : 0; }\n",
+          "main.c": "int a_ok(void);\nint b_ok(void);\nint main(void) { return (a_ok() && b_ok()) ? 0 : 1; }\n"},
+         CHECK_RUN),
         ("eb_mf_007",
          "main.c does not include util.h but uses get(). Add the include. util.h must be included from main.c (string '#include \"util.h\"' in main.c).",
          {"util.h": "int get(void);\n",
@@ -720,20 +746,20 @@ r = subprocess.run(["./tbin"])
 sys.exit(r.returncode)
 '''),
         ("eb_dbg_004",
-         "Operator bug: clamp_upper must return hi when v > hi, but uses < . Fix the comparison so max is applied. Content: must contain 'v > hi' in the true branch sense — require util.c contains 'if (v > hi) return hi;'",
+         "Operator bug: clamp_upper must return hi when v > hi, but uses < . Fix the comparison so max is applied. The program must exit 0 (clamp_upper(20,10) == 10).",
          {"util.c": "int clamp_upper(int v, int hi) {\n    if (v < hi) return hi;\n    return v;\n}\nint main(void) { return clamp_upper(20, 10); }\n"},
          {"util.c": "int clamp_upper(int v, int hi) {\n    if (v > hi) return hi;\n    return v;\n}\nint main(void) { return clamp_upper(20, 10) == 10 ? 0 : 1; }\n"},
-         contains_check("if (v > hi) return hi;", forbid=("if (v < hi) return hi;",))),
+         CHECK_RUN),
         ("eb_dbg_005",
          "Uninitialized variable: total must start at 0 before the loop. Fix the code; require 'int total = 0'.",
          {"main.c": "int main(void) {\n    int total;\n    for (int i = 1; i <= 3; i++) total += i;\n    return total == 6 ? 0 : 1;\n}\n"},
          {"main.c": "int main(void) {\n    int total = 0;\n    for (int i = 1; i <= 3; i++) total += i;\n    return total == 6 ? 0 : 1;\n}\n"},
          contains_check("int total = 0", forbid=("    int total;\n",))),
         ("eb_dbg_006",
-         "Logic error: is_valid should accept v in [0, 99] inclusive. Currently rejects 99 (uses v < 99). Fix to v <= 99 (or equivalent). Forbidden: 'v < 99' as sole upper bound.",
+         "Logic error: is_valid should accept v in [0, 99] inclusive. Currently rejects 99 (uses v < 99). Fix so the program exits 0.",
          {"main.c": "static int is_valid(int v) {\n    return v >= 0 && v < 99;\n}\nint main(void) {\n    return is_valid(99) ? 0 : 1;\n}\n"},
          {"main.c": "static int is_valid(int v) {\n    return v >= 0 && v <= 99;\n}\nint main(void) {\n    return is_valid(99) ? 0 : 1;\n}\n"},
-         contains_check("v <= 99", forbid=("v < 99",))),
+         CHECK_RUN),
         ("eb_dbg_007",
          "Buffer too small: the buffer must hold 6 chars + NUL (char buf[7] at least). Currently buf[4]. Fix the size. Forbidden: 'char buf[4]'.",
          {"main.c": "int main(void) {\n    char buf[4] = \"abcdef\";\n    return buf[0] == 'a' ? 0 : 1;\n}\n"},

@@ -1,1 +1,1 @@
-Operator bug: clamp_upper must return hi when v > hi, but uses < . Fix the comparison so max is applied. Content: must contain 'v > hi' in the true branch sense — require util.c contains 'if (v > hi) return hi;'
+Operator bug: clamp_upper must return hi when v > hi, but uses < . Fix the comparison so max is applied. The program must exit 0 (clamp_upper(20,10) == 10).
