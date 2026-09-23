@@ -561,7 +561,7 @@ int main(void)
         put(d, "main.c", t);
         char op[600]; snprintf(op, sizeof(op), "%s/../ops_%s.tsv", d, "demote");
         FILE *f = fopen(op, "w");
-        if (f) { fputs("# test table\nrelop1@return\tdemoted\t0\t1\t1\n", f); fclose(f); }
+        if (f) { fputs("# test table\nrelop1@return/o1\tdemoted\t0\t1\t1\n", f); fclose(f); }
         set_ops(op);
         TASK_OPS_REPORT r;
         TaskOpsSolve(d, "The range check in in_range is wrong; fix it.", &r);

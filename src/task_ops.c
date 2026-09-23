@@ -2294,6 +2294,86 @@ static int iop_status(const char *pat)
     return 0;
 }
 
+/* Phase 4b: oracle strength at the edit site. The enclosing function is
+   the nearest column-0 head above the edit ("name(" on a line that is not
+   a directive or a brace). Strength counts the distinct argument lists it
+   is called with elsewhere in the workspace plus in stated examples:
+   "o1" = one input or none (a single-value self-check, which lets a wrong
+   swap still exit 0), "o2" = two or more. */
+static void enclosing_name(const char *data, size_t at, char *out, size_t size)
+{
+    out[0] = '\0';
+    size_t ls = at;
+    while (1) {
+        while (ls > 0 && data[ls - 1] != '\n') ls--;
+        const char *l = data + ls;
+        if (ident_char((unsigned char)*l) && *l != '#') {
+            const char *par = l;
+            while (*par && *par != '\n' && *par != '(') par++;
+            if (*par == '(') {
+                const char *e = par;
+                while (e > l && isspace((unsigned char)e[-1])) e--;
+                const char *b = e;
+                while (b > l && ident_char((unsigned char)b[-1])) b--;
+                if (e > b && (size_t)(e - b) < size) {
+                    memcpy(out, b, (size_t)(e - b));
+                    out[e - b] = '\0';
+                    return;
+                }
+            }
+        }
+        if (ls == 0) return;
+        ls--;
+    }
+}
+
+static const char *oracle_strength(const TASK_OPS_WORKSPACE *ws, const char *fn, const EXAMPLE *ex, int nex)
+{
+    char seen[4][64];
+    int ns = 0;
+    size_t fl = strlen(fn);
+    if (!fl) return "o1";
+    for (int f = 0; f < ws->count && ns < 2; f++) {
+        const TASK_OPS_FILE *F = &ws->files[f];
+        if (!is_c_source(F->rel)) continue;
+        for (size_t i = 0; i + fl < F->len && ns < 2; i++) {
+            if (strncmp(F->data + i, fn, fl) || (i > 0 && ident_char((unsigned char)F->data[i - 1]))) continue;
+            size_t j = i + fl;
+            while (j < F->len && F->data[j] == ' ') j++;
+            if (j >= F->len || F->data[j] != '(') continue;
+            size_t ls = i;
+            while (ls > 0 && F->data[ls - 1] != '\n') ls--;
+            {   /* definition head: column-0 line, only type words before the name */
+                int head = ident_char((unsigned char)F->data[ls]);
+                for (size_t q = ls; head && q < i; q++)
+                    if (!ident_char((unsigned char)F->data[q]) && F->data[q] != ' ' && F->data[q] != '*' && F->data[q] != '\t')
+                        head = 0;
+                if (head && i - ls >= 6 && !strncmp(F->data + ls, "return", 6)) head = 0;
+                if (head) continue;
+            }
+            size_t k = j, depth = 0;
+            for (; k < F->len; k++) {
+                if (F->data[k] == '(') depth++;
+                else if (F->data[k] == ')' && --depth == 0) break;
+            }
+            if (k >= F->len || k - j >= 63) continue;
+            char args[64];
+            memcpy(args, F->data + j, k - j + 1);
+            args[k - j + 1] = '\0';
+            int dup = 0;
+            for (int q = 0; q < ns; q++) dup |= !strcmp(seen[q], args);
+            if (!dup) snprintf(seen[ns++], 64, "%s", args);
+        }
+    }
+    for (int e = 0; e < nex && ns < 2; e++)
+        if (!strncmp(ex[e].call, fn, fl) && ex[e].call[fl] == '(') {
+            int dup = 0;
+            for (int q = 0; q < ns; q++) dup |= !strcmp(seen[q], ex[e].call + fl);
+            if (!dup) snprintf(seen[ns++], 64, "%.63s", ex[e].call + fl);
+        }
+    return ns >= 2 ? "o2" : "o1";
+}
+
 static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, RELOP_HIT *hit)
 {
     int builds = 0;
@@ -2370,7 +2450,10 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
                             h->at = at;
                             h->len = ol;
                             snprintf(h->to, sizeof(h->to), "%s", cands[r]);
-                            snprintf(h->pat, sizeof(h->pat), "%s@%s", prim_class(tier), site_ctx(t, k));
+                            char fn[64];
+                            enclosing_name(F->data, at, fn, sizeof(fn));
+                            snprintf(h->pat, sizeof(h->pat), "%s@%s/%s", prim_class(tier), site_ctx(t, k),
+                                     oracle_strength(ws, fn, ex, nex));
                         }
                     }
                 }
