@@ -52,6 +52,15 @@ static char *get(const char *dir, const char *rel)
     return buf;
 }
 
+static int file_exists(const char *dir, const char *rel)
+{
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/%s", dir, rel);
+    FILE *f = fopen(path, "rb");
+    if (f) fclose(f);
+    return f != NULL;
+}
+
 static void make_dir(char *out, size_t size, const char *tag)
 {
     const char *t = getenv("TMPDIR");
@@ -447,6 +456,27 @@ int main(void)
         put(d2, "z.c", m);
         CHECK(!TaskOpsSolve(d2, "Change to a faster approach.", &r) && !strcmp(get(d2, "z.c"), m),
               "stated_fragment: plain words after 'Change to' are not a fragment");
+    }
+
+    /* operator 10: author_test */
+    {
+        char d[512]; make_dir(d, sizeof(d), "authtest");
+        put(d, "m.c", "int twice(int v) { return 2 * v; }\nint has_x(const char *s) { return s[0] == 'x'; }\n");
+        put(d, "m.h", "int twice(int v);\nint has_x(const char *s);\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Write check_twice.c: a test that twice(v) works, asserting twice(21) == 42.", &r);
+        CHECK(kept && !strcmp(r.op, "author_test") && strstr(get(d, "check_twice.c"), "#include \"m.h\"") &&
+              strstr(get(d, "check_twice.c"), "twice(21) == 42"), "author_test: literal call and expected value from the task");
+        char d2[512]; make_dir(d2, sizeof(d2), "authtest2");
+        put(d2, "m.c", "int has_x(const char *s) { return s[0] == 'x'; }\n");
+        put(d2, "m.h", "int has_x(const char *s);\n");
+        kept = TaskOpsSolve(d2, "has_x on a string without x must return 0; put it in t_has.c.", &r);
+        CHECK(kept && strstr(get(d2, "t_has.c"), "has_x(\"abc\") == 0"), "author_test: arguments from the prototype");
+        char d3[512]; make_dir(d3, sizeof(d3), "authtest3");
+        put(d3, "m.c", "int twice(int v) { return 2 * v; }\n");
+        put(d3, "m.h", "int twice(int v);\n");
+        CHECK(!TaskOpsSolve(d3, "Add t2.c asserting twice(2) == 5.", &r) && !file_exists(d3, "t2.c"),
+              "author_test: a test that fails on the current code is rolled back");
     }
 
     /* nothing applicable: untouched */

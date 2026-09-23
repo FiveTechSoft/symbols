@@ -1727,9 +1727,193 @@ static char *ub_apply(const char *data, size_t at)
     return out;
 }
 
-enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_COUNT };
+/* ---------------------------------------------------------- author_test
+   Operator 10: write a test. Preconditions: the task names exactly one .c
+   file that does not exist (the test file), exactly one function that a
+   workspace header declares, and an integer the call is expected to return
+   (the first integer after the call in its sentence). The call is the one
+   written in the task; if the task names the function without arguments,
+   arguments come from the prototype (declared rule: int-like -> 1, char
+   pointer -> "abc"; any other parameter type = abstain). The file includes
+   that header and returns 0 when the call equals the value. Verify: the test
+   compiles with the workspace sources that have no main, and exits 0. */
+
+typedef struct {
+    char test_rel[TASK_OPS_MAX_PATH];
+    char header[TASK_OPS_MAX_PATH];
+    char call[256];
+    long expect;
+} TEST_PLAN;
+
+static int defines_main(const char *data)
+{
+    for (const char *p = strstr(data, "main"); p; p = strstr(p + 1, "main")) {
+        if ((p == data || !ident_char((unsigned char)p[-1])) && !ident_char((unsigned char)p[4])) {
+            const char *q = p + 4;
+            while (*q == ' ' || *q == '\t') q++;
+            if (*q == '(') return 1;
+        }
+    }
+    return 0;
+}
+
+/* header index declaring name; params copied (between the parentheses) */
+static int at_prototype(const TASK_OPS_WORKSPACE *ws, const char *name, char *params, size_t ps)
+{
+    int found = -1;
+    for (int f = 0; f < ws->count; f++) {
+        if (!is_header(ws->files[f].rel)) continue;
+        const char *d = ws->files[f].data;
+        size_t nl = strlen(name);
+        for (const char *p = strstr(d, name); p; p = strstr(p + 1, name)) {
+            if ((p != d && ident_char((unsigned char)p[-1])) || ident_char((unsigned char)p[nl])) continue;
+            const char *q = p + nl;
+            while (*q == ' ') q++;
+            if (*q != '(') continue;
+            const char *e = strchr(q, ')');
+            if (!e || !strchr(e, ';') || memchr(q, '\n', (size_t)(e - q))) continue;
+            const char *semi = e + 1;
+            while (*semi == ' ') semi++;
+            if (*semi != ';') continue;
+            if (found >= 0 && found != f) return -2;
+            found = f;
+            snprintf(params, ps, "%.*s", (int)(e - q - 1), q + 1);
+        }
+    }
+    return found;
+}
+
+static int at_args_from_params(const char *params, char *out, size_t os)
+{
+    size_t o = 0;
+    out[0] = '\0';
+    if (!strcmp(params, "void") || !params[0]) return 1;
+    const char *p = params;
+    while (*p) {
+        const char *e = strchr(p, ',');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        char one[128];
+        if (l >= sizeof(one)) return 0;
+        memcpy(one, p, l);
+        one[l] = '\0';
+        const char *val;
+        if (strstr(one, "char") && strchr(one, '*')) val = "\"abc\"";
+        else if (strchr(one, '*') || strchr(one, '[') || strstr(one, "struct") || strstr(one, "...")) return 0;
+        else val = "1";
+        o += (size_t)snprintf(out + o, os - o, "%s%s", o ? ", " : "", val);
+        if (o >= os) return 0;
+        p = e ? e + 1 : p + l;
+    }
+    return 1;
+}
+
+static int find_test_plan(const TASK_OPS_WORKSPACE *ws, const char *task, TEST_PLAN *tp)
+{
+    memset(tp, 0, sizeof(*tp));
+    size_t pos = 0;
+    char name[TASK_OPS_MAX_PATH];
+    int nt = 0;
+    while (next_named_file(task, &pos, name, sizeof(name))) {
+        size_t n = strlen(name);
+        if (n > 2 && !strcmp(name + n - 2, ".c") && ws_find_named(ws, name) < 0 &&
+            (nt == 0 || strcmp(tp->test_rel, name) != 0)) {
+            snprintf(tp->test_rel, sizeof(tp->test_rel), "%s", name);
+            nt++;
+        }
+    }
+    if (nt != 1 || strchr(tp->test_rel, '/'))
+        return 0;
+    int nf = 0;
+    const char *after = NULL;
+    int literal_call = 0;
+    char seen[16][64];
+    int nseen = 0;
+    for (const char *p = task; *p; p++) {
+        if (!ident_start((unsigned char)*p) || (p > task && (ident_char((unsigned char)p[-1]) || p[-1] == '.'))) continue;
+        const char *s = p;
+        while (ident_char((unsigned char)*p)) p++;
+        size_t l = (size_t)(p - s);
+        if (l >= 64 || *p == '.') { p--; continue; }
+        char id[64], params[256];
+        memcpy(id, s, l);
+        id[l] = '\0';
+        int dup = 0;
+        for (int k = 0; k < nseen; k++) if (!strcmp(seen[k], id)) dup = 1;
+        int hf = at_prototype(ws, id, params, sizeof(params));
+        if (!dup && nseen < 16) snprintf(seen[nseen++], 64, "%s", id);
+        if (hf < 0) { p--; continue; }
+        if (!dup) nf++;
+        snprintf(tp->header, sizeof(tp->header), "%s", ws->files[hf].rel);
+        const char *q = p;
+        while (*q == ' ') q++;
+        if (*q == '(') {
+            /* a written call; one with literal-only arguments wins */
+            const char *e = strchr(q, ')');
+            if (!e || e - s >= (long)sizeof(tp->call)) return 0;
+            int literal = 1;
+            for (const char *a = q + 1; a < e; a++)
+                if (ident_start((unsigned char)*a) && !ident_char((unsigned char)a[-1])) literal = 0;
+            if (!after || literal_call == 0 && literal) {
+                snprintf(tp->call, sizeof(tp->call), "%.*s", (int)(e + 1 - s), s);
+                after = e + 1;
+                literal_call = literal;
+            }
+        } else if (!after) {
+            char args[160];
+            if (!at_args_from_params(params, args, sizeof(args))) return 0;
+            snprintf(tp->call, sizeof(tp->call), "%s(%s)", id, args);
+            after = p;
+        }
+        p--;
+    }
+    if (nf != 1 || !after)
+        return 0;
+    for (const char *q = after; *q && *q != '\n'; q++) {
+        if (*q == '.' && (q[1] == ' ' || !q[1])) break;   /* same sentence */
+        if ((isdigit((unsigned char)*q) || (*q == '-' && isdigit((unsigned char)q[1]))) &&
+            !ident_char((unsigned char)q[-1])) {
+            char *end;
+            tp->expect = strtol(q, &end, 10);
+            if (ident_char((unsigned char)*end) || *end == '.' && isdigit((unsigned char)end[1])) return 0;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int run_test_plan(const TASK_OPS_WORKSPACE *ws, const TEST_PLAN *tp, const char *flags)
+{
+    char cmd[4096], bin[TASK_OPS_MAX_PATH];
+    size_t o = 0;
+    temp_binary(bin, sizeof(bin));
+    o += (size_t)snprintf(cmd, sizeof(cmd), "gcc %s-o \"%s\" \"%s\"", flags, bin, tp->test_rel);
+    for (int i = 0; i < ws->count && o < sizeof(cmd); i++) {
+        size_t n = strlen(ws->files[i].rel);
+        if (n < 3 || strcmp(ws->files[i].rel + n - 2, ".c") || !strcmp(ws->files[i].rel, tp->test_rel) ||
+            defines_main(ws->files[i].data) || strchr(ws->files[i].rel, '"'))
+            continue;
+        o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, " \"%s\"", ws->files[i].rel);
+    }
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r) return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    int ok = !r->execution_failed && r->exit_code == 0;
+    if (ok) {
+        char run_cmd[TASK_OPS_MAX_PATH + 8];
+        snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", bin);
+        AgentShellResultInit(r);
+        AgentShellExec(run_cmd, ws->root, 5000, r);
+        ok = !r->timed_out && r->exit_code == 0;
+    }
+    remove(bin);
+    free(r);
+    return ok;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace"
 };
 
 static int mem_enabled(void)
@@ -1862,6 +2046,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
     char da[128] = {0}, db[128] = {0}, dead[128] = {0};
     int deads = 0;
+    TEST_PLAN tplan;
     LIT_PLAN lit;
     char *lit_out = NULL;
     FRAG_HIT hit;
@@ -1937,6 +2122,18 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "remove_dead_function");
             snprintf(rep->detail, sizeof(rep->detail), "%.100s removed from %d file(s)", dead, touched);
+        } else if (op == OP_TEST && find_test_plan(ws, task, &tplan)) {
+            size_t cap = 512 + strlen(tplan.call);
+            created.data = (char *)malloc(cap);
+            if (created.data) {
+                snprintf(created.rel, sizeof(created.rel), "%s", tplan.test_rel);
+                snprintf(created.data, cap, "#include \"%s\"\n\nint main(void)\n{\n    return %s == %ld ? 0 : 1;\n}\n",
+                         tplan.header, tplan.call, tplan.expect);
+                touched = 1;
+                rep->candidates = 1;
+                snprintf(rep->op, sizeof(rep->op), "author_test");
+                snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
+            }
         } else if (op == OP_BRACE && rep->compile_before == 0) {
             int bf = -1;
             size_t bat = 0;
@@ -1992,6 +2189,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "literal_to_constant")) {
             int f2, files2;
             intent = literal_uses(after, &lit, &f2, &files2) == 0 && TaskOpsCountToken(after, lit.name) >= 2;
+        } else if (!strcmp(rep->op, "author_test")) {
+            intent = run_test_plan(after, &tplan, flags);
         } else if (!strcmp(rep->op, "remove_dead_function")) {
             intent = TaskOpsCountToken(after, dead) == 0 && rep->compile_after == 1;
         } else if (!strcmp(rep->op, "doc_sync")) {
@@ -2016,6 +2215,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         if (!named_files_exist(ws, after, task, &named, &named_touched) ||
             (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
             intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
+        if (!strcmp(rep->op, "author_test"))
+            no_regress = 1;   /* sources untouched; the test's own build and run is the evidence */
         verified = intent && no_regress;
         if (!verified)
             snprintf(rep->reason, sizeof(rep->reason),
