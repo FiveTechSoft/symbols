@@ -1,1 +1,1 @@
-main.c calls add() but the definition lives only in util.c without a header. Create util.h with the prototype and include it from both util.c and main.c.
+main.c calls add() but has no include and no local prototype; the definition lives only in util.c. Create util.h with the prototype, include it from both util.c and main.c, so the program compiles with -Werror=implicit-function-declaration and exits 0.

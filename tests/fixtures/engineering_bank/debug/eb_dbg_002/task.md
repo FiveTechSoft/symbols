@@ -1,1 +1,1 @@
-Null pointer dereference: guard ptr before reading *ptr. The code must check ptr != NULL (or equivalent) before dereference. Forbidden: unconditional first-line deref — require 'if (ptr' or 'ptr &&' style guard present.
+Null pointer dereference: guard ptr before reading *ptr. The program must exit 0 without crashing (the guard may return 0 early).

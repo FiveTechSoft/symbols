@@ -150,6 +150,91 @@ def files_check(required: tuple[str, ...], forbid: tuple[str, ...] = ()) -> str:
     return "\n".join(parts) + "\n"
 
 
+def _content_snippet(
+    must: dict[str, tuple[str, ...]],
+    forbid: tuple[tuple[str, str], ...] = (),
+    regex: bool = False,
+) -> str:
+    lines = ["import re", "ok = True"]
+    for name, needles in must.items():
+        lines.append(f"_t = Path({name!r}).read_text(encoding='utf-8', errors='replace') if Path({name!r}).is_file() else ''")
+        for n in needles:
+            if regex:
+                lines.append(f"if not re.search(r'{n}', _t):")
+            else:
+                lines.append(f"if {n!r} not in _t:")
+            lines.append(f"    print('missing', {n!r}, 'in', {name!r})")
+            lines.append("    ok = False")
+    for name, bad in forbid:
+        lines.append(f"_t = Path({name!r}).read_text(encoding='utf-8', errors='replace') if Path({name!r}).is_file() else ''")
+        if regex:
+            lines.append(f"if re.search(r'{bad}', _t):")
+        else:
+            lines.append(f"if {bad!r} in _t:")
+        lines.append(f"    print('forbidden', {bad!r}, 'in', {name!r})")
+        lines.append("    ok = False")
+    lines.append("sys.exit(0 if ok else 1)")
+    return "\n".join(lines) + "\n"
+
+
+def run_and_contains(
+    must: dict[str, tuple[str, ...]],
+    forbid: tuple[tuple[str, str], ...] = (),
+    regex: bool = False,
+) -> str:
+    """Compile+run all *.c (exit 0 required), then per-file content checks."""
+    content = _content_snippet(must, forbid, regex=regex)
+    return CHECK_RUN.replace(
+        "r2 = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)\n"
+        "sys.exit(r2.returncode)\n",
+        "r2 = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)\n"
+        "if r2.returncode != 0:\n"
+        "    sys.exit(r2.returncode)\n"
+        + content,
+    )
+
+
+def compile_and_contains(
+    must: dict[str, tuple[str, ...]],
+    forbid: tuple[tuple[str, str], ...] = (),
+    regex: bool = False,
+) -> str:
+    """-fsyntax-only compile of all *.c (must succeed), then content checks."""
+    content = _content_snippet(must, forbid, regex=regex)
+    return CHECK_COMPILE.replace(
+        "if r.returncode != 0:\n"
+        "    sys.stderr.write(r.stderr)\n"
+        "sys.exit(r.returncode)\n",
+        "if r.returncode != 0:\n"
+        "    sys.stderr.write(r.stderr)\n"
+        "    sys.exit(r.returncode)\n"
+        + content,
+    )
+
+
+def run_and_files(required: tuple[str, ...], forbid: tuple[str, ...] = ()) -> str:
+    """Compile+run all *.c (exit 0 required), then require/forbid files."""
+    file_lines = ["ok = True"]
+    for name in required:
+        file_lines.append(f"if not Path({name!r}).is_file():")
+        file_lines.append(f"    print('missing file', {name!r})")
+        file_lines.append("    ok = False")
+    for name in forbid:
+        file_lines.append(f"if Path({name!r}).exists():")
+        file_lines.append(f"    print('forbidden file', {name!r})")
+        file_lines.append("    ok = False")
+    file_lines.append("sys.exit(0 if ok else 1)")
+    content = "\n".join(file_lines) + "\n"
+    return CHECK_RUN.replace(
+        "r2 = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)\n"
+        "sys.exit(r2.returncode)\n",
+        "r2 = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)\n"
+        "if r2.returncode != 0:\n"
+        "    sys.exit(r2.returncode)\n"
+        + content,
+    )
+
+
 # Runtime shell resolver embedded in every generated shell check.
 # Resolved on the host that runs check.py — never baked at generation time.
 SH_RESOLVE = r'''import shutil
@@ -280,40 +365,54 @@ def main() -> int:
     # ---- refactor (7) --------------------------------------------------------
     rf = [
         ("eb_rf_001",
-         "Replace the magic number 42 with a named constant MAX_ITEMS. The program must still print 42. Forbidden: the bare token 42 must not appear in main.c except inside the constant definition line if you keep the value there as MAX_ITEMS.",
+         "Replace the magic number 42 with a named constant MAX_ITEMS. The program must still exit 0. Forbidden: the bare token 42 must not appear outside the constant definition line.",
          {"main.c": "int main(void) {\n    int n = 42;\n    return n == 42 ? 0 : 1;\n}\n"},
          {"main.c": "#define MAX_ITEMS 42\n\nint main(void) {\n    int n = MAX_ITEMS;\n    return n == MAX_ITEMS ? 0 : 1;\n}\n"},
-         contains_check("MAX_ITEMS", forbid=("    int n = 42;",))),
+         run_and_contains(
+             {"main.c": ("MAX_ITEMS",)},
+             forbid=(("main.c", "int n = 42;"),))),
         ("eb_rf_002",
-         "Rename the function compute to compute_total everywhere in main.c. Do not leave the old name.",
-         {"main.c": "static int compute(int a) { return a + 1; }\n\nint main(void) {\n    return compute(1);\n}\n"},
-         {"main.c": "static int compute_total(int a) { return a + 1; }\n\nint main(void) {\n    return compute_total(1);\n}\n"},
-         contains_check("compute_total", forbid=("compute(", "static int compute("))),
+         "Rename the function compute to compute_total everywhere in main.c. Do not leave the old name. The program must exit 0.",
+         {"main.c": "static int compute(int a) { return a + 1; }\n\nint main(void) {\n    return compute(1) == 2 ? 0 : 1;\n}\n"},
+         {"main.c": "static int compute_total(int a) { return a + 1; }\n\nint main(void) {\n    return compute_total(1) == 2 ? 0 : 1;\n}\n"},
+         run_and_contains(
+             {"main.c": ("compute_total",)},
+             forbid=(("main.c", "compute("), ("main.c", "static int compute(")))),
         ("eb_rf_003",
-         "Remove the unused function dead_helper so only live code remains. main must stay.",
+         "Remove the unused function dead_helper so only live code remains. main must stay and the program must exit 0.",
          {"main.c": "static int dead_helper(int x) { return x; }\n\nint main(void) {\n    return 0;\n}\n"},
          {"main.c": "int main(void) {\n    return 0;\n}\n"},
-         contains_check("int main", forbid=("dead_helper",))),
+         run_and_contains(
+             {"main.c": ("int main",)},
+             forbid=(("main.c", "dead_helper"),))),
         ("eb_rf_004",
-         "Make the pointer parameter of scale const-correct: the function must not modify *p, and the signature should use const int *. Update the call site if needed. Signature must contain 'const int *'.",
+         "Make the pointer parameter of scale const-correct: the function must not modify *p, and the signature must use const int *. The program must exit 0.",
          {"main.c": "static int scale(int *p, int k) {\n    return *p * k;\n}\n\nint main(void) {\n    int v = 2;\n    return scale(&v, 3) == 6 ? 0 : 1;\n}\n"},
          {"main.c": "static int scale(const int *p, int k) {\n    return *p * k;\n}\n\nint main(void) {\n    int v = 2;\n    return scale(&v, 3) == 6 ? 0 : 1;\n}\n"},
-         contains_check("const int *", forbid=("static int scale(int *p",))),
+         run_and_contains(
+             {"main.c": ("const int *",)},
+             forbid=(("main.c", "static int scale(int *p"),))),
         ("eb_rf_005",
-         "Extract the repeated literal \"RESULT: \" into a named constant RESULT_PREFIX and use it in both printf calls.",
+         "Extract the repeated literal \"RESULT: \" into a named constant RESULT_PREFIX and use it in both printf calls. The program must exit 0.",
          {"main.c": "#include <stdio.h>\n\nint main(void) {\n    printf(\"RESULT: %d\\n\", 1);\n    printf(\"RESULT: %d\\n\", 2);\n    return 0;\n}\n"},
          {"main.c": "#include <stdio.h>\n\n#define RESULT_PREFIX \"RESULT: \"\n\nint main(void) {\n    printf(RESULT_PREFIX \"%d\\n\", 1);\n    printf(RESULT_PREFIX \"%d\\n\", 2);\n    return 0;\n}\n"},
-         contains_check("RESULT_PREFIX", forbid=('printf("RESULT: %d',))),
+         run_and_contains(
+             {"main.c": ("RESULT_PREFIX",)},
+             forbid=(("main.c", 'printf("RESULT: %d'),))),
         ("eb_rf_006",
-         "Convert the while loop that counts to 3 into a for loop with the same semantics. The file must compile and must contain 'for ('.",
+         "Convert the while loop that counts to 3 into a for loop with the same semantics. The program must exit 0 and the file must contain a for loop, not while.",
          {"main.c": "int main(void) {\n    int i = 0;\n    while (i < 3) {\n        i++;\n    }\n    return i == 3 ? 0 : 1;\n}\n"},
          {"main.c": "int main(void) {\n    int i;\n    for (i = 0; i < 3; i++) {\n    }\n    return i == 3 ? 0 : 1;\n}\n"},
-         contains_check("for (", forbid=("while (",))),
+         run_and_contains(
+             {"main.c": ("for (",)},
+             forbid=(("main.c", "while ("),))),
         ("eb_rf_007",
-         "Replace the goto-based flow with structured control flow (no goto). Keep returning 0 on the success path.",
+         "Replace the goto-based flow with structured control flow (no goto). Keep returning 0 on the success path; the program must exit 0 and must not contain goto.",
          {"main.c": "int main(void) {\n    int ok = 1;\n    if (!ok) goto fail;\n    return 0;\nfail:\n    return 1;\n}\n"},
          {"main.c": "int main(void) {\n    int ok = 1;\n    if (!ok) {\n        return 1;\n    }\n    return 0;\n}\n"},
-         contains_check("int main", forbid=("goto",))),
+         run_and_contains(
+             {"main.c": ("int main",)},
+             forbid=(("main.c", "goto"),))),
     ]
     for tid, prompt, b, a, c in rf:
         write_task(tid, "refactor", prompt, b, a, c)
@@ -542,10 +641,12 @@ sys.exit(0 if t.count("```") % 2 == 0 and t.count("```") >= 2 else 1)
          {"README.md": "# Install\n\ncmake -S . -B build\n"},
          contains_check("cmake -S . -B build", forbid=("pip install",))),
         ("eb_dc_005",
-         "The function comment lies: it says returns -1 on error but the code returns 0 on success only. Update the comment to say 'returns 0 on success'.",
+         "The function comment lies: it says returns -1 on error but the code returns 0 on success only. Update the comment to say 'returns 0 on success'. The program must still exit 0.",
          {"main.c": "/* returns -1 on error */\nint parse_ok(void) { return 0; }\n\nint main(void) { return parse_ok(); }\n"},
          {"main.c": "/* returns 0 on success */\nint parse_ok(void) { return 0; }\n\nint main(void) { return parse_ok(); }\n"},
-         contains_check("returns 0 on success", forbid=("returns -1 on error",))),
+         run_and_contains(
+             {"main.c": ("returns 0 on success",)},
+             forbid=(("main.c", "returns -1 on error"),))),
         ("eb_dc_006",
          "Add a '## License' section to README.md with the text 'MIT'. The file currently has no license section.",
          {"README.md": "# Project\n\nHello.\n"},
@@ -575,11 +676,19 @@ sys.exit(0 if t.count("```") % 2 == 0 and t.count("```") >= 2 else 1)
          {"run.sh": "#!/bin/sh\nexit 0\n"},
          {"run.sh": "#!/bin/sh\nif [ \"$1\" = \"fail\" ]; then\n    exit 3\nfi\nexit 0\n"},
          sh_run_check('["run.sh", "fail"]', "rc == 3")),
-         ("eb_sh_003",
-          "run.sh uses an unquoted variable so a path with spaces breaks. Quote \"$1\" when echoing it. Checker requires the literal line echo \"$1\" and forbids unquoted echo $1.",
-          {"run.sh": "#!/bin/sh\necho $1\n"},
-          {"run.sh": "#!/bin/sh\necho \"$1\"\n"},
-          contains_check('echo "$1"', forbid=("echo $1\n",))),
+        ("eb_sh_003",
+         "run.sh uses an unquoted variable so a path with spaces/multiple spaces is collapsed. The checker runs `sh run.sh 'a  b'` (two spaces) and requires the stdout line to be exactly `a  b`.",
+         {"run.sh": "#!/bin/sh\necho $1\n"},
+         {"run.sh": "#!/bin/sh\necho \"$1\"\n"},
+         f'''#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+{SH_RESOLVE}
+r = subprocess.run(shell + ["run.sh", "a  b"], capture_output=True, text=True)
+if r.returncode != 0:
+    sys.exit(1)
+sys.exit(0 if (r.stdout or "") == "a  b\\n" else 1)
+'''),
         ("eb_sh_004",
          "run.sh is missing a shebang. Add #!/bin/sh as the first line. Checker requires the file to start with #!/bin/sh.",
          {"run.sh": "echo ok\n"},
@@ -591,10 +700,16 @@ t = Path("run.sh").read_text(encoding="utf-8")
 sys.exit(0 if t.startswith("#!/bin/sh") else 1)
 '''),
         ("eb_sh_005",
-         "run.sh should enable errexit (set -e) so failures stop the script. Add set -e as an executable line (not only in a comment).",
-         {"run.sh": "#!/bin/sh\necho hi\n"},
-         {"run.sh": "#!/bin/sh\nset -e\necho hi\n"},
-         contains_check("set -e", forbid=("# set -e",))),
+         "run.sh must fail closed: if any command fails, the script must exit non-zero before later commands run. Currently it continues after a failure. Fix with set -e (or equivalent). The checker runs the script (which contains a failing command) and requires a non-zero exit.",
+         {"run.sh": "#!/bin/sh\nfalse\necho hi\n"},
+         {"run.sh": "#!/bin/sh\nset -e\nfalse\necho hi\n"},
+         f'''#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+{SH_RESOLVE}
+r = subprocess.run(shell + ["run.sh"], capture_output=True, text=True)
+sys.exit(0 if r.returncode != 0 else 1)
+'''),
         ("eb_sh_006",
          "run.sh must create output.txt with content OK using a redirection. Checker runs the script then requires output.txt to contain OK.",
          {"run.sh": "#!/bin/sh\ntouch output.txt\n"},
@@ -630,50 +745,48 @@ sys.exit(0 if p.is_file() and p.read_text(encoding="utf-8").strip() == "OK" else
          {"util.h": "#define NEW_LIMIT 10\nint get_limit(void);\n",
           "util.c": "#include \"util.h\"\nint get_limit(void) { return NEW_LIMIT; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return get_limit() == 10 ? 0 : 1; }\n"},
-         contains_check("NEW_LIMIT", forbid=("OLD_LIMIT",))),
-("eb_mf_002",
-          "util.c defines helper but util.h does not declare it. Add a prototype to util.h so consumers can use it. Parameter names may match the definition (int x) or be omitted (int).",
-          {"util.h": "/* helpers */\n",
-           "util.c": "int helper(int x) { return x + 1; }\n",
-           "main.c": "int helper(int x);\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
-          {"util.h": "int helper(int x);\n",
-           "util.c": "int helper(int x) { return x + 1; }\n",
-           "main.c": "#include \"util.h\"\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
-          '''#!/usr/bin/env python3
-import re
-import sys
-from pathlib import Path
-if not Path("util.h").is_file():
-    sys.exit(1)
-t = Path("util.h").read_text(encoding="utf-8")
-# Accept parameter names or bare types: int helper(int x); / int helper(int);
-pat = re.compile(r"\\bint\\s+helper\\s*\\(\\s*int(?:\\s+\\w+)?\\s*\\)")
-sys.exit(0 if pat.search(t) else 1)
-'''),
+         run_and_contains(
+             {"util.h": ("NEW_LIMIT",), "util.c": ("NEW_LIMIT",)},
+             forbid=(("util.h", "OLD_LIMIT"), ("util.c", "OLD_LIMIT")))),
+        ("eb_mf_002",
+         "util.c defines helper but util.h does not declare it. main.c must include util.h and must not carry a local prototype; add the prototype to util.h so the program compiles with -Werror=implicit-function-declaration. Parameter names may match the definition (int x) or be omitted (int).",
+         {"util.h": "/* helpers */\n",
+          "util.c": "int helper(int x) { return x + 1; }\n",
+          "main.c": "#include \"util.h\"\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
+         {"util.h": "int helper(int x);\n",
+          "util.c": "int helper(int x) { return x + 1; }\n",
+          "main.c": "#include \"util.h\"\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
+         compile_and_contains(
+             {"util.h": (r"\bint\s+helper\s*\(\s*int(?:\s+\w+)?\s*\)",)},
+             regex=True)),
         ("eb_mf_003",
-         "main.c calls add() but the definition lives only in util.c without a header. Create util.h with the prototype and include it from both util.c and main.c.",
+         "main.c calls add() but has no include and no local prototype; the definition lives only in util.c. Create util.h with the prototype, include it from both util.c and main.c, so the program compiles with -Werror=implicit-function-declaration and exits 0.",
          {"util.c": "int add(int a, int b) { return a + b; }\n",
-          "main.c": "int add(int a, int b);\nint main(void) { return add(1, 2) == 3 ? 0 : 1; }\n"},
+          "main.c": "int main(void) { return add(1, 2) == 3 ? 0 : 1; }\n"},
          {"util.h": "int add(int a, int b);\n",
           "util.c": "#include \"util.h\"\nint add(int a, int b) { return a + b; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return add(1, 2) == 3 ? 0 : 1; }\n"},
-         contains_check('#include "util.h"', "int add(int a, int b);")),
+         run_and_contains(
+             {"main.c": ('#include "util.h"',), "util.c": ('#include "util.h"',),
+              "util.h": ("int add(int a, int b);",)})),
         ("eb_mf_004",
-         "The include guard in util.h is wrong (uses MAIN_H). Change it to UTIL_H in both #ifndef and #define.",
+         "The include guard in util.h is wrong (uses MAIN_H). Change it to UTIL_H in both #ifndef and #define so the program still exits 0 and the guard names match.",
          {"util.h": "#ifndef MAIN_H\n#define MAIN_H\nint util_value(void);\n#endif\n",
           "util.c": "#include \"util.h\"\nint util_value(void) { return 1; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return util_value() == 1 ? 0 : 1; }\n"},
          {"util.h": "#ifndef UTIL_H\n#define UTIL_H\nint util_value(void);\n#endif\n",
           "util.c": "#include \"util.h\"\nint util_value(void) { return 1; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return util_value() == 1 ? 0 : 1; }\n"},
-         contains_check("#ifndef UTIL_H", "#define UTIL_H", forbid=("MAIN_H",))),
+         run_and_contains(
+             {"util.h": ("#ifndef UTIL_H", "#define UTIL_H")},
+             forbid=(("util.h", "MAIN_H"),))),
         ("eb_mf_005",
-         "Split process() out of main.c into process.c with a prototype in process.h; main.c must include process.h and call process(). Forbidden: 'static int process' remaining only as a static in main without a separate file — require process.c and process.h to exist.",
+         "Split process() out of main.c into process.c with a prototype in process.h; main.c must include process.h and call process(). Require process.c and process.h to exist, and the linked program must exit 0.",
          {"main.c": "static int process(int x) { return x + 1; }\n\nint main(void) {\n    return process(1) == 2 ? 0 : 1;\n}\n"},
          {"process.h": "int process(int x);\n",
           "process.c": "#include \"process.h\"\nint process(int x) { return x + 1; }\n",
           "main.c": "#include \"process.h\"\n\nint main(void) {\n    return process(1) == 2 ? 0 : 1;\n}\n"},
-         files_check(("process.c", "process.h"))),
+         run_and_files(("process.c", "process.h"))),
         ("eb_mf_006",
          "Two headers define the same macro LIMIT differently. Unify them: both a.h and b.h must define LIMIT as 5 (exact token '5'). The program links one check TU per header and must exit 0 only when both are 5.",
          {"a.h": "#define LIMIT 3\n",
@@ -688,23 +801,15 @@ sys.exit(0 if pat.search(t) else 1)
           "main.c": "int a_ok(void);\nint b_ok(void);\nint main(void) { return (a_ok() && b_ok()) ? 0 : 1; }\n"},
          CHECK_RUN),
         ("eb_mf_007",
-         "main.c does not include util.h but uses get(). Add the include. util.h must be included from main.c (string '#include \"util.h\"' in main.c).",
+         "main.c calls get() but does not include util.h and has no local prototype. Add the include so the program compiles with -Werror=implicit-function-declaration and exits 0.",
          {"util.h": "int get(void);\n",
           "util.c": "#include \"util.h\"\nint get(void) { return 1; }\n",
-          "main.c": "int get(void);\nint main(void) { return get() == 1 ? 0 : 1; }\n"},
+          "main.c": "int main(void) { return get() == 1 ? 0 : 1; }\n"},
          {"util.h": "int get(void);\n",
           "util.c": "#include \"util.h\"\nint get(void) { return 1; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return get() == 1 ? 0 : 1; }\n"},
-         '''#!/usr/bin/env python3
-import sys
-from pathlib import Path
-t = Path("main.c").read_text(encoding="utf-8") if Path("main.c").is_file() else ""
-sys.exit(0 if '#include "util.h"' in t else 1)
-'''),
+         run_and_contains({"main.c": ('#include "util.h"',)})),
     ]
-    # Fix eb_mf_003 check (the | 0 hack)
-    mf[2] = (mf[2][0], mf[2][1], mf[2][2], mf[2][3],
-             contains_check('#include "util.h"', "int add(int a, int b);"))
     for tid, prompt, b, a, c in mf:
         write_task(tid, "multi_file", prompt, b, a, c)
         tasks.append((tid, "multi_file"))
@@ -717,10 +822,10 @@ sys.exit(0 if '#include "util.h"' in t else 1)
          {"main.c": "int main(void) {\n    int a[3];\n    int n = 3;\n    for (int i = 0; i < n; i++) {\n        a[i] = i;\n    }\n    return a[0];\n}\n"},
          contains_check("i < n", forbid=("i <= n",))),
         ("eb_dbg_002",
-         "Null pointer dereference: guard ptr before reading *ptr. The code must check ptr != NULL (or equivalent) before dereference. Forbidden: unconditional first-line deref — require 'if (ptr' or 'ptr &&' style guard present.",
+         "Null pointer dereference: guard ptr before reading *ptr. The program must exit 0 without crashing (the guard may return 0 early).",
          {"main.c": "int main(void) {\n    const char *ptr = 0;\n    int c = *ptr;\n    return c;\n}\n"},
          {"main.c": "int main(void) {\n    const char *ptr = 0;\n    if (ptr == 0) {\n        return 0;\n    }\n    int c = *ptr;\n    return c;\n}\n"},
-         contains_check("if (ptr", "return 0")),
+         CHECK_RUN),
         ("eb_dbg_003",
          "Wrong comparison: sum_to(n) must include n (inclusive). Currently uses i < n exclusive — for sum_to(3) expect 6 not 3. Change to i <= n.",
          {"util.c": "int sum_to(int n) {\n    int s = 0;\n    for (int i = 1; i < n; i++) s += i;\n    return s;\n}\n",
@@ -742,7 +847,8 @@ r = subprocess.run(["gcc", "-std=c11", "-Werror=implicit-function-declaration", 
                    capture_output=True, text=True)
 if r.returncode != 0:
     sys.stderr.write(r.stderr); sys.exit(1)
-r = subprocess.run(["./tbin"])
+bin_path = Path("tbin.exe") if Path("tbin.exe").is_file() else Path("tbin")
+r = subprocess.run([str(bin_path.resolve())])
 sys.exit(r.returncode)
 '''),
         ("eb_dbg_004",
@@ -761,10 +867,12 @@ sys.exit(r.returncode)
          {"main.c": "static int is_valid(int v) {\n    return v >= 0 && v <= 99;\n}\nint main(void) {\n    return is_valid(99) ? 0 : 1;\n}\n"},
          CHECK_RUN),
         ("eb_dbg_007",
-         "Buffer too small: the buffer must hold 6 chars + NUL (char buf[7] at least). Currently buf[4]. Fix the size. Forbidden: 'char buf[4]'.",
+         "Buffer too small: the buffer must hold 6 chars + NUL (char buf[7] at least). Currently buf[4]. Fix the size so strcpy-like initialization is valid and the program exits 0. Forbidden: 'char buf[4]'.",
          {"main.c": "int main(void) {\n    char buf[4] = \"abcdef\";\n    return buf[0] == 'a' ? 0 : 1;\n}\n"},
          {"main.c": "int main(void) {\n    char buf[7] = \"abcdef\";\n    return buf[0] == 'a' ? 0 : 1;\n}\n"},
-         contains_check("char buf[7]", forbid=("char buf[4]",))),
+         run_and_contains(
+             {"main.c": ("char buf[7]",)},
+             forbid=(("main.c", "char buf[4]"),))),
     ]
     for tid, prompt, b, a, c in dbg:
         write_task(tid, "debug", prompt, b, a, c)

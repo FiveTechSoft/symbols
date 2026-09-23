@@ -1,1 +1,1 @@
-Replace the goto-based flow with structured control flow (no goto). Keep returning 0 on the success path.
+Replace the goto-based flow with structured control flow (no goto). Keep returning 0 on the success path; the program must exit 0 and must not contain goto.

@@ -1,1 +1,1 @@
-run.sh should enable errexit (set -e) so failures stop the script. Add set -e as an executable line (not only in a comment).
+run.sh must fail closed: if any command fails, the script must exit non-zero before later commands run. Currently it continues after a failure. Fix with set -e (or equivalent). The checker runs the script (which contains a failing command) and requires a non-zero exit.

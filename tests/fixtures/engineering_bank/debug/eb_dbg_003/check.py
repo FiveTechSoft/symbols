@@ -11,5 +11,6 @@ r = subprocess.run(["gcc", "-std=c11", "-Werror=implicit-function-declaration", 
                    capture_output=True, text=True)
 if r.returncode != 0:
     sys.stderr.write(r.stderr); sys.exit(1)
-r = subprocess.run(["./tbin"])
+bin_path = Path("tbin.exe") if Path("tbin.exe").is_file() else Path("tbin")
+r = subprocess.run([str(bin_path.resolve())])
 sys.exit(r.returncode)
