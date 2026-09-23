@@ -48,6 +48,31 @@ if r.returncode != 0:
 sys.exit(r.returncode)
 '''
 
+# Configure+build a CMake project in a temp dir; exit 0 only if both succeed.
+CHECK_CMAKE_BUILD = r'''#!/usr/bin/env python3
+import shutil, subprocess, sys, tempfile
+from pathlib import Path
+if not Path("CMakeLists.txt").is_file():
+    sys.exit(1)
+td = tempfile.mkdtemp(prefix="eb_cmake_")
+try:
+    r = subprocess.run(
+        ["cmake", "-S", ".", "-B", td],
+        capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        sys.stderr.write((r.stderr or "") + (r.stdout or ""))
+        sys.exit(1)
+    r = subprocess.run(
+        ["cmake", "--build", td],
+        capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        sys.stderr.write((r.stderr or "") + (r.stdout or ""))
+        sys.exit(1)
+    sys.exit(0)
+finally:
+    shutil.rmtree(td, ignore_errors=True)
+'''
+
 # Compile every *.c in CWD and run the binary; exit 0 only if the program exits 0.
 # Used where before/ deterministically exits non-zero and after/ exits 0.
 CHECK_RUN = r'''#!/usr/bin/env python3
@@ -561,44 +586,80 @@ sys.exit(r.returncode)
     # ---- build_ci (7) --------------------------------------------------------
     bi = [
         ("eb_bi_001",
-         "CMakeLists.txt does not compile main.c (the add_executable list is empty). Add main.c so configure+build would include it. Checker only verifies CMakeLists.txt lists main.c and that main.c still exists.",
+         "CMakeLists.txt does not compile main.c (the add_executable list is empty). Add main.c so cmake configure+build succeeds.",
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo)\n",
           "main.c": "int main(void) { return 0; }\n"},
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo main.c)\n",
           "main.c": "int main(void) { return 0; }\n"},
-         contains_check("add_executable(demo main.c)", forbid=("add_executable(demo)\n",))),
+         CHECK_CMAKE_BUILD),
         ("eb_bi_002",
-         "The CI shell script build.sh does not invoke a C compiler. Make it run gcc -std=c11 -fsyntax-only on main.c and exit with gcc's status.",
+         "The CI shell script build.sh does not invoke a C compiler. Make it run gcc -std=c11 -fsyntax-only on main.c. The checker breaks main.c and requires the script to exit non-zero (compiler must see the error).",
          {"build.sh": "#!/bin/sh\necho building\nexit 0\n",
           "main.c": "int main(void) { return 0; }\n"},
-          {"build.sh": "#!/bin/sh\ngcc -std=c11 -fsyntax-only main.c\n",
-           "main.c": "int main(void) { return 0; }\n"},
-          contains_check("gcc", forbid=("echo building",))),
+         {"build.sh": "#!/bin/sh\ngcc -std=c11 -fsyntax-only main.c\n",
+          "main.c": "int main(void) { return 0; }\n"},
+         f'''#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+{SH_RESOLVE}
+if not Path("build.sh").is_file():
+    sys.exit(1)
+Path("main.c").write_text("int main(void) {{ return 0 }}\\nint broken(\\n", encoding="utf-8")
+r = subprocess.run(shell + ["build.sh"], capture_output=True, text=True)
+sys.exit(0 if r.returncode != 0 else 1)
+'''),
         ("eb_bi_003",
-         "Makefile target all does not depend on app. Fix the Makefile so `make -n all` would build app (checker: Makefile contains 'all: app').",
+         "Makefile target all does not depend on app. Fix the Makefile so `make -n all` would show a build of app (checker: runs make -n all and requires the app link line, or fails if make is unavailable).",
          {"Makefile": "all:\n\t@echo done\n",
           "app.c": "int main(void) { return 0; }\n"},
          {"Makefile": "all: app\n\napp: app.c\n\tgcc -std=c11 -o app app.c\n",
           "app.c": "int main(void) { return 0; }\n"},
-         contains_check("all: app")),
+         f'''#!/usr/bin/env python3
+import shutil, subprocess, sys
+from pathlib import Path
+if not Path("Makefile").is_file():
+    sys.exit(1)
+make_bin = None
+for name in ("make", "mingw32-make", "gmake"):
+    p = shutil.which(name)
+    if p and "system32" not in p.lower():
+        make_bin = p
+        break
+if not make_bin:
+    # Fallback: structural when no make on PATH (e.g. bare Windows without MinGW make).
+    t = Path("Makefile").read_text(encoding="utf-8")
+    sys.exit(0 if "all: app" in t else 1)
+r = subprocess.run([make_bin, "-n", "all"], capture_output=True, text=True)
+out = (r.stdout or "") + (r.stderr or "")
+sys.exit(0 if r.returncode == 0 and "app" in out and "echo done" not in out else 1)
+'''),
         ("eb_bi_004",
          "CMakeLists.txt is missing project(). Add a project(<name> C) line after cmake_minimum_required.",
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\n"},
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\n"},
          contains_check("project(")),
         ("eb_bi_005",
-         "build.sh ignores compiler failures (always exits 0). Propagate the compiler exit status (set -e or explicit check). The checker builds a failing main.c case: actually the workdir main.c is valid; checker only requires build.sh not to hardcode exit 0 after a failed gcc. It runs build.sh on the provided main.c which succeeds; additionally greps that the script does not end with a blind 'exit 0' after echo-only build.",
+         "build.sh must fail closed: if the compiler fails, the script must exit non-zero. The checker writes invalid C to main.c and runs build.sh; before/ hardcodes success, after/ must exit non-zero.",
          {"build.sh": "#!/bin/sh\necho compile\nexit 0\n",
           "main.c": "int main(void) { return 0; }\n"},
          {"build.sh": "#!/bin/sh\nset -e\ngcc -std=c11 -fsyntax-only main.c\n",
           "main.c": "int main(void) { return 0; }\n"},
-         contains_check("gcc", forbid=("exit 0",))),
+         f'''#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+{SH_RESOLVE}
+if not Path("build.sh").is_file():
+    sys.exit(1)
+Path("main.c").write_text("int main(void) {{ return 0 }}\\nint broken(\\n", encoding="utf-8")
+r = subprocess.run(shell + ["build.sh"], capture_output=True, text=True)
+sys.exit(0 if r.returncode != 0 else 1)
+'''),
         ("eb_bi_006",
-         "CMakeLists.txt registers an executable but the source file main.c is missing from disk. Recreate a minimal main.c (int main(void) { return 0; }) so the declared source exists.",
+         "CMakeLists.txt registers an executable but the source file main.c is missing from disk. Recreate a minimal main.c so cmake configure+build succeeds.",
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo main.c)\n"},
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo main.c)\n",
           "main.c": "int main(void) { return 0; }\n"},
-         files_check(("main.c", "CMakeLists.txt"))),
+         CHECK_CMAKE_BUILD),
         ("eb_bi_007",
          "The GitHub Actions workflow file ci.yml must contain a step that runs ctest. Add it under jobs.build.steps as a run: ctest line (any indentation). Checker only requires the file to exist and contain 'ctest'.",
          {"ci.yml": "name: ci\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"},

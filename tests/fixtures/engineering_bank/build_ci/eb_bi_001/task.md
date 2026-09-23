@@ -1,1 +1,1 @@
-CMakeLists.txt does not compile main.c (the add_executable list is empty). Add main.c so configure+build would include it. Checker only verifies CMakeLists.txt lists main.c and that main.c still exists.
+CMakeLists.txt does not compile main.c (the add_executable list is empty). Add main.c so cmake configure+build succeeds.

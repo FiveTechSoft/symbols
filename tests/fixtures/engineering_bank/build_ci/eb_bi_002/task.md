@@ -1,1 +1,1 @@
-The CI shell script build.sh does not invoke a C compiler. Make it run gcc -std=c11 -fsyntax-only on main.c and exit with gcc's status.
+The CI shell script build.sh does not invoke a C compiler. Make it run gcc -std=c11 -fsyntax-only on main.c. The checker breaks main.c and requires the script to exit non-zero (compiler must see the error).

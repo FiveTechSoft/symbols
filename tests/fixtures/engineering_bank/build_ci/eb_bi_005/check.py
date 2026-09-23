@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-import re
-import sys
+import subprocess, sys
 from pathlib import Path
-blob = ''
-skip_names = {'check.py'}
-skip = {'.pyc', '.o', '.obj', '.exe', '.bin', '.png', '.jpg'}
-for p in Path('.').rglob('*'):
-    if not p.is_file() or p.suffix in skip or p.name in skip_names:
-        continue
-    if p.stat().st_size > 65536:
-        continue
-    try:
-        blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
-    except OSError:
-        pass
-norm = re.sub(r'\s+', ' ', blob)
-ok = True
-need = 'gcc'
-need_n = re.sub(r'\s+', ' ', need)
-if need not in blob and need_n not in norm:
-    print('missing', need)
-    ok = False
-bad = 'exit 0'
-bad_n = re.sub(r'\s+', ' ', bad)
-if bad in blob or bad_n in norm:
-    print('forbidden', bad)
-    ok = False
-sys.exit(0 if ok else 1)
+import shutil
+def _sh_bin():
+    for name in ("bash", "sh"):
+        path = shutil.which(name)
+        if path and "system32" not in path.lower():
+            return [path]
+    for cand in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\sh.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if Path(cand).is_file():
+            return [cand]
+    path = shutil.which("sh")
+    if path:
+        return [path]
+    return ["sh"]
+shell = _sh_bin()
+
+if not Path("build.sh").is_file():
+    sys.exit(1)
+Path("main.c").write_text("int main(void) { return 0 }\nint broken(\n", encoding="utf-8")
+r = subprocess.run(shell + ["build.sh"], capture_output=True, text=True)
+sys.exit(0 if r.returncode != 0 else 1)
