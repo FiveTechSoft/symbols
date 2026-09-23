@@ -16,6 +16,7 @@
 #include "learn.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "server_subagent.h"
 #include "output_contract.h"
 #include "c_edit_ops.h"
 #include "agent_git.h"
@@ -384,6 +385,8 @@ static MODEL *g_server_model = NULL;
 
 /* Session of the request being answered (the server is single-threaded). */
 static ServerSession *g_reply_sess = NULL;
+/* Set while the normal loop runs on a body stripped of our delegation. */
+static int g_sa_direct = 0;
 
 static void ChildResultHook(char *content, size_t size)
 {
@@ -1014,6 +1017,41 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     sess->is_subagent = ServerIsSubagentShape(declared_tools, (uint32_t)num_declared);
     g_reply_sess = sess;
+
+    /* OpenCode parent side (declared rules in server_subagent.h): split a
+       request naming 2+ workspace files into parallel task calls, rebuild
+       what each child reports, resume a failed part once, and hand an
+       exhausted delegation back to the normal loop below. */
+    if (!sess->is_subagent)
+    {
+        static SA_DECISION sad;
+        char saq[4096] = "";
+        ServerExtractQuery(body, saq, sizeof(saq));
+        int sak = SaDecide(body, declared_tools, num_declared, saq, &sad);
+        if (sak == SA_CALLS)
+        {
+            SendToolCallsForRequest(s, body, ++g_seq, &sad.calls, "", resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        if (sak == SA_TEXT)
+        {
+            SendContentForRequest(s, body, ++g_seq, sad.text, saq, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        if (sak == SA_DIRECT && !g_sa_direct)
+        {
+            char *stripped = (char *)malloc(strlen(body) + 1);
+            if (stripped && SaStripExchanges(body, stripped, strlen(body) + 1))
+            {
+                g_sa_direct = 1;
+                HandleCompletions(s, stripped, corpus);
+                g_sa_direct = 0;
+                free(stripped);
+                return;
+            }
+            free(stripped);
+        }
+    }
 
     /* Output contract: a request with no tools whose system message
        declares the shape of the answer (lines / words / characters), and
