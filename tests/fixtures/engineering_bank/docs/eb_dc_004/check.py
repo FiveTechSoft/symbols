@@ -2,28 +2,21 @@
 import re
 import sys
 from pathlib import Path
-blob = ''
-skip_names = {'check.py'}
-skip = {'.pyc', '.o', '.obj', '.exe', '.bin', '.png', '.jpg'}
-for p in Path('.').rglob('*'):
-    if not p.is_file() or p.suffix in skip or p.name in skip_names:
-        continue
-    if p.stat().st_size > 65536:
-        continue
-    try:
-        blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
-    except OSError:
-        pass
-norm = re.sub(r'\s+', ' ', blob)
+p = Path('README.md')
+if not p.is_file():
+    print('missing file', 'README.md')
+    sys.exit(1)
+text = p.read_text(encoding='utf-8', errors='replace')
+norm = re.sub(r'\s+', ' ', text)
 ok = True
 need = 'cmake -S . -B build'
 need_n = re.sub(r'\s+', ' ', need)
-if need not in blob and need_n not in norm:
-    print('missing', need)
+if need not in text and need_n not in norm:
+    print('missing', need, 'in', 'README.md')
     ok = False
 bad = 'pip install'
 bad_n = re.sub(r'\s+', ' ', bad)
-if bad in blob or bad_n in norm:
-    print('forbidden', bad)
+if bad in text or bad_n in norm:
+    print('forbidden', bad, 'in', 'README.md')
     ok = False
 sys.exit(0 if ok else 1)

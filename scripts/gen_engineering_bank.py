@@ -836,7 +836,7 @@ sys.exit(0)
          "Docs say the tool is installed with 'pip install demo' but the project is CMake. Replace that line with 'cmake -S . -B build'. Forbidden: 'pip install'.",
          {"README.md": "# Install\n\npip install demo\n"},
          {"README.md": "# Install\n\ncmake -S . -B build\n"},
-         contains_check("cmake -S . -B build", forbid=("pip install",))),
+         file_check("README.md", "cmake -S . -B build", forbid=("pip install",))),
         ("eb_dc_005",
          "The function comment lies: it says returns -1 on error but the code returns 0 on success only. Update the comment to say 'returns 0 on success'. The program must still exit 0.",
          {"main.c": "/* returns -1 on error */\nint parse_ok(void) { return 0; }\n\nint main(void) { return parse_ok(); }\n"},
