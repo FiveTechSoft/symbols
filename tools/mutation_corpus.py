@@ -3,7 +3,9 @@
 
 Sources: C workspaces in this repo that carry their own self-check - a main()
 that builds and exits 0. By default these are the engineering bank's golden
-after/ trees. The whole bank is development data since fa230f4; the new blind
+after/ trees. With --repo-sources, also tests/fixtures/mutation_sources:
+functions copied verbatim from src/ whose main() checks several inputs
+(phase 2b). The whole bank is development data since fa230f4; the new blind
 batch is never passed here.
 
 For each source it makes single-primitive mutants:
@@ -34,6 +36,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BANK = ROOT / "tests" / "fixtures" / "engineering_bank"
+REPO_SOURCES = ROOT / "tests" / "fixtures" / "mutation_sources"
 NEUTRAL_TASK = "The program no longer builds or no longer exits 0. Fix it without changing its intended behavior."
 
 TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*.*?\*/|'
@@ -117,10 +120,22 @@ def sources(bank):
                 yield parts[0], d
 
 
+def repo_sources(root):
+    """Phase 2b: self-checking workspaces cut from the repo's own tested C
+    functions (one dir each, function verbatim + a main() that checks
+    several inputs). Ids are prefixed ms_."""
+    for d in sorted(p for p in Path(root).iterdir() if p.is_dir()):
+        yield "ms_" + d.name, d
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bank", default=str(BANK))
     ap.add_argument("--per-source", type=int, default=12)
+    ap.add_argument("--repo-sources", action="store_true",
+                    help="also use tests/fixtures/mutation_sources (phase 2b: repo functions, multi-input checks)")
+    ap.add_argument("--only", help="regex over source ids (re-run a subset)")
+    ap.add_argument("--no-bank", action="store_true", help="skip the bank's golden trees (with --repo-sources)")
     ap.add_argument("--repair", action="store_true")
     ap.add_argument("--anchor", action="store_true",
                     help="task text also names the enclosing function (site region, not the primitive)")
@@ -137,7 +152,12 @@ def main():
         import induce_operators
         loo_rows = induce_operators.read_rows(a.loo_from)
     rows, n_src = [], 0
-    for sid, d in sources(Path(a.bank)):
+    srcs = [] if a.no_bank else list(sources(Path(a.bank)))
+    if a.repo_sources:
+        srcs += list(repo_sources(REPO_SOURCES))
+    if a.only:
+        srcs = [(sid, d) for sid, d in srcs if re.search(a.only, sid)]
+    for sid, d in srcs:
         c, rc = build_run(str(d))
         if c != 1 or rc != 0 or not any("main(" in p.read_text(errors="ignore") for p in d.glob("*.c")):
             continue

@@ -2407,20 +2407,34 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
                 continue;   /* never flip a test's own comparison to make it pass */
             const char *line = F->data;
             int depth = 0, in_fn = 0, in_main = 0;   /* inside the body of a function whose head holds an anchor / of main */
+            int pending = 0;   /* head seen at depth 0, body brace not yet (Allman style: "{" on the next line) */
             while (line && *line) {
                 const char *nl = strchr(line, '\n');
                 size_t ll = nl ? (size_t)(nl - line) : strlen(line);
                 int anchored = line_has_anchor(line, ll, an, na);
                 if (depth == 0) {
-                    in_fn = anchored;
-                    in_main = line_defines_main(line, ll);
+                    if (!pending) {
+                        in_fn = anchored;
+                        in_main = line_defines_main(line, ll);
+                    } else {
+                        in_fn |= anchored;
+                        in_main |= line_defines_main(line, ll);
+                    }
                 }
                 for (size_t q = 0; q < ll; q++)
                     depth += line[q] == '{' ? 1 : line[q] == '}' ? -1 : 0;
                 if (depth < 0) depth = 0;
                 int eligible = (anchored || in_fn) && !(has_main && in_main);
-                if (depth == 0 && !anchored) in_fn = 0;
-                if (depth == 0) in_main = 0;
+                if (depth == 0) {
+                    const char *h0 = line;
+                    while (h0 < line + ll && isspace((unsigned char)*h0)) h0++;
+                    pending = (in_fn || in_main) && h0 < line + ll && *h0 != '#' && memchr(line, '(', ll) &&
+                              !memchr(line, ';', ll) && !memchr(line, '{', ll) && !memchr(line, '}', ll);
+                    if (!pending) {
+                        if (!anchored) in_fn = 0;
+                        in_main = 0;
+                    }
+                }
                 const char *t0 = line;
                 while (t0 < line + ll && isspace((unsigned char)*t0)) t0++;
                 CTOK t[256];

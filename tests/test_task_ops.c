@@ -602,6 +602,39 @@ int main(void)
         CHECK(strstr(get(d, "main.c"), "== 3 ? 0 : 1") != NULL, "primitive search: main's check never edited");
     }
 
+    /* phase 2b: Allman braces ("{" on the next line). main's body stays the
+       oracle, and the anchored function's body is searched, not only the
+       lines that name it. */
+    {
+        char d[512]; make_dir(d, sizeof(d), "allmanmain");
+        const char *t = "static int helper(int x)\n{\n    return x * 2;\n}\n\nint main(void)\n{\n    int bad = 0;\n    bad += helper(1) != 3;\n    bad += helper(2) != 6;\n    return bad == 0 ? 0 : 1;\n}\n";
+        put(d, "main.c", t);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program no longer builds or no longer exits 0. Fix it without changing its intended behavior. The problem is in helper().", &r);
+        CHECK(strstr(get(d, "main.c"), "helper(1) != 3;") && strstr(get(d, "main.c"), "bad == 0 ? 0 : 1"),
+              "Allman main: check lines never edited");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "allmanfn");
+        const char *good = "static int common_prefix(const char *a, const char *b)\n{\n    int n = 0;\n    if (!a || !b)\n        return 0;\n    while (a[n] && a[n] == b[n])\n        n++;\n    return n;\n}\n\nint main(void)\n{\n    int bad = 0;\n    bad += common_prefix(\"ab\", \"ab\") != 2;\n    bad += common_prefix(0, \"ab\") != 0;\n    return bad == 0 ? 0 : 1;\n}\n";
+        const char *bug = "static int common_prefix(const char *a, const char *b)\n{\n    int n = 0;\n    if (!a || !b)\n        return 1;\n    while (a[n] && a[n] == b[n])\n        n++;\n    return n;\n}\n\nint main(void)\n{\n    int bad = 0;\n    bad += common_prefix(\"ab\", \"ab\") != 2;\n    bad += common_prefix(0, \"ab\") != 0;\n    return bad == 0 ? 0 : 1;\n}\n";
+        put(d, "main.c", bug);
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "The program no longer builds or no longer exits 0. Fix it without changing its intended behavior. The problem is in common_prefix().", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        CHECK(kept && !strcmp(get(d, "main.c"), good), "Allman body: bug below the head line repaired exactly");
+    }
+
+    {   /* an #include naming the anchor must not carry "inside the anchored function" into main */
+        char d[512]; make_dir(d, sizeof(d), "inclmain");
+        put(d, "twice_of.h", "int twice_of(int x);\n");
+        put(d, "twice_of.c", "#include \"twice_of.h\"\nint twice_of(int x) { return x * 3; }\n");
+        put(d, "main.c", "#include \"twice_of.h\"\n\nint main(void) {\n    return twice_of(1) == 2 ? 0 : 1;\n}\n");
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program no longer builds or no longer exits 0. Fix it without changing its intended behavior. The problem is in twice_of().", &r);
+        CHECK(strstr(get(d, "main.c"), "twice_of(1) == 2 ? 0 : 1") != NULL, "include naming the anchor: main's check never edited");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");
