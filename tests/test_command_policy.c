@@ -46,6 +46,9 @@ static const CASE cases[] = {
     {"echo `rm -rf x`", POLICY_DESTRUCTIVE}, {"(cd sub; rm -rf .)", POLICY_DESTRUCTIVE}, {"env X=1 sudo ls", POLICY_DESTRUCTIVE},
     {"/usr/bin/sudo ls", POLICY_DESTRUCTIVE}, {"kill -9 1", POLICY_DESTRUCTIVE}, {"true || rm -rf /", POLICY_DESTRUCTIVE},
     {"r\\m -rf x", POLICY_DESTRUCTIVE}, {"'rm' -rf x", POLICY_DESTRUCTIVE}, {"git push -\"f\"", POLICY_DESTRUCTIVE},
+    /* found by test_core_fuzz */
+    {"echo $((git clean -fdx))", POLICY_DESTRUCTIVE}, {"echo $((echo $(git stash clear)))", POLICY_DESTRUCTIVE},
+    {"echo $( (rm -rf x) )", POLICY_DESTRUCTIVE}, {"n=$(( (1+2)*3 )); echo $n", POLICY_READ},
     /* unparseable */
     {"echo 'unterminated", POLICY_UNPARSEABLE}, {"echo \"x", POLICY_UNPARSEABLE}, {"eval \"$CMD\"", POLICY_UNPARSEABLE},
     {"echo $(ls", POLICY_UNPARSEABLE},

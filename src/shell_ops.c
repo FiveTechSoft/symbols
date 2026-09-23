@@ -76,9 +76,14 @@ static size_t expansion_len(const char *s)
         return 0;
     if (s[1] == '{') {
         const char *e = strchr(s + 2, '}');
-        return e ? (size_t)(e - s) + 1 : 0;
+        if (!e || e == s + 2)
+            return 0;
+        for (const char *c = s + 2; c < e; c++)   /* plain ${name...} only */
+            if (isspace((unsigned char)*c) || strchr("\"'\\$`{", *c))
+                return 0;
+        return (size_t)(e - s) + 1;
     }
-    if (isdigit((unsigned char)s[1]) || strchr("@*#?", s[1]))
+    if (isdigit((unsigned char)s[1]) || (s[1] && strchr("@*#?", s[1])))
         return 2;
     size_t i = 1;
     while (isalnum((unsigned char)s[i]) || s[i] == '_')

@@ -38,3 +38,16 @@ New module `src/command_policy.c` (`include/command_policy.h`): every command li
 Enforcement: `AgentShellExecGuarded` refuses destructive and unparseable commands without running them (exit 126, reason in stderr); the only grant is `SYMBOLS_ALLOW_DESTRUCTIVE=1`. The agent runner now runs every task-supplied build and test command through it. Internal fixed commands (compiler probes, cmake, `sh -n`) are unchanged.
 
 Evidence: tests/test_command_policy.c, 82 labeled commands (read 14, write 16, destructive 48, unparseable 4) including obfuscations (`r\m -rf`, `'rm' -rf`, `git push -"f"`, `true || rm -rf /`, `$(git reset --hard)`), all classified correctly, plus a guarded-execution test that proves a refused command leaves no side effect. Bank git tasks are still to come: the harness needs repository fixtures, which is a scripts/ change.
+
+## Phase E result: hardening
+
+New test `tests/test_core_fuzz.c`: seeded xorshift fuzzing of the three new parsers (20,000 iterations per stage in ctest; `SYMBOLS_FUZZ_ITERS` raises it). Invariants: a destructive command stays destructive under every wrapper and under nested wrappers up to depth 4 (`&&`, `;`, `||`, `$( )`, backticks, subshells, braces, env prefixes, pipes, background); destructive or unparseable always carries a reason; every shell rule's output passes that rule's own intent check; every build plan is well formed. Run under ASan and UBSan with `-fno-sanitize-recover=all` at 200,000 iterations per stage: clean after the fixes below.
+
+Bugs the fuzzer found, all fixed with regression cases:
+- `shell_ops`: a trailing lone `$` read past the end of the buffer (heap overflow under ASan; `strchr` matches the terminator).
+- `shell_ops`: `${...}` containing quotes was treated as an expansion, so quoting produced text that failed its own check.
+- `command_policy`: `$((cmd))` was always treated as arithmetic, so `echo $((git clean -fdx))` and nested forms lost the destructive class. Now the arithmetic body is also classified and counts when it reads as destructive or unparseable; `$( (cmd) )` is handled as a command substitution by paren matching.
+
+Timeouts: every command the new code runs is bounded (cmake configure 60 s, build 120 s, build scripts 30 s, `make -n` 20 s, `sh -n` 10 s); a timeout counts as not verified and the edit is rolled back.
+
+Bank unchanged: 37/56, 0 wrong edits. ctest 105/105.

@@ -312,9 +312,26 @@ POLICY_CLASS CommandPolicyClassify(const char *cmd, char *reason, size_t rn)
             const char *b = c == '`' ? p + 1 : p + 2;
             int d = 1;
             const char *e = b;
-            if (close == ')' && e[0] == '(') {   /* $(( arithmetic )) */
-                const char *z = strstr(e, "))");
-                if (!z) { free(s); set_reason(reason, rn, "%s", "unbalanced $(("); return POLICY_UNPARSEABLE; }
+            const char *z = NULL;
+            if (close == ')' && e[0] == '(') {   /* $(( arithmetic )) if the inner ( closes right before ) */
+                int pd = 0;
+                for (const char *q = e; *q; q++) {
+                    if (*q == '(') pd++;
+                    else if (*q == ')' && --pd == 0) { if (q[1] == ')') z = q; break; }
+                }
+            }
+            if (z) {
+                /* shells differ on $((cmd)): if the body reads as a
+                   destructive command, count it (fail closed) */
+                size_t al = (size_t)(z - e - 1);
+                char *arith = (char *)malloc(al + 1);
+                if (!arith) { free(s); return POLICY_UNPARSEABLE; }
+                memcpy(arith, e + 1, al);
+                arith[al] = '\0';
+                char r3[160] = "";
+                POLICY_CLASS ac = CommandPolicyClassify(arith, r3, sizeof(r3));
+                free(arith);
+                if (ac >= POLICY_DESTRUCTIVE && ac > worst) { worst = ac; if (reason && rn) snprintf(reason, rn, "%s", r3); }
                 p = z + 1;
                 in_tok = 1;
                 continue;
