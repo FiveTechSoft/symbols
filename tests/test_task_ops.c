@@ -394,6 +394,27 @@ int main(void)
               "doc_sync: two stale terms = abstain");
     }
 
+    /* operator 7: remove_dead_function */
+    {
+        char d[512]; make_dir(d, sizeof(d), "deadfn");
+        put(d, "k.c", "#include <stdio.h>\nint old_calc(int v);\n\nint old_calc(int v)\n{\n    return v * 2; /* } */\n}\n\nint main(void) { puts(\"ok\"); return 0; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Please delete old_calc, nothing calls it.", &r);
+        CHECK(kept && !strcmp(r.op, "remove_dead_function") &&
+              !strcmp(get(d, "k.c"), "#include <stdio.h>\n\nint main(void) { puts(\"ok\"); return 0; }\n"),
+              "remove_dead_function: definition and prototype removed, output unchanged");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "deadused");
+        const char *m = "int twice(int v) { return 2 * v; }\nint main(void) { return twice(0); }\n";
+        put(d, "u.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Remove twice.", &r) && !strcmp(get(d, "u.c"), m),
+              "remove_dead_function: a called function is not dead");
+        CHECK(!TaskOpsSolve(d, "Document twice in the header.", &r) && !strcmp(get(d, "u.c"), m),
+              "remove_dead_function: no removal verb, no edit");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

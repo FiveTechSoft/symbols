@@ -1474,9 +1474,178 @@ static int find_doc_sync(const TASK_OPS_WORKSPACE *ws, const char *task, char *a
     return 1;
 }
 
-enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_COUNT };
+/* ------------------------------------------------- remove_dead_function
+   Operator 7: a task sentence with a removal verb (declared lexical cue:
+   remove/delete/drop/eliminate) names a function X that is defined once in a
+   C source and referenced nowhere else (a file-scope prototype line is the
+   only other use allowed). Remove the definition (from the start of its
+   line through the matching '}') and any such prototype lines. */
+
+static const char *df_skip_lit(const char *p)
+{
+    if (p[0] == '/' && p[1] == '/') { while (*p && *p != '\n') p++; return p; }
+    if (p[0] == '/' && p[1] == '*') { const char *e = strstr(p + 2, "*/"); return e ? e + 2 : p + strlen(p); }
+    if (*p == '"' || *p == '\'') {
+        char q = *p++;
+        while (*p && *p != q) { if (*p == '\\' && p[1]) p++; p++; }
+        return *p ? p + 1 : p;
+    }
+    return NULL;
+}
+
+/* Span of the definition of `name` in data: [from, to). 1 when exactly one. */
+static int df_definition(const char *data, const char *name, size_t *from, size_t *to)
+{
+    size_t nl = strlen(name);
+    int found = 0, depth = 0;
+    const char *p = data;
+    while (*p) {
+        const char *s = df_skip_lit(p);
+        if (s) { p = s; continue; }
+        if (*p == '{') { depth++; p++; continue; }
+        if (*p == '}') { depth--; p++; continue; }
+        if (depth == 0 && !strncmp(p, name, nl) && (p == data || !ident_char((unsigned char)p[-1])) &&
+            !ident_char((unsigned char)p[nl])) {
+            const char *q = p + nl;
+            while (isspace((unsigned char)*q)) q++;
+            if (*q == '(') {
+                int par = 0;
+                while (*q) { if (*q == '(') par++; else if (*q == ')' && --par == 0) break; q++; }
+                if (*q) q++;
+                while (isspace((unsigned char)*q)) q++;
+                if (*q == '{') {
+                    const char *b = q;
+                    int d = 0;
+                    while (*b) {
+                        const char *s2 = df_skip_lit(b);
+                        if (s2) { b = s2; continue; }
+                        if (*b == '{') d++;
+                        else if (*b == '}' && --d == 0) break;
+                        b++;
+                    }
+                    if (!*b) return 0;
+                    const char *ls = p;
+                    while (ls > data && ls[-1] != '\n') ls--;
+                    const char *le = b + 1;
+                    while (*le == ' ' || *le == '\t') le++;
+                    if (*le == '\n') le++;
+                    if (*le == '\n' && (ls == data || ls[-1] == '\n')) le++;   /* one blank separator */
+                    *from = (size_t)(ls - data);
+                    *to = (size_t)(le - data);
+                    found++;
+                    p = b + 1;
+                    continue;
+                }
+            }
+        }
+        p++;
+    }
+    return found == 1;
+}
+
+/* 1 when the line holding offset `at` is a file-scope prototype of name. */
+static int df_prototype_line(const char *data, size_t at, size_t *ls, size_t *le)
+{
+    size_t s = at, e = at;
+    while (s > 0 && data[s - 1] != '\n') s--;
+    while (data[e] && data[e] != '\n') e++;
+    size_t k = e;
+    while (k > s && isspace((unsigned char)data[k - 1])) k--;
+    if (k == s || data[k - 1] != ';' || memchr(data + s, '{', e - s) || memchr(data + s, '=', e - s))
+        return 0;
+    *ls = s;
+    *le = data[e] ? e + 1 : e;
+    return 1;
+}
+
+static int df_cue_sentence(const char *task, const char *name)
+{
+    static const char *cues[] = {"remove", "Remove", "delete", "Delete", "drop", "Drop", "eliminate", "Eliminate", NULL};
+    const char *p = task;
+    while (*p) {
+        const char *e = p;
+        while (*e && !(*e == '.' && (e[1] == ' ' || e[1] == '\n' || !e[1])) && *e != '\n' && *e != ';') e++;
+        size_t l = (size_t)(e - p);
+        char sent[1024];
+        if (l >= sizeof(sent)) l = sizeof(sent) - 1;
+        memcpy(sent, p, l);
+        sent[l] = '\0';
+        if (count_token_in(sent, name) > 0)
+            for (int k = 0; cues[k]; k++)
+                if (strstr(sent, cues[k]) && !strstr(sent, "must not") && !strstr(sent, "don't") && !strstr(sent, "do not"))
+                    return 1;
+        p = *e ? e + 1 : e;
+    }
+    return 0;
+}
+
+/* Plan: returns count of candidate names (1 = usable) and fills name. */
+static int find_dead_function(const TASK_OPS_WORKSPACE *ws, const char *task, char *name, size_t ns)
+{
+    int n = 0;
+    const char *p = task;
+    char seen[16][128];
+    int nseen = 0;
+    while (*p) {
+        if (!ident_start((unsigned char)*p) || (p > task && ident_char((unsigned char)p[-1]))) { p++; continue; }
+        const char *s = p;
+        while (ident_char((unsigned char)*p)) p++;
+        size_t l = (size_t)(p - s);
+        if (l >= 128 || (l == 4 && !strncmp(s, "main", 4)))
+            continue;
+        char id[128];
+        memcpy(id, s, l);
+        id[l] = '\0';
+        int dup = 0;
+        for (int k = 0; k < nseen; k++) if (!strcmp(seen[k], id)) dup = 1;
+        if (dup || nseen >= 16) continue;
+        snprintf(seen[nseen++], 128, "%s", id);
+        int defs = 0, uses = 0, protos = 0;
+        for (int f = 0; f < ws->count; f++) {
+            if (!is_c_source(ws->files[f].rel)) continue;
+            const char *d = ws->files[f].data;
+            size_t a, b;
+            defs += df_definition(d, id, &a, &b);
+            size_t il = strlen(id);
+            for (const char *q = strstr(d, id); q; q = strstr(q + 1, id))
+                if ((q == d || !ident_char((unsigned char)q[-1])) && !ident_char((unsigned char)q[il])) {
+                    size_t x, y;
+                    uses++;
+                    if (df_prototype_line(d, (size_t)(q - d), &x, &y)) protos++;
+                }
+        }
+        if (defs == 1 && uses == 1 + protos && df_cue_sentence(task, id)) {
+            n++;
+            snprintf(name, ns, "%s", id);
+        }
+    }
+    return n;
+}
+
+static char *df_apply(const char *data, const char *name)
+{
+    size_t len = strlen(data), a, b;
+    char *out = (char *)malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, data, len + 1);
+    if (df_definition(out, name, &a, &b))
+        memmove(out + a, out + b, strlen(out + b) + 1);
+    size_t il = strlen(name);
+    for (char *q = strstr(out, name); q; ) {
+        size_t x, y;
+        if ((q == out || !ident_char((unsigned char)q[-1])) && !ident_char((unsigned char)q[il]) &&
+            df_prototype_line(out, (size_t)(q - out), &x, &y)) {
+            memmove(out + x, out + y, strlen(out + y) + 1);
+            q = strstr(out + x, name);
+        } else
+            q = strstr(q + 1, name);
+    }
+    return out;
+}
+
+enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync"
+    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function"
 };
 
 static int mem_enabled(void)
@@ -1607,7 +1776,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     int renames = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
     char y_text[128] = {0};
     int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
-    char da[128] = {0}, db[128] = {0};
+    char da[128] = {0}, db[128] = {0}, dead[128] = {0};
+    int deads = 0;
     LIT_PLAN lit;
     char *lit_out = NULL;
     FRAG_HIT hit;
@@ -1674,11 +1844,22 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "doc_sync");
             snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d doc file(s)", da, db, touched);
+        } else if (op == OP_DEADFN && (deads = find_dead_function(ws, task, dead, sizeof(dead))) == 1) {
+            for (int i = 0; i < ws->count; i++)
+                if (is_c_source(ws->files[i].rel) && count_token_in(ws->files[i].data, dead) > 0) {
+                    next[i] = df_apply(ws->files[i].data, dead);
+                    touched++;
+                }
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "remove_dead_function");
+            snprintf(rep->detail, sizeof(rep->detail), "%.100s removed from %d file(s)", dead, touched);
         }
     }
     if (!touched) {
         if (frags > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d places fit the stated fragment", frags);
+        else if (deads > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d dead functions named", deads);
         else if (docs > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d doc terms fit", docs);
         else if (renames > 1)
@@ -1718,6 +1899,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "literal_to_constant")) {
             int f2, files2;
             intent = literal_uses(after, &lit, &f2, &files2) == 0 && TaskOpsCountToken(after, lit.name) >= 2;
+        } else if (!strcmp(rep->op, "remove_dead_function")) {
+            intent = TaskOpsCountToken(after, dead) == 0 && rep->compile_after == 1;
         } else if (!strcmp(rep->op, "doc_sync")) {
             int sh = ds_shape(da);
             intent = ds_in(after, da, sh, 1) == 0 && ds_in(after, db, sh, 1) > 0;
@@ -1733,7 +1916,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
            files in the same order unless a file was created) */
         int named = 0, named_touched = 0;
         /* refactors must preserve observable behavior: same stdout */
-        if ((!strcmp(rep->op, "rename_symbol") || !strcmp(rep->op, "literal_to_constant")) &&
+        if ((!strcmp(rep->op, "rename_symbol") || !strcmp(rep->op, "literal_to_constant") ||
+             !strcmp(rep->op, "remove_dead_function")) &&
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
         if (!named_files_exist(ws, after, task, &named, &named_touched) ||
