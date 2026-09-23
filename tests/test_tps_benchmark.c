@@ -20,6 +20,21 @@
 #include "agent_planner.h"
 #include "tokenizer.h"
 
+/* Sanitizer builds (MSVC /fsanitize=address, gcc/clang -fsanitize=address)
+   run 2-10x slower and unoptimized, so throughput thresholds say nothing
+   there. Under a sanitizer the timing checks are reported as [SKIP] with the
+   measured value; every functional check still runs and still counts. */
+#if defined(__SANITIZE_ADDRESS__)
+#define SANITIZER_BUILD 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SANITIZER_BUILD 1
+#endif
+#endif
+#ifndef SANITIZER_BUILD
+#define SANITIZER_BUILD 0
+#endif
+
 static int g_tests_run = 0;
 static int g_tests_passed = 0;
 
@@ -31,6 +46,15 @@ static int g_tests_passed = 0;
     } else { \
         printf("  [FAIL] %s (line %d)\n", msg, __LINE__); \
     } \
+} while(0)
+
+/* Timing threshold; in sanitizer builds only "rate > 0" is checked */
+#define PERF_ASSERT(expr, value, msg) do { \
+    if (SANITIZER_BUILD) { \
+        printf("  [SKIP] %s (sanitizer build, measured %.0f)\n", msg, (double)(value)); \
+        TEST_ASSERT((value) > 0.0, "work was done (sanitizer build: rate > 0 only)"); \
+    } else \
+        TEST_ASSERT(expr, msg); \
 } while(0)
 
 /* High-resolution timer via C11 timespec */
@@ -135,7 +159,7 @@ int main(void)
     printf("   -> Generated %llu words (%.0f BPE tokens) across %d essays in %.4f s\n",
            (unsigned long long)total_words, bpe_tokens, ESSAY_ITERS, nlg_elapsed);
     printf("   -> Measured Generation Speed: %.1f TPS\n", nlg_tps);
-    TEST_ASSERT(nlg_tps > 1000000.0, "NLG Generation exceeds 1,000,000 TPS (>10,000x faster than LLM)");
+    PERF_ASSERT(nlg_tps > 1000000.0, nlg_tps, "NLG Generation exceeds 1,000,000 TPS (>10,000x faster than LLM)");
 
     /* 2. Conversational Turn Dispatch */
     const int CHAT_ITERS = 2000;
@@ -156,7 +180,7 @@ int main(void)
     printf("\n2. Conversational Dialogue Turn:\n");
     printf("   -> Processed %d conversational turns in %.4f s\n", CHAT_ITERS, chat_elapsed);
     printf("   -> Measured Dialogue Speed: %.1f TPS\n", chat_tps);
-    TEST_ASSERT(chat_tps > 1000000.0, "Dialogue turn throughput exceeds 1,000,000 TPS");
+    PERF_ASSERT(chat_tps > 1000000.0, chat_tps, "Dialogue turn throughput exceeds 1,000,000 TPS");
 
     /* 3. Deep Rhetorical Structure Realization */
     NLG_PLAN dplan;
@@ -181,7 +205,7 @@ int main(void)
     printf("\n3. Deep RST Graph-to-Text Realization:\n");
     printf("   -> Synthesized %d RST propositions in %.4f s\n", RST_ITERS, rst_elapsed);
     printf("   -> Measured Realization Speed: %.1f TPS\n", rst_tps);
-    TEST_ASSERT(rst_tps > 2000000.0, "Surface realization exceeds 2,000,000 TPS");
+    PERF_ASSERT(rst_tps > 2000000.0, rst_tps, "Surface realization exceeds 2,000,000 TPS");
 
     /* 4. STRIPS Forward State-Space Planning */
     AGENT_PLANNER planner;
@@ -208,7 +232,7 @@ int main(void)
     printf("   -> Formulated %d optimal plans in %.4f s\n", plans_solved, plan_elapsed);
     printf("   -> Measured Planning Speed: %.1f plans/s (%.1f actions/s)\n",
            plans_per_sec, plans_per_sec * (plan.step_count > 0 ? plan.step_count : 1));
-    TEST_ASSERT(plans_per_sec > 100000.0, "STRIPS planning exceeds 100,000 plans/second");
+    PERF_ASSERT(plans_per_sec > 100000.0, plans_per_sec, "STRIPS planning exceeds 100,000 plans/second");
 
     GraphDestroy(g);
 

@@ -225,6 +225,7 @@ void SymbolTableDestroy(SYMBOL_TABLE *table)
     free(table->items);
     free(table->buckets);
     free(table->norm_buckets);
+    free(table);   /* every table comes from SymbolTableCreate (malloc) */
 }
 
 SYMBOL_ID SymbolAdd(SYMBOL_TABLE *table, const char *name)

@@ -437,6 +437,19 @@ int main(void)
 
     ChatDestroy(&ch);
 
+    /* Drift guard: "que es X?" answered only through X's translation
+       must quote a sentence that defines it, or abstain (reported:
+       "que es el anima?" -> soul -> an unrelated Holderlin verse). */
+    ChatInit(&ch, "data/texts/jung.txt");
+    ch.episodic.auto_save = 0;
+    q(&ch, "que es el anima?", out, sizeof(out));
+    check(strstr(out, "Helios") == NULL &&
+          (strstr(out, "soul is") != NULL || strstr(out, "No tengo constancia") != NULL),
+          "DRIFT anima: defining sentence or abstain, not a verse");
+    q(&ch, "que es un quark?", out, sizeof(out));
+    check(strstr(out, "Segun el texto") == NULL, "DRIFT quark: no unrelated quote");
+    ChatDestroy(&ch);
+
     /* =================================================================
        SUMMARY
        ================================================================= */

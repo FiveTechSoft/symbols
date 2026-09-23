@@ -4536,8 +4536,8 @@ static int ChatFindGroundedSentence(const CHAT *ch, const char *need,
 
 /* buffered answer: byte-identical text to the former ChatAnswer,
    plus the per-goal status for the composite dispatcher. */
-static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
-                            size_t size, int *status)
+static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
+                               size_t size, int *status)
 {
     size_t pos = 0;
     int st = GOAL_UNKNOWN;
@@ -6663,6 +6663,149 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         out[(pos < size) ? pos : size - 1] = '\0';
     if (status != NULL)
         *status = st;
+}
+
+/* Definitional frame: `key` followed by is/are/was/means (or es/son/
+   significa), e.g. "the soul is ...". Returns 1 + the byte offset of
+   the first frame, 0 when there is none. */
+static int ChatHasDefinition(const char *sent, const char *key)
+{
+    static const char *const cop[] = {"is", "are", "was", "means", "es", "son", "significa"};
+    size_t kl, sl, i;
+    if (sent == NULL || key == NULL || key[0] == '\0')
+        return 0;
+    kl = strlen(key);
+    sl = strlen(sent);
+    for (i = 0; i + kl <= sl; i++)
+    {
+        size_t j, c;
+        if (i > 0 && ChatIsWordChar((unsigned char)sent[i - 1]))
+            continue;
+        for (j = 0; j < kl; j++)
+        {
+            char h = sent[i + j], n = key[j];
+            if (h >= 'A' && h <= 'Z') h = (char)(h + 32);
+            if (n >= 'A' && n <= 'Z') n = (char)(n + 32);
+            if (h != n) break;
+        }
+        if (j < kl || (i + kl < sl && ChatIsWordChar((unsigned char)sent[i + kl])))
+            continue;
+        j = i + kl;
+        while (j < sl && (sent[j] == ' ' || sent[j] == ','))
+            j++;
+        for (c = 0; c < sizeof(cop) / sizeof(cop[0]); c++)
+        {
+            size_t cl = strlen(cop[c]);
+            if (j + cl <= sl && strncmp(sent + j, cop[c], cl) == 0 &&
+                (j + cl == sl || !ChatIsWordChar((unsigned char)sent[j + cl])))
+                return (int)i + 1;
+        }
+    }
+    return 0;
+}
+
+/* Corpus sentence that defines `key` (frame nearest the start, then
+   shortest), 0 if none. */
+static int ChatFindDefinition(const CHAT *ch, const char *key, char *out, size_t out_sz)
+{
+    uint32_t f, s, best = 0, bestf = 0;
+    int have = 0, bestpos = 0;
+    size_t bestlen = 0;
+    if (ch == NULL || key == NULL || key[0] == '\0' || ch->tgraph == NULL)
+        return 0;
+    for (f = 0; f < ch->ntfiles; f++)
+    {
+        const TEXTLEX *tl = &ch->tlex[f];
+        if (tl->image == NULL)
+            continue;
+        for (s = 0; s < tl->nsent; s++)
+        {
+            char sent[2048];
+            size_t sl;
+            int pos;
+            if (TextLexSentenceText(tl, s, tl->image, tl->imagelen, sent, sizeof(sent)) <= 0 ||
+                ChatLooksLikeIndexLine(sent))
+                continue;
+            sl = strlen(sent);
+            if (sl > 480 || (pos = ChatHasDefinition(sent, key)) == 0)
+                continue;
+            if (!have || pos < bestpos || (pos == bestpos && sl < bestlen))
+            {
+                have = 1; best = s; bestf = f; bestpos = pos; bestlen = sl;
+            }
+        }
+    }
+    if (!have)
+        return 0;
+    return TextLexSentenceText(&ch->tlex[bestf], best, ch->tlex[bestf].image,
+                               ch->tlex[bestf].imagelen, out, out_sz) > 0;
+}
+
+/* Subject of a definition question: the first content token after
+   "que es" / "what is" (articles skipped), or NULL. */
+static const char *ChatDefSubject(const PARSED *p)
+{
+    static const char *const art[] = {"el", "la", "los", "las", "un", "una", "lo", "the", "a", "an"};
+    uint32_t i, k;
+    for (i = 0; i + 1 < p->ntoks; i++)
+    {
+        const char *a = p->toks[i], *b = p->toks[i + 1];
+        if ((!strcmp(a, "que") || !strcmp(a, "qu\xc3\xa9") || !strcmp(a, "what")) &&
+            (!strcmp(b, "es") || !strcmp(b, "son") || !strcmp(b, "is") || !strcmp(b, "are")))
+        {
+            for (k = i + 2; k < p->ntoks; k++)
+            {
+                size_t t, isart = 0;
+                for (t = 0; t < sizeof(art) / sizeof(art[0]); t++)
+                    isart |= !strcmp(p->toks[k], art[t]);
+                if (!isart)
+                    return p->toks[k];
+            }
+            return NULL;
+        }
+    }
+    return NULL;
+}
+
+/* Drift guard for definition questions ("que es X?"). A quoted corpus
+   sentence ("Segun el texto ...") must name X itself, or define X's
+   dictionary translation / marked substitute ("the soul is ...").
+   A sentence that only mentions the translation does not answer the
+   question: quote a corpus sentence that defines the translation
+   (marked "[soul]"), else abstain. Reported case: "que es el anima?" -> soul -> an
+   unrelated verse. Applies only to quoted sentences; KB facts,
+   commonsense and abstentions pass through unchanged. */
+static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
+                            size_t size, int *status)
+{
+    const char *subj, *q, *tr;
+    ChatAnswerToBufRaw(ch, p, out, size, status);
+    if (out == NULL || size == 0 || strncmp(out, "Segun el texto", 14) != 0)
+        return;
+    subj = ChatDefSubject(p);
+    if (subj == NULL || subj[0] == '\0')
+        return;
+    q = strchr(out, ':');
+    q = q ? q + 1 : out;
+    if (ChatHasWord(q, subj))
+        return;
+    tr = DictTranslate(&ch->dict, subj);
+    if (tr != NULL && tr[0] != '\0' && ChatHasDefinition(q, tr))
+        return;
+    if (p->t_sub[0] != '\0' && ChatHasDefinition(q, p->t_sub))
+        return;
+    {   /* a grounded definition of the translation, marked, beats a mention */
+        char def[2048];
+        const char *k = (tr != NULL && tr[0] != '\0') ? tr : (p->t_sub[0] ? p->t_sub : NULL);
+        if (k != NULL && ChatFindDefinition(ch, k, def, sizeof(def)))
+        {
+            snprintf(out, size, "Segun el texto [%s]: %s\n", k, def);
+            return;
+        }
+    }
+    snprintf(out, size, "No tengo constancia suficiente para responder a eso.\n");
+    if (status)
+        *status = GOAL_UNKNOWN;
 }
 /* frozen wh set (same literals as the kw_who scan; reused, no new
    words): plan-level interrogative force for the dispatcher. */

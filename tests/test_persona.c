@@ -23,6 +23,21 @@
 static int g_pass = 0;
 static int g_fail = 0;
 
+/* Sanitizer builds (MSVC /fsanitize=address, gcc/clang -fsanitize=address)
+   run 2-10x slower and unoptimized, so throughput thresholds say nothing
+   there. Under a sanitizer the timing checks are reported as [SKIP] with the
+   measured value; every functional check still runs and still counts. */
+#if defined(__SANITIZE_ADDRESS__)
+#define SANITIZER_BUILD 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SANITIZER_BUILD 1
+#endif
+#endif
+#ifndef SANITIZER_BUILD
+#define SANITIZER_BUILD 0
+#endif
+
 static void check_str(const char *test_name, const char *actual, const char *expected)
 {
     if (actual != NULL && strcmp(actual, expected) == 0)
@@ -317,7 +332,10 @@ int main(void)
         printf("  [BENCH] Latency: %.3f us/projection\n", us_per_proj);
         printf("  [BENCH] Throughput: %.0f projections/sec\n", proj_per_sec);
 
-        check_int("Projection throughput > 500,000 proj/sec", (proj_per_sec > 500000.0), 1);
+        if (SANITIZER_BUILD)
+            printf("  [SKIP] Projection throughput > 500,000 proj/sec (sanitizer build, measured %.0f)\n", proj_per_sec);
+        else
+            check_int("Projection throughput > 500,000 proj/sec", (proj_per_sec > 500000.0), 1);
     }
 
     printf("\n=======================================================\n");
