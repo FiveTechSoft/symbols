@@ -65,7 +65,7 @@ if r.returncode != 0:
 bin_path = Path("eb_bin.exe") if Path("eb_bin.exe").is_file() else Path("eb_bin")
 if not bin_path.is_file():
     sys.exit(1)
-r2 = subprocess.run([str(bin_path)], capture_output=True, text=True)
+r2 = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)
 sys.exit(r2.returncode)
 '''
 
