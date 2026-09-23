@@ -369,6 +369,209 @@ static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile,
 }
 
 
+/* ------------------------------------------------- stated code fragment */
+
+/* The task quotes a code fragment Y that is absent from the workspace; find
+   the unique place X that Y is a small token edit of, and replace X with Y.
+   Names are anchors: X must contain every name of Y that the workspace
+   already knows, and may hold no name Y lacks, so only operators, literals
+   and punctuation change. */
+
+#define FRAG_MAX_TOK 24
+
+typedef struct
+{
+    size_t start, end;
+    char   text[64];
+    int    name;          /* identifier/keyword */
+} CTOK;
+
+static int ctok_lex(const char *s, size_t len, CTOK *out, int max)
+{
+    static const char *ops[] = {"<<=", ">>=", "<=", ">=", "==", "!=", "&&", "||", "->", "++",
+                                "--", "<<", ">>", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", NULL};
+    int n = 0;
+    size_t i = 0;
+    while (i < len && n < max) {
+        unsigned char c = (unsigned char)s[i];
+        if (isspace(c)) { i++; continue; }
+        size_t st = i;
+        int name = 0;
+        if (ident_char(c)) {
+            name = !isdigit(c);
+            while (i < len && ident_char((unsigned char)s[i])) i++;
+        } else if (c == '"' || c == '\'') {
+            i++;
+            while (i < len && s[i] != (char)c && s[i] != '\n') i += (s[i] == '\\' && i + 1 < len) ? 2 : 1;
+            if (i < len && s[i] == (char)c) i++;
+        } else {
+            size_t k = 0;
+            for (; ops[k]; k++)
+                if (strlen(ops[k]) <= len - i && !strncmp(s + i, ops[k], strlen(ops[k])))
+                    break;
+            i += ops[k] ? strlen(ops[k]) : 1;
+        }
+        if (i - st >= sizeof(out[0].text))
+            return -1;
+        out[n].start = st;
+        out[n].end = i;
+        memcpy(out[n].text, s + st, i - st);
+        out[n].text[i - st] = '\0';
+        out[n].name = name;
+        n++;
+    }
+    return n;
+}
+
+static int tok_distance(const CTOK *x, int nx, const CTOK *y, int ny)
+{
+    int d[FRAG_MAX_TOK + 1][FRAG_MAX_TOK + 1];
+    for (int i = 0; i <= nx; i++) d[i][0] = i;
+    for (int j = 0; j <= ny; j++) d[0][j] = j;
+    for (int i = 1; i <= nx; i++)
+        for (int j = 1; j <= ny; j++) {
+            int sub = d[i - 1][j - 1] + (strcmp(x[i - 1].text, y[j - 1].text) != 0);
+            int del = d[i - 1][j] + 1, ins = d[i][j - 1] + 1;
+            d[i][j] = sub < del ? (sub < ins ? sub : ins) : (del < ins ? del : ins);
+        }
+    return d[nx][ny];
+}
+
+static int has_name(const CTOK *t, int n, const char *name)
+{
+    for (int i = 0; i < n; i++)
+        if (t[i].name && !strcmp(t[i].text, name))
+            return 1;
+    return 0;
+}
+
+/* Normalized containment: Y's tokens appear consecutively somewhere. */
+static int ws_contains_tokens(const TASK_OPS_WORKSPACE *ws, const CTOK *y, int ny)
+{
+    for (int f = 0; f < ws->count; f++) {
+        const char *line = ws->files[f].data;
+        while (line && *line) {
+            const char *nl = strchr(line, '\n');
+            size_t len = nl ? (size_t)(nl - line) : strlen(line);
+            CTOK t[256];
+            int n = ctok_lex(line, len, t, 256);
+            for (int s = 0; n > 0 && s + ny <= n; s++) {
+                int k = 0;
+                while (k < ny && !strcmp(t[s + k].text, y[k].text)) k++;
+                if (k == ny) return 1;
+            }
+            line = nl ? nl + 1 : NULL;
+        }
+    }
+    return 0;
+}
+
+/* A clause that states the fragment must NOT hold. Declared lexical cue. */
+static int negated_clause(const char *task, size_t quote_start)
+{
+    static const char *cues[] = {"forbid", "Forbid", "must not", "never", "no longer", "prohib", NULL};
+    size_t s = quote_start;
+    while (s > 0 && task[s - 1] != '.' && task[s - 1] != ';' && task[s - 1] != '\n')
+        s--;
+    for (int k = 0; cues[k]; k++) {
+        const char *p = strstr(task + s, cues[k]);
+        if (p && (size_t)(p - task) < quote_start)
+            return 1;
+    }
+    return 0;
+}
+
+typedef struct
+{
+    int    file;
+    size_t from, to;
+    int    dist, span;
+} FRAG_HIT;
+
+/* Returns the number of distinct best locations (1 = usable); fills y_text,
+   hit. */
+static int find_fragment_edit(const TASK_OPS_WORKSPACE *ws, const char *task, char *y_text,
+                              size_t y_size, FRAG_HIT *out)
+{
+    size_t len = strlen(task);
+    int usable = 0;
+    FRAG_HIT best = {-1, 0, 0, 1 << 20, 1 << 20};
+    int ties = 0;
+    char best_y[128] = {0};
+    for (size_t i = 0; i < len; i++) {
+        char q = task[i];
+        if (q != '\'' && q != '"' && q != '`')
+            continue;
+        if (i > 0 && ident_char((unsigned char)task[i - 1]))
+            continue;                               /* apostrophe inside a word */
+        const char *e = strchr(task + i + 1, q);
+        if (!e || e - (task + i + 1) < 3 || e - (task + i + 1) > 80)
+            continue;
+        size_t fl = (size_t)(e - (task + i + 1));
+        CTOK y[FRAG_MAX_TOK];
+        int ny = ctok_lex(task + i + 1, fl, y, FRAG_MAX_TOK);
+        int punct = 0;
+        for (int k = 0; k < ny; k++) punct += !y[k].name;
+        if (ny < 3 || ny >= FRAG_MAX_TOK - 2 || punct == 0 || negated_clause(task, i) ||
+            ws_contains_tokens(ws, y, ny)) {
+            i = (size_t)(e - task);
+            continue;
+        }
+        usable++;
+        for (int f = 0; f < ws->count; f++) {
+            const char *data = ws->files[f].data, *line = data;
+            while (line && *line) {
+                const char *nl = strchr(line, '\n');
+                size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+                CTOK t[256];
+                int n = ctok_lex(line, ll, t, 256);
+                for (int s = 0; n > 0 && s < n; s++)
+                    for (int w = (ny > 2 ? ny - 2 : 1); w <= ny + 2 && s + w <= n; w++) {
+                        int ok = 1;
+                        for (int k = 0; k < ny && ok; k++)
+                            if (y[k].name && TaskOpsCountToken(ws, y[k].text) > 0 &&
+                                !has_name(t + s, w, y[k].text))
+                                ok = 0;
+                        int anchors = 0;
+                        for (int k = 0; k < w && ok; k++)
+                            if (t[s + k].name) {
+                                if (!has_name(y, ny, t[s + k].text))
+                                    ok = 0;
+                                anchors++;
+                            }
+                        if (!anchors)
+                            ok = 0;   /* an edit must be anchored on a shared name */
+                        if (!ok)
+                            continue;
+                        int d = tok_distance(t + s, w, y, ny);
+                        if (d > 2 || d >= ny)
+                            continue;
+                        size_t from = (size_t)(line - data) + t[s].start;
+                        size_t to = (size_t)(line - data) + t[s + w - 1].end;
+                        FRAG_HIT h = {f, from, to, d, w};
+                        int overlap = best.file == f && from < best.to && best.from < to;
+                        if (d < best.dist || (d == best.dist && overlap && w < best.span)) {
+                            if (!(d == best.dist && overlap))
+                                ties = 0;
+                            best = h;
+                            memcpy(best_y, task + i + 1, fl);
+                            best_y[fl] = '\0';
+                        } else if (d == best.dist && !overlap) {
+                            ties++;
+                        }
+                    }
+                line = nl ? nl + 1 : NULL;
+            }
+        }
+        i = (size_t)(e - task);
+    }
+    if (!usable || best.file < 0)
+        return 0;
+    snprintf(y_text, y_size, "%s", best_y);
+    *out = best;
+    return 1 + ties;
+}
+
 /* ------------------------------------------------------ compiler fix-its */
 
 typedef struct
@@ -561,7 +764,27 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 touched++;
             }
         snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
-    } else if (rep->compile_before == 0) {
+    }
+    char y_text[128] = {0};
+    FRAG_HIT hit;
+    int frags = renames == 1 ? 0 : find_fragment_edit(ws, task, y_text, sizeof(y_text), &hit);
+    if (frags == 1) {
+        rep->candidates = 1;
+        snprintf(rep->op, sizeof(rep->op), "stated_fragment");
+        const TASK_OPS_FILE *f = &ws->files[hit.file];
+        size_t yl = strlen(y_text);
+        char *out = (char *)malloc(f->len - (hit.to - hit.from) + yl + 1);
+        if (out) {
+            memcpy(out, f->data, hit.from);
+            memcpy(out + hit.from, y_text, yl);
+            memcpy(out + hit.from + yl, f->data + hit.to, f->len - hit.to + 1);
+            next[hit.file] = out;
+            touched = 1;
+        }
+        snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
+                 (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
+                 y_text, f->rel);
+    } else if (renames != 1 && rep->compile_before == 0) {
         int fixes = 0;
         touched = compiler_fixits(ws, flags, next, &fixes);
         if (touched) {
@@ -571,7 +794,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         }
     }
     if (!touched) {
-        if (renames > 1)
+        if (frags > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d places fit the stated fragment", frags);
+        else if (renames > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
         else
             snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
@@ -595,9 +820,15 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     if (after) {
         TaskOpsLoadWorkspace(workspace, after);
         probe(after, flags, &rep->compile_after, &rep->run_after);
-        int intent = !strcmp(rep->op, "rename_symbol")
-                         ? (TaskOpsCountToken(after, a) == 0 && TaskOpsCountToken(after, b) > 0)
-                         : (rep->compile_after == 1);
+        int intent;
+        if (!strcmp(rep->op, "rename_symbol"))
+            intent = TaskOpsCountToken(after, a) == 0 && TaskOpsCountToken(after, b) > 0;
+        else if (!strcmp(rep->op, "stated_fragment")) {
+            CTOK y[FRAG_MAX_TOK];
+            int ny = ctok_lex(y_text, strlen(y_text), y, FRAG_MAX_TOK);
+            intent = ny > 0 && ws_contains_tokens(after, y, ny);
+        } else
+            intent = rep->compile_after == 1;
         int no_regress = rep->compile_after >= rep->compile_before &&
                          (rep->run_before != 0 || rep->run_after == 0);
         verified = intent && no_regress;

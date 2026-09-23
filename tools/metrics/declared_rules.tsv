@@ -13,3 +13,5 @@ fixed "gcc" compiler in runner tests	tests/test_agent_runner_external.c	"gcc %s 
 code-shaped token (underscore, digit, inner capital, or quoted)	src/task_ops.c	static int code_shaped(	declared lexical rule (task_ops rename)
 rename adjacency (at most 16 bytes between the two names)	src/task_ops.c	y->start - x->end > 16	declared threshold (task_ops rename)
 task flag prefixes kept for the probe (-W -D -O -std=)	src/task_ops.c	!strncmp(task + i, "-std=", 5)	declared lexical rule (task_ops probe)
+negated-clause cues for stated fragments (forbid, must not, never, no longer, prohib)	src/task_ops.c	"forbid", "Forbid", "must not"	declared lexical cue (task_ops stated_fragment)
+stated fragment max token edit distance 2, anchored on a shared name	src/task_ops.c	if (d > 2 || d >= ny)	declared threshold (task_ops stated_fragment)

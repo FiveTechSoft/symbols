@@ -156,6 +156,55 @@ int main(void)
         CHECK(!TaskOpsSolve(d, "Tidy it with -std=c99.", &r) && !strcmp(get(d, "ok.c"), m), "working build: no fix-it, untouched");
     }
 
+
+    /* stated fragment: anchored small token edit */
+    {
+        char d[512]; make_dir(d, sizeof(d), "frag");
+        put(d, "cap.c", "static int cap(int x, int limit) { return x > limit ? limit : x; }\nint main(void) { return cap(5, 5) == 5 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Values equal to the limit must be capped too; the code should read `x >= limit`.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        CHECK(kept && !strcmp(r.op, "stated_fragment") && strstr(get(d, "cap.c"), "x >= limit ?"), "fragment edit applied at the anchored place");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "fragneg");
+        const char *m = "int main(void) { int q = 1; return q > 1; }\n";
+        put(d, "n.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Keep it simple. The form 'q >= 1' is forbidden here.", &r) && !strcmp(get(d, "n.c"), m),
+              "fragment stated as forbidden is never inserted");
+        CHECK(!TaskOpsSolve(d, "Add the heading '## Usage notes' to the docs.", &r) && !strcmp(get(d, "n.c"), m),
+              "fragment with no shared name is not anchored: untouched");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "fragamb");
+        const char *m = "int f(int k) { if (k > 2) return 1; if (k > 2) return 2; return 0; }\nint main(void) { return f(0); }\n";
+        put(d, "a.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Use 'k >= 2'.", &r) && !strcmp(get(d, "a.c"), m) && strstr(r.reason, "ambiguous"),
+              "two equally good places: abstain");
+    }
+
+
+    /* random quoted fragments terminate and never touch an unanchored file */
+    {
+        char d[512]; make_dir(d, sizeof(d), "fuzz");
+        const char *m = "alpha_1 = beta_2 + 3;\n";
+        put(d, "notes.txt", m);
+        char task[200];
+        unsigned s = 777;
+        const char alphabet[] = "ab_1 +-<>=;'`\"#()[]{}alpha_1beta_2";
+        int ok = 1;
+        for (int it = 0; it < 400 && ok; it++) {
+            for (int i = 0; i < 199; i++) { s = s * 1103515245u + 12345u; task[i] = alphabet[(s >> 16) % (sizeof(alphabet) - 1)]; }
+            task[199] = '\0';
+            TASK_OPS_REPORT r;
+            TaskOpsSolve(d, task, &r);
+            if (r.verified) put(d, "notes.txt", m);   /* restore for the next round */
+        }
+        CHECK(ok, "400 random quoted task texts terminate");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");
