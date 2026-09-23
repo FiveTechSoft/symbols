@@ -1,0 +1,36 @@
+# Fixed question set for the grounded-QA metric (tools/metrics.py).
+# Labels are decided by support in data/c_lang/c_corpus.txt, NOT by the engine's output.
+# Some questions are in Spanish on purpose (cross-lingual queries).
+# Columns: question <TAB> expected (ANSWER|ABSTAIN) <TAB> words a correct answer must contain (separated by |, all required)
+explain recursion	ANSWER	recursion|itself
+explain pointer arithmetic	ANSWER	pointer arithmetic
+what is a null pointer?	ANSWER	null pointer|no valid
+what does malloc do?	ANSWER	malloc|allocat
+what does free do?	ANSWER	free function|releas
+para que sirve malloc?	ANSWER	malloc|allocat
+que pasa si se llama free dos veces?	ANSWER	free
+what is a struct in C?	ANSWER	struct keyword|member
+what is a linked list?	ANSWER	linked list|node
+what is a stack?	ANSWER	stack|lifo
+what is a memory leak?	ANSWER	memory leak
+what is a buffer overflow?	ANSWER	buffer overflow
+what does the preprocessor do?	ANSWER	preprocessor
+what is a function prototype?	ANSWER	prototype
+what does the switch statement do?	ANSWER	switch
+what does typedef do?	ANSWER	typedef
+que es una fuga de memoria?	ANSWER	memory leak
+que es una pila?	ANSWER	stack
+what does snprintf do?	ANSWER	snprintf
+what is the heap segment?	ANSWER	heap
+what is the weather today?	ABSTAIN
+tell me a joke	ABSTAIN
+how do I bake bread?	ABSTAIN
+explain the history of rome	ABSTAIN
+who won the world cup?	ABSTAIN
+what is the capital of France?	ABSTAIN
+how do I configure a Kubernetes ingress?	ABSTAIN
+what is photosynthesis?	ABSTAIN
+quien escribio el quijote?	ABSTAIN
+what is the best pizza topping?	ABSTAIN
+how tall is Mount Everest?	ABSTAIN
+what is a monad in Haskell?	ABSTAIN

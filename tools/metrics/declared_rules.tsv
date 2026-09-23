@@ -1,0 +1,12 @@
+# Inventory of hand-written rules still in the engine (not learned).
+# tools/metrics.py checks that each identifying symbol is still in its file; if it disappears, the rule is reported as "stale".
+# Initial and incomplete inventory: add every new lexical rule here, and remove it when a mechanism replaces it.
+# Columns: name <TAB> file <TAB> identifying symbol <TAB> kind
+total cue (total/valor/value/suma/sum/worth)	src/c_edit_ops.c	strstr(f, "worth")	declared lexical cue (decided 2026-09-23)
+Spanish detector by words (que/para/el/la/sirve...)	src/chat.c	strcmp(t, "sirve")	lexical
+foreign-word detector by accents and suffixes	src/dict.c	"cion"	lexical/morphological
+shell allowlist	data/agentic/tools.tsv	allow	declarative table
+per-relation contracts (reigns/father/sibling...)	data/agentic/tools.tsv	contract	declarative table
+fixture facts (Babylonia, David, Saul...)	data/agentic/fixtures.tsv	rel	declarative table
+English-Spanish alignment	data/english-spanish.txt	=	declarative table
+fixed "gcc" compiler in runner tests	tests/test_agent_runner_external.c	"gcc %s -fsyntax-only	test

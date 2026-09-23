@@ -54,6 +54,31 @@ Harbour is the first reference domain in the roadmap. C and C++ remain the subst
 | Persistent workflows and verified engineering memory | Planned | Roadmap Phases 5-6 | Not implemented |
 | Harbour end-to-end adapter | Planned | roadmap domain orientation | No Harbour release gate has passed |
 
+### 2.1 Progress metrics (measured, not estimated)
+
+Every number in this table comes from a real run of `python3 tools/metrics.py --write --ci` on the stated commit; nothing is filled in by hand. Anything that cannot be measured yet is shown as "not measured". The per-commit history is in [`tools/metrics_history.csv`](tools/metrics_history.csv), and the per-phase targets are in [`ROADMAP.md`](ROADMAP.md#measurable-targets-per-phase). The fixed task bank has its own per-commit JSONL report and CI gate in [`scripts/bank_report.py`](scripts/bank_report.py) (workflow `bank`); this table reads the same runner output.
+
+<!-- METRICS:BEGIN -->
+Measured on commit `fe7908e` on 2026-09-23 (linux, build) with `python3 tools/metrics.py`.
+
+| Metric | Value | How it is measured |
+|---|---|---|
+| CTest suite | 85/94 pass, 0 fail, 9 skipped | full `ctest`; skipped = optional data missing |
+| Unit asserts | 762 pass, 0 fail | sum of `TEST RESULTS` over all tests |
+| Agent: C repair, evaluation | 12/25 resolved (48%), 0 harmful edits, 13 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
+| Agent: C repair, development | 2/4 resolved (50%), 0 harmful edits, 2 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
+| Agent: C repair, held-out | 2/4 resolved (50%), 0 harmful edits | `test_agent_runner_external` / `_heldout` (separated fixtures) |
+| Grounded QA (fixed set of 32) | precision 78%, recall 82% (TP 14, FP 4, FN 3, TN 11) | `tools/metrics/qa_battery.tsv` against the server; labels from the corpus, not from the engine |
+| Invented or wrong answers | 4 of 32 | FP from the row above |
+| Server latency | p50 1.0 ms, p95 1.6 ms | same set, local |
+| Procedural memory: repeat benefit | 6 real commands: 6 probes the first time → 0 on repeat | same list twice, the probe really runs; non-commands are re-probed on purpose |
+| C edit operator (OpenCode) | 46 asserts pass, 0 fail | `test_c_edit_ops` |
+| Varied engineering task bank (bug fix, rename, multi-file...) | not measured | does not exist yet; see ROADMAP |
+| Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |
+| CI per platform | asan-msvc: in_progress, build-test-linux: success, build-test-msvc: success | [run](https://github.com/FiveTechSoft/symbols/actions/runs/35819506330); failing tests are listed in each job log |
+| Hand-written rules (declared) | 8 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
+<!-- METRICS:END -->
+
 ## 3. Architecture
 
 ### 3.1 Base structures
