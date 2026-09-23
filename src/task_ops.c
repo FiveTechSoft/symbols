@@ -1981,6 +1981,153 @@ static int run_test_plan(const TASK_OPS_WORKSPACE *ws, const TEST_PLAN *tp, cons
 }
 
 
+
+/* ------------------------------------------ task-stated examples (phase 3) */
+
+/* Examples the task writes as f(<int literals>) == <int> or
+   f(<int literals>) expect <int>, where f is defined in the workspace.
+   They become an extra, stronger check for behavior-changing operators, and
+   a probe for workspaces with no main. Declared rule (example shape). */
+#define EX_MAX 8
+typedef struct
+{
+    char call[160];
+    long expect;
+} EXAMPLE;
+
+static const char *skip_int(const char *p)
+{
+    if (*p == '-') p++;
+    if (!isdigit((unsigned char)*p)) return NULL;
+    while (isdigit((unsigned char)*p)) p++;
+    return p;
+}
+
+static int task_examples(const TASK_OPS_WORKSPACE *ws, const char *task, EXAMPLE *ex, int max)
+{
+    int n = 0;
+    size_t len = strlen(task);
+    for (size_t i = 0; i < len && n < max; i++) {
+        if (!ident_start((unsigned char)task[i]) || (i > 0 && ident_char((unsigned char)task[i - 1])))
+            continue;
+        size_t e = i;
+        while (ident_char((unsigned char)task[e])) e++;
+        if (task[e] != '(' || e - i >= 64)
+            { i = e; continue; }
+        const char *p = task + e + 1;
+        int ok = 1, args = 0;
+        while (*p == ' ') p++;
+        while (*p && *p != ')') {
+            const char *q = skip_int(p);
+            if (!q) { ok = 0; break; }
+            args++;
+            p = q;
+            while (*p == ' ') p++;
+            if (*p == ',') { p++; while (*p == ' ') p++; }
+            else if (*p != ')') { ok = 0; break; }
+        }
+        if (!ok || *p != ')' || args == 0)
+            { i = e; continue; }
+        const char *close = p;
+        p++;
+        while (*p == ' ') p++;
+        if (!strncmp(p, "==", 2)) p += 2;
+        else if (!strncmp(p, "expect", 6)) p += 6;
+        else { i = e; continue; }
+        while (*p == ' ') p++;
+        const char *v = p, *ve = skip_int(p);
+        char name[64];
+        memcpy(name, task + i, e - i);
+        name[e - i] = '\0';
+        if (!ve || !file_has_define(ws, name))
+            { i = e; continue; }
+        snprintf(ex[n].call, sizeof(ex[n].call), "%.*s", (int)(close + 1 - (task + i)), task + i);
+        ex[n].expect = strtol(v, NULL, 10);
+        n++;
+        i = (size_t)(ve - task);
+    }
+    return n;
+}
+
+static int any_main(const TASK_OPS_WORKSPACE *ws)
+{
+    for (int i = 0; i < ws->count; i++)
+        if (is_c_source(ws->files[i].rel) && defines_main(ws->files[i].data))
+            return 1;
+    return 0;
+}
+
+/* 1 = every example holds (built from the workspace sources that have no
+   main, plus a generated harness outside the workspace), 0 = not, -1 = no
+   build. */
+static int run_examples(const TASK_OPS_WORKSPACE *ws, const char *flags, const EXAMPLE *ex, int n)
+{
+    char hpath[TASK_OPS_MAX_PATH + 8], bin[TASK_OPS_MAX_PATH];
+    temp_binary(bin, sizeof(bin));
+    snprintf(hpath, sizeof(hpath), "%s_h.c", bin);
+    FILE *h = fopen(hpath, "w");
+    if (!h) return -1;
+    for (int k = 0; k < n; k++) {
+        char name[64];
+        size_t nl = 0;
+        while (nl < sizeof(name) - 1 && ident_char((unsigned char)ex[k].call[nl])) nl++;
+        memcpy(name, ex[k].call, nl);
+        name[nl] = '\0';
+        int dup = 0;
+        for (int j = 0; j < k; j++) dup |= !strncmp(ex[j].call, name, nl) && ex[j].call[nl] == '(';
+        for (int i = 0; !dup && i < ws->count; i++) {
+            size_t ll;
+            long at = is_c_source(ws->files[i].rel) ? file_level_decl(ws->files[i].data, name, 1, &ll) : -1;
+            if (at >= 0) { fprintf(h, "%.*s;\n", (int)ll, ws->files[i].data + at); break; }
+        }
+    }
+    fprintf(h, "int main(void)\n{\n    return (1");
+    for (int k = 0; k < n; k++) fprintf(h, " && (%s) == %ld", ex[k].call, ex[k].expect);
+    fprintf(h, ") ? 0 : 1;\n}\n");
+    fclose(h);
+    char cmd[4096], objs[TASK_OPS_MAX_FILES][TASK_OPS_MAX_PATH + 16];
+    int nobj = 0;
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    int res = -1;
+    if (!r) { remove(hpath); return -1; }
+    /* a source that defines main is compiled with its main renamed, so the
+       functions it defines stay callable from the harness */
+    for (int i = 0; i < ws->count && nobj < TASK_OPS_MAX_FILES; i++)
+        if (is_c_source(ws->files[i].rel) && defines_main(ws->files[i].data) && !strchr(ws->files[i].rel, '"') &&
+            strncmp(ws->files[i].rel, "test", 4) != 0) {
+            snprintf(objs[nobj], sizeof(objs[nobj]), "%s_%d.o", bin, nobj);
+            snprintf(cmd, sizeof(cmd), "gcc %s-w -Dmain=symbols_ws_main -c \"%s\" -o \"%s\"", flags, ws->files[i].rel, objs[nobj]);
+            AgentShellResultInit(r);
+            AgentShellExec(cmd, ws->root, 20000, r);
+            nobj++;
+            if (r->execution_failed || r->exit_code != 0) goto done;
+        }
+    size_t o = (size_t)snprintf(cmd, sizeof(cmd), "gcc %s-w -o \"%s\" \"%s\"", flags, bin, hpath);
+    for (int i = 0; i < ws->count && o < sizeof(cmd); i++)
+        if (is_c_source(ws->files[i].rel) && !defines_main(ws->files[i].data) && !strchr(ws->files[i].rel, '"') &&
+            strncmp(ws->files[i].rel, "test", 4) != 0)
+            o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, " \"%s\"", ws->files[i].rel);
+    for (int k = 0; k < nobj && o < sizeof(cmd); k++)
+        o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, " \"%s\"", objs[k]);
+    {
+        AgentShellResultInit(r);
+        AgentShellExec(cmd, ws->root, 20000, r);
+        if (!r->execution_failed && r->exit_code == 0) {
+            char run_cmd[TASK_OPS_MAX_PATH + 8];
+            snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", bin);
+            AgentShellResultInit(r);
+            AgentShellExec(run_cmd, ws->root, 15000, r);
+            res = (!r->timed_out && r->exit_code == 0) ? 1 : 0;
+        }
+    }
+done:
+    free(r);
+    for (int k = 0; k < nobj; k++) remove(objs[k]);
+    remove(bin);
+    remove(hpath);
+    return res;
+}
+
 /* ------------------------------------------ relational operator search */
 
 /* Observed state: the program builds but exits non-zero. Try one
@@ -2030,6 +2177,20 @@ static int line_has_anchor(const char *line, size_t ll, const TASK_TOKEN *an, in
 static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, RELOP_HIT *hit)
 {
     int builds = 0;
+    EXAMPLE ex[EX_MAX];
+    int nex = task_examples(ws, task ? task : "", ex, EX_MAX), has_main = any_main(ws);
+    if (!has_main && nex == 0)
+        return 0;
+    {   /* the observed state must fail before: own exit code or a stated example */
+        int c0 = -1, r0 = -1;
+        if (has_main) probe_out(ws, flags, &c0, &r0, NULL);
+        int main_fails = has_main && c0 == 1 && r0 != 0 && r0 != 124;
+        int ex_fails = nex > 0 && run_examples(ws, flags, ex, nex) == 0;
+        if (!main_fails && !ex_fails)
+            return 0;
+        if (has_main && c0 != 1)
+            return 0;
+    }
     TASK_TOKEN an[64];
     int na = 0, nt = lex_code_tokens_g(task ? task : "", an, 64, ws);
     for (int k = 0; k < nt; k++)
@@ -2073,12 +2234,15 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
                         memcpy(cand, F->data, at);
                         memcpy(cand + at, relops[r], nl2);
                         memcpy(cand + at + nl2, F->data + at + ol, F->len - at - ol + 1);
-                        int c = -1, run = -1;
-                        if (write_file(ws->root, F->rel, cand))
-                            probe_out(ws, flags, &c, &run, NULL);
+                        int c = -1, run = -1, exok = 1;
+                        if (write_file(ws->root, F->rel, cand)) {
+                            if (has_main) probe_out(ws, flags, &c, &run, NULL);
+                            if (nex && (!has_main || (c == 1 && run == 0))) exok = run_examples(ws, flags, ex, nex) == 1;
+                        }
                         write_file(ws->root, F->rel, F->data);
                         free(cand);
-                        if (c == 1 && run == 0) {
+                        /* own exit code when there is a main, and every stated example */
+                        if ((!has_main || (c == 1 && run == 0)) && exok) {
                             found++;
                             hit->file = f;
                             hit->at = at;
@@ -2400,7 +2564,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->op, sizeof(rep->op), "author_test");
                 snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
             }
-        } else if (op == OP_RELOP && rep->compile_before == 1 && rep->run_before != 0 && rep->run_before != 124 &&
+        } else if (op == OP_RELOP &&
                    (relops_found = relop_search(ws, flags, task, &rhit)) == 1) {
             const TASK_OPS_FILE *F = &ws->files[rhit.file];
             size_t tl = strlen(rhit.to);
@@ -2482,7 +2646,10 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             int sh = ds_shape(da);
             intent = ds_in(after, da, sh, 1) == 0 && ds_in(after, db, sh, 1) > 0;
         } else if (!strcmp(rep->op, "relop_search")) {
-            intent = rep->compile_after == 1 && rep->run_after == 0;
+            EXAMPLE vex[EX_MAX];
+            int vn = task_examples(after, task, vex, EX_MAX), vm = any_main(after);
+            intent = (!vm || (rep->compile_after == 1 && rep->run_after == 0)) &&
+                     (vn == 0 || run_examples(after, flags, vex, vn) == 1);
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
