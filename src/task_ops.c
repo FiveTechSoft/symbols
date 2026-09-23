@@ -495,11 +495,50 @@ typedef struct
     int    dist, span;
 } FRAG_HIT;
 
+/* Unquoted target after a change cue (declared lexical cue: "change to" /
+   "change it to", any case of the first letter) is quoted with backticks up
+   to the end of its sentence, so the fragment search below sees it. */
+static void quote_change_targets(const char *task, char *out, size_t size)
+{
+    static const char *cues[] = {"hange to ", "hange it to ", NULL};
+    size_t o = 0;
+    const char *p = task;
+    while (*p && o + 3 < size) {
+        int hit = 0;
+        for (int k = 0; cues[k] && !hit; k++) {
+            size_t cl = strlen(cues[k]);
+            if ((p[0] == 'c' || p[0] == 'C') && !strncmp(p + 1, cues[k], cl) &&
+                (p == task || !ident_char((unsigned char)p[-1]))) {
+                const char *s = p + 1 + cl, *e = s;
+                while (*e && *e != '\n' && !(*e == '.' && (e[1] == ' ' || e[1] == '\n' || !e[1])) && *e != ';')
+                    e++;
+                size_t l = (size_t)(e - p);
+                if (strpbrk(s, "'\"`") && (size_t)(strpbrk(s, "'\"`") - s) < (size_t)(e - s))
+                    break;   /* already quoted */
+                if (o + l + 3 >= size)
+                    break;
+                memcpy(out + o, p, (size_t)(s - p)); o += (size_t)(s - p);
+                out[o++] = '`';
+                memcpy(out + o, s, (size_t)(e - s)); o += (size_t)(e - s);
+                out[o++] = '`';
+                p = e;
+                hit = 1;
+            }
+        }
+        if (!hit)
+            out[o++] = *p++;
+    }
+    out[o] = '\0';
+}
+
 /* Returns the number of distinct best locations (1 = usable); fills y_text,
    hit. */
-static int find_fragment_edit(const TASK_OPS_WORKSPACE *ws, const char *task, char *y_text,
+static int find_fragment_edit(const TASK_OPS_WORKSPACE *ws, const char *task_in, char *y_text,
                               size_t y_size, FRAG_HIT *out)
 {
+    static char quoted[8192];
+    quote_change_targets(task_in, quoted, sizeof(quoted));
+    const char *task = quoted;
     size_t len = strlen(task);
     int usable = 0;
     FRAG_HIT best = {-1, 0, 0, 1 << 20, 1 << 20};

@@ -434,6 +434,21 @@ int main(void)
               "unmatched_brace: two stray braces = abstain");
     }
 
+    /* stated_fragment: unquoted target after "change to" */
+    {
+        char d[512]; make_dir(d, sizeof(d), "chgto");
+        put(d, "w.c", "int lim(int k) { return k > 9; }\nint main(void) { return !lim(9); }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Nine must count too: it uses k > 9 now. Change to k >= 9.", &r);
+        CHECK(kept && !strcmp(r.op, "stated_fragment") && strstr(get(d, "w.c"), "return k >= 9;"),
+              "stated_fragment: unquoted target after 'Change to' is used");
+        const char *m = "int main(void) { return 0; }\n";
+        char d2[512]; make_dir(d2, sizeof(d2), "chgto2");
+        put(d2, "z.c", m);
+        CHECK(!TaskOpsSolve(d2, "Change to a faster approach.", &r) && !strcmp(get(d2, "z.c"), m),
+              "stated_fragment: plain words after 'Change to' are not a fragment");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");
