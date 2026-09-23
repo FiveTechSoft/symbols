@@ -56,6 +56,7 @@ add_library(symbolic STATIC
     src/qa_layer.c
     src/dict.c
     src/server_proto.c
+    src/output_contract.c
     src/c_edit_ops.c
     src/text_lex.c
     src/meta_graph.c
@@ -270,6 +271,10 @@ add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_mod
 
 # Hidden QA split: measure-only runner (never a development threshold).
 # Prints HIDDEN_QA pass= total= rate=; exit 0 on well-formed set, 77 if model missing.
+add_executable(test_output_contract tests/test_output_contract.c)
+target_link_libraries(test_output_contract symbolic)
+add_test(NAME test_output_contract COMMAND test_output_contract)
+
 add_executable(test_qa_hidden tests/test_qa_hidden.c)
 target_link_libraries(test_qa_hidden symbolic)
 add_test(NAME test_qa_hidden COMMAND test_qa_hidden tests/qa_hidden.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

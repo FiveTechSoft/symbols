@@ -14,6 +14,13 @@
    Returns 1 on success (unescaped UTF-8 in out). */
 int ServerExtractQuery(const char *body, char *out, size_t size);
 
+/* First {"role":"system","content":"..."} (unescaped). Returns 1 if found. */
+int ServerExtractFirstSystem(const char *body, char *out, size_t size);
+
+/* Message roles in order, one letter each: s(ystem) u(ser) a(ssistant)
+   t(ool), '?' for others. Returns the number of messages. */
+int ServerRoleSequence(const char *body, char *out, size_t size);
+
 /* Extract optional session identifier ("user" or "session_id" field)
    from chat-completions body. Returns 1 if found, 0 if absent. */
 int ServerExtractSession(const char *body, char *out, size_t size);

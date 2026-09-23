@@ -16,6 +16,7 @@
 #include "learn.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "output_contract.h"
 #include "c_edit_ops.h"
 #include "agent_git.h"
 #include "agent_planner.h"
@@ -987,6 +988,44 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         strncpy(sess->declared_tools[i], declared_tools[i], sizeof(sess->declared_tools[i]) - 1);
         sess->declared_tools[i][sizeof(sess->declared_tools[i]) - 1] = '\0';
+    }
+
+    /* Output contract: a request with no tools whose system message
+       declares the shape of the answer (lines / words / characters), and
+       whose last two turns are an instruction followed by the material,
+       is a transform, not a task. Answer from the material itself within
+       the declared shape and verify it; never reply with a task fallback.
+       Nothing here depends on which client sent it or on its wording. */
+    if (num_declared == 0 && has_system && strcmp(last_role, "user") == 0)
+    {
+        char roles[128];
+        int nr = ServerRoleSequence(body, roles, sizeof(roles));
+        if (nr >= 3 && roles[nr - 1] == 'u' && roles[nr - 2] == 'u')
+        {
+            char sys_text[4096], subject[4096], shaped[512];
+            OUTPUT_CONTRACT oc;
+            if (ServerExtractFirstSystem(body, sys_text, sizeof(sys_text)) &&
+                OutputContractParse(sys_text, &oc) &&
+                ServerExtractQuery(body, subject, sizeof(subject)) &&
+                OutputContractCompose(subject, &oc, shaped, sizeof(shaped)))
+            {
+                fprintf(stderr, "[contract] transform lines<=%d words<=%d chars<=%d -> '%s'\n",
+                        oc.max_lines, oc.max_words, oc.max_chars, shaped);
+                if (ServerWantsStream(body))
+                {
+                    ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                              shaped, sse, sizeof(sse));
+                    SendRaw(s, 200, "OK", "text/event-stream", sse);
+                }
+                else
+                {
+                    ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
+                                        shaped, subject, resp, sizeof(resp));
+                    SendJson(s, 200, "OK", resp);
+                }
+                return;
+            }
+        }
     }
 
     OPENAI_TOOL_RESPONSE tool_resp;

@@ -289,7 +289,8 @@ static int IsWs(char c)
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-int ServerExtractQuery(const char *body, char *out, size_t size)
+static int ExtractRoleContent(const char *body, const char *want_role, int want_last,
+                              char *out, size_t size)
 {
     const char *p;
     char last[4096];
@@ -337,7 +338,7 @@ int ServerExtractQuery(const char *body, char *out, size_t size)
                 strncpy(role, tmp, sizeof(role) - 1);
                 q = qq + 1;
             }
-            if (strcmp(role, "user") != 0)
+            if (strcmp(role, want_role) != 0 || (found && !want_last))
             {
                 p = q;
                 continue;
@@ -405,6 +406,50 @@ int ServerExtractQuery(const char *body, char *out, size_t size)
     strncpy(out, last, size - 1);
     out[size - 1] = '\0';
     return 1;
+}
+
+int ServerExtractQuery(const char *body, char *out, size_t size)
+{
+    return ExtractRoleContent(body, "user", 1, out, size);
+}
+
+int ServerExtractFirstSystem(const char *body, char *out, size_t size)
+{
+    return ExtractRoleContent(body, "system", 0, out, size);
+}
+
+int ServerRoleSequence(const char *body, char *out, size_t size)
+{
+    const char *p = body;
+    size_t o = 0;
+    if (body == NULL || out == NULL || size == 0)
+        return 0;
+    while ((p = strstr(p, "\"role\"")) != NULL)
+    {
+        const char *q = p + 6;
+        /* a key, not text inside an escaped string */
+        if (p > body && p[-1] == '\\')
+        {
+            p += 6;
+            continue;
+        }
+        while (IsWs(*q))
+            q++;
+        if (*q == ':')
+        {
+            q++;
+            while (IsWs(*q))
+                q++;
+            if (*q == '"' && o + 1 < size)
+            {
+                char c = q[1];
+                out[o++] = (c == 's' || c == 'u' || c == 'a' || c == 't') ? c : '?';
+            }
+        }
+        p += 6;
+    }
+    out[o] = '\0';
+    return (int)o;
 }
 
 /* Derive a stable session key for clients (OpenCode 1.18.x) that send
