@@ -193,6 +193,18 @@ sllm_test(test_agent_planner tests/test_agent_planner.c)
 sllm_test(test_agent_runner tests/test_agent_runner.c)
 sllm_test(test_agent_runner_heldout tests/test_agent_runner_heldout.c)
 sllm_test(test_agent_runner_external tests/test_agent_runner_external.c)
+sllm_test(test_agent_runner_learning tests/test_agent_runner_learning.c)
+# Per-commit bank report: runs external+heldout+learning, appends one JSONL row.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(bank_report
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/bank_report.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        DEPENDS test_agent_runner_external test_agent_runner_heldout
+                test_agent_runner_learning
+        COMMENT "Agent-runner task bank report (JSONL)"
+        VERBATIM)
+endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
 sllm_test(test_server_tool_calling tests/test_server_tool_calling.c)

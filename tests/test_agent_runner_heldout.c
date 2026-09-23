@@ -66,9 +66,10 @@ static int run_case(const char *dir, const char *replacement, int expected,
         strcmp(result.last_repair_operator, "missing-header") == 0 &&
         strstr(result.unified_diff, expected_header) != NULL;
     else ok = ok && result.repairs_applied == 0 && same_file(initial, target);
-    printf("%-18s solved=%d expected=%d attempts=%u replans=%u repair=%s\n",
+    printf("%-18s solved=%d expected=%d attempts=%u replans=%u repair=%s %s\n",
            dir, rc, expected, result.attempts_executed, result.replans_triggered,
-           result.last_repair_operator[0] ? result.last_repair_operator : "none");
+           result.last_repair_operator[0] ? result.last_repair_operator : "none",
+           ok ? "OK" : "FAIL");
     AgentRunnerDestroy(r); remove(target); return ok;
 }
 

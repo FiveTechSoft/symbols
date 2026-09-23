@@ -64,6 +64,7 @@ CTestTestfile.cmake
 Testing/
 conversation.txt
 observations.jsonl
+bank_report.jsonl
 *.log
 
 # SWE-bench harness leftover workspace trees (must not live at repo root)

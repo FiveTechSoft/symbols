@@ -1,0 +1,56 @@
+name: bank
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  agent-runner-bank:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ ninja-build
+
+      - name: Configure
+        run: cmake -S . -B build-gcc -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build bank targets
+        run: |
+          cmake --build build-gcc --target \
+            test_agent_runner_external \
+            test_agent_runner_heldout \
+            test_agent_runner_learning
+
+      - name: Run task bank report
+        id: bank
+        run: |
+          python3 scripts/bank_report.py --out bank_report.jsonl | tee bank_row.txt
+          python3 - <<'PY'
+          import json, pathlib, sys
+          row = json.loads(pathlib.Path("bank_row.txt").read_text().strip().splitlines()[-1])
+          g = row.get("global", {})
+          print(f"clean_rate={g.get('clean_rate')} wrong_edits={row.get('wrong_edits')} pass={row.get('pass')}")
+          print(f"learning={row.get('learning')}")
+          if not row.get("pass"):
+              sys.exit(1)
+          if int(row.get("wrong_edits") or 0) != 0:
+              print("wrong_edits must be 0", file=sys.stderr)
+              sys.exit(1)
+          if float(g.get("clean_rate") or 0) < 1.0:
+              print("clean_rate must be 1.0 on fixed bank", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Upload report row
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bank-report
+          path: |
+            bank_report.jsonl
+            bank_row.txt
