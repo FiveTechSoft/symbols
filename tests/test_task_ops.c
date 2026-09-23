@@ -249,6 +249,37 @@ int main(void)
               !strcmp(get(d, "m.c"), m), "task names a file the edit does not create: rolled back");
     }
 
+
+    /* literal -> named constant, behavior preserved */
+    {
+        char d[512]; make_dir(d, sizeof(d), "litnum");
+        put(d, "q.c", "#include <stdio.h>\nint main(void) { int w = 17; printf(\"%d\\n\", w * 17); return w == 17 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Name the magic 17 as WIDTH_CELLS. Output must not change.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        const char *g = get(d, "q.c");
+        CHECK(kept && strstr(g, "#define WIDTH_CELLS 17") && strstr(g, "w * WIDTH_CELLS") && !strstr(g, "w == 17"),
+              "number literal replaced by a defined constant");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "litstr");
+        put(d, "q.c", "#include <stdio.h>\nint main(void) { printf(\"ERR> bad\\n\"); printf(\"ERR> worse\\n\"); return 0; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Pull the literal \"ERR> \" into ERR_TAG and reuse it.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        const char *g = get(d, "q.c");
+        CHECK(kept && strstr(g, "#define ERR_TAG \"ERR> \"") && strstr(g, "printf(ERR_TAG \"bad"),
+              "string prefix kept by C string concatenation");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "litamb");
+        const char *m = "int main(void) { int a = 3, b = 4; return a + b == 7 ? 0 : 1; }\n";
+        put(d, "q.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Use a constant LIMIT_V for 3 or 4.", &r) && !strcmp(get(d, "q.c"), m),
+              "two literals in the sentence: abstain");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

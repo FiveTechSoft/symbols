@@ -338,8 +338,11 @@ static size_t c_sources(const TASK_OPS_WORKSPACE *ws, char *srcs, size_t size)
     return used;
 }
 
-static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile, int *run)
+static char probe_stdout[2][1024];   /* [0] before, [1] after: behavior evidence */
+
+static void probe_out(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile, int *run, char *out)
 {
+    if (out) out[0] = '\0';
     char cmd[4096], srcs[3072], bin[TASK_OPS_MAX_PATH];
     *compile = -1;
     *run = -1;
@@ -363,6 +366,9 @@ static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile,
         AgentShellResultInit(r);
         AgentShellExec(run_cmd, ws->root, 5000, r);
         *run = r->timed_out ? 124 : r->exit_code;
+        if (out)
+            snprintf(out, sizeof(probe_stdout[0]), "%.*s", (int)(r->stdout_len < 1023 ? r->stdout_len : 1023),
+                     r->stdout_buf);
     }
     remove(bin);
     free(r);
@@ -993,6 +999,182 @@ static int named_files_exist(const TASK_OPS_WORKSPACE *ws, const char *task, cha
     return 1;
 }
 
+/* -------------------------------------------- literal -> named constant */
+
+/* In one sentence the task names a new constant N (code-shaped, absent from
+   the workspace) and a literal L (a number, or a quoted string) that the C
+   sources use. Define N once and replace every use of L; a string literal
+   that only starts/ends with L keeps the rest by C string concatenation.
+   Sentence boundary ". " is a declared lexical rule. */
+
+static int is_c_source(const char *rel)
+{
+    size_t n = strlen(rel);
+    return n > 2 && (!strcmp(rel + n - 2, ".c") || !strcmp(rel + n - 2, ".h"));
+}
+
+typedef struct
+{
+    char name[128];
+    char lit[96];      /* number text, or string contents without quotes */
+    int  is_string;
+} LIT_PLAN;
+
+/* occurrences of the literal as a C token (numbers) or inside string tokens */
+static int literal_uses(const TASK_OPS_WORKSPACE *ws, const LIT_PLAN *p, int *file_out, int *files_out)
+{
+    int uses = 0, files = 0;
+    *file_out = -1;
+    for (int f = 0; f < ws->count; f++) {
+        if (!is_c_source(ws->files[f].rel))
+            continue;
+        int here = 0;
+        const char *line = ws->files[f].data;
+        while (line && *line) {
+            const char *nl = strchr(line, '\n');
+            size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+            CTOK t[256];
+            int n = (line[0] == '#') ? 0 : ctok_lex(line, ll, t, 256);
+            for (int k = 0; k < n; k++) {
+                if (!p->is_string && !strcmp(t[k].text, p->lit))
+                    here++;
+                if (p->is_string && t[k].text[0] == '"') {
+                    size_t tl = strlen(t[k].text), lt = strlen(p->lit);
+                    if (tl >= lt + 2 && (!strncmp(t[k].text + 1, p->lit, lt) ||
+                                         !strncmp(t[k].text + tl - 1 - lt, p->lit, lt)))
+                        here++;
+                }
+            }
+            line = nl ? nl + 1 : NULL;
+        }
+        if (here) { files++; *file_out = f; uses += here; }
+    }
+    *files_out = files;
+    return uses;
+}
+
+static int find_literal_plan(const TASK_OPS_WORKSPACE *ws, const char *task, LIT_PLAN *out)
+{
+    size_t len = strlen(task), s = 0;
+    int plans = 0;
+    while (s < len) {
+        size_t e = s;
+        while (e < len && !(task[e] == '.' && (e + 1 >= len || isspace((unsigned char)task[e + 1]))))
+            e++;
+        char sent[512];
+        size_t sl = e - s < sizeof(sent) - 1 ? e - s : sizeof(sent) - 1;
+        memcpy(sent, task + s, sl);
+        sent[sl] = '\0';
+        /* the new name: code-shaped, absent from the workspace, unique here */
+        TASK_TOKEN tok[32];
+        int nt = lex_code_tokens(sent, tok, 32), names = 0;
+        char name[128] = {0};
+        for (int k = 0; k < nt; k++)
+            if (TaskOpsCountToken(ws, tok[k].text) == 0 && strcmp(name, tok[k].text)) {
+                names++;
+                snprintf(name, sizeof(name), "%s", tok[k].text);
+            }
+        if (names == 1) {
+            /* literals of the sentence that the sources use */
+            int lits = 0;
+            LIT_PLAN cand = {{0}, {0}, 0};
+            for (size_t i = 0; i < sl; i++) {
+                LIT_PLAN p;
+                memset(&p, 0, sizeof(p));
+                snprintf(p.name, sizeof(p.name), "%s", name);
+                size_t j = i;
+                if (sent[i] == '"') {
+                    const char *q = strchr(sent + i + 1, '"');
+                    if (!q || q - (sent + i + 1) < 1 || q - (sent + i + 1) >= (long)sizeof(p.lit))
+                        continue;
+                    memcpy(p.lit, sent + i + 1, (size_t)(q - (sent + i + 1)));
+                    p.is_string = 1;
+                    j = (size_t)(q - sent);
+                } else if (isdigit((unsigned char)sent[i]) && (i == 0 || !ident_char((unsigned char)sent[i - 1]))) {
+                    while (j < sl && ident_char((unsigned char)sent[j])) j++;
+                    if (j - i >= sizeof(p.lit)) continue;
+                    memcpy(p.lit, sent + i, j - i);
+                    j--;
+                } else {
+                    continue;
+                }
+                int f, files;
+                if (literal_uses(ws, &p, &f, &files) > 0 && strcmp(cand.lit, p.lit)) {
+                    lits++;
+                    cand = p;
+                }
+                i = j;
+            }
+            if (lits == 1) {
+                plans++;
+                *out = cand;
+            }
+        }
+        s = e + 1;
+    }
+    return plans;
+}
+
+/* Rewrite of the one C file using the literal; NULL when uses span files. */
+static char *apply_literal_plan(const TASK_OPS_WORKSPACE *ws, const LIT_PLAN *p, int *file)
+{
+    int files;
+    if (literal_uses(ws, p, file, &files) == 0 || files != 1)
+        return NULL;
+    const TASK_OPS_FILE *f = &ws->files[*file];
+    size_t cap = f->len * 2 + 1024;
+    char *out = (char *)malloc(cap);
+    if (!out)
+        return NULL;
+    size_t w = 0, at = after_includes(f->data);
+    memcpy(out, f->data, at);
+    w = at;
+    if (p->is_string)
+        w += (size_t)snprintf(out + w, cap - w, "#define %s \"%s\"\n", p->name, p->lit);
+    else
+        w += (size_t)snprintf(out + w, cap - w, "#define %s %s\n", p->name, p->lit);
+    const char *line = f->data + at;
+    size_t lt = strlen(p->lit);
+    while (line && *line) {
+        const char *nl = strchr(line, '\n');
+        size_t ll = nl ? (size_t)(nl - line) + 1 : strlen(line);
+        CTOK t[256];
+        int n = (line[0] == '#') ? 0 : ctok_lex(line, ll, t, 256);
+        size_t pos = 0;
+        for (int k = 0; k < n && w + ll + 256 < cap; k++) {
+            const char *tx = t[k].text;
+            size_t tl = strlen(tx);
+            int hit = 0;
+            char repl[512];
+            if (!p->is_string && !strcmp(tx, p->lit)) {
+                snprintf(repl, sizeof(repl), "%s", p->name);
+                hit = 1;
+            } else if (p->is_string && tx[0] == '"' && tl >= lt + 2) {
+                if (tl == lt + 2 && !strncmp(tx + 1, p->lit, lt)) {
+                    snprintf(repl, sizeof(repl), "%s", p->name); hit = 1;
+                } else if (!strncmp(tx + 1, p->lit, lt)) {
+                    snprintf(repl, sizeof(repl), "%s \"%.*s", p->name, (int)(tl - 1 - lt), tx + 1 + lt); hit = 1;
+                } else if (!strncmp(tx + tl - 1 - lt, p->lit, lt)) {
+                    snprintf(repl, sizeof(repl), "%.*s\" %s", (int)(tl - 1 - lt), tx, p->name); hit = 1;
+                }
+            }
+            if (!hit)
+                continue;
+            memcpy(out + w, line + pos, t[k].start - pos);
+            w += t[k].start - pos;
+            size_t rl = strlen(repl);
+            memcpy(out + w, repl, rl);
+            w += rl;
+            pos = t[k].end;
+        }
+        memcpy(out + w, line + pos, ll - pos);
+        w += ll - pos;
+        line = nl ? nl + 1 : NULL;
+    }
+    out[w] = '\0';
+    return out;
+}
+
 /* ------------------------------------------------------------------ act */
 
 static int write_file(const char *root, const char *rel, const char *data)
@@ -1025,7 +1207,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 
     char flags[512];
     task_flags(task, flags, sizeof(flags));
-    probe(ws, flags, &rep->compile_before, &rep->run_before);
+    probe_out(ws, flags, &rep->compile_before, &rep->run_before, probe_stdout[0]);
 
     /* reason: first operator whose preconditions hold */
     char a[128], b[128];
@@ -1042,7 +1224,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
     }
     char y_text[128] = {0};
-    int uses_before = 0;
+    int uses_before = 0, lit_file = -1;
+    LIT_PLAN lit;
+    char *lit_out = NULL;
     FRAG_HIT hit;
     int frags = renames == 1 ? 0 : find_fragment_edit(ws, task, y_text, sizeof(y_text), &hit);
     if (frags == 1) {
@@ -1061,6 +1245,14 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
                  (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
                  y_text, f->rel);
+    } else if (renames != 1 && find_literal_plan(ws, task, &lit) == 1 &&
+               (lit_out = apply_literal_plan(ws, &lit, &lit_file)) != NULL) {
+        next[lit_file] = lit_out;
+        touched = 1;
+        rep->candidates = 1;
+        snprintf(rep->op, sizeof(rep->op), "literal_to_constant");
+        snprintf(rep->detail, sizeof(rep->detail), "%s%.60s%s -> %.60s in %.60s", lit.is_string ? "\"" : "",
+                 lit.lit, lit.is_string ? "\"" : "", lit.name, ws->files[lit_file].rel);
     } else if (renames != 1 && rep->compile_before >= 0 &&
                (touched = declare_implicit(ws, flags, next, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
         rep->candidates = 1;
@@ -1100,7 +1292,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     TASK_OPS_WORKSPACE *after = ok ? (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*after)) : NULL;
     if (after) {
         TaskOpsLoadWorkspace(workspace, after);
-        probe(after, flags, &rep->compile_after, &rep->run_after);
+        probe_out(after, flags, &rep->compile_after, &rep->run_after, probe_stdout[1]);
         int intent;
         if (!strcmp(rep->op, "rename_symbol"))
             intent = TaskOpsCountToken(after, a) == 0 && TaskOpsCountToken(after, b) > 0;
@@ -1108,6 +1300,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             CTOK y[FRAG_MAX_TOK];
             int ny = ctok_lex(y_text, strlen(y_text), y, FRAG_MAX_TOK);
             intent = ny > 0 && ws_contains_tokens(after, y, ny);
+        } else if (!strcmp(rep->op, "literal_to_constant")) {
+            int f2, files2;
+            intent = literal_uses(after, &lit, &f2, &files2) == 0 && TaskOpsCountToken(after, lit.name) >= 2;
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
@@ -1119,6 +1314,10 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
            edit must touch at least one of them (ws and after list the same
            files in the same order unless a file was created) */
         int named = 0, named_touched = 0;
+        /* refactors must preserve observable behavior: same stdout */
+        if ((!strcmp(rep->op, "rename_symbol") || !strcmp(rep->op, "literal_to_constant")) &&
+            rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
+            no_regress = 0;
         if (!named_files_exist(after, task, after->count == ws->count ? next : NULL, &named, &named_touched) ||
             (named > 0 && named_touched == 0))
             intent = 0;

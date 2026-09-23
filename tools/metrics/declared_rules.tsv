@@ -17,3 +17,5 @@ negated-clause cues for stated fragments (forbid, must not, never, no longer, pr
 stated fragment max token edit distance 2, anchored on a shared name	src/task_ops.c	if (d > 2 || d >= ny)	declared threshold (task_ops stated_fragment)
 task-named file shape (name.ext, ext 1-4 alnum); named files must exist and be touched	src/task_ops.c	static int named_files_exist(	declared lexical rule (task_ops scope check)
 gcc implicit-declaration diagnostic text	src/task_ops.c	"implicit declaration of function "	declared compiler-output parse (task_ops declare_implicit)
+sentence boundary '. ' for literal/name pairing	src/task_ops.c	static int find_literal_plan(	declared lexical rule (task_ops literal_to_constant)
+behavior-preserving edits (rename, literal) must leave a clean run's stdout unchanged	src/task_ops.c	static void probe_out(	declared verify rule (task_ops rename_symbol, literal_to_constant)
