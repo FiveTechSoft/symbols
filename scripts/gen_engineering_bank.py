@@ -73,6 +73,29 @@ finally:
     shutil.rmtree(td, ignore_errors=True)
 '''
 
+# Configure only: fail while cmake warns that project() is missing (dev warning).
+CHECK_CMAKE_HAS_PROJECT = r'''#!/usr/bin/env python3
+import shutil, subprocess, sys, tempfile
+from pathlib import Path
+if not Path("CMakeLists.txt").is_file():
+    sys.exit(1)
+td = tempfile.mkdtemp(prefix="eb_cmake_")
+try:
+    r = subprocess.run(
+        ["cmake", "-S", ".", "-B", td],
+        capture_output=True, text=True, timeout=60)
+    out = (r.stderr or "") + (r.stdout or "")
+    if r.returncode != 0:
+        sys.stderr.write(out)
+        sys.exit(1)
+    if "No project() command is present" in out:
+        print(out)
+        sys.exit(1)
+    sys.exit(0)
+finally:
+    shutil.rmtree(td, ignore_errors=True)
+'''
+
 # Compile every *.c in CWD and run the binary; exit 0 only if the program exits 0.
 # Used where before/ deterministically exits non-zero and after/ exits 0.
 CHECK_RUN = r'''#!/usr/bin/env python3
@@ -634,10 +657,10 @@ out = (r.stdout or "") + (r.stderr or "")
 sys.exit(0 if r.returncode == 0 and "app" in out and "echo done" not in out else 1)
 '''),
         ("eb_bi_004",
-         "CMakeLists.txt is missing project(). Add a project(<name> C) line after cmake_minimum_required.",
+         "CMakeLists.txt is missing project(). Add a project(<name> C) line after cmake_minimum_required. The checker runs cmake configure and fails while cmake warns that project() is absent.",
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\n"},
          {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)\nproject(demo C)\n"},
-         contains_check("project(")),
+         CHECK_CMAKE_HAS_PROJECT),
         ("eb_bi_005",
          "build.sh must fail closed: if the compiler fails, the script must exit non-zero. The checker writes invalid C to main.c and runs build.sh; before/ hardcodes success, after/ must exit non-zero.",
          {"build.sh": "#!/bin/sh\necho compile\nexit 0\n",
@@ -673,12 +696,51 @@ sys.exit(0 if r.returncode != 0 else 1)
     # ---- docs (7) ------------------------------------------------------------
     dc = [
         ("eb_dc_001",
-         "README.md documents the function as compute_total but the code exports compute. Fix the README so it matches the actual symbol name 'compute'.",
+         "README.md documents the function as compute_total but the code exports compute. Fix the README so it matches the actual symbol name 'compute'. The checker compiles main.c, requires the compute symbol in the object, and requires README to name compute without compute_total.",
          {"main.c": "int compute(int a) { return a; }\n",
           "README.md": "# Demo\n\nCall `compute_total(x)` to compute a value.\n"},
          {"main.c": "int compute(int a) { return a; }\n",
           "README.md": "# Demo\n\nCall `compute(x)` to compute a value.\n"},
-         contains_check("compute", forbid=("compute_total",))),
+         r'''#!/usr/bin/env python3
+import shutil, subprocess, sys, tempfile
+from pathlib import Path
+if not Path("main.c").is_file() or not Path("README.md").is_file():
+    sys.exit(1)
+td = Path(tempfile.mkdtemp(prefix="eb_dc001_"))
+try:
+    obj = td / "main.o"
+    r = subprocess.run(
+        ["gcc", "-std=c11", "-c", "-o", str(obj), "main.c"],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.stderr.write(r.stderr)
+        sys.exit(1)
+    nm = subprocess.run(["nm", str(obj)], capture_output=True, text=True)
+    if nm.returncode != 0:
+        sys.stderr.write(nm.stderr)
+        sys.exit(1)
+    syms = set()
+    for line in (nm.stdout or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[1] in ("T", "t", "D", "d", "B", "b", "R", "r"):
+            syms.add(parts[2])
+    if "compute" not in syms:
+        print("missing symbol compute", sorted(syms))
+        sys.exit(1)
+    if "compute_total" in syms:
+        print("unexpected symbol compute_total")
+        sys.exit(1)
+    readme = Path("README.md").read_text(encoding="utf-8", errors="replace")
+    if "compute" not in readme:
+        print("README missing compute")
+        sys.exit(1)
+    if "compute_total" in readme:
+        print("README still has compute_total")
+        sys.exit(1)
+    sys.exit(0)
+finally:
+    shutil.rmtree(td, ignore_errors=True)
+'''),
         ("eb_dc_002",
          "The code block in README.md is fenced incorrectly (missing closing ```). Fix the markdown so the fence is balanced (even number of ``` lines).",
          {"README.md": "# Usage\n\n```c\nint main(void) { return 0; }\n"},
@@ -690,12 +752,42 @@ t = Path("README.md").read_text(encoding="utf-8")
 sys.exit(0 if t.count("```") % 2 == 0 and t.count("```") >= 2 else 1)
 '''),
         ("eb_dc_003",
-         "README example calls helper() but the source defines helper(int). Update the README signature to helper(int n).",
+         "README example calls helper() but the source defines helper(int). Update the README signature to helper(int n). The checker reads the definition from util.c and requires that exact parameter list in README.",
          {"util.c": "int helper(int n) { return n; }\n",
           "README.md": "# API\n\n`helper()` returns its argument.\n"},
          {"util.c": "int helper(int n) { return n; }\n",
           "README.md": "# API\n\n`helper(int n)` returns its argument.\n"},
-         contains_check("helper(int n)", forbid=("helper()",))),
+         r'''#!/usr/bin/env python3
+import re, subprocess, sys
+from pathlib import Path
+if not Path("util.c").is_file() or not Path("README.md").is_file():
+    sys.exit(1)
+src = Path("util.c").read_text(encoding="utf-8", errors="replace")
+m = re.search(r"\bhelper\s*\(([^)]*)\)", src)
+if not m:
+    print("no helper definition in util.c")
+    sys.exit(1)
+params = re.sub(r"\s+", " ", m.group(1)).strip()
+if not params:
+    print("helper has no parameters in source")
+    sys.exit(1)
+r = subprocess.run(
+    ["gcc", "-std=c11", "-fsyntax-only", "util.c"],
+    capture_output=True, text=True)
+if r.returncode != 0:
+    sys.stderr.write(r.stderr)
+    sys.exit(1)
+readme = Path("README.md").read_text(encoding="utf-8", errors="replace")
+readme_n = re.sub(r"\s+", " ", readme)
+sig = "helper(" + params + ")"
+if sig not in readme and sig not in readme_n:
+    print("README missing signature", sig)
+    sys.exit(1)
+if re.search(r"helper\s*\(\s*\)", readme):
+    print("README still has empty helper()")
+    sys.exit(1)
+sys.exit(0)
+'''),
         ("eb_dc_004",
          "Docs say the tool is installed with 'pip install demo' but the project is CMake. Replace that line with 'cmake -S . -B build'. Forbidden: 'pip install'.",
          {"README.md": "# Install\n\npip install demo\n"},

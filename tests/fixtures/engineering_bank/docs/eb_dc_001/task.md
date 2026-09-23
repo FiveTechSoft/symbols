@@ -1,1 +1,1 @@
-README.md documents the function as compute_total but the code exports compute. Fix the README so it matches the actual symbol name 'compute'.
+README.md documents the function as compute_total but the code exports compute. Fix the README so it matches the actual symbol name 'compute'. The checker compiles main.c, requires the compute symbol in the object, and requires README to name compute without compute_total.

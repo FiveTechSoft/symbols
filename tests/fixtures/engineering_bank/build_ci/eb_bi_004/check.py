@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
-import re
-import sys
+import shutil, subprocess, sys, tempfile
 from pathlib import Path
-blob = ''
-skip_names = {'check.py'}
-skip = {'.pyc', '.o', '.obj', '.exe', '.bin', '.png', '.jpg'}
-for p in Path('.').rglob('*'):
-    if not p.is_file() or p.suffix in skip or p.name in skip_names:
-        continue
-    if p.stat().st_size > 65536:
-        continue
-    try:
-        blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
-    except OSError:
-        pass
-norm = re.sub(r'\s+', ' ', blob)
-ok = True
-need = 'project('
-need_n = re.sub(r'\s+', ' ', need)
-if need not in blob and need_n not in norm:
-    print('missing', need)
-    ok = False
-sys.exit(0 if ok else 1)
+if not Path("CMakeLists.txt").is_file():
+    sys.exit(1)
+td = tempfile.mkdtemp(prefix="eb_cmake_")
+try:
+    r = subprocess.run(
+        ["cmake", "-S", ".", "-B", td],
+        capture_output=True, text=True, timeout=60)
+    out = (r.stderr or "") + (r.stdout or "")
+    if r.returncode != 0:
+        sys.stderr.write(out)
+        sys.exit(1)
+    if "No project() command is present" in out:
+        print(out)
+        sys.exit(1)
+    sys.exit(0)
+finally:
+    shutil.rmtree(td, ignore_errors=True)

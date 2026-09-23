@@ -1,1 +1,1 @@
-README example calls helper() but the source defines helper(int). Update the README signature to helper(int n).
+README example calls helper() but the source defines helper(int). Update the README signature to helper(int n). The checker reads the definition from util.c and requires that exact parameter list in README.
