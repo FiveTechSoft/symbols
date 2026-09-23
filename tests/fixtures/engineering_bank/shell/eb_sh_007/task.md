@@ -1,1 +1,1 @@
-run.sh should exit 2 when helper.sh is missing (fail closed). Implement a file-existence guard. Checker runs in a dir without helper.sh and expects exit 2.
+run.sh should exit 3 when helper.sh is missing (fail closed). Implement a file-existence guard. Checker runs in a dir without helper.sh and expects exit 3 (a code no shell uses for a missing script: dash exits 2, bash 127).

@@ -2,5 +2,5 @@
 if [ -f helper.sh ]; then
     sh helper.sh
 else
-    exit 2
+    exit 3
 fi

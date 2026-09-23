@@ -23,7 +23,7 @@ shell = _sh_bin()
 
 r = subprocess.run(shell + ["run.sh"], capture_output=True, text=True)
 rc = r.returncode
-ok = (rc == 2)
+ok = (rc == 3)
 if not ok:
     print("rc", rc, "out", (r.stdout or "") + (r.stderr or ""))
 sys.exit(0 if ok else 1)
