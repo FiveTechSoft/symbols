@@ -18,6 +18,18 @@ static void set_memory(int on)
 #endif
 }
 
+static void set_trace(const char *path)
+{
+    char buf[700];
+    snprintf(buf, sizeof(buf), "SYMBOLS_TRACE=%s", path ? path : "");
+#ifdef _WIN32
+    _putenv(buf);
+#else
+    if (path) setenv("SYMBOLS_TRACE", path, 1); else unsetenv("SYMBOLS_TRACE");
+    (void)buf;
+#endif
+}
+
 static int pass = 0, fail = 0;
 #define CHECK(c, msg) do { if (c) { pass++; printf("  [PASS] %s\n", msg); } \
                            else { fail++; printf("  [FAIL] %s\n", msg); } } while (0)
@@ -510,6 +522,24 @@ int main(void)
         printf("    %s %s | %s | run %d->%d\n", r.op, r.detail, r.reason, r.run_before, r.run_after);
         if (r.compile_before == -1) CHECK(1, "no compiler: relop skipped");
         else CHECK(kept && strstr(get(d, "main.c"), "v <= 9"), "relop_search: boundary swap kept");
+    }
+
+    /* induction phase 1: SYMBOLS_TRACE appends one observed-state line per attempt */
+    {
+        char d[512]; make_dir(d, sizeof(d), "trace");
+        put(d, "main.c", "static int ok(int v) { return v >= 0 && v < 9; }\nint main(void) { return ok(9) ? 0 : 1; }\n");
+        char tp[600]; snprintf(tp, sizeof(tp), "%s/../trace_%s.tsv", d, "t1");
+        remove(tp);
+        set_trace(tp);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The range check is wrong; fix it.", &r);
+        set_trace(NULL);
+        FILE *f = fopen(tp, "r");
+        char line[1024] = {0};
+        if (f) { if (!fgets(line, sizeof(line), f)) line[0] = '\0'; fclose(f); }
+        remove(tp);
+        if (r.compile_before == -1) CHECK(f != NULL && strstr(line, "op=") != NULL, "trace line written (no compiler)");
+        else CHECK(strstr(line, "compile=1\trun=1\t") && strstr(line, "op=relop_search\tverified=1"), "trace line: observed state, operator, verified");
     }
 
     /* relop_search never edits a test file */

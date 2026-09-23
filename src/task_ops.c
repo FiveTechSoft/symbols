@@ -2064,6 +2064,85 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, RELOP_H
     return 0;
 }
 
+
+/* ------------------------------------------------ induction traces (phase 1) */
+
+/* When SYMBOLS_TRACE names a file, every TaskOpsSolve attempt appends one
+   TSV line: workspace hash, observed features, operator, verified, detail.
+   Features are observed state only (build/run result and the first gcc
+   diagnostic, with names and numbers masked), never task wording. No
+   behavior change when the variable is unset. See docs/operator_induction.md. */
+static unsigned long ws_hash(const TASK_OPS_WORKSPACE *ws)
+{
+    unsigned long h = 1469598103UL;
+    for (int i = 0; i < ws->count; i++) {
+        for (const char *c = ws->files[i].rel; *c; c++) h = (h ^ (unsigned char)*c) * 16777619UL;
+        for (size_t k = 0; k < ws->files[i].len; k++) h = (h ^ (unsigned char)ws->files[i].data[k]) * 16777619UL;
+    }
+    return h & 0xffffffffUL;
+}
+
+static void first_diag_class(const TASK_OPS_WORKSPACE *ws, const char *flags, char *out, size_t size)
+{
+    char cmd[4096], srcs[3072];
+    snprintf(out, size, "-");
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return;
+    snprintf(cmd, sizeof(cmd), "gcc %s-Wall -fsyntax-only %s", flags, srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r) return;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    const char *p = r->execution_failed ? NULL : strstr(r->stderr_buf, "error: ");
+    if (!p && !r->execution_failed) p = strstr(r->stderr_buf, "warning: ");
+    if (p) {
+        size_t o = 0;
+        int in_q = 0;
+        for (const char *c = p; *c && *c != '\n' && o + 2 < size; c++) {
+            unsigned char u = (unsigned char)*c;
+            if (*c == '\'' || u == 0xe2) {             /* quoted name: mask */
+                if (u == 0xe2) c += 2;
+                if (!in_q && o + 2 < size) { out[o++] = 'X'; }
+                in_q = !in_q;
+                continue;
+            }
+            if (in_q) continue;
+            if (isdigit(u)) { if (o == 0 || out[o - 1] != 'N') out[o++] = 'N'; continue; }
+            out[o++] = (*c == '\t') ? ' ' : *c;
+        }
+        out[o] = '\0';
+    }
+    free(r);
+}
+
+static char trace_diag[160];   /* first diagnostic class, taken before any edit */
+
+static void trace_begin(const TASK_OPS_WORKSPACE *ws, const char *flags)
+{
+    const char *path = getenv("SYMBOLS_TRACE");
+    trace_diag[0] = '\0';
+    if (path && *path)
+        first_diag_class(ws, flags, trace_diag, sizeof(trace_diag));
+}
+
+static void trace_attempt(const TASK_OPS_WORKSPACE *ws, const char *flags, const TASK_OPS_REPORT *rep)
+{
+    const char *path = getenv("SYMBOLS_TRACE");
+    (void)flags;
+    if (!path || !*path)
+        return;
+    const char *diag = trace_diag[0] ? trace_diag : "-";
+    FILE *f = fopen(path, "a");
+    if (!f)
+        return;
+    char detail[256];
+    snprintf(detail, sizeof(detail), "%s", rep->op[0] ? rep->detail : rep->reason);
+    for (char *c = detail; *c; c++) if (*c == '\t' || *c == '\n') *c = ' ';
+    fprintf(f, "%08lx\tcompile=%d\trun=%d\tdiag=%s\top=%s\tverified=%d\t%s\n", ws_hash(ws), rep->compile_before,
+            rep->run_before, diag, rep->op[0] ? rep->op : "none", rep->verified, detail);
+    fclose(f);
+}
+
 enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
     "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search"
@@ -2175,6 +2254,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     char flags[512];
     task_flags(task, flags, sizeof(flags));
     probe_out(ws, flags, &rep->compile_before, &rep->run_before, probe_stdout[0]);
+    trace_begin(ws, flags);
 
     /* recall (learn step, opt-in) */
     int use_mem = mem_enabled(), skip[OP_COUNT] = {0}, net[OP_COUNT] = {0}, order[OP_COUNT];
@@ -2328,6 +2408,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
         else
             snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
+        trace_attempt(ws, flags, rep);
         free(created.data);
         TaskOpsFreeWorkspace(ws);
         free(ws);
@@ -2420,6 +2501,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         free(next[i]);
     free(next);
     rep->verified = verified;
+    trace_attempt(ws, flags, rep);
     TaskOpsFreeWorkspace(ws);
     free(ws);
     return verified;
