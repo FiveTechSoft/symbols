@@ -420,14 +420,14 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
         int build_rc = 0;
         if (task->build_command[0] != '\0')
         {
-            AgentShellExec(task->build_command, runner->workspace_dir, 10000, &shell_res);
+            AgentShellExecGuarded(task->build_command, runner->workspace_dir, 10000, &shell_res);
             build_rc = shell_res.exit_code;
         }
 
         int test_rc = 0;
         if (build_rc == 0 && task->test_command[0] != '\0')
         {
-            AgentShellExec(task->test_command, runner->workspace_dir, 10000, &shell_res);
+            AgentShellExecGuarded(task->test_command, runner->workspace_dir, 10000, &shell_res);
             test_rc = shell_res.exit_code;
         }
         out_result->last_shell_exec = shell_res;

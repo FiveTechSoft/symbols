@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "agent_shell.h"
+#include "command_policy.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -562,4 +563,25 @@ int AgentShellExec(const char *cmd_line,
                    SHELL_EXEC_RESULT *out_result)
 {
     return AgentShellExecExplicit(SHELL_BACKEND_AUTO, cmd_line, working_dir, timeout_ms, out_result);
+}
+
+int AgentShellExecGuarded(const char *cmd_line,
+                          const char *working_dir,
+                          uint32_t timeout_ms,
+                          SHELL_EXEC_RESULT *out_result)
+{
+    char why[160];
+    POLICY_CLASS c = CommandPolicyClassify(cmd_line, why, sizeof(why));
+    const char *grant = getenv("SYMBOLS_ALLOW_DESTRUCTIVE");
+    if (!CommandPolicyAllowed(c) && !(grant && !strcmp(grant, "1"))) {
+        AgentShellResultInit(out_result);
+        out_result->execution_failed = true;
+        out_result->exit_code = 126;
+        int n = snprintf(out_result->stderr_buf, sizeof(out_result->stderr_buf),
+                         "refused by command policy (%s): %s\n", CommandPolicyName(c), why[0] ? why : "no reason");
+        out_result->stderr_len = n > 0 ? (size_t)n : 0;
+        out_result->stderr_total_len = out_result->stderr_len;
+        return 1;
+    }
+    return AgentShellExec(cmd_line, working_dir, timeout_ms, out_result);
 }

@@ -74,6 +74,16 @@ int AgentShellExec(const char *cmd_line,
                    uint32_t timeout_ms,
                    SHELL_EXEC_RESULT *out_result);
 
+/* Execute a command that came from outside the agent (a task's build or
+   test command) only when the command policy classifies it as read or
+   write. Destructive or unparseable commands are refused without running:
+   returns 1 with exit_code 126, execution_failed set, and the reason in
+   stderr_buf. SYMBOLS_ALLOW_DESTRUCTIVE=1 is the explicit operator grant. */
+int AgentShellExecGuarded(const char *cmd_line,
+                          const char *working_dir,
+                          uint32_t timeout_ms,
+                          SHELL_EXEC_RESULT *out_result);
+
 /* Execute command using an explicit shell backend */
 int AgentShellExecExplicit(SHELL_BACKEND backend,
                            const char *cmd_line,
