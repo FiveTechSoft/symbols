@@ -212,9 +212,11 @@ if(Python3_Interpreter_FOUND)
         COMMENT "Agent-runner task bank report (JSONL)"
         VERBATIM)
     # Engineering bank self-test: every check.py fails on before/ and passes on after/.
+    # TIMEOUT 300: measured 101s alone, 148s under full-suite load (flaked at default 180s).
     add_test(NAME test_engineering_bank
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/test_engineering_bank.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_engineering_bank PROPERTIES TIMEOUT 300)
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
