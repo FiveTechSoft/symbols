@@ -184,6 +184,27 @@ int main(void)
             free(o);
         }
     }
+    /* 6. C fixes (declare_local, comment_fix, split): no crash on mutated input */
+    static const char *const DSRC[] = {
+        "int main(void) {\n    return buf_len > 0;\n}\n", "/* returns -1 on error */\nint f(void) { return 0; }\n",
+        "static int process(int x) { return x + 1; }\n\nint main(void) { return process(1); }\n", "{ /* ' */ }\n", ""};
+    static const char *const DTASK[] = {"buf_len is never declared", "comment says returns -1 on error; say 'returns 0 on success'",
+        "Split process() out of main.c into process.c with a prototype in process.h", "'a b' 'c d'", ""};
+    for (long i = 0; i < iters; i++) {
+        char src[512], task[256], rule[32], detail[128];
+        mutate(src, sizeof(src), DSRC[rnd(sizeof(DSRC) / sizeof(DSRC[0]))]);
+        mutate(task, sizeof(task), DTASK[rnd(sizeof(DTASK) / sizeof(DTASK[0]))]);
+        char *o = CFixApply(src, task, rule, sizeof(rule), detail, sizeof(detail));
+        if (o) {
+            if (!rule[0]) FAIL("c fix without rule");
+            free(o);
+        }
+        CFIX_SPLIT sp;
+        if (CFixSplit(src, "main.c", task, &sp)) {
+            if (!sp.new_src || !sp.c_text || !sp.h_text) FAIL("split without outputs");
+            CFixSplitFree(&sp);
+        }
+    }
 
     printf("test_core_fuzz: %ld iterations per stage, %s\n", iters, fails ? "FAILED" : "ALL PASSED");
     return fails ? 1 : 0;

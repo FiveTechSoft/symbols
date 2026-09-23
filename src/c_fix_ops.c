@@ -177,6 +177,315 @@ static char *goto_return(const char *d, char *detail, size_t dsz)
     return o;
 }
 
+/* skip a comment or string/char literal starting at p; returns p if none */
+static const char *skip_lit(const char *p)
+{
+    if (p[0] == '/' && p[1] == '/') { while (*p && *p != '\n') p++; return p; }
+    if (p[0] == '/' && p[1] == '*') { const char *e = strstr(p + 2, "*/"); return e ? e + 2 : p + strlen(p); }
+    if (*p == '"' || *p == '\'') {
+        char q = *p++;
+        while (*p && *p != q && *p != '\n') { if (*p == '\\' && p[1]) p++; p++; }
+        return *p == q ? p + 1 : p;
+    }
+    return p;
+}
+
+static int is_ident_start(int c) { return isalpha(c) || c == '_'; }
+static int is_ident(int c) { return isalnum(c) || c == '_'; }
+
+/* declare_local: the task names one identifier that is used but never
+   declared; it gets "int X = 0;" at the top of the one function using it */
+static char *declare_local(const char *d, const char *task, char *detail, size_t dsz)
+{
+    static const char *const nodecl[] = {"return", "sizeof", "case", "else", "do", "goto", NULL};
+    char cand[64] = {0};
+    int ncand = 0;
+    for (const char *t = task; *t; t++) {
+        if (!is_ident_start((unsigned char)*t) || (t > task && is_ident((unsigned char)t[-1])))
+            continue;
+        size_t l = 0;
+        while (is_ident((unsigned char)t[l])) l++;
+        char w[64];
+        if (l < 3 || l >= sizeof(w)) { t += l - 1; continue; }
+        memcpy(w, t, l); w[l] = '\0';
+        t += l - 1;
+        if (!strpbrk(w, "_0123456789") || !strcmp(w, cand))
+            continue;
+        /* used in the source, never declared, never called, never #defined */
+        int uses = 0, decl = 0;
+        for (const char *p = d; *p;) {
+            const char *q = skip_lit(p);
+            if (q != p) { p = q; continue; }
+            if (!word_at(d, p, w)) { p++; continue; }
+            uses++;
+            const char *a = p + strlen(w);
+            while (*a == ' ' || *a == '\t') a++;
+            if (*a == '(') decl = 1;
+            const char *b = p;
+            while (b > d && (b[-1] == ' ' || b[-1] == '\t' || b[-1] == '*')) b--;
+            if (b > d && is_ident((unsigned char)b[-1])) {
+                const char *e = b;
+                while (b > d && is_ident((unsigned char)b[-1])) b--;
+                char prev[32];
+                size_t pl = (size_t)(e - b);
+                if (pl >= sizeof(prev)) decl = 1;
+                else {
+                    memcpy(prev, b, pl); prev[pl] = '\0';
+                    int kw = 0;
+                    for (int k = 0; nodecl[k]; k++) if (!strcmp(prev, nodecl[k])) kw = 1;
+                    if (!kw) decl = 1;
+                }
+            }
+            p += strlen(w);
+        }
+        if (uses > 0 && !decl) {
+            if (ncand == 0) snprintf(cand, sizeof(cand), "%s", w);
+            ncand++;
+        }
+    }
+    if (ncand != 1)
+        return NULL;
+    /* every use inside the same top-level function body */
+    int depth = 0;
+    const char *open = NULL, *fn = NULL;
+    for (const char *p = d; *p;) {
+        const char *q = skip_lit(p);
+        if (q != p) { p = q; continue; }
+        if (*p == '{') { if (depth++ == 0) open = p; }
+        else if (*p == '}') { if (depth > 0) depth--; }
+        else if (word_at(d, p, cand)) {
+            if (depth == 0 || (fn && fn != open)) return NULL;
+            fn = open;
+        }
+        p++;
+    }
+    if (!fn)
+        return NULL;
+    const char *nl = strchr(fn, '\n');
+    if (!nl)
+        return NULL;
+    const char *ind = nl + 1;
+    size_t il = 0;
+    while (ind[il] == ' ' || ind[il] == '\t') il++;
+    char ins[128];
+    if (il == 0 || il > 16 || ind[il] == '}')
+        snprintf(ins, sizeof(ins), "    int %s = 0;\n", cand);
+    else
+        snprintf(ins, sizeof(ins), "%.*sint %s = 0;\n", (int)il, ind, cand);
+    snprintf(detail, dsz, "int %s = 0", cand);
+    return splice(d, (size_t)(nl + 1 - d), 0, ins);
+}
+
+/* the single-quoted phrase of the task (two or more words); 0 if none/several */
+static int quoted_phrase(const char *task, char *q, size_t qsz, const char **qs, const char **qe)
+{
+    const char *a = strchr(task, '\''), *b = a ? strchr(a + 1, '\'') : NULL;
+    if (!b || strchr(b + 1, '\'') || (size_t)(b - a - 1) >= qsz || b - a - 1 < 3)
+        return 0;
+    memcpy(q, a + 1, (size_t)(b - a - 1));
+    q[b - a - 1] = '\0';
+    if (!strchr(q, ' '))
+        return 0;
+    *qs = a; *qe = b + 1;
+    return 1;
+}
+
+#define CF_MAXW 96
+/* comment_fix: the task quotes the new wording 'Q' and repeats the stale
+   wording W (three or more words) that appears in exactly one comment and
+   nowhere in code; W becomes Q in that comment */
+static char *comment_fix(const char *d, const char *task, char *detail, size_t dsz)
+{
+    char q[256];
+    const char *qs, *qe;
+    if (!quoted_phrase(task, q, sizeof(q), &qs, &qe) || strstr(d, q))
+        return NULL;
+    const char *ws[CF_MAXW], *we[CF_MAXW];
+    int n = 0;
+    for (const char *t = task; *t && n < CF_MAXW;) {
+        while (*t && isspace((unsigned char)*t)) t++;
+        if (!*t) break;
+        const char *s = t;
+        while (*t && !isspace((unsigned char)*t)) t++;
+        if (s >= qs && s < qe) continue;
+        ws[n] = s; we[n] = t; n++;
+    }
+    for (int len = n; len >= 3; len--) {
+        char best[256] = {0};
+        const char *cs = NULL, *ce = NULL;
+        int hits = 0;
+        for (int i = 0; i + len <= n; i++) {
+            int split = 0;
+            for (int k = i; k + 1 < i + len; k++)
+                if ((ws[k] < qs) != (ws[k + 1] < qs)) split = 1;   /* window spans the quote */
+            if (split) continue;
+            size_t l = (size_t)(we[i + len - 1] - ws[i]);
+            while (l && strchr(".,;:!?", ws[i][l - 1])) l--;
+            char w[256];
+            if (l == 0 || l >= sizeof(w)) continue;
+            memcpy(w, ws[i], l); w[l] = '\0';
+            if (!strcmp(w, best)) continue;
+            /* count occurrences in comments vs code */
+            int inc = 0, outc = 0;
+            const char *c0 = NULL, *c1 = NULL;
+            for (const char *p = d; *p;) {
+                const char *e = skip_lit(p);
+                if (e != p) {
+                    int com = p[0] == '/';
+                    for (const char *f = p; f && f < e; ) {
+                        const char *h = strstr(f, w);
+                        if (!h || h + l > e) break;
+                        if (com) { inc++; c0 = p; c1 = e; } else outc++;
+                        f = h + 1;
+                    }
+                    p = e;
+                    continue;
+                }
+                if (!strncmp(p, w, l)) outc++;
+                p++;
+            }
+            if (inc == 1 && outc == 0) {
+                hits++;
+                snprintf(best, sizeof(best), "%s", w);
+                cs = c0; ce = c1;
+            } else if (inc > 0) {
+                return NULL;   /* stale wording in several places: abstain */
+            }
+        }
+        if (hits > 1) return NULL;
+        if (hits == 1) {
+            const char *h = strstr(cs, best);
+            if (!h || h >= ce) return NULL;
+            snprintf(detail, dsz, "'%.50s' -> '%.50s'", best, q);
+            return splice(d, (size_t)(h - d), strlen(best), q);
+        }
+    }
+    return NULL;
+}
+
+static int ends_with(const char *s, size_t l, const char *suf)
+{
+    size_t n = strlen(suf);
+    return l > n && !strncmp(s + l - n, suf, n);
+}
+
+int CFixSplit(const char *src, const char *src_rel, const char *task, CFIX_SPLIT *out)
+{
+    memset(out, 0, sizeof(*out));
+    if (!(ci_has(task, "split") || ci_has(task, "move") || ci_has(task, "out of")) || !ci_has(task, "prototype"))
+        return 0;
+    /* S.c (not the source itself) and S.h named in the task; F() named */
+    char stem[64] = {0}, fn[64] = {0};
+    int nstem = 0, nfn = 0, hdr = 0;
+    for (const char *t = task; *t;) {
+        while (*t && (isspace((unsigned char)*t) || strchr("'\"`(,;", *t))) t++;
+        const char *s = t;
+        while (*t && !isspace((unsigned char)*t)) t++;
+        size_t l = (size_t)(t - s);
+        while (l && strchr(".,;:'\"`", s[l - 1]) && !(l >= 2 && s[l - 2] == '.' )) l--;
+        while (l && strchr(",;:'\"`", s[l - 1])) l--;
+        if (l == 0 || l >= 64) continue;
+        char w[64];
+        memcpy(w, s, l); w[l] = '\0';
+        if (ends_with(w, l, ".c") && strcmp(w, src_rel) && !strchr(w, '/')) {
+            w[l - 2] = '\0';
+            if (nstem == 0 || strcmp(stem, w)) { snprintf(stem, sizeof(stem), "%s", w); nstem++; }
+        } else if (ends_with(w, l, "()")) {
+            w[l - 2] = '\0';
+            int ok = w[0] && is_ident_start((unsigned char)w[0]);
+            for (char *c = w; *c; c++) if (!is_ident((unsigned char)*c)) ok = 0;
+            if (ok && (nfn == 0 || strcmp(fn, w))) { snprintf(fn, sizeof(fn), "%s", w); nfn++; }
+        }
+    }
+    if (nstem != 1 || nfn != 1 || !stem[0])
+        return 0;
+    for (size_t i = 0; stem[i]; i++) if (!is_ident((unsigned char)stem[i])) return 0;
+    snprintf(out->h_rel, sizeof(out->h_rel), "%s.h", stem);
+    snprintf(out->c_rel, sizeof(out->c_rel), "%s.c", stem);
+    for (const char *t = strstr(task, out->h_rel); t; t = strstr(t + 1, out->h_rel)) hdr = 1;
+    if (!hdr)
+        return 0;
+    /* the one top-level definition "... F(...) {" */
+    const char *def = NULL, *brace = NULL;
+    int depth = 0, defs = 0;
+    for (const char *p = src; *p;) {
+        const char *q = skip_lit(p);
+        if (q != p) { p = q; continue; }
+        if (*p == '{') depth++;
+        else if (*p == '}') { if (depth > 0) depth--; }
+        else if (depth == 0 && word_at(src, p, fn)) {
+            const char *a = p + strlen(fn);
+            while (*a == ' ' || *a == '\t') a++;
+            if (*a == '(') {
+                int pd = 0;
+                const char *r = a;
+                for (; *r; r++) { if (*r == '(') pd++; else if (*r == ')' && --pd == 0) break; }
+                if (*r) {
+                    r++;
+                    while (isspace((unsigned char)*r)) r++;
+                    if (*r == '{') { defs++; brace = r; def = p; }
+                }
+            }
+        }
+        p++;
+    }
+    if (defs != 1)
+        return 0;
+    const char *ls = def;
+    while (ls > src && ls[-1] != '\n') ls--;
+    depth = 0;
+    const char *end = brace;
+    for (const char *p = brace; *p;) {
+        const char *q = skip_lit(p);
+        if (q != p) { p = q; continue; }
+        if (*p == '{') depth++;
+        else if (*p == '}' && --depth == 0) { end = p + 1; break; }
+        p++;
+    }
+    if (depth != 0)
+        return 0;
+    if (*end == '\n') end++;
+    const char *hs = ls;
+    int was_static = !strncmp(hs, "static ", 7);
+    if (was_static) hs += 7;
+    size_t hl = (size_t)(brace - hs);
+    while (hl && isspace((unsigned char)hs[hl - 1])) hl--;
+    size_t bl = (size_t)(end - hs);
+    char guard[80];
+    size_t g = 0;
+    for (; stem[g] && g < 60; g++) guard[g] = (char)toupper((unsigned char)stem[g]);
+    snprintf(guard + g, sizeof(guard) - g, "_H");
+    size_t hcap = hl + 2 * strlen(guard) + 64, ccap = bl + strlen(out->h_rel) + 32;
+    out->h_text = (char *)malloc(hcap);
+    out->c_text = (char *)malloc(ccap);
+    if (!out->h_text || !out->c_text) { CFixSplitFree(out); return 0; }
+    snprintf(out->h_text, hcap, "#ifndef %s\n#define %s\n\n%.*s;\n\n#endif\n", guard, guard, (int)hl, hs);
+    snprintf(out->c_text, ccap, "#include \"%s\"\n\n%.*s", out->h_rel, (int)bl, hs);
+    if (out->c_text[strlen(out->c_text) - 1] != '\n') strcat(out->c_text, "\n");
+    /* source: drop the definition, include the header after the last #include */
+    const char *cut_end = end;
+    if (*cut_end == '\n' && (ls == src || ls[-1] == '\n')) cut_end++;   /* one blank line after it */
+    char *tmp = splice(src, (size_t)(ls - src), (size_t)(cut_end - ls), "");
+    if (!tmp) { CFixSplitFree(out); return 0; }
+    size_t at = 0;
+    for (const char *p = tmp; (p = strstr(p, "#include")); p++)
+        if (p == tmp || p[-1] == '\n') { const char *e = strchr(p, '\n'); at = e ? (size_t)(e + 1 - tmp) : strlen(tmp); }
+    char inc[96];
+    snprintf(inc, sizeof(inc), at ? "#include \"%s\"\n" : "#include \"%s\"\n\n", out->h_rel);
+    if (!at && tmp[0] == '\n') snprintf(inc, sizeof(inc), "#include \"%s\"\n", out->h_rel);
+    out->new_src = splice(tmp, at, 0, inc);
+    free(tmp);
+    if (!out->new_src) { CFixSplitFree(out); return 0; }
+    snprintf(out->detail, sizeof(out->detail), "%.40s() -> %.40s + %.40s%s", fn, out->c_rel, out->h_rel, was_static ? " (static dropped)" : "");
+    return 1;
+}
+
+void CFixSplitFree(CFIX_SPLIT *s)
+{
+    free(s->new_src); free(s->c_text); free(s->h_text);
+    s->new_src = s->c_text = s->h_text = NULL;
+}
+
 char *CFixApply(const char *src, const char *task, char *rule, size_t rule_size, char *detail, size_t detail_size)
 {
     rule[0] = detail[0] = '\0';
@@ -191,6 +500,14 @@ char *CFixApply(const char *src, const char *task, char *rule, size_t rule_size,
     if (ci_has(task, "goto") && (ci_has(task, "no goto") || ci_has(task, "replace") || ci_has(task, "remove"))) {
         char *o = goto_return(src, detail, detail_size);
         if (o) { snprintf(rule, rule_size, "goto_return"); return o; }
+    }
+    if (ci_has(task, "declared") || (ci_has(task, "declare") && ci_has(task, "variable")) || ci_has(task, "introduce a local")) {
+        char *o = declare_local(src, task, detail, detail_size);
+        if (o) { snprintf(rule, rule_size, "declare_local"); return o; }
+    }
+    if (ci_has(task, "comment")) {
+        char *o = comment_fix(src, task, detail, detail_size);
+        if (o) { snprintf(rule, rule_size, "comment_fix"); return o; }
     }
     return NULL;
 }

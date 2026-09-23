@@ -57,3 +57,12 @@ Bank unchanged: 37/56, 0 wrong edits. ctest 105/105.
 Developed only against dev tasks (odd numbers). New rule `stated_output` in shell_ops ("print exactly TOKEN" with one echo line), and new module `src/c_fix_ops.c` (operator `c_fix`): `loop_bound` (off-by-one in the one simple for-loop condition), `array_fit` (char array smaller than its string initializer, resized to strlen + 1; escapes abstain), `goto_return` (a single forward `if (C) goto L;` whose label only returns becomes a block with that return). c_fix edits are kept only when the program builds and its own exit code is 0 afterwards (and, for goto_return, no goto remains); every rule abstains on two candidates. Fuzzed in test_core_fuzz (ASan/UBSan clean at 200k).
 
 Bank: 37/56 -> 41/56, 0 wrong edits. Dev 25/32 -> 29/32 (sh_001, dbg_001, dbg_007, rf_007). Heldout unchanged at 12/24: none of the new rules fired on sh_002, sh_006, or the heldout debug/refactor tasks, which is the expected result for dev-only development. Still failing on dev: cr_005, dc_005, mf_005.
+
+## Last dev failures: cr_005, dc_005, mf_005
+
+Three more c_fix rules, still developed only against dev tasks:
+- `declare_local`: the task says an identifier (with `_` or a digit) is used but never declared. If exactly one such name is used in the source and is never declared, called or defined, and every use sits in one function, `int X = 0;` opens that function.
+- `comment_fix`: the task quotes new wording `'Q'` and repeats the stale wording W (3+ words). W must appear in exactly one comment and nowhere in code, and then W becomes Q. The rule abstains with several quotes, several matching comments, or W also appearing in code.
+- `split_function`: "split F() out ... into S.c with a prototype in S.h". The one top-level definition of F moves to S.c (a `static` is dropped), S.h gets a guarded prototype, and the source includes S.h. Both files must be new; the linked program must build and exit 0 with both files present, otherwise everything is rolled back, including the created files.
+
+Bank: 41/56 -> 44/56, 0 wrong edits. Dev 32/32, heldout unchanged at 12/24 (sh_002 and sh_006 stay as the generalization measure, by decision). Unit tests and fuzz stage 6 cover the new rules (ASan/UBSan clean at 200k).

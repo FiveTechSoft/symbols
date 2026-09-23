@@ -2754,6 +2754,27 @@ static int cfix_target(const TASK_OPS_WORKSPACE *ws, const char *task, char **ou
     return hit;
 }
 
+/* The one C source a split request applies to; the new files must not exist. */
+static int cfix_split_target(const TASK_OPS_WORKSPACE *ws, const char *task, CFIX_SPLIT *out)
+{
+    int hit = -1;
+    for (int i = 0; i < ws->count; i++) {
+        if (!is_c_source(ws->files[i].rel) || strchr(ws->files[i].rel, '/'))
+            continue;
+        CFIX_SPLIT s;
+        if (!CFixSplit(ws->files[i].data, ws->files[i].rel, task, &s))
+            continue;
+        if (hit >= 0 || ws_find_named(ws, s.c_rel) >= 0 || ws_find_named(ws, s.h_rel) >= 0) {
+            CFixSplitFree(&s);
+            CFixSplitFree(out);
+            return -1;
+        }
+        hit = i;
+        *out = s;
+    }
+    return hit;
+}
+
 enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
     "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix"
@@ -2857,8 +2878,11 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 
     TASK_OPS_WORKSPACE *ws = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*ws));
     char **next = (char **)calloc(TASK_OPS_MAX_FILES, sizeof(char *));
-    NEW_FILE created;
+    NEW_FILE created, created2;   /* created2: a c_fix split's header */
     memset(&created, 0, sizeof(created));
+    memset(&created2, 0, sizeof(created2));
+    CFIX_SPLIT split;
+    memset(&split, 0, sizeof(split));
     if (!ws || !next) { free(ws); free(next); return 0; }
     TaskOpsLoadWorkspace(workspace, ws);
 
@@ -2998,6 +3022,18 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "c_fix");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.120s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
+        } else if (op == OP_CFIX && (cfix_file = cfix_split_target(ws, task, &split)) >= 0) {
+            next[cfix_file] = split.new_src;
+            snprintf(created.rel, sizeof(created.rel), "%s", split.c_rel);
+            created.data = split.c_text;
+            snprintf(created2.rel, sizeof(created2.rel), "%s", split.h_rel);
+            created2.data = split.h_text;
+            split.new_src = split.c_text = split.h_text = NULL;   /* owned by next[] / created now */
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(cfix_rule, sizeof(cfix_rule), "split_function");
+            snprintf(rep->op, sizeof(rep->op), "c_fix");
+            snprintf(rep->detail, sizeof(rep->detail), "split_function: %.140s", split.detail);
         } else if (op == OP_TEST && find_test_plan(ws, task, &tplan)) {
             size_t cap = 512 + strlen(tplan.call);
             created.data = (char *)malloc(cap);
@@ -3054,6 +3090,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
         trace_attempt(ws, flags, rep);
         free(created.data);
+        free(created2.data);
         TaskOpsFreeWorkspace(ws);
         free(ws);
         free(next);
@@ -3066,6 +3103,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         if (next[i] && !write_file(ws->root, ws->files[i].rel, next[i]))
             ok = 0;
     if (created.data && !write_file(ws->root, created.rel, created.data))
+        ok = 0;
+    if (created2.data && !write_file(ws->root, created2.rel, created2.data))
         ok = 0;
     rep->applied = touched;
 
@@ -3105,7 +3144,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             intent = build_verified(after, &bedit);
         } else if (!strcmp(rep->op, "c_fix")) {
             intent = rep->compile_after == 1 && rep->run_after == 0 &&
-                     (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0);
+                     (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0) &&
+                     (strcmp(cfix_rule, "split_function") != 0 ||
+                      (ws_find_named(after, created.rel) >= 0 && ws_find_named(after, created2.rel) >= 0));
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
@@ -3150,7 +3191,13 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(path, sizeof(path), "%s/%s", ws->root, created.rel);
         remove(path);
     }
+    if (!verified && created2.data) {
+        char path[TASK_OPS_MAX_PATH * 2];
+        snprintf(path, sizeof(path), "%s/%s", ws->root, created2.rel);
+        remove(path);
+    }
     free(created.data);
+    free(created2.data);
     /* learn: remember what this operator did on this workspace+task */
     if (use_mem && rep->op[0])
         mem_record(ws->root, key, rep->op, verified);
