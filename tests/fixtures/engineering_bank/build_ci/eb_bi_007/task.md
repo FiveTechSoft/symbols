@@ -1,1 +1,1 @@
-The GitHub Actions workflow file ci.yml must contain a step that runs ctest. Add it under jobs.build.steps as a run: ctest line (any indentation). Checker only requires the file to exist and contain 'ctest'.
+The GitHub Actions workflow file ci.yml must contain a step that runs ctest. Add it under jobs.build.steps as a run: ctest line (any indentation). The checker reads ci.yml only and requires a run: step whose command includes ctest.

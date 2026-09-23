@@ -139,6 +139,50 @@ def write_task(tid: str, category: str, prompt: str,
         p.write_text(content, encoding="utf-8")
 
 
+def file_check(filename: str, *must: str, forbid: tuple[str, ...] = (),
+               regex: bool = False) -> str:
+    """Require needles only inside one file (not the whole tree blob)."""
+    if isinstance(forbid, str):
+        forbid = (forbid,)
+    parts = [
+        "#!/usr/bin/env python3",
+        "import re",
+        "import sys",
+        "from pathlib import Path",
+        f"p = Path({filename!r})",
+        "if not p.is_file():",
+        f"    print('missing file', {filename!r})",
+        "    sys.exit(1)",
+        "text = p.read_text(encoding='utf-8', errors='replace')",
+        "norm = re.sub(r'\\s+', ' ', text)",
+        "ok = True",
+    ]
+    for m in must:
+        if regex:
+            parts.append(f"if not re.search({m!r}, text):")
+            parts.append(f"    print('missing pattern', {m!r}, 'in', {filename!r})")
+            parts.append("    ok = False")
+        else:
+            parts.append(f"need = {m!r}")
+            parts.append("need_n = re.sub(r'\\s+', ' ', need)")
+            parts.append("if need not in text and need_n not in norm:")
+            parts.append(f"    print('missing', need, 'in', {filename!r})")
+            parts.append("    ok = False")
+    for f in forbid:
+        if regex:
+            parts.append(f"if re.search({f!r}, text):")
+            parts.append(f"    print('forbidden pattern', {f!r}, 'in', {filename!r})")
+            parts.append("    ok = False")
+        else:
+            parts.append(f"bad = {f!r}")
+            parts.append("bad_n = re.sub(r'\\s+', ' ', bad)")
+            parts.append(f"if bad in text or bad_n in norm:")
+            parts.append(f"    print('forbidden', bad, 'in', {filename!r})")
+            parts.append("    ok = False")
+    parts.append("sys.exit(0 if ok else 1)")
+    return "\n".join(parts) + "\n"
+
+
 def contains_check(*must: str, forbid: tuple[str, ...] = ()) -> str:
     if isinstance(forbid, str):  # tolerate missing trailing comma
         forbid = (forbid,)
@@ -684,10 +728,10 @@ sys.exit(0 if r.returncode != 0 else 1)
           "main.c": "int main(void) { return 0; }\n"},
          CHECK_CMAKE_BUILD),
         ("eb_bi_007",
-         "The GitHub Actions workflow file ci.yml must contain a step that runs ctest. Add it under jobs.build.steps as a run: ctest line (any indentation). Checker only requires the file to exist and contain 'ctest'.",
+         "The GitHub Actions workflow file ci.yml must contain a step that runs ctest. Add it under jobs.build.steps as a run: ctest line (any indentation). The checker reads ci.yml only and requires a run: step whose command includes ctest.",
          {"ci.yml": "name: ci\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"},
          {"ci.yml": "name: ci\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ctest --test-dir build\n"},
-         contains_check("ctest")),
+         file_check("ci.yml", r"run:\s*.*ctest", regex=True)),
     ]
     for tid, prompt, b, a, c in bi:
         write_task(tid, "build_ci", prompt, b, a, c)
@@ -801,10 +845,10 @@ sys.exit(0)
              {"main.c": ("returns 0 on success",)},
              forbid=(("main.c", "returns -1 on error"),))),
         ("eb_dc_006",
-         "Add a '## License' section to README.md with the text 'MIT'. The file currently has no license section.",
+         "Add a '## License' section to README.md with the text 'MIT'. The file currently has no license section. The checker reads README.md only (not other files).",
          {"README.md": "# Project\n\nHello.\n"},
          {"README.md": "# Project\n\nHello.\n\n## License\n\nMIT\n"},
-         contains_check("## License", "MIT")),
+         file_check("README.md", "## License", "MIT")),
         ("eb_dc_007",
          "The documented flag --verbose does not match the code which checks for --debug. Update README to document --debug only. Forbidden: --verbose. Program must compile and exit 0.",
          {"main.c": "int main(int argc, char **argv) {\n    for (int i = 1; i < argc; i++)\n        if (argv[i][0] == '-' && argv[i][1] == '-' ) { /* --debug */ }\n    return 0;\n}\n",

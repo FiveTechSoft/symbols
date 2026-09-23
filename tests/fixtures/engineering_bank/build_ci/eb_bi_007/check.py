@@ -2,23 +2,14 @@
 import re
 import sys
 from pathlib import Path
-blob = ''
-skip_names = {'check.py'}
-skip = {'.pyc', '.o', '.obj', '.exe', '.bin', '.png', '.jpg'}
-for p in Path('.').rglob('*'):
-    if not p.is_file() or p.suffix in skip or p.name in skip_names:
-        continue
-    if p.stat().st_size > 65536:
-        continue
-    try:
-        blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
-    except OSError:
-        pass
-norm = re.sub(r'\s+', ' ', blob)
+p = Path('ci.yml')
+if not p.is_file():
+    print('missing file', 'ci.yml')
+    sys.exit(1)
+text = p.read_text(encoding='utf-8', errors='replace')
+norm = re.sub(r'\s+', ' ', text)
 ok = True
-need = 'ctest'
-need_n = re.sub(r'\s+', ' ', need)
-if need not in blob and need_n not in norm:
-    print('missing', need)
+if not re.search('run:\\s*.*ctest', text):
+    print('missing pattern', 'run:\\s*.*ctest', 'in', 'ci.yml')
     ok = False
 sys.exit(0 if ok else 1)
