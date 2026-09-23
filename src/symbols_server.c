@@ -16,6 +16,7 @@
 #include "learn.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "c_edit_ops.h"
 #include "agent_git.h"
 #include "agent_planner.h"
 #include "agent_runner.h"
@@ -282,6 +283,12 @@ typedef struct
     char              workspace_feature_header_source[8192];
     char              workspace_feature_impl_source[8192];
     int               workspace_phase; /* 1=discover, 2=inspect, 3=verify, 4=edit, 5=reverify */
+    /* generic edit operators (phases 20-22): observed files, planned hunks */
+    char              ceo_paths[CEO_MAX_FILES][260];
+    char              ceo_srcs[CEO_MAX_FILES][8192];
+    int               ceo_nfiles, ceo_next;
+    CeoPlan           ceo_plan;
+    int               ceo_hunk;
 } ServerSession;
 
 static void WorkspaceReadContent(const char *input, char *out, size_t size)
@@ -1167,13 +1174,37 @@ static void HandleCompletions(socket_t s, const char *body,
             return;
         }
         snprintf(sess->workspace_source, sizeof(sess->workspace_source), "%s", tool_resp.content);
-        if (ServerIsExplicitStockTotalFeature(sess->current_issue) &&
-            ServerSelectFeatureFiles(sess->workspace_listing, sess->workspace_target,
-                                     sess->workspace_feature_impl, sizeof(sess->workspace_feature_impl),
-                                     sess->workspace_feature_main, sizeof(sess->workspace_feature_main)))
+        if (CeoIsAddFieldAndTotalRequest(sess->current_issue) && HasDeclaredTool(sess, "edit"))
         {
-            WorkspaceReadContent(tool_resp.content, sess->workspace_feature_header_source, sizeof(sess->workspace_feature_header_source));
-            memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"read");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\"}",sess->workspace_feature_impl);sess->workspace_phase=7;SendToolCallsForRequest(s,body,g_seq,&tc,"Inspecting feature implementation source.",resp,sizeof(resp),sse,sizeof(sse));return;
+            /* Perceive every observed source (no fixed names or roles). */
+            const char *lp = sess->workspace_listing;
+            sess->ceo_nfiles = 0; sess->ceo_next = 0; sess->ceo_hunk = 0;
+            while (*lp && sess->ceo_nfiles < CEO_MAX_FILES)
+            {
+                const char *a = lp; size_t n; char low[260];
+                while (*lp && *lp != '\n') lp++;
+                n = (size_t)(lp - a); while (n && (a[n-1] == '\r' || a[n-1] == ' ')) n--;
+                if (*lp) lp++;
+                if (n < 3 || n >= 260) continue;
+                memcpy(low, a, n); low[n] = '\0';
+                {
+                    const char *b = strrchr(low, '/'); b = b ? b + 1 : low;
+                    int is_c = (n > 2 && low[n-2] == '.' && (low[n-1] == 'c' || low[n-1] == 'h'));
+                    int is_mk = strcmp(b, "Makefile") == 0 || strcmp(b, "makefile") == 0;
+                    if ((!is_c && !is_mk) || strstr(b, "test")) continue;
+                }
+                snprintf(sess->ceo_paths[sess->ceo_nfiles++], 260, "%s", low);
+            }
+            if (sess->ceo_nfiles > 0)
+            {
+                memset(&tc,0,sizeof(tc)); tc.count=1;
+                snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);
+                snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"read");
+                snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\"}",sess->ceo_paths[0]);
+                sess->workspace_phase = 20;
+                SendToolCallsForRequest(s,body,g_seq,&tc,"Perceiving every observed source before planning.",resp,sizeof(resp),sse,sizeof(sse));
+                return;
+            }
         }
         if (ServerIssueRequestsSanitizer(sess->current_issue))
         {
@@ -1218,6 +1249,91 @@ static void HandleCompletions(socket_t s, const char *body,
         SendToolCallsForRequest(s, body, g_seq, &tc,
                                 "Running the workspace-evidenced verification before editing.",
                                 resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 20)
+    {
+        OPENAI_TOOL_CALLS tc;
+        if (tool_resp.is_error) { sess->agent_active = 0; sess->workspace_phase = 0;
+            snprintf(content, sizeof(content), "No pude leer `%s`. No he modificado archivos.", sess->ceo_paths[sess->ceo_next]);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse)); return; }
+        WorkspaceReadContent(tool_resp.content, sess->ceo_srcs[sess->ceo_next], sizeof(sess->ceo_srcs[0]));
+        sess->ceo_next++;
+        memset(&tc,0,sizeof(tc)); tc.count=1;
+        snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);
+        if (sess->ceo_next < sess->ceo_nfiles)
+        {
+            snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"read");
+            snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\"}",sess->ceo_paths[sess->ceo_next]);
+            SendToolCallsForRequest(s,body,g_seq,&tc,"Perceiving observed sources.",resp,sizeof(resp),sse,sizeof(sse));
+            return;
+        }
+        {
+            const char *paths[CEO_MAX_FILES], *srcs[CEO_MAX_FILES]; int n = 0;
+            for (int f = 0; f < sess->ceo_nfiles; f++) { paths[n] = sess->ceo_paths[f]; srcs[n] = sess->ceo_srcs[f]; n++; }
+            if (!CeoPlanAddFieldAndTotal(sess->current_issue, paths, srcs, n, &sess->ceo_plan))
+            {
+                sess->agent_active = 0; sess->workspace_phase = 0;
+                snprintf(content, sizeof(content), "He leído %d archivos del workspace, pero me abstengo: %s. No he modificado archivos.", n, sess->ceo_plan.reason);
+                SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+                return;
+            }
+            if (!CeoDeriveRunCommand(paths, srcs, n, sess->workspace_listing, sess->workspace_command, sizeof(sess->workspace_command)))
+                sess->workspace_command[0] = '\0';
+        }
+        sess->ceo_hunk = 0; sess->workspace_phase = 21;
+        /* fall through to emit the first hunk */
+    }
+    if (sess->agent_active && sess->workspace_phase == 21 && has_tool_resp)
+    {
+        OPENAI_TOOL_CALLS tc; char old_esc[4096], new_esc[4096];
+        if (sess->ceo_hunk > 0 && tool_resp.is_error)
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            snprintf(content, sizeof(content), "Una edición planificada falló al aplicarse (%.300s). Revisa `git diff`: pueden quedar cambios parciales.", tool_resp.content);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        memset(&tc,0,sizeof(tc)); tc.count=1;
+        snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);
+        if (sess->ceo_hunk < sess->ceo_plan.nhunks)
+        {
+            const CeoHunk *H = &sess->ceo_plan.hunks[sess->ceo_hunk++];
+            ServerJsonEscape(H->old_text, old_esc, sizeof(old_esc));
+            ServerJsonEscape(H->new_text, new_esc, sizeof(new_esc));
+            snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");
+            if ((size_t)snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                                 sess->ceo_paths[H->file], old_esc, new_esc) >= sizeof(tc.calls[0].arguments))
+            { sess->agent_active = 0; sess->workspace_phase = 0;
+              SendContentForRequest(s, body, ++g_seq, "Una edición excede el tamaño de llamada permitido; me detengo.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse)); return; }
+            SendToolCallsForRequest(s,body,g_seq,&tc,"Applying an operator edit derived from the observed code.",resp,sizeof(resp),sse,sizeof(sse));
+            return;
+        }
+        if (!sess->workspace_command[0] || !HasDeclaredTool(sess, "bash"))
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            snprintf(content, sizeof(content), "%s No pude ejecutar una verificación (sin comando de build observado o sin `bash`).", sess->ceo_plan.summary);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"bash");
+        snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"command\":\"%s\"}",sess->workspace_command);
+        sess->workspace_phase = 22;
+        SendToolCallsForRequest(s,body,g_seq,&tc,"Building and running to verify the observed behavior.",resp,sizeof(resp),sse,sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 22)
+    {
+        char want[64]; int ok;
+        snprintf(want, sizeof(want), "%.2f", sess->ceo_plan.expected_total);
+        ok = !tool_resp.is_error && !(tool_resp.has_exit_code && tool_resp.exit_code != 0) &&
+             strstr(tool_resp.content, "error") == NULL && strstr(tool_resp.content, want) != NULL;
+        sess->agent_active = 0; sess->workspace_phase = 0;
+        if (ok)
+            snprintf(content, sizeof(content), "%s\n\nVerificado: `%s` compila y ejecuta, e imprime el total esperado %s.", sess->ceo_plan.summary, sess->workspace_command, want);
+        else
+            snprintf(content, sizeof(content), "%s\n\nLa verificación NO confirma el cambio: esperaba ver %s en la salida de `%s`. Salida observada:\n%.1500s", sess->ceo_plan.summary, want, sess->workspace_command, tool_resp.content);
+        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 7)

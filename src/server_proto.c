@@ -9,6 +9,7 @@
 #include "compat.h"
 #include "chat.h"
 #include "server_proto.h"
+#include "c_edit_ops.h"
 #include "agent_diagnose.h"
 
 /* --- Enclitic pronoun stripping + declarative edit-verb table --- */
@@ -3361,6 +3362,10 @@ int ServerIsRepositoryTask(const char *text)
     if (ServerIsFileCreationTask(text) || ServerIsShellTask(text) ||
         ServerIsDiffTask(text) || ServerIsGitInquiryTask(text))
         return 0;
+    /* Adding a quantity field plus a total to observed code is a repository
+       change however it is phrased (new programs go to synthesis instead). */
+    if (CeoIsAddFieldAndTotalRequest(text) && !ServerIsCodeSynthesisTask(text))
+        return 1;
     for (i = 0; i < sizeof(actions) / sizeof(actions[0]); i++)
         if (MatchWordBoundary(lower, actions[i]) || strstr(lower, actions[i]) != NULL)
             { has_action = 1; break; }
