@@ -23,6 +23,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
+#include <math.h>
 #include "schema.h"
 #include "metaschema.h"
 #include "learn.h"
