@@ -422,6 +422,42 @@ static void test_tool_error_validation(void)
 }
 
 /* 7. Test Binary Model Detection in Chat Layer */
+static void test_observed_repair_gaps(void)
+{
+    char old_text[512], new_text[512];
+    const char *semi_src = "int main(void)\n{\n    int total = 3\n    return total;\n}\n";
+    TEST_ASSERT(ServerPlanObservedCRepair(semi_src,
+                    "inventario.c:4:5: error: expected ';' before 'return'",
+                    old_text, sizeof(old_text), new_text, sizeof(new_text)) == 1 &&
+                strstr(new_text, "int total = 3;") != NULL &&
+                strstr(old_text, "int total = 3") != NULL,
+                "missing ';' (ASCII quotes) appends ';' to the previous line");
+    TEST_ASSERT(ServerPlanObservedCRepair(semi_src,
+                    "inventario.c:4:5: error: expected \xe2\x80\x98;\xe2\x80\x99 before \xe2\x80\x98return\xe2\x80\x99",
+                    old_text, sizeof(old_text), new_text, sizeof(new_text)) == 1 &&
+                strstr(new_text, "int total = 3;") != NULL,
+                "missing ';' (gcc UTF-8 quotes) appends ';' to the previous line");
+    const char *inc_src = "#include <stdio.h>\nint main(void)\n{\n    return (int)strlen(\"ab\");\n}\n";
+    TEST_ASSERT(ServerPlanObservedCRepair(inc_src,
+                    "nombre.c:4:17: warning: implicit declaration of function 'strlen'\n"
+                    "nombre.c:2:1: note: include '<string.h>' or provide a declaration of 'strlen'",
+                    old_text, sizeof(old_text), new_text, sizeof(new_text)) == 1 &&
+                strstr(new_text, "#include <string.h>") != NULL,
+                "gcc include note yields the missing #include");
+    OPENAI_TOOL_RESPONSE resp;
+    const char *brace_payload =
+        "{\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"bash\",\"parameters\":{\"properties\":{\"content\":{\"type\":\"string\"}}}}}],"
+        "\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"{}\"}}]},"
+        "{\"role\":\"tool\",\"tool_call_id\":\"c1\",\"content\":\"a.c: In function 'f': { } warning: unused\"}]}";
+    TEST_ASSERT(ServerExtractLastToolResponse(brace_payload, &resp) == 1 &&
+                strstr(resp.content, "warning: unused") != NULL,
+                "tool output containing braces keeps its content");
+    TEST_ASSERT(ServerCheckOutputFails("x.c:3:1: warning: implicit declaration") == 1 &&
+                ServerCheckOutputFails("x.c:3:1: error: expected") == 1 &&
+                ServerCheckOutputFails("build ok\n") == 0,
+                "warnings-only output is not a pass");
+}
+
 static void test_binary_model_support(void)
 {
     printf("\n=== Test 7: Binary Model Detection in Chat Layer ===\n");
@@ -952,6 +988,7 @@ int main(void)
     test_tool_call_streaming_response();
     test_coding_task_intent();
     test_tool_error_validation();
+    test_observed_repair_gaps();
     test_binary_model_support();
     test_last_role_extraction();
     test_discrimination_battery();

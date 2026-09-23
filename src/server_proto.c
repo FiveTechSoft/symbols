@@ -1306,11 +1306,25 @@ int ServerExtractLastToolResponse(const char *body, OPENAI_TOOL_RESPONSE *out)
                     const char *obj_start = p;
                     while (obj_start > body && *obj_start != '{') obj_start--;
 
+                    /* Braces inside JSON strings (tool output such as
+                       "int main(void) {") must not move the object end,
+                       or later keys of other objects (a tool schema's
+                       "content" property) overwrite this message. */
                     const char *obj_end = q;
                     int depth = 1;
                     while (*obj_end != '\0')
                     {
-                        if (*obj_end == '{') depth++;
+                        if (*obj_end == '"')
+                        {
+                            obj_end++;
+                            while (*obj_end != '\0' && *obj_end != '"')
+                            {
+                                if (*obj_end == '\\' && obj_end[1] != '\0') obj_end++;
+                                obj_end++;
+                            }
+                            if (*obj_end == '\0') break;
+                        }
+                        else if (*obj_end == '{') depth++;
                         else if (*obj_end == '}') {
                             depth--;
                             if (depth == 0) break;
@@ -4191,6 +4205,127 @@ static int CopyDiagnosticIdentifier(const char *text, const char *needle,
     return 1;
 }
 
+/* Line `n` (1-based) of text: start pointer and length, or NULL. */
+static const char *RepairLine(const char *text, int n, size_t *len)
+{
+    const char *p = text;
+    for (int i = 1; i < n && p; i++)
+    {
+        p = strchr(p, '\n');
+        if (p) p++;
+    }
+    if (!p || !*p) return NULL;
+    *len = strcspn(p, "\n");
+    return p;
+}
+
+static int RepairUnique(const char *source, const char *needle)
+{
+    const char *a = strstr(source, needle);
+    return a && !strstr(a + 1, needle);
+}
+
+/* gcc "expected ';' before" (also "expected ',' or ';' before") at the
+   start of a line: the statement on the previous non-blank line lacks its
+   terminator. Declared rule; the edit is previous line + ';'. */
+static int RepairMissingSemicolon(const char *source, const char *diagnostic,
+                                  char *old_text, size_t old_size,
+                                  char *new_text, size_t new_size)
+{
+    const char *e = strstr(diagnostic, "error: expected ';' before");
+    if (!e) e = strstr(diagnostic, "error: expected ',' or ';' before");
+    if (!e) return 0;
+    const char *ls = e;
+    while (ls > diagnostic && ls[-1] != '\n') ls--;
+    /* "<file>:<line>:<col>: error: ..." */
+    const char *c = ls;
+    int line = 0, col = 0;
+    while (c < e && *c != ':') c++;
+    if (c >= e || sscanf(c, ":%d:%d:", &line, &col) != 2 || line < 2) return 0;
+    size_t cl, pl;
+    const char *cur = RepairLine(source, line, &cl);
+    if (!cur) return 0;
+    size_t ind = 0;
+    while (ind < cl && (cur[ind] == ' ' || cur[ind] == '\t')) ind++;
+    if ((int)ind + 1 != col) return 0;          /* not at the line start */
+    int pn = line - 1;
+    const char *prev = NULL;
+    while (pn >= 1)
+    {
+        prev = RepairLine(source, pn, &pl);
+        size_t k = 0;
+        while (prev && k < pl && isspace((unsigned char)prev[k])) k++;
+        if (prev && k < pl) break;
+        pn--;
+        prev = NULL;
+    }
+    if (!prev || pn != line - 1) return 0;      /* keep the edit adjacent */
+    size_t end = pl;
+    while (end && isspace((unsigned char)prev[end - 1])) end--;
+    size_t first = 0;
+    while (first < pl && isspace((unsigned char)prev[first])) first++;
+    char last = prev[end - 1];
+    if (last == ';' || last == '{' || last == '}' || last == ',' || last == ':' ||
+        last == '\\' || prev[first] == '#')
+        return 0;
+    if (pl + cl + 3 >= old_size || pl + cl + 4 >= new_size) return 0;
+    snprintf(old_text, old_size, "%.*s\n%.*s", (int)pl, prev, (int)cl, cur);
+    snprintf(new_text, new_size, "%.*s;%.*s\n%.*s", (int)end, prev,
+             (int)(pl - end), prev + end, (int)cl, cur);
+    if (!RepairUnique(source, old_text)) { old_text[0] = new_text[0] = '\0'; return 0; }
+    return 1;
+}
+
+/* gcc's own note for an implicit declaration names the header:
+   "note: include '<string.h>' or provide a declaration of 'strlen'".
+   Add that include after the last #include line. Declared rule. */
+static int RepairIncludeFromNote(const char *source, const char *diagnostic,
+                                 char *old_text, size_t old_size,
+                                 char *new_text, size_t new_size)
+{
+    const char *n = strstr(diagnostic, "note: include '<");
+    if (!n) return 0;
+    n += strlen("note: include '");
+    const char *ne = strchr(n, '\'');
+    if (!ne || ne - n < 3 || ne - n > 64 || n[ne - n - 1] != '>') return 0;
+    char inc[96];
+    snprintf(inc, sizeof(inc), "#include %.*s", (int)(ne - n), n);
+    if (strstr(source, inc)) return 0;
+    const char *last = NULL, *p = source;
+    while (p && *p)
+    {
+        const char *q = p;
+        while (*q == ' ' || *q == '\t') q++;
+        if (strncmp(q, "#include", 8) == 0) last = p;
+        p = strchr(p, '\n');
+        if (p) p++;
+    }
+    size_t ll;
+    const char *line = last ? last : source;
+    ll = strcspn(line, "\n");
+    if (ll == 0 || ll + 2 >= old_size || ll + strlen(inc) + 3 >= new_size) return 0;
+    if (last)
+    {
+        snprintf(old_text, old_size, "%.*s\n", (int)ll, line);
+        snprintf(new_text, new_size, "%.*s\n%s\n", (int)ll, line, inc);
+    }
+    else
+    {
+        snprintf(old_text, old_size, "%.*s", (int)ll, line);
+        snprintf(new_text, new_size, "%s\n%.*s", inc, (int)ll, line);
+    }
+    if (!RepairUnique(source, old_text)) { old_text[0] = new_text[0] = '\0'; return 0; }
+    return 1;
+}
+
+int ServerCheckOutputFails(const char *content)
+{
+    return content && (strstr(content, "error:") != NULL ||
+                       strstr(content, "warning:") != NULL ||
+                       strstr(content, "AddressSanitizer") != NULL ||
+                       strstr(content, "Assertion") != NULL);
+}
+
 int ServerPlanObservedCRepair(const char *source, const char *diagnostic,
                               char *old_text, size_t old_size,
                               char *new_text, size_t new_size)
@@ -4207,6 +4342,28 @@ int ServerPlanObservedCRepair(const char *source, const char *diagnostic,
         snprintf(old_text, old_size, "%s", bad);
         snprintf(new_text, new_size, "%s", good);
         return 1;
+    }
+    {
+        /* gcc quotes with U+2018/U+2019 under a UTF-8 locale and with
+           ASCII apostrophes otherwise: read both the same way. */
+        static char diag[16384];
+        size_t o = 0;
+        for (const char *d = diagnostic; *d && o + 1 < sizeof(diag); d++)
+        {
+            if ((unsigned char)d[0] == 0xE2 && (unsigned char)d[1] == 0x80 &&
+                ((unsigned char)d[2] == 0x98 || (unsigned char)d[2] == 0x99))
+            {
+                diag[o++] = '\'';
+                d += 2;
+                continue;
+            }
+            diag[o++] = *d;
+        }
+        diag[o] = '\0';
+        if (RepairMissingSemicolon(source, diag, old_text, old_size, new_text, new_size))
+            return 1;
+        if (RepairIncludeFromNote(source, diag, old_text, old_size, new_text, new_size))
+            return 1;
     }
     if (strstr(diagnostic, "AddressSanitizer") == NULL &&
         strstr(diagnostic, "heap-buffer-overflow") == NULL)

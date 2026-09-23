@@ -1592,9 +1592,7 @@ static void HandleCompletions(socket_t s, const char *body,
         OPENAI_TOOL_CALLS tc; char old_text[512], new_text[512];
         int failed = tool_resp.is_error ||
                      (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
-                     strstr(tool_resp.content, "error:") != NULL ||
-                     strstr(tool_resp.content, "AddressSanitizer") != NULL ||
-                     strstr(tool_resp.content, "Assertion") != NULL;
+                     ServerCheckOutputFails(tool_resp.content);
         if (!failed)
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
@@ -1603,7 +1601,11 @@ static void HandleCompletions(socket_t s, const char *body,
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
-        if (!ServerPlanObservedCRepair(sess->workspace_source, tool_resp.content,
+        /* plan on the file text itself: OpenCode's read output carries
+           "N: " line prefixes and a <content> wrapper */
+        static char repair_src[sizeof(sess->workspace_source)];
+        WorkspaceReadContent(sess->workspace_source, repair_src, sizeof(repair_src));
+        if (!ServerPlanObservedCRepair(repair_src, tool_resp.content,
                                        old_text, sizeof(old_text), new_text, sizeof(new_text)))
         {
             snprintf(sess->workspace_diagnostic, sizeof(sess->workspace_diagnostic), "%s", tool_resp.content);
@@ -1640,9 +1642,14 @@ static void HandleCompletions(socket_t s, const char *body,
         memset(&tc, 0, sizeof(tc)); tc.count = 1;
         snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
         snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "edit");
-        snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
-                 "{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
-                 sess->workspace_dir, sess->workspace_target, old_text, new_text);
+        {
+            char old_esc[1100], new_esc[1100];
+            ServerJsonEscape(old_text, old_esc, sizeof(old_esc));
+            ServerJsonEscape(new_text, new_esc, sizeof(new_esc));
+            snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments),
+                     "{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                     sess->workspace_dir, sess->workspace_target, old_esc, new_esc);
+        }
         snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "edit");
         sess->workspace_phase = 4;
         SendToolCallsForRequest(s, body, g_seq, &tc,
@@ -1705,9 +1712,7 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         int failed = tool_resp.is_error ||
                      (tool_resp.has_exit_code && tool_resp.exit_code != 0) ||
-                     strstr(tool_resp.content, "error:") != NULL ||
-                     strstr(tool_resp.content, "AddressSanitizer") != NULL ||
-                     strstr(tool_resp.content, "Assertion") != NULL;
+                     ServerCheckOutputFails(tool_resp.content);
         sess->agent_active = 0; sess->workspace_phase = 0;
         if (failed)
             snprintf(content, sizeof(content),

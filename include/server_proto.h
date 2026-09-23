@@ -317,6 +317,10 @@ int ServerDeriveSingleCCommand(const char *issue, const char *path,
 /* Plan one conservative edit from observed C source plus an actual compiler or
    sanitizer diagnostic. Supports identifier suggestions and allocation-size
    mismatches; exact old/new strings are returned for the client's edit tool. */
+/* A check's output counts as failing when the compiler or runtime
+   printed a diagnostic: "error:", "warning:", AddressSanitizer or an
+   assertion (declared rule: warnings are not a pass). */
+int ServerCheckOutputFails(const char *content);
 int ServerPlanObservedCRepair(const char *source, const char *diagnostic,
                               char *old_text, size_t old_size,
                               char *new_text, size_t new_size);
