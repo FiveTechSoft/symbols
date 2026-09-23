@@ -288,7 +288,7 @@ def render(m):
         cats = ", ".join(f"{k} {v}" for k, v in b["passed_by_category"].items())
         L.append(f"| Engineering task bank ({b['tasks_total']} tasks, {len(b['passed_by_category'])} categories) | "
                  f"`symbols-agent`: {b['tasks_passed']}/{b['tasks_total']} pass ({pct(b['pass_rate'])}; "
-                 f"dev {b.get('passed_by_split', {}).get('dev', '?')}, held-out {b.get('passed_by_split', {}).get('heldout', '?')}), "
+                 f"dev {b.get('passed_by_split', {}).get('dev', '?')}, retired held-out {b.get('passed_by_split', {}).get('heldout', '?')} (seen since fa230f4; blind: none yet)), "
                  f"{b['wrong_edits']} wrong edits, {b['untouched']} untouched; by category: {cats} | "
                  f"`tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, "
                  f"{b.get('self_test', 'not run')}) |")

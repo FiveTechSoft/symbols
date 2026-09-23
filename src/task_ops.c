@@ -365,7 +365,7 @@ static void probe_out(const TASK_OPS_WORKSPACE *ws, const char *flags, int *comp
         char run_cmd[TASK_OPS_MAX_PATH + 8];
         snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", bin);
         AgentShellResultInit(r);
-        AgentShellExec(run_cmd, ws->root, 5000, r);
+        AgentShellExec(run_cmd, ws->root, 15000, r);   /* 5 s flaked under load (cca91ab note) */
         *run = r->timed_out ? 124 : r->exit_code;
         if (out)
             snprintf(out, sizeof(probe_stdout[0]), "%.*s", (int)(r->stdout_len < 1023 ? r->stdout_len : 1023),
@@ -1903,7 +1903,7 @@ static int run_test_plan(const TASK_OPS_WORKSPACE *ws, const TEST_PLAN *tp, cons
         char run_cmd[TASK_OPS_MAX_PATH + 8];
         snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", bin);
         AgentShellResultInit(r);
-        AgentShellExec(run_cmd, ws->root, 5000, r);
+        AgentShellExec(run_cmd, ws->root, 15000, r);   /* 5 s flaked under load (cca91ab note) */
         ok = !r->timed_out && r->exit_code == 0;
     }
     remove(bin);

@@ -178,6 +178,8 @@ def main() -> int:
     ap.add_argument("--min-pass-rate", type=float)
     ap.add_argument("--max-wrong-edits", type=int)
     ap.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
+    ap.add_argument("--counts-only", action="store_true",
+                    help="omit per-task rows (ids, files) from the output; for blind banks")
     a = ap.parse_args()
     rows = [r for r in read_index(Path(a.bank)) if a.split == "all" or split_of(r[0]) == a.split]
     if not rows:
@@ -185,6 +187,8 @@ def main() -> int:
         return 2
     tasks = [run_task(tid, cat, tdir, a.agent, a.self_test, a.timeout) for tid, cat, tdir in rows]
     res = summarize(tasks, a.agent, a.self_test)
+    if a.counts_only:
+        res.pop("tasks", None)
     text = json.dumps(res, ensure_ascii=False)
     if a.out:
         Path(a.out).write_text(text + "\n", encoding="utf-8")
