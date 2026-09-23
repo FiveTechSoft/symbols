@@ -415,6 +415,25 @@ int main(void)
               "remove_dead_function: no removal verb, no edit");
     }
 
+    /* operator 8: unmatched_brace */
+    {
+        char d[512]; make_dir(d, sizeof(d), "brace");
+        put(d, "b.c", "int f(void) { return 1; }\n  }\nint main(void) { const char *s = \"}\"; return f() - 1 + (s[0] != '}'); }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Make it compile.", &r);
+        CHECK(kept && !strcmp(r.op, "unmatched_brace") &&
+              !strcmp(get(d, "b.c"), "int f(void) { return 1; }\nint main(void) { const char *s = \"}\"; return f() - 1 + (s[0] != '}'); }\n"),
+              "unmatched_brace: the one closing brace that closes nothing is removed");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "brace2");
+        const char *m = "int main(void) {\n    return 0;\n}\n}\n}\n";
+        put(d, "c.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Make it compile.", &r) && !strcmp(get(d, "c.c"), m),
+              "unmatched_brace: two stray braces = abstain");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

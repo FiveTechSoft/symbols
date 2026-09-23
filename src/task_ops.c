@@ -1643,9 +1643,54 @@ static char *df_apply(const char *data, const char *name)
     return out;
 }
 
-enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_COUNT };
+/* ------------------------------------------------------ unmatched_brace
+   Operator 8: the build fails and exactly one '}' in the C sources closes
+   nothing (brace depth, outside comments/strings/chars, would go below 0).
+   Remove it (its whole line when the line holds only that brace). No task
+   cue: the compiler failure plus the brace count is the precondition, and
+   the build must go from failing to ok. */
+static int find_unmatched_brace(const TASK_OPS_WORKSPACE *ws, int *file, size_t *at)
+{
+    int n = 0;
+    for (int f = 0; f < ws->count; f++) {
+        if (!is_c_source(ws->files[f].rel)) continue;
+        const char *d = ws->files[f].data, *p = d;
+        int depth = 0;
+        while (*p) {
+            const char *s = df_skip_lit(p);
+            if (s) { p = s; continue; }
+            if (*p == '{') depth++;
+            else if (*p == '}') {
+                if (depth == 0) { n++; *file = f; *at = (size_t)(p - d); }
+                else depth--;
+            }
+            p++;
+        }
+        if (depth != 0) return 0;   /* an unclosed '{' too: not this operator */
+    }
+    return n;
+}
+
+static char *ub_apply(const char *data, size_t at)
+{
+    size_t len = strlen(data), s = at, e = at + 1;
+    while (s > 0 && (data[s - 1] == ' ' || data[s - 1] == '\t')) s--;
+    size_t k = e;
+    while (data[k] == ' ' || data[k] == '\t') k++;
+    if ((s == 0 || data[s - 1] == '\n') && (data[k] == '\n' || !data[k]))
+        e = data[k] ? k + 1 : k;
+    else
+        s = at;
+    char *out = (char *)malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, data, s);
+    memcpy(out + s, data + e, len - e + 1);
+    return out;
+}
+
+enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function"
+    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace"
 };
 
 static int mem_enabled(void)
@@ -1853,6 +1898,15 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "remove_dead_function");
             snprintf(rep->detail, sizeof(rep->detail), "%.100s removed from %d file(s)", dead, touched);
+        } else if (op == OP_BRACE && rep->compile_before == 0) {
+            int bf = -1;
+            size_t bat = 0;
+            if (find_unmatched_brace(ws, &bf, &bat) == 1 && (next[bf] = ub_apply(ws->files[bf].data, bat)) != NULL) {
+                touched = 1;
+                rep->candidates = 1;
+                snprintf(rep->op, sizeof(rep->op), "unmatched_brace");
+                snprintf(rep->detail, sizeof(rep->detail), "stray '}' removed in %.100s", ws->files[bf].rel);
+            }
         }
     }
     if (!touched) {
