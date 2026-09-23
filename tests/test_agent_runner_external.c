@@ -82,10 +82,10 @@ static int baseline_resolves(const EXT_CASE *c, const char *workspace,
     if (fputs(replacement, f) == EOF) { fclose(f); remove(base); return 0; }
     fclose(f);
     if (c->extra_source)
-        snprintf(cmd, sizeof(cmd), "cc %s -fsyntax-only main.baseline.c %s",
+        snprintf(cmd, sizeof(cmd), "gcc %s -fsyntax-only main.baseline.c %s",
                  c->flags, c->extra_source);
     else
-        snprintf(cmd, sizeof(cmd), "cc %s -fsyntax-only main.baseline.c", c->flags);
+        snprintf(cmd, sizeof(cmd), "gcc %s -fsyntax-only main.baseline.c", c->flags);
     AgentShellResultInit(&res);
     AgentShellExec(cmd, workspace, 10000, &res);
     remove(base);
@@ -118,10 +118,10 @@ static int run_case(const char *root, const EXT_CASE *c, METRICS *m,
     fclose(f);
     strncpy(t.fixed_snippet, c->replacement, sizeof(t.fixed_snippet) - 1);
     if (c->extra_source)
-        snprintf(cmd, sizeof(cmd), "cc %s -fsyntax-only %s %s",
+        snprintf(cmd, sizeof(cmd), "gcc %s -fsyntax-only %s %s",
                  c->flags, target, c->extra_source);
     else
-        snprintf(cmd, sizeof(cmd), "cc %s -fsyntax-only %s", c->flags, target);
+        snprintf(cmd, sizeof(cmd), "gcc %s -fsyntax-only %s", c->flags, target);
     strncpy(t.build_command, cmd, sizeof(t.build_command) - 1);
 
     /* Baseline first, then remove its artifact so it cannot become a

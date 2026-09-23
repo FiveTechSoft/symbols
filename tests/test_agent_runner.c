@@ -276,7 +276,7 @@ static void test_did_you_mean_repair(void)
     strncpy(task.buggy_snippet, "int Value(int buffer_size) { return 0; }\n", sizeof(task.buggy_snippet) - 1);
     strncpy(task.fixed_snippet, "int Value(int buffer_size) { return buff_size; }\n", sizeof(task.fixed_snippet) - 1);
     snprintf(task.build_command, sizeof(task.build_command),
-             "cc -fsyntax-only %s", target_file);
+             "gcc -fsyntax-only %s", target_file);
 
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);
@@ -320,7 +320,7 @@ static void test_did_you_mean_repair_rejects_unsupported(void)
     strncpy(task.buggy_snippet, initial_code, sizeof(task.buggy_snippet) - 1);
     strncpy(task.fixed_snippet, "int Value(void) { return totally_unknown; }\n", sizeof(task.fixed_snippet) - 1);
     snprintf(task.build_command, sizeof(task.build_command),
-             "cc -fsyntax-only %s", target_file);
+             "gcc -fsyntax-only %s", target_file);
 
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);
@@ -362,7 +362,7 @@ static void test_did_you_mean_repair_rejects_ambiguous(void)
             "int Value(int buffer_size) { int x = buff_size; return x + buff_size; }\n",
             sizeof(task.fixed_snippet) - 1);
     snprintf(task.build_command, sizeof(task.build_command),
-             "cc -fsyntax-only %s", target_file);
+             "gcc -fsyntax-only %s", target_file);
 
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);

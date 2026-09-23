@@ -54,7 +54,7 @@ static int run_case(const char *dir, const char *replacement, int expected,
     if (!f || !fgets(t.buggy_snippet, sizeof(t.buggy_snippet), f)) { if (f) fclose(f); AgentRunnerDestroy(r); remove(target); return 0; }
     fclose(f);
     strncpy(t.fixed_snippet, replacement, sizeof(t.fixed_snippet)-1);
-    snprintf(cmd, sizeof(cmd), "cc -std=c11 -Werror=implicit-function-declaration -fsyntax-only %s", target);
+    snprintf(cmd, sizeof(cmd), "gcc -std=c11 -Werror=implicit-function-declaration -fsyntax-only %s", target);
     strncpy(t.build_command, cmd, sizeof(t.build_command)-1);
     clock_t start = clock();
     int rc = AgentRunnerSolveTask(r, &t, &result);
