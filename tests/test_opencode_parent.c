@@ -34,6 +34,17 @@ static void check(const char *name, int ok)
 #define V2 "{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"v2\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"{\\\"command\\\":\\\"gcc src/b.c\\\",\\\"description\\\":\\\"symbols-reverify: src/b.c\\\"}\"}}]}"
 #define V2_OK "{\"role\":\"tool\",\"tool_call_id\":\"v2\",\"content\":\"symbols-exit=0\\n\"}"
 
+static void set_mem_env(const char *path)
+{
+    static char kv[600];
+    snprintf(kv, sizeof(kv), "SYMBOLS_SUBAGENT_MEMORY=%s", path ? path : "");
+#ifdef _WIN32
+    _putenv(kv);
+#else
+    putenv(kv);
+#endif
+}
+
 static char g_body[16384];
 static const char *body(int with_task, const char *msgs)
 {
@@ -107,11 +118,16 @@ int main(void)
     char declared[3][64] = { "bash", "glob", "todowrite" };
     check("stripped body is a plain request again", SaDecide(out, declared, 3, "fix", &d) == SA_NONE);
 
-    char mem[] = "/tmp/test_opencode_parent_memXXXXXX";
-    int fd = mkstemp(mem);
-    if (fd >= 0) {
-        FILE *f = fdopen(fd, "w"); if (f) fclose(f);
-        setenv("SYMBOLS_SUBAGENT_MEMORY", mem, 1);
+    char mem[512];
+    const char *tmpdir = getenv("TEMP");
+    if (!tmpdir || !tmpdir[0]) tmpdir = getenv("TMPDIR");
+    if (!tmpdir || !tmpdir[0]) tmpdir = ".";
+    snprintf(mem, sizeof(mem), "%s/test_opencode_parent_mem.tsv", tmpdir);
+    FILE *f = fopen(mem, "w");
+    check("memory file created", f != NULL);
+    if (f) {
+        fclose(f);
+        set_mem_env(mem);
         SaMemoryRecord("explore", "a.c", "verified");
         SaMemoryRecord("explore", "b.c", "verified");
         SaMemoryRecord("general", "a.c", "failed");
@@ -122,7 +138,7 @@ int main(void)
         SaMemoryRecord("explore", "a.c", "failed"); SaMemoryRecord("explore", "a.c", "failed");
         SaMemoryRecord("explore", "a.c", "failed"); SaMemoryRecord("explore", "a.c", "failed");
         check("memory: repeated failures -> do it directly", decide(1, USER "," GLOB, &d) == SA_NONE);
-        unsetenv("SYMBOLS_SUBAGENT_MEMORY");
+        set_mem_env("");
         remove(mem);
     }
 
