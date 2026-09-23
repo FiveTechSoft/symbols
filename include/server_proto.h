@@ -143,6 +143,34 @@ int ServerIsRepositoryTask(const char *text);
 /* Command-line shape (no program whitelist); had_verb/cmd_start optional. */
 int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start);
 #define SERVER_SHELL_NOT_FOUND_MARK "symbols-probe:not-a-command:"
+#define SERVER_SHELL_IS_COMMAND_MARK "symbols-probe:is-command:"
+#include "episodic_memory.h"
+/* Procedural memory of probe outcomes (percibir -> razonar -> actuar ->
+   verificar -> aprender).  Records: word is_command|not_command scope. */
+#define SERVER_PROC_IS  "is_command"
+#define SERVER_PROC_NOT "not_command"
+typedef struct {
+    int p1_known, p2_known;      /* +1 command, -1 not a command, 0 unknown */
+    int decision;                /* SERVER_PROC_* below */
+    char p1[64], p2[64];
+} SERVER_PROC_TRACE;
+#define SERVER_PROC_PROBED        1   /* nothing known: tested in the environment */
+#define SERVER_PROC_DIRECT        2   /* memory made the probe unnecessary */
+#define SERVER_PROC_PARTIAL       3   /* memory removed one of two readings */
+#define SERVER_PROC_FROM_MEMORY   4   /* answered from memory, no tool call */
+void ServerProcScope(const char *body, char *out, size_t size);
+int  ServerProcRecall(const EPISODIC_STORE *st, const char *scope, const char *word);
+/* Learn from probe marker lines in a tool output; returns records changed. */
+int  ServerProcLearnFromOutput(EPISODIC_STORE *st, const char *scope, const char *output,
+                               char *learned, size_t learned_size);
+/* Correct: a remembered command that the shell reports as missing is forgotten. */
+int  ServerProcCorrectFromOutput(EPISODIC_STORE *st, const char *scope, const char *command,
+                                 const char *output);
+/* Remove probe marker lines from output shown to the user. */
+void ServerStripProbeLines(const char *in, char *out, size_t size);
+/* 0 not shell, 1 shell (tool call), 2 every reading already known not to be a command */
+int  ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char *scope,
+                         SERVER_PROC_TRACE *trace);
 
 /* 1 when the prompt is a literal shell/CLI command (cmake, gcc, git, ls…).
    The engine must emit a tool_call; the harness runs it. */
@@ -150,6 +178,9 @@ int ServerIsShellTask(const char *text);
 
 /* Map a shell prompt to bash or execute_command among declared tools.
    Fills out (name + arguments JSON). Returns 1 if a shell tool is available. */
+int ServerMapShellToolCallMem(const char *query, const char names[][64],
+                              uint32_t nnames, const EPISODIC_STORE *st, const char *scope,
+                              SERVER_PROC_TRACE *trace, OPENAI_TOOL_CALL *out);
 int ServerMapShellToolCall(const char *query, const char names[][64],
                            uint32_t nnames, OPENAI_TOOL_CALL *out);
 

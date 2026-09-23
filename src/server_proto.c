@@ -2319,11 +2319,63 @@ static int ShellArgShaped(const char *t, size_t n, int bare)
     return !upper && alpha <= 6;
 }
 
+/* Shape of a command line starting at text+t0.  tail=1 means the line
+   follows a leading word that may or may not be a program (the probe will
+   tell); that word is not assumed to be a "run" verb from any list. */
+static int ShellShapeAt(const char *text, size_t t0, int tail)
+{
+    size_t i, e, letters = 0;
+    int ntok = 0, plain = 0, option = 0;
+    if (text[t0] == '\0')
+        return 0;
+    /* program token: lowercase-led, path/identifier characters only */
+    e = t0;
+    while (text[e] && text[e] != ' ' && text[e] != '\t')
+    {
+        unsigned char c = (unsigned char)text[e];
+        if (!(islower(c) || isdigit(c) || strchr("._-/~+", c) != NULL ||
+              (tail && isupper(c))))
+            return 0;
+        if (isalpha(c)) letters++;
+        e++;
+    }
+    if (letters == 0 || e - t0 > 40 || text[t0] == '-')
+        return 0;
+    i = e;
+    while (text[i] == ' ' || text[i] == '\t') i++;
+    /* a lone word after an unverified leading word must look like a
+       command name, not prose (same test as a bare argument) */
+    if (tail && text[i] == '\0' && !ShellArgShaped(text + t0, e - t0, 1))
+        return 0;
+    i = e;
+    ntok = 1;
+    while (text[i])
+    {
+        size_t s, k;
+        int sp = 0;
+        while (text[i] == ' ' || text[i] == '\t') i++;
+        if (!text[i]) break;
+        s = i;
+        while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
+        if (!ShellArgShaped(text + s, i - s, !tail))
+            return 0;
+        for (k = s; k < i; k++) if (!isalpha((unsigned char)text[k])) sp = 1;
+        if (text[s] == '-') option = 1;
+        if (!sp) plain++;
+        if (++ntok > (tail ? 24 : 12))
+            return 0;
+    }
+    /* plain words without any option read as a sentence; after an
+       unverified leading word allow at most one */
+    if (!option && plain > (tail ? 1 : 2))
+        return 0;
+    return 1;
+}
+
 int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start)
 {
-    static const char *verbs[] = { "run", "ejecuta", "ejecutar", "corre", "lanza", "execute" };
-    size_t i = 0, t0, n, v;
-    int verb = 0, ntok = 0, plain = 0, option = 0;
+    size_t i = 0, t0, w, k;
+    int full, tail = 0, alpha_word = 1;
     if (had_verb) *had_verb = 0;
     if (cmd_start) *cmd_start = 0;
     if (text == NULL || text[0] == '\0')
@@ -2334,61 +2386,24 @@ int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start)
         return 0;
     while (text[i] == ' ' || text[i] == '\t') i++;
     t0 = i;
-    while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
-    n = i - t0;
-    for (v = 0; v < sizeof(verbs) / sizeof(verbs[0]); v++)
-        if (strlen(verbs[v]) == n && strncasecmp(text + t0, verbs[v], n) == 0)
-            verb = 1;
-    if (verb)
-    {
-        while (text[i] == ' ' || text[i] == '\t') i++;
-        t0 = i;
-    }
-    else
-        i = t0;
     if (cmd_start) *cmd_start = t0;
-    if (text[t0] == '\0')
-        return 0;
-    /* program token: lowercase-led, path/identifier characters only */
+    full = ShellShapeAt(text, t0, 0);
+    /* the first word may be a program or a request word: keep both
+       readings when the rest is itself command-shaped */
+    while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
+    w = i - t0;
+    for (k = t0; k < i; k++) if (!isalpha((unsigned char)text[k])) alpha_word = 0;
+    if (alpha_word && w > 0 && w <= 12)
     {
-        size_t e = t0, letters = 0;
-        while (text[e] && text[e] != ' ' && text[e] != '\t')
-        {
-            unsigned char c = (unsigned char)text[e];
-            if (!(islower(c) || isdigit(c) || strchr("._-/~+", c) != NULL ||
-                  (verb && isupper(c))))
-                return 0;
-            if (isalpha(c)) letters++;
-            e++;
-        }
-        if (letters == 0 || e - t0 > 40)
-            return 0;
-        i = e;
-        ntok = 1;
-    }
-    while (text[i])
-    {
-        size_t s;
         while (text[i] == ' ' || text[i] == '\t') i++;
-        if (!text[i]) break;
-        s = i;
-        while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
-        if (!ShellArgShaped(text + s, i - s, !verb))
-            return 0;
+        if (text[i] && ShellShapeAt(text, i, 1))
         {
-            size_t k; int sp = 0;
-            for (k = s; k < i; k++) if (!isalpha((unsigned char)text[k])) sp = 1;
-            if (text[s] == '-') option = 1;
-            if (!sp) plain++;
+            tail = 1;
+            if (had_verb) *had_verb = 1;
+            if (cmd_start) *cmd_start = i;
         }
-        if (++ntok > (verb ? 24 : 12))
-            return 0;
     }
-    /* several plain words without any option read as a sentence */
-    if (!option && plain > (verb ? 3 : 2))
-        return 0;
-    if (had_verb) *had_verb = verb;
-    return 1;
+    return full || tail;
 }
 
 int ServerIsShellTask(const char *text)
@@ -2398,6 +2413,13 @@ int ServerIsShellTask(const char *text)
 
 int ServerMapShellToolCall(const char *query, const char names[][64],
                            uint32_t nnames, OPENAI_TOOL_CALL *out)
+{
+    return ServerMapShellToolCallMem(query, names, nnames, NULL, NULL, NULL, out);
+}
+
+int ServerMapShellToolCallMem(const char *query, const char names[][64],
+                              uint32_t nnames, const EPISODIC_STORE *st, const char *scope,
+                              SERVER_PROC_TRACE *trace, OPENAI_TOOL_CALL *out)
 {
     const char *tool = NULL;
     uint32_t k;
@@ -2457,26 +2479,92 @@ int ServerMapShellToolCall(const char *query, const char names[][64],
         }
     }
 
+    static char probe_raw[SERVER_ARG_JSON_MAX];
     {
-        int had_verb = 0; size_t start = 0;
-        if (ServerShellShape(query, &had_verb, &start))
+        int had_prefix = 0; size_t start = 0;
+        SERVER_PROC_TRACE tr;
+        memset(&tr, 0, sizeof(tr));
+        if (ServerShellShape(query, &had_prefix, &start))
         {
-            p = query + start;
-            int strong = 0;
+            const char *full = query, *rest = query + start;
+            size_t n = 0;
+            int strong = 0, full_ok, w;
+            while (*full == ' ' || *full == '\t') full++;
+            full_ok = ShellShapeAt(full, 0, 0);
             {
                 /* option- or path-shaped arguments are strong command evidence */
-                const char *a = strchr(p, ' ');
+                const char *a = strchr(full, ' ');
                 for (; a && *a; a++) if (strchr("-/.=*~", *a) != NULL) { strong = 1; break; }
             }
-            if (!had_verb && !strong)
+            while (full[n] && full[n] != ' ' && full[n] != '\t' && n + 1 < sizeof(tr.p1)) { tr.p1[n] = full[n]; n++; }
+            tr.p1[n] = '\0';
+            if (had_prefix)
+            {
+                n = 0;
+                while (rest[n] && rest[n] != ' ' && rest[n] != '\t' && n + 1 < sizeof(tr.p2)) { tr.p2[n] = rest[n]; n++; }
+                tr.p2[n] = '\0';
+            }
+            tr.p1_known = ServerProcRecall(st, scope, tr.p1);
+            tr.p2_known = had_prefix ? ServerProcRecall(st, scope, tr.p2) : 0;
+            p = full;
+            w = 0;
+            if (full_ok && tr.p1_known > 0)
+            {
+                tr.decision = SERVER_PROC_DIRECT;              /* known program: run it */
+            }
+            else if (had_prefix && tr.p1_known < 0)
+            {
+                /* the leading word is a learned request word: only the rest can run */
+                if (tr.p2_known > 0 || strong)
+                {
+                    tr.decision = SERVER_PROC_DIRECT;
+                    p = rest;
+                }
+                else
+                {
+                    tr.decision = SERVER_PROC_PARTIAL;
+                    w = snprintf(probe_raw, sizeof(probe_raw),
+                        "if command -v %s >/dev/null 2>&1; then echo %s%s; %s; else echo %s%s; exit 127; fi",
+                        tr.p2, SERVER_SHELL_IS_COMMAND_MARK, tr.p2, rest, SERVER_SHELL_NOT_FOUND_MARK, tr.p2);
+                }
+            }
+            else if (had_prefix)
+            {
+                /* Test both readings against the environment: the whole line
+                   if its first word is a program, else the rest of the line. */
+                tr.decision = SERVER_PROC_PROBED;
+                if (full_ok)
+                    w = snprintf(probe_raw, sizeof(probe_raw),
+                        "if command -v %s >/dev/null 2>&1; then echo %s%s; %s; elif command -v %s >/dev/null 2>&1; then echo %s%s; echo %s%s; %s; else ",
+                        tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p1, full,
+                        tr.p2, SERVER_SHELL_NOT_FOUND_MARK, tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p2, rest);
+                else
+                    w = snprintf(probe_raw, sizeof(probe_raw),
+                        "if command -v %s >/dev/null 2>&1; then echo %s%s; echo %s%s; %s; else ",
+                        tr.p2, SERVER_SHELL_NOT_FOUND_MARK, tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p2, rest);
+                if (w > 0 && (size_t)w < sizeof(probe_raw))
+                {
+                    int w2;
+                    if (strong)
+                        w2 = snprintf(probe_raw + w, sizeof(probe_raw) - (size_t)w, "%s; fi", full_ok ? full : rest);
+                    else
+                        w2 = snprintf(probe_raw + w, sizeof(probe_raw) - (size_t)w, "echo %s%s %s; exit 127; fi",
+                                      SERVER_SHELL_NOT_FOUND_MARK, tr.p1, tr.p2);
+                    w = (w2 > 0) ? w + w2 : -1;
+                }
+            }
+            else if (!strong)
             {
                 /* weak bare line: probe that the program exists before running it */
-                char prog[64]; size_t n = 0;
-                while (p[n] && p[n] != ' ' && p[n] != '\t' && n + 1 < sizeof(prog)) { prog[n] = p[n]; n++; }
-                prog[n] = '\0';
-                o = (size_t)snprintf(esc, sizeof(esc),
-                    "command -v %s >/dev/null 2>&1 || { echo %s%s; exit 127; }; ", prog, SERVER_SHELL_NOT_FOUND_MARK, prog);
+                tr.decision = SERVER_PROC_PROBED;
+                w = snprintf(probe_raw, sizeof(probe_raw),
+                    "if command -v %s >/dev/null 2>&1; then echo %s%s; %s; else echo %s%s; exit 127; fi",
+                    tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p1, full, SERVER_SHELL_NOT_FOUND_MARK, tr.p1);
             }
+            else
+                tr.decision = SERVER_PROC_DIRECT;          /* strong line, run as typed */
+            if (w > 0 && (size_t)w < sizeof(probe_raw))
+                p = probe_raw;
         }
         else
         {
@@ -2484,6 +2572,7 @@ int ServerMapShellToolCall(const char *query, const char names[][64],
             while (*p == ' ' || *p == '\t')
                 p++;
         }
+        if (trace) *trace = tr;
     }
     for (; *p != '\0' && o + 2 < sizeof(esc); p++)
     {
@@ -4314,4 +4403,169 @@ void ServerComposeGitPreflightAnswer(GIT_PREFLIGHT_STATUS status,
                  "Me abstengo: estado del repositorio desconocido.");
         break;
     }
+}
+
+
+/* ---- Procedural memory of probe outcomes ---------------------------- */
+
+void ServerProcScope(const char *body, char *out, size_t size)
+{
+    const char *p;
+    size_t n = 0;
+    if (out == NULL || size == 0) return;
+    snprintf(out, size, "unknown");
+    if (body == NULL) return;
+    p = strstr(body, "Platform:");
+    if (p == NULL) return;
+    p += 9;
+    while (*p == ' ') p++;
+    while (p[n] && (isalnum((unsigned char)p[n]) || p[n] == '_' || p[n] == '-') && n + 1 < size)
+    { out[n] = (char)tolower((unsigned char)p[n]); n++; }
+    if (n > 0) out[n] = '\0';
+}
+
+int ServerProcRecall(const EPISODIC_STORE *st, const char *scope, const char *word)
+{
+    uint32_t i;
+    uint64_t best = 0;
+    int v = 0, seen = 0;
+    if (st == NULL || scope == NULL || word == NULL || word[0] == '\0') return 0;
+    for (i = 0; i < st->count; i++)
+    {
+        const EPISODIC_RECORD *r = &st->records[i];
+        int rv;
+        if (strcmp(r->subject, word) != 0 || strcmp(r->object, scope) != 0) continue;
+        if (strcmp(r->relation, SERVER_PROC_IS) == 0) rv = 1;
+        else if (strcmp(r->relation, SERVER_PROC_NOT) == 0) rv = -1;
+        else continue;
+        if (!seen || r->timestamp >= best) { best = r->timestamp; v = rv; seen = 1; }
+    }
+    return v;
+}
+
+static int ProcSet(EPISODIC_STORE *st, const char *scope, const char *word, int is_cmd,
+                   char *learned, size_t lsize)
+{
+    const char *rel = is_cmd ? SERVER_PROC_IS : SERVER_PROC_NOT;
+    const char *other = is_cmd ? SERVER_PROC_NOT : SERVER_PROC_IS;
+    int changed = 0;
+    if (word[0] == '\0' || strlen(word) >= EPISODIC_STR_MAX) return 0;
+    if (EpisodicStoreExists(st, word, other, scope))
+    {
+        EpisodicStoreForget(st, word, other, scope);
+        changed = 1;
+    }
+    if (EpisodicStoreAppend(st, word, rel, scope, "probe") == 1)
+        changed = 1;
+    if (changed && learned && lsize)
+    {
+        size_t l = strlen(learned);
+        snprintf(learned + l, lsize - l, "%s%s=%s", l ? " " : "", word, is_cmd ? "command" : "not-command");
+    }
+    return changed;
+}
+
+int ServerProcLearnFromOutput(EPISODIC_STORE *st, const char *scope, const char *output,
+                              char *learned, size_t learned_size)
+{
+    const char *p;
+    int changed = 0;
+    if (learned && learned_size) learned[0] = '\0';
+    if (st == NULL || scope == NULL || output == NULL) return 0;
+    for (p = output; (p = strstr(p, "symbols-probe:")) != NULL; )
+    {
+        int is_cmd;
+        const char *m;
+        if (strncmp(p, SERVER_SHELL_IS_COMMAND_MARK, strlen(SERVER_SHELL_IS_COMMAND_MARK)) == 0)
+        { is_cmd = 1; m = p + strlen(SERVER_SHELL_IS_COMMAND_MARK); }
+        else if (strncmp(p, SERVER_SHELL_NOT_FOUND_MARK, strlen(SERVER_SHELL_NOT_FOUND_MARK)) == 0)
+        { is_cmd = 0; m = p + strlen(SERVER_SHELL_NOT_FOUND_MARK); }
+        else { p++; continue; }
+        while (*m && *m != '\n')
+        {
+            char w[64];
+            size_t n = 0;
+            while (*m == ' ') m++;
+            while (*m && *m != ' ' && *m != '\n' && n + 1 < sizeof(w)) w[n++] = *m++;
+            w[n] = '\0';
+            if (n) changed += ProcSet(st, scope, w, is_cmd, learned, learned_size);
+        }
+        p = m;
+    }
+    return changed;
+}
+
+int ServerProcCorrectFromOutput(EPISODIC_STORE *st, const char *scope, const char *command,
+                                const char *output)
+{
+    char prog[64], pat[96];
+    size_t n = 0;
+    if (st == NULL || scope == NULL || command == NULL || output == NULL) return 0;
+    while (*command == ' ') command++;
+    while (command[n] && command[n] != ' ' && n + 1 < sizeof(prog)) { prog[n] = command[n]; n++; }
+    prog[n] = '\0';
+    if (n == 0 || ServerProcRecall(st, scope, prog) <= 0) return 0;
+    snprintf(pat, sizeof(pat), "%s: command not found", prog);
+    if (strstr(output, pat) == NULL)
+    {
+        snprintf(pat, sizeof(pat), "%s: not found", prog);
+        if (strstr(output, pat) == NULL) return 0;
+    }
+    return EpisodicStoreForget(st, prog, SERVER_PROC_IS, scope) == 1;
+}
+
+void ServerStripProbeLines(const char *in, char *out, size_t size)
+{
+    size_t o = 0;
+    const char *p = in;
+    if (out == NULL || size == 0) return;
+    out[0] = '\0';
+    if (in == NULL) return;
+    while (*p)
+    {
+        const char *e = strchr(p, '\n');
+        size_t len = e ? (size_t)(e - p) + 1 : strlen(p);
+        if (strncmp(p, "symbols-probe:", 14) != 0)
+        {
+            if (o + len >= size) len = size - o - 1;
+            memcpy(out + o, p, len);
+            o += len;
+            if (o + 1 >= size) break;
+        }
+        p += e ? (size_t)(e - p) + 1 : strlen(p);
+    }
+    out[o] = '\0';
+}
+
+int ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char *scope,
+                        SERVER_PROC_TRACE *trace)
+{
+    int had_prefix = 0, strong = 0;
+    size_t start = 0, n = 0;
+    const char *full = query, *a;
+    SERVER_PROC_TRACE tr;
+    memset(&tr, 0, sizeof(tr));
+    if (trace) *trace = tr;
+    if (!ServerShellShape(query, &had_prefix, &start))
+        return 0;
+    while (*full == ' ' || *full == '\t') full++;
+    for (a = strchr(full, ' '); a && *a; a++) if (strchr("-/.=*~", *a) != NULL) { strong = 1; break; }
+    while (full[n] && full[n] != ' ' && full[n] != '\t' && n + 1 < sizeof(tr.p1)) { tr.p1[n] = full[n]; n++; }
+    tr.p1[n] = '\0';
+    if (had_prefix)
+    {
+        const char *r = query + start;
+        n = 0;
+        while (r[n] && r[n] != ' ' && r[n] != '\t' && n + 1 < sizeof(tr.p2)) { tr.p2[n] = r[n]; n++; }
+        tr.p2[n] = '\0';
+    }
+    tr.p1_known = ServerProcRecall(st, scope, tr.p1);
+    tr.p2_known = had_prefix ? ServerProcRecall(st, scope, tr.p2) : 0;
+    if (trace) *trace = tr;
+    if (!strong && tr.p1_known < 0 && (!had_prefix || tr.p2_known < 0))
+    {
+        if (trace) trace->decision = SERVER_PROC_FROM_MEMORY;
+        return 2;
+    }
+    return 1;
 }

@@ -602,6 +602,54 @@ static void test_shell_tool_dispatch(void)
         TEST_ASSERT(ServerBuildResponse("m", 1, 1, big, "q", out, sizeof(out)) == 0 && out[0] == '\0',
                     "failed encode never leaves a stale response");
     }
+    /* procedural memory: the second identical request must not repeat the probe */
+    {
+        EPISODIC_STORE st, st2;
+        OPENAI_TOOL_CALL tc;
+        SERVER_PROC_TRACE tr;
+        char learned[256], scope[32], shown[256];
+        const char *path = "/tmp/symbols_test_procedural.tsv";
+        remove(path);
+        ServerProcScope("<env>\n  Platform: linux\n</env>", scope, sizeof(scope));
+        TEST_ASSERT(strcmp(scope, "linux") == 0, "scope comes from the client env block");
+        TEST_ASSERT(EpisodicStoreInit(&st, path), "procedural store opens");
+        /* run 1: nothing known -> probe both readings */
+        TEST_ASSERT(ServerMapShellToolCallMem("ejecuta ps aux", bash_only, 3, &st, scope, &tr, &tc) == 1 &&
+                    tr.decision == SERVER_PROC_PROBED && strstr(tc.arguments, "command -v ejecuta") != NULL,
+                    "first run probes");
+        /* environment answer for run 1 */
+        TEST_ASSERT(ServerProcLearnFromOutput(&st, scope,
+                    "symbols-probe:not-a-command:ejecuta\nsymbols-probe:is-command:ps\nUSER PID\n",
+                    learned, sizeof(learned)) == 2, "learns both outcomes");
+        ServerStripProbeLines("symbols-probe:is-command:ps\nUSER PID\n", shown, sizeof(shown));
+        TEST_ASSERT(strcmp(shown, "USER PID\n") == 0, "probe lines never reach the user");
+        /* run 2: same request goes direct */
+        TEST_ASSERT(ServerMapShellToolCallMem("ejecuta ps aux", bash_only, 3, &st, scope, &tr, &tc) == 1 &&
+                    tr.decision == SERVER_PROC_DIRECT && strstr(tc.arguments, "\"command\":\"ps aux\"") != NULL,
+                    "second run goes direct with no probe");
+        /* transfer: a new request with the learned request word only probes the unknown part */
+        TEST_ASSERT(ServerMapShellToolCallMem("ejecuta df -h", bash_only, 3, &st, scope, &tr, &tc) == 1 &&
+                    tr.decision == SERVER_PROC_DIRECT && strstr(tc.arguments, "\"command\":\"df -h\"") != NULL,
+                    "learned request word transfers to new commands");
+        TEST_ASSERT(ServerMapShellToolCallMem("ejecuta htop", bash_only, 3, &st, scope, &tr, &tc) == 1 &&
+                    tr.decision == SERVER_PROC_PARTIAL && strstr(tc.arguments, "command -v ejecuta") == NULL &&
+                    strstr(tc.arguments, "command -v htop") != NULL, "only the unknown program is probed");
+        /* all-negative line: answered from memory, no tool */
+        ServerProcLearnFromOutput(&st, scope, "symbols-probe:not-a-command:hola que\n", learned, sizeof(learned));
+        TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, scope, &tr) == 2 && tr.decision == SERVER_PROC_FROM_MEMORY,
+                    "known non-commands skip the tool round-trip");
+        TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, "windows", &tr) == 1, "memory is scoped per platform");
+        /* restart: memory survives on disk */
+        TEST_ASSERT(EpisodicStoreInit(&st2, path) && EpisodicStoreLoad(&st2) >= 4, "memory reloads after restart");
+        TEST_ASSERT(ServerProcRecall(&st2, scope, "ps") == 1 && ServerProcRecall(&st2, scope, "ejecuta") == -1,
+                    "reloaded memory keeps outcomes");
+        /* correct: a remembered command that is now missing is forgotten */
+        TEST_ASSERT(ServerProcCorrectFromOutput(&st2, scope, "ps aux", "/bin/bash: line 1: ps: command not found\n") == 1 &&
+                    ServerProcRecall(&st2, scope, "ps") == 0, "stale positive memory is corrected");
+        EpisodicStoreDestroy(&st);
+        EpisodicStoreDestroy(&st2);
+        remove(path);
+    }
     /* shape-based routing: no program whitelist */
     TEST_ASSERT(ServerIsShellTask("ejecuta ps aux") == 1, "ejecuta + unlisted program is shell");
     TEST_ASSERT(ServerIsShellTask("ejecuta ollama list") == 1, "ejecuta + unknown program is shell");
@@ -615,7 +663,16 @@ static void test_shell_tool_dispatch(void)
         TEST_ASSERT(strstr(tc.arguments, "command -v ps") != NULL && strstr(tc.arguments, "ps aux") != NULL,
                     "weak bare line is probed before running");
         TEST_ASSERT(ServerMapShellToolCall("ejecuta ollama list", bash_only, 3, &tc) == 1 &&
-                    strstr(tc.arguments, "\"command\":\"ollama list\"") != NULL, "verb form runs the command itself");
+                    strstr(tc.arguments, "command -v ejecuta") != NULL &&
+                    strstr(tc.arguments, "elif command -v ollama") != NULL &&
+                    strstr(tc.arguments, "is-command:ollama; ollama list;") != NULL,
+                    "leading word is tested, not looked up in a verb list");
+        TEST_ASSERT(ServerMapShellToolCall("lanza git status", bash_only, 3, &tc) == 1 &&
+                    strstr(tc.arguments, "is-command:git; git status;") != NULL, "any leading word works, no verb list");
+        TEST_ASSERT(ServerMapShellToolCall("ejecuta ls -la", bash_only, 3, &tc) == 1 &&
+                    strstr(tc.arguments, "else ejecuta ls -la; fi") != NULL,
+                    "strong line falls back to running it for the real error");
+        TEST_ASSERT(ServerIsShellTask("fix the leak in parser.c") == 0, "prose after a leading word is not a command");
     }
     TEST_ASSERT(ServerIsShellTask("quien es el padre de David?") == 0,
                 "factual QA is not a shell task");

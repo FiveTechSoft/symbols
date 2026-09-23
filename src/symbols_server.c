@@ -211,6 +211,62 @@ static size_t StripEnclitic(const char *verb, char *out, size_t out_size)
    persist across requests; the base corpus ingests once. */
 static CHAT g_session;
 static int g_session_ready = 0;
+/* Procedural memory: what probing the client environment taught us. */
+static EPISODIC_STORE g_proc;
+static int g_proc_ready = 0;
+static unsigned long g_proc_stat[5];      /* indexed by SERVER_PROC_* decision */
+static unsigned long g_proc_learned = 0, g_proc_corrected = 0;
+static void ProcEnsure(void)
+{
+    const char *path;
+    if (g_proc_ready) return;
+    path = getenv("SYMBOLS_PROCEDURAL");
+    if (path == NULL || path[0] == '\0') path = "data/memory/procedural.tsv";
+    if (EpisodicStoreInit(&g_proc, path))
+    {
+        EpisodicStoreLoad(&g_proc);
+        g_proc_ready = 1;
+        fprintf(stderr, "[procmem] loaded %u entries from %s\n", g_proc.count, path);
+    }
+}
+static const char *ProcDecisionName(int d)
+{
+    switch (d) {
+    case SERVER_PROC_PROBED: return "probed";
+    case SERVER_PROC_DIRECT: return "direct(memory)";
+    case SERVER_PROC_PARTIAL: return "partial(memory)";
+    case SERVER_PROC_FROM_MEMORY: return "answered-from-memory";
+    default: return "none";
+    }
+}
+static void ProcLogDecision(const char *query, const SERVER_PROC_TRACE *tr)
+{
+    if (tr->decision > 0 && tr->decision < 5) g_proc_stat[tr->decision]++;
+    fprintf(stderr, "[procmem] q=%.60s decision=%s p1=%s(%d) p2=%s(%d) entries=%u\n",
+            query, ProcDecisionName(tr->decision), tr->p1, tr->p1_known,
+            tr->p2[0] ? tr->p2 : "-", tr->p2_known, g_proc_ready ? g_proc.count : 0);
+}
+/* Learn from probe markers and correct stale memories; returns 1 if the
+   output carried probe markers. */
+static int ProcLearnFromTool(const char *body, const char *arguments, const char *output)
+{
+    char scope[32], learned[512] = "";
+    const char *cmd;
+    int changed, corrected = 0;
+    ProcEnsure();
+    if (!g_proc_ready || output == NULL) return 0;
+    ServerProcScope(body, scope, sizeof(scope));
+    changed = ServerProcLearnFromOutput(&g_proc, scope, output, learned, sizeof(learned));
+    cmd = arguments ? strstr(arguments, "\"command\"") : NULL;
+    if (cmd && (cmd = strchr(cmd + 9, '"')) != NULL)
+        corrected = ServerProcCorrectFromOutput(&g_proc, scope, cmd + 1, output);
+    g_proc_learned += (unsigned long)changed;
+    g_proc_corrected += (unsigned long)corrected;
+    if (changed || corrected)
+        fprintf(stderr, "[procmem] learned=[%s] corrected=%d scope=%s entries=%u\n",
+                learned, corrected, scope, g_proc.count);
+    return strstr(output, "symbols-probe:") != NULL;
+}
 
 #define SERVER_MAX_SESSIONS 32
 
@@ -1025,6 +1081,41 @@ static void HandleCompletions(socket_t s, const char *body,
         SendJson(s, 200, "OK", resp);
         return;
     }
+    if (has_tool_resp && strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) != NULL &&
+        strstr(tool_resp.content, SERVER_SHELL_IS_COMMAND_MARK) == NULL)
+    {
+        ProcLearnFromTool(body, has_paired_call ? paired_call.arguments : NULL, tool_resp.content);
+        /* The environment says the bare line's first token is not a program:
+           the shell reading was wrong, so answer it as language instead. */
+        char raw2[8192], mapped[8192], prog[64] = "", prog2[64] = "";
+        const char *m = strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) + strlen(SERVER_SHELL_NOT_FOUND_MARK);
+        size_t n = 0;
+        while (m[n] && !isspace((unsigned char)m[n]) && n + 1 < sizeof(prog)) { prog[n] = m[n]; n++; }
+        prog[n] = '\0';
+        m += n;
+        if (*m == ' ')
+        {
+            m++; n = 0;
+            while (m[n] && !isspace((unsigned char)m[n]) && n + 1 < sizeof(prog2)) { prog2[n] = m[n]; n++; }
+            prog2[n] = '\0';
+        }
+        sess->agent_active = 0;
+        char asked[4096] = "";
+        if (!ServerExtractQuery(body, asked, sizeof(asked)))
+            snprintf(asked, sizeof(asked), "%s", sess->current_issue);
+        if (!g_session_ready || !ServerAnswerQuery(&g_session, asked, raw2, sizeof(raw2)))
+            snprintf(raw2, sizeof(raw2), "No tengo constancia suficiente para responder.");
+        if (ServerIsUnknown(raw2))
+            mapped[0] = '\0';   /* nothing grounded to add */
+        else
+            ServerMapContent(raw2, mapped, sizeof(mapped));
+        if (prog2[0])
+            snprintf(content, sizeof(content), "Ni `%s` ni `%s` son programas disponibles en este entorno (lo he comprobado), así que no lo he ejecutado como comando.\n\n%s", prog, prog2, mapped);
+        else
+            snprintf(content, sizeof(content), "`%s` no es un programa disponible en este entorno (lo he comprobado), así que no lo he ejecutado como comando.\n\n%s", prog, mapped);
+        SendContentForRequest(s, body, ++g_seq, content, asked, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
     /* A literal shell request is a bounded one-tool transaction.  Relay
        only the observed tool output and exit status; never synthesize build
        or regression claims from a successful command. */
@@ -1034,6 +1125,12 @@ static void HandleCompletions(socket_t s, const char *body,
         strstr(paired_call.arguments, "\"command\"") != NULL)
     {
         sess->agent_active = 0;
+        if (ProcLearnFromTool(body, paired_call.arguments, tool_resp.content))
+        {
+            static char stripped[sizeof(tool_resp.content)];
+            ServerStripProbeLines(tool_resp.content, stripped, sizeof(stripped));
+            memcpy(tool_resp.content, stripped, sizeof(tool_resp.content));
+        }
         if (tool_resp.content[0] != '\0')
         {
             /* The reply must fit the response encoder; relay a bounded
@@ -1512,23 +1609,6 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* 1. AGENTIC RESUMPTION: Client returned output of previous tool call */
-    if (has_tool_resp && sess->agent_active && strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) != NULL)
-    {
-        /* The environment says the bare line's first token is not a program:
-           the shell reading was wrong, so answer it as language instead. */
-        char raw2[8192], mapped[8192], prog[64] = "";
-        const char *m = strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) + strlen(SERVER_SHELL_NOT_FOUND_MARK);
-        size_t n = 0;
-        while (m[n] && !isspace((unsigned char)m[n]) && n + 1 < sizeof(prog)) { prog[n] = m[n]; n++; }
-        prog[n] = '\0';
-        sess->agent_active = 0;
-        if (!g_session_ready || !ServerAnswerQuery(&g_session, sess->current_issue, raw2, sizeof(raw2)))
-            snprintf(raw2, sizeof(raw2), "No tengo constancia suficiente para responder.");
-        ServerMapContent(raw2, mapped, sizeof(mapped));
-        snprintf(content, sizeof(content), "`%s` no es un programa disponible en este entorno, así que no lo he ejecutado como comando.\n\n%s", prog, mapped);
-        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
-        return;
-    }
     if (has_tool_resp && sess->agent_active)
     {
         sess->last_active = time(NULL);
@@ -2011,6 +2091,22 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* Episodic memory inspection: /memory, /memoria */
+    if (strcmp(query, "/procedural") == 0 || strcmp(query, "/procedimental") == 0 ||
+        strcasecmp(query, "memoria procedimental") == 0)
+    {
+        size_t w;
+        uint32_t i;
+        ProcEnsure();
+        w = (size_t)snprintf(content, sizeof(content),
+            "[memoria procedimental] %u entradas. Esta sesion: %lu probadas, %lu directas por memoria, %lu parciales, %lu respondidas desde memoria sin herramienta; %lu aprendidas, %lu corregidas.\n",
+            g_proc_ready ? g_proc.count : 0, g_proc_stat[SERVER_PROC_PROBED], g_proc_stat[SERVER_PROC_DIRECT],
+            g_proc_stat[SERVER_PROC_PARTIAL], g_proc_stat[SERVER_PROC_FROM_MEMORY], g_proc_learned, g_proc_corrected);
+        for (i = 0; g_proc_ready && i < g_proc.count && w + 128 < sizeof(content); i++)
+            w += (size_t)snprintf(content + w, sizeof(content) - w, "- %s %s (%s)\n",
+                                  g_proc.records[i].subject, g_proc.records[i].relation, g_proc.records[i].object);
+        SendContentForRequest(s, body, ++g_seq, content, query, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
     if (strcmp(query, "/memory") == 0 || strcmp(query, "/memoria") == 0 ||
         strcmp(query, ":memory") == 0 || strcmp(query, ":memoria") == 0 ||
         strcmp(query, "/episodic") == 0)
@@ -2169,7 +2265,36 @@ static void HandleCompletions(socket_t s, const char *body,
     int is_coding = ServerIsCodingTask(query);
 
     /* Literal shell/CLI: emit one tool_call; the client harness executes it. */
-    if (sess->declared_tools_count > 0 && ServerIsShellTask(query))
+    int shell_route = 0;
+    char proc_scope[32];
+    SERVER_PROC_TRACE proc_tr;
+    memset(&proc_tr, 0, sizeof(proc_tr));
+    if (sess->declared_tools_count > 0)
+    {
+        ProcEnsure();
+        ServerProcScope(body, proc_scope, sizeof(proc_scope));
+        shell_route = ServerShellRouteMem(query, g_proc_ready ? &g_proc : NULL, proc_scope, &proc_tr);
+    }
+    if (shell_route == 2)
+    {
+        /* Every reading of the line was already tested here and none is a
+           program: do not spend a tool round-trip on it again. */
+        char raw2[8192], mapped[8192];
+        ProcLogDecision(query, &proc_tr);
+        if (!g_session_ready || !ServerAnswerQuery(&g_session, query, raw2, sizeof(raw2)) || ServerIsUnknown(raw2))
+            mapped[0] = '\0';
+        else
+            ServerMapContent(raw2, mapped, sizeof(mapped));
+        if (proc_tr.p2[0])
+            snprintf(content, sizeof(content), "Ya comprobé antes que ni `%s` ni `%s` son programas disponibles en este entorno (lo recuerdo), así que no lo ejecuto como comando.%s%s",
+                     proc_tr.p1, proc_tr.p2, mapped[0] ? "\n\n" : "", mapped);
+        else
+            snprintf(content, sizeof(content), "Ya comprobé antes que `%s` no es un programa disponible en este entorno (lo recuerdo), así que no lo ejecuto como comando.%s%s",
+                     proc_tr.p1, mapped[0] ? "\n\n" : "", mapped);
+        SendContentForRequest(s, body, ++g_seq, content, query, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (shell_route == 1)
     {
         int has_glob = HasDeclaredTool(sess, "glob");
         int glob_ok = has_glob && (strchr(query, '*') != NULL);
@@ -2191,10 +2316,12 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             OPENAI_TOOL_CALLS tc;
             memset(&tc, 0, sizeof(tc));
-            if (ServerMapShellToolCall(query, sess->declared_tools,
+            if (ServerMapShellToolCallMem(query, sess->declared_tools,
                                        (uint32_t)sess->declared_tools_count,
+                                       g_proc_ready ? &g_proc : NULL, proc_scope, &proc_tr,
                                        &tc.calls[0]))
             {
+                ProcLogDecision(query, &proc_tr);
                 tc.count = 1;
                 snprintf(tc.calls[0].id, sizeof(tc.calls[0].id),
                          "call_sym_%lu", ++g_seq);
