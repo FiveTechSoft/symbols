@@ -112,6 +112,41 @@ typedef struct
 /* Extract list of function names declared in "tools": [...] array */
 int ServerExtractToolsDeclared(const char *body, char names[][64], uint32_t max_names);
 
+/* ------------------------------------------------ OpenCode subagent (child) */
+
+/* OpenCode child-session shape (declared rule): the client declares tools,
+   and neither "task" nor "todowrite" is among them. OpenCode 1.18 denies
+   todowrite in every child session it creates for the task tool, while
+   primary agents keep it. */
+int ServerIsSubagentShape(char names[][64], uint32_t n);
+
+/* Tool names that write files (declared list). */
+int ServerToolWritesFiles(const char *name);
+
+#define SERVER_CHILD_MAX_FILES 8
+typedef struct
+{
+    char files[SERVER_CHILD_MAX_FILES][260];
+    int  nfiles;
+    int  ncommands;
+    char last_command[256];
+} SERVER_CHILD_LOG;
+
+/* Record one tool call this server emitted: file-writing calls add their
+   filePath/path argument, bash calls count and keep the last command. */
+void ServerChildLogCall(SERVER_CHILD_LOG *log, const char *name, const char *arguments);
+
+/* The parent only sees the child's last text, so that text ends with a
+   block of what the server observably did (no claims beyond the log).
+   Returns 1 when the block was appended. */
+int ServerAppendSubagentResult(const SERVER_CHILD_LOG *log, int can_write, char *content, size_t size);
+
+/* Optional hook applied to the text of every final (non-tool-call) reply
+   built by ServerBuildResponse / ServerBuildStreamResponse. NULL = none. */
+typedef void (*SERVER_TEXT_HOOK)(char *content, size_t size);
+void ServerSetTextHook(SERVER_TEXT_HOOK hook);
+
+
 /* Inspect tool response content for exit codes, error statuses, and diagnostics */
 void ServerInspectToolResponse(OPENAI_TOOL_RESPONSE *resp);
 

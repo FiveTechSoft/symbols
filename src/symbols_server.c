@@ -351,6 +351,10 @@ typedef struct
     int               ceo_nfiles, ceo_next;
     CeoPlan           ceo_plan;
     int               ceo_hunk;
+    /* OpenCode child session (task tool): what this server did, reported
+       in the final text because the parent sees only that text */
+    int               is_subagent;
+    SERVER_CHILD_LOG  child_log;
 } ServerSession;
 
 static void WorkspaceReadContent(const char *input, char *out, size_t size)
@@ -377,6 +381,20 @@ static ServerSession g_sessions[SERVER_MAX_SESSIONS];
 static uint32_t g_num_sessions = 0;
 static CODE_GRAPH *g_server_code_graph = NULL;
 static MODEL *g_server_model = NULL;
+
+/* Session of the request being answered (the server is single-threaded). */
+static ServerSession *g_reply_sess = NULL;
+
+static void ChildResultHook(char *content, size_t size)
+{
+    int can_write = 0;
+    if (!g_reply_sess || !g_reply_sess->is_subagent)
+        return;
+    for (int i = 0; i < g_reply_sess->declared_tools_count; i++)
+        if (ServerToolWritesFiles(g_reply_sess->declared_tools[i]))
+            can_write = 1;
+    ServerAppendSubagentResult(&g_reply_sess->child_log, can_write, content, size);
+}
 
 static int HasDeclaredTool(const ServerSession *sess, const char *name)
 {
@@ -852,6 +870,9 @@ static int SendToolCallsForRequest(socket_t s, const char *body,
                                    const char *content, char *json, size_t jsonsz,
                                    char *sse, size_t ssesz)
 {
+    if (g_reply_sess && g_reply_sess->is_subagent && calls)
+        for (uint32_t i = 0; i < calls->count && i < SERVER_MAX_TOOL_CALLS; i++)
+            ServerChildLogCall(&g_reply_sess->child_log, calls->calls[i].name, calls->calls[i].arguments);
     if (ServerWantsStream(body))
     {
         if (!ServerBuildToolCallStreamResponse(SERVER_MODEL_ID,
@@ -901,6 +922,8 @@ static void HandleCompletions(socket_t s, const char *body,
     long latency_ms;
     FILE *log;
 
+    g_reply_sess = NULL;
+    ServerSetTextHook(ChildResultHook);
     ServerExtractSession(body, session_id, sizeof(session_id));
     if (session_id[0] == '\0')
         ServerDeriveSessionKey(body, session_id, sizeof(session_id));
@@ -989,6 +1012,8 @@ static void HandleCompletions(socket_t s, const char *body,
         strncpy(sess->declared_tools[i], declared_tools[i], sizeof(sess->declared_tools[i]) - 1);
         sess->declared_tools[i][sizeof(sess->declared_tools[i]) - 1] = '\0';
     }
+    sess->is_subagent = ServerIsSubagentShape(declared_tools, (uint32_t)num_declared);
+    g_reply_sess = sess;
 
     /* Output contract: a request with no tools whose system message
        declares the shape of the answer (lines / words / characters), and

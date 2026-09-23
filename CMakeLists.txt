@@ -176,6 +176,10 @@ if(UNIX)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_opencode_repository_stream.sh
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_opencode_repository_stream_e2e PROPERTIES SKIP_RETURN_CODE 77)
+    add_test(NAME test_opencode_subagent_e2e
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_opencode_subagent.sh
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_opencode_subagent_e2e PROPERTIES SKIP_RETURN_CODE 77)
     add_test(NAME test_repository_c_repair_e2e
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_repository_c_repair.sh
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -214,6 +218,7 @@ endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
 sllm_test(test_server_tool_calling tests/test_server_tool_calling.c)
+sllm_test(test_opencode_subagent tests/test_opencode_subagent.c)
 sllm_test(test_c_edit_ops tests/test_c_edit_ops.c)
 sllm_test(test_agent_diagnose tests/test_agent_diagnose.c)
 sllm_test(test_code_graph_polyglot tests/test_code_graph_polyglot.c)

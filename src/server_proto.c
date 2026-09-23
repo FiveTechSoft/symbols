@@ -647,11 +647,26 @@ static uint32_t WordCount(const char *s)
     return n;
 }
 
+static SERVER_TEXT_HOOK g_text_hook = NULL;
+
+void ServerSetTextHook(SERVER_TEXT_HOOK hook) { g_text_hook = hook; }
+
+static const char *ApplyTextHook(const char *content)
+{
+    static char hooked[32768 + 2048];
+    if (!g_text_hook || !content)
+        return content;
+    snprintf(hooked, sizeof(hooked), "%s", content);
+    g_text_hook(hooked, sizeof(hooked));
+    return hooked;
+}
+
 int ServerBuildResponse(const char *model, long created,
                         unsigned long seq, const char *content,
                         const char *query_for_tokens, char *out,
                         size_t size)
 {
+    content = ApplyTextHook(content);
     char esc[8192];
     uint32_t pt, ct;
     int w;
@@ -744,6 +759,7 @@ int ServerBuildStreamResponse(const char *model, long created,
                               unsigned long seq, const char *content,
                               char *out, size_t size)
 {
+    content = ApplyTextHook(content);
     char esc[8192];
     size_t pos = 0;
     int w;
@@ -4679,5 +4695,113 @@ int ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char 
             return 2;
         }
     }
+    return 1;
+}
+
+/* ------------------------------------------------ OpenCode subagent (child) */
+
+int ServerIsSubagentShape(char names[][64], uint32_t n)
+{
+    if (n == 0)
+        return 0;
+    for (uint32_t i = 0; i < n; i++)
+        if (strcmp(names[i], "task") == 0 || strcmp(names[i], "todowrite") == 0)
+            return 0;
+    return 1;
+}
+
+int ServerToolWritesFiles(const char *name)
+{
+    static const char *const w[] = { "edit", "write", "patch", "multiedit", "apply_patch" };
+    if (!name)
+        return 0;
+    for (size_t i = 0; i < sizeof(w) / sizeof(w[0]); i++)
+        if (strcmp(name, w[i]) == 0)
+            return 1;
+    return 0;
+}
+
+/* Value of a top-level string field in a flat JSON object; unescapes
+   \" \\ \/ and \n, drops other escapes. */
+static int ChildArgString(const char *json, const char *key, char *out, size_t size)
+{
+    char pat[64];
+    snprintf(pat, sizeof(pat), "\"%s\"", key);
+    const char *p = json ? strstr(json, pat) : NULL;
+    if (!p || size == 0)
+        return 0;
+    p += strlen(pat);
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p != ':')
+        return 0;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p != '"')
+        return 0;
+    p++;
+    size_t o = 0;
+    while (*p && *p != '"' && o + 1 < size) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            if (*p == 'n') out[o++] = '\n';
+            else if (*p == '"' || *p == '\\' || *p == '/') out[o++] = *p;
+            p++;
+            continue;
+        }
+        out[o++] = *p++;
+    }
+    out[o] = '\0';
+    return o > 0;
+}
+
+void ServerChildLogCall(SERVER_CHILD_LOG *log, const char *name, const char *arguments)
+{
+    if (!log || !name)
+        return;
+    if (ServerToolWritesFiles(name)) {
+        char path[260];
+        if (!ChildArgString(arguments, "filePath", path, sizeof(path)) &&
+            !ChildArgString(arguments, "path", path, sizeof(path)))
+            return;
+        for (int i = 0; i < log->nfiles; i++)
+            if (strcmp(log->files[i], path) == 0)
+                return;
+        if (log->nfiles < SERVER_CHILD_MAX_FILES) {
+            snprintf(log->files[log->nfiles], sizeof(log->files[0]), "%s", path);
+            log->nfiles++;
+        }
+    } else if (strcmp(name, "bash") == 0) {
+        log->ncommands++;
+        if (!ChildArgString(arguments, "command", log->last_command, sizeof(log->last_command)))
+            log->last_command[0] = '\0';
+    }
+}
+
+int ServerAppendSubagentResult(const SERVER_CHILD_LOG *log, int can_write, char *content, size_t size)
+{
+    if (!log || !content || size == 0)
+        return 0;
+    char block[2048];
+    size_t b = 0;
+    b += (size_t)snprintf(block + b, sizeof(block) - b, "\n\n---\nSubagent result (Symbols):\n- files changed: ");
+    if (log->nfiles == 0)
+        b += (size_t)snprintf(block + b, sizeof(block) - b, "none");
+    for (int i = 0; i < log->nfiles && b < sizeof(block); i++)
+        b += (size_t)snprintf(block + b, sizeof(block) - b, "%s%s", i ? ", " : "", log->files[i]);
+    if (b < sizeof(block)) {
+        if (log->ncommands > 0 && log->last_command[0])
+            b += (size_t)snprintf(block + b, sizeof(block) - b, "\n- commands run: %d (last: `%s`)",
+                                  log->ncommands, log->last_command);
+        else
+            b += (size_t)snprintf(block + b, sizeof(block) - b, "\n- commands run: %d", log->ncommands);
+    }
+    if (!can_write && b < sizeof(block))
+        b += (size_t)snprintf(block + b, sizeof(block) - b, "\n- read-only session: no file-writing tool was declared");
+    if (b >= sizeof(block) || strstr(content, "Subagent result (Symbols):"))
+        return 0;
+    size_t cl = strlen(content);
+    if (cl + b + 1 > size)
+        return 0;
+    memcpy(content + cl, block, b + 1);
     return 1;
 }
