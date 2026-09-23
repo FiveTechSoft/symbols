@@ -213,7 +213,7 @@ static void TqCalibrate(const TEXTLEX *tl)
     for (len = 1; len <= TQ_MAXLEN; len++) fprintf(stderr, " %.2f", g_tq.thr[len]);
     fputc('\n', stderr);
 }
-static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent)
+static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent, int majority)
 {
     float c;
     if (nw == 0)
@@ -253,7 +253,7 @@ static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_
         /* most of the question must be vocabulary the corpus knows; when
            the unknown words outnumber the known ones it is about something
            else (a lone shared word is not evidence) */
-        if (nk == 0 || 2 * nk < ncount)
+        if (nk == 0 || (majority && 2 * nk < ncount))
             return 0;
         c = TqCoverage(kw, nk, sent);
         if (getenv("SYMBOLS_TQ_DEBUG")) { fprintf(stderr, "[tq] nw=%u nk=%u c=%.2f thr=%.2f words:", nw, nk, c, g_tq.thr[nk]); for (k = 0; k < nw; k++) fprintf(stderr, " %s", words[k]); fprintf(stderr, " | %.60s\n", sent); }
@@ -261,6 +261,10 @@ static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_
            a known word that the sentence contains is then all we can ask */
         return g_tq.thr[nk] >= 1.0f ? c >= 1.0f : c > g_tq.thr[nk];
     }
+}
+static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent)
+{
+    return TextQueryCoveredEx(tl, words, nw, sent, 1);
 }
 
 
@@ -8137,7 +8141,67 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
     return st;
 }
 
+static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size);
+
+/* verificar: every path that quotes the corpus ("Segun el texto") passes the
+   same calibrated coverage test as the retrieval path.  Continuations
+   (no content word, or a single word the corpus does not know: clitic
+   follow-ups, near-spelling substitutes) keep their own logic. */
+static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
+{
+    const char *sent, *e;
+    char sbuf[2048], words[TQ_MAXLEN][CHAT_TOKEN_MAX];
+    const char *wp[TQ_MAXLEN];
+    char low[512];
+    uint32_t nw = 0, known = 0;
+    size_t i;
+    if (ch->ntfiles == 0 || ch->tlex[0].image == NULL || strncmp(out, "Segun el texto", 14) != 0)
+        return 1;
+    sent = strstr(out, ": ");
+    if (sent == NULL) return 1;
+    sent += 2;
+    e = strchr(sent, '\n');
+    i = e ? (size_t)(e - sent) : strlen(sent);
+    if (i >= sizeof(sbuf)) i = sizeof(sbuf) - 1;
+    memcpy(sbuf, sent, i); sbuf[i] = '\0';
+    for (i = 0; line[i] && i + 1 < sizeof(low); i++) low[i] = (char)tolower((unsigned char)line[i]);
+    low[i] = '\0';
+    for (const char *s = low; *s && nw < TQ_MAXLEN; )
+    {
+        char w[CHAT_TOKEN_MAX];
+        size_t l = 0;
+        const char *tr;
+        while (*s && !isalnum((unsigned char)*s)) s++;
+        while (*s && isalnum((unsigned char)*s)) { if (l + 1 < sizeof(w)) w[l++] = *s; s++; }
+        w[l] = '\0';
+        if (l < 3 || IsStopTok(w)) continue;
+        tr = DictTranslate(&ch->dict, w);
+        snprintf(words[nw], CHAT_TOKEN_MAX, "%s", (tr && tr[0]) ? tr : w);
+        wp[nw] = words[nw];
+        if (TextLexFindSymbol(ch->tgraph, words[nw]) != SYMBOL_INVALID) known++;
+        nw++;
+    }
+    if (nw == 0 || (nw == 1 && known == 0))
+        return 1;
+    /* other paths already matched the content words to the corpus their own
+       way; here only require that the quoted sentence covers the known ones
+       above chance (no majority rule: request words like "sirve" are not in
+       the corpus) */
+    return TextQueryCoveredEx(&ch->tlex[0], wp, nw, sbuf, 0);
+}
+
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
+{
+    int r = ChatHandleToBufInner(ch, line, out, size);
+    if (r && ch != NULL && line != NULL && out != NULL && !ChatQuoteVerified(ch, line, out))
+    {
+        if (getenv("SYMBOLS_TQ_DEBUG")) fprintf(stderr, "[tq] quote rejected for: %s\n", line);
+        snprintf(out, size, "No tengo constancia suficiente para responder a eso.\n");
+    }
+    return r;
+}
+
+static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size)
 {
     if (ch == NULL || line == NULL || out == NULL || size == 0)
         return 0;

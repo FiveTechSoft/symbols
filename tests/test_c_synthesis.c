@@ -334,6 +334,25 @@ static void test_c_corpus_chat_fallback(void)
     TEST_ASSERT(strstr(out, "consecuencias fisicas") == NULL,
                 "double-free is not a physical-consequence abstention");
 
+    /* Corpus-calibrated abstention: answer what the corpus covers, abstain
+       on what it does not, whatever path produced the quote. */
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "explain pointer arithmetic", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "arithmetic") != NULL, "'explain pointer arithmetic' finds the pointer-arithmetic sentence");
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "explain recursion", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "Recursion") != NULL, "'explain recursion' is answered from the corpus");
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "who won the world cup?", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "Segun el texto") == NULL, "off-corpus question abstains (world cup)");
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "explain the history of rome", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "Segun el texto") == NULL, "off-corpus question abstains (rome)");
+    memset(out, 0, sizeof(out));
+    ChatHandleToBuf(&ch, "what does free do?", out, sizeof(out));
+    TEST_ASSERT(strstr(out, "Segun el texto") == NULL || strstr(out, "free") != NULL,
+                "a quote about free must mention free");
+
     ChatDestroy(&ch);
 }
 
