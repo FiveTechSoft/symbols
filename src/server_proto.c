@@ -2573,6 +2573,316 @@ static int TokenEditClose(const char *lower, const char *name)
     return 0;
 }
 
+
+/* ------------------------------------------------------------------
+ * C inventory synthesis: build a complete program from the request's own
+ * products, stock quantities and prices. Anything the request does not
+ * state (names, prices) is filled with example values that the answer
+ * reports explicitly as assumptions.
+ * ------------------------------------------------------------------ */
+#define INV_MAX_ITEMS 16
+#define INV_NAME_MAX 64
+typedef struct { char name[INV_NAME_MAX]; int has_name; int stock; int has_stock; double price; int has_price; } InvItem;
+typedef struct { InvItem items[INV_MAX_ITEMS]; int n; int english; char field[32]; } InvSpec;
+
+static void InvFold(const char *in, char *out, size_t size)
+{
+    size_t i = 0, o = 0;
+    if (!out || size == 0) return;
+    while (in && in[i] && o + 1 < size)
+    {
+        unsigned char c = (unsigned char)in[i];
+        if (c == 0xC3 && in[i + 1])
+        {
+            unsigned char d = (unsigned char)in[i + 1] | 0x20;
+            char r = '?';
+            if (d >= 0xA0 && d <= 0xA5) r = 'a';
+            else if (d == 0xA7) r = 'c';
+            else if (d >= 0xA8 && d <= 0xAB) r = 'e';
+            else if (d >= 0xAC && d <= 0xAF) r = 'i';
+            else if (d == 0xB1) r = 'n';
+            else if (d >= 0xB2 && d <= 0xB6) r = 'o';
+            else if (d >= 0xB9 && d <= 0xBC) r = 'u';
+            out[o++] = r; i += 2;
+        }
+        else if (c == 0xE2 && (unsigned char)in[i + 1] == 0x82 && (unsigned char)in[i + 2] == 0xAC)
+        { if (o + 6 < size) { memcpy(out + o, " euro ", 6); o += 6; } i += 3; }
+        else if (c == 0xC2 && in[i + 1]) { i += 2; out[o++] = ' '; }
+        else { out[o++] = (char)tolower(c); i++; }
+    }
+    out[o] = '\0';
+}
+
+/* ---------------- tokenizer ---------------- */
+#define TOK_MAX 256
+typedef struct { char w[INV_NAME_MAX]; int is_num; double num; int has_dot; } Tok;
+
+static int Tokenize(const char *folded, Tok *t, int max)
+{
+    int n = 0; const char *p = folded;
+    while (*p && n < max)
+    {
+        if (isdigit((unsigned char)*p))
+        {
+            char buf[32]; int k = 0, dot = 0;
+            while ((isdigit((unsigned char)*p) || ((*p == '.' || *p == ',') && isdigit((unsigned char)p[1]) && !dot)) && k < 30)
+            { if (*p == '.' || *p == ',') { dot = 1; buf[k++] = '.'; } else buf[k++] = *p; p++; }
+            buf[k] = '\0';
+            snprintf(t[n].w, sizeof(t[n].w), "%s", buf);
+            t[n].is_num = 1; t[n].num = atof(buf); t[n].has_dot = dot; n++;
+        }
+        else if (isalpha((unsigned char)*p) || *p == '_')
+        {
+            int k = 0;
+            while ((isalnum((unsigned char)*p) || *p == '_') && k < INV_NAME_MAX - 1) t[n].w[k++] = *p++;
+            while (isalnum((unsigned char)*p) || *p == '_') p++;
+            t[n].w[k] = '\0'; t[n].is_num = 0; t[n].num = 0; t[n].has_dot = 0; n++;
+        }
+        else if (*p == '$') { snprintf(t[n].w, sizeof(t[n].w), "dollar"); t[n].is_num = 0; n++; p++; }
+        else if (*p == '.' || *p == ';' || *p == ':' || *p == ',' || *p == '(' || *p == ')')
+        { t[n].w[0] = *p; t[n].w[1] = '\0'; t[n].is_num = 0; n++; p++; }
+        else p++;
+    }
+    return n;
+}
+
+static int In(const char *w, const char *const *list)
+{
+    for (; *list; list++) if (strcmp(w, *list) == 0) return 1;
+    return 0;
+}
+
+static const char *const STOP[] = {
+    "el","la","los","las","un","una","unos","unas","de","del","para","por","con","y","e","o","a","al",
+    "en","que","cada","su","sus","the","a","an","of","for","with","and","or","to","in","each","its",
+    "stock","existencias","unidades","unidad","cantidad","cantidades","units","unit","quantity","quantities",
+    "qty","precio","precios","price","prices","cuesta","cuestan","costs","cost","euro","euros","eur","dollar",
+    "dollars","dolares","dolar","usd","valor","total","value","inventario","inventory","producto","productos",
+    "product","products","articulo","articulos","item","items","programa","program","c","muestre","muestra",
+    "mostrar","show","shows","print","imprime","calcule","calcula","calculate","dos","tres","two","three",
+    "otro","otra","another","other","primero","segundo","first","second","respectivamente","respectively",
+    "stocks","has","tiene","tienen","hay","is","are","es","son","at","se","lo","le","como","as","", NULL };
+static const char *const STOCKW[] = {"stock","stocks","existencias","unidades","unidad","cantidad","cantidades",
+    "units","unit","quantity","quantities","qty","uds","ud","piezas","pieces", NULL};
+static const char *const PRICEW[] = {"precio","precios","price","prices","cuesta","cuestan","costs","cost",
+    "vale","valen","priced", NULL};
+static const char *const CURW[] = {"euro","euros","eur","dollar","dollars","dolares","dolar","usd", NULL};
+static const char *const LINKW[] = {"para","for","de","of","del", NULL};
+static const char *const ARTW[] = {"el","la","los","las","the","un","una","a","an", NULL};
+
+static int IsNameWord(const Tok *t)
+{
+    return !t->is_num && isalpha((unsigned char)t->w[0]) && strlen(t->w) >= 3 && !In(t->w, STOP);
+}
+
+static int FindItem(InvSpec *s, const char *name)
+{
+    for (int i = 0; i < s->n; i++) if (s->items[i].has_name && strcmp(s->items[i].name, name) == 0) return i;
+    return -1;
+}
+
+/* Name that a number refers to: "4 para el teclado", "4 unidades de teclado",
+   "teclado: 4", "teclado con stock 4", "teclado a 20 euros". */
+static int NameForward(const Tok *t, int n, int i, char *out)
+{
+    int j = i + 1, hops = 0;
+    while (j < n && hops < 3 && (In(t[j].w, STOCKW) || In(t[j].w, CURW))) { j++; hops++; }
+    if (j < n && In(t[j].w, LINKW)) { j++; if (j < n && In(t[j].w, ARTW)) j++; if (j < n && IsNameWord(&t[j])) { snprintf(out, INV_NAME_MAX, "%s", t[j].w); return 1; } }
+    return 0;
+}
+static int NameBackward(const Tok *t, int i, char *out)
+{
+    int j = i - 1, hops = 0;
+    while (j >= 0 && hops < 4 && !t[j].is_num && (In(t[j].w, STOCKW) || In(t[j].w, PRICEW) || strcmp(t[j].w, ":") == 0 ||
+           strcmp(t[j].w, "con") == 0 || strcmp(t[j].w, "with") == 0 || strcmp(t[j].w, "a") == 0 || strcmp(t[j].w, "at") == 0 ||
+           strcmp(t[j].w, "de") == 0 || strcmp(t[j].w, "dollar") == 0 || strcmp(t[j].w, "=") == 0 || strcmp(t[j].w, "tiene") == 0 || strcmp(t[j].w, "has") == 0))
+    { j--; hops++; }
+    if (hops > 0 && j >= 0 && IsNameWord(&t[j])) { snprintf(out, INV_NAME_MAX, "%s", t[j].w); return 1; }
+    return 0;
+}
+
+static int InvParseSpec(const char *text, InvSpec *spec)
+{
+    static char folded[4096]; static Tok t[TOK_MAX];
+    int n, stock_ctx = 0, price_ctx = 0;
+    InvItem stocks[INV_MAX_ITEMS], prices[INV_MAX_ITEMS]; int ns = 0, np = 0;
+    if (!text || !spec) return 0;
+    memset(spec, 0, sizeof(*spec));
+    InvFold(text, folded, sizeof(folded));
+    spec->english = strstr(folded, " the ") || strstr(folded, "write ") || strstr(folded, "inventory") || strstr(folded, "program in");
+    snprintf(spec->field, sizeof(spec->field), "stock");
+    n = Tokenize(folded, t, TOK_MAX);
+    memset(stocks, 0, sizeof(stocks)); memset(prices, 0, sizeof(prices));
+    for (int i = 0; i < n; i++)
+    {
+        if (!t[i].is_num)
+        {
+            if (In(t[i].w, STOCKW)) { stock_ctx = 1; price_ctx = 0; }
+            else if (In(t[i].w, PRICEW)) { price_ctx = 1; stock_ctx = 0; }
+            else if (strcmp(t[i].w, ".") == 0 || strcmp(t[i].w, ";") == 0) stock_ctx = price_ctx = 0;
+            continue;
+        }
+        /* skip "en C11", "c99" style and version-like tokens */
+        if (i > 0 && (strcmp(t[i-1].w, "c") == 0 && !t[i].has_dot && (t[i].num == 11 || t[i].num == 99 || t[i].num == 89 || t[i].num == 17 || t[i].num == 23))) continue;
+        int is_price = 0, is_stock = 0;
+        int nxt_cur = (i + 1 < n && In(t[i+1].w, CURW));
+        int prv_cur = (i > 0 && strcmp(t[i-1].w, "dollar") == 0);
+        int nxt_stock = (i + 1 < n && In(t[i+1].w, STOCKW));
+        if (nxt_cur || prv_cur || (price_ctx && !nxt_stock) || t[i].has_dot) is_price = 1;
+        else if (nxt_stock || stock_ctx) is_stock = 1;
+        if (!is_price && !is_stock) continue;
+        InvItem it; memset(&it, 0, sizeof(it));
+        char nm[INV_NAME_MAX];
+        if (NameForward(t, n, i, nm) || NameBackward(t, i, nm)) { snprintf(it.name, sizeof(it.name), "%s", nm); it.has_name = 1; }
+        if (is_price && np < INV_MAX_ITEMS) { it.price = t[i].num; it.has_price = 1; prices[np++] = it; }
+        if (is_stock && ns < INV_MAX_ITEMS && t[i].num >= 0 && t[i].num < 1000000 && !t[i].has_dot) { it.stock = (int)t[i].num; it.has_stock = 1; stocks[ns++] = it; }
+    }
+    /* merge stocks (defines products) */
+    for (int i = 0; i < ns && spec->n < INV_MAX_ITEMS; i++)
+    {
+        int k = stocks[i].has_name ? FindItem(spec, stocks[i].name) : -1;
+        if (k < 0) { k = spec->n++; spec->items[k] = stocks[i]; }
+        else { spec->items[k].stock = stocks[i].stock; spec->items[k].has_stock = 1; }
+    }
+    /* prices: by name, else positional to products without price */
+    for (int i = 0; i < np; i++)
+    {
+        int k = prices[i].has_name ? FindItem(spec, prices[i].name) : -1;
+        if (k < 0 && prices[i].has_name && spec->n < INV_MAX_ITEMS)
+        { k = spec->n++; spec->items[k] = prices[i]; continue; }
+        if (k < 0) for (int j = 0; j < spec->n; j++) if (!spec->items[j].has_price) { k = j; break; }
+        if (k < 0) continue;
+        spec->items[k].price = prices[i].price; spec->items[k].has_price = 1;
+    }
+    return spec->n;
+}
+
+static int InvCompleteSpec(InvSpec *spec)
+{
+    int mask = 0;
+    if (!spec) return 0;
+    if (spec->n == 0)
+    {
+        spec->n = 2; mask |= 4;
+        spec->items[0].stock = 4; spec->items[1].stock = 10;
+        spec->items[0].has_stock = spec->items[1].has_stock = 1;
+    }
+    for (int i = 0; i < spec->n; i++)
+    {
+        InvItem *it = &spec->items[i];
+        if (!it->has_name)
+        {
+            snprintf(it->name, sizeof(it->name), spec->english ? "Product %c" : "Producto %c", 'A' + i);
+            it->has_name = 1; mask |= 1;
+        }
+        if (!it->has_stock) { it->stock = 0; it->has_stock = 1; mask |= 4; }
+        if (!it->has_price) { it->price = 10.0 * (i + 1); it->has_price = 1; mask |= 2; }
+    }
+    return mask;
+}
+
+static void CEscapeName(const char *in, char *out, size_t size)
+{
+    size_t o = 0;
+    for (; *in && o + 2 < size; in++)
+    { if (*in == '"' || *in == '\\') out[o++] = '\\'; out[o++] = *in; }
+    out[o] = '\0';
+}
+
+static int InvGenerateSource(const InvSpec *s, char *out, size_t size)
+{
+    size_t o = 0; int w = 0;
+    if (!s || !out || s->n <= 0) return 0;
+    const char *hdr_name = s->english ? "name" : "nombre";
+    const char *hdr_price = s->english ? "price" : "precio";
+    const char *label_total = s->english ? "Total inventory value" : "Valor total del inventario";
+#define EMIT(...) do { w = snprintf(out + o, size - o, __VA_ARGS__); if (w < 0 || (size_t)w >= size - o) return 0; o += (size_t)w; } while (0)
+    EMIT("#include <stdio.h>\n\n");
+    EMIT("typedef struct\n{\n    const char *%s;\n    double %s;\n    int stock;\n} %s;\n\n", hdr_name, hdr_price, s->english ? "Product" : "Producto");
+    EMIT("static double %s(const %s *p)\n{\n    return p->%s * p->stock;\n}\n\n",
+         s->english ? "item_value" : "valor_producto", s->english ? "Product" : "Producto", hdr_price);
+    EMIT("static double %s(const %s *items, size_t n)\n{\n    double total = 0.0;\n    for (size_t i = 0; i < n; i++)\n        total += %s(&items[i]);\n    return total;\n}\n\n",
+         s->english ? "inventory_value" : "valor_total_inventario", s->english ? "Product" : "Producto", s->english ? "item_value" : "valor_producto");
+    EMIT("int main(void)\n{\n    const %s inventario[] = {\n", s->english ? "Product" : "Producto");
+    for (int i = 0; i < s->n; i++)
+    {
+        char esc[2 * INV_NAME_MAX];
+        CEscapeName(s->items[i].name, esc, sizeof(esc));
+        EMIT("        {\"%s\", %.2f, %d},\n", esc, s->items[i].price, s->items[i].stock);
+    }
+    EMIT("    };\n    const size_t n = sizeof inventario / sizeof inventario[0];\n\n");
+    EMIT("    printf(\"%%-20s %%8s %%6s %%10s\\n\", \"%s\", \"%s\", \"stock\", \"%s\");\n",
+         s->english ? "Product" : "Producto", s->english ? "Price" : "Precio", s->english ? "Value" : "Valor");
+    EMIT("    for (size_t i = 0; i < n; i++)\n        printf(\"%%-20s %%8.2f %%6d %%10.2f\\n\", inventario[i].%s, inventario[i].%s,\n               inventario[i].stock, %s(&inventario[i]));\n",
+         hdr_name, hdr_price, s->english ? "item_value" : "valor_producto");
+    EMIT("    printf(\"%s: %%.2f\\n\", %s(inventario, n));\n    return 0;\n}\n",
+         label_total, s->english ? "inventory_value" : "valor_total_inventario");
+#undef EMIT
+    return 1;
+}
+
+static int InvExpectedOutput(const InvSpec *s, char *out, size_t size)
+{
+    size_t o = 0; double total = 0; int w;
+    if (!s || !out || size == 0) return 0;
+    w = snprintf(out, size, "%-20s %8s %6s %10s\n", s->english ? "Product" : "Producto", s->english ? "Price" : "Precio", "stock", s->english ? "Value" : "Valor");
+    if (w < 0 || (size_t)w >= size) return 0;
+    o = (size_t)w;
+    for (int i = 0; i < s->n; i++)
+    {
+        double v = s->items[i].price * s->items[i].stock; total += v;
+        w = snprintf(out + o, size - o, "%-20s %8.2f %6d %10.2f\n", s->items[i].name, s->items[i].price, s->items[i].stock, v);
+        if (w < 0 || (size_t)w >= size - o) return 0;
+        o += (size_t)w;
+    }
+    w = snprintf(out + o, size - o, "%s: %.2f\n", s->english ? "Total inventory value" : "Valor total del inventario", total);
+    return w > 0 && (size_t)w < size - o;
+}
+
+
+static int InvIsInventoryRequest(const char *text)
+{
+    char f[2048];
+    InvFold(text ? text : "", f, sizeof(f));
+    int topic = strstr(f, "inventario") || strstr(f, "inventory") || strstr(f, "existencias") ||
+                strstr(f, "almacen") || strstr(f, "warehouse") ||
+                ((strstr(f, "stock") != NULL) && (strstr(f, "producto") || strstr(f, "product") || strstr(f, "articulo") || strstr(f, "item")));
+    if (!topic) return 0;
+    int value = strstr(f, "valor") || strstr(f, "value") || strstr(f, "total") || strstr(f, "precio") ||
+                strstr(f, "price") || strstr(f, "stock") || strstr(f, "existencias") || strstr(f, "muestr") ||
+                strstr(f, "lista") || strstr(f, "list") || strstr(f, "show");
+    return value;
+}
+
+static int InvSynthesizeProgram(const char *query, char *out, size_t size)
+{
+    InvSpec s; static char src[8192], expect[2048]; char assumed[512] = ""; int mask; size_t o;
+    if (!query || !out || size == 0) return 0;
+    InvParseSpec(query, &s);
+    mask = InvCompleteSpec(&s);
+    if (!InvGenerateSource(&s, src, sizeof(src)) || !InvExpectedOutput(&s, expect, sizeof(expect))) return 0;
+    if (s.english)
+    {
+        if (mask & 1) strcat(assumed, "- Product names were not given; I used placeholder names.\n");
+        if (mask & 2) strcat(assumed, "- Prices were not given; I used example prices (change them in the `inventario` array).\n");
+        if (mask & 4) strcat(assumed, "- Some stock quantities were not given; I used example values.\n");
+    }
+    else
+    {
+        if (mask & 1) strcat(assumed, "- No indicaste nombres de producto; he usado nombres de ejemplo.\n");
+        if (mask & 2) strcat(assumed, "- No indicaste precios; he usado precios de ejemplo (cámbialos en el array `inventario`).\n");
+        if (mask & 4) strcat(assumed, "- Faltaba alguna cantidad de stock; he usado valores de ejemplo.\n");
+    }
+    o = (size_t)snprintf(out, size, s.english
+            ? "Inventory program in C (C11): %d products, each with price and stock; it lists every product and the total value (price x stock).\n\n```c\n%s```\n\nCompile and run:\n\n```\ngcc -std=c11 -Wall -Wextra inventario.c -o inventario && ./inventario\n```\n\nExpected output:\n\n```\n%s```\n"
+            : "Programa de inventario en C (C11): %d productos con precio y stock; muestra cada producto y el valor total (precio x stock).\n\n```c\n%s```\n\nCompilar y ejecutar:\n\n```\ngcc -std=c11 -Wall -Wextra inventario.c -o inventario && ./inventario\n```\n\nSalida esperada:\n\n```\n%s```\n",
+            s.n, src, expect);
+    if (o >= size) return 0;
+    if (assumed[0])
+        snprintf(out + o, size - o, "\n%s\n%s", s.english ? "Assumptions:" : "Supuestos:", assumed);
+    return 1;
+}
+
 void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
 {
     char lower[1024];
@@ -2586,6 +2896,11 @@ void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
         i++;
     }
     lower[i] = '\0';
+
+    /* Inventory/stock programs come from the request, not the generic stub.
+       Checked first so words like "lista" do not select another template. */
+    if (InvIsInventoryRequest(query) && InvSynthesizeProgram(query, out, out_sz))
+        return;
 
     if (MatchWordBoundary(lower, "fibonacci") ||
         MatchWordBoundary(lower, "fibinacci") ||
