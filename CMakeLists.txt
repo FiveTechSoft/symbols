@@ -56,6 +56,7 @@ add_library(symbolic STATIC
     src/qa_layer.c
     src/dict.c
     src/server_proto.c
+    src/c_edit_ops.c
     src/text_lex.c
     src/meta_graph.c
     src/vsa.c
