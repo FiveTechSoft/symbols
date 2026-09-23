@@ -1,0 +1,1 @@
+Replace the magic number 42 with a named constant MAX_ITEMS. The program must still print 42. Forbidden: the bare token 42 must not appear in main.c except inside the constant definition line if you keep the value there as MAX_ITEMS.

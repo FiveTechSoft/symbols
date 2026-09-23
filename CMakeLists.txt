@@ -204,6 +204,10 @@ if(Python3_Interpreter_FOUND)
                 test_agent_runner_learning
         COMMENT "Agent-runner task bank report (JSONL)"
         VERBATIM)
+    # Engineering bank self-test: every check.py fails on before/ and passes on after/.
+    add_test(NAME test_engineering_bank
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/test_engineering_bank.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)

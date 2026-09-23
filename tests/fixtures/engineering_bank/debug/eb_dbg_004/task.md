@@ -1,0 +1,1 @@
+Operator bug: clamp_upper must return hi when v > hi, but uses < . Fix the comparison so max is applied. Content: must contain 'v > hi' in the true branch sense — require util.c contains 'if (v > hi) return hi;'

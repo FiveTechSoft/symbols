@@ -1,0 +1,1 @@
+Split process() out of main.c into process.c with a prototype in process.h; main.c must include process.h and call process(). Forbidden: 'static int process' remaining only as a static in main without a separate file — require process.c and process.h to exist.
