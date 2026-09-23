@@ -374,6 +374,60 @@ int CeoIsAddFieldAndTotalRequest(const char *issue)
     return pairs >= 2 && total;
 }
 
+/* The request's name for the new field, read from its structure instead
+   of a word list: (1) a word that is not an observed initializer key and
+   sits directly before a quantity ("con stock 4"), else (2) the first word
+   before the first quantity that is neither an observed key, member, nor
+   struct name: the one introducing the list ("Quiero anadir stock:
+   teclado 4"), else the first after the leading verb ("Agrega existencias
+   a cada producto: teclado 4").  0 when the request never names it. */
+static int FieldIsObserved(const char *w, const void *mv, const void *sv)
+{
+    const Model *M = (const Model *)mv; const Struct *S = (const Struct *)sv;
+    size_t n = strlen(w);
+    for (int g = 0; g < M->ngrp; g++)
+    {
+        char k[64]; Fold(M->grp[g].key, k, sizeof(k));
+        size_t m = strlen(k), c = m < n ? m : n;
+        if (m && (strcmp(k, w) == 0 || (c >= 4 && strncmp(k, w, c) == 0 && (m > n ? m - n : n - m) <= 2))) return 1;
+    }
+    for (int k = 0; k < S->nmem; k++) if (strcasecmp(S->mem[k].name, w) == 0) return 1;
+    {
+        char a[64], b[64]; Fold(S->tag, a, sizeof(a)); Fold(S->tdef, b, sizeof(b));
+        if ((a[0] && strncmp(a, w, strlen(a)) == 0) || (b[0] && strncmp(b, w, strlen(b)) == 0)) return 1;
+    }
+    return 0;
+}
+static int FieldFromRequest(const char *fi, const void *M, const void *S, char *out, size_t size)
+{
+    char w[48], first[48] = "", head[48] = ""; size_t i = 0; int tok = 0, seen_num = 0;
+    /* (1) word right before a quantity */
+    while (fi[i])
+    {
+        size_t n = 0;
+        while (fi[i] && !isalnum((unsigned char)fi[i])) i++;
+        size_t st = i;
+        while (fi[i] && isalnum((unsigned char)fi[i])) { if (n + 1 < sizeof(w)) w[n++] = (char)tolower((unsigned char)fi[i]); i++; }
+        w[n] = '\0';
+        if (n == 0) break;
+        if (isdigit((unsigned char)fi[st])) { seen_num = 1; continue; }
+        if (tok > 0 && n >= 3 && fi[i] == ' ' && isdigit((unsigned char)fi[i + 1]) && !FieldIsObserved(w, M, S))
+        { snprintf(out, size, "%s", w); return 1; }
+        /* (2) candidates before any quantity: the word that introduces the
+           list (directly followed by ':' or '(') wins; else the first word
+           after the leading verb */
+        if (tok++ > 0 && !seen_num && n >= 4 && !FieldIsObserved(w, M, S))
+        {
+            size_t j = i; while (fi[j] == ' ') j++;
+            if (!head[0] && (fi[j] == ':' || fi[j] == '(')) snprintf(head, sizeof(head), "%s", w);
+            if (!first[0]) snprintf(first, sizeof(first), "%s", w);
+        }
+    }
+    if (head[0]) { snprintf(out, size, "%s", head); return 1; }
+    if (first[0]) { snprintf(out, size, "%s", first); return 1; }
+    return 0;
+}
+
 static int AddEdit(Model *M, int f, size_t pos, size_t del, const char *ins)
 {
     if (M->ned >= CEO_MAX_EDITS) return 0;
@@ -443,9 +497,9 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
     static Model M; char fi[4096];
     if (!P) return 0;
     memset(P, 0, sizeof(*P));
-    if (!issue || !paths || !srcs || nfiles <= 0) ABSTAIN("no observed sources");
+    if (!issue || !paths || !srcs || nfiles <= 0) ABSTAIN("no hay archivos observados");
     memset(&M, 0, sizeof(M)); M.paths = paths; M.srcs = srcs; M.n = nfiles > CEO_MAX_FILES ? CEO_MAX_FILES : nfiles;
-    for (int f = 0; f < M.n; f++) { if (strlen(srcs[f]) >= CEO_SRC_MAX) ABSTAIN("%s is too large to plan safely", paths[f]); Mask(srcs[f], M.mask[f]); }
+    for (int f = 0; f < M.n; f++) { if (strlen(srcs[f]) >= CEO_SRC_MAX) ABSTAIN("%s es demasiado grande para planificar con seguridad", paths[f]); Mask(srcs[f], M.mask[f]); }
     Fold(issue, fi, sizeof(fi));
     FindStructs(&M); FindCollectionsAndGroups(&M); FindMain(&M);
 
@@ -476,7 +530,7 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         for (int g = 0; g < M.ngrp; g++) if (M.grp[g].st == s && M.grp[g].key[0] && QuantityForKey(fi, M.grp[g].key, &v)) hits++;
         if (hits > best_hits) { best_hits = hits; si = s; }
     }
-    if (si < 0) ABSTAIN("no observed struct initializer is named in the request (found %d structs, %d initializers)", M.nst, M.ngrp);
+    if (si < 0) ABSTAIN("la petición no nombra ningún inicializador de struct observado (vistos %d structs, %d inicializadores)", M.nst, M.ngrp);
     Struct *S = &M.st[si];
     snprintf(P->struct_name, sizeof(P->struct_name), "%s", S->tdef[0] ? S->tdef : S->tag);
 
@@ -490,13 +544,14 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         char names[160] = "";
         for (int k = 0; k < S->nmem; k++) if (S->mem[k].is_float)
         { size_t l = strlen(names); snprintf(names + l, sizeof(names) - l, "%s%s", l ? ", " : "", S->mem[k].name); }
-        ABSTAIN("struct %s has several numeric members (%s); which one multiplies the %s is ambiguous", S->tdef[0] ? S->tdef : S->tag, names, "new field");
+        ABSTAIN("el struct %s tiene varios miembros numéricos (%s); no está claro cuál multiplica el %s", S->tdef[0] ? S->tdef : S->tag, names, "campo nuevo");
     }
-    if (vm < 0) ABSTAIN("struct %s has no unambiguous numeric value member to multiply", P->struct_name);
+    if (vm < 0) ABSTAIN("el struct %s no tiene un miembro numérico de valor inequívoco que multiplicar", P->struct_name);
 
     /* field name: request word, else stock; refuse if it exists */
-    snprintf(P->field, sizeof(P->field), "%s", strstr(fi, "stock") ? "stock" : strstr(fi, "cantidad") ? "cantidad" : strstr(fi, "quantity") ? "quantity" : strstr(fi, "existencias") ? "existencias" : "stock");
-    for (int k = 0; k < S->nmem; k++) if (strcmp(S->mem[k].name, P->field) == 0) ABSTAIN("struct %s already has a member named %s", P->struct_name, P->field);
+    if (!FieldFromRequest(fi, &M, S, P->field, sizeof(P->field)))
+        ABSTAIN("la petición da cantidades para el struct %s pero no nombra el campo nuevo; ¿cómo quieres que se llame?", P->struct_name);
+    for (int k = 0; k < S->nmem; k++) if (strcmp(S->mem[k].name, P->field) == 0) ABSTAIN("el struct %s ya tiene un miembro llamado %s", P->struct_name, P->field);
 
     /* operator 1: add the field */
     {
@@ -552,18 +607,18 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         size_t p = G->open + 1; int k = 0, d = 0;
         for (; p < G->close && k < vm; p++) { if (m[p] == '{' || m[p] == '(') d++; else if (m[p] == '}' || m[p] == ')') d--; else if (m[p] == ',' && d == 0) k++; }
         char *endp; double price = strtod(srcs[G->file] + SkipWs(m, p), &endp);
-        if (endp == srcs[G->file] + SkipWs(m, p)) ABSTAIN("cannot read the %s value of %s from the observed initializer", S->mem[vm].name, G->key);
+        if (endp == srcs[G->file] + SkipWs(m, p)) ABSTAIN("no puedo leer el valor %s de %s en el inicializador observado", S->mem[vm].name, G->key);
         P->expected_total += price * v; P->nitems++; ngroups++;
     }
-    if (missing[0]) ABSTAIN("the request gives no %s for: %s", P->field, missing);
-    if (ngroups == 0) ABSTAIN("no initializers of %s to update", P->struct_name);
+    if (missing[0]) ABSTAIN("la petición no da %s para: %s", P->field, missing);
+    if (ngroups == 0) ABSTAIN("no hay inicializadores de %s que actualizar", P->struct_name);
 
     /* operator 2: aggregation over the collection */
     int ci = -1;
-    for (int c = 0; c < M.ncoll; c++) if (M.coll[c].st == si) { if (ci >= 0) ABSTAIN("more than one collection of %s; which one is the inventory is ambiguous", P->struct_name); ci = c; }
-    if (ci < 0) ABSTAIN("no array of %s was observed to aggregate over", P->struct_name);
+    for (int c = 0; c < M.ncoll; c++) if (M.coll[c].st == si) { if (ci >= 0) ABSTAIN("hay más de una colección de %s; no está claro cuál es el inventario", P->struct_name); ci = c; }
+    if (ci < 0) ABSTAIN("no he visto ningún array de %s sobre el que sumar", P->struct_name);
     Coll *C = &M.coll[ci];
-    if (!C->counter[0]) ABSTAIN("cannot determine how many elements %s holds", C->ident);
+    if (!C->counter[0]) ABSTAIN("no puedo determinar cuántos elementos tiene %s", C->ident);
     /* name the aggregate after the observed naming convention of the file
        that owns the collection: the shared prefix of its functions
        (inventario_agregar/inventario_mostrar -> inventario_total), else the
@@ -588,7 +643,7 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         }
         if (nf > 0 && pre[0]) snprintf(P->total_func, sizeof(P->total_func), "%stotal", pre);
         else snprintf(P->total_func, sizeof(P->total_func), "%s_total", C->ident);
-        for (int f = 0; f < M.n; f++) { char pat[80]; snprintf(pat, sizeof(pat), "%s(", P->total_func); if (strstr(M.mask[f], pat)) ABSTAIN("%s already exists", P->total_func); }
+        for (int f = 0; f < M.n; f++) { char pat[80]; snprintf(pat, sizeof(pat), "%s(", P->total_func); if (strstr(M.mask[f], pat)) ABSTAIN("%s ya existe", P->total_func); }
     }
     {
         char fn[640];
@@ -599,7 +654,7 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         AddEdit(&M, C->file, end, 0, fn);
     }
     /* prototype visible to main */
-    if (M.main_file < 0) ABSTAIN("no main() observed to show the total");
+    if (M.main_file < 0) ABSTAIN("no he visto ningún main() donde mostrar el total");
     char proto[128]; snprintf(proto, sizeof(proto), "double %s(void);\n", P->total_func);
     if (M.main_file != C->file)
     {
@@ -651,7 +706,7 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         if (!strstr(ms, "<stdio.h>"))
         { const char *inc = strstr(ms, "#include"); AddEdit(&M, M.main_file, inc ? (size_t)(inc - ms) : 0, 0, "#include <stdio.h>\n"); }
     }
-    if (!BuildHunks(&M, P)) ABSTAIN("could not express the edits as unique, non-overlapping hunks");
+    if (!BuildHunks(&M, P)) ABSTAIN("no he podido expresar los cambios como bloques únicos y sin solapes");
     snprintf(P->summary, sizeof(P->summary),
              "%s: campo `int %s` añadido y propagado a %d inicializadores; `%s()` suma %s[i].%s * %s sobre %s (%s); main lo imprime. Total esperado %.2f.",
              P->struct_name, P->field, ngroups, P->total_func, C->ident, S->mem[vm].name, P->field, C->ident, C->counter, P->expected_total);

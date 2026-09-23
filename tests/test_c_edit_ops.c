@@ -148,12 +148,20 @@ int main(void)
 {
     const char *c4 = "Añade un campo stock al producto, con stock 4 para el teclado, 10 para el ratón y 2 para el monitor, y una función que devuelva el valor total del inventario (precio multiplicado por stock de cada producto). Actualiza el main para que muestre ese total.";
     Expect("ext1/case4", c4, ext1_paths, ext1_srcs, 3, 585.0, "inventario_total");
+    CHECK(strcmp(P.field, "stock") == 0, "ext1/case4: field is the word before a quantity");
     Expect("ext1/name-first", "Agrega existencias a cada producto: teclado 4, ratón 10 y monitor 2. Quiero ver también el valor total del inventario.", ext1_paths, ext1_srcs, 3, 585.0, "existencias");
+    CHECK(strcmp(P.field, "existencias") == 0, "ext1/name-first: field is the object of the verb");
+    Expect("ext1/modal-verb", "Quiero añadir stock: teclado 4, ratón 10 y monitor 2. Quiero ver también el valor total del inventario.", ext1_paths, ext1_srcs, 3, 585.0, "stock");
+    CHECK(strcmp(P.field, "stock") == 0, "ext1/modal-verb: the word introducing the list wins over the verb");
     Expect("ext2/english", "Add a quantity in stock to each item (keyboard 4, mouse 10, monitor 2) and show the total inventory value.", ext2_paths, ext2_srcs, 3, 643.0, "{\"mouse\", 12.5f, 10}");
     Expect("ext2/order-fallback", c4, ext2_paths, ext2_srcs, 3, 643.0, "store_total");
     CHECK(P.order_assumed == 1, "ext2/order-fallback: assumption flagged");
     Expect("l1/single-file-typedef", "Add stock: bolt 100, nut 250, and print the total inventory value.", l1_paths, l1_srcs, 1, 50.0, "double parts_total(void);");
-    Expect("l2/one-line-main", "hay 10 manzanas, 4 peras, 20 kiwis y 1 uva; quiero el valor total del inventario", l2_paths, l2_srcs, 3, 16.0, "listar(); printf(");
+    Expect("l1/unlisted-field-name", "Add reserve: bolt 100, nut 250, and print the total inventory value.", l1_paths, l1_srcs, 1, 50.0, "int reserve;");
+    CHECK(strcmp(P.field, "reserve") == 0, "l1: field name read from the request, not from a word list");
+    Abstain("l2/unnamed-field-asks", "hay 10 manzanas, 4 peras, 20 kiwis y 1 uva; quiero el valor total del inventario", l2_paths, l2_srcs, 3);
+    CHECK(strstr(P.reason, "no nombra el campo nuevo") != NULL, "l2: asks for the field name instead of assuming one");
+    Expect("l2/one-line-main", "anota unidades: 10 manzanas, 4 peras, 20 kiwis y 1 uva; quiero el valor total del inventario", l2_paths, l2_srcs, 3, 16.0, "listar(); printf(");
     CHECK(strcmp(P.total_func, "cesta_total") == 0, "l2: name from collection when no shared prefix");
     Abstain("ext2/missing-values", "Añade existencias: teclado 4 y ratón 10, y muestra el valor total del inventario.", ext2_paths, ext2_srcs, 3);
     Abstain("l2/count-mismatch", "Añade unidades: manzana 10, pera 4 y muestra el valor total.", l2_paths, l2_srcs, 3);

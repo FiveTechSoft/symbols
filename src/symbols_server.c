@@ -1395,7 +1395,12 @@ static void HandleCompletions(socket_t s, const char *body,
             if (!CeoPlanAddFieldAndTotal(sess->current_issue, paths, srcs, n, &sess->ceo_plan))
             {
                 sess->agent_active = 0; sess->workspace_phase = 0;
-                snprintf(content, sizeof(content), "He leído %d archivos del workspace, pero me abstengo: %s. No he modificado archivos.", n, sess->ceo_plan.reason);
+                {
+                    size_t rl = strlen(sess->ceo_plan.reason);
+                    char last = rl ? sess->ceo_plan.reason[rl - 1] : '.';
+                    snprintf(content, sizeof(content), "He leído %d archivos del workspace, pero me abstengo: %s%s No he modificado archivos.",
+                             n, sess->ceo_plan.reason, (last == '?' || last == '.' || last == '!') ? "" : ".");
+                }
                 SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
                 return;
             }

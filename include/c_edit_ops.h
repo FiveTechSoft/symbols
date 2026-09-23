@@ -39,7 +39,7 @@ typedef struct
     int     order_assumed;            /* values mapped by request order (names not found) */
     int     nitems;
     char    summary[768];
-    char    reason[512];              /* set when planning abstains */
+    char    reason[512];              /* set when planning abstains (Spanish, matches the server wrapper) */
 } CeoPlan;
 
 /* Request asks to add a per-item quantity and an aggregate total. */
