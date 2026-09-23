@@ -24,7 +24,9 @@ collect phase-1 traces for the inducer.
 
 Output: TSV on stdout (and --out): id, source, file, primitive, from, to,
 line, caught, repaired, exact (the
-repaired file equals the original byte for byte).  Summary line on stderr: MUTATION_CORPUS ...
+repaired file equals the original byte for byte), pattern (the phase-4
+induction pattern of the kept edit, read from the agent's trace), induced
+(1 when that pattern was a promoted operator in the loaded table).  Summary line on stderr: MUTATION_CORPUS ...
 Declared rules: primitive set above, max --per-source mutants per source.
 """
 import argparse, os, re, shutil, subprocess, sys, tempfile
@@ -125,7 +127,15 @@ def main():
     ap.add_argument("--agent", default=str(ROOT / "build" / "symbols-agent"))
     ap.add_argument("--keep", help="directory to keep caught mutant workspaces")
     ap.add_argument("--out")
+    ap.add_argument("--operators", help="induced operator table passed to the agent (SYMBOLS_OPERATORS)")
+    ap.add_argument("--loo-from", help="leave-one-source-out: corpus TSV with patterns; for each source the "
+                    "operator table is induced from the other sources only (tools/induce_operators.py)")
     a = ap.parse_args()
+    loo_rows = None
+    if a.loo_from:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import induce_operators
+        loo_rows = induce_operators.read_rows(a.loo_from)
     rows, n_src = [], 0
     for sid, d in sources(Path(a.bank)):
         c, rc = build_run(str(d))
@@ -146,11 +156,29 @@ def main():
                 mc, mrc = build_run(w)
                 caught = int(mc == 0 or mrc != 0)
                 repaired, exact = "", 0
+                pattern, induced = "", 0
                 if caught and a.repair:
                     try:
                         fn = enclosing_function(text, line) if a.anchor else ""
                         task = NEUTRAL_TASK + (f" The problem is in {fn}()." if fn else "")
-                        subprocess.run([a.agent, "-w", w, task], capture_output=True, timeout=120)
+                        env = dict(os.environ)
+                        tr = os.path.join(tempfile.gettempdir(), f"mut_trace_{os.getpid()}.tsv")
+                        if os.path.exists(tr):
+                            os.remove(tr)
+                        env["SYMBOLS_TRACE"] = tr
+                        if loo_rows is not None:
+                            opf = os.path.join(tempfile.gettempdir(), f"mut_ops_{os.getpid()}.tsv")
+                            Path(opf).write_text(induce_operators.table(
+                                induce_operators.induce([r for r in loo_rows if r["source"] != sid])), encoding="utf-8")
+                            env["SYMBOLS_OPERATORS"] = opf
+                        elif a.operators:
+                            env["SYMBOLS_OPERATORS"] = a.operators
+                        subprocess.run([a.agent, "-w", w, task], capture_output=True, timeout=120, env=env)
+                        if os.path.exists(tr):
+                            for tl in Path(tr).read_text(encoding="utf-8", errors="ignore").splitlines():
+                                m = re.search(r"op=relop_search\tverified=1\t.*\[(\S+?)( induced)?\]$", tl)
+                                if m:
+                                    pattern, induced = m.group(1), int(bool(m.group(2)))
                     except subprocess.TimeoutExpired:
                         pass
                     rc2, rrc = build_run(w)
@@ -159,8 +187,9 @@ def main():
                 if caught and a.keep:
                     shutil.copytree(w, Path(a.keep) / mid, dirs_exist_ok=True)
                 shutil.rmtree(w, ignore_errors=True)
-                rows.append([mid, sid, cf.name, prim, frm, to, str(line), str(caught), repaired, str(exact) if repaired else ""])
-    text = "id\tsource\tfile\tprimitive\tfrom\tto\tline\tcaught\trepaired\texact\n" + "".join("\t".join(r) + "\n" for r in rows)
+                rows.append([mid, sid, cf.name, prim, frm, to, str(line), str(caught), repaired,
+                             str(exact) if repaired else "", pattern, str(induced) if pattern else ""])
+    text = "id\tsource\tfile\tprimitive\tfrom\tto\tline\tcaught\trepaired\texact\tpattern\tinduced\n" + "".join("\t".join(r) + "\n" for r in rows)
     if a.out:
         Path(a.out).write_text(text, encoding="utf-8")
     sys.stdout.write(text)
@@ -173,7 +202,9 @@ def main():
     summ = " ".join(f"{k}={v[1]}/{v[0]}" for k, v in sorted(by.items())) if a.repair else ""
     print(f"MUTATION_CORPUS sources={n_src} mutants={len(rows)} caught={len(caught)} "
           f"repaired={sum(1 for r in caught if r[8] == '1') if a.repair else 'n/a'} "
-          f"exact={sum(1 for r in caught if r[9] == '1') if a.repair else 'n/a'} {summ}", file=sys.stderr)
+          f"exact={sum(1 for r in caught if r[9] == '1') if a.repair else 'n/a'} "
+          f"wrong={sum(1 for r in caught if r[8] == '1' and r[9] != '1') if a.repair else 'n/a'} "
+          f"induced_fires={sum(1 for r in caught if r[11] == '1')} {summ}", file=sys.stderr)
     return 0
 
 

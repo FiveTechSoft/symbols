@@ -30,6 +30,18 @@ static void set_trace(const char *path)
 #endif
 }
 
+static void set_ops(const char *path)
+{
+    char buf[700];
+    snprintf(buf, sizeof(buf), "SYMBOLS_OPERATORS=%s", path ? path : "");
+#ifdef _WIN32
+    _putenv(buf);
+#else
+    if (path) setenv("SYMBOLS_OPERATORS", path, 1); else unsetenv("SYMBOLS_OPERATORS");
+    (void)buf;
+#endif
+}
+
 static int pass = 0, fail = 0;
 #define CHECK(c, msg) do { if (c) { pass++; printf("  [PASS] %s\n", msg); } \
                            else { fail++; printf("  [FAIL] %s\n", msg); } } while (0)
@@ -540,6 +552,23 @@ int main(void)
         remove(tp);
         if (r.compile_before == -1) CHECK(f != NULL && strstr(line, "op=") != NULL, "trace line written (no compiler)");
         else CHECK(strstr(line, "compile=1\trun=1\t") && strstr(line, "op=relop_search\tverified=1"), "trace line: observed state, operator, verified");
+    }
+
+    /* phase 4: a demoted induced pattern is never applied */
+    {
+        char d[512]; make_dir(d, sizeof(d), "iopdemote");
+        const char *t = "static int in_range(int v) { return v >= 0 && v < 9; }\nint main(void) { return in_range(9) ? 0 : 1; }\n";
+        put(d, "main.c", t);
+        char op[600]; snprintf(op, sizeof(op), "%s/../ops_%s.tsv", d, "demote");
+        FILE *f = fopen(op, "w");
+        if (f) { fputs("# test table\nrelop1@return\tdemoted\t0\t1\t1\n", f); fclose(f); }
+        set_ops(op);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The range check in in_range is wrong; fix it.", &r);
+        set_ops(NULL);
+        remove(op);
+        if (r.compile_before == -1) CHECK(1, "no compiler: induced table skipped");
+        else CHECK(!strcmp(get(d, "main.c"), t) && strstr(r.reason, "demoted"), "induced table: demoted pattern abstains");
     }
 
     /* relop_search never edits a test file */

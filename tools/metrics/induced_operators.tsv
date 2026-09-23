@@ -1,0 +1,6 @@
+# pattern	status	support_sources	fires	fails  (tools/induce_operators.py, K=3)
+arith@return	promoted	5	5	0
+lit@return	promoted	9	16	0
+relop1@return	demoted	1	2	1
+relop2@if	demoted	2	3	1
+relop2@return	demoted	1	3	2

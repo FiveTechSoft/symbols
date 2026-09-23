@@ -2154,6 +2154,7 @@ typedef struct
     int    file;
     size_t at, len;
     char   to[24];
+    char   pat[32];   /* induction pattern: primitive class @ site context */
 } RELOP_HIT;
 
 /* Phase 3b: the same search widened to the other single-token primitives,
@@ -2233,6 +2234,66 @@ static int line_defines_main(const char *line, size_t ll)
     return 0;
 }
 
+/* ---- phase 4: induced operators ------------------------------------
+   A pattern is "<primitive class>@<site>": class relop1/relop2/relop3
+   (the relational tier), lit, arith or logic; site is the statement the
+   token sits in, read from the line's first keyword before it: loop
+   (for/while), if, return, else stmt. tools/induce_operators.py writes
+   the table from labeled traces (exact restoration = positive); it is
+   loaded only when SYMBOLS_OPERATORS names a file, otherwise the search
+   behaves exactly as before. Demoted patterns (any non-exact repair in
+   training) are never applied; when a tier has several verified
+   candidates, a single promoted one is kept instead of abstaining. */
+static const char *site_ctx(const CTOK *t, int k)
+{
+    for (int i = 0; i < k; i++) {
+        if (!strcmp(t[i].text, "for") || !strcmp(t[i].text, "while")) return "loop";
+        if (!strcmp(t[i].text, "if")) return "if";
+        if (!strcmp(t[i].text, "return")) return "return";
+    }
+    return "stmt";
+}
+
+static const char *prim_class(int tier)
+{
+    static const char *const c[] = {"?", "relop1", "relop2", "relop3", "lit", "arith", "logic"};
+    return tier >= 1 && tier <= 6 ? c[tier] : "?";
+}
+
+#define IOP_MAX 64
+static struct { char pat[32]; int promoted; } iops[IOP_MAX];
+static int niops = -1;
+static char iops_path[512];
+
+static void iops_load(void)
+{
+    const char *path = getenv("SYMBOLS_OPERATORS");
+    char line[256];
+    niops = 0;
+    snprintf(iops_path, sizeof(iops_path), "%s", path ? path : "");
+    if (!path || !*path) return;
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    while (niops < IOP_MAX && fgets(line, sizeof(line), f)) {
+        char pat[32], st[16];
+        if (line[0] == '#' || sscanf(line, "%31s %15s", pat, st) != 2) continue;
+        if (strcmp(st, "promoted") && strcmp(st, "demoted")) continue;
+        snprintf(iops[niops].pat, sizeof(iops[niops].pat), "%s", pat);
+        iops[niops++].promoted = !strcmp(st, "promoted");
+    }
+    fclose(f);
+}
+
+/* 1 promoted, -1 demoted, 0 unknown (or no table) */
+static int iop_status(const char *pat)
+{
+    const char *path = getenv("SYMBOLS_OPERATORS");
+    if (niops < 0 || strcmp(iops_path, path ? path : "")) iops_load();
+    for (int i = 0; i < niops; i++)
+        if (!strcmp(iops[i].pat, pat)) return iops[i].promoted ? 1 : -1;
+    return 0;
+}
+
 static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, RELOP_HIT *hit)
 {
     int builds = 0;
@@ -2258,7 +2319,8 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
     if (na == 0)
         return 0;
     for (int tier = 1; tier <= 6; tier++) {
-        int found = 0;
+        RELOP_HIT hits[8];
+        int nh = 0;
         for (int f = 0; f < ws->count; f++) {
             const TASK_OPS_FILE *F = &ws->files[f];
             if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test"))
@@ -2302,20 +2364,34 @@ static int relop_search(const TASK_OPS_WORKSPACE *ws, const char *flags, const c
                         write_file(ws->root, F->rel, F->data);
                         free(cand);
                         /* own exit code when there is a main, and every stated example */
-                        if ((!has_main || (c == 1 && run == 0)) && exok) {
-                            found++;
-                            hit->file = f;
-                            hit->at = at;
-                            hit->len = ol;
-                            snprintf(hit->to, sizeof(hit->to), "%s", cands[r]);
+                        if ((!has_main || (c == 1 && run == 0)) && exok && nh < 8) {
+                            RELOP_HIT *h = &hits[nh++];
+                            h->file = f;
+                            h->at = at;
+                            h->len = ol;
+                            snprintf(h->to, sizeof(h->to), "%s", cands[r]);
+                            snprintf(h->pat, sizeof(h->pat), "%s@%s", prim_class(tier), site_ctx(t, k));
                         }
                     }
                 }
                 line = nl ? nl + 1 : NULL;
             }
         }
-        if (found)
-            return found;
+        if (nh) {
+            /* drop demoted patterns; one left = keep it; several = keep a
+               single promoted one, else abstain (the pre-phase-4 rule) */
+            int keep = -1, left = 0, prom = 0, pi = -1;
+            for (int i = 0; i < nh; i++) {
+                int stt = iop_status(hits[i].pat);
+                if (stt < 0) continue;
+                left++;
+                keep = i;
+                if (stt > 0) { prom++; pi = i; }
+            }
+            if (left == 1) { *hit = hits[keep]; return 1; }
+            if (left > 1 && prom == 1) { *hit = hits[pi]; return 1; }
+            return left ? left : -1;   /* -1: every verified candidate was demoted */
+        }
     }
     return 0;
 }
@@ -2637,8 +2713,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 touched = 1;
                 rep->candidates = 1;
                 snprintf(rep->op, sizeof(rep->op), "relop_search");
-                snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%s' in %.100s", (int)rhit.len, F->data + rhit.at,
-                         rhit.to, F->rel);
+                snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%s' in %.100s [%s%s]", (int)rhit.len, F->data + rhit.at,
+                         rhit.to, F->rel, rhit.pat, iop_status(rhit.pat) > 0 ? " induced" : "");
             }
         } else if (op == OP_BRACE && rep->compile_before == 0) {
             int bf = -1;
@@ -2654,6 +2730,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     if (!touched) {
         if (relops_found > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d relational swaps make it exit 0", relops_found);
+        else if (relops_found < 0)
+            snprintf(rep->reason, sizeof(rep->reason), "abstain: every verified swap matches a demoted induced pattern");
         else if (frags > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d places fit the stated fragment", frags);
         else if (deads > 1)
