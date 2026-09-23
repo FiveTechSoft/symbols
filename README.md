@@ -59,23 +59,23 @@ Harbour is the first reference domain in the roadmap. C and C++ remain the subst
 Every number in this table comes from a real run of `python3 tools/metrics.py --write --ci` on the stated commit; nothing is filled in by hand. Anything that cannot be measured yet is shown as "not measured". The per-commit history is in [`tools/metrics_history.csv`](tools/metrics_history.csv), and the per-phase targets are in [`ROADMAP.md`](ROADMAP.md#measurable-targets-per-phase). The fixed task bank has its own per-commit JSONL report and CI gate in [`scripts/bank_report.py`](scripts/bank_report.py) (workflow `bank`); this table reads the same runner output.
 
 <!-- METRICS:BEGIN -->
-Measured on commit `3ac663c` on 2026-09-23 (linux, build) with `python3 tools/metrics.py`.
+Measured on commit `37f0496` on 2026-09-23 (linux, build) with `python3 tools/metrics.py`.
 
 | Metric | Value | How it is measured |
 |---|---|---|
 | CTest suite | 88/98 pass, 0 fail, 10 skipped | full `ctest`; skipped = optional data missing |
-| Unit asserts | 801 pass, 0 fail | sum of `TEST RESULTS` over all tests |
+| Unit asserts | 805 pass, 0 fail | sum of `TEST RESULTS` over all tests |
 | Agent: C repair, evaluation | 12/25 resolved (48%), 0 harmful edits, 13 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
 | Agent: C repair, development | 2/4 resolved (50%), 0 harmful edits, 2 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
 | Agent: C repair, held-out | 2/4 resolved (50%), 0 harmful edits | `test_agent_runner_external` / `_heldout` (separated fixtures) |
 | Grounded QA (fixed set of 32) | precision 78%, recall 82% (TP 14, FP 4, FN 3, TN 11) | `tools/metrics/qa_battery.tsv` against the server; labels from the corpus, not from the engine |
 | Invented or wrong answers | 4 of 32 | FP from the row above |
-| Server latency | p50 1.3 ms, p95 2.1 ms | same set, local |
+| Server latency | p50 1.2 ms, p95 2.0 ms | same set, local |
 | Procedural memory: repeat benefit | 6 real commands: 6 probes the first time → 0 on repeat | same list twice, the probe really runs; non-commands are re-probed on purpose |
 | C edit operator (OpenCode) | 46 asserts pass, 0 fail | `test_c_edit_ops` |
-| Engineering task bank (56 tasks, 8 categories) | `symbols-agent`: 2/56 pass (4%; dev 1/32, held-out 1/24), 0 wrong edits, 54 untouched; by category: build_ci 0/7, compiler_repair 0/7, debug 0/7, docs 0/7, multi_file 2/7, refactor 0/7, shell 0/7, test_authoring 0/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 56/56) |
+| Engineering task bank (56 tasks, 8 categories) | `symbols-agent`: 5/56 pass (9%; dev 2/32, held-out 3/24), 0 wrong edits, 51 untouched; by category: build_ci 0/7, compiler_repair 3/7, debug 0/7, docs 0/7, multi_file 2/7, refactor 0/7, shell 0/7, test_authoring 0/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 56/56) |
 | Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |
-| CI per platform | apply: success, ci / asan-msvc: failure, ci / build-test-linux: success, ci / build-test-msvc: success | [run](https://github.com/FiveTechSoft/symbols/actions/runs/35839811971); failing tests are listed in each job log |
+| CI per platform | asan-msvc: in_progress, build-test-linux: success, build-test-msvc: success | [run](https://github.com/FiveTechSoft/symbols/actions/runs/35841260543); failing tests are listed in each job log |
 | Hand-written rules (declared) | 11 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
 <!-- METRICS:END -->
 

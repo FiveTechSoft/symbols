@@ -323,21 +323,27 @@ static void temp_binary(char *out, size_t size)
 
 /* Build all *.c with the task's flags into a temp binary outside the
    workspace, then run it. compile: -1 no C sources or no compiler. */
-static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile, int *run)
+static size_t c_sources(const TASK_OPS_WORKSPACE *ws, char *srcs, size_t size)
 {
-    char cmd[4096], srcs[3072] = {0}, bin[TASK_OPS_MAX_PATH];
     size_t used = 0;
-    *compile = -1;
-    *run = -1;
+    srcs[0] = '\0';
     for (int i = 0; i < ws->count; i++) {
         size_t n = strlen(ws->files[i].rel);
         if (n < 3 || strcmp(ws->files[i].rel + n - 2, ".c") != 0)
             continue;
-        if (strchr(ws->files[i].rel, '"') || used + n + 4 >= sizeof(srcs))
+        if (strchr(ws->files[i].rel, '"') || used + n + 4 >= size)
             continue;
-        used += (size_t)snprintf(srcs + used, sizeof(srcs) - used, "\"%s\" ", ws->files[i].rel);
+        used += (size_t)snprintf(srcs + used, size - used, "\"%s\" ", ws->files[i].rel);
     }
-    if (used == 0)
+    return used;
+}
+
+static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile, int *run)
+{
+    char cmd[4096], srcs[3072], bin[TASK_OPS_MAX_PATH];
+    *compile = -1;
+    *run = -1;
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
         return;
     temp_binary(bin, sizeof(bin));
     snprintf(cmd, sizeof(cmd), "gcc %s-o \"%s\" %s", flags, bin, srcs);
@@ -360,6 +366,152 @@ static void probe(const TASK_OPS_WORKSPACE *ws, const char *flags, int *compile,
     }
     remove(bin);
     free(r);
+}
+
+
+/* ------------------------------------------------------ compiler fix-its */
+
+typedef struct
+{
+    int    file;          /* index into ws->files */
+    size_t from, to;      /* byte range replaced (to exclusive) */
+    char   text[256];
+} FIXIT;
+
+static long line_col_offset(const char *data, size_t len, long line, long col)
+{
+    long l = 1;
+    size_t i = 0;
+    while (i < len && l < line) {
+        if (data[i] == '\n')
+            l++;
+        i++;
+    }
+    if (l != line || col < 1)
+        return -1;
+    size_t off = i + (size_t)(col - 1);
+    return off <= len ? (long)off : -1;
+}
+
+/* Parse gcc -fdiagnostics-parseable-fixits lines:
+   fix-it:"file":{l1:c1-l2:c2}:"text"   (text uses C escapes) */
+static int parse_fixits(const TASK_OPS_WORKSPACE *ws, const char *out, FIXIT *fx, int max)
+{
+    int n = 0;
+    for (const char *p = strstr(out, "fix-it:\""); p && n < max; p = strstr(p + 1, "fix-it:\"")) {
+        const char *q = p + 8, *e = strchr(q, '"');
+        if (!e || e - q >= TASK_OPS_MAX_PATH)
+            continue;
+        char rel[TASK_OPS_MAX_PATH];
+        memcpy(rel, q, (size_t)(e - q));
+        rel[e - q] = '\0';
+        long l1, c1, l2, c2;
+        if (sscanf(e + 1, ":{%ld:%ld-%ld:%ld}:", &l1, &c1, &l2, &c2) != 4)
+            continue;
+        const char *t = strstr(e + 1, "}:\"");
+        if (!t)
+            continue;
+        t += 3;
+        int fi = -1;
+        for (int i = 0; i < ws->count; i++)
+            if (!strcmp(ws->files[i].rel, rel))
+                fi = i;
+        if (fi < 0)
+            continue;
+        FIXIT *f = &fx[n];
+        size_t w = 0;
+        int ok = 0;
+        while (*t && *t != '\n' && w + 1 < sizeof(f->text)) {
+            if (*t == '"') { ok = 1; break; }
+            if (*t == '\\' && t[1]) {
+                t++;
+                char c = *t == 'n' ? '\n' : *t == 't' ? '\t' : *t;
+                if (*t >= '0' && *t <= '7') {
+                    int v = 0, k = 0;
+                    while (k < 3 && *t >= '0' && *t <= '7') { v = v * 8 + (*t - '0'); t++; k++; }
+                    f->text[w++] = (char)v;
+                    continue;
+                }
+                f->text[w++] = c;
+                t++;
+                continue;
+            }
+            f->text[w++] = *t++;
+        }
+        f->text[w] = '\0';
+        long a = line_col_offset(ws->files[fi].data, ws->files[fi].len, l1, c1);
+        long b = line_col_offset(ws->files[fi].data, ws->files[fi].len, l2, c2);
+        if (!ok || a < 0 || b < a)
+            continue;
+        f->file = fi;
+        f->from = (size_t)a;
+        f->to = (size_t)b;
+        n++;
+    }
+    return n;
+}
+
+/* Rewrites of every file named by the compiler's own fix-its; 0 when the
+   build has none, or when two fix-its in one file overlap (fail closed). */
+static int compiler_fixits(const TASK_OPS_WORKSPACE *ws, const char *flags, char **next,
+                           int *count)
+{
+    char cmd[4096], srcs[3072];
+    *count = 0;
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return 0;
+    snprintf(cmd, sizeof(cmd), "gcc %s-fsyntax-only -fdiagnostics-parseable-fixits %s", flags, srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    FIXIT *fx = (FIXIT *)malloc(sizeof(FIXIT) * 32);
+    if (!r || !fx) { free(r); free(fx); return 0; }
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    int n = (r->exit_code != 0 && !r->execution_failed) ? parse_fixits(ws, r->stderr_buf, fx, 32) : 0;
+    free(r);
+    int files = 0;
+    for (int fi = 0; fi < ws->count && n > 0; fi++) {
+        /* this file's fix-its, applied back to front */
+        size_t total = ws->files[fi].len + 1, mine = 0;
+        for (int k = 0; k < n; k++)
+            if (fx[k].file == fi) { total += strlen(fx[k].text); mine++; }
+        if (!mine)
+            continue;
+        for (int k = 0; k < n; k++)
+            for (int j = 0; j < n; j++)
+                if (k != j && fx[k].file == fi && fx[j].file == fi &&
+                    fx[j].from < fx[k].to && fx[k].from < fx[j].to) {
+                    free(fx);
+                    return 0;
+                }
+        char *out = (char *)malloc(total);
+        if (!out) break;
+        const char *src = ws->files[fi].data;
+        size_t pos = 0, w = 0;
+        for (;;) {
+            int best = -1;
+            for (int k = 0; k < n; k++)
+                if (fx[k].file == fi && fx[k].from >= pos &&
+                    (best < 0 || fx[k].from < fx[best].from))
+                    best = k;
+            if (best < 0) break;
+            memcpy(out + w, src + pos, fx[best].from - pos);
+            w += fx[best].from - pos;
+            size_t tl = strlen(fx[best].text);
+            memcpy(out + w, fx[best].text, tl);
+            w += tl;
+            pos = fx[best].to;
+            fx[best].file = -1;   /* consumed */
+            if (fx[best].to == fx[best].from) pos = fx[best].from;
+        }
+        memcpy(out + w, src + pos, ws->files[fi].len - pos);
+        w += ws->files[fi].len - pos;
+        out[w] = '\0';
+        next[fi] = out;
+        files++;
+        *count += (int)mine;
+    }
+    free(fx);
+    return files;
 }
 
 /* ------------------------------------------------------------------ act */
@@ -388,57 +540,73 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         return 0;
 
     TASK_OPS_WORKSPACE *ws = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*ws));
-    if (!ws)
-        return 0;
+    char **next = (char **)calloc(TASK_OPS_MAX_FILES, sizeof(char *));
+    if (!ws || !next) { free(ws); free(next); return 0; }
     TaskOpsLoadWorkspace(workspace, ws);
-
-    char a[128], b[128];
-    rep->candidates = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
-    if (rep->candidates != 1) {
-        snprintf(rep->reason, sizeof(rep->reason),
-                 rep->candidates ? "ambiguous: %d rename candidates" : "no operator preconditions hold",
-                 rep->candidates);
-        TaskOpsFreeWorkspace(ws);
-        free(ws);
-        return 0;
-    }
 
     char flags[512];
     task_flags(task, flags, sizeof(flags));
     probe(ws, flags, &rep->compile_before, &rep->run_before);
 
-    /* act: rewrite every file that mentions A; originals stay in ws */
-    char *next[TASK_OPS_MAX_FILES] = {0};
-    int touched = 0, ok = 1;
-    for (int i = 0; i < ws->count && ok; i++) {
-        if (count_token_in(ws->files[i].data, a) == 0)
-            continue;
-        next[i] = replace_token(ws->files[i].data, a, b);
-        ok = next[i] && write_file(ws->root, ws->files[i].rel, next[i]);
-        touched++;
-    }
-    rep->applied = touched;
-    snprintf(rep->op, sizeof(rep->op), "rename_symbol");
-    snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
-
-    /* verify: intent holds and the agent's own probe did not regress */
-    int verified = 0;
-    if (ok) {
-        TASK_OPS_WORKSPACE *after = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*after));
-        if (after) {
-            TaskOpsLoadWorkspace(workspace, after);
-            int intent = TaskOpsCountToken(after, a) == 0 && TaskOpsCountToken(after, b) > 0;
-            probe(after, flags, &rep->compile_after, &rep->run_after);
-            int no_regress = rep->compile_after >= rep->compile_before &&
-                             (rep->run_before != 0 || rep->run_after == 0);
-            verified = intent && no_regress;
-            if (!verified)
-                snprintf(rep->reason, sizeof(rep->reason),
-                         "verify failed: intent=%d compile %d->%d run %d->%d", intent,
-                         rep->compile_before, rep->compile_after, rep->run_before, rep->run_after);
-            TaskOpsFreeWorkspace(after);
-            free(after);
+    /* reason: first operator whose preconditions hold */
+    char a[128], b[128];
+    int touched = 0;
+    int renames = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
+    rep->candidates = renames;
+    if (renames == 1) {
+        snprintf(rep->op, sizeof(rep->op), "rename_symbol");
+        for (int i = 0; i < ws->count; i++)
+            if (count_token_in(ws->files[i].data, a) > 0) {
+                next[i] = replace_token(ws->files[i].data, a, b);
+                touched++;
+            }
+        snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
+    } else if (rep->compile_before == 0) {
+        int fixes = 0;
+        touched = compiler_fixits(ws, flags, next, &fixes);
+        if (touched) {
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "compiler_fixit");
+            snprintf(rep->detail, sizeof(rep->detail), "%d fix-it(s) in %d file(s)", fixes, touched);
         }
+    }
+    if (!touched) {
+        if (renames > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
+        else
+            snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
+        TaskOpsFreeWorkspace(ws);
+        free(ws);
+        free(next);
+        return 0;
+    }
+
+    /* act */
+    int ok = 1;
+    for (int i = 0; i < ws->count; i++)
+        if (next[i] && !write_file(ws->root, ws->files[i].rel, next[i]))
+            ok = 0;
+    rep->applied = touched;
+
+    /* verify: operator intent holds and the agent's own probe did not
+       regress (a compiler fix-it must take the build from failing to ok) */
+    int verified = 0;
+    TASK_OPS_WORKSPACE *after = ok ? (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*after)) : NULL;
+    if (after) {
+        TaskOpsLoadWorkspace(workspace, after);
+        probe(after, flags, &rep->compile_after, &rep->run_after);
+        int intent = !strcmp(rep->op, "rename_symbol")
+                         ? (TaskOpsCountToken(after, a) == 0 && TaskOpsCountToken(after, b) > 0)
+                         : (rep->compile_after == 1);
+        int no_regress = rep->compile_after >= rep->compile_before &&
+                         (rep->run_before != 0 || rep->run_after == 0);
+        verified = intent && no_regress;
+        if (!verified)
+            snprintf(rep->reason, sizeof(rep->reason),
+                     "verify failed: intent=%d compile %d->%d run %d->%d", intent,
+                     rep->compile_before, rep->compile_after, rep->run_before, rep->run_after);
+        TaskOpsFreeWorkspace(after);
+        free(after);
     } else {
         snprintf(rep->reason, sizeof(rep->reason), "write failed");
     }
@@ -450,6 +618,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 write_file(ws->root, ws->files[i].rel, ws->files[i].data);
     for (int i = 0; i < TASK_OPS_MAX_FILES; i++)
         free(next[i]);
+    free(next);
     rep->verified = verified;
     TaskOpsFreeWorkspace(ws);
     free(ws);

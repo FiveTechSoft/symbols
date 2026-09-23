@@ -130,6 +130,32 @@ int main(void)
         }
     }
 
+
+    /* compiler fix-it: the compiler proposes, the probe verifies */
+    {
+        char d[512]; make_dir(d, sizeof(d), "fixit");
+        put(d, "calc.c", "int length_of(const char *s) { return (int)strlen(s); }\nint main(void) { return length_of(\"ab\") == 2 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Build with -std=c99 -Werror=implicit-function-declaration and make it pass.", &r);
+        printf("    %s %s | %s | compile %d->%d run %d->%d\n", r.op, r.detail, r.reason, r.compile_before, r.compile_after, r.run_before, r.run_after);
+        if (r.compile_before == -1) {
+            CHECK(1, "no compiler: fix-it case skipped");
+        } else {
+            CHECK(kept && !strcmp(r.op, "compiler_fixit"), "fix-it applied and verified (build fail -> ok)");
+            CHECK(strstr(get(d, "calc.c"), "#include <string.h>") != NULL, "header inserted by the compiler's fix-it");
+            CHECK(r.run_after == 0, "own probe: program exits 0 after");
+        }
+    }
+
+    /* compiler fix-it never fires on a build that already works */
+    {
+        char d[512]; make_dir(d, sizeof(d), "fixok");
+        const char *m = "#include <string.h>\nint main(void) { return (int)strlen(\"\"); }\n";
+        put(d, "ok.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Tidy it with -std=c99.", &r) && !strcmp(get(d, "ok.c"), m), "working build: no fix-it, untouched");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");
