@@ -1,0 +1,49 @@
+# Hidden QA split: question<TAB>expected_answer_substring
+# Measure only. Never edit rows to raise a score. English only.
+# Runner: test_qa_hidden (prints HIDDEN_QA pass= total= rate=).
+# Format matches tests/qa_eval.tsv. Disjoint from all tests/qa_eval*.tsv questions.
+what is the capital of France?	PARIS
+what is the capital of Japan?	TOKYO
+what is the capital of Canada?	OTTAWA
+what is the capital of Brazil?	BRASILIA
+what is the capital of Australia?	CANBERRA
+what is the capital of Egypt?	CAIRO
+what is the capital of India?	NEW DELHI
+what is the capital of Spain?	MADRID
+what is the capital of Italy?	ROME
+what is the capital of Portugal?	LISBON
+what is the capital of Germany?	BERLIN
+what is the capital of Mexico?	MEXICO CITY
+what is the capital of South Korea?	SEOUL
+what is the capital of Turkey?	ANKARA
+what is the capital of Poland?	WARSAW
+what is the capital of Sweden?	STOCKHOLM
+what is the capital of Norway?	OSLO
+what is the capital of Denmark?	COPENHAGEN
+what is the capital of Finland?	HELSINKI
+what is the capital of Greece?	ATHENS
+what is the capital of Netherlands?	AMSTERDAM
+what is the capital of Belgium?	BRUSSELS
+what is the capital of Switzerland?	BERN
+what is the capital of Austria?	VIENNA
+what is the capital of Ireland?	DUBLIN
+what is the currency of Japan?	YEN
+what is the currency of India?	RUPEE
+what is the currency of United_Kingdom?	POUND
+what is the currency of Switzerland?	FRANC
+what is the currency of Sweden?	KRONA
+what is the official language of Spain?	SPANISH
+what is the official language of Brazil?	PORTUGUESE
+what is the official language of Egypt?	ARABIC
+what is the official language of Japan?	JAPANESE
+what is the official language of Germany?	GERMAN
+who wrote Hamlet?	SHAKESPEARE
+who wrote Pride_and_Prejudice?	AUSTEN
+who wrote Moby_Dick?	MELVILLE
+who wrote The_Odyssey?	HOMER
+who wrote Don_Quixote?	CERVANTES
+who discovered gravity?	NEWTON
+who developed the theory of relativity?	EINSTEIN
+who invented the telephone?	BELL
+who painted the Mona_Lisa?	DAVINCI
+who composed the Ninth_Symphony?	BEETHOVEN

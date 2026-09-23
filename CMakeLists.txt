@@ -264,6 +264,13 @@ add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
 target_link_libraries(test_qa_hygiene symbolic)
 add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+# Hidden QA split: measure-only runner (never a development threshold).
+# Prints HIDDEN_QA pass= total= rate=; exit 0 on well-formed set, 77 if model missing.
+add_executable(test_qa_hidden tests/test_qa_hidden.c)
+target_link_libraries(test_qa_hidden symbolic)
+add_test(NAME test_qa_hidden COMMAND test_qa_hidden tests/qa_hidden.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_qa_hidden PROPERTIES SKIP_RETURN_CODE 77)
+
 add_executable(test_qa_layer tests/test_qa_layer.c)
 target_link_libraries(test_qa_layer symbolic)
 add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
