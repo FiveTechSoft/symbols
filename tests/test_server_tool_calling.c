@@ -639,6 +639,15 @@ static void test_shell_tool_dispatch(void)
         TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, scope, &tr) == 2 && tr.decision == SERVER_PROC_FROM_MEMORY,
                     "known non-commands skip the tool round-trip");
         TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, "windows", &tr) == 1, "memory is scoped per platform");
+        {
+            uint32_t i;
+            for (i = 0; i < st.count; i++)
+                if (strcmp(st.records[i].subject, "que") == 0) st.records[i].timestamp -= SERVER_PROC_NEG_TTL + 10;
+            TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, scope, &tr) == 1,
+                        "an old missing-program memory is re-checked, not trusted forever");
+            ServerProcLearnFromOutput(&st, scope, "symbols-probe:not-a-command:hola que\n", learned, sizeof(learned));
+            TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, scope, &tr) == 2, "re-verification refreshes the memory");
+        }
         /* restart: memory survives on disk */
         TEST_ASSERT(EpisodicStoreInit(&st2, path) && EpisodicStoreLoad(&st2) >= 4, "memory reloads after restart");
         TEST_ASSERT(ServerProcRecall(&st2, scope, "ps") == 1 && ServerProcRecall(&st2, scope, "ejecuta") == -1,

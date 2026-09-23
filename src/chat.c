@@ -40,13 +40,87 @@
 /* Coverage test for text retrieval: the fraction of the question's content
    words (after the corpus-frequency filter) that occur in the sentence.
    More than half must be present; a single incidental overlap is not an answer. */
-static int TextQueryCovered(const char *const *words, uint32_t nw, const char *sent)
+/* ---- Retrieval abstention calibrated on the corpus itself ------------
+   Coverage of a question by a sentence is IDF-weighted: rare words count
+   more, and a word the corpus never contains weighs most.  The threshold
+   is not a fixed fraction: it is the level that bags of words drawn at
+   random from this same corpus reach by chance against their best
+   matching sentence (95th percentile, per question length).  A retrieval
+   that does not beat chance abstains. */
+#define TQ_HASH 16384
+#define TQ_MAXLEN 8
+typedef struct {
+    const void *tl;
+    uint32_t nsent;
+    char (*word)[24];
+    uint32_t *df;
+    uint32_t nvocab;
+    float thr[TQ_MAXLEN + 1];
+    int ready;
+} TQ_CALIB;
+static TQ_CALIB g_tq;
+
+static uint32_t TqHash(const char *w)
+{
+    uint32_t h = 2166136261u;
+    while (*w) { h ^= (unsigned char)*w++; h *= 16777619u; }
+    return h & (TQ_HASH - 1);
+}
+static uint32_t *TqSlot(const char *w, int insert)
+{
+    uint32_t h = TqHash(w), k;
+    for (k = 0; k < TQ_HASH; k++, h = (h + 1) & (TQ_HASH - 1))
+    {
+        if (g_tq.word[h][0] == '\0')
+        {
+            if (!insert) return NULL;
+            snprintf(g_tq.word[h], sizeof(g_tq.word[h]), "%s", w);
+            g_tq.nvocab++;
+            return &g_tq.df[h];
+        }
+        if (strcmp(g_tq.word[h], w) == 0) return &g_tq.df[h];
+    }
+    return NULL;
+}
+/* lowercase alnum words of 3+ bytes, each once */
+static uint32_t TqWords(const char *s, char out[][24], uint32_t max)
+{
+    uint32_t n = 0, k;
+    while (*s && n < max)
+    {
+        char w[24];
+        size_t l = 0;
+        while (*s && !isalnum((unsigned char)*s)) s++;
+        while (*s && isalnum((unsigned char)*s))
+        {
+            if (l + 1 < sizeof(w)) w[l++] = (char)tolower((unsigned char)*s);
+            s++;
+        }
+        w[l] = '\0';
+        if (l < 3) continue;
+        for (k = 0; k < n; k++) if (strcmp(out[k], w) == 0) break;
+        if (k == n) { memcpy(out[n], w, sizeof(w)); n++; }
+    }
+    return n;
+}
+static float TqIdf(const char *w)
+{
+    char low[24];
+    size_t i;
+    uint32_t *d;
+    for (i = 0; w[i] && i + 1 < sizeof(low); i++) low[i] = (char)tolower((unsigned char)w[i]);
+    low[i] = '\0';
+    d = TqSlot(low, 0);
+    return logf(((float)g_tq.nsent + 1.0f) / ((d ? (float)*d : 0.0f) + 0.5f));
+}
+/* IDF-weighted share of the question's words that the sentence contains
+   (prefix match at a word start tolerates inflection). */
+static float TqCoverage(const char *const *words, uint32_t nw, const char *sent)
 {
     char low[2048];
-    uint32_t k, hit = 0;
+    uint32_t k;
     size_t i;
-    if (nw == 0)
-        return 1;
+    float hit = 0.0f, all = 0.0f;
     for (i = 0; sent[i] && i + 1 < sizeof(low); i++)
         low[i] = (char)tolower((unsigned char)sent[i]);
     low[i] = '\0';
@@ -55,16 +129,138 @@ static int TextQueryCovered(const char *const *words, uint32_t nw, const char *s
         char w[64];
         size_t n = 0;
         const char *h;
+        float idf;
         while (words[k][n] && n + 1 < sizeof(w)) { w[n] = (char)tolower((unsigned char)words[k][n]); n++; }
         w[n] = '\0';
         if (n == 0) continue;
+        idf = TqIdf(w);
+        all += idf;
         for (h = strstr(low, w); h; h = strstr(h + 1, w))
-        {
-            int lb = (h == low) || !isalnum((unsigned char)h[-1]);
-            if (lb) { hit++; break; }   /* prefix match tolerates inflection */
-        }
+            if (h == low || !isalnum((unsigned char)h[-1])) { hit += idf; break; }
     }
-    return hit * 2 > nw;
+    return all > 0.0f ? hit / all : 1.0f;
+}
+static int TqFloatCmp(const void *a, const void *b)
+{
+    float x = *(const float *)a, y = *(const float *)b;
+    return (x > y) - (x < y);
+}
+static void TqCalibrate(const TEXTLEX *tl)
+{
+    uint32_t i, n, len, trial;
+    static char sw[64][24];
+    uint32_t seed = 12345u;
+    char (*vocab)[24];
+    uint32_t nv = 0;
+    if (g_tq.ready && g_tq.tl == (const void *)tl) return;
+    if (g_tq.word == NULL)
+    {
+        g_tq.word = calloc(TQ_HASH, sizeof(*g_tq.word));
+        g_tq.df = calloc(TQ_HASH, sizeof(*g_tq.df));
+        if (g_tq.word == NULL || g_tq.df == NULL) return;
+    }
+    memset(g_tq.word, 0, TQ_HASH * sizeof(*g_tq.word));
+    memset(g_tq.df, 0, TQ_HASH * sizeof(*g_tq.df));
+    g_tq.nvocab = 0;
+    g_tq.tl = tl;
+    g_tq.nsent = TextLexSentCount(tl);
+    /* perceive: document frequency of every word in the corpus */
+    for (i = 0; i < g_tq.nsent; i++)
+    {
+        char sent[2048];
+        if (TextLexSentenceText(tl, i, tl->image, tl->imagelen, sent, sizeof(sent)) == 0) continue;
+        n = TqWords(sent, sw, 64);
+        while (n--) { uint32_t *d = TqSlot(sw[n], 1); if (d) (*d)++; }
+    }
+    /* test: chance coverage of random word bags drawn from the corpus
+       (by occurrence) against their best sentence */
+    vocab = malloc((size_t)g_tq.nvocab * sizeof(*vocab) + 1);
+    for (i = 0; vocab && i < TQ_HASH; i++)
+        if (g_tq.word[i][0]) memcpy(vocab[nv++], g_tq.word[i], sizeof(vocab[0]));
+    for (len = 1; len <= TQ_MAXLEN; len++)
+    {
+        float chance[64];
+        uint32_t ntr = 0;
+        g_tq.thr[len] = 0.5f;   /* only if calibration is impossible */
+        if (nv < 4 || g_tq.nsent < 8) continue;
+        for (trial = 0; trial < 64; trial++)
+        {
+            const char *q[TQ_MAXLEN];
+            float best = 0.0f;
+            uint32_t k, j, step = g_tq.nsent > 400 ? g_tq.nsent / 400 : 1;
+            for (k = 0; k < len; k++)
+            {
+                seed = seed * 1103515245u + 12345u;
+                q[k] = vocab[(seed >> 8) % nv];
+            }
+            for (j = (seed >> 4) % step; j < g_tq.nsent; j += step)
+            {
+                char sent[2048];
+                float c;
+                if (TextLexSentenceText(tl, j, tl->image, tl->imagelen, sent, sizeof(sent)) == 0) continue;
+                c = TqCoverage(q, len, sent);
+                if (c > best) best = c;
+            }
+            chance[ntr++] = best;
+        }
+        qsort(chance, ntr, sizeof(float), TqFloatCmp);
+        g_tq.thr[len] = chance[(ntr * 95) / 100 < ntr ? (ntr * 95) / 100 : ntr - 1];
+    }
+    free(vocab);
+    g_tq.ready = 1;
+    fprintf(stderr, "[calib] retrieval abstention: %u sentences, %u words; chance95 by length 1..8 =",
+            g_tq.nsent, g_tq.nvocab);
+    for (len = 1; len <= TQ_MAXLEN; len++) fprintf(stderr, " %.2f", g_tq.thr[len]);
+    fputc('\n', stderr);
+}
+static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent)
+{
+    float c;
+    if (nw == 0)
+        return 1;
+    TqCalibrate(tl);
+    if (!g_tq.ready)
+        return 1;
+    {
+        /* The chance model draws its bags from the corpus vocabulary, so the
+           test is only fair over the question words the corpus knows (a
+           shared stem of 4+ letters counts as known).  Words it has never
+           seen say nothing about which sentence answers; if none is known
+           the question is outside the corpus. */
+        const char *kw[TQ_MAXLEN];
+        uint32_t k, h, nk = 0, ncount = 0;
+        for (k = 0; k < nw && nk < TQ_MAXLEN; k++)
+        {
+            char w[24];
+            size_t n = 0, m;
+            int known = 0;
+            while (words[k][n] && n + 1 < sizeof(w)) { w[n] = (char)tolower((unsigned char)words[k][n]); n++; }
+            w[n] = '\0';
+            if (n < 3) continue;
+            ncount++;
+            if (TqSlot(w, 0) != NULL) known = 1;
+            for (h = 0; !known && n >= 4 && h < TQ_HASH; h++)
+            {
+                const char *v = g_tq.word[h];
+                if (!v[0]) continue;
+                m = strlen(v);
+                if (m >= 4 && strncmp(v, w, m < n ? m : n) == 0 && (m < n ? m : n) >= 4 &&
+                    (m < n ? n - m : m - n) <= 2)
+                    known = 1;
+            }
+            if (known) kw[nk++] = words[k];
+        }
+        /* most of the question must be vocabulary the corpus knows; when
+           the unknown words outnumber the known ones it is about something
+           else (a lone shared word is not evidence) */
+        if (nk == 0 || 2 * nk < ncount)
+            return 0;
+        c = TqCoverage(kw, nk, sent);
+        if (getenv("SYMBOLS_TQ_DEBUG")) { fprintf(stderr, "[tq] nw=%u nk=%u c=%.2f thr=%.2f words:", nw, nk, c, g_tq.thr[nk]); for (k = 0; k < nw; k++) fprintf(stderr, " %s", words[k]); fprintf(stderr, " | %.60s\n", sent); }
+        /* chance95 of 1.00 means the test has no power at this length:
+           a known word that the sentence contains is then all we can ask */
+        return g_tq.thr[nk] >= 1.0f ? c >= 1.0f : c > g_tq.thr[nk];
+    }
 }
 
 
@@ -4799,8 +4995,7 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                     if (sym != NULL && total_freq > 0)
                     {
                         float rel = (float)sym->frequency / (float)total_freq;
-                        if (rel > 0.003f)
-                            continue;
+                        (void)rel;   /* frequent words stay: IDF weighting discounts them */
                     }
                 }
                 words[nw++] = w;
@@ -4896,8 +5091,35 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
                                     ch->tlex[bestf].image,
                                     ch->tlex[bestf].imagelen, sent,
                                     sizeof(sent)) > 0 &&
-                !p->t_following && !TextQueryCovered(words, nw, sent))
+                !p->t_following && !TextQueryCovered(&ch->tlex[bestf], words, nw, sent))
                 covered = 0;
+            if (!covered)
+            {
+                /* verify the other retrieved candidates before abstaining:
+                   keep the best-ranked one that the test accepts */
+                float vsc = 0.0f;
+                for (f = 0; f < ch->ntfiles; f++)
+                {
+                    uint32_t idx[16], nret, r;
+                    float sc[16];
+                    if (p->t_sub[0] != '\0' && strcmp(ch->tfiles[f], p->t_sub) != 0)
+                        continue;
+                    nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph, ch->temb, words, nw, idx, sc, 16);
+                    for (r = 0; r < nret; r++)
+                    {
+                        char cs[2048];
+                        if ((covered && sc[r] <= vsc) || ch->tlex[f].image == NULL ||
+                            TextLexSentenceText(&ch->tlex[f], idx[r], ch->tlex[f].image,
+                                                ch->tlex[f].imagelen, cs, sizeof(cs)) == 0 ||
+                            !TextQueryCovered(&ch->tlex[f], words, nw, cs))
+                            continue;
+                        covered = 1;
+                        vsc = sc[r];
+                        best = idx[r];
+                        bestf = f;
+                    }
+                }
+            }
             if (!covered)
             {
                 /* The best sentence explains too little of the question:

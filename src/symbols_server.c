@@ -1105,14 +1105,16 @@ static void HandleCompletions(socket_t s, const char *body,
             snprintf(asked, sizeof(asked), "%s", sess->current_issue);
         if (!g_session_ready || !ServerAnswerQuery(&g_session, asked, raw2, sizeof(raw2)))
             snprintf(raw2, sizeof(raw2), "No tengo constancia suficiente para responder.");
+        /* The probe proved it is language, not a command line: answer the
+           question (or abstain) first; the probe result is only a note. */
         if (ServerIsUnknown(raw2))
-            mapped[0] = '\0';   /* nothing grounded to add */
+            snprintf(mapped, sizeof(mapped), "I don't know.");
         else
             ServerMapContent(raw2, mapped, sizeof(mapped));
         if (prog2[0])
-            snprintf(content, sizeof(content), "Ni `%s` ni `%s` son programas disponibles en este entorno (lo he comprobado), así que no lo he ejecutado como comando.\n\n%s", prog, prog2, mapped);
+            snprintf(content, sizeof(content), "%s\n\n(Lo he tratado como pregunta: comprobé que ni `%s` ni `%s` son programas en este entorno.)", mapped, prog, prog2);
         else
-            snprintf(content, sizeof(content), "`%s` no es un programa disponible en este entorno (lo he comprobado), así que no lo he ejecutado como comando.\n\n%s", prog, mapped);
+            snprintf(content, sizeof(content), "%s\n\n(Lo he tratado como pregunta: comprobé que `%s` no es un programa en este entorno.)", mapped, prog);
         SendContentForRequest(s, body, ++g_seq, content, asked, resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
@@ -2091,6 +2093,26 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* Episodic memory inspection: /memory, /memoria */
+    if (strncasecmp(query, "memoria procedimental olvida ", 29) == 0)
+    {
+        char scope[32], w[64];
+        int removed = 0;
+        ProcEnsure();
+        ServerProcScope(body, scope, sizeof(scope));
+        if (sscanf(query + 29, "%63s", w) == 1 && g_proc_ready)
+        {
+            removed += EpisodicStoreForget(&g_proc, w, SERVER_PROC_NOT, scope) == 1;
+            removed += EpisodicStoreForget(&g_proc, w, SERVER_PROC_IS, scope) == 1;
+            fprintf(stderr, "[procmem] forget %s scope=%s removed=%d entries=%u\n", w, scope, removed, g_proc.count);
+            snprintf(content, sizeof(content), removed
+                     ? "[memoria procedimental] Olvidado `%s` (%s). La próxima vez lo vuelvo a comprobar."
+                     : "[memoria procedimental] No tenía nada guardado sobre `%s` (%s).", w, scope);
+        }
+        else
+            snprintf(content, sizeof(content), "Uso: memoria procedimental olvida PALABRA");
+        SendContentForRequest(s, body, ++g_seq, content, query, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
     if (strcmp(query, "/procedural") == 0 || strcmp(query, "/procedimental") == 0 ||
         strcasecmp(query, "memoria procedimental") == 0)
     {
@@ -2282,15 +2304,15 @@ static void HandleCompletions(socket_t s, const char *body,
         char raw2[8192], mapped[8192];
         ProcLogDecision(query, &proc_tr);
         if (!g_session_ready || !ServerAnswerQuery(&g_session, query, raw2, sizeof(raw2)) || ServerIsUnknown(raw2))
-            mapped[0] = '\0';
+            snprintf(mapped, sizeof(mapped), "I don't know.");
         else
             ServerMapContent(raw2, mapped, sizeof(mapped));
         if (proc_tr.p2[0])
-            snprintf(content, sizeof(content), "Ya comprobé antes que ni `%s` ni `%s` son programas disponibles en este entorno (lo recuerdo), así que no lo ejecuto como comando.%s%s",
-                     proc_tr.p1, proc_tr.p2, mapped[0] ? "\n\n" : "", mapped);
+            snprintf(content, sizeof(content), "%s\n\n(Lo he tratado como pregunta: ya comprobé en la última hora que ni `%s` ni `%s` son programas aquí. Si ya lo has instalado, escribe `memoria procedimental olvida %s`.)",
+                     mapped, proc_tr.p1, proc_tr.p2, proc_tr.p2);
         else
-            snprintf(content, sizeof(content), "Ya comprobé antes que `%s` no es un programa disponible en este entorno (lo recuerdo), así que no lo ejecuto como comando.%s%s",
-                     proc_tr.p1, mapped[0] ? "\n\n" : "", mapped);
+            snprintf(content, sizeof(content), "%s\n\n(Lo he tratado como pregunta: ya comprobé en la última hora que `%s` no es un programa aquí. Si ya lo has instalado, escribe `memoria procedimental olvida %s`.)",
+                     mapped, proc_tr.p1, proc_tr.p1);
         SendContentForRequest(s, body, ++g_seq, content, query, resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
@@ -2751,9 +2773,15 @@ static void HandleCompletions(socket_t s, const char *body,
         }
         else
         {
-            snprintf(content, sizeof(content),
-                     "Peticion de inspeccion o codigo ('%s') recibida, pero no hay herramientas declaradas en la sesion ni repositorio indexado.",
-                     query);
+            /* No tools and no repository: a question about code can still be
+               grounded in the text corpus; only fall back when it is not. */
+            char raw3[8192];
+            if (g_session_ready && ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) && !ServerIsUnknown(raw3))
+                ServerMapContent(raw3, content, sizeof(content));
+            else
+                snprintf(content, sizeof(content),
+                         "Peticion de inspeccion o codigo ('%s') recibida, pero no hay herramientas declaradas en la sesion ni repositorio indexado.",
+                         query);
         }
 
         if (ServerWantsStream(body))

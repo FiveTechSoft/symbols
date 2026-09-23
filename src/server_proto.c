@@ -6,6 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <time.h>
 #include "compat.h"
 #include "chat.h"
 #include "server_proto.h"
@@ -4455,8 +4456,22 @@ static int ProcSet(EPISODIC_STORE *st, const char *scope, const char *word, int 
         EpisodicStoreForget(st, word, other, scope);
         changed = 1;
     }
-    if (EpisodicStoreAppend(st, word, rel, scope, "probe") == 1)
-        changed = 1;
+    {
+        int rc = EpisodicStoreAppend(st, word, rel, scope, "probe");
+        if (rc == 1)
+            changed = 1;
+        else if (rc == 2)
+        {
+            /* re-verified: refresh when it was last seen true */
+            uint32_t i;
+            for (i = 0; i < st->count; i++)
+                if (strcmp(st->records[i].subject, word) == 0 &&
+                    strcmp(st->records[i].relation, rel) == 0 &&
+                    strcmp(st->records[i].object, scope) == 0)
+                    st->records[i].timestamp = (uint64_t)time(NULL);
+            EpisodicStoreSave(st);
+        }
+    }
     if (changed && learned && lsize)
     {
         size_t l = strlen(learned);
@@ -4537,6 +4552,20 @@ void ServerStripProbeLines(const char *in, char *out, size_t size)
     out[o] = '\0';
 }
 
+/* Age in seconds of the newest record for word in scope, or -1. */
+static long ProcAge(const EPISODIC_STORE *st, const char *scope, const char *word)
+{
+    uint32_t i;
+    uint64_t best = 0;
+    if (st == NULL || scope == NULL || word == NULL) return -1;
+    for (i = 0; i < st->count; i++)
+        if (strcmp(st->records[i].subject, word) == 0 && strcmp(st->records[i].object, scope) == 0 &&
+            st->records[i].timestamp > best)
+            best = st->records[i].timestamp;
+    if (best == 0) return -1;
+    return (long)((uint64_t)time(NULL) - best);
+}
+
 int ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char *scope,
                         SERVER_PROC_TRACE *trace)
 {
@@ -4562,7 +4591,12 @@ int ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char 
     tr.p1_known = ServerProcRecall(st, scope, tr.p1);
     tr.p2_known = had_prefix ? ServerProcRecall(st, scope, tr.p2) : 0;
     if (trace) *trace = tr;
-    if (!strong && tr.p1_known < 0 && (!had_prefix || tr.p2_known < 0))
+    /* Skipping the tool relies on a negative in program position; the
+       environment can change (a program gets installed), so that negative
+       only stands while it is recent.  Past SERVER_PROC_NEG_TTL the line is
+       probed again and the memory refreshed or corrected. */
+    if (!strong && tr.p1_known < 0 && (!had_prefix || tr.p2_known < 0) &&
+        ProcAge(st, scope, had_prefix ? tr.p2 : tr.p1) <= SERVER_PROC_NEG_TTL)
     {
         if (trace) trace->decision = SERVER_PROC_FROM_MEMORY;
         return 2;

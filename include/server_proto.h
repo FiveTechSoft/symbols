@@ -149,6 +149,7 @@ int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start);
    verificar -> aprender).  Records: word is_command|not_command scope. */
 #define SERVER_PROC_IS  "is_command"
 #define SERVER_PROC_NOT "not_command"
+#define SERVER_PROC_NEG_TTL 3600   /* seconds a missing-program memory may skip the probe */
 typedef struct {
     int p1_known, p2_known;      /* +1 command, -1 not a command, 0 unknown */
     int decision;                /* SERVER_PROC_* below */
