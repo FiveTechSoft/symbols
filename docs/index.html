@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Symbolic LLM — Autonomous Deterministic Agent & Knowledge Engine</title>
+  <title>Symbolic LLM — Deterministic Code Verification and Repair Engine</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,20 +26,20 @@
     <!-- Live Performance Metrics -->
     <div class="hud-telemetry">
       <div class="hud-card">
-        <span class="hud-label">Inference Latency</span>
-        <span class="hud-value" id="hudLatency">0.072 µs</span>
+        <span class="hud-label">Last Reply Latency</span>
+        <span class="hud-value" id="hudLatency">—</span>
       </div>
       <div class="hud-card">
-        <span class="hud-label">Memory / Fact</span>
+        <span class="hud-label">Relation Struct</span>
         <span class="hud-value">32 Bytes</span>
       </div>
       <div class="hud-card">
-        <span class="hud-label">Hallucination Rate</span>
-        <span class="hud-value highlight-green">0.00% (P=0)</span>
+        <span class="hud-label">No Evidence</span>
+        <span class="hud-value highlight-green">Abstains</span>
       </div>
       <div class="hud-card">
-        <span class="hud-label">Ingest Throughput</span>
-        <span class="hud-value">5.4M rel/s</span>
+        <span class="hud-label">Status</span>
+        <span class="hud-value">Research prototype</span>
       </div>
     </div>
 
@@ -154,7 +154,7 @@
         <!-- Welcome Hero Banner & Suggested Prompts -->
         <div class="hero-pills-container">
           <div class="hero-pills-title">
-            <span>⚡</span> Autonomous Deterministic Dialogue — Try asking:
+            <span>⚡</span> Deterministic Dialogue — Try asking:
           </div>
           <div class="pills-grid">
             <button class="prompt-pill" onclick="sendPrompt('what areas do you know?')">

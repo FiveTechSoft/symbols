@@ -1,5 +1,5 @@
 // engine.js - Pure JavaScript Implementation of the Symbolic LLM Core Engine
-// Strict 0% Hallucination, O(1) Graph Lookups, Concept Concentration (kappa), Verbatim Provenance
+// Fail-closed answers (abstain without evidence), hash-indexed graph lookups, Concept Concentration (kappa), Verbatim Provenance
 
 class SymbolicEngine {
   constructor() {
@@ -415,8 +415,8 @@ class SymbolicEngine {
       const res = this.ingestText(payload, "user_dialogue");
       this.episodic.learnedFacts.push(payload);
       response = isSpanish
-        ? `Entendido. Almacenado literalmente en memoria e incorporados ${res.symbolsAdded} nuevos símbolos y aristas al grafo en ${res.elapsedMs.toFixed(3)} ms. Cero alucinación garantizado.`
-        : `Understood. Stored verbatim into literal memory and incorporated ${res.symbolsAdded} new symbols and relational edges into the graph in ${res.elapsedMs.toFixed(3)} ms. Zero hallucination guaranteed.`;
+        ? `Entendido. Almacenado literalmente en memoria e incorporados ${res.symbolsAdded} nuevos símbolos y aristas al grafo en ${res.elapsedMs.toFixed(3)} ms.`
+        : `Understood. Stored verbatim into literal memory and incorporated ${res.symbolsAdded} new symbols and relational edges into the graph in ${res.elapsedMs.toFixed(3)} ms.`;
       status = "DYNAMIC_LEARNED";
     }
     // Intent 4: Specific Kinship/Succession/Fact Queries
@@ -717,7 +717,7 @@ class SymbolicEngine {
         }
       }
 
-      // 4D. Fail-Closed Fallback (0% hallucination)
+      // 4D. Fail-Closed Fallback (abstain without evidence)
       if (!response) {
         response = isSpanish
           ? "No lo sé (No existe verdad de base verificada en el corpus para esta afirmación)."

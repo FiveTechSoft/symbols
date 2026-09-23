@@ -73,7 +73,7 @@ Measured on commit `97c4123` on 2026-09-23 (linux, build) with `python3 tools/me
 | Server latency | p50 1.7 ms, p95 2.6 ms | same set, local |
 | Procedural memory: repeat benefit | 6 real commands: 6 probes the first time → 0 on repeat | same list twice, the probe really runs; non-commands are re-probed on purpose |
 | C edit operator (OpenCode) | 46 asserts pass, 0 fail | `test_c_edit_ops` |
-| Engineering task bank (56 tasks, 8 categories) | `symbols-agent`: 27/56 pass (48%; dev 19/32, retired held-out 8/24 (seen since fa230f4; blind: none yet)), 0 wrong edits, 29 untouched; by category: build_ci 0/7, compiler_repair 6/7, debug 4/7, docs 3/7, multi_file 5/7, refactor 4/7, shell 0/7, test_authoring 5/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 56/56) |
+| Engineering task bank (56 tasks, 8 categories) | `symbols-agent`: 27/56 pass (48%; dev 19/32, retired held-out 8/24 (seen since fa230f4); blind batch counted separately by Mimo with --counts-only, see COORDINATION.md), 0 wrong edits, 29 untouched; by category: build_ci 0/7, compiler_repair 6/7, debug 4/7, docs 3/7, multi_file 5/7, refactor 4/7, shell 0/7, test_authoring 5/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 56/56) |
 | Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |
 | CI per platform | apply: success, ci / asan-msvc: success, ci / build-test-linux: success, ci / build-test-msvc: success | [run](https://github.com/FiveTechSoft/symbols/actions/runs/35897257996); failing tests are listed in each job log |
 | Hand-written rules (declared) | 51 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
@@ -188,6 +188,8 @@ These runs demonstrate the named paths only. They do not turn shell access into 
 The CI workflow builds normal MSVC and GCC configurations and includes Windows sanitizer jobs and corpus linting. The release rule is stricter than a local green run: evidence must belong to the exact SHA under discussion.
 
 Durable run [#27](https://github.com/FiveTechSoft/symbols/actions/runs/35703732949) validated the integration sequence leading to this paper: Linux and MSVC Release passed. The sanitizer job remained red on two pre-existing performance thresholds under sanitizer instrumentation; its AgentShell memory-safety test passed and reported no AddressSanitizer memory error. This is partial cross-platform evidence, not a fully green release matrix.
+
+Since then the sanitizer build skips only its throughput thresholds (it prints the measured value and still runs every functional check), and the full matrix (apply, Linux, MSVC, MSVC ASan) passed on consecutive `master` commits, for example [run for 929c2e2](https://github.com/FiveTechSoft/symbols/actions/runs/35900870211). That is evidence for those SHAs only; any later SHA needs its own green run.
 
 ### 4.5 Performance numbers
 

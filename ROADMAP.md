@@ -26,9 +26,9 @@ The repository already contains substantial symbolic and agent infrastructure. T
 
 ### Native engine and measured C components
 
-- An O(1) relation store with a fixed 32-byte relation representation, snapshot persistence, provenance, rule reasoning, planning, diagnosis, and graph traversal.
+- A hash-indexed relation store (expected-average, not worst-case constant time) with a 32-byte relation representation on the tested ABIs, snapshot persistence, provenance, rule reasoning, planning, diagnosis, and graph traversal.
 - CCG realization, VSA operations, commonsense ingestion, and persona projection with dedicated unit tests and benchmarks documented in `README.md` and the completed milestones in the previous roadmap.
-- Current published benchmark evidence includes 1,000,000 relations in 32.00 MB, 72 ns random relation queries, 5.4 million triples/second ingestion, and representative SWE-bench patch verification averaging about 1.50 ms/task. These are baselines to preserve, not substitutes for end-to-end task success.
+- Stress benchmarks for relations and embeddings exist, but this roadmap does not cite their timing or memory figures as evidence. The `bench_1m` summary counter is internally inconsistent, and timings depend on compiler, build type, OS, and hardware; see `README.md` section 4.5. Figures become evidence only after the harness is corrected and CI records the environment on the final SHA.
 
 ### Coding-agent operators
 
@@ -284,13 +284,13 @@ Phases are measured with the same metrics the README publishes (Section 2.1, reg
 |---|---|---|---|---|---|
 | Agent: C repair, evaluation (resolved) | 12/25 | ≥ 12/25 | ≥ 15/25 | ≥ 18/25 | ≥ 20/25 |
 | Harmful edits (any suite) | 0 | 0 | 0 | 0 | 0 |
-| Varied engineering task bank (resolved, hidden split) | not measured | bank exists (≥ 50 tasks, ≥ 8 categories) | ≥ 20% | ≥ 40% | ≥ 60% |
+| Varied engineering task bank (resolved, hidden split) | blind 2/24 (Mimo, counts only; public bank 27/56, see README) | bank exists (≥ 50 tasks, ≥ 8 categories) | ≥ 20% | ≥ 40% | ≥ 60% |
 | Grounded QA: precision | see README | ≥ 85% | ≥ 90% | ≥ 95% | ≥ 95% |
 | Grounded QA: recall | see README | ≥ 80% | ≥ 85% | ≥ 90% | ≥ 90% |
 | Invented or wrong answers on the QA set | see README | ≤ 2 | ≤ 1 | 0 | 0 |
 | Memory: probes when repeating already-learned commands | 0 | 0 | 0 | 0 | 0 |
 | Memory: repeated tasks solved faster or with fewer attempts | not measured | not measured | measured | ≥ 50% | ≥ 80% |
-| CI on the final SHA (Linux, MSVC, MSVC ASan) | ASan red only on performance thresholds | green except performance thresholds | fully green | fully green | fully green |
+| CI on the final SHA (Linux, MSVC, MSVC ASan) | fully green on recent `master` SHAs (sanitizer skips only throughput thresholds) | green except performance thresholds | fully green | fully green | fully green |
 | Declared hand-written rules | see README | does not grow undeclared | decreasing | decreasing | decreasing |
 
 ## Cross-cutting release gates

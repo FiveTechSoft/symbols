@@ -286,7 +286,7 @@ async function handleUserSend() {
   appendMessage("user", query);
 
   // Live HUD animation
-  document.getElementById("hudLatency").innerText = "0.072 µs";
+  document.getElementById("hudLatency").innerText = "…";
 
   if (currentMode === "server") {
     // Forward query to C11 symbols-server
@@ -431,7 +431,7 @@ async function executeInBrowserEngine(query) {
   // If local knowledge graph returns UNKNOWN_FAIL_CLOSED and agenticWebSearch is enabled:
   if (res.status === "UNKNOWN_FAIL_CLOSED" && isAgenticWebSearchEnabled) {
     const topic = extractSearchTopic(query, engine?.episodic?.activeFocus);
-    addSystemMessage(`🔍 Zero-Hallucination Gate triggered: No local ground truth for "${query}". Invoking Real-Time Web Search Tool${topic ? ` (Target: '${topic}')` : ""}...`);
+    addSystemMessage(`🔍 No-evidence gate triggered: No local ground truth for "${query}". Invoking Real-Time Web Search Tool${topic ? ` (Target: '${topic}')` : ""}...`);
     const webResult = await fetchWebKnowledge(query, topic);
 
     if (webResult && webResult.text) {
@@ -592,13 +592,13 @@ function appendMessage(role, text, meta = {}) {
   innerHTML += `</div>`;
 
   if (role === "assistant" && meta.status) {
+    const hud = document.getElementById("hudLatency");
+    if (hud) hud.innerText = meta.elapsedMs ? `${meta.elapsedMs.toFixed(3)} ms` : "n/a";
     const isUnknown = meta.status.includes("UNKNOWN");
     innerHTML += `
       <div class="message-meta">
         <span class="meta-pill ${isUnknown ? 'unknown' : ''}">${meta.status}</span>
-        <span>Latency: ${meta.elapsedMs ? meta.elapsedMs.toFixed(3) : '0.072'} ms</span>
-        <span>RAM: 32 bytes</span>
-        <span>Hallucination: 0.00%</span>
+        <span>Latency: ${meta.elapsedMs ? meta.elapsedMs.toFixed(3) + ' ms' : 'n/a'}</span>
       </div>
     `;
   }
@@ -637,7 +637,7 @@ async function triggerWebSearchTool() {
     saveSessionToStorage();
     updateUIStats();
     rebuildGraphVisualizer();
-    addSystemMessage(`✅ Ingested '${webResult.title}' from Wikipedia in ${res.elapsedMs.toFixed(2)} ms (+${res.sentencesAdded} sentences, +${res.symbolsAdded} symbols). You can now ask questions about '${webResult.title}' with 0% hallucination.`);
+    addSystemMessage(`✅ Ingested '${webResult.title}' from Wikipedia in ${res.elapsedMs.toFixed(2)} ms (+${res.sentencesAdded} sentences, +${res.symbolsAdded} symbols). You can now ask questions about '${webResult.title}' grounded in that text.`);
   } else {
     addSystemMessage(`⚠ Could not retrieve verified Wikipedia article for '${topic}'. Preserving honest fail-closed unknown.`);
   }

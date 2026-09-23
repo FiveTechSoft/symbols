@@ -1,5 +1,6 @@
 /* ============================================================
-   agent_cli_main.c: Standalone Autonomous Senior Staff AI Coding Agent CLI.
+   agent_cli_main.c: symbols-agent CLI, a deterministic code verification
+   and repair agent. It is not a general autonomous programmer.
    Pure ISO C11, zero tensors, zero backprop, fail-closed verification.
 
    Usage:
@@ -27,8 +28,10 @@
 static void PrintHelp(const char *prog)
 {
     printf("=========================================================\n");
-    printf("  SYMBOLS-AGENT: Autonomous Senior Staff AI Coding Agent \n");
-    printf("  Pure ISO C11, Zero Backprop, Fail-Closed Verification  \n");
+    printf("  SYMBOLS-AGENT: deterministic code verification and\n");
+    printf("  repair agent. Pure ISO C11, fail-closed verification.\n");
+    printf("  Not a general autonomous programmer: work outside its\n");
+    printf("  verified operators abstains. See README.md, section 7.\n");
     printf("=========================================================\n\n");
     printf("Usage:\n");
     printf("  %s [options] [task_description]\n\n", prog);
