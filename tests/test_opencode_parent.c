@@ -33,6 +33,8 @@ static void check(const char *name, int ok)
 #define R3_OK "{\"role\":\"tool\",\"tool_call_id\":\"t3\",\"content\":\"task_id: ses_b (for resuming to continue this task if needed)\\n\\n<task_result>\\nDone.\\n</task_result>\"}"
 #define V2 "{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"v2\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"{\\\"command\\\":\\\"gcc src/b.c\\\",\\\"description\\\":\\\"symbols-reverify: src/b.c\\\"}\"}}]}"
 #define V2_OK "{\"role\":\"tool\",\"tool_call_id\":\"v2\",\"content\":\"symbols-exit=0\\n\"}"
+#define USER_AT(name) "{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"@" name " fix the compile error in a.c\"},{\"type\":\"text\",\"text\":\" Use the above message and context to generate a prompt and call the task tool with subagent: " name "\"}]}"
+#define USER_ONE "{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fix the compile error in a.c\"}]}"
 
 static void set_mem_env(const char *path)
 {
@@ -108,6 +110,25 @@ int main(void)
           strstr(d.calls.calls[0].arguments, "symbols-reverify: src/b.c"));
     check("final report after every part rebuilt", decide(1, USER "," GLOB "," TASKS "," R1_OK "," R2_ERR "," V1 "," V1_OK "," RES2 "," R3_OK "," V2 "," V2_OK, &d) == SA_TEXT &&
           strstr(d.text, "`a.c` -> general") && strstr(d.text, "`src/b.c` -> general (task ses_b, 2 attempts): done"));
+
+    /* explicit @agent mention (declared rule): honored even for one part */
+    {
+        char declared1[8][64] = { "bash", "glob", "todowrite", "task" };
+        const char *q_at = "@explore fix the compile error in a.c\n Use the above message and context to generate a prompt and call the task tool with subagent: explore";
+        check("mention: agent found only when listed", SaMentionedAgent(q_at, ag, na) == 0 &&
+              SaMentionedAgent("call the task tool with subagent: builder", ag, na) == -1 &&
+              SaMentionedAgent("fix a.c", ag, na) == -1);
+        check("@explore on one file delegates that one part to explore",
+              SaDecide(body(1, USER_AT("explore") "," GLOB), declared1, 4, q_at, &d) == SA_CALLS && d.calls.count == 1 &&
+              strstr(d.calls.calls[0].arguments, "\"subagent_type\":\"explore\"") && strstr(d.calls.calls[0].arguments, "part: a.c"));
+        check("mention scaffolding is not in the child's prompt", !strstr(d.calls.calls[0].arguments, "@explore") &&
+              !strstr(d.calls.calls[0].arguments, "call the task tool") && strstr(d.calls.calls[0].arguments, "fix the compile error in a.c"));
+        const char *q_bad = "@builder fix the compile error in a.c\n Use the above message and context to generate a prompt and call the task tool with subagent: builder";
+        check("mention of an unlisted agent: no delegation for one part",
+              SaDecide(body(1, USER_AT("builder") "," GLOB), declared1, 4, q_bad, &d) == SA_NONE);
+        check("one part without a mention: no delegation",
+              SaDecide(body(1, USER_ONE "," GLOB), declared1, 4, "fix the compile error in a.c", &d) == SA_NONE);
+    }
 
     static char out[16384];
     const char *b = body(1, USER "," GLOB "," TASKS "," R1_OK "," R2_ERR "," V1 "," V1_OK "," RES2 "," R3_ERR);

@@ -583,6 +583,7 @@ typedef struct
     int last_is_tool;
     char listing[16384];   /* latest glob/list output */
     int listing_is_last;
+    char last_user[4096];  /* text parts of the latest user message */
 } SA_HIST;
 
 static void SaParseHistory(const char *body, SA_HIST *h)
@@ -657,6 +658,8 @@ static void SaParseHistory(const char *body, SA_HIST *h)
                 }
             }
         }
+        else if (strcmp(role, "user") == 0)
+            SaContent(SaKey(p, pe, "content"), h->last_user, sizeof(h->last_user));
         else if (strcmp(role, "tool") == 0)
         {
             char tcid[64];
@@ -752,6 +755,44 @@ static void SaTail(const char *s, size_t keep, char *out, size_t size)
 
 enum { P_WAIT, P_VERIFY, P_FAILED, P_DONE, P_UNVERIFIED };
 
+int SaMentionedAgent(const char *user_text, const SA_AGENT *agents, int n)
+{
+    const char *m = user_text ? strstr(user_text, SA_MENTION_MARK) : NULL;
+    if (!m)
+        return -1;
+    m += strlen(SA_MENTION_MARK);
+    for (int a = 0; a < n; a++)
+    {
+        size_t l = strlen(agents[a].name);
+        if (l && strncmp(m, agents[a].name, l) == 0 && !SaIsNameChar(m[l]) && m[l] != '-')
+            return a;
+    }
+    return -1;
+}
+
+/* The user's own request without OpenCode's mention scaffolding: drops a
+   leading "@name " and the appended SA_MENTION_MARK sentence. */
+static void SaMentionQuery(const char *query, const char *name, char *out, size_t size)
+{
+    const char *q = query;
+    while (*q == ' ' || *q == '\n') q++;
+    size_t l = strlen(name);
+    if (q[0] == '@' && strncmp(q + 1, name, l) == 0 && (q[1 + l] == ' ' || q[1 + l] == '\0'))
+        q += 1 + l;
+    while (*q == ' ') q++;
+    snprintf(out, size, "%s", q);
+    char *m = strstr(out, SA_MENTION_MARK);
+    if (m)
+    {
+        /* cut back to the start of the sentence that carries the mark */
+        char *c = m;
+        while (c > out && c[-1] != '\n' && c[-1] != '.') c--;
+        *c = '\0';
+        size_t k = strlen(out);
+        while (k && (out[k - 1] == ' ' || out[k - 1] == '\n')) out[--k] = '\0';
+    }
+}
+
 int SaDecide(const char *body, char declared[][64], int ndeclared,
              const char *query, SA_DECISION *d)
 {
@@ -774,31 +815,44 @@ int SaDecide(const char *body, char declared[][64], int ndeclared,
         if (!SaHasTool(declared, ndeclared, "task") || !h.listing_is_last || !query)
             return SA_NONE;
         char parts[SA_MAX_PARTS][260];
-        int np = SaNamedParts(query, h.listing, workdir, parts, SA_MAX_PARTS);
-        if (np < 2)
-            return SA_NONE;
         int na = SaParseAgents(body, agents, SA_MAX_AGENTS);
         if (na == 0)
             return SA_NONE;
-        for (int i = 0; i < np; i++)
+        /* An explicit @agent the client relays (declared rule) is honored
+           even for one part; it overrides the agent choice and memory. */
+        int mentioned = SaMentionedAgent(h.last_user, agents, na);
+        char mq[4096];
+        if (mentioned >= 0)
         {
-            int a = SaChooseAgent(agents, na, parts[i]);
-            if (a < 0 || SaMemoryScore(agents[a].name, parts[i]) <= -2)
-                return SA_NONE;   /* memory says delegation fails here */
+            SaMentionQuery(query, agents[mentioned].name, mq, sizeof(mq));
+            query = mq;
         }
+        int np = SaNamedParts(query, h.listing, workdir, parts, SA_MAX_PARTS);
+        if (np < (mentioned >= 0 ? 1 : 2))
+            return SA_NONE;
+        if (mentioned < 0)
+            for (int i = 0; i < np; i++)
+            {
+                int a = SaChooseAgent(agents, na, parts[i]);
+                if (a < 0 || SaMemoryScore(agents[a].name, parts[i]) <= -2)
+                    return SA_NONE;   /* memory says delegation fails here */
+            }
         for (int i = 0; i < np; i++)
         {
-            int a = SaChooseAgent(agents, na, parts[i]);
+            int a = mentioned >= 0 ? mentioned : SaChooseAgent(agents, na, parts[i]);
             char prompt[2600], own[1800];
             SaPartQuery(query, parts, np, i, own, sizeof(own));
             snprintf(prompt, sizeof(prompt),
-                     "%s\n\nYour part is only `%s`; do not change any other file "
+                     np > 1 ? "%s\n\nYour part is only `%s`; do not change any other file "
                      "(other parts run in parallel). Make the change, build or run "
+                     "the relevant check, and end with the files you changed and the "
+                     "check's result." : "%s\n\nYour part is only `%s`; do not change any other file. Make the change, build or run "
                      "the relevant check, and end with the files you changed and the "
                      "check's result.", own, parts[i]);
             SaTaskCall(&d->calls, agents[a].name, parts[i], NULL, prompt);
         }
-        fprintf(stderr, "[subagent] delegating %d parts\n", np);
+        fprintf(stderr, "[subagent] delegating %d part%s%s%s\n", np, np == 1 ? "" : "s",
+                mentioned >= 0 ? " to explicit @" : "", mentioned >= 0 ? agents[mentioned].name : "");
         d->kind = SA_CALLS;
         return d->kind;
     }
@@ -915,7 +969,7 @@ int SaDecide(const char *body, char declared[][64], int ndeclared,
     }
     /* Final: record outcomes, then either report or do the rest directly. */
     size_t o = 0;
-    o += (size_t)snprintf(d->text + o, sizeof(d->text) - o, "Delegated %d parts in parallel:", np);
+    o += (size_t)snprintf(d->text + o, sizeof(d->text) - o, np == 1 ? "Delegated %d part:" : "Delegated %d parts in parallel:", np);
     for (int k = 0; k < np && o < sizeof(d->text); k++)
     {
         const char *agent = h.c[last_task[k]].subagent;

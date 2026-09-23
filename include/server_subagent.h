@@ -62,6 +62,13 @@ int  SaMemoryScore(const char *agent, const char *part);
 #define SA_PARALLEL_WORDS "execute multiple units of work in parallel"
 int SaChooseAgent(const SA_AGENT *agents, int n, const char *part);
 
+/* Explicit @agent mention (declared protocol rule): OpenCode 1.18 appends
+   this sentence, followed by the agent name, to a user message that starts
+   with "@name". Honored only when the name is in the task tool's agent list;
+   then even one named workspace file is delegated, to that agent. */
+#define SA_MENTION_MARK "call the task tool with subagent: "
+int SaMentionedAgent(const char *user_text, const SA_AGENT *agents, int n);
+
 enum { SA_NONE = 0, SA_CALLS = 1, SA_TEXT = 2, SA_DIRECT = 3 };
 
 typedef struct
