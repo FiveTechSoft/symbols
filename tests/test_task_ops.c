@@ -363,6 +363,37 @@ int main(void)
               "memory off (default): fixed operator order");
     }
 
+    /* operator 6: doc_sync */
+    {
+        char d[512]; make_dir(d, sizeof(d), "docflag");
+        const char *c = "#include <string.h>\nint main(int c, char **v) { return c > 1 && !strcmp(v[1], \"--quiet\") ? 0 : 0; }\n";
+        put(d, "app.c", c);
+        put(d, "USAGE.md", "Pass --silent to mute it. --silent is optional.\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "USAGE.md says --silent but app.c checks --quiet. Make the docs match.", &r);
+        CHECK(kept && !strcmp(r.op, "doc_sync") && !strcmp(get(d, "USAGE.md"), "Pass --quiet to mute it. --quiet is optional.\n") &&
+              !strcmp(get(d, "app.c"), c), "doc_sync: flag in docs replaced by the one the code uses; code untouched");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "doccall");
+        put(d, "lib.c", "int scale(int k, int f) { return k * f; }\n");
+        put(d, "README", "Call `scale(k)` to scale.\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "The README shows scale(k) but lib.c defines scale(int k, int f); document scale(int k, int f).", &r);
+        CHECK(kept && strstr(get(d, "README"), "`scale(int k, int f)`") && !strstr(get(d, "README"), "scale(k)"),
+              "doc_sync: call signature synced from the definition");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "docamb");
+        const char *md = "Use --fast or --tiny.\n";
+        put(d, "main.c", "int main(void) { const char *a = \"--quick\", *b = \"--small\"; return a == b; }\n");
+        put(d, "notes.md", md);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "notes.md mentions --fast and --tiny; code has --quick and --small.", &r) &&
+              !strcmp(get(d, "notes.md"), md) && strstr(r.reason, "ambiguous"),
+              "doc_sync: two stale terms = abstain");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

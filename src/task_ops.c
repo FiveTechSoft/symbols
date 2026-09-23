@@ -1291,9 +1291,192 @@ static char *apply_literal_plan(const TASK_OPS_WORKSPACE *ws, const LIT_PLAN *p,
    several operators could apply, the order follows remembered net success
    (kept - rolled_back) per operator, ties keep the default order. */
 
-enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_COUNT };
+/* ---------------------------------------------------------- doc_sync
+   Operator 6: the task names a code-shaped term A that a documentation file
+   (.md/.txt/.rst or README*) uses but no C source (.c/.h) contains, and
+   exactly one other term B of the same shape that a C source does contain.
+   Replace A with B in the documentation files only. Shapes (declared
+   lexical rule): flag "-x"/"--name", call "name(...)", identifier with '_'
+   or a digit for A (any identifier of 3+ chars, not a C keyword, for B). */
+
+enum { DS_NONE, DS_FLAG, DS_CALL, DS_IDENT };
+
+static int is_doc_file(const char *rel)
+{
+    const char *base = strrchr(rel, '/');
+    base = base ? base + 1 : rel;
+    size_t n = strlen(base);
+    if (!strncmp(base, "README", 6))
+        return 1;
+    return (n > 3 && !strcmp(base + n - 3, ".md")) || (n > 4 && !strcmp(base + n - 4, ".txt")) ||
+           (n > 4 && !strcmp(base + n - 4, ".rst"));
+}
+
+static int ds_boundary(int c) { return !ident_char(c) && c != '-'; }
+
+static int ds_count(const char *s, const char *term)
+{
+    size_t n = strlen(term);
+    int count = 0;
+    if (!n)
+        return 0;
+    for (const char *p = strstr(s, term); p; p = strstr(p + 1, term))
+        if ((p == s || ds_boundary((unsigned char)p[-1])) &&
+            (!ident_char((unsigned char)term[n - 1]) && term[n - 1] != '-' ? 1 : ds_boundary((unsigned char)p[n])))
+            count++;
+    return count;
+}
+
+static char *ds_replace(const char *s, const char *from, const char *to)
+{
+    size_t fl = strlen(from), tl = strlen(to), sl = strlen(s);
+    int hits = ds_count(s, from);
+    char *out = (char *)malloc(sl + (size_t)hits * (tl > fl ? tl - fl : 0) + 1), *w = out;
+    if (!out)
+        return NULL;
+    const char *p = s;
+    while (*p) {
+        const char *q = strstr(p, from);
+        while (q && !((q == s || ds_boundary((unsigned char)q[-1])) &&
+                      (!ident_char((unsigned char)from[fl - 1]) && from[fl - 1] != '-' ? 1 : ds_boundary((unsigned char)q[fl]))))
+            q = strstr(q + 1, from);
+        if (!q) {
+            size_t rest = strlen(p);
+            memcpy(w, p, rest);
+            w += rest;
+            break;
+        }
+        memcpy(w, p, (size_t)(q - p));
+        w += q - p;
+        memcpy(w, to, tl);
+        w += tl;
+        p = q + fl;
+    }
+    *w = '\0';
+    return out;
+}
+
+static int ds_shape(const char *t)
+{
+    size_t n = strlen(t);
+    if (n >= 2 && t[0] == '-' && (isalnum((unsigned char)t[1]) || (t[1] == '-' && n >= 3 && isalnum((unsigned char)t[2])))) {
+        for (size_t i = 1; i < n; i++)
+            if (!ident_char((unsigned char)t[i]) && t[i] != '-')
+                return DS_NONE;
+        return DS_FLAG;
+    }
+    if (!ident_start((unsigned char)t[0]))
+        return DS_NONE;
+    size_t i = 0;
+    while (ident_char((unsigned char)t[i]))
+        i++;
+    if (t[i] == '(' && n > i + 1 && t[n - 1] == ')' && !strchr(t + i + 1, '(') && strchr(t + i, ')') == t + n - 1)
+        return DS_CALL;
+    return t[i] == '\0' ? DS_IDENT : DS_NONE;
+}
+
+static int ds_is_keyword(const char *t)
+{
+    static const char *const kw[] = { "auto", "break", "case", "char", "const", "continue", "default", "do",
+        "double", "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return",
+        "short", "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void",
+        "volatile", "while", NULL };
+    for (int i = 0; kw[i]; i++)
+        if (!strcmp(t, kw[i]))
+            return 1;
+    return 0;
+}
+
+#define DS_MAX_TERMS 96
+/* Terms of the task text: whitespace-separated, with surrounding quotes,
+   backticks and trailing punctuation removed; "name(int n)" is rejoined. */
+static int ds_terms(const char *task, char terms[][128], int max)
+{
+    int n = 0;
+    const char *p = task;
+    while (*p && n < max) {
+        while (*p && isspace((unsigned char)*p))
+            p++;
+        if (!*p)
+            break;
+        const char *s = p;
+        int depth = 0;
+        while (*p && (depth > 0 || !isspace((unsigned char)*p))) {
+            if (*p == '(') depth++;
+            else if (*p == ')' && depth > 0) depth--;
+            p++;
+        }
+        size_t l = (size_t)(p - s);
+        while (l && strchr("'\"`", *s)) { s++; l--; }
+        while (l && strchr(".,;:!?'\"`", s[l - 1])) l--;
+        if (l == 0 || l >= 128)
+            continue;
+        memcpy(terms[n], s, l);
+        terms[n][l] = '\0';
+        int dup = 0;
+        for (int k = 0; k < n; k++)
+            if (!strcmp(terms[k], terms[n])) dup = 1;
+        if (!dup)
+            n++;
+    }
+    return n;
+}
+
+static int ds_in_file(const char *data, const char *term, int shape)
+{
+    return shape == DS_IDENT ? count_token_in(data, term) : ds_count(data, term);
+}
+
+static int ds_in(const TASK_OPS_WORKSPACE *ws, const char *term, int shape, int docs)
+{
+    int total = 0;
+    for (int i = 0; i < ws->count; i++) {
+        if (docs ? !is_doc_file(ws->files[i].rel) : !is_c_source(ws->files[i].rel))
+            continue;
+        total += shape == DS_IDENT ? count_token_in(ws->files[i].data, term) : ds_count(ws->files[i].data, term);
+    }
+    return total;
+}
+
+/* 1 = unique plan in a/b; >1 = ambiguous; 0 = none */
+static int find_doc_sync(const TASK_OPS_WORKSPACE *ws, const char *task, char *a, size_t as, char *b, size_t bs)
+{
+    static char terms[DS_MAX_TERMS][128];
+    int n = ds_terms(task, terms, DS_MAX_TERMS), na = 0, ia = -1;
+    for (int i = 0; i < n; i++) {
+        int sh = ds_shape(terms[i]);
+        if (sh == DS_NONE)
+            continue;
+        if (sh == DS_IDENT && !strpbrk(terms[i], "_0123456789"))
+            continue;
+        if (ds_in(ws, terms[i], sh, 1) > 0 && ds_in(ws, terms[i], sh, 0) == 0) {
+            na++;
+            ia = i;
+        }
+    }
+    if (na != 1)
+        return na;
+    int sa = ds_shape(terms[ia]), nb = 0, ib = -1;
+    for (int i = 0; i < n; i++) {
+        if (i == ia || ds_shape(terms[i]) != sa)
+            continue;
+        if (sa == DS_IDENT && (strlen(terms[i]) < 3 || ds_is_keyword(terms[i])))
+            continue;
+        if (ds_in(ws, terms[i], sa, 0) > 0) {
+            nb++;
+            ib = i;
+        }
+    }
+    if (nb != 1)
+        return nb;
+    snprintf(a, as, "%s", terms[ia]);
+    snprintf(b, bs, "%s", terms[ib]);
+    return 1;
+}
+
+enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit"
+    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync"
 };
 
 static int mem_enabled(void)
@@ -1423,7 +1606,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     int touched = 0;
     int renames = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
     char y_text[128] = {0};
-    int uses_before = 0, lit_file = -1, frags = 0;
+    int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
+    char da[128] = {0}, db[128] = {0};
     LIT_PLAN lit;
     char *lit_out = NULL;
     FRAG_HIT hit;
@@ -1480,11 +1664,23 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->op, sizeof(rep->op), "compiler_fixit");
                 snprintf(rep->detail, sizeof(rep->detail), "%d fix-it(s) in %d file(s)", fixes, touched);
             }
+        } else if (op == OP_DOCSYNC && (docs = find_doc_sync(ws, task, da, sizeof(da), db, sizeof(db))) == 1) {
+            int sh = ds_shape(da);
+            for (int i = 0; i < ws->count; i++)
+                if (is_doc_file(ws->files[i].rel) && ds_in_file(ws->files[i].data, da, sh) > 0) {
+                    next[i] = sh == DS_IDENT ? replace_token(ws->files[i].data, da, db) : ds_replace(ws->files[i].data, da, db);
+                    touched++;
+                }
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "doc_sync");
+            snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d doc file(s)", da, db, touched);
         }
     }
     if (!touched) {
         if (frags > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d places fit the stated fragment", frags);
+        else if (docs > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d doc terms fit", docs);
         else if (renames > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
         else
@@ -1522,6 +1718,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "literal_to_constant")) {
             int f2, files2;
             intent = literal_uses(after, &lit, &f2, &files2) == 0 && TaskOpsCountToken(after, lit.name) >= 2;
+        } else if (!strcmp(rep->op, "doc_sync")) {
+            int sh = ds_shape(da);
+            intent = ds_in(after, da, sh, 1) == 0 && ds_in(after, db, sh, 1) > 0;
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
@@ -1538,8 +1737,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
         if (!named_files_exist(ws, after, task, &named, &named_touched) ||
-            (named > 0 && named_touched == 0))
-            intent = 0;
+            (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
+            intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
         verified = intent && no_regress;
         if (!verified)
             snprintf(rep->reason, sizeof(rep->reason),
