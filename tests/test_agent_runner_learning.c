@@ -5,8 +5,8 @@
    Gate is fail-closed and one-sided:
      - second run must stay solved if first was solved;
      - second run must not use more attempts than the first;
-     - first-run time is recorded; second-run delta is reported
-       (speedup is informational — no wall-clock flake gate).
+     - improved = fewer attempts or fewer replans on pass 2
+       (wall-clock delta is informational only — no timing gate).
 
    Emits one LEARN line for scripts/bank_report.py.
    ============================================================ */
@@ -98,7 +98,8 @@ int main(void)
     if (a1 < 2)
         ok = 0;
 
-    improved = (ms2 > 0.0 && ms2 < ms1) ? 1 : 0;
+    /* improved = fewer attempts or fewer replans on pass 2 (not wall time). */
+    improved = (a2 < a1 || r2.replans_triggered < r1.replans_triggered) ? 1 : 0;
 
     printf("LEARN pass1_ms=%.3f pass2_ms=%.3f attempts1=%u attempts2=%u "
            "replans1=%u replans2=%u op1=%s op2=%s solved1=%d solved2=%d "

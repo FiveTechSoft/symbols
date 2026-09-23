@@ -74,6 +74,7 @@ def contains_check(*must: str, forbid: tuple[str, ...] = ()) -> str:
         forbid = (forbid,)
     parts = [
         "#!/usr/bin/env python3",
+        "import re",
         "import sys",
         "from pathlib import Path",
         "blob = ''",
@@ -88,16 +89,20 @@ def contains_check(*must: str, forbid: tuple[str, ...] = ()) -> str:
         "        blob += p.read_text(encoding='utf-8', errors='replace') + '\\n'",
         "    except OSError:",
         "        pass",
+        # Normalize whitespace so indentation / blank lines do not flip the check.
+        "norm = re.sub(r'\\s+', ' ', blob)",
         "ok = True",
     ]
     for m in must:
         parts.append(f"need = {m!r}")
-        parts.append("if need not in blob:")
+        parts.append("need_n = re.sub(r'\\s+', ' ', need)")
+        parts.append("if need not in blob and need_n not in norm:")
         parts.append("    print('missing', need)")
         parts.append("    ok = False")
     for f in forbid:
         parts.append(f"bad = {f!r}")
-        parts.append("if bad in blob:")
+        parts.append("bad_n = re.sub(r'\\s+', ' ', bad)")
+        parts.append("if bad in blob or bad_n in norm:")
         parts.append("    print('forbidden', bad)")
         parts.append("    ok = False")
     parts.append("sys.exit(0 if ok else 1)")
@@ -123,39 +128,37 @@ def files_check(required: tuple[str, ...], forbid: tuple[str, ...] = ()) -> str:
     return "\n".join(parts) + "\n"
 
 
-def _sh_bin() -> list[str]:
-    """POSIX shell that works on this host. Prefer Git bash over WSL bash."""
-    import shutil
-    candidates = [
-        r"C:\Program Files\Git\bin\bash.exe",
-        r"C:\Program Files\Git\usr\bin\sh.exe",
-        r"C:\Program Files (x86)\Git\bin\bash.exe",
-    ]
-    for cand in candidates:
-        if Path(cand).is_file():
-            return [cand]
-    # PATH lookup: bash may be WSL (system32) — only accept non-system32
+# Runtime shell resolver embedded in every generated shell check.
+# Resolved on the host that runs check.py — never baked at generation time.
+SH_RESOLVE = r'''import shutil
+def _sh_bin():
     for name in ("bash", "sh"):
         path = shutil.which(name)
         if path and "system32" not in path.lower():
             return [path]
-    # Last resort: any sh on PATH (Linux CI)
+    for cand in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\sh.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if Path(cand).is_file():
+            return [cand]
     path = shutil.which("sh")
     if path:
         return [path]
     return ["sh"]
+shell = _sh_bin()
+'''
 
 
 def run_script_check(script: str, expect_out: str) -> str:
-    shell = _sh_bin()
-    shell_lit = repr(shell)
     return f'''#!/usr/bin/env python3
 import subprocess, sys
 from pathlib import Path
+{SH_RESOLVE}
 if not Path({script!r}).is_file():
     print("missing", {script!r})
     sys.exit(1)
-shell = {shell_lit}
 r = subprocess.run(shell + [{script!r}], capture_output=True, text=True)
 out = (r.stdout or "") + (r.stderr or "")
 if r.returncode != 0:
@@ -170,12 +173,10 @@ sys.exit(0)
 
 def sh_run_check(argv_tail: str, expect_rc_expr: str, extra: str = "") -> str:
     """Build a check that runs a shell command via a portable shell."""
-    shell = _sh_bin()
-    shell_lit = repr(shell)
     return f'''#!/usr/bin/env python3
 import subprocess, sys
 from pathlib import Path
-shell = {shell_lit}
+{SH_RESOLVE}
 {extra}
 r = subprocess.run(shell + {argv_tail}, capture_output=True, text=True)
 rc = r.returncode
@@ -579,7 +580,7 @@ sys.exit(0 if t.startswith("#!/bin/sh") else 1)
          f'''#!/usr/bin/env python3
 import subprocess, sys
 from pathlib import Path
-shell = {_sh_bin()!r}
+{SH_RESOLVE}
 r = subprocess.run(shell + ["run.sh"], capture_output=True, text=True)
 if r.returncode != 0:
     print((r.stdout or "") + (r.stderr or ""))
@@ -608,21 +609,24 @@ sys.exit(0 if p.is_file() and p.read_text(encoding="utf-8").strip() == "OK" else
           "util.c": "#include \"util.h\"\nint get_limit(void) { return NEW_LIMIT; }\n",
           "main.c": "#include \"util.h\"\nint main(void) { return get_limit() == 10 ? 0 : 1; }\n"},
          contains_check("NEW_LIMIT", forbid=("OLD_LIMIT",))),
-        ("eb_mf_002",
-         "util.c defines helper but util.h does not declare it. Add the prototype to util.h so consumers can use it.",
-         {"util.h": "/* helpers */\n",
-          "util.c": "int helper(int x) { return x + 1; }\n",
-          "main.c": "int helper(int x);\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
-         {"util.h": "int helper(int x);\n",
-          "util.c": "int helper(int x) { return x + 1; }\n",
-          "main.c": "#include \"util.h\"\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
-         '''#!/usr/bin/env python3
+("eb_mf_002",
+          "util.c defines helper but util.h does not declare it. Add a prototype to util.h so consumers can use it. Parameter names may match the definition (int x) or be omitted (int).",
+          {"util.h": "/* helpers */\n",
+           "util.c": "int helper(int x) { return x + 1; }\n",
+           "main.c": "int helper(int x);\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
+          {"util.h": "int helper(int x);\n",
+           "util.c": "int helper(int x) { return x + 1; }\n",
+           "main.c": "#include \"util.h\"\nint main(void) { return helper(1) == 2 ? 0 : 1; }\n"},
+          '''#!/usr/bin/env python3
+import re
 import sys
 from pathlib import Path
 if not Path("util.h").is_file():
     sys.exit(1)
 t = Path("util.h").read_text(encoding="utf-8")
-sys.exit(0 if "int helper(int x);" in t else 1)
+# Accept parameter names or bare types: int helper(int x); / int helper(int);
+pat = re.compile(r"\\bint\\s+helper\\s*\\(\\s*int(?:\\s+\\w+)?\\s*\\)")
+sys.exit(0 if pat.search(t) else 1)
 '''),
         ("eb_mf_003",
          "main.c calls add() but the definition lives only in util.c without a header. Create util.h with the prototype and include it from both util.c and main.c.",

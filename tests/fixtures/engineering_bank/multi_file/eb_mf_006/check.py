@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import sys
 from pathlib import Path
 blob = ''
@@ -13,17 +14,21 @@ for p in Path('.').rglob('*'):
         blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
     except OSError:
         pass
+norm = re.sub(r'\s+', ' ', blob)
 ok = True
 need = '#define LIMIT 5'
-if need not in blob:
+need_n = re.sub(r'\s+', ' ', need)
+if need not in blob and need_n not in norm:
     print('missing', need)
     ok = False
 bad = '#define LIMIT 3'
-if bad in blob:
+bad_n = re.sub(r'\s+', ' ', bad)
+if bad in blob or bad_n in norm:
     print('forbidden', bad)
     ok = False
 bad = '#define LIMIT 4'
-if bad in blob:
+bad_n = re.sub(r'\s+', ' ', bad)
+if bad in blob or bad_n in norm:
     print('forbidden', bad)
     ok = False
 sys.exit(0 if ok else 1)

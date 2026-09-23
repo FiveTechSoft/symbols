@@ -18,14 +18,17 @@ BANK = ROOT / "tests" / "fixtures" / "engineering_bank"
 
 def _sh_args(script: str) -> list[str]:
     import shutil
-    for cand in ("bash", "sh", r"C:\Program Files\Git\bin\bash.exe",
-                 r"C:\Program Files\Git\usr\bin\sh.exe"):
-        if cand.endswith(".exe"):
-            path = cand if Path(cand).is_file() else None
-        else:
-            path = shutil.which(cand)
-        if path:
+    for cand in ("bash", "sh"):
+        path = shutil.which(cand)
+        if path and "system32" not in path.lower():
             return [path, script]
+    for cand in (r"C:\Program Files\Git\bin\bash.exe",
+                 r"C:\Program Files\Git\usr\bin\sh.exe"):
+        if Path(cand).is_file():
+            return [cand, script]
+    path = shutil.which("sh")
+    if path:
+        return [path, script]
     return ["sh", script]
 
 

@@ -16,7 +16,7 @@ Schema v1 (one JSONL row):
   ctest_exit      int   0 = all bank tests passed
   pass            bool  ctest_exit == 0
   wrong_edits     int   false positives (edit when expected to abstain)
-  learning        obj|null  repeat-task probe (pass1/pass2 times, improved)
+  learning        obj|null  repeat-task probe (pass1/pass2, improved = fewer attempts/replans)
   global          obj   aggregate over all suites
   suites          obj   name -> metrics
 
@@ -28,10 +28,11 @@ Per-suite metrics:
 clean_rate = pass_cases / cases  (met expectation with no wrong edit)
 resolution_rate = resolved / cases  (rc==1; includes wrong resolves)
 
-Usage (from repo root, after cmake --build build-gcc):
+Usage (from repo root, after cmake --build <dir>):
   python scripts/bank_report.py
   python scripts/bank_report.py --out bank_report.jsonl
   python scripts/bank_report.py --dry-run
+Build dir is auto-detected (build-gcc, build, ... with CTestTestfile.cmake).
 """
 from __future__ import annotations
 
@@ -60,11 +61,20 @@ CASE_RE = re.compile(
 )
 
 
+def detect_build_dir() -> str:
+    """First existing build dir with CTestTestfile.cmake; else build-gcc."""
+    for name in ("build-gcc", "build", "build-release", "build-debug"):
+        if (REPO / name / "CTestTestfile.cmake").is_file():
+            return name
+    return "build-gcc"
+
+
 def run_ctest() -> tuple[int, str]:
+    build_dir = detect_build_dir()
     cmd = [
         "ctest",
         "--test-dir",
-        "build-gcc",
+        build_dir,
         "-R",
         "|".join(TESTS),
         "-V",

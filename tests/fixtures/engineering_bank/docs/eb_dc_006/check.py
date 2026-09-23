@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import sys
 from pathlib import Path
 blob = ''
@@ -13,13 +14,16 @@ for p in Path('.').rglob('*'):
         blob += p.read_text(encoding='utf-8', errors='replace') + '\n'
     except OSError:
         pass
+norm = re.sub(r'\s+', ' ', blob)
 ok = True
 need = '## License'
-if need not in blob:
+need_n = re.sub(r'\s+', ' ', need)
+if need not in blob and need_n not in norm:
     print('missing', need)
     ok = False
 need = 'MIT'
-if need not in blob:
+need_n = re.sub(r'\s+', ' ', need)
+if need not in blob and need_n not in norm:
     print('missing', need)
     ok = False
 sys.exit(0 if ok else 1)
