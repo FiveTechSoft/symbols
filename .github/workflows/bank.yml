@@ -54,3 +54,35 @@ jobs:
           path: |
             bank_report.jsonl
             bank_row.txt
+
+  engineering-bank:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ ninja-build
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build symbols-agent
+        run: cmake --build build --target symbols-agent
+
+      - name: Bank self-test (gate, golden after/ must pass every check)
+        run: python3 tools/bank_harness.py --self-test --min-pass-rate 1.0 --out bank_selftest.json
+
+      - name: Bank run with symbols-agent (report only)
+        continue-on-error: true
+        run: python3 tools/bank_harness.py --out bank_agent.json
+
+      - name: Upload bank results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-bank
+          path: |
+            bank_selftest.json
+            bank_agent.json
