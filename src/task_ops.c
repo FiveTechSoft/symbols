@@ -5,6 +5,7 @@
 #include "agent_shell.h"
 #include "shell_ops.h"
 #include "build_ops.h"
+#include "c_fix_ops.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -2726,9 +2727,36 @@ static int build_verified(const TASK_OPS_WORKSPACE *after, const BUILD_EDIT *e)
     return ok;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_COUNT };
+/* The one C source a c_fix rule applies to; -1 when none or ambiguous. */
+static int cfix_target(const TASK_OPS_WORKSPACE *ws, const char *task, char **out,
+                       char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    int hit = -1;
+    *out = NULL;
+    for (int i = 0; i < ws->count; i++) {
+        if (!is_c_source(ws->files[i].rel))
+            continue;
+        char r[32], d[128];
+        char *o = CFixApply(ws->files[i].data, task, r, sizeof(r), d, sizeof(d));
+        if (!o)
+            continue;
+        if (hit >= 0) {
+            free(o);
+            free(*out);
+            *out = NULL;
+            return -1;
+        }
+        hit = i;
+        *out = o;
+        snprintf(rule, rsz, "%s", r);
+        snprintf(detail, dsz, "%s", d);
+    }
+    return hit;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix"
 };
 
 static int mem_enabled(void)
@@ -2843,6 +2871,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     int use_mem = mem_enabled(), skip[OP_COUNT] = {0}, net[OP_COUNT] = {0}, order[OP_COUNT];
     int shell_file = -1;
     BUILD_EDIT bedit;
+    char cfix_rule[32] = "", cfix_detail[128] = "";
+    int cfix_file = -1;
     memset(&bedit, 0, sizeof(bedit));
     char *next_shell = NULL, shell_rule[32] = "", shell_detail[128] = "";
     char key[32] = {0};
@@ -2961,6 +2991,13 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "build_repair");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.120s in %.100s", bedit.rule, bedit.detail, bedit.rel);
+        } else if (op == OP_CFIX && (cfix_file = cfix_target(ws, task, &next_shell, cfix_rule, sizeof(cfix_rule), cfix_detail, sizeof(cfix_detail))) >= 0) {
+            next[cfix_file] = next_shell;
+            next_shell = NULL;
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "c_fix");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.120s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
         } else if (op == OP_TEST && find_test_plan(ws, task, &tplan)) {
             size_t cap = 512 + strlen(tplan.call);
             created.data = (char *)malloc(cap);
@@ -3066,6 +3103,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                      shell_syntax_ok(after->root, after->files[shell_file].rel);
         } else if (!strcmp(rep->op, "build_repair")) {
             intent = build_verified(after, &bedit);
+        } else if (!strcmp(rep->op, "c_fix")) {
+            intent = rep->compile_after == 1 && rep->run_after == 0 &&
+                     (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0);
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;

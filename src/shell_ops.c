@@ -233,6 +233,48 @@ char *ShellOpsApply(const char *data, const char *task, char *rule, size_t rule_
         snprintf(detail, detail_size, "quoted %d expansion(s)", n);
         return o;
     }
+    /* stated output: "print exactly TOKEN" and one echo line */
+    {
+        const char *k = NULL;
+        const char *keys[] = {"print exactly ", "output exactly ", "prints exactly "};
+        for (int i = 0; i < 3 && !k; i++) {
+            const char *f = strstr(task, keys[i]);
+            if (f) k = f + strlen(keys[i]);
+        }
+        if (k) {
+            char tok[64];
+            size_t tl = 0;
+            while ((isalnum((unsigned char)k[tl]) || k[tl] == '_') && tl + 1 < sizeof(tok)) { tok[tl] = k[tl]; tl++; }
+            tok[tl] = '\0';
+            const char *hit = NULL, *l = data;
+            size_t hl = 0;
+            int echoes = 0;
+            while (tl > 0 && *l) {
+                const char *nl = strchr(l, '\n');
+                size_t ll = nl ? (size_t)(nl - l) : strlen(l);
+                const char *t = l;
+                while (*t == ' ' || *t == '\t') t++;
+                if (!strncmp(t, "echo ", 5) || !strncmp(t, "printf ", 7)) { echoes++; hit = t; hl = ll - (size_t)(t - l); }
+                if (!nl) break;
+                l = nl + 1;
+            }
+            if (tl > 0 && echoes == 1) {
+                char line[96];
+                snprintf(line, sizeof(line), "echo %s", tok);
+                size_t at = (size_t)(hit - data), dl = strlen(data), il = strlen(line);
+                if (hl == il && !strncmp(hit, line, il))
+                    return NULL;   /* already prints it */
+                char *o = (char *)malloc(dl - hl + il + 1);
+                if (!o) return NULL;
+                memcpy(o, data, at);
+                memcpy(o + at, line, il);
+                memcpy(o + at + il, data + at + hl, dl - at - hl + 1);
+                snprintf(rule, rule_size, "stated_output");
+                snprintf(detail, detail_size, "echo %s", tok);
+                return o;
+            }
+        }
+    }
     /* guard a run of a named file that may be missing */
     if (ci_has(task, "missing") || ci_has(task, "exist")) {
         char file[128];
@@ -259,6 +301,8 @@ int ShellOpsIntent(const char *data, const char *rule)
         return has_set_e(data);
     if (!strcmp(rule, "quote_vars"))
         return quote_bare(data, NULL) == 0;
+    if (!strcmp(rule, "stated_output"))
+        return strstr(data, "echo ") != NULL;
     if (!strcmp(rule, "file_guard"))
         return strstr(data, "[ -f ") != NULL && strstr(data, "exit ") != NULL;
     return 0;

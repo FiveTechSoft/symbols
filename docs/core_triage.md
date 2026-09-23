@@ -51,3 +51,9 @@ Bugs the fuzzer found, all fixed with regression cases:
 Timeouts: every command the new code runs is bounded (cmake configure 60 s, build 120 s, build scripts 30 s, `make -n` 20 s, `sh -n` 10 s); a timeout counts as not verified and the edit is rolled back.
 
 Bank unchanged: 37/56, 0 wrong edits. ctest 105/105.
+
+## Next round: remaining dev failures in shell, debug, refactor
+
+Developed only against dev tasks (odd numbers). New rule `stated_output` in shell_ops ("print exactly TOKEN" with one echo line), and new module `src/c_fix_ops.c` (operator `c_fix`): `loop_bound` (off-by-one in the one simple for-loop condition), `array_fit` (char array smaller than its string initializer, resized to strlen + 1; escapes abstain), `goto_return` (a single forward `if (C) goto L;` whose label only returns becomes a block with that return). c_fix edits are kept only when the program builds and its own exit code is 0 afterwards (and, for goto_return, no goto remains); every rule abstains on two candidates. Fuzzed in test_core_fuzz (ASan/UBSan clean at 200k).
+
+Bank: 37/56 -> 41/56, 0 wrong edits. Dev 25/32 -> 29/32 (sh_001, dbg_001, dbg_007, rf_007). Heldout unchanged at 12/24: none of the new rules fired on sh_002, sh_006, or the heldout debug/refactor tasks, which is the expected result for dev-only development. Still failing on dev: cr_005, dc_005, mf_005.

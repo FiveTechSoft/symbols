@@ -8,6 +8,7 @@
  *  - a build plan always carries text, a rule and a target.
  * Seeded xorshift, so failures reproduce. SYMBOLS_FUZZ_ITERS overrides the count. */
 #include "build_ops.h"
+#include "c_fix_ops.h"
 #include "command_policy.h"
 #include "shell_ops.h"
 
@@ -166,6 +167,21 @@ int main(void)
         if (BuildOpsPlan(rels, datas, n, task, &be)) {
             if (!be.text || !be.rule[0] || !be.rel[0]) FAIL("malformed build plan rule=%s", be.rule);
             free(be.text);
+        }
+    }
+
+    /* 5. C fixes: no crash on mutated sources; an edit always names its rule */
+    static const char *const CSRC[] = {
+        "for (int i = 0; i <= n; i++) a[i] = i;\n", "char buf[4] = \"abcdef\";\n",
+        "int f(void) {\n    if (!ok) goto fail;\n    return 0;\nfail:\n    return 1;\n}\n", "for(;;){}\n", "char x[] = \"\\\";\n", ""};
+    static const char *const CTASK[] = {"Off-by-one loop bound.", "The buffer is too small.", "Replace goto; no goto.", "remove goto", ""};
+    for (long i = 0; i < iters; i++) {
+        char src[512], rule[32], detail[128];
+        mutate(src, sizeof(src), CSRC[rnd(sizeof(CSRC) / sizeof(CSRC[0]))]);
+        char *o = CFixApply(src, CTASK[rnd(sizeof(CTASK) / sizeof(CTASK[0]))], rule, sizeof(rule), detail, sizeof(detail));
+        if (o) {
+            if (!rule[0]) FAIL("c fix without rule");
+            free(o);
         }
     }
 

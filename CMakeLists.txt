@@ -63,6 +63,7 @@ add_library(symbolic STATIC
     src/shell_ops.c
     src/build_ops.c
     src/command_policy.c
+    src/c_fix_ops.c
     src/text_lex.c
     src/meta_graph.c
     src/vsa.c
@@ -237,6 +238,7 @@ sllm_test(test_shell_ops tests/test_shell_ops.c)
 sllm_test(test_build_ops tests/test_build_ops.c)
 sllm_test(test_command_policy tests/test_command_policy.c)
 sllm_test(test_core_fuzz tests/test_core_fuzz.c)
+sllm_test(test_c_fix_ops tests/test_c_fix_ops.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)

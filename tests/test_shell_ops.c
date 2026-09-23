@@ -52,6 +52,11 @@ int main(void)
     o = apply("echo $1 ${\"}\n", "The variable is unquoted.", rule);
     CHECK(o && !strcmp(o, "echo \"$1\" ${\"}\n"));
     free(o);
+    o = apply("#!/bin/sh\necho nope\n", "run.sh must print exactly HELLO_X (with newline).", rule);
+    CHECK(o && !strcmp(rule, "stated_output") && !strcmp(o, "#!/bin/sh\necho HELLO_X\n"));
+    free(o);
+    CHECK(apply("echo a\necho b\n", "print exactly OK", rule) == NULL);          /* two echo lines: abstain */
+    CHECK(apply("#!/bin/sh\necho OK\n", "print exactly OK", rule) == NULL);      /* already prints it */
     /* no rule stated */
     CHECK(apply("#!/bin/sh\necho $1\n", "Print a greeting.", rule) == NULL);
 
