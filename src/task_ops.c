@@ -855,10 +855,51 @@ static char *insert_at(const char *data, size_t len, size_t at, const char *text
     return out;
 }
 
-/* Fills next[] for every implicit use it can ground; returns files touched. */
-static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, char **next,
-                            char *detail, size_t detail_size, int *uses_before)
+typedef struct {
+    char  rel[TASK_OPS_MAX_PATH];
+    char *data;
+} NEW_FILE;
+
+static int missing_named_header(const TASK_OPS_WORKSPACE *ws, const char *task, char *out, size_t out_size);
+
+/* Append a prototype to the header the task asks for, creating it (with an
+   include guard derived from its name) on first use. */
+static int new_header_add(NEW_FILE *nf, const char *proto)
 {
+    if (!nf->data) {
+        char guard[TASK_OPS_MAX_PATH];
+        size_t g = 0;
+        for (const char *c = nf->rel; *c && g + 1 < sizeof(guard); c++)
+            guard[g++] = isalnum((unsigned char)*c) ? (char)toupper((unsigned char)*c) : '_';
+        guard[g] = '\0';
+        size_t cap = 3 * strlen(guard) + 64;
+        nf->data = (char *)malloc(cap);
+        if (!nf->data)
+            return 0;
+        snprintf(nf->data, cap, "#ifndef %s\n#define %s\n\n#endif\n", guard, guard);
+    }
+    if (strstr(nf->data, proto))
+        return 1;
+    const char *endif = strstr(nf->data, "#endif");
+    size_t at = (size_t)(endif - nf->data);
+    char *grown = insert_at(nf->data, strlen(nf->data), at > 0 && nf->data[at - 1] == '\n' && nf->data[at - 2] == '\n' ? at - 1 : at, proto);
+    if (!grown)
+        return 0;
+    free(nf->data);
+    nf->data = grown;
+    return 1;
+}
+
+/* Fills next[] for every implicit use it can ground; returns files touched.
+   When no header fits and the task names exactly one header file that does
+   not exist, the prototype goes into that new header (nf). */
+static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, char **next,
+                            NEW_FILE *nf, char *detail, size_t detail_size, int *uses_before)
+{
+    char want_hdr[TASK_OPS_MAX_PATH] = {0};
+    int can_create = nf && missing_named_header(ws, task, want_hdr, sizeof(want_hdr));
+    if (can_create && !nf->rel[0])
+        snprintf(nf->rel, sizeof(nf->rel), "%s", want_hdr);
     IMPLICIT_USE use[DECL_MAX];
     int n = implicit_uses(ws, flags, use, DECL_MAX), files = 0;
     *uses_before = n;
@@ -882,12 +923,13 @@ static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, cha
             snprintf(text, sizeof(text), "#include \"%s\"\n", ws->files[header].rel);
         } else if (headers == 0) {
             /* the definition's head, from exactly one source file */
-            int defs = 0;
+            int defs = 0, def_file = -1;
             for (int i = 0; i < ws->count; i++) {
                 size_t ll;
                 long at = file_level_decl(ws->files[i].data, use[k].name, 1, &ll);
                 if (at >= 0 && ll < sizeof(text) - 3) {
                     defs++;
+                    def_file = i;
                     memcpy(text, ws->files[i].data + at, ll);
                     memcpy(text + ll, ";\n", 3);
                 }
@@ -917,7 +959,21 @@ static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, cha
                         hdr = hdr == -1 ? h : -2;
                 }
             }
-            if (hdr >= 0 && hdr != use[k].file && !next[hdr] && !strchr(ws->files[hdr].rel, '/')) {
+            if (hdr == -1 && text[0] && can_create && def_file >= 0 && !strchr(f->rel, '/') &&
+                !strchr(ws->files[def_file].rel, '/') && new_header_add(nf, text)) {
+                char inc[TASK_OPS_MAX_PATH + 16];
+                snprintf(inc, sizeof(inc), "#include \"%s\"\n", nf->rel);
+                size_t dl0 = strlen(detail);
+                snprintf(detail + dl0, detail_size - dl0, "%snew %s: %.*s", dl0 ? "; " : "", nf->rel,
+                         (int)(strlen(text) - 1), text);
+                const TASK_OPS_FILE *d = &ws->files[def_file];
+                if (def_file != use[k].file && !next[def_file] && !strstr(d->data, inc)) {
+                    next[def_file] = insert_at(d->data, d->len, after_includes(d->data), inc);
+                    files++;
+                }
+                files++;
+                snprintf(text, sizeof(text), "%s", inc);
+            } else if (hdr >= 0 && hdr != use[k].file && !next[hdr] && !strchr(ws->files[hdr].rel, '/')) {
                 const TASK_OPS_FILE *h = &ws->files[hdr];
                 size_t at = h->len;
                 const char *endif = NULL;
@@ -959,12 +1015,11 @@ static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, cha
 /* Every file name the task mentions (name.ext, ext 1-4 alnum) must exist
    after the edit: an edit that leaves a named artifact missing cannot have
    done what the task asks. Declared lexical rule (file-name shape). */
-static int named_files_exist(const TASK_OPS_WORKSPACE *ws, const char *task, char *const *next,
-                             int *named, int *named_touched)
+/* Next file name the task mentions (name.ext, ext 1-4 alnum), from *pos. */
+static int next_named_file(const char *task, size_t *pos, char *name, size_t name_size)
 {
-    *named = *named_touched = 0;
     size_t len = strlen(task);
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = *pos; i < len; i++) {
         if (!ident_start((unsigned char)task[i]) || (i > 0 && (ident_char((unsigned char)task[i - 1]) ||
                                                             task[i - 1] == '.' || task[i - 1] == '/')))
             continue;
@@ -977,26 +1032,74 @@ static int named_files_exist(const TASK_OPS_WORKSPACE *ws, const char *task, cha
         if (e - i < 2 || x - e - 1 < 1 || x - e - 1 > 4 || (x < len && (task[x] == '.' && x + 1 < len &&
                                                           isalnum((unsigned char)task[x + 1]))))
             { i = x; continue; }
-        char name[TASK_OPS_MAX_PATH];
-        if (x - i >= sizeof(name)) { i = x; continue; }
+        if (x - i >= name_size) { i = x; continue; }
         memcpy(name, task + i, x - i);
         name[x - i] = '\0';
+        *pos = x;
+        return 1;
+    }
+    *pos = len;
+    return 0;
+}
+
+static int ws_find_named(const TASK_OPS_WORKSPACE *ws, const char *name)
+{
+    for (int f = 0; f < ws->count; f++) {
+        const char *r = ws->files[f].rel;
+        size_t rl = strlen(r), nl = strlen(name);
+        if (!strcmp(r, name) || (rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name)))
+            return f;
+    }
+    return -1;
+}
+
+/* Every file name the task mentions must exist after the edit: an edit
+   that leaves a named artifact missing cannot have done what the task asks.
+   A named file counts as touched when it is new or its content changed.
+   Declared lexical rule (file-name shape). */
+static int named_files_exist(const TASK_OPS_WORKSPACE *before, const TASK_OPS_WORKSPACE *after,
+                             const char *task, int *named, int *named_touched)
+{
+    *named = *named_touched = 0;
+    size_t pos = 0;
+    char name[TASK_OPS_MAX_PATH];
+    while (next_named_file(task, &pos, name, sizeof(name))) {
         int found = 0;
-        for (int f = 0; f < ws->count && !found; f++) {
-            const char *r = ws->files[f].rel;
+        for (int f = 0; f < after->count; f++) {
+            const char *r = after->files[f].rel;
             size_t rl = strlen(r), nl = strlen(name);
-            found = !strcmp(r, name) || (rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name));
-            if (found) {
-                (*named)++;
-                if (next && next[f])
-                    (*named_touched)++;
-            }
+            if (!(!strcmp(r, name) || (rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name))))
+                continue;
+            found = 1;
+            (*named)++;
+            int same = 0;
+            for (int g = 0; g < before->count; g++)
+                if (!strcmp(before->files[g].rel, r))
+                    same = before->files[g].len == after->files[f].len &&
+                           !memcmp(before->files[g].data, after->files[f].data, after->files[f].len);
+            if (!same)
+                (*named_touched)++;
         }
         if (!found)
             return 0;
-        i = x;
     }
     return 1;
+}
+
+/* The one header name (x.h, workspace root) the task mentions that does not
+   exist yet; 0 when there is none or more than one. */
+static int missing_named_header(const TASK_OPS_WORKSPACE *ws, const char *task, char *out, size_t out_size)
+{
+    size_t pos = 0;
+    char name[TASK_OPS_MAX_PATH];
+    int n = 0;
+    while (next_named_file(task, &pos, name, sizeof(name)))
+        if (is_header(name) && !strchr(name, '/') && ws_find_named(ws, name) < 0 &&
+            (n == 0 || strcmp(out, name) != 0)) {
+            snprintf(out, out_size, "%s", name);
+            n++;
+        }
+    return n == 1;
 }
 
 /* -------------------------------------------- literal -> named constant */
@@ -1202,6 +1305,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 
     TASK_OPS_WORKSPACE *ws = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*ws));
     char **next = (char **)calloc(TASK_OPS_MAX_FILES, sizeof(char *));
+    NEW_FILE created;
+    memset(&created, 0, sizeof(created));
     if (!ws || !next) { free(ws); free(next); return 0; }
     TaskOpsLoadWorkspace(workspace, ws);
 
@@ -1254,7 +1359,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(rep->detail, sizeof(rep->detail), "%s%.60s%s -> %.60s in %.60s", lit.is_string ? "\"" : "",
                  lit.lit, lit.is_string ? "\"" : "", lit.name, ws->files[lit_file].rel);
     } else if (renames != 1 && rep->compile_before >= 0 &&
-               (touched = declare_implicit(ws, flags, next, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
+               (touched = declare_implicit(ws, flags, task, next, &created, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
         rep->candidates = 1;
         snprintf(rep->op, sizeof(rep->op), "declare_implicit");
     } else if (renames != 1 && rep->compile_before == 0) {
@@ -1273,6 +1378,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
         else
             snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
+        free(created.data);
         TaskOpsFreeWorkspace(ws);
         free(ws);
         free(next);
@@ -1284,6 +1390,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     for (int i = 0; i < ws->count; i++)
         if (next[i] && !write_file(ws->root, ws->files[i].rel, next[i]))
             ok = 0;
+    if (created.data && !write_file(ws->root, created.rel, created.data))
+        ok = 0;
     rep->applied = touched;
 
     /* verify: operator intent holds and the agent's own probe did not
@@ -1318,7 +1426,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         if ((!strcmp(rep->op, "rename_symbol") || !strcmp(rep->op, "literal_to_constant")) &&
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
-        if (!named_files_exist(after, task, after->count == ws->count ? next : NULL, &named, &named_touched) ||
+        if (!named_files_exist(ws, after, task, &named, &named_touched) ||
             (named > 0 && named_touched == 0))
             intent = 0;
         verified = intent && no_regress;
@@ -1337,6 +1445,12 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         for (int i = 0; i < ws->count; i++)
             if (next[i])
                 write_file(ws->root, ws->files[i].rel, ws->files[i].data);
+    if (!verified && created.data) {
+        char path[TASK_OPS_MAX_PATH * 2];
+        snprintf(path, sizeof(path), "%s/%s", ws->root, created.rel);
+        remove(path);
+    }
+    free(created.data);
     for (int i = 0; i < TASK_OPS_MAX_FILES; i++)
         free(next[i]);
     free(next);

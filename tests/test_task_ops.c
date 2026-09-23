@@ -245,8 +245,35 @@ int main(void)
         const char *m = "int main(void) { return quad_of(1); }\nint quad_of(int v) { return v * 4; }\n";
         put(d, "m.c", m);
         TASK_OPS_REPORT r;
-        CHECK(!TaskOpsSolve(d, "Declare it in quad.h and build with -Werror=implicit-function-declaration.", &r) &&
+        CHECK(!TaskOpsSolve(d, "Declare it and write notes.txt; build with -Werror=implicit-function-declaration.", &r) &&
               !strcmp(get(d, "m.c"), m), "task names a file the edit does not create: rolled back");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "declnew");
+        put(d, "calc.c", "long twice(long v) { return v * 2; }\n");
+        put(d, "app.c", "int main(void) { return twice(3) == 6 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Put the declaration in calc.h and include it where needed; build with -Werror=implicit-function-declaration.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        if (r.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else {
+            const char *h = get(d, "calc.h");
+            CHECK(kept && h && strstr(h, "#ifndef CALC_H") && strstr(h, "long twice(long v);") &&
+                  strstr(get(d, "app.c"), "#include \"calc.h\"") && strstr(get(d, "calc.c"), "#include \"calc.h\""),
+                  "task-named header created with the prototype, included by user and definer");
+        }
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "declnew2");
+        const char *m = "int main(void) { return twice(3) == 6 ? 0 : 1; }\n";
+        put(d, "calc.c", "long twice(long v) { return v * 2; }\n");
+        put(d, "app.c", m);
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Declare it in calc.h or maybe api.h; build with -Werror=implicit-function-declaration.", &r);
+        char p2[600]; snprintf(p2, sizeof(p2), "%s/calc.h", d);
+        FILE *hf = fopen(p2, "rb"); if (hf) fclose(hf);
+        CHECK(!hf && (!kept || strstr(get(d, "app.c"), "long twice(long v);")),
+              "two missing headers named: no header is created");
     }
 
 
