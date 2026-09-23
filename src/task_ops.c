@@ -4,6 +4,7 @@
 #include "task_ops.h"
 #include "agent_shell.h"
 #include "shell_ops.h"
+#include "build_ops.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -2625,9 +2626,109 @@ static int shell_syntax_ok(const char *root, const char *rel)
     return ok;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_COUNT };
+/* --------------------------------------------------------- build repair */
+
+static int build_plan(const TASK_OPS_WORKSPACE *ws, const char *task, BUILD_EDIT *e)
+{
+    const char *rels[TASK_OPS_MAX_FILES], *datas[TASK_OPS_MAX_FILES];
+    for (int i = 0; i < ws->count; i++) {
+        rels[i] = ws->files[i].rel;
+        datas[i] = ws->files[i].data;
+    }
+    return BuildOpsPlan(rels, datas, ws->count, task, e);
+}
+
+static int run_ok(const char *cmd, const char *cwd, int timeout_ms, const char *must_not, const char *must)
+{
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, cwd, timeout_ms, r);
+    int ok = !r->execution_failed && !r->timed_out && r->exit_code == 0;
+    if (ok && (must_not || must)) {
+        char *all = (char *)malloc(r->stdout_len + r->stderr_len + 1);
+        if (all) {
+            memcpy(all, r->stdout_buf, r->stdout_len);
+            memcpy(all + r->stdout_len, r->stderr_buf, r->stderr_len);
+            all[r->stdout_len + r->stderr_len] = '\0';
+            if (must_not && strstr(all, must_not)) ok = 0;
+            if (must && !strstr(all, must)) ok = 0;
+            free(all);
+        } else
+            ok = 0;
+    }
+    free(r);
+    return ok;
+}
+
+static void make_dir(const char *path)
+{
+#ifdef _WIN32
+    _mkdir(path);
+#else
+    mkdir(path, 0755);
+#endif
+}
+
+/* Evidence by really building: cmake configure (+build) out of tree,
+   make -n (dry run), or the build script in a temp copy of the workspace
+   that must pass on the real source and fail on a broken one. */
+static int build_verified(const TASK_OPS_WORKSPACE *after, const BUILD_EDIT *e)
+{
+    const char *text = NULL;
+    for (int i = 0; i < after->count; i++)
+        if (!strcmp(after->files[i].rel, e->rel))
+            text = after->files[i].data;
+    if (!BuildOpsIntent(text, e))
+        return 0;
+    if (!strcmp(e->rule, "ci_ctest"))
+        return 1;
+    char tmp[TASK_OPS_MAX_PATH], cmd[TASK_OPS_MAX_PATH * 3];
+    temp_binary(tmp, sizeof(tmp));
+    if (strchr(tmp, '"') || strchr(after->root, '"'))
+        return 0;
+    int ok = 0;
+    if (!strncmp(e->rule, "cmake_", 6)) {
+        snprintf(cmd, sizeof(cmd), "cmake -S \"%s\" -B \"%s\"", after->root, tmp);
+        ok = run_ok(cmd, after->root, 60000, "No project() command", NULL);
+        if (ok && strcmp(e->rule, "cmake_project") != 0) {
+            snprintf(cmd, sizeof(cmd), "cmake --build \"%s\"", tmp);
+            ok = run_ok(cmd, after->root, 120000, NULL, NULL);
+        }
+        snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
+        run_ok(cmd, after->root, 30000, NULL, NULL);
+    } else if (!strcmp(e->rule, "make_dep")) {
+        ok = run_ok("make -n all", after->root, 20000, NULL, e->expect);
+    } else if (!strcmp(e->rule, "build_compile_step")) {
+        make_dir(tmp);
+        int wrote = 1;
+        for (int i = 0; i < after->count; i++)
+            if (strchr(after->files[i].rel, '/') == NULL)   /* flat copy of top-level files */
+                wrote &= write_file(tmp, after->files[i].rel, after->files[i].data);
+        if (wrote && !strchr(e->rel, '"')) {
+            snprintf(cmd, sizeof(cmd), "sh \"%s\"", e->rel);
+            int good = run_ok(cmd, tmp, 30000, NULL, NULL);
+            write_file(tmp, e->expect, "int broken(\n");
+            int bad_fails = !run_ok(cmd, tmp, 30000, NULL, NULL);
+            ok = good && bad_fails;
+        }
+        snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
+        if (!run_ok(cmd, after->root, 30000, NULL, NULL)) {
+            for (int i = 0; i < after->count; i++) {
+                char path[TASK_OPS_MAX_PATH * 2];
+                snprintf(path, sizeof(path), "%s/%s", tmp, after->files[i].rel);
+                remove(path);
+            }
+            remove(tmp);
+        }
+    }
+    return ok;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair"
 };
 
 static int mem_enabled(void)
@@ -2741,6 +2842,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     /* recall (learn step, opt-in) */
     int use_mem = mem_enabled(), skip[OP_COUNT] = {0}, net[OP_COUNT] = {0}, order[OP_COUNT];
     int shell_file = -1;
+    BUILD_EDIT bedit;
+    memset(&bedit, 0, sizeof(bedit));
     char *next_shell = NULL, shell_rule[32] = "", shell_detail[128] = "";
     char key[32] = {0};
     for (int o = 0; o < OP_COUNT; o++)
@@ -2846,6 +2949,18 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "shell_harden");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.60s in %.120s", shell_rule, shell_detail, ws->files[shell_file].rel);
+        } else if (op == OP_BUILD && build_plan(ws, task, &bedit)) {
+            if (bedit.file >= 0)
+                next[bedit.file] = bedit.text;
+            else {
+                snprintf(created.rel, sizeof(created.rel), "%s", bedit.rel);
+                created.data = bedit.text;
+            }
+            bedit.text = NULL;   /* owned by next[] / created now */
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "build_repair");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.120s in %.100s", bedit.rule, bedit.detail, bedit.rel);
         } else if (op == OP_TEST && find_test_plan(ws, task, &tplan)) {
             size_t cap = 512 + strlen(tplan.call);
             created.data = (char *)malloc(cap);
@@ -2949,6 +3064,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "shell_harden")) {
             intent = ShellOpsIntent(after->files[shell_file].data, shell_rule) &&
                      shell_syntax_ok(after->root, after->files[shell_file].rel);
+        } else if (!strcmp(rep->op, "build_repair")) {
+            intent = build_verified(after, &bedit);
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
@@ -2965,7 +3082,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
              !strcmp(rep->op, "remove_dead_function")) &&
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
-        int guard_names_missing = !strcmp(rep->op, "shell_harden") && !strcmp(shell_rule, "file_guard");
+        int guard_names_missing = (!strcmp(rep->op, "shell_harden") && !strcmp(shell_rule, "file_guard")) ||
+                                  (!strcmp(rep->op, "build_repair") && !strcmp(bedit.rule, "cmake_missing_source"));
         if ((!guard_names_missing && !named_files_exist(ws, after, task, &named, &named_touched)) ||
             (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
             intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
