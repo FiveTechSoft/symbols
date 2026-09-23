@@ -22,6 +22,7 @@
 #include "agent_runner.h"
 #include "code_graph.h"
 #include "agent_diagnose.h"
+#include "task_ops.h"
 
 static void PrintHelp(const char *prog)
 {
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
     char workspace[MAX_PATCH_PATH] = ".";
     char blast_symbol[MAX_CODE_NAME] = {0};
     char diagnose_file[MAX_PATCH_PATH] = {0};
-    char task_desc[MAX_TASK_DESC] = {0};
+    char task_desc[4096] = {0}; /* full task text; the runner copy is bounded */
     bool do_index_only = false;
     uint32_t max_replans = 3;
 
@@ -229,6 +230,22 @@ int main(int argc, char **argv)
 
         clock_t tr_start = clock();
         int solved = AgentRunnerSolveTask(runner, &task, &result);
+        /* The runner verifies a proposed patch; with none given (CLI task
+           mode), let the generic task operators propose, verify or roll back. */
+        TASK_OPS_REPORT ops;
+        memset(&ops, 0, sizeof(ops));
+        if (!solved)
+        {
+            solved = TaskOpsSolve(workspace, task_desc, &ops);
+            if (ops.op[0])
+                printf("[symbols-agent] Operator %s: %s (%s)\n", ops.op, ops.detail,
+                       ops.verified ? "verified, kept" : "rolled back");
+            if (!ops.verified && ops.reason[0])
+                printf("[symbols-agent] No edit kept: %s\n", ops.reason);
+            if (ops.op[0])
+                printf("[symbols-agent] Probe compile %d->%d, run %d->%d\n", ops.compile_before,
+                       ops.compile_after, ops.run_before, ops.run_after);
+        }
         double solve_ms = (double)(clock() - tr_start) * 1000.0 / CLOCKS_PER_SEC;
 
         printf("---------------------------------------------------------\n");

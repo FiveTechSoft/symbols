@@ -57,6 +57,13 @@ def read_index(bank: Path) -> list[tuple[str, str, Path]]:
     return rows
 
 
+def split_of(task_id: str) -> str:
+    """Fixed 50/50 split by the parity of the id's trailing number:
+    odd = dev (used while developing the agent), even = heldout."""
+    digits = task_id.rsplit("_", 1)[-1]
+    return "dev" if digits.isdigit() and int(digits) % 2 == 1 else "heldout"
+
+
 def snapshot(d: Path) -> dict[str, str]:
     out = {}
     for p in sorted(d.rglob("*")):
@@ -154,6 +161,9 @@ def summarize(tasks: list[dict], agent: str, self_test: bool) -> dict:
         "untouched": sum(1 for t in tasks if not t["changed_files"]),
         "agent_errors": sum(1 for t in tasks if t["agent_rc"] in (124, 127)),
         "wall_ms_total": round(sum(t["wall_ms"] for t in tasks), 1),
+        "passed_by_split": {sp: f"{sum(1 for t in tasks if t['passed'] and split_of(t['id']) == sp)}"
+                                f"/{sum(1 for t in tasks if split_of(t['id']) == sp)}"
+                            for sp in ("dev", "heldout")},
         "tasks": tasks,
     }
 
@@ -167,8 +177,9 @@ def main() -> int:
     ap.add_argument("--out")
     ap.add_argument("--min-pass-rate", type=float)
     ap.add_argument("--max-wrong-edits", type=int)
+    ap.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     a = ap.parse_args()
-    rows = read_index(Path(a.bank))
+    rows = [r for r in read_index(Path(a.bank)) if a.split == "all" or split_of(r[0]) == a.split]
     if not rows:
         print("no tasks in index.tsv", file=sys.stderr)
         return 2
@@ -179,6 +190,7 @@ def main() -> int:
         Path(a.out).write_text(text + "\n", encoding="utf-8")
     print(text)
     s = {k: res[k] for k in ("mode", "tasks_total", "tasks_passed", "pass_rate", "wrong_edits", "untouched", "agent_errors")}
+    s.update({f"pass_{k}": v for k, v in res["passed_by_split"].items()})
     print("BANK_HARNESS " + " ".join(f"{k}={v}" for k, v in s.items()), file=sys.stderr)
     rc = 0
     if a.min_pass_rate is not None and res["pass_rate"] < a.min_pass_rate:

@@ -1,0 +1,145 @@
+/*
+ * test_task_ops.c - generic task operators (synthetic workspaces only; no
+ * engineering-bank task is used here, so the bank stays an honest measure).
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "compat.h"
+#include "task_ops.h"
+
+static int pass = 0, fail = 0;
+#define CHECK(c, msg) do { if (c) { pass++; printf("  [PASS] %s\n", msg); } \
+                           else { fail++; printf("  [FAIL] %s\n", msg); } } while (0)
+
+static void mem_ws(TASK_OPS_WORKSPACE *ws, const char *rel, const char *text)
+{
+    TASK_OPS_FILE *f = &ws->files[ws->count++];
+    snprintf(f->rel, sizeof(f->rel), "%s", rel);
+    f->len = strlen(text);
+    f->data = (char *)malloc(f->len + 1);
+    memcpy(f->data, text, f->len + 1);
+}
+
+static void put(const char *dir, const char *rel, const char *text)
+{
+    char p[1024];
+    snprintf(p, sizeof(p), "%s/%s", dir, rel);
+    FILE *f = fopen(p, "wb");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+static char *get(const char *dir, const char *rel)
+{
+    static char buf[4096];
+    char p[1024];
+    snprintf(p, sizeof(p), "%s/%s", dir, rel);
+    FILE *f = fopen(p, "rb");
+    size_t n = 0;
+    buf[0] = '\0';
+    if (f) { n = fread(buf, 1, sizeof(buf) - 1, f); fclose(f); }
+    buf[n] = '\0';
+    return buf;
+}
+
+static void make_dir(char *out, size_t size, const char *tag)
+{
+    const char *t = getenv("TMPDIR");
+    if (!t || !*t) t = getenv("TEMP");
+    if (!t || !*t) t = "/tmp";
+    snprintf(out, size, "%s/task_ops_test_%s_%ld", t, tag, (long)time(NULL));
+    _mkdir(out);
+}
+
+int main(void)
+{
+    printf("=== task_ops ===\n");
+    char a[128], b[128];
+
+    /* reasoning only */
+    {
+        TASK_OPS_WORKSPACE ws; memset(&ws, 0, sizeof(ws));
+        mem_ws(&ws, "k.h", "#define WIDGET_MAX 8\nint widget_count(void);\n");
+        mem_ws(&ws, "k.c", "#include \"k.h\"\nint widget_count(void) { return WIDGET_MAX; }\n");
+        CHECK(TaskOpsCountToken(&ws, "WIDGET_MAX") == 2, "whole-token count across files");
+        CHECK(TaskOpsCountToken(&ws, "WIDGET") == 0, "partial identifiers do not count");
+        CHECK(TaskOpsFindRename(&ws, "Please call WIDGET_MAX GADGET_LIMIT instead.", a, sizeof(a), b, sizeof(b)) == 1 &&
+              !strcmp(a, "WIDGET_MAX") && !strcmp(b, "GADGET_LIMIT"), "adjacent present->absent pair found");
+        CHECK(TaskOpsFindRename(&ws, "Cambia widget_count por gadgetCount en todo el proyecto", a, sizeof(a), b, sizeof(b)) == 1 &&
+              !strcmp(b, "gadgetCount"), "language-independent connector, camelCase target");
+        CHECK(TaskOpsFindRename(&ws, "Rename the counter to something better", a, sizeof(a), b, sizeof(b)) == 0,
+              "plain prose words are never rename targets");
+        CHECK(TaskOpsFindRename(&ws, "widget_count WIDGET_MAX", a, sizeof(a), b, sizeof(b)) == 0,
+              "target already present: no rename");
+        CHECK(TaskOpsFindRename(&ws, "widget_count -> w_count; WIDGET_MAX -> W_MAX", a, sizeof(a), b, sizeof(b)) == 2,
+              "two different pairs: reported ambiguous");
+        CHECK(TaskOpsFindRename(&ws, "WIDGET_MAX with -Werror=new_flag_x", a, sizeof(a), b, sizeof(b)) == 0,
+              "compiler flags are not names");
+        CHECK(TaskOpsFindRename(&ws, "WIDGET_MAX, and much later after a long long sentence, GADGET_LIMIT", a, sizeof(a), b, sizeof(b)) == 0,
+              "non-adjacent names are not paired");
+        TaskOpsFreeWorkspace(&ws);
+    }
+
+    /* random input terminates */
+    {
+        TASK_OPS_WORKSPACE ws; memset(&ws, 0, sizeof(ws));
+        mem_ws(&ws, "r.c", "int x_1 = 0;\n");
+        char task[300];
+        unsigned s = 12345;
+        int ok = 1;
+        for (int it = 0; it < 3000; it++) {
+            for (int i = 0; i < 299; i++) { s = s * 1103515245u + 12345u; task[i] = (char)(1 + (s >> 16) % 255); }
+            task[299] = '\0';
+            if (TaskOpsFindRename(&ws, task, a, sizeof(a), b, sizeof(b)) < 0) ok = 0;
+        }
+        CHECK(ok, "3000 random task texts terminate");
+        TaskOpsFreeWorkspace(&ws);
+    }
+
+    /* full loop on disk: verified edit kept */
+    {
+        char d[512]; make_dir(d, sizeof(d), "keep");
+        put(d, "lib.h", "#define OLD_SIZE 3\nint twice(int);\n");
+        put(d, "lib.c", "#include \"lib.h\"\nint twice(int v) { return v * 2 + OLD_SIZE - OLD_SIZE; }\n");
+        put(d, "main.c", "#include \"lib.h\"\nint main(void) { return twice(OLD_SIZE) == 6 ? 0 : 1; }\n");
+        put(d, "NOTES.md", "OLD_SIZE is the size.\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Constant OLD_SIZE should be NEW_SIZE everywhere.", &r);
+        printf("    %s | %s | compile %d->%d run %d->%d\n", r.detail, r.reason, r.compile_before, r.compile_after, r.run_before, r.run_after);
+        CHECK(kept && r.verified, "rename verified and kept");
+        CHECK(strstr(get(d, "main.c"), "NEW_SIZE") && !strstr(get(d, "lib.h"), "OLD_SIZE") &&
+              strstr(get(d, "NOTES.md"), "NEW_SIZE"), "all mentions renamed, docs included");
+        if (r.compile_before != -1)
+            CHECK(r.compile_after == 1 && r.run_after == 0, "own probe: builds and exits 0 after");
+    }
+
+    /* full loop on disk: regression rolled back */
+    {
+        char d[512]; make_dir(d, sizeof(d), "roll");
+        const char *m = "#include <stdlib.h>\nint main(void) { return EXIT_SUCCESS; }\n";
+        put(d, "main.c", m);
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Use EXIT_SUCCESS -> EXIT_FINE here", &r);
+        printf("    %s | %s | compile %d->%d run %d->%d\n", r.detail, r.reason, r.compile_before, r.compile_after, r.run_before, r.run_after);
+        if (r.compile_before == -1) {
+            CHECK(1, "no compiler: regression case skipped");
+        } else {
+            CHECK(!kept && !r.verified, "edit that breaks the build is not kept");
+            CHECK(!strcmp(get(d, "main.c"), m), "file restored byte for byte");
+        }
+    }
+
+    /* nothing applicable: untouched */
+    {
+        char d[512]; make_dir(d, sizeof(d), "none");
+        const char *m = "int main(void) { return 0; }\n";
+        put(d, "main.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Make the program faster.", &r) && r.applied == 0 &&
+              !strcmp(get(d, "main.c"), m), "no preconditions: workspace untouched");
+    }
+
+    printf("\nTEST RESULTS: %d passed, %d failed\n", pass, fail);
+    return fail ? 1 : 0;
+}

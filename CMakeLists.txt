@@ -30,6 +30,7 @@ add_library(symbolic STATIC
     src/agent_runner.c
     src/agent_diagnose.c
     src/agent_shell.c
+    src/task_ops.c
     src/agent_git.c
     src/swe_bench_harness.c
     src/numeric.c
@@ -219,6 +220,7 @@ sllm_test(test_code_graph_polyglot tests/test_code_graph_polyglot.c)
 sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
 sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 sllm_test(test_agent_shell tests/test_agent_shell.c)
+sllm_test(test_task_ops tests/test_task_ops.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)
