@@ -2562,6 +2562,15 @@ int ServerMapShellToolCallMem(const char *query, const char names[][64],
                     "if command -v %s >/dev/null 2>&1; then echo %s%s; %s; else echo %s%s; exit 127; fi",
                     tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p1, full, SERVER_SHELL_NOT_FOUND_MARK, tr.p1);
             }
+            else if (tr.p1_known < 0)
+            {
+                /* strong shape but remembered as not-a-command: re-probe —
+                   the environment may have changed since the negative was learned */
+                tr.decision = SERVER_PROC_PROBED;
+                w = snprintf(probe_raw, sizeof(probe_raw),
+                    "if command -v %s >/dev/null 2>&1; then echo %s%s; %s; else echo %s%s; exit 127; fi",
+                    tr.p1, SERVER_SHELL_IS_COMMAND_MARK, tr.p1, full, SERVER_SHELL_NOT_FOUND_MARK, tr.p1);
+            }
             else
                 tr.decision = SERVER_PROC_DIRECT;          /* strong line, run as typed */
             if (w > 0 && (size_t)w < sizeof(probe_raw))
@@ -4524,9 +4533,21 @@ int ServerProcCorrectFromOutput(EPISODIC_STORE *st, const char *scope, const cha
     if (strstr(output, pat) == NULL)
     {
         snprintf(pat, sizeof(pat), "%s: not found", prog);
-        if (strstr(output, pat) == NULL) return 0;
+        if (strstr(output, pat) == NULL)
+        {
+            /* Windows cmd/PowerShell: 'prog' is not recognized as ... */
+            snprintf(pat, sizeof(pat), "'%s' is not recognized", prog);
+            if (strstr(output, pat) == NULL) return 0;
+        }
     }
     return EpisodicStoreForget(st, prog, SERVER_PROC_IS, scope) == 1;
+}
+
+int ServerProcArgumentsCarryProbe(const char *arguments)
+{
+    return arguments != NULL &&
+           (strstr(arguments, SERVER_SHELL_IS_COMMAND_MARK) != NULL ||
+            strstr(arguments, SERVER_SHELL_NOT_FOUND_MARK) != NULL);
 }
 
 void ServerStripProbeLines(const char *in, char *out, size_t size)
@@ -4598,8 +4619,20 @@ int ServerShellRouteMem(const char *query, const EPISODIC_STORE *st, const char 
     if (!strong && tr.p1_known < 0 && (!had_prefix || tr.p2_known < 0) &&
         ProcAge(st, scope, had_prefix ? tr.p2 : tr.p1) <= SERVER_PROC_NEG_TTL)
     {
-        if (trace) trace->decision = SERVER_PROC_FROM_MEMORY;
-        return 2;
+        /* Multi-word readings stay answered from memory (tested).  A bare
+           single-token line re-probes: the program may have been installed
+           since the negative was learned — never freeze a negative forever. */
+        const char *q = full;
+        int bare_token = !had_prefix;
+        while (*q == ' ' || *q == '\t') q++;
+        while (*q && *q != ' ' && *q != '\t') q++;
+        while (*q == ' ' || *q == '\t') q++;
+        if (*q != '\0') bare_token = 0;
+        if (!bare_token)
+        {
+            if (trace) trace->decision = SERVER_PROC_FROM_MEMORY;
+            return 2;
+        }
     }
     return 1;
 }

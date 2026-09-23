@@ -247,16 +247,21 @@ static void ProcLogDecision(const char *query, const SERVER_PROC_TRACE *tr)
             tr->p2[0] ? tr->p2 : "-", tr->p2_known, g_proc_ready ? g_proc.count : 0);
 }
 /* Learn from probe markers and correct stale memories; returns 1 if the
-   output carried probe markers. */
+   output carried probe markers.  Markers are ingested only when THIS
+   request's command carried our probe — never from unrelated output. */
 static int ProcLearnFromTool(const char *body, const char *arguments, const char *output)
 {
     char scope[32], learned[512] = "";
     const char *cmd;
     int changed, corrected = 0;
+    int our_probe;
     ProcEnsure();
     if (!g_proc_ready || output == NULL) return 0;
     ServerProcScope(body, scope, sizeof(scope));
-    changed = ServerProcLearnFromOutput(&g_proc, scope, output, learned, sizeof(learned));
+    our_probe = ServerProcArgumentsCarryProbe(arguments);
+    changed = 0;
+    if (our_probe)
+        changed = ServerProcLearnFromOutput(&g_proc, scope, output, learned, sizeof(learned));
     cmd = arguments ? strstr(arguments, "\"command\"") : NULL;
     if (cmd && (cmd = strchr(cmd + 9, '"')) != NULL)
         corrected = ServerProcCorrectFromOutput(&g_proc, scope, cmd + 1, output);

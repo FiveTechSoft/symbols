@@ -1,0 +1,9 @@
+# fixtures.tsv — external tool fixtures for FixtureInit().
+# File rows win over the compiled fallback when >= 1 valid row exists.
+# Columns: TYPE, subject/name, rel/detail, object/detail
+# rel	babylonia	rey	nebuchadnezzar
+rel	babylonia	rey	nebuchadnezzar
+rel	david	mother	nitzevet
+rel	saul	rey	israel
+person	jonas	nacio en Gathepher
+person	jesse	nacio en Bethlehem

@@ -167,6 +167,8 @@ int  ServerProcLearnFromOutput(EPISODIC_STORE *st, const char *scope, const char
 /* Correct: a remembered command that the shell reports as missing is forgotten. */
 int  ServerProcCorrectFromOutput(EPISODIC_STORE *st, const char *scope, const char *command,
                                  const char *output);
+/* 1 when tool-call arguments carry our probe markers (ingest gate). */
+int  ServerProcArgumentsCarryProbe(const char *arguments);
 /* Remove probe marker lines from output shown to the user. */
 void ServerStripProbeLines(const char *in, char *out, size_t size);
 /* 0 not shell, 1 shell (tool call), 2 every reading already known not to be a command */

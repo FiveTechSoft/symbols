@@ -655,6 +655,34 @@ static void test_shell_tool_dispatch(void)
         /* correct: a remembered command that is now missing is forgotten */
         TEST_ASSERT(ServerProcCorrectFromOutput(&st2, scope, "ps aux", "/bin/bash: line 1: ps: command not found\n") == 1 &&
                     ServerProcRecall(&st2, scope, "ps") == 0, "stale positive memory is corrected");
+        /* ingest gate: markers are learned only when OUR call carried the probe */
+        TEST_ASSERT(ServerProcArgumentsCarryProbe("{\"command\":\"ls\"}") == 0,
+                    "plain command arguments fail the ingest gate");
+        TEST_ASSERT(ServerProcArgumentsCarryProbe(
+                        "{\"command\":\"if command -v ls; then echo symbols-probe:is-command:ls; fi\"}") == 1,
+                    "probe markers in arguments pass the ingest gate");
+        TEST_ASSERT(ServerProcArgumentsCarryProbe(NULL) == 0, "NULL arguments fail the ingest gate");
+        /* risk 8: strong shape + remembered negative re-probes instead of DIRECT */
+        TEST_ASSERT(ServerProcLearnFromOutput(&st, scope,
+                    "symbols-probe:not-a-command:htop\n", learned, sizeof(learned)) >= 1,
+                    "learn htop as not-a-command");
+        TEST_ASSERT(ServerMapShellToolCallMem("htop -d 1", bash_only, 3, &st, scope, &tr, &tc) == 1 &&
+                    tr.decision == SERVER_PROC_PROBED &&
+                    strstr(tc.arguments, "command -v htop") != NULL,
+                    "strong shape with remembered negative re-probes");
+        /* bare single-token negative re-probes; multi-word reading stays from memory */
+        TEST_ASSERT(ServerShellRouteMem("htop", &st, scope, &tr) == 1,
+                    "bare remembered non-command re-probes");
+        TEST_ASSERT(ServerShellRouteMem("hola que tal", &st, scope, &tr) == 2 &&
+                    tr.decision == SERVER_PROC_FROM_MEMORY,
+                    "multi-word known negative stays answered from memory");
+        /* risk 7: Windows not-recognized corrects a stale positive */
+        ServerProcLearnFromOutput(&st, scope, "symbols-probe:is-command:htop\n", learned, sizeof(learned));
+        TEST_ASSERT(ServerProcRecall(&st, scope, "htop") == 1, "htop remembered as command");
+        TEST_ASSERT(ServerProcCorrectFromOutput(&st, scope, "htop -d 1",
+                    "'htop' is not recognized as an internal or external command,\r\n") == 1 &&
+                    ServerProcRecall(&st, scope, "htop") == 0,
+                    "Windows not-recognized corrects stale positive memory");
         EpisodicStoreDestroy(&st);
         EpisodicStoreDestroy(&st2);
         remove(path);
