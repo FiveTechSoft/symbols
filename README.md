@@ -31,7 +31,7 @@ Symbols asks whether a useful engineering assistant can be built from mechanisms
 
 The authority path stays deterministic. Candidate generation may be heuristic or probabilistic, but a state change is accepted only after deterministic checks. This makes Symbols closer to a verifier, corrector, and repository guardian than to a general-purpose language model.
 
-Harbour is the first reference domain in the roadmap. C and C++ remain the substrate for the engine, Harbour runtime, extensions, and portability tests.
+The current focus is systems work: shell, git, and C. C and C++ are both the substrate of the engine and its first domain.
 
 ## 2. Current status
 
@@ -52,7 +52,6 @@ Harbour is the first reference domain in the roadmap. C and C++ remain the subst
 | Persistent conversational facts | Implemented and restart-tested | `episodic_memory`; `test_episodic_memory` | Flat TSV triples only; see Section 6 |
 | Structured filesystem, safe Git, build/test intelligence, Clang AST | Planned | Roadmap Phases 1-4 | Not release-ready capabilities |
 | Persistent workflows and verified engineering memory | Planned | Roadmap Phases 5-6 | Not implemented |
-| Harbour end-to-end adapter | Planned | roadmap domain orientation | No Harbour release gate has passed |
 
 ### 2.1 Progress metrics (measured, not estimated)
 
@@ -252,7 +251,6 @@ Symbols does **not** currently claim:
 - upstream SWE-bench resolution results;
 - production-grade Git mutation or filesystem transactions;
 - verified engineering-episode memory;
-- a completed Harbour adapter;
 - a green cross-platform release matrix on the current final SHA.
 
 The project also does not remove the need for compilers, tests, corpora, operating-system services, or human decisions. Its purpose is to make those sources of truth explicit and to refuse changes it cannot verify.

@@ -16,9 +16,9 @@ This roadmap does not encode one behavior per situation. It builds mechanisms: *
 
 ## Domain orientation
 
-- **North star: any language.** The long-term target is a language-agnostic core that can support any programming language. Adding a language means supplying its toolchain, semantics, diagnostics, corpus, and evaluations behind the same contracts, never rewriting the engine.
-- **Harbour is the first reference implementation.** The primary initial audience is Harbour programmers, with `harbour/core` (https://github.com/harbour/core) as the reference codebase. Harbour is the first complete, demanding domain: corpus, code graph, diagnostics, build and test tooling, and repair fixtures. It is the stress test that proves the contracts, not an architectural boundary. Initial Harbour semantics ride the real toolchain: `hbmk2` builds, preprocessed `.ppo` sources, `harbour -s` diagnostics, and generated C feeding the Clang pipeline; Harbour acceptance evidence comes only from real `hbmk2` builds and tests.
-- **C/C++ remains the substrate.** The engine, the Harbour runtime, and C extensions stay on the C pipeline; its portability and memory-safety gates remain mandatory.
+- **Current focus: shell, git, and C.** The core is built and proven on systems work first: safe shell execution, git operations, and C/C++ builds, diagnostics, and repair. The core comes before any new front.
+- **Language-agnostic contracts.** Language knowledge stays behind contracts (toolchain, semantics, diagnostics, corpus, evaluations), so a later language is added by supplying those, never by rewriting the engine. No other language is in scope until the systems core meets its gates.
+- **C/C++ is the substrate and the first domain.** The engine and its extensions stay on the C pipeline; its portability and memory-safety gates remain mandatory.
 
 ## Verified foundation
 
@@ -327,7 +327,7 @@ Benchmark thresholds belong beside versioned fixtures and should be tightened on
 - Autonomous force push, history rewriting, secret handling, privilege escalation, or destructive cleanup by default.
 - Treating a lexical scanner as compiler-equivalent C/C++ semantics.
 - Claiming full SWE-bench issue resolution from candidate-patch verification results.
-- Expanding to additional languages beyond Harbour and the C/C++ substrate before their semantics, build/test evidence, and workflow recovery meet their gates.
+- Expanding to languages beyond C/C++ before their semantics, build/test evidence, and workflow recovery meet their gates.
 - Maximizing conversational breadth at the expense of engineering reliability.
 
 ## Next gate
