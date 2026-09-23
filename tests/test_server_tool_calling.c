@@ -592,6 +592,31 @@ static void test_shell_tool_dispatch(void)
         TEST_ASSERT(strcmp(tc.name, "bash") == 0, "mapper prefers bash over glob");
     }
 
+    {
+        static char big[12000], out[4096];
+        memset(big, 'x', sizeof(big) - 1); big[sizeof(big) - 1] = '\0';
+        strcpy(out, "STALE");
+        TEST_ASSERT(ServerBuildStreamResponse("m", 1, 1, big, out, sizeof(out)) == 0 && out[0] == '\0',
+                    "failed stream encode never leaves a stale response");
+        strcpy(out, "STALE");
+        TEST_ASSERT(ServerBuildResponse("m", 1, 1, big, "q", out, sizeof(out)) == 0 && out[0] == '\0',
+                    "failed encode never leaves a stale response");
+    }
+    /* shape-based routing: no program whitelist */
+    TEST_ASSERT(ServerIsShellTask("ejecuta ps aux") == 1, "ejecuta + unlisted program is shell");
+    TEST_ASSERT(ServerIsShellTask("ejecuta ollama list") == 1, "ejecuta + unknown program is shell");
+    TEST_ASSERT(ServerIsShellTask("ps aux") == 1, "terse bare command line is shell-shaped");
+    TEST_ASSERT(ServerIsShellTask("kubectl get pods -n web") == 1, "options make a bare line strong");
+    TEST_ASSERT(ServerIsShellTask("ejecuta ls y dime cuantos ficheros hay") == 0, "verb + sentence is not a command");
+    TEST_ASSERT(ServerIsShellTask("que diria un pirata del siglo XVIII acerca de la mecanica cuantica ?") == 0, "question is not a command");
+    {
+        OPENAI_TOOL_CALL tc;
+        TEST_ASSERT(ServerMapShellToolCall("ps aux", bash_only, 3, &tc) == 1, "bare weak line maps");
+        TEST_ASSERT(strstr(tc.arguments, "command -v ps") != NULL && strstr(tc.arguments, "ps aux") != NULL,
+                    "weak bare line is probed before running");
+        TEST_ASSERT(ServerMapShellToolCall("ejecuta ollama list", bash_only, 3, &tc) == 1 &&
+                    strstr(tc.arguments, "\"command\":\"ollama list\"") != NULL, "verb form runs the command itself");
+    }
     TEST_ASSERT(ServerIsShellTask("quien es el padre de David?") == 0,
                 "factual QA is not a shell task");
     TEST_ASSERT(ServerIsShellTask("escribe en C la funcion de fibonacci") == 0,

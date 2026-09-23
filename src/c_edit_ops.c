@@ -352,19 +352,17 @@ static int QuantityForKey(const char *issue_folded, const char *key, int *value)
 
 int CeoIsAddFieldAndTotalRequest(const char *issue)
 {
+    /* Pre-routing signal only; the decision is made after perception, when
+       the planner either grounds the request in observed code or abstains.
+       Structural evidence: two or more integer quantities attached to words
+       ("4 teclados", "mouse 10").  The one lexical cue left is the aggregate
+       the user asks to see (total / value / sum / "cuanto vale"). */
     char f[2048]; Fold(issue ? issue : "", f, sizeof(f));
-    int add = strstr(f, "anad") || strstr(f, "agreg") || strstr(f, "incluy") || strstr(f, "incorpor") ||
-              strstr(f, "extend") || strstr(f, "amplia") || strstr(f, "pon ") || strstr(f, "anota");
-    for (size_t i = 0; f[i] && !add; i++) add = WordAt(f, i, "add") || WordAt(f, i, "include") || WordAt(f, i, "track");
-    int qty = strstr(f, "stock") || strstr(f, "existencias") || strstr(f, "cantidad") || strstr(f, "unidades") ||
-              strstr(f, "quantity") || strstr(f, "units") || strstr(f, "inventory count");
     int total = strstr(f, "total") || strstr(f, "valor") || strstr(f, "value") || strstr(f, "suma") || strstr(f, "sum") ||
                 strstr(f, "cuanto vale") || strstr(f, "worth");
-    /* Structural evidence, independent of verbs: at least two integer
-       quantities each attached to a word ("4 teclados", "mouse 10"). */
     int pairs = 0;
     for (size_t i = 0; f[i]; i++)
-        if (isdigit((unsigned char)f[i]) && (i == 0 || !isalnum((unsigned char)f[i - 1])) && f[i - (i ? 1 : 0)] != '.')
+        if (isdigit((unsigned char)f[i]) && (i == 0 || !isalnum((unsigned char)f[i - 1])))
         {
             size_t e = i; while (isdigit((unsigned char)f[e])) e++;
             if ((f[e] == '.' || f[e] == ',') && isdigit((unsigned char)f[e + 1])) { i = e; continue; }
@@ -373,8 +371,7 @@ int CeoIsAddFieldAndTotalRequest(const char *issue)
             if (after || before) pairs++;
             i = e;
         }
-    if (pairs >= 2) { add = 1; qty = 1; }
-    return add && qty && total;
+    return pairs >= 2 && total;
 }
 
 static int AddEdit(Model *M, int f, size_t pos, size_t del, const char *ins)
@@ -488,20 +485,18 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
     for (int k = 0; k < S->nmem; k++) if (S->mem[k].is_float) { nfloat++; vm = k; }
     if (nfloat > 1)
     {
-        vm = -1;
-        for (int k = 0; k < S->nmem; k++)
-        { char n[64]; Fold(S->mem[k].name, n, sizeof(n)); if (S->mem[k].is_float && (strstr(n, "prec") || strstr(n, "price") || strstr(n, "cost") || strstr(n, "valor") || strstr(n, "value"))) { vm = k; break; } }
+        /* several floating members: nothing observed says which one is the
+           unit value, so ask instead of guessing from names */
+        char names[160] = "";
+        for (int k = 0; k < S->nmem; k++) if (S->mem[k].is_float)
+        { size_t l = strlen(names); snprintf(names + l, sizeof(names) - l, "%s%s", l ? ", " : "", S->mem[k].name); }
+        ABSTAIN("struct %s has several numeric members (%s); which one multiplies the %s is ambiguous", S->tdef[0] ? S->tdef : S->tag, names, "new field");
     }
     if (vm < 0) ABSTAIN("struct %s has no unambiguous numeric value member to multiply", P->struct_name);
 
     /* field name: request word, else stock; refuse if it exists */
     snprintf(P->field, sizeof(P->field), "%s", strstr(fi, "stock") ? "stock" : strstr(fi, "cantidad") ? "cantidad" : strstr(fi, "quantity") ? "quantity" : strstr(fi, "existencias") ? "existencias" : "stock");
     for (int k = 0; k < S->nmem; k++) if (strcmp(S->mem[k].name, P->field) == 0) ABSTAIN("struct %s already has a member named %s", P->struct_name, P->field);
-
-    char vmn[64]; Fold(S->mem[vm].name, vmn, sizeof(vmn));
-    int english = strstr(vmn, "price") || strstr(vmn, "cost") || strstr(vmn, "value");
-    snprintf(P->total_func, sizeof(P->total_func), english ? "inventory_value" : "valor_total_inventario");
-    for (int f = 0; f < M.n; f++) { char pat[80]; snprintf(pat, sizeof(pat), "%s(", P->total_func); if (strstr(M.mask[f], pat)) ABSTAIN("%s already exists", P->total_func); }
 
     /* operator 1: add the field */
     {
@@ -569,6 +564,32 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
     if (ci < 0) ABSTAIN("no array of %s was observed to aggregate over", P->struct_name);
     Coll *C = &M.coll[ci];
     if (!C->counter[0]) ABSTAIN("cannot determine how many elements %s holds", C->ident);
+    /* name the aggregate after the observed naming convention of the file
+       that owns the collection: the shared prefix of its functions
+       (inventario_agregar/inventario_mostrar -> inventario_total), else the
+       collection itself (catalog -> catalog_total) */
+    {
+        const char *m = M.mask[C->file]; char pre[48] = ""; int nf = 0;
+        for (size_t q = 0; m[q]; q++)
+        {
+            if (m[q] != '(' || q == 0) continue;
+            size_t e = q; while (e > 0 && m[e - 1] == ' ') e--;
+            size_t b = e; while (b > 0 && (isalnum((unsigned char)m[b - 1]) || m[b - 1] == '_')) b--;
+            if (b == e) continue;
+            size_t ls = LineStart(m, b);
+            if (ls == b || isspace((unsigned char)m[ls]) || BraceDepth(m, b) != 0) continue;   /* top-level definitions only */
+            char id[64]; size_t n = e - b < sizeof(id) - 1 ? e - b : sizeof(id) - 1; memcpy(id, m + b, n); id[n] = '\0';
+            if (strcmp(id, "main") == 0) continue;
+            char *us = strchr(id, '_'); if (!us) { pre[0] = '\0'; nf = -1; break; }
+            us[1] = '\0';
+            if (nf == 0) snprintf(pre, sizeof(pre), "%s", id);
+            else if (strcmp(pre, id) != 0) { pre[0] = '\0'; nf = -1; break; }
+            nf++;
+        }
+        if (nf > 0 && pre[0]) snprintf(P->total_func, sizeof(P->total_func), "%stotal", pre);
+        else snprintf(P->total_func, sizeof(P->total_func), "%s_total", C->ident);
+        for (int f = 0; f < M.n; f++) { char pat[80]; snprintf(pat, sizeof(pat), "%s(", P->total_func); if (strstr(M.mask[f], pat)) ABSTAIN("%s already exists", P->total_func); }
+    }
     {
         char fn[640];
         snprintf(fn, sizeof(fn), "\ndouble %s(void)\n{\n    double total = 0.0;\n    for (int i = 0; i < %s; i++)\n        total += %s[i].%s * %s[i].%s;\n    return total;\n}\n",
@@ -622,10 +643,10 @@ int CeoPlanAddFieldAndTotal(const char *issue, const char *const *paths,
         if (inline_stmt)
         {
             at = anchor;
-            snprintf(line, sizeof(line), "printf(\"%s: %%.2f\\n\", %s());%s", english ? "Total inventory value" : "Valor total del inventario", P->total_func, " ");
+            snprintf(line, sizeof(line), "printf(\"%s: %%.2f\\n\", %s());%s", "Total", P->total_func, " ");
         }
         else
-            snprintf(line, sizeof(line), "%sprintf(\"%s: %%.2f\\n\", %s());\n", ind, english ? "Total inventory value" : "Valor total del inventario", P->total_func);
+            snprintf(line, sizeof(line), "%sprintf(\"%s: %%.2f\\n\", %s());\n", ind, "Total", P->total_func);
         AddEdit(&M, M.main_file, at, 0, line);
         if (!strstr(ms, "<stdio.h>"))
         { const char *inc = strstr(ms, "#include"); AddEdit(&M, M.main_file, inc ? (size_t)(inc - ms) : 0, 0, "#include <stdio.h>\n"); }

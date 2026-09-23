@@ -1036,14 +1036,31 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->agent_active = 0;
         if (tool_resp.content[0] != '\0')
         {
+            /* The reply must fit the response encoder; relay a bounded
+               prefix cut at a line boundary and say so, rather than
+               failing the encode. */
+            char shown[4096], note[160];
+            size_t total = strlen(tool_resp.content), keep = total;
+            note[0] = '\0';
+            if (keep > 3000)
+            {
+                keep = 3000;
+                while (keep > 0 && tool_resp.content[keep - 1] != '\n') keep--;
+                if (keep == 0) keep = 3000;
+                snprintf(note, sizeof(note),
+                         "\n(Salida recortada: se muestran %zu de los %zu bytes recibidos; la salida completa está en el resultado de la herramienta.)",
+                         keep, total);
+            }
+            memcpy(shown, tool_resp.content, keep);
+            shown[keep] = '\0';
             if (tool_resp.has_exit_code)
                 snprintf(content, sizeof(content),
-                         "```text\n%s\n```\nExit status: %d",
-                         tool_resp.content, tool_resp.exit_code);
+                         "```text\n%s\n```%s\nExit status: %d",
+                         shown, note, tool_resp.exit_code);
             else
                 snprintf(content, sizeof(content),
-                         "```text\n%s\n```\nExit status was not reported by the shell tool.",
-                         tool_resp.content);
+                         "```text\n%s\n```%s\nExit status was not reported by the shell tool.",
+                         shown, note);
         }
         else if (tool_resp.has_exit_code)
             snprintf(content, sizeof(content), "Exit status: %d", tool_resp.exit_code);
@@ -1495,6 +1512,23 @@ static void HandleCompletions(socket_t s, const char *body,
     }
 
     /* 1. AGENTIC RESUMPTION: Client returned output of previous tool call */
+    if (has_tool_resp && sess->agent_active && strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) != NULL)
+    {
+        /* The environment says the bare line's first token is not a program:
+           the shell reading was wrong, so answer it as language instead. */
+        char raw2[8192], mapped[8192], prog[64] = "";
+        const char *m = strstr(tool_resp.content, SERVER_SHELL_NOT_FOUND_MARK) + strlen(SERVER_SHELL_NOT_FOUND_MARK);
+        size_t n = 0;
+        while (m[n] && !isspace((unsigned char)m[n]) && n + 1 < sizeof(prog)) { prog[n] = m[n]; n++; }
+        prog[n] = '\0';
+        sess->agent_active = 0;
+        if (!g_session_ready || !ServerAnswerQuery(&g_session, sess->current_issue, raw2, sizeof(raw2)))
+            snprintf(raw2, sizeof(raw2), "No tengo constancia suficiente para responder.");
+        ServerMapContent(raw2, mapped, sizeof(mapped));
+        snprintf(content, sizeof(content), "`%s` no es un programa disponible en este entorno, así que no lo he ejecutado como comando.\n\n%s", prog, mapped);
+        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
     if (has_tool_resp && sess->agent_active)
     {
         sess->last_active = time(NULL);

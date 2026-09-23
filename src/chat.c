@@ -37,6 +37,36 @@
 #include "ingest.h"
 #include "stem.h"
 
+/* Coverage test for text retrieval: the fraction of the question's content
+   words (after the corpus-frequency filter) that occur in the sentence.
+   More than half must be present; a single incidental overlap is not an answer. */
+static int TextQueryCovered(const char *const *words, uint32_t nw, const char *sent)
+{
+    char low[2048];
+    uint32_t k, hit = 0;
+    size_t i;
+    if (nw == 0)
+        return 1;
+    for (i = 0; sent[i] && i + 1 < sizeof(low); i++)
+        low[i] = (char)tolower((unsigned char)sent[i]);
+    low[i] = '\0';
+    for (k = 0; k < nw; k++)
+    {
+        char w[64];
+        size_t n = 0;
+        const char *h;
+        while (words[k][n] && n + 1 < sizeof(w)) { w[n] = (char)tolower((unsigned char)words[k][n]); n++; }
+        w[n] = '\0';
+        if (n == 0) continue;
+        for (h = strstr(low, w); h; h = strstr(h + 1, w))
+        {
+            int lb = (h == low) || !isalnum((unsigned char)h[-1]);
+            if (lb) { hit++; break; }   /* prefix match tolerates inflection */
+        }
+    }
+    return hit * 2 > nw;
+}
+
 
 #define CHAT_MAX_TOKS 16
 
@@ -4861,7 +4891,21 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         if (have && ch->tlex[bestf].image != NULL)
         {
             char sent[2048];
+            int covered = 1;
             if (TextLexSentenceText(&ch->tlex[bestf], best,
+                                    ch->tlex[bestf].image,
+                                    ch->tlex[bestf].imagelen, sent,
+                                    sizeof(sent)) > 0 &&
+                !p->t_following && !TextQueryCovered(words, nw, sent))
+                covered = 0;
+            if (!covered)
+            {
+                /* The best sentence explains too little of the question:
+                   abstain instead of quoting a loosely related line. */
+                st = GOAL_UNKNOWN;
+                EMIT("No tengo constancia suficiente para responder a eso.\n");
+            }
+            else if (TextLexSentenceText(&ch->tlex[bestf], best,
                                     ch->tlex[bestf].image,
                                     ch->tlex[bestf].imagelen, sent,
                                     sizeof(sent)) > 0)

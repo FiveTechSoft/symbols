@@ -142,18 +142,23 @@ static void Abstain(const char *label, const char *issue, const char **paths, co
     char m[256]; snprintf(m, sizeof m, "%s: abstains", label);
     CHECK(CeoPlanAddFieldAndTotal(issue, paths, srcs, n, &P) == 0 && P.reason[0], m);
 }
+static const char *l3_paths[] = { "shop.c" };
+static const char *l3_srcs[] = { "#include <stdio.h>\nstruct row { const char *sku; double cost; double weight; };\nstatic struct row rows[] = { {\"a1\", 2.0, 0.5}, {\"b2\", 3.0, 1.5} };\nint main(void) { printf(\"%s\\n\", rows[0].sku); return 0; }\n" };
 int main(void)
 {
     const char *c4 = "Añade un campo stock al producto, con stock 4 para el teclado, 10 para el ratón y 2 para el monitor, y una función que devuelva el valor total del inventario (precio multiplicado por stock de cada producto). Actualiza el main para que muestre ese total.";
-    Expect("ext1/case4", c4, ext1_paths, ext1_srcs, 3, 585.0, "items[i].precio * items[i].stock");
+    Expect("ext1/case4", c4, ext1_paths, ext1_srcs, 3, 585.0, "inventario_total");
     Expect("ext1/name-first", "Agrega existencias a cada producto: teclado 4, ratón 10 y monitor 2. Quiero ver también el valor total del inventario.", ext1_paths, ext1_srcs, 3, 585.0, "existencias");
     Expect("ext2/english", "Add a quantity in stock to each item (keyboard 4, mouse 10, monitor 2) and show the total inventory value.", ext2_paths, ext2_srcs, 3, 643.0, "{\"mouse\", 12.5f, 10}");
-    Expect("ext2/order-fallback", c4, ext2_paths, ext2_srcs, 3, 643.0, "inventory_value()");
+    Expect("ext2/order-fallback", c4, ext2_paths, ext2_srcs, 3, 643.0, "store_total");
     CHECK(P.order_assumed == 1, "ext2/order-fallback: assumption flagged");
-    Expect("l1/single-file-typedef", "Add stock: bolt 100, nut 250, and print the total inventory value.", l1_paths, l1_srcs, 1, 50.0, "double inventory_value(void);");
+    Expect("l1/single-file-typedef", "Add stock: bolt 100, nut 250, and print the total inventory value.", l1_paths, l1_srcs, 1, 50.0, "double parts_total(void);");
     Expect("l2/one-line-main", "hay 10 manzanas, 4 peras, 20 kiwis y 1 uva; quiero el valor total del inventario", l2_paths, l2_srcs, 3, 16.0, "listar(); printf(");
+    CHECK(strcmp(P.total_func, "cesta_total") == 0, "l2: name from collection when no shared prefix");
     Abstain("ext2/missing-values", "Añade existencias: teclado 4 y ratón 10, y muestra el valor total del inventario.", ext2_paths, ext2_srcs, 3);
     Abstain("l2/count-mismatch", "Añade unidades: manzana 10, pera 4 y muestra el valor total.", l2_paths, l2_srcs, 3);
+    Abstain("l3/two-floats-ambiguous", "a1 5, b2 7: show the total value", l3_paths, l3_srcs, 1);
+    CHECK(strstr(P.reason, "cost, weight") != NULL, "l3: reason names the ambiguous members");
     CHECK(!CeoIsAddFieldAndTotalRequest("que diria un pirata del siglo XVIII acerca de la mecanica cuantica ?"), "pirate is not an edit request");
     CHECK(!CeoIsAddFieldAndTotalRequest("ejecuta ps aux"), "shell is not an edit request");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_pass, g_fail);

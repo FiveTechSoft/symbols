@@ -140,6 +140,9 @@ int ServerIsCodingTask(const char *text);
 /* Existing-workspace change/fix/implement/optimize intent. This route wins
    over standalone code synthesis and requires client workspace evidence. */
 int ServerIsRepositoryTask(const char *text);
+/* Command-line shape (no program whitelist); had_verb/cmd_start optional. */
+int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start);
+#define SERVER_SHELL_NOT_FOUND_MARK "symbols-probe:not-a-command:"
 
 /* 1 when the prompt is a literal shell/CLI command (cmake, gcc, git, ls…).
    The engine must emit a tool_call; the harness runs it. */

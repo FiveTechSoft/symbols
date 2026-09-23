@@ -609,6 +609,8 @@ int ServerBuildResponse(const char *model, long created,
     char esc[8192];
     uint32_t pt, ct;
     int w;
+    if (out != NULL && size > 0)
+        out[0] = '\0';   /* never leave a previous response behind */
     if (model == NULL || content == NULL ||
         query_for_tokens == NULL || out == NULL || size == 0)
         return 0;
@@ -699,11 +701,12 @@ int ServerBuildStreamResponse(const char *model, long created,
     char esc[8192];
     size_t pos = 0;
     int w;
+    if (out != NULL && size > 0)
+        out[0] = '\0';   /* never leave a previous response behind */
     if (model == NULL || content == NULL || out == NULL || size == 0)
         return 0;
     if (!ServerJsonEscape(content, esc, sizeof(esc)))
         return 0;
-    out[0] = '\0';
     w = snprintf(out + pos, size - pos,
                  "data: {\"id\":\"chatcmpl-symbols-%lu\",\"object\":"
                  "\"chat.completion.chunk\",\"created\":%ld,\"model\":"
@@ -2282,94 +2285,115 @@ static int MatchesAlgorithmKeyword(const char *text)
     return 0;
 }
 
-int ServerIsShellTask(const char *text)
+/* Shape of a command line, with no list of known programs.
+   A leading imperative verb (run/ejecuta/...) means the user asked to execute:
+   the rest only needs command shape.  Without a verb the line must look like
+   a terse command (lowercase program token, option/path-like or short
+   arguments); the harness then probes that the program exists before running
+   it (see ServerMapShellToolCall), so a wrong guess is corrected by the
+   environment instead of by a whitelist. */
+static int ShellArgShaped(const char *t, size_t n, int bare)
 {
-    static const char *cmds[] = {
-        "cmake", "gcc", "g++", "clang", "cl", "ctest", "git", "make",
-        "ninja", "cargo", "npm", "npx", "pip", "python", "py", "node",
-        "go", "rustc", "dotnet", "powershell", "pwsh", "cmd",
-        "dir", "ls", "pwd", "echo", "mkdir", "rmdir", "rm", "cp",
-        "mv", "curl", "wget", "tar", "zip", "unzip", "uname"
-    };
-    char tok[64];
-    size_t i = 0, t = 0;
+    size_t k, alpha = 0;
+    int special = 0, upper = 0;
+    for (k = 0; k < n; k++)
+    {
+        unsigned char c = (unsigned char)t[k];
+        if (c >= 0x80 || c == '?' || c == '!')
+            return 0;
+        if (strchr("-/.=*:~\\_+,@%0123456789\"'$", c) != NULL)
+            special = 1;
+        else if (isalpha(c))
+        {
+            alpha++;
+            if (isupper(c)) upper = 1;
+        }
+        else
+            return 0;
+    }
+    if (special)
+        return 1;
+    if (!bare)
+        return 1;
+    /* bare word arguments: lowercase and terse (long plain words read as prose) */
+    return !upper && alpha <= 6;
+}
+
+int ServerShellShape(const char *text, int *had_verb, size_t *cmd_start)
+{
+    static const char *verbs[] = { "run", "ejecuta", "ejecutar", "corre", "lanza", "execute" };
+    size_t i = 0, t0, n, v;
+    int verb = 0, ntok = 0, plain = 0, option = 0;
+    if (had_verb) *had_verb = 0;
+    if (cmd_start) *cmd_start = 0;
     if (text == NULL || text[0] == '\0')
         return 0;
     if (ServerIsFileCreationTask(text))
         return 0;
     if (LooksLikeDefinitionQuestion(text))
         return 0;
-    while (text[i] != '\0' && (text[i] == ' ' || text[i] == '\t'))
-        i++;
-    while (text[i] != '\0' && t + 1 < sizeof(tok) &&
-           text[i] != ' ' && text[i] != '\t')
+    while (text[i] == ' ' || text[i] == '\t') i++;
+    t0 = i;
+    while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
+    n = i - t0;
+    for (v = 0; v < sizeof(verbs) / sizeof(verbs[0]); v++)
+        if (strlen(verbs[v]) == n && strncasecmp(text + t0, verbs[v], n) == 0)
+            verb = 1;
+    if (verb)
     {
-        tok[t++] = (char)tolower((unsigned char)text[i]);
-        i++;
+        while (text[i] == ' ' || text[i] == '\t') i++;
+        t0 = i;
     }
-    tok[t] = '\0';
-    if (strcmp(tok, "run") == 0 || strcmp(tok, "ejecuta") == 0 ||
-        strcmp(tok, "ejecutar") == 0 || strcmp(tok, "corre") == 0)
-    {
-        t = 0;
-        while (text[i] != '\0' && (text[i] == ' ' || text[i] == '\t'))
-            i++;
-        while (text[i] != '\0' && t + 1 < sizeof(tok) &&
-               text[i] != ' ' && text[i] != '\t')
-        {
-            tok[t++] = (char)tolower((unsigned char)text[i]);
-            i++;
-        }
-        tok[t] = '\0';
-    }
-    if (tok[0] == '\0')
+    else
+        i = t0;
+    if (cmd_start) *cmd_start = t0;
+    if (text[t0] == '\0')
         return 0;
+    /* program token: lowercase-led, path/identifier characters only */
     {
-    size_t arg_pos = i;
-    for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++)
-    {
-        if (strcmp(tok, cmds[i]) == 0)
+        size_t e = t0, letters = 0;
+        while (text[e] && text[e] != ' ' && text[e] != '\t')
         {
-            /* uname is accepted only as the literal command plus option
-               tokens.  This covers real CLI intent such as `uname -a`
-               without executing ordinary prose beginning with "uname". */
-            if (strcmp(tok, "uname") == 0)
-            {
-                while (text[arg_pos] == ' ' || text[arg_pos] == '\t')
-                    arg_pos++;
-                if (text[arg_pos] != '\0' && text[arg_pos] != '-')
-                    return 0;
-            }
-            return 1;
+            unsigned char c = (unsigned char)text[e];
+            if (!(islower(c) || isdigit(c) || strchr("._-/~+", c) != NULL ||
+                  (verb && isupper(c))))
+                return 0;
+            if (isalpha(c)) letters++;
+            e++;
         }
+        if (letters == 0 || e - t0 > 40)
+            return 0;
+        i = e;
+        ntok = 1;
     }
+    while (text[i])
+    {
+        size_t s;
+        while (text[i] == ' ' || text[i] == '\t') i++;
+        if (!text[i]) break;
+        s = i;
+        while (text[i] && text[i] != ' ' && text[i] != '\t') i++;
+        if (!ShellArgShaped(text + s, i - s, !verb))
+            return 0;
+        {
+            size_t k; int sp = 0;
+            for (k = s; k < i; k++) if (!isalpha((unsigned char)text[k])) sp = 1;
+            if (text[s] == '-') option = 1;
+            if (!sp) plain++;
+        }
+        if (++ntok > (verb ? 24 : 12))
+            return 0;
     }
+    /* several plain words without any option read as a sentence */
+    if (!option && plain > (verb ? 3 : 2))
+        return 0;
+    if (had_verb) *had_verb = verb;
+    return 1;
+}
 
-    /* Natural language shell intent: "list files", "show directories",
-       "lista archivos", "muestra subcarpetas", etc. */
-    {
-        char lower[1024];
-        size_t j = 0;
-        while (text[j] != '\0' && j < sizeof(lower) - 1)
-        {
-            lower[j] = (char)tolower((unsigned char)text[j]);
-            j++;
-        }
-        lower[j] = '\0';
-        if (strstr(lower, "list ") != NULL || strstr(lower, "lista ") != NULL ||
-            strstr(lower, "show ") != NULL || strstr(lower, "muestra ") != NULL ||
-            strstr(lower, "explore ") != NULL || strstr(lower, "explora ") != NULL)
-        {
-            if (strstr(lower, "file") != NULL || strstr(lower, "archivo") != NULL ||
-                strstr(lower, "fichero") != NULL || strstr(lower, "folder") != NULL ||
-                strstr(lower, "carpeta") != NULL || strstr(lower, "director") != NULL ||
-                strstr(lower, "subcarpet") != NULL || strstr(lower, "subfolder") != NULL ||
-                strstr(lower, "content") != NULL || strstr(lower, "contenido") != NULL)
-                return 1;
-        }
-    }
-
-    return 0;
+int ServerIsShellTask(const char *text)
+{
+    return ServerShellShape(text, NULL, NULL);
 }
 
 int ServerMapShellToolCall(const char *query, const char names[][64],
@@ -2433,22 +2457,32 @@ int ServerMapShellToolCall(const char *query, const char names[][64],
         }
     }
 
-    p = query;
-    while (*p == ' ' || *p == '\t')
-        p++;
     {
-        const char *q = p;
-        char lead[32];
-        size_t n = 0;
-        while (*q && *q != ' ' && *q != '\t' && n + 1 < sizeof(lead))
-            lead[n++] = (char)tolower((unsigned char)*q++);
-        lead[n] = '\0';
-        if (strcmp(lead, "run") == 0 || strcmp(lead, "ejecuta") == 0 ||
-            strcmp(lead, "ejecutar") == 0 || strcmp(lead, "corre") == 0)
+        int had_verb = 0; size_t start = 0;
+        if (ServerShellShape(query, &had_verb, &start))
         {
-            while (*q == ' ' || *q == '\t')
-                q++;
-            p = q;
+            p = query + start;
+            int strong = 0;
+            {
+                /* option- or path-shaped arguments are strong command evidence */
+                const char *a = strchr(p, ' ');
+                for (; a && *a; a++) if (strchr("-/.=*~", *a) != NULL) { strong = 1; break; }
+            }
+            if (!had_verb && !strong)
+            {
+                /* weak bare line: probe that the program exists before running it */
+                char prog[64]; size_t n = 0;
+                while (p[n] && p[n] != ' ' && p[n] != '\t' && n + 1 < sizeof(prog)) { prog[n] = p[n]; n++; }
+                prog[n] = '\0';
+                o = (size_t)snprintf(esc, sizeof(esc),
+                    "command -v %s >/dev/null 2>&1 || { echo %s%s; exit 127; }; ", prog, SERVER_SHELL_NOT_FOUND_MARK, prog);
+            }
+        }
+        else
+        {
+            p = query;
+            while (*p == ' ' || *p == '\t')
+                p++;
         }
     }
     for (; *p != '\0' && o + 2 < sizeof(esc); p++)
