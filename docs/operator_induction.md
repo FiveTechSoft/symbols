@@ -1,6 +1,6 @@
 # Operator induction: learning repair operators from verified repairs
 
-Status: design draft (2026-09-23). Nothing here is implemented yet. It is meant to be measured against Mimo's new blind bank batch.
+Status: design accepted (2026-09-23), build started. It is measured against Mimo's new blind bank batch.
 
 ## Why
 
@@ -73,9 +73,17 @@ Blind search is bounded. The default is 64 builds per task, which is what relop_
 
 Success criterion: the blind pass rate goes up with 0 wrong edits, and the induced operators account for the gain.
 
-## Open decisions (for Antonio)
+## Decisions (Antonio left them to Instinct's judgment, 2026-09-23; the recommendations were adopted)
 
-1. **Synthetic training data.** Should the engine break its own repo code (mutation testing) to create training traces? This would give many more traces than the 56 bank tasks. Recommendation: yes, restricted to functions that have tests.
-2. **K (support threshold).** Recommendation: 3. Lower is faster to learn but risks overfitting.
-3. **Retire hand-written wording-cued operators** (doc_sync, remove_dead_function, the change-to cue) once induced operators cover them on dev. Recommendation: keep them until induction matches them, then remove them and report the delta.
-4. **Budget.** 64 builds per task, about 1-3 s on the bank. Recommendation: keep it, and allow parallel copies.
+1. **Synthetic training data:** yes. Mutation testing on the repo's own C functions that have tests: break one thing, and check that the test catches it and that the engine can repair it.
+2. **K = 3** distinct workspaces to promote an operator.
+3. **Wording-cued operators** (doc_sync, remove_dead_function, the change-to cue) are removed once induced operators match them on dev. The difference is reported.
+4. **Budget:** 64 builds per task, with parallel isolated copies allowed.
+
+## Build plan (one gated commit per phase)
+
+1. **Traces.** TaskOpsSolve appends one line per attempt (observed features, operator, site, verified) to a trace file when `SYMBOLS_TRACE` is set. Nothing changes in behavior.
+2. **Mutation corpus.** A script creates broken copies of small repo functions that have tests (single primitive mutations), and records whether the test catches each one. These are training workspaces only; the bank's blind batch is never used.
+3. **Primitive search.** Generalize relop_search into a bounded primitive search: token swaps, +/-1 on literals, line insert/delete. Verification is by observed state. Every attempt is traced.
+4. **Inducer.** Group verified traces by (feature pattern, primitive). Promote at K=3 with 0 false fires and leave-one-out. Write `operators.tsv`. Load the induced operators before blind search.
+5. **Measure and retire.** Compare on dev and on Mimo's blind batch (counts only). Remove the wording-cued operators once the induced ones match them on dev, and report the difference.
