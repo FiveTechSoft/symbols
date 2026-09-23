@@ -20,3 +20,4 @@ gcc implicit-declaration diagnostic text	src/task_ops.c	"implicit declaration of
 sentence boundary '. ' for literal/name pairing	src/task_ops.c	static int find_literal_plan(	declared lexical rule (task_ops literal_to_constant)
 behavior-preserving edits (rename, literal) must leave a clean run's stdout unchanged	src/task_ops.c	static void probe_out(	declared verify rule (task_ops rename_symbol, literal_to_constant)
 exactly one task-named header (x.h, root) that does not exist may be created for a grounded prototype; include guard = upper-cased file name	src/task_ops.c	static int missing_named_header(	declared lexical rule (task_ops declare_implicit, new header)
+operator memory (opt-in SYMBOLS_TASK_OPS_MEMORY): skip an operator that rolled back on the same workspace+task hash; order by remembered net success	src/task_ops.c	static void mem_recall(	declared learning rule (task_ops memory)

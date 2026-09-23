@@ -46,6 +46,8 @@ typedef struct
     int  compile_after;
     int  run_before;      /* -1 = not run, otherwise exit code */
     int  run_after;
+    int  memory_skipped;  /* operators skipped: they rolled back before on this workspace+task */
+    int  memory_reordered;/* 1 = operator order came from remembered outcomes */
 } TASK_OPS_REPORT;
 
 /* Load text files (no NUL bytes, <= TASK_OPS_MAX_FILE) under root. */

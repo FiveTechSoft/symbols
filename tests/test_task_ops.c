@@ -9,6 +9,15 @@
 #include "compat.h"
 #include "task_ops.h"
 
+static void set_memory(int on)
+{
+#ifdef _WIN32
+    _putenv(on ? "SYMBOLS_TASK_OPS_MEMORY=1" : "SYMBOLS_TASK_OPS_MEMORY=0");
+#else
+    setenv("SYMBOLS_TASK_OPS_MEMORY", on ? "1" : "0", 1);
+#endif
+}
+
 static int pass = 0, fail = 0;
 #define CHECK(c, msg) do { if (c) { pass++; printf("  [PASS] %s\n", msg); } \
                            else { fail++; printf("  [FAIL] %s\n", msg); } } while (0)
@@ -305,6 +314,53 @@ int main(void)
         TASK_OPS_REPORT r;
         CHECK(!TaskOpsSolve(d, "Use a constant LIMIT_V for 3 or 4.", &r) && !strcmp(get(d, "q.c"), m),
               "two literals in the sentence: abstain");
+    }
+
+    /* operator memory (learn step, opt-in) */
+    {
+        char d[512]; make_dir(d, sizeof(d), "memskip");
+        const char *m = "int main(void) { return quad_of(1) == 4 ? 0 : 1; }\nint quad_of(int v) { return v * 4; }\n";
+        put(d, "m.c", m);
+        const char *t = "Declare it and write notes.txt; build with -Werror=implicit-function-declaration.";
+        TASK_OPS_REPORT r1, r2;
+        set_memory(1);
+        int k1 = TaskOpsSolve(d, t, &r1);
+        int k2 = TaskOpsSolve(d, t, &r2);
+        set_memory(0);
+        char mp[600]; snprintf(mp, sizeof(mp), "%s/.symbols/task_ops_memory.tsv", d);
+        FILE *mf = fopen(mp, "rb"); char line[256] = {0};
+        if (mf) { if (!fgets(line, sizeof(line), mf)) line[0] = 0; fclose(mf); }
+        printf("    memory: %s| second run skipped %d\n", line, r2.memory_skipped);
+        if (r1.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(!k1 && !k2 && strstr(line, "declare_implicit\trolled_back") && r2.memory_skipped == 1 &&
+                   !r2.op[0] && !strcmp(get(d, "m.c"), m),
+                   "rolled-back operator is remembered and skipped on the same workspace+task");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "memorder");
+        put(d, "m.c", "int main(void) { int old_n = 2; return helper(old_n) - 2; }\nint helper(int v) { return v; }\n");
+        char sd[600]; snprintf(sd, sizeof(sd), "%s/.symbols", d);
+        _mkdir(sd);
+        put(d, ".symbols/task_ops_memory.tsv", "0000000000000000\tdeclare_implicit\tkept\n");
+        TASK_OPS_REPORT r;
+        set_memory(1);
+        int kept = TaskOpsSolve(d, "Rename old_n to new_n; build with -Werror=implicit-function-declaration.", &r);
+        set_memory(0);
+        printf("    %s %s | reordered %d\n", r.op, r.detail, r.memory_reordered);
+        if (r.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(kept && !strcmp(r.op, "declare_implicit") && r.memory_reordered,
+                   "remembered success puts that operator first when several apply");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "memoff");
+        put(d, "m.c", "int main(void) { int old_n = 2; return helper(old_n) - 2; }\nint helper(int v) { return v; }\n");
+        char sd[600]; snprintf(sd, sizeof(sd), "%s/.symbols", d);
+        _mkdir(sd);
+        put(d, ".symbols/task_ops_memory.tsv", "0000000000000000\tdeclare_implicit\tkept\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Rename old_n to new_n; build with -Werror=implicit-function-declaration.", &r);
+        CHECK(kept && !strcmp(r.op, "rename_symbol") && !r.memory_reordered,
+              "memory off (default): fixed operator order");
     }
 
     /* nothing applicable: untouched */

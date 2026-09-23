@@ -13,6 +13,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <direct.h>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -1280,6 +1281,94 @@ static char *apply_literal_plan(const TASK_OPS_WORKSPACE *ws, const LIT_PLAN *p,
 
 /* ------------------------------------------------------------------ act */
 
+/* ------------------------------------------------------ operator memory */
+
+/* Learn step. Opt-in (SYMBOLS_TASK_OPS_MEMORY=1) so bank and CI numbers stay
+   reproducible. Each verified or rolled-back attempt is appended to
+   <workspace>/.symbols/task_ops_memory.tsv as "key<TAB>op<TAB>kept|rolled_back",
+   key = FNV-1a 64 of the task text and every workspace file (path + bytes).
+   Recall: an operator that rolled back on the same key is skipped; when
+   several operators could apply, the order follows remembered net success
+   (kept - rolled_back) per operator, ties keep the default order. */
+
+enum { OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_COUNT };
+static const char *const op_names[OP_COUNT] = {
+    "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit"
+};
+
+static int mem_enabled(void)
+{
+    const char *v = getenv("SYMBOLS_TASK_OPS_MEMORY");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static unsigned long long fnv_add(unsigned long long h, const char *p, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        h ^= (unsigned char)p[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static void mem_key(const TASK_OPS_WORKSPACE *ws, const char *task, char *out, size_t out_size)
+{
+    unsigned long long h = 1469598103934665603ULL;
+    h = fnv_add(h, task, strlen(task) + 1);
+    for (int i = 0; i < ws->count; i++) {
+        h = fnv_add(h, ws->files[i].rel, strlen(ws->files[i].rel) + 1);
+        h = fnv_add(h, ws->files[i].data, ws->files[i].len);
+    }
+    snprintf(out, out_size, "%016llx", h);
+}
+
+static void mem_path(const char *root, char *out, size_t out_size, int dir_only)
+{
+    snprintf(out, out_size, "%s/.symbols%s", root, dir_only ? "" : "/task_ops_memory.tsv");
+}
+
+static void mem_recall(const char *root, const char *key, int skip[OP_COUNT], int net[OP_COUNT])
+{
+    memset(skip, 0, sizeof(int) * OP_COUNT);
+    memset(net, 0, sizeof(int) * OP_COUNT);
+    char path[TASK_OPS_MAX_PATH * 2], line[256];
+    mem_path(root, path, sizeof(path), 0);
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    while (fgets(line, sizeof(line), f)) {
+        char *t1 = strchr(line, '\t'), *t2 = t1 ? strchr(t1 + 1, '\t') : NULL;
+        if (!t2)
+            continue;
+        *t1 = *t2 = '\0';
+        int kept = !strncmp(t2 + 1, "kept", 4);
+        for (int o = 0; o < OP_COUNT; o++)
+            if (!strcmp(t1 + 1, op_names[o])) {
+                net[o] += kept ? 1 : -1;
+                if (!kept && !strcmp(line, key))
+                    skip[o] = 1;
+            }
+    }
+    fclose(f);
+}
+
+static void mem_record(const char *root, const char *key, const char *op, int kept)
+{
+    char path[TASK_OPS_MAX_PATH * 2];
+    mem_path(root, path, sizeof(path), 1);
+#ifdef _WIN32
+    _mkdir(path);
+#else
+    mkdir(path, 0755);
+#endif
+    mem_path(root, path, sizeof(path), 0);
+    FILE *f = fopen(path, "ab");
+    if (!f)
+        return;
+    fprintf(f, "%s\t%s\t%s\n", key, op, kept ? "kept" : "rolled_back");
+    fclose(f);
+}
+
 static int write_file(const char *root, const char *rel, const char *data)
 {
     char path[TASK_OPS_MAX_PATH * 2];
@@ -1314,61 +1403,83 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     task_flags(task, flags, sizeof(flags));
     probe_out(ws, flags, &rep->compile_before, &rep->run_before, probe_stdout[0]);
 
-    /* reason: first operator whose preconditions hold */
-    char a[128], b[128];
+    /* recall (learn step, opt-in) */
+    int use_mem = mem_enabled(), skip[OP_COUNT] = {0}, net[OP_COUNT] = {0}, order[OP_COUNT];
+    char key[32] = {0};
+    for (int o = 0; o < OP_COUNT; o++)
+        order[o] = o;
+    if (use_mem) {
+        mem_key(ws, task, key, sizeof(key));
+        mem_recall(ws->root, key, skip, net);
+        for (int i = 1; i < OP_COUNT; i++)   /* stable insertion sort by net success */
+            for (int j = i; j > 0 && net[order[j]] > net[order[j - 1]]; j--) {
+                int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
+                rep->memory_reordered = 1;
+            }
+    }
+
+    /* reason: first operator (in that order) whose preconditions hold */
+    char a[128] = {0}, b[128] = {0};
     int touched = 0;
     int renames = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
-    rep->candidates = renames;
-    if (renames == 1) {
-        snprintf(rep->op, sizeof(rep->op), "rename_symbol");
-        for (int i = 0; i < ws->count; i++)
-            if (count_token_in(ws->files[i].data, a) > 0) {
-                next[i] = replace_token(ws->files[i].data, a, b);
-                touched++;
-            }
-        snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
-    }
     char y_text[128] = {0};
-    int uses_before = 0, lit_file = -1;
+    int uses_before = 0, lit_file = -1, frags = 0;
     LIT_PLAN lit;
     char *lit_out = NULL;
     FRAG_HIT hit;
-    int frags = renames == 1 ? 0 : find_fragment_edit(ws, task, y_text, sizeof(y_text), &hit);
-    if (frags == 1) {
-        rep->candidates = 1;
-        snprintf(rep->op, sizeof(rep->op), "stated_fragment");
-        const TASK_OPS_FILE *f = &ws->files[hit.file];
-        size_t yl = strlen(y_text);
-        char *out = (char *)malloc(f->len - (hit.to - hit.from) + yl + 1);
-        if (out) {
-            memcpy(out, f->data, hit.from);
-            memcpy(out + hit.from, y_text, yl);
-            memcpy(out + hit.from + yl, f->data + hit.to, f->len - hit.to + 1);
-            next[hit.file] = out;
-            touched = 1;
+    rep->candidates = renames;
+    for (int oi = 0; oi < OP_COUNT && !touched; oi++) {
+        int op = order[oi];
+        if (skip[op]) {
+            rep->memory_skipped++;
+            continue;
         }
-        snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
-                 (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
-                 y_text, f->rel);
-    } else if (renames != 1 && find_literal_plan(ws, task, &lit) == 1 &&
-               (lit_out = apply_literal_plan(ws, &lit, &lit_file)) != NULL) {
-        next[lit_file] = lit_out;
-        touched = 1;
-        rep->candidates = 1;
-        snprintf(rep->op, sizeof(rep->op), "literal_to_constant");
-        snprintf(rep->detail, sizeof(rep->detail), "%s%.60s%s -> %.60s in %.60s", lit.is_string ? "\"" : "",
-                 lit.lit, lit.is_string ? "\"" : "", lit.name, ws->files[lit_file].rel);
-    } else if (renames != 1 && rep->compile_before >= 0 &&
-               (touched = declare_implicit(ws, flags, task, next, &created, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
-        rep->candidates = 1;
-        snprintf(rep->op, sizeof(rep->op), "declare_implicit");
-    } else if (renames != 1 && rep->compile_before == 0) {
-        int fixes = 0;
-        touched = compiler_fixits(ws, flags, next, &fixes);
-        if (touched) {
+        if (op == OP_RENAME && renames == 1) {
+            snprintf(rep->op, sizeof(rep->op), "rename_symbol");
+            for (int i = 0; i < ws->count; i++)
+                if (count_token_in(ws->files[i].data, a) > 0) {
+                    next[i] = replace_token(ws->files[i].data, a, b);
+                    touched++;
+                }
+            snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
+        } else if (op == OP_FRAGMENT &&
+                   (frags = find_fragment_edit(ws, task, y_text, sizeof(y_text), &hit)) == 1) {
             rep->candidates = 1;
-            snprintf(rep->op, sizeof(rep->op), "compiler_fixit");
-            snprintf(rep->detail, sizeof(rep->detail), "%d fix-it(s) in %d file(s)", fixes, touched);
+            snprintf(rep->op, sizeof(rep->op), "stated_fragment");
+            const TASK_OPS_FILE *f = &ws->files[hit.file];
+            size_t yl = strlen(y_text);
+            char *out = (char *)malloc(f->len - (hit.to - hit.from) + yl + 1);
+            if (out) {
+                memcpy(out, f->data, hit.from);
+                memcpy(out + hit.from, y_text, yl);
+                memcpy(out + hit.from + yl, f->data + hit.to, f->len - hit.to + 1);
+                next[hit.file] = out;
+                touched = 1;
+            }
+            snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
+                     (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
+                     y_text, f->rel);
+        } else if (op == OP_LITERAL &&
+                   find_literal_plan(ws, task, &lit) == 1 &&
+                   (lit_out = apply_literal_plan(ws, &lit, &lit_file)) != NULL) {
+            next[lit_file] = lit_out;
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "literal_to_constant");
+            snprintf(rep->detail, sizeof(rep->detail), "%s%.60s%s -> %.60s in %.60s", lit.is_string ? "\"" : "",
+                     lit.lit, lit.is_string ? "\"" : "", lit.name, ws->files[lit_file].rel);
+        } else if (op == OP_DECLARE && rep->compile_before >= 0 &&
+                   (touched = declare_implicit(ws, flags, task, next, &created, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "declare_implicit");
+        } else if (op == OP_FIXIT && rep->compile_before == 0) {
+            int fixes = 0;
+            touched = compiler_fixits(ws, flags, next, &fixes);
+            if (touched) {
+                rep->candidates = 1;
+                snprintf(rep->op, sizeof(rep->op), "compiler_fixit");
+                snprintf(rep->detail, sizeof(rep->detail), "%d fix-it(s) in %d file(s)", fixes, touched);
+            }
         }
     }
     if (!touched) {
@@ -1451,6 +1562,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         remove(path);
     }
     free(created.data);
+    /* learn: remember what this operator did on this workspace+task */
+    if (use_mem && rep->op[0])
+        mem_record(ws->root, key, rep->op, verified);
     for (int i = 0; i < TASK_OPS_MAX_FILES; i++)
         free(next[i]);
     free(next);
