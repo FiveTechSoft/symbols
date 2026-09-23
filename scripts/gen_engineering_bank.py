@@ -589,10 +589,10 @@ p = Path("output.txt")
 sys.exit(0 if p.is_file() and p.read_text(encoding="utf-8").strip() == "OK" else 1)
 '''),
         ("eb_sh_007",
-         "run.sh should exit 2 when helper.sh is missing (fail closed). Implement a file-existence guard. Checker runs in a dir without helper.sh and expects exit 2.",
+         "run.sh should exit 3 when helper.sh is missing (fail closed). Implement a file-existence guard. Checker runs in a dir without helper.sh and expects exit 3 (a code no shell uses for a missing script: dash exits 2, bash 127).",
          {"run.sh": "#!/bin/sh\nsh helper.sh\n"},
-         {"run.sh": "#!/bin/sh\nif [ -f helper.sh ]; then\n    sh helper.sh\nelse\n    exit 2\nfi\n"},
-         sh_run_check('["run.sh"]', "rc == 2")),
+         {"run.sh": "#!/bin/sh\nif [ -f helper.sh ]; then\n    sh helper.sh\nelse\n    exit 3\nfi\n"},
+         sh_run_check('["run.sh"]', "rc == 3")),
     ]
     for tid, prompt, b, a, c in sh:
         write_task(tid, "shell", prompt, b, a, c)
