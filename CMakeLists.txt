@@ -60,6 +60,7 @@ add_library(symbolic STATIC
     src/server_subagent.c
     src/output_contract.c
     src/c_edit_ops.c
+    src/shell_ops.c
     src/text_lex.c
     src/meta_graph.c
     src/vsa.c
@@ -230,6 +231,7 @@ sllm_test(test_swe_bench_harness tests/test_swe_bench_harness.c)
 sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 sllm_test(test_agent_shell tests/test_agent_shell.c)
 sllm_test(test_task_ops tests/test_task_ops.c)
+sllm_test(test_shell_ops tests/test_shell_ops.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)

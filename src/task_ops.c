@@ -3,6 +3,7 @@
  */
 #include "task_ops.h"
 #include "agent_shell.h"
+#include "shell_ops.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -2572,9 +2573,61 @@ static void trace_attempt(const TASK_OPS_WORKSPACE *ws, const char *flags, const
     fclose(f);
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_COUNT };
+/* ------------------------------------------------------- shell hardening */
+
+/* The one shell script a shell rule applies to; a task that names script
+   files restricts the candidates to those. -1 when none or ambiguous. */
+static int shell_target(const TASK_OPS_WORKSPACE *ws, const char *task, char **out,
+                        char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    int hit = -1, named = 0;
+    *out = NULL;
+    for (int i = 0; i < ws->count; i++)
+        if (ShellOpsIsScript(ws->files[i].rel, ws->files[i].data) && strstr(task, ws->files[i].rel))
+            named++;
+    for (int i = 0; i < ws->count; i++) {
+        if (!ShellOpsIsScript(ws->files[i].rel, ws->files[i].data))
+            continue;
+        if (named && !strstr(task, ws->files[i].rel))
+            continue;
+        char r[32], d[128];
+        char *o = ShellOpsApply(ws->files[i].data, task, r, sizeof(r), d, sizeof(d));
+        if (!o)
+            continue;
+        if (hit >= 0) {           /* ambiguous: abstain */
+            free(o);
+            free(*out);
+            *out = NULL;
+            return -1;
+        }
+        hit = i;
+        *out = o;
+        snprintf(rule, rsz, "%s", r);
+        snprintf(detail, dsz, "%s", d);
+    }
+    return hit;
+}
+
+/* `sh -n` accepts the script; no shell available = not verified */
+static int shell_syntax_ok(const char *root, const char *rel)
+{
+    if (strchr(rel, '"'))
+        return 0;
+    char cmd[TASK_OPS_MAX_PATH + 16];
+    snprintf(cmd, sizeof(cmd), "sh -n \"%s\"", rel);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, root, 10000, r);
+    int ok = !r->execution_failed && !r->timed_out && r->exit_code == 0;
+    free(r);
+    return ok;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden"
 };
 
 static int mem_enabled(void)
@@ -2687,6 +2740,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 
     /* recall (learn step, opt-in) */
     int use_mem = mem_enabled(), skip[OP_COUNT] = {0}, net[OP_COUNT] = {0}, order[OP_COUNT];
+    int shell_file = -1;
+    char *next_shell = NULL, shell_rule[32] = "", shell_detail[128] = "";
     char key[32] = {0};
     for (int o = 0; o < OP_COUNT; o++)
         order[o] = o;
@@ -2785,6 +2840,12 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "remove_dead_function");
             snprintf(rep->detail, sizeof(rep->detail), "%.100s removed from %d file(s)", dead, touched);
+        } else if (op == OP_SHELL && (shell_file = shell_target(ws, task, &next_shell, shell_rule, sizeof(shell_rule), shell_detail, sizeof(shell_detail))) >= 0) {
+            next[shell_file] = next_shell;
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "shell_harden");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.60s in %.120s", shell_rule, shell_detail, ws->files[shell_file].rel);
         } else if (op == OP_TEST && find_test_plan(ws, task, &tplan)) {
             size_t cap = 512 + strlen(tplan.call);
             created.data = (char *)malloc(cap);
@@ -2885,6 +2946,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             int vn = task_examples(after, task, vex, EX_MAX), vm = any_main(after);
             intent = (!vm || (rep->compile_after == 1 && rep->run_after == 0)) &&
                      (vn == 0 || run_examples(after, flags, vex, vn) == 1);
+        } else if (!strcmp(rep->op, "shell_harden")) {
+            intent = ShellOpsIntent(after->files[shell_file].data, shell_rule) &&
+                     shell_syntax_ok(after->root, after->files[shell_file].rel);
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
@@ -2901,7 +2965,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
              !strcmp(rep->op, "remove_dead_function")) &&
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
-        if (!named_files_exist(ws, after, task, &named, &named_touched) ||
+        int guard_names_missing = !strcmp(rep->op, "shell_harden") && !strcmp(shell_rule, "file_guard");
+        if ((!guard_names_missing && !named_files_exist(ws, after, task, &named, &named_touched)) ||
             (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
             intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
         if (!strcmp(rep->op, "author_test"))
