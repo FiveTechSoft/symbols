@@ -717,6 +717,282 @@ static int compiler_fixits(const TASK_OPS_WORKSPACE *ws, const char *flags, char
     return files;
 }
 
+/* ------------------------------------------- declare an implicit function */
+
+/* gcc reports a call to an undeclared function; ground the name in the
+   workspace: a header that declares it (include that header), or its own
+   definition (declare it from the definition's head). */
+
+#define DECL_MAX 8
+
+typedef struct
+{
+    int  file;            /* file that uses the name */
+    char name[128];
+} IMPLICIT_USE;
+
+static int implicit_uses(const TASK_OPS_WORKSPACE *ws, const char *flags, IMPLICIT_USE *out, int max)
+{
+    char cmd[4096], srcs[3072];
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return 0;
+    snprintf(cmd, sizeof(cmd), "gcc %s-Wimplicit-function-declaration -fsyntax-only %s", flags, srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    int n = 0;
+    if (!r->execution_failed) {
+        const char *key = "implicit declaration of function ";
+        for (const char *p = strstr(r->stderr_buf, key); p && n < max; p = strstr(p + 1, key)) {
+            /* file is the text before the first ':' of this diagnostic line */
+            const char *ls = p;
+            while (ls > r->stderr_buf && ls[-1] != '\n') ls--;
+            const char *colon = strchr(ls, ':');
+            const char *q = p + strlen(key);
+            while (*q && !ident_start((unsigned char)*q) && *q != '\n') q++;   /* ' or UTF-8 quote */
+            size_t nl = 0;
+            while (ident_char((unsigned char)q[nl])) nl++;
+            if (!colon || colon > p || nl == 0 || nl >= sizeof(out[0].name))
+                continue;
+            int fi = -1;
+            for (int i = 0; i < ws->count; i++)
+                if (strlen(ws->files[i].rel) == (size_t)(colon - ls) &&
+                    !strncmp(ws->files[i].rel, ls, (size_t)(colon - ls)))
+                    fi = i;
+            if (fi < 0)
+                continue;
+            int dup = 0;
+            for (int k = 0; k < n; k++)
+                if (out[k].file == fi && strlen(out[k].name) == nl && !strncmp(out[k].name, q, nl))
+                    dup = 1;
+            if (dup)
+                continue;
+            out[n].file = fi;
+            memcpy(out[n].name, q, nl);
+            out[n].name[nl] = '\0';
+            n++;
+        }
+    }
+    free(r);
+    return n;
+}
+
+static int is_header(const char *rel)
+{
+    size_t n = strlen(rel);
+    return n > 2 && !strcmp(rel + n - 2, ".h");
+}
+
+/* Line in data (start offset) holding "name(" at file level followed by
+   ';' (prototype) or '{' (definition) on the same line. */
+static long file_level_decl(const char *data, const char *name, int want_def, size_t *line_len)
+{
+    const char *line = data;
+    while (line && *line) {
+        const char *nl = strchr(line, '\n');
+        size_t len = nl ? (size_t)(nl - line) : strlen(line);
+        if (!isspace((unsigned char)line[0]) && line[0] != '#') {
+            char buf[512];
+            size_t bl = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;
+            memcpy(buf, line, bl);
+            buf[bl] = '\0';
+            char *p = buf;
+            size_t nlen = strlen(name);
+            while ((p = strstr(p, name)) != NULL) {
+                int left = p == buf || !ident_char((unsigned char)p[-1]);
+                const char *a = p + nlen;
+                while (*a == ' ') a++;
+                if (left && *a == '(' && p != buf) {
+                    const char *close = strchr(a, ')');
+                    const char *after = close ? close + 1 : NULL;
+                    while (after && *after == ' ') after++;
+                    if (after && ((want_def && *after == '{') || (!want_def && *after == ';'))) {
+                        *line_len = (size_t)(close + 1 - buf);
+                        return (long)(line - data);
+                    }
+                }
+                p += nlen;
+            }
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+    return -1;
+}
+
+/* Offset just after the last #include line, or 0. */
+static size_t after_includes(const char *data)
+{
+    size_t off = 0;
+    const char *line = data;
+    while (line && *line) {
+        const char *nl = strchr(line, '\n');
+        const char *t = line;
+        while (*t == ' ' || *t == '\t') t++;
+        if (!strncmp(t, "#include", 8))
+            off = nl ? (size_t)(nl + 1 - data) : strlen(data);
+        line = nl ? nl + 1 : NULL;
+    }
+    return off;
+}
+
+static char *insert_at(const char *data, size_t len, size_t at, const char *text)
+{
+    size_t tl = strlen(text);
+    char *out = (char *)malloc(len + tl + 1);
+    if (!out)
+        return NULL;
+    memcpy(out, data, at);
+    memcpy(out + at, text, tl);
+    memcpy(out + at + tl, data + at, len - at + 1);
+    return out;
+}
+
+/* Fills next[] for every implicit use it can ground; returns files touched. */
+static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, char **next,
+                            char *detail, size_t detail_size, int *uses_before)
+{
+    IMPLICIT_USE use[DECL_MAX];
+    int n = implicit_uses(ws, flags, use, DECL_MAX), files = 0;
+    *uses_before = n;
+    detail[0] = '\0';
+    for (int k = 0; k < n; k++) {
+        const TASK_OPS_FILE *f = &ws->files[use[k].file];
+        if (next[use[k].file])
+            continue;   /* one grounded edit per file per round */
+        char text[640] = {0};
+        /* a header (other than the user) that declares the name */
+        int header = -1, headers = 0;
+        for (int i = 0; i < ws->count; i++) {
+            size_t ll;
+            if (i != use[k].file && is_header(ws->files[i].rel) &&
+                file_level_decl(ws->files[i].data, use[k].name, 0, &ll) >= 0) {
+                header = i;
+                headers++;
+            }
+        }
+        if (headers == 1 && !strchr(ws->files[header].rel, '/') && !strchr(f->rel, '/')) {
+            snprintf(text, sizeof(text), "#include \"%s\"\n", ws->files[header].rel);
+        } else if (headers == 0) {
+            /* the definition's head, from exactly one source file */
+            int defs = 0;
+            for (int i = 0; i < ws->count; i++) {
+                size_t ll;
+                long at = file_level_decl(ws->files[i].data, use[k].name, 1, &ll);
+                if (at >= 0 && ll < sizeof(text) - 3) {
+                    defs++;
+                    memcpy(text, ws->files[i].data + at, ll);
+                    memcpy(text + ll, ";\n", 3);
+                }
+            }
+            if (defs != 1)
+                text[0] = '\0';
+            /* the declaration belongs in the one local header the defining
+               file includes; the user then includes that header */
+            int hdr = -1;
+            /* first choice: the one local header the user already includes */
+            for (int h = 0; text[0] && h < ws->count; h++) {
+                char inc[TASK_OPS_MAX_PATH + 16];
+                snprintf(inc, sizeof(inc), "#include \"%s\"", ws->files[h].rel);
+                if (is_header(ws->files[h].rel) && strstr(f->data, inc))
+                    hdr = hdr == -1 ? h : -2;
+            }
+            if (hdr == -2)
+                hdr = -3;   /* several: keep the local prototype */
+            for (int i = 0; text[0] && hdr == -1 && i < ws->count; i++) {
+                size_t ll;
+                if (file_level_decl(ws->files[i].data, use[k].name, 1, &ll) < 0)
+                    continue;
+                for (int h = 0; h < ws->count; h++) {
+                    char inc[TASK_OPS_MAX_PATH + 16];
+                    snprintf(inc, sizeof(inc), "#include \"%s\"", ws->files[h].rel);
+                    if (is_header(ws->files[h].rel) && strstr(ws->files[i].data, inc))
+                        hdr = hdr == -1 ? h : -2;
+                }
+            }
+            if (hdr >= 0 && hdr != use[k].file && !next[hdr] && !strchr(ws->files[hdr].rel, '/')) {
+                const TASK_OPS_FILE *h = &ws->files[hdr];
+                size_t at = h->len;
+                const char *endif = NULL;
+                for (const char *q = strstr(h->data, "#endif"); q; q = strstr(q + 1, "#endif"))
+                    endif = q;
+                if (endif && strstr(h->data, "#ifndef"))
+                    at = (size_t)(endif - h->data);
+                char proto[700];
+                snprintf(proto, sizeof(proto), "%s%s", (at == h->len && h->len && h->data[h->len - 1] != '\n') ? "\n" : "", text);
+                next[hdr] = insert_at(h->data, h->len, at, proto);
+                char inc[TASK_OPS_MAX_PATH + 16];
+                snprintf(inc, sizeof(inc), "#include \"%s\"", h->rel);
+                size_t dl0 = strlen(detail);
+                snprintf(detail + dl0, detail_size - dl0, "%s%s: %.*s", dl0 ? "; " : "", h->rel,
+                         (int)(strlen(text) - 1), text);
+                if (strstr(f->data, inc)) {
+                    text[0] = '\0';   /* header already included: prototype only */
+                    files++;
+                    continue;
+                }
+                snprintf(text, sizeof(text), "%s\n", inc);
+                files++;
+            }
+        }
+        if (!text[0])
+            continue;
+        next[use[k].file] = insert_at(f->data, f->len, after_includes(f->data), text);
+        if (next[use[k].file]) {
+            files++;
+            size_t dl = strlen(detail);
+            snprintf(detail + dl, detail_size - dl, "%s%s: %.*s", dl ? "; " : "", f->rel,
+                     (int)(strlen(text) - 1), text);
+        }
+    }
+    return files;
+}
+
+
+/* Every file name the task mentions (name.ext, ext 1-4 alnum) must exist
+   after the edit: an edit that leaves a named artifact missing cannot have
+   done what the task asks. Declared lexical rule (file-name shape). */
+static int named_files_exist(const TASK_OPS_WORKSPACE *ws, const char *task, char *const *next,
+                             int *named, int *named_touched)
+{
+    *named = *named_touched = 0;
+    size_t len = strlen(task);
+    for (size_t i = 0; i < len; i++) {
+        if (!ident_start((unsigned char)task[i]) || (i > 0 && (ident_char((unsigned char)task[i - 1]) ||
+                                                            task[i - 1] == '.' || task[i - 1] == '/')))
+            continue;
+        size_t e = i;
+        while (e < len && (ident_char((unsigned char)task[e]) || task[e] == '/' || task[e] == '-')) e++;
+        if (e >= len || task[e] != '.')
+            { i = e; continue; }
+        size_t x = e + 1;
+        while (x < len && isalnum((unsigned char)task[x])) x++;
+        if (e - i < 2 || x - e - 1 < 1 || x - e - 1 > 4 || (x < len && (task[x] == '.' && x + 1 < len &&
+                                                          isalnum((unsigned char)task[x + 1]))))
+            { i = x; continue; }
+        char name[TASK_OPS_MAX_PATH];
+        if (x - i >= sizeof(name)) { i = x; continue; }
+        memcpy(name, task + i, x - i);
+        name[x - i] = '\0';
+        int found = 0;
+        for (int f = 0; f < ws->count && !found; f++) {
+            const char *r = ws->files[f].rel;
+            size_t rl = strlen(r), nl = strlen(name);
+            found = !strcmp(r, name) || (rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name));
+            if (found) {
+                (*named)++;
+                if (next && next[f])
+                    (*named_touched)++;
+            }
+        }
+        if (!found)
+            return 0;
+        i = x;
+    }
+    return 1;
+}
+
 /* ------------------------------------------------------------------ act */
 
 static int write_file(const char *root, const char *rel, const char *data)
@@ -766,6 +1042,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(rep->detail, sizeof(rep->detail), "%.100s -> %.100s in %d file(s)", a, b, touched);
     }
     char y_text[128] = {0};
+    int uses_before = 0;
     FRAG_HIT hit;
     int frags = renames == 1 ? 0 : find_fragment_edit(ws, task, y_text, sizeof(y_text), &hit);
     if (frags == 1) {
@@ -784,6 +1061,10 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
                  (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
                  y_text, f->rel);
+    } else if (renames != 1 && rep->compile_before >= 0 &&
+               (touched = declare_implicit(ws, flags, next, rep->detail, sizeof(rep->detail), &uses_before)) > 0) {
+        rep->candidates = 1;
+        snprintf(rep->op, sizeof(rep->op), "declare_implicit");
     } else if (renames != 1 && rep->compile_before == 0) {
         int fixes = 0;
         touched = compiler_fixits(ws, flags, next, &fixes);
@@ -827,10 +1108,20 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             CTOK y[FRAG_MAX_TOK];
             int ny = ctok_lex(y_text, strlen(y_text), y, FRAG_MAX_TOK);
             intent = ny > 0 && ws_contains_tokens(after, y, ny);
+        } else if (!strcmp(rep->op, "declare_implicit")) {
+            IMPLICIT_USE left[DECL_MAX];
+            intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;
         } else
             intent = rep->compile_after == 1;
         int no_regress = rep->compile_after >= rep->compile_before &&
                          (rep->run_before != 0 || rep->run_after == 0);
+        /* scope: named files must exist, and when the task names files the
+           edit must touch at least one of them (ws and after list the same
+           files in the same order unless a file was created) */
+        int named = 0, named_touched = 0;
+        if (!named_files_exist(after, task, after->count == ws->count ? next : NULL, &named, &named_touched) ||
+            (named > 0 && named_touched == 0))
+            intent = 0;
         verified = intent && no_regress;
         if (!verified)
             snprintf(rep->reason, sizeof(rep->reason),

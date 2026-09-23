@@ -205,6 +205,50 @@ int main(void)
         CHECK(ok, "400 random quoted task texts terminate");
     }
 
+
+    /* declare an implicit function, grounded in the workspace */
+    {
+        char d[512]; make_dir(d, sizeof(d), "declself");
+        put(d, "m.c", "int main(void) { return triple_of(1) == 3 ? 0 : 1; }\nint triple_of(int v) { return v * 3; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Make it build with -std=c99 -Werror=implicit-function-declaration.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        if (r.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(kept && strstr(get(d, "m.c"), "int triple_of(int v);"), "prototype from its own definition");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "declhdr");
+        put(d, "api.h", "int twice_of(int v);\n");
+        put(d, "api.c", "#include \"api.h\"\nint twice_of(int v) { return v * 2; }\n");
+        put(d, "m.c", "int main(void) { return twice_of(2) == 4 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Build with -std=c99 -Werror=implicit-function-declaration.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        if (r.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(kept && strstr(get(d, "m.c"), "#include \"api.h\"") && !strstr(get(d, "m.c"), "int twice_of"),
+                   "existing declaring header is included, no local prototype");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "declown");
+        put(d, "lib.h", "/* lib */\n");
+        put(d, "lib.c", "int half_of(int v) { return v / 2; }\n");
+        put(d, "m.c", "#include \"lib.h\"\nint main(void) { return half_of(4) == 2 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Build with -std=c99 -Werror=implicit-function-declaration.", &r);
+        printf("    %s %s | %s\n", r.op, r.detail, r.reason);
+        if (r.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(kept && strstr(get(d, "lib.h"), "int half_of(int v);") && !strstr(get(d, "m.c"), "int half_of"),
+                   "prototype goes into the header the user already includes");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "declmiss");
+        const char *m = "int main(void) { return quad_of(1); }\nint quad_of(int v) { return v * 4; }\n";
+        put(d, "m.c", m);
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "Declare it in quad.h and build with -Werror=implicit-function-declaration.", &r) &&
+              !strcmp(get(d, "m.c"), m), "task names a file the edit does not create: rolled back");
+    }
+
     /* nothing applicable: untouched */
     {
         char d[512]; make_dir(d, sizeof(d), "none");

@@ -15,3 +15,5 @@ rename adjacency (at most 16 bytes between the two names)	src/task_ops.c	y->star
 task flag prefixes kept for the probe (-W -D -O -std=)	src/task_ops.c	!strncmp(task + i, "-std=", 5)	declared lexical rule (task_ops probe)
 negated-clause cues for stated fragments (forbid, must not, never, no longer, prohib)	src/task_ops.c	"forbid", "Forbid", "must not"	declared lexical cue (task_ops stated_fragment)
 stated fragment max token edit distance 2, anchored on a shared name	src/task_ops.c	if (d > 2 || d >= ny)	declared threshold (task_ops stated_fragment)
+task-named file shape (name.ext, ext 1-4 alnum); named files must exist and be touched	src/task_ops.c	static int named_files_exist(	declared lexical rule (task_ops scope check)
+gcc implicit-declaration diagnostic text	src/task_ops.c	"implicit declaration of function "	declared compiler-output parse (task_ops declare_implicit)
