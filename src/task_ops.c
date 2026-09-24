@@ -7,6 +7,7 @@
 #include "shell_ops.h"
 #include "build_ops.h"
 #include "c_fix_ops.h"
+#include "compile_repair.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -3298,9 +3299,105 @@ static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int 
     return 1;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_EVIDENCE, OP_COUNT };
+
+/* compile_repair: the first compiler (or linker) error yields single-edit
+   candidates; each is compiled on a scratch copy outside the tree, and only
+   the one candidate of the lowest tier that builds (and, when the program
+   runs, exits 0) is kept. */
+static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags, char **next,
+                                 char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    char cmd[4096], srcs[3072], bin[TASK_OPS_MAX_PATH];
+    char *diag = NULL;
+    int touched = 0;
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return 0;
+    temp_binary(bin, sizeof(bin));
+    snprintf(cmd, sizeof(cmd), "gcc %s-o \"%s\" %s", flags, bin, srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    if (!r->execution_failed && r->exit_code != 0) {
+        diag = (char *)malloc(r->stderr_len + r->stdout_len + 1);
+        if (diag) {
+            memcpy(diag, r->stderr_buf, r->stderr_len);
+            memcpy(diag + r->stderr_len, r->stdout_buf, r->stdout_len);
+            diag[r->stderr_len + r->stdout_len] = '\0';
+        }
+    }
+    free(r);
+    remove(bin);
+    if (!diag)
+        return 0;
+    CR_CAND *c = (CR_CAND *)calloc(32, sizeof(CR_CAND));
+    TASK_OPS_WORKSPACE *tw = (TASK_OPS_WORKSPACE *)malloc(sizeof(*tw));
+    int n = c ? CompileRepairCandidates(ws, diag, c, 32) : 0;
+    free(diag);
+    int ok[32] = {0};
+    for (int k = 0; k < n && tw; k++) {
+        char dir[TASK_OPS_MAX_PATH];
+        char *tmp[TASK_OPS_MAX_FILES] = {0};
+        int wrote = 1, comp = -1, run = -1;
+        memcpy(tw, ws, sizeof(*tw));
+        temp_binary(dir, sizeof(dir));
+        strncat(dir, "_cr", sizeof(dir) - strlen(dir) - 1);
+        snprintf(tw->root, sizeof(tw->root), "%s", dir);
+        make_dir(dir);
+        for (int i = 0; i < ws->count; i++) {
+            const char *data = ws->files[i].data;
+            if (c[k].file == i)
+                data = c[k].text;
+            else if (c[k].file < 0 && count_token_in(data, c[k].from) > 0)
+                data = tmp[i] = replace_token(data, c[k].from, c[k].to);
+            tw->files[i].data = (char *)data;
+            char sub[TASK_OPS_MAX_PATH * 2];
+            const char *rr = ws->files[i].rel;
+            for (const char *q = strchr(rr, '/'); q; q = strchr(q + 1, '/')) {
+                snprintf(sub, sizeof(sub), "%s/%.*s", dir, (int)(q - rr), rr);
+                make_dir(sub);
+            }
+            if (!data || !write_file(dir, rr, data))
+                wrote = 0;
+        }
+        if (wrote)
+            probe_out(tw, flags, &comp, &run, NULL);
+        ok[k] = !(wrote && comp == 1) ? 0 : run <= 0 ? 1 : 2;   /* 2 = builds, run fails */
+        sc_rm_tree(dir, 0);
+        for (int i = 0; i < ws->count; i++)
+            free(tmp[i]);
+    }
+    free(tw);
+    int best = -1, tier = 99, dup = 0;
+    for (int k = 0; k < n; k++)
+        if (ok[k]) {
+            if (c[k].tier < tier) { tier = c[k].tier; best = k; dup = 0; }
+            else if (c[k].tier == tier) dup = 1;
+        }
+    /* uniqueness is judged on building alone; the run only vetoes */
+    if (best >= 0 && !dup && ok[best] == 1) {
+        if (c[best].file >= 0) {
+            next[c[best].file] = c[best].text;
+            c[best].text = NULL;
+            touched = 1;
+        } else
+            for (int i = 0; i < ws->count; i++)
+                if (count_token_in(ws->files[i].data, c[best].from) > 0) {
+                    next[i] = replace_token(ws->files[i].data, c[best].from, c[best].to);
+                    touched++;
+                }
+        snprintf(rule, rsz, "%s", c[best].rule);
+        snprintf(detail, dsz, "%s", c[best].detail);
+    }
+    if (c) CompileRepairFree(c, n);
+    free(c);
+    return touched;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_CREPAIR, OP_EVIDENCE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "evidence_fix"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "compile_repair", "evidence_fix"
 };
 
 /* The run-based evidence search (a candidate edit kept because the bare
@@ -3567,6 +3664,19 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             if (order[o] != OP_EVIDENCE) order[w++] = order[o];
         order[w] = OP_EVIDENCE;
     }
+    if (rep->compile_before == 0) {
+        /* verified single-edit repairs from the workspace outrank the
+           compiler's own guesses (which may point at a library name) */
+        int fx = -1, cr = -1;
+        for (int o = 0; o < OP_COUNT; o++) {
+            if (order[o] == OP_FIXIT) fx = o;
+            if (order[o] == OP_CREPAIR) cr = o;
+        }
+        if (fx >= 0 && cr > fx) {
+            for (int o = cr; o > fx; o--) order[o] = order[o - 1];
+            order[fx] = OP_CREPAIR;
+        }
+    }
 
     /* reason: first operator (in that order) whose preconditions hold */
     char a[128] = {0}, b[128] = {0};
@@ -3679,6 +3789,11 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "c_fix");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.120s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
+        } else if (op == OP_CREPAIR && rep->compile_before == 0 &&
+                   (touched = compile_repair_target(ws, flags, next, cfix_rule, sizeof(cfix_rule), cfix_detail, sizeof(cfix_detail))) > 0) {
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "compile_repair");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.160s", cfix_rule, cfix_detail);
         } else if (op == OP_CFIX && (cfix_file = cfix_split_target(ws, task, &split)) >= 0) {
             next[cfix_file] = split.new_src;
             snprintf(created.rel, sizeof(created.rel), "%s", split.c_rel);
@@ -3827,6 +3942,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                      (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0) &&
                      (strcmp(cfix_rule, "split_function") != 0 ||
                       (ws_find_named(after, created.rel) >= 0 && ws_find_named(after, created2.rel) >= 0));
+        } else if (!strcmp(rep->op, "compile_repair")) {
+            intent = rep->compile_after == 1 && rep->run_after <= 0;
         } else if (!strcmp(rep->op, "evidence_fix")) {
             intent = rep->compile_after == 1 && rep->run_after == 0;
         } else if (!strcmp(rep->op, "declare_implicit")) {
