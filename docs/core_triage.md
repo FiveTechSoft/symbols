@@ -74,3 +74,7 @@ Mimo's blind re-run on ecd9560 had 1 wrong edit: multi_file, where the agent kep
 - A named file that did not exist before could be satisfied by a same-named file in a subdirectory. A new file now has to exist at exactly the named path. Files that already existed keep the subdirectory match.
 
 This is a verification change only: it can turn a kept edit into a rollback, never the other way. The new test in test_task_ops fails on the old code and passes on the new. Bank unchanged at 44/56 with 0 wrong edits; ctest 106/106. This was not tuned on the blind batch. Only Mimo's category/cause line was used.
+
+## Bank harness: per-task setup for git tasks
+
+Git tasks need a repository with history, which a plain before/ tree cannot hold. tools/bank_harness.py now runs an optional `setup.py` in the workdir before the snapshot and the agent, with a fixed git identity and fixed dates. In self-test mode it also runs an optional `golden.py` for golden states that are git operations. The snapshot ignores .git/ internals and records HEAD, refs and status as one `@git` entry. A failing setup is a harness error, not a pass or a wrong edit. Covered by tests/test_bank_harness_setup.py (ctest). The fixtures themselves come from Mimo.

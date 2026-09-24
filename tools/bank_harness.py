@@ -8,6 +8,20 @@ For each row of tests/fixtures/engineering_bank/index.tsv:
 The golden after/ state is read only in --self-test mode (then it replaces
 step 2, to prove every check can pass).
 
+Optional per-task setup (for tasks that need state a plain file tree cannot
+hold, such as a git repository with history):
+  setup.py   run with CWD = workdir after before/ is copied and before the
+             snapshot and the agent; a fixed git identity and fixed dates are
+             in its environment so the history it builds is reproducible.
+             A failing setup is a harness error (check_rc 125, setup_failed),
+             never a pass or a wrong edit.
+  golden.py  self-test only: run instead of copying after/ over the workdir,
+             for golden states that are git operations (commit, branch, ...).
+             Without it, a task with setup.py overlays after/ onto the
+             workdir and keeps .git.
+The snapshot skips .git/ contents and records the repository state (HEAD,
+branches, status) as one "@git" entry, so a commit counts as a change.
+
 Output: one JSON object on stdout (and --out FILE), with
   tasks_total, tasks_passed, pass_rate, pass_rate_by_category,
   wrong_edits (the agent changed files and the check still fails),
@@ -64,12 +78,50 @@ def split_of(task_id: str) -> str:
     return "dev" if digits.isdigit() and int(digits) % 2 == 1 else "heldout"
 
 
+GIT_ENV = {
+    "GIT_AUTHOR_NAME": "Bank Setup", "GIT_AUTHOR_EMAIL": "bank@example.invalid",
+    "GIT_COMMITTER_NAME": "Bank Setup", "GIT_COMMITTER_EMAIL": "bank@example.invalid",
+    "GIT_AUTHOR_DATE": "2026-01-01T00:00:00+0000", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00+0000",
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
+
+
+def git_state(d: Path) -> str:
+    """HEAD, branches and status of the repository in d, as one string."""
+    parts = []
+    for args in (["rev-parse", "HEAD"], ["for-each-ref", "--format=%(refname) %(objectname)"],
+                 ["status", "--porcelain"]):
+        try:
+            r = subprocess.run(["git", *args], cwd=d, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=20)
+            parts.append(r.stdout)
+        except (OSError, subprocess.TimeoutExpired):
+            parts.append("?")
+    return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
+
+
 def snapshot(d: Path) -> dict[str, str]:
     out = {}
     for p in sorted(d.rglob("*")):
+        rel = p.relative_to(d).as_posix()
+        if rel == ".git" or rel.startswith(".git/"):
+            continue
         if p.is_file():
-            out[p.relative_to(d).as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
+            out[rel] = hashlib.sha256(p.read_bytes()).hexdigest()
+    if (d / ".git").exists():
+        out["@git"] = git_state(d)
     return out
+
+
+def run_script(script: Path, wd: Path, timeout: int) -> int:
+    env = dict(os.environ)
+    env.update(GIT_ENV)
+    try:
+        r = subprocess.run([sys.executable, str(script)], cwd=wd, env=env, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", timeout=timeout)
+        return r.returncode
+    except (OSError, subprocess.TimeoutExpired):
+        return 124
 
 
 def changed(before: dict[str, str], after: dict[str, str]) -> list[str]:
@@ -110,21 +162,31 @@ def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
     with tempfile.TemporaryDirectory(prefix="bank_") as td:
         wd = Path(td) / "work"
         shutil.copytree(tdir / "before", wd)
-        snap0 = snapshot(wd)
-        if self_test:
-            shutil.rmtree(wd)
-            shutil.copytree(tdir / "after", wd)
-            agent_rc, agent_ms, log = 0, 0.0, ""
+        has_setup = (tdir / "setup.py").is_file()
+        setup_failed = has_setup and run_script(tdir / "setup.py", wd, timeout) != 0
+        agent_rc, agent_ms, log, diff = 0, 0.0, "", []
+        if setup_failed:
+            check_rc = 125
         else:
-            agent_rc, agent_ms, log = run_agent(agent, wd, task_text, task_md, timeout)
-        diff = changed(snap0, snapshot(wd))
-        shutil.copy2(tdir / "check.py", wd / "check.py")
-        try:
-            r = subprocess.run([sys.executable, "check.py"], cwd=wd, capture_output=True,
-                               text=True, encoding="utf-8", errors="replace", timeout=timeout)
-            check_rc = r.returncode
-        except subprocess.TimeoutExpired:
-            check_rc = 124
+            snap0 = snapshot(wd)
+            if self_test and (tdir / "golden.py").is_file():
+                if run_script(tdir / "golden.py", wd, timeout) != 0:
+                    agent_rc = 1
+            elif self_test and has_setup:
+                shutil.copytree(tdir / "after", wd, dirs_exist_ok=True)
+            elif self_test:
+                shutil.rmtree(wd)
+                shutil.copytree(tdir / "after", wd)
+            else:
+                agent_rc, agent_ms, log = run_agent(agent, wd, task_text, task_md, timeout)
+            diff = changed(snap0, snapshot(wd))
+            shutil.copy2(tdir / "check.py", wd / "check.py")
+            try:
+                r = subprocess.run([sys.executable, "check.py"], cwd=wd, capture_output=True,
+                                   text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                check_rc = r.returncode
+            except subprocess.TimeoutExpired:
+                check_rc = 124
     passed = check_rc == 0
     return {
         "id": tid,
@@ -134,6 +196,7 @@ def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
         "agent_rc": agent_rc,
         "changed_files": diff,
         "wrong_edit": bool(diff) and not passed,
+        "setup_failed": setup_failed,
         "wall_ms": round((time.perf_counter() - t0) * 1000.0, 1),
         "agent_ms": round(agent_ms, 1),
         "agent_log_tail": log[-300:] if (not passed and log) else "",
@@ -160,6 +223,7 @@ def summarize(tasks: list[dict], agent: str, self_test: bool) -> dict:
         "wrong_edits": sum(1 for t in tasks if t["wrong_edit"]),
         "untouched": sum(1 for t in tasks if not t["changed_files"]),
         "agent_errors": sum(1 for t in tasks if t["agent_rc"] in (124, 127)),
+        "setup_failures": sum(1 for t in tasks if t.get("setup_failed")),
         "wall_ms_total": round(sum(t["wall_ms"] for t in tasks), 1),
         "passed_by_split": {sp: f"{sum(1 for t in tasks if t['passed'] and split_of(t['id']) == sp)}"
                                 f"/{sum(1 for t in tasks if split_of(t['id']) == sp)}"
@@ -193,13 +257,15 @@ def main() -> int:
     if a.out:
         Path(a.out).write_text(text + "\n", encoding="utf-8")
     print(text)
-    s = {k: res[k] for k in ("mode", "tasks_total", "tasks_passed", "pass_rate", "wrong_edits", "untouched", "agent_errors")}
+    s = {k: res[k] for k in ("mode", "tasks_total", "tasks_passed", "pass_rate", "wrong_edits", "untouched", "agent_errors", "setup_failures")}
     s.update({f"pass_{k}": v for k, v in res["passed_by_split"].items()})
     print("BANK_HARNESS " + " ".join(f"{k}={v}" for k, v in s.items()), file=sys.stderr)
     rc = 0
     if a.min_pass_rate is not None and res["pass_rate"] < a.min_pass_rate:
         rc = 1
     if a.max_wrong_edits is not None and res["wrong_edits"] > a.max_wrong_edits:
+        rc = 1
+    if res["setup_failures"]:
         rc = 1
     return rc
 

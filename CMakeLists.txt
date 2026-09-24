@@ -221,6 +221,11 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/test_engineering_bank.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_engineering_bank PROPERTIES TIMEOUT 300)
+    # Bank harness per-task setup.py / golden.py (git fixtures); skips (77) without git.
+    add_test(NAME test_bank_harness_setup
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bank_harness_setup.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_bank_harness_setup PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
