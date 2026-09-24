@@ -277,10 +277,11 @@ target_link_libraries(relprobe symbolic)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)
 target_link_libraries(symbolic-learn symbolic)
 
-# Wikidata QA tests (parked, see COORDINATION.md Ask 5). Golden model lives at
-# data/wiki_model.bin (recovered from f4579eb^, Antonio 2026-09-24). Without it
-# these ten tests exit 77 (Skipped). They carry the ctest label qa_model; exclude
-# them with `ctest -LE qa_model`. Tests are read-only and never write the model.
+# Wikidata QA tests (Ask 5 gate still parked; golden now tracked). Golden model
+# lives at data/wiki_model.bin (recovered from f4579eb^, Antonio 2026-09-24;
+# committed as 8cb275d). Without the file these ten tests exit 77 (Skipped).
+# They carry the ctest label qa_model; exclude with `ctest -LE qa_model`.
+# Tests are read-only and never write the model.
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
 add_test(NAME test_wiki_inference COMMAND test_wiki_inference data/wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
