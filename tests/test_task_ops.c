@@ -683,6 +683,26 @@ int main(void)
         CHECK(!strcmp(get(d3, "main.c"), t3), "compiler evidence: two undeclared names -> abstain");
     }
 
+    /* declare_implicit: defined in another source file and no header to
+       take the prototype -> abstain (no local prototype in the caller) */
+    {
+        char d[512]; make_dir(d, sizeof(d), "implhdr");
+        const char *m = "int main(void) { return add(1, 2) == 3 ? 0 : 1; }\n";
+        put(d, "main.c", m);
+        put(d, "util.c", "int add(int a, int b) { return a + b; }\n");
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(!strcmp(get(d, "main.c"), m), "declare_implicit: no header to hold the prototype -> main.c untouched");
+        char d2[512]; make_dir(d2, sizeof(d2), "implhdr2");
+        put(d2, "main.c", "#include \"util.h\"\nint main(void) { return add(1, 2) == 3 ? 0 : 1; }\n");
+        put(d2, "util.h", "#ifndef UTIL_H\n#define UTIL_H\n#endif\n");
+        put(d2, "util.c", "#include \"util.h\"\nint add(int a, int b) { return a + b; }\n");
+        TaskOpsSolve(d2, "The program fails; fix the bug so it exits 0.", &r);
+        if (r.compile_before == -1) CHECK(1, "no compiler: declare_implicit skipped");
+        else CHECK(strstr(get(d2, "util.h"), "int add(int a, int b);") && !strstr(get(d2, "main.c"), "int add("),
+                   "declare_implicit: the prototype goes into the header main.c already includes");
+    }
+
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the
        lines that name it. */

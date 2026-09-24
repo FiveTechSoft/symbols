@@ -106,3 +106,9 @@ Measurement: public bank with the real task text still 44/56, 0 wrong edits. Neu
 When the program does not compile and gcc reports exactly one identifier as "undeclared (first use in this function)", in one file, with no "did you mean" hint anywhere, `evidence_fix` applies the existing `declare_local` rule to that name (`int NAME = 0;` opens the one function that uses it; the name must hold `_` or a digit, must never be called, declared or #defined). The edit is kept only if the program then builds and exits 0. A typo gcc can name a fix for, two undeclared names, or uses in two functions all abstain. gcc quotes with U+2018/U+2019 under UTF-8 locales (Python's subprocess coerces LC_CTYPE to C.UTF-8), so both quote styles are read.
 
 Measurement: public bank still 44/56, 0 wrong edits. Neutral-wording probe 16/56 -> 17/56 (compiler_repair 6/7 -> 7/7, cr_005).
+
+## Safety: declare_implicit never hides a missing header
+
+The neutral-wording probe had one wrong edit, eb_mf_003: `add()` is defined in util.c, main.c has no include, and `declare_implicit` put a local prototype in main.c. It compiled, but the declaration belongs in a header. Now, when the definition lives in another source file and no header can take the prototype (none included, several candidates, or not editable), `declare_implicit` abstains instead of writing a local prototype. A function defined later in the same file still gets a local prototype, and the header paths (the one header the caller includes, the one the defining file includes, or a header the task names) are unchanged.
+
+Measurement: public bank 44/56, 0 wrong edits (unchanged). Neutral-wording probe 17/56 with wrong edits 1 -> 0.

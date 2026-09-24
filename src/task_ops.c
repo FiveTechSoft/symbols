@@ -1099,6 +1099,11 @@ static int declare_implicit(const TASK_OPS_WORKSPACE *ws, const char *flags, con
                 }
                 snprintf(text, sizeof(text), "%s\n", inc);
                 files++;
+            } else if (text[0] && def_file >= 0 && def_file != use[k].file) {
+                /* defined in another source file and no header takes the
+                   prototype (none included, several, or not editable): a
+                   local prototype would hide the missing header. Abstain. */
+                text[0] = '\0';
             }
         }
         /* no workspace declaration or definition: the standard header the
