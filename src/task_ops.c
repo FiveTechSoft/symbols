@@ -21,6 +21,7 @@
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 /* ---------------------------------------------------------------- workspace */
@@ -2652,6 +2653,149 @@ static int shell_syntax_ok(const char *root, const char *rel)
     return ok;
 }
 
+
+/* Stated-contract shell rules (arg_exit, file_content) are also run: all
+   workspace text files are copied to a throwaway directory outside the
+   tree, the edited script runs there once with HOME pointed at the copy
+   and a 3 s timeout, and the stated contract is checked (exit code for the
+   stated argument; the stated file holds the stated word). The copy is
+   removed afterwards. SYMBOLS_SHELL_RUN=0 keeps the check static only. */
+static void make_dir(const char *path);
+
+static int sc_exec(const char *cmd, const char *cwd, int *code, int *timed_out)
+{
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    int ok;
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, cwd, 3000, r);
+    ok = !r->execution_failed;
+    *code = r->exit_code;
+    *timed_out = r->timed_out;
+    free(r);
+    return ok;
+}
+
+static void sc_rm_tree(const char *dir, int depth)
+{
+    char p[TASK_OPS_MAX_PATH * 2];
+    if (depth > 16)
+        return;
+#ifdef _WIN32
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+    snprintf(p, sizeof(p), "%s\\*", dir);
+    h = FindFirstFileA(p, &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, ".."))
+                continue;
+            snprintf(p, sizeof(p), "%s/%s", dir, fd.cFileName);
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                sc_rm_tree(p, depth + 1);
+            else {
+                SetFileAttributesA(p, FILE_ATTRIBUTE_NORMAL);
+                remove(p);
+            }
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+    }
+    _rmdir(dir);
+#else
+    DIR *d = opendir(dir);
+    struct dirent *e;
+    if (d) {
+        while ((e = readdir(d)) != NULL) {
+            struct stat st;
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+                continue;
+            snprintf(p, sizeof(p), "%s/%s", dir, e->d_name);
+            if (lstat(p, &st) == 0 && S_ISDIR(st.st_mode))
+                sc_rm_tree(p, depth + 1);
+            else
+                remove(p);
+        }
+        closedir(d);
+    }
+    rmdir(dir);
+#endif
+}
+
+static int sc_safe_name(const char *f)
+{
+    return f[0] && f[0] != '/' && f[0] != '\\' && !strstr(f, "..") && !strchr(f, '"') &&
+           !strchr(f, ':') && !strchr(f, '$') && !strchr(f, '`');
+}
+
+static int shell_contract_run(const TASK_OPS_WORKSPACE *ws, int idx, const char *rule, const char *detail)
+{
+    const char *v = getenv("SYMBOLS_SHELL_RUN");
+    char dir[TASK_OPS_MAX_PATH], cmd[TASK_OPS_MAX_PATH * 3], word[64] = "", file[128] = "";
+    int code = -1, want = -1, to = 0, ok = 0;
+    const char *rel = ws->files[idx].rel;
+    if (v && !strcmp(v, "0"))
+        return 1;
+    if (!strcmp(rule, "arg_exit")) {
+        if (sscanf(detail, "exit %d when $1 is %63s", &want, word) != 2)
+            return 0;
+    } else if (!strcmp(rule, "file_content")) {
+        if (sscanf(detail, "echo %63s > %127s", word, file) != 2 || !sc_safe_name(file))
+            return 0;
+    } else
+        return 1;
+    if (!sc_safe_name(rel) || !sc_safe_name(word))
+        return 0;
+    temp_binary(dir, sizeof(dir));
+    strncat(dir, "_shrun", sizeof(dir) - strlen(dir) - 1);
+    if (strchr(dir, '"'))
+        return 0;
+    make_dir(dir);
+    for (int i = 0; i < ws->count; i++) {
+        char sub[TASK_OPS_MAX_PATH * 2];
+        const char *r = ws->files[i].rel;
+        for (const char *q = strchr(r, '/'); q; q = strchr(q + 1, '/')) {
+            snprintf(sub, sizeof(sub), "%s/%.*s", dir, (int)(q - r), r);
+            make_dir(sub);
+        }
+        if (!write_file(dir, r, ws->files[i].data))
+            goto out;
+    }
+#ifdef _WIN32
+    if (want >= 0)
+        snprintf(cmd, sizeof(cmd), "sh \"%s\" \"%s\"", rel, word);
+    else
+        snprintf(cmd, sizeof(cmd), "sh \"%s\"", rel);
+#else
+    if (want >= 0)
+        snprintf(cmd, sizeof(cmd), "HOME=\"%s\" sh \"%s\" \"%s\" </dev/null", dir, rel, word);
+    else
+        snprintf(cmd, sizeof(cmd), "HOME=\"%s\" sh \"%s\" </dev/null", dir, rel);
+#endif
+    if (!sc_exec(cmd, dir, &code, &to) || to)
+        goto out;
+    if (want >= 0)
+        ok = code == want;
+    else {
+        char p[TASK_OPS_MAX_PATH * 2], buf[128];
+        FILE *f;
+        size_t n;
+        snprintf(p, sizeof(p), "%s/%s", dir, file);
+        f = fopen(p, "rb");
+        if (f) {
+            n = fread(buf, 1, sizeof(buf) - 1, f);
+            fclose(f);
+            buf[n] = '\0';
+            while (n && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+                buf[--n] = '\0';
+            ok = !strcmp(buf, word);
+        }
+    }
+out:
+    sc_rm_tree(dir, 0);
+    return ok;
+}
+
 /* --------------------------------------------------------- build repair */
 
 /* sh -n evidence: a script the shell parser rejects; the one lowest-tier
@@ -3608,7 +3752,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                      (vn == 0 || run_examples(after, flags, vex, vn) == 1);
         } else if (!strcmp(rep->op, "shell_harden")) {
             intent = ShellOpsIntent(after->files[shell_file].data, shell_rule) &&
-                     shell_syntax_ok(after->root, after->files[shell_file].rel);
+                     shell_syntax_ok(after->root, after->files[shell_file].rel) &&
+                     shell_contract_run(after, shell_file, shell_rule, shell_detail);
         } else if (!strcmp(rep->op, "build_repair")) {
             intent = build_verified(after, &bedit);
         } else if (!strcmp(rep->op, "c_fix")) {

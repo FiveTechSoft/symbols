@@ -79,6 +79,26 @@ int main(void)
     CHECK(!ok && strstr(p.reason, "too large"));
     StoPlanFree(&p);
 
+    /* stated contract is also run in a throwaway copy: a script that cannot
+       reach the fixed line fails the run check even though the static
+       intent and sh -n hold */
+    put(path, "#!/bin/sh\ncd /nonexistent_dir_for_test || exit 5\ntouch out.txt\n");
+    ok = StoPlanTask(dir, "run.sh must create out.txt with content OK.", 3000, &p);
+    CHECK(!ok);
+    StoPlanFree(&p);
+    put(path, "#!/bin/sh\ntouch out.txt\n");
+    ok = StoPlanTask(dir, "run.sh must create out.txt with content OK.", 3000, &p);
+    CHECK(ok && p.nhunks == 1 && strstr(p.hunks[0].new_text, "echo OK > out.txt"));
+    StoPlanFree(&p);
+    {
+        char outp[320];
+        FILE *f;
+        snprintf(outp, sizeof(outp), "%s/out.txt", dir);
+        f = fopen(outp, "rb");
+        CHECK(f == NULL);                                     /* never run in the real tree */
+        if (f) fclose(f);
+    }
+
     /* escaped quoted request, as OpenCode sends it: \" inside is a quote */
     remove(path);
     {
