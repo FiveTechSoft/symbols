@@ -355,7 +355,7 @@ typedef struct
     int               ceo_hunk;
     /* task operators run on a scratch copy (phases 30-31) */
     StoPlan           sto;
-    int               sto_next;
+    int               sto_next, sto_tried;
     /* OpenCode child session (task tool): what this server did, reported
        in the final text because the parent sees only that text */
     int               is_subagent;
@@ -935,6 +935,25 @@ static int StoHunkCall(const ServerSession *sess, const StoHunk *h, OPENAI_TOOL_
                             path_esc, old_esc, new_esc) < sizeof(call->arguments);
 }
 
+/* First step of a plan: the first hunk, or (git operators with no textual
+   change) the repository command itself, re-verified by its exit status. */
+static int StoFirstCall(ServerSession *sess, OPENAI_TOOL_CALL *call)
+{
+    if (sess->sto.nhunks > 0)
+        return StoHunkCall(sess, &sess->sto.hunks[0], call);
+    if (sess->sto.bash[0] && HasDeclaredTool(sess, "bash"))
+    {
+        char esc[2200];
+        if (!ServerJsonEscape(sess->sto.bash, esc, sizeof(esc)))
+            return 0;
+        snprintf(call->name, sizeof(call->name), "bash");
+        snprintf(call->arguments, sizeof(call->arguments), "{\"command\":\"%s\",\"description\":\"Apply the verified repository operator\"}", esc);
+        snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s", sess->sto.bash);
+        return 1;
+    }
+    return 0;
+}
+
 static void HandleCompletions(socket_t s, const char *body,
                               const char *corpus)
 {
@@ -1134,6 +1153,48 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         /* User submitted a new prompt: abort any stale agentic coding loop */
         sess->agent_active = 0;
+        sess->sto_tried = 0;
+        /* Task operators before every older route: when the client declares a
+           workspace and can edit, plan and verify on a scratch copy first. */
+        {
+            char wd[260], uq[4096];
+            const char *off = getenv("SYMBOLS_SERVER_TASKOPS");
+            if (!(off && !strcmp(off, "0")) && sess->declared_tools_count > 0 &&
+                ServerExtractQuery(body, uq, sizeof(uq)) && uq[0] &&
+                HasDeclaredTool(sess, "edit") && HasDeclaredTool(sess, "write") &&
+                HasDeclaredTool(sess, "task") && /* root agent only: subagent prompts are fragments */
+                ServerExtractWorkingDir(body, wd, sizeof(wd)) && wd[0])
+            {
+                OPENAI_TOOL_CALLS tc;
+                sess->sto_tried = 1;
+                StoPlanFree(&sess->sto);
+                snprintf(sess->workspace_dir, sizeof(sess->workspace_dir), "%s", wd);
+                if (StoPlanTask(wd, uq, (SERVER_ARG_JSON_MAX - 1200) / 2, &sess->sto))
+                {
+                    fprintf(stderr, "[taskops] %s: %s (%d hunk(s))\n", sess->sto.op, sess->sto.detail, sess->sto.nhunks);
+                    memset(&tc, 0, sizeof(tc));
+                    tc.count = 1;
+                    snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                    if (StoFirstCall(sess, &tc.calls[0]))
+                    {
+                        sess->agent_active = 1;
+                        sess->workspace_build[0] = '\0';
+                        strncpy(sess->current_issue, uq, sizeof(sess->current_issue) - 1);
+                        sess->current_issue[sizeof(sess->current_issue) - 1] = '\0';
+                        sess->sto_next = 1;
+                        sess->workspace_phase = sess->sto.nhunks ? 30 : 31;
+                        snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "%s", tc.calls[0].name);
+                        SendToolCallsForRequest(s, body, g_seq, &tc,
+                                                "Applying an operator edit verified on a scratch copy of the workspace.",
+                                                resp, sizeof(resp), sse, sizeof(sse));
+                        return;
+                    }
+                    StoPlanFree(&sess->sto);
+                }
+                else
+                    fprintf(stderr, "[taskops] abstain: %s\n", sess->sto.reason);
+            }
+        }
     }
 
     /* OpenCode 1.18.32 omits name and exit status on role=tool.  Recover
@@ -1369,17 +1430,18 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             const char *off = getenv("SYMBOLS_SERVER_TASKOPS");
             StoPlanFree(&sess->sto);
-            if (!(off && !strcmp(off, "0")) && HasDeclaredTool(sess, "edit") && HasDeclaredTool(sess, "write") &&
+            if (!(off && !strcmp(off, "0")) && !sess->sto_tried && HasDeclaredTool(sess, "edit") && HasDeclaredTool(sess, "write") &&
+                HasDeclaredTool(sess, "task") &&
                 StoPlanTask(sess->workspace_dir, sess->current_issue, (SERVER_ARG_JSON_MAX - 1200) / 2, &sess->sto))
             {
                 fprintf(stderr, "[taskops] %s: %s (%d hunk(s))\n", sess->sto.op, sess->sto.detail, sess->sto.nhunks);
                 memset(&tc, 0, sizeof(tc));
                 tc.count = 1;
                 snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
-                if (StoHunkCall(sess, &sess->sto.hunks[0], &tc.calls[0]))
+                if (StoFirstCall(sess, &tc.calls[0]))
                 {
                     sess->sto_next = 1;
-                    sess->workspace_phase = 30;
+                    sess->workspace_phase = sess->sto.nhunks ? 30 : 31;
                     snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "%s", tc.calls[0].name);
                     SendToolCallsForRequest(s, body, g_seq, &tc,
                                             "Applying an operator edit verified on a scratch copy of the workspace.",
@@ -1559,7 +1621,9 @@ static void HandleCompletions(socket_t s, const char *body,
             char cmd[1024];
             size_t used = 0;
             cmd[0] = '\0';
-            for (int i = 0; i < sess->sto.nhunks; i++)
+            if (sess->sto.bash[0])
+                used = (size_t)snprintf(cmd, sizeof(cmd), "%s", sess->sto.bash);
+            for (int i = 0; !sess->sto.bash[0] && i < sess->sto.nhunks; i++)
             {
                 const char *r = sess->sto.hunks[i].rel;
                 size_t rl = strlen(r);

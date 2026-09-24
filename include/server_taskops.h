@@ -7,7 +7,9 @@
  * verification (shell rules stay static: intent + sh -n). Hand back: for
  * each changed file one hunk (the smallest line range that differs,
  * widened until its old text is unique in the file), or the whole text
- * for a created file. Abstain (0) when no edit was kept, a file was
+ * for a created file. Repository-state operators (git_ops) run on a full
+ * copy including .git; their result comes back as the git command the
+ * client runs (plus hunks for resolved conflicts). Abstain (0) when no edit was kept, a file was
  * deleted, or a hunk does not fit a tool call.
  */
 #ifndef SERVER_TASKOPS_H
@@ -30,6 +32,7 @@ typedef struct {
     char    reason[256];
     int     nhunks;
     StoHunk hunks[STO_MAX_HUNKS];
+    char    bash[480];    /* repository-state step run after the hunks ("" = none) */
 } StoPlan;
 
 /* 1 = verified edit planned; 0 = abstain (reason filled). max_arg bounds

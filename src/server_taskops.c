@@ -1,6 +1,7 @@
 /* server_taskops.c: see server_taskops.h. No task ids, file names or answers live here. */
 #include "server_taskops.h"
 #include "task_ops.h"
+#include "git_ops.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 #define sto_mkdir(p) mkdir(p, 0755)
 #define sto_rmdir(p) rmdir(p)
 #endif
@@ -113,6 +115,158 @@ int StoMinimalHunk(const char *a, const char *b, char **old_text, char **new_tex
     }
 }
 
+/* binary-safe recursive copy / removal, used for repositories (.git) */
+static int copy_file(const char *a, const char *b)
+{
+    FILE *in = fopen(a, "rb"), *out;
+    char buf[65536];
+    size_t n;
+    int ok = 1;
+    if (!in)
+        return 0;
+    out = fopen(b, "wb");
+    if (!out) { fclose(in); return 0; }
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+        if (fwrite(buf, 1, n, out) != n) { ok = 0; break; }
+    fclose(in);
+    return (fclose(out) == 0) && ok;
+}
+
+static int tree_op(const char *src, const char *dst, int depth)
+{
+    char a[1200], b[1200];
+    int ok = 1;
+    if (depth > 24)
+        return 0;
+    if (dst)
+        sto_mkdir(dst);
+#ifdef _WIN32
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+    snprintf(a, sizeof(a), "%s\\*", src);
+    h = FindFirstFileA(a, &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        return dst == NULL;
+    do {
+        const char *nm = fd.cFileName;
+        if (!strcmp(nm, ".") || !strcmp(nm, ".."))
+            continue;
+        snprintf(a, sizeof(a), "%s/%s", src, nm);
+        if (dst) snprintf(b, sizeof(b), "%s/%s", dst, nm);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            ok &= tree_op(a, dst ? b : NULL, depth + 1);
+        else if (dst)
+            ok &= copy_file(a, b);
+        else {
+            SetFileAttributesA(a, FILE_ATTRIBUTE_NORMAL);
+            remove(a);
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    DIR *d = opendir(src);
+    struct dirent *e;
+    if (!d)
+        return dst == NULL;
+    while ((e = readdir(d)) != NULL) {
+        struct stat st;
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))
+            continue;
+        snprintf(a, sizeof(a), "%s/%s", src, e->d_name);
+        if (dst) snprintf(b, sizeof(b), "%s/%s", dst, e->d_name);
+        if (lstat(a, &st) != 0)
+            continue;
+        if (S_ISDIR(st.st_mode))
+            ok &= tree_op(a, dst ? b : NULL, depth + 1);
+        else if (dst) {
+            if (S_ISREG(st.st_mode))
+                ok &= copy_file(a, b);
+        } else
+            remove(a);
+    }
+    closedir(d);
+#endif
+    if (!dst)
+        sto_rmdir(src);
+    return ok;
+}
+
+static int is_git_repo(const char *root)
+{
+    char p[700];
+    FILE *f;
+    snprintf(p, sizeof(p), "%s/.git/HEAD", root);
+    f = fopen(p, "rb");
+    if (f) { fclose(f); return 1; }
+    return 0;
+}
+
+/* Git operators on a full copy; 1 = planned, 0 = matched but abstained,
+   -1 = no git operator applies (text operators run as before). */
+static int plan_git(const char *workdir, const char *root, const TASK_OPS_WORKSPACE *orig,
+                    const char *task, size_t max_arg, StoPlan *p)
+{
+    GIT_OPS_RESULT g;
+    int rc;
+    memset(&g, 0, sizeof(g));
+    if (!tree_op(workdir, root, 0)) {
+        tree_op(root, NULL, 0);
+        return -1;
+    }
+    rc = GitOpsSolve(root, task, &g);
+    snprintf(p->op, sizeof(p->op), "%s", g.op);
+    snprintf(p->detail, sizeof(p->detail), "%s", g.detail);
+    if (rc != 1 || !g.verified) {
+        snprintf(p->reason, sizeof(p->reason), "%s", g.reason[0] ? g.reason : "no operator preconditions hold");
+        tree_op(root, NULL, 0);
+        return rc == 0 ? 0 : -1;
+    }
+    if (!strcmp(g.op, "restore_deleted")) {
+        char f[300];
+        if (sscanf(g.detail, "%299s restored", f) != 1 || strchr(f, '\'')) { rc = 0; goto out; }
+        snprintf(p->bash, sizeof(p->bash), "git checkout HEAD~1 -- '%s'", f);
+    } else if (!strcmp(g.op, "revert_head")) {
+        snprintf(p->bash, sizeof(p->bash), "git revert --no-edit HEAD");
+    } else if (!strcmp(g.op, "resolve_merge")) {
+        size_t used = (size_t)snprintf(p->bash, sizeof(p->bash), "git add");
+        TASK_OPS_WORKSPACE *after = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*after));
+        if (!after || !TaskOpsLoadWorkspace(root, after)) { free(after); rc = 0; goto out; }
+        for (int i = 0; i < after->count && rc == 1; i++) {
+            int j = find_rel(orig, after->files[i].rel);
+            StoHunk *h;
+            if (j < 0 || !strcmp(orig->files[j].data, after->files[i].data))
+                continue;
+            if (p->nhunks >= STO_MAX_HUNKS || strchr(after->files[i].rel, '\'')) { rc = 0; break; }
+            h = &p->hunks[p->nhunks];
+            snprintf(h->rel, sizeof(h->rel), "%s", after->files[i].rel);
+            if (!StoMinimalHunk(orig->files[j].data, after->files[i].data, &h->old_text, &h->new_text) ||
+                strlen(h->old_text) + strlen(h->new_text) > max_arg) {
+                p->nhunks++;
+                rc = 0;
+                break;
+            }
+            p->nhunks++;
+            used += (size_t)snprintf(p->bash + used, used < sizeof(p->bash) ? sizeof(p->bash) - used : 0, " '%s'", h->rel);
+        }
+        TaskOpsFreeWorkspace(after);
+        free(after);
+        if (rc == 1 && (p->nhunks == 0 || used + 32 >= sizeof(p->bash)))
+            rc = 0;
+        if (rc == 1)
+            snprintf(p->bash + used, sizeof(p->bash) - used, " && git commit --no-edit");
+    } else
+        rc = 0;
+out:
+    tree_op(root, NULL, 0);
+    if (rc != 1) {
+        snprintf(p->reason, sizeof(p->reason), "git operator %s verified but cannot be handed back", g.op);
+        StoPlanFree(p);
+        p->bash[0] = '\0';
+        return 0;
+    }
+    return 1;
+}
+
 void StoPlanFree(StoPlan *p)
 {
     for (int i = 0; i < p->nhunks; i++) {
@@ -146,7 +300,23 @@ int StoPlanTask(const char *workdir, const char *task, size_t max_arg, StoPlan *
 #else
     snprintf(root, sizeof(root), "%s/sto_%lu_%lu_%u", t, (unsigned long)getpid(), (unsigned long)time(NULL), counter);
 #endif
-    if (!TaskOpsLoadWorkspace(workdir, orig) || orig->count == 0) {
+    TaskOpsLoadWorkspace(workdir, orig);
+    if (is_git_repo(workdir)) {
+        char req0[4096];
+        size_t tl0 = strlen(task);
+        if (tl0 >= 2 && task[0] == '"' && task[tl0 - 1] == '"' && tl0 - 2 < sizeof(req0)) {
+            memcpy(req0, task + 1, tl0 - 2);
+            req0[tl0 - 2] = '\0';
+        } else
+            snprintf(req0, sizeof(req0), "%s", task);
+        int g = plan_git(workdir, root, orig, req0, max_arg, p);
+        if (g >= 0) {
+            ok = g;
+            goto done;
+        }
+        memset(p, 0, sizeof(*p));
+    }
+    if (orig->count == 0) {
         snprintf(p->reason, sizeof(p->reason), "no readable text files in the workspace");
         goto done;
     }
