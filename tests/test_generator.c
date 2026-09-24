@@ -18,10 +18,10 @@ int main(void)
     printf("--- 1. Simple sentence from relation ---\n");
     SYMBOL_ID antonio = GraphAddSymbol(graph, "ANTONIO");
     SYMBOL_ID prog    = GraphAddSymbol(graph, "PROGRAMA");
-    SYMBOL_ID harbour = GraphAddSymbol(graph, "HARBOUR");
-    GraphAddRelation(graph, antonio, prog, harbour);
+    SYMBOL_ID pascal = GraphAddSymbol(graph, "PASCAL");
+    GraphAddRelation(graph, antonio, prog, pascal);
 
-    RELATION *r1 = GraphFindRelation(graph, antonio, prog, harbour);
+    RELATION *r1 = GraphFindRelation(graph, antonio, prog, pascal);
     GeneratorFromRelation(graph, r1, &cfg, output, sizeof(output));
     printf("Generated: \"%s\"\n\n", output);
 

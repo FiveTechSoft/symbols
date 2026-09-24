@@ -229,7 +229,7 @@ function testSuite4() {
   eng.loadPreset("jung");
 
   // Turn 1: learn FiveWin
-  let r1 = eng.query("learn: FiveWin is a visual GUI library for Harbour created by Antonio Linares.");
+  let r1 = eng.query("learn: FiveWin is a visual GUI library created by Antonio Linares.");
   assert(r1.status === "DYNAMIC_LEARNED", "Turn 1: learn directive returns DYNAMIC_LEARNED", { status: r1.status });
 
   // Turn 2: query FiveWin

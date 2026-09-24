@@ -221,9 +221,9 @@ if __name__ == "__main__":
     test_sentences = [
         "España es un país soberano situado en Europa.",
         "Su capital es Madrid.",
-        "Antonio programa en Harbour.",
-        "Harbour es un lenguaje xBase.",
-        "El compila con hbmk2.",
+        "Antonio programa en Pascal.",
+        "Pascal es un lenguaje estructurado.",
+        "El compila con fpc.",
         "Madrid tiene una población de tres millones.",
         "Barcelona produce vino desde el siglo X.",
         "Google fue fundado por Larry Page y Sergey Brin.",

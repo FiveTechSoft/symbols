@@ -39,8 +39,8 @@ static void WriteTestCorpus(const char *filepath)
     fprintf(f, "# This is a comment\n");
     fprintf(f, "\n");
     fprintf(f, "  \n");
-    fprintf(f, "ANTONIO\tPROGRAMA\tHARBOUR\n");
-    fprintf(f, "ANTONIO\tCOMPILA\tHBMK2\n");
+    fprintf(f, "ANTONIO\tPROGRAMA\tPASCAL\n");
+    fprintf(f, "ANTONIO\tCOMPILA\tFPC\n");
 
     fclose(f);
 }

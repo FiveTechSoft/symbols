@@ -40,7 +40,7 @@ def extract_triples_from_doc(doc):
                     if child.dep_ in ("dobj", "pobj", "attr"):
                         obj = get_full_noun_phrase(child)
 
-                    # Prepositional complements: "programa EN Harbour"
+                    # Prepositional complements: "programa EN Pascal"
                     if child.dep_ == "prep":
                         for pobj in child.children:
                             if pobj.dep_ == "pobj":

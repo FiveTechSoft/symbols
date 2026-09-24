@@ -31,8 +31,8 @@ int main(void)
     LearningSentence(original->graph, "Gato come pescado.");
     LearningSentence(original->graph, "Gato come carne.");
     LearningSentence(original->graph, "Gato es animal.");
-    LearningSentence(original->graph, "Antonio programa Harbour.");
-    LearningSentence(original->graph, "Antonio compila hbmk2.");
+    LearningSentence(original->graph, "Antonio programa Pascal.");
+    LearningSentence(original->graph, "Antonio compila fpc.");
 
     printf("   Learned symbols : %u\n", SymbolCount(original->graph->symbols));
     printf("   Graph relations : %u\n", RelationCount(original->graph->relations));

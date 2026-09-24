@@ -185,7 +185,7 @@ int main(void)
         /* Query some known entities */
         const char *queries[] = {
             "ESPAÑA", "FRANCIA", "ALEMANIA", "MADRID", "BARCELONA",
-            "ALBERT_EINSTEIN", "HARBOUR", "DAVID", "JESUS", "MOSES", NULL
+            "ALBERT_EINSTEIN", "DAVID", "JESUS", "MOSES", NULL
         };
 
         for (int qi = 0; queries[qi]; qi++)

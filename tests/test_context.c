@@ -27,21 +27,21 @@ int main(void)
 
     /* Sentence 1: canonical shape (no medial preposition) so the
        syntax tree roots PROGRAMA on a virgin map. */
-    printf("1. Processing: \"Antonio usa Harbour.\"\n");
-    LearningSentence(graph, "Antonio usa Harbour.");
+    printf("1. Processing: \"Antonio usa Pascal.\"\n");
+    LearningSentence(graph, "Antonio usa Pascal.");
 
     SYMBOL_ID antonio = GraphAddSymbol(graph, "ANTONIO");
-    SYMBOL_ID harbour = GraphAddSymbol(graph, "HARBOUR");
+    SYMBOL_ID pascal = GraphAddSymbol(graph, "PASCAL");
 
     ContextPushEntity(ctx, antonio, "ANTONIO", 1);
-    ContextPushEntity(ctx, harbour, "HARBOUR", 0);
+    ContextPushEntity(ctx, pascal, "PASCAL", 0);
 
     /* Sentence 2: pronoun lead resolves structurally (unknown "El"
        takes the topicalized subject). Canonical shape, no preposition. */
-    printf("\n2. Pronoun sentence: \"El compila hbmk2.\"\n");
+    printf("\n2. Pronoun sentence: \"El compila fpc.\"\n");
 
     char resolved[256];
-    ContextPreprocessSentence(ctx, graph, "El compila hbmk2.",
+    ContextPreprocessSentence(ctx, graph, "El compila fpc.",
                               resolved, sizeof(resolved));
     printf("   Resolved sentence: \"%s\"\n", resolved);
     Assert(strstr(resolved, "ANTONIO") != NULL,
@@ -50,9 +50,9 @@ int main(void)
     LearningSentence(graph, resolved);
 
     ContextStepTurn(ctx);
-    SYMBOL_ID hbmk2 = GraphAddSymbol(graph, "HBMK2");
+    SYMBOL_ID fpc = GraphAddSymbol(graph, "FPC");
     ContextPushEntity(ctx, antonio, "ANTONIO", 1);
-    ContextPushEntity(ctx, hbmk2, "HBMK2", 0);
+    ContextPushEntity(ctx, fpc, "FPC", 0);
 
     /* Sentence 3: elided subject */
     printf("\n3. Elided subject:\n");

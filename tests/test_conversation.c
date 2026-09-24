@@ -21,10 +21,10 @@ int main(void)
 
     const char *conversation[] = {
         "Hola! Buenos dias",
-        "Antonio programa en Harbour.",
-        "Harbour es un lenguaje xBase.",
+        "Antonio programa en Pascal.",
+        "Pascal es un lenguaje estructurado.",
         "Que programa Antonio?",
-        "El compila con hbmk2.",
+        "El compila con fpc.",
         "Con que compila Antonio?",
         "Que come el perro?",
         "Muchas gracias por la ayuda!",
