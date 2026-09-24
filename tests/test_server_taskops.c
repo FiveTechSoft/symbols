@@ -79,7 +79,20 @@ int main(void)
     CHECK(!ok && strstr(p.reason, "too large"));
     StoPlanFree(&p);
 
+    /* escaped quoted request, as OpenCode sends it: \" inside is a quote */
     remove(path);
+    {
+        char cpath[320];
+        const char *src = "#include <stdio.h>\nint main(void)\n{\n    printf(\"RESULT: %d\\n\", 1);\n    printf(\"RESULT: %d\\n\", 2);\n    return 0;\n}\n";
+        snprintf(cpath, sizeof(cpath), "%s/main.c", dir);
+        put(cpath, src);
+        ok = StoPlanTask(dir, "\"Extract the repeated literal \\\"RESULT: \\\" into a named constant RESULT_PREFIX and use it in both printf calls.\"", 8000, &p);
+        CHECK(ok && p.nhunks == 1 && !strcmp(p.op, "literal_to_constant"));
+        CHECK(ok && strstr(p.hunks[0].new_text, "RESULT_PREFIX"));
+        CHECK(same(cpath, src));                              /* workspace untouched */
+        StoPlanFree(&p);
+        remove(cpath);
+    }
 #ifdef _WIN32
     _rmdir(dir);
 #else

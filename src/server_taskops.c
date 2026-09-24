@@ -267,6 +267,22 @@ out:
     return 1;
 }
 
+/* The client may hand the request over as a quoted, escaped string
+   ("... \"RESULT: \" ..."): drop the outer quotes and undo \" and \\. */
+static void unwrap_request(const char *task, char *req, size_t size)
+{
+    size_t tl = strlen(task), o = 0;
+    if (tl >= 2 && task[0] == '"' && task[tl - 1] == '"') {
+        for (size_t i = 1; i + 1 < tl && o + 1 < size; i++) {
+            if (task[i] == '\\' && i + 2 < tl && (task[i + 1] == '"' || task[i + 1] == '\\'))
+                i++;
+            req[o++] = task[i];
+        }
+        req[o] = '\0';
+    } else
+        snprintf(req, size, "%s", task);
+}
+
 void StoPlanFree(StoPlan *p)
 {
     for (int i = 0; i < p->nhunks; i++) {
@@ -303,12 +319,7 @@ int StoPlanTask(const char *workdir, const char *task, size_t max_arg, StoPlan *
     TaskOpsLoadWorkspace(workdir, orig);
     if (is_git_repo(workdir)) {
         char req0[4096];
-        size_t tl0 = strlen(task);
-        if (tl0 >= 2 && task[0] == '"' && task[tl0 - 1] == '"' && tl0 - 2 < sizeof(req0)) {
-            memcpy(req0, task + 1, tl0 - 2);
-            req0[tl0 - 2] = '\0';
-        } else
-            snprintf(req0, sizeof(req0), "%s", task);
+        unwrap_request(task, req0, sizeof(req0));
         int g = plan_git(workdir, root, orig, req0, max_arg, p);
         if (g >= 0) {
             ok = g;
@@ -331,12 +342,7 @@ int StoPlanTask(const char *workdir, const char *task, size_t max_arg, StoPlan *
     }
     {   /* the client may hand the request over wrapped in quotes */
         char req[4096];
-        size_t tl = strlen(task);
-        if (tl >= 2 && task[0] == '"' && task[tl - 1] == '"' && tl - 2 < sizeof(req)) {
-            memcpy(req, task + 1, tl - 2);
-            req[tl - 2] = '\0';
-        } else
-            snprintf(req, sizeof(req), "%s", task);
+        unwrap_request(task, req, sizeof(req));
         kept = TaskOpsSolve(root, req, &rep);
     }
     snprintf(p->op, sizeof(p->op), "%s", rep.op);
