@@ -645,6 +645,23 @@ int main(void)
         CHECK(!strcmp(get(d, "main.c"), t), "evidence_fix: two single edits both work -> abstain");
     }
 
+#ifndef _WIN32
+    /* sh -n evidence: neutral wording, the parser error picks the repair */
+    if (system("sh -c true >/dev/null 2>&1") == 0) {
+        char d[512]; make_dir(d, sizeof(d), "shsyntax");
+        put(d, "run.sh", "#!/bin/sh\nif [ -n \"$1\" ]; then\n  echo arg\necho done\n");
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The script fails; fix it.", &r);
+        CHECK(!strcmp(r.op, "shell_harden") && !strcmp(get(d, "run.sh"), "#!/bin/sh\nif [ -n \"$1\" ]; then\n  echo arg\nfi\necho done\n"),
+              "sh -n evidence: the open if is closed where indentation returns");
+        char d2[512]; make_dir(d2, sizeof(d2), "shsyntax2");
+        const char *t = "#!/bin/sh\nif [ -n \"$1\" ]; then\necho arg\necho done\n";
+        put(d2, "run.sh", t);
+        TaskOpsSolve(d2, "The script fails; fix it.", &r);
+        CHECK(!strcmp(get(d2, "run.sh"), t), "sh -n evidence: flat body (fi could go in two places) -> abstain");
+    }
+#endif
+
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the
        lines that name it. */

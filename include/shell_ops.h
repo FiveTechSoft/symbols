@@ -25,4 +25,20 @@ char *ShellOpsApply(const char *data, const char *task, char *rule, size_t rule_
 /* static intent of rule on the edited text (1 holds, 0 not) */
 int   ShellOpsIntent(const char *data, const char *rule);
 
+/* Syntax candidates for a script `sh -n` rejects: tier 1 missing_then,
+ * missing_do, close_quote (odd double quotes on a plain line), close_block
+ * (the one open if/for/while/case closed where indentation returns to the
+ * opener's level); tier 2 stray_closer (a lone fi/done/esac removed). The
+ * caller keeps the one edit of the lowest tier after which `sh -n` passes;
+ * several: abstain. Task wording is not read. */
+typedef struct {
+    char *text;
+    int tier;
+    char rule[24];
+    char detail[96];
+} SHELL_CAND;
+
+int  ShellSyntaxCandidates(const char *data, SHELL_CAND *out, int max);
+void ShellSyntaxCandidatesFree(SHELL_CAND *c, int n);
+
 #endif

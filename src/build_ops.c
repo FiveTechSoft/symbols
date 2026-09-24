@@ -143,8 +143,9 @@ static int in_workspace(const char *const *rels, int n, const char *rel)
     return 0;
 }
 
+/* ev: cmake's own configure output (evidence mode, task == ""), or NULL */
 static int cmake_rules(const char *const *rels, const char *const *datas, int n, const char *task,
-                       int f, BUILD_EDIT *e)
+                       int f, BUILD_EDIT *e, const char *ev)
 {
     const char *d = datas[f];
     int count;
@@ -154,7 +155,8 @@ static int cmake_rules(const char *const *rels, const char *const *datas, int n,
     int na = p >= 0 && count == 1 ? call_args(d, p, args, 8, &close) : -1;
 
     /* project() missing */
-    if (!ci_has(d, "project(") && !ci_has(d, "project (") && ci_has(task, "project(")) {
+    if (!ci_has(d, "project(") && !ci_has(d, "project (") &&
+        (ev ? strstr(ev, "No project() command is present") != NULL : ci_has(task, "project("))) {
         const char *name = na >= 1 ? args[0] : "app";
         int c2;
         long m = find_call(d, "cmake_minimum_required", &c2);
@@ -171,8 +173,10 @@ static int cmake_rules(const char *const *rels, const char *const *datas, int n,
         return e->text != NULL;
     }
     if (na == 1) {   /* add_executable(NAME) with no sources */
-        int c = pick_c(rels, n, task);
-        if (c < 0 || (!task_names(task, rels[c]) && !ci_has(task, "add_executable")))
+        if (ev && !strstr(ev, "No SOURCES given to target"))
+            return 0;
+        int c = pick_c(rels, n, task);   /* evidence mode: the one C file */
+        if (c < 0 || (!ev && !task_names(task, rels[c]) && !ci_has(task, "add_executable")))
             return 0;
         char ins[300];
         snprintf(ins, sizeof(ins), " %s", rels[c]);
@@ -181,7 +185,7 @@ static int cmake_rules(const char *const *rels, const char *const *datas, int n,
         snprintf(e->detail, sizeof(e->detail), "add_executable(%s %s)", args[0], rels[c]);
         return e->text != NULL;
     }
-    if (na >= 2 && na <= 8 && (ci_has(task, "missing") || ci_has(task, "recreate"))) {
+    if (na >= 2 && na <= 8 && (ev ? strstr(ev, "Cannot find source file") != NULL : (ci_has(task, "missing") || ci_has(task, "recreate")))) {
         int missing = -1, nm = 0;
         for (int a = 1; a < na; a++)
             if (!in_workspace(rels, n, args[a])) {
@@ -189,7 +193,7 @@ static int cmake_rules(const char *const *rels, const char *const *datas, int n,
                 nm++;
             }
         if (nm != 1 || !is_c_file(args[missing]) || strchr(args[missing], '$') || strchr(args[missing], '/') ||
-            !task_names(task, args[missing]))
+            !task_names(ev ? ev : task, args[missing]))
             return 0;
         for (int i = 0; i < n; i++)   /* another source already defines main */
             if (is_c_file(rels[i]) && strstr(datas[i], "main("))
@@ -468,7 +472,7 @@ int BuildOpsPlan(const char *const *rels, const char *const *datas, int n, const
         snprintf(e.rel, sizeof(e.rel), "%s", rels[i]);
         int ok = 0;
         if (is_cmake(rels[i]))
-            ok = cmake_rules(rels, datas, n, task, i, &e);
+            ok = cmake_rules(rels, datas, n, task, i, &e, NULL);
         else if (is_make(rels[i]))
             ok = make_rule(rels, n, task, datas[i], &e);
         else if (ShellOpsIsScript(rels[i], datas[i]))
@@ -480,6 +484,35 @@ int BuildOpsPlan(const char *const *rels, const char *const *datas, int n, const
             continue;
         }
         if (found) {   /* ambiguous */
+            free(e.text);
+            free(out->text);
+            memset(out, 0, sizeof(*out));
+            return 0;
+        }
+        *out = e;
+        found = 1;
+    }
+    return found;
+}
+
+int BuildOpsPlanEvidence(const char *const *rels, const char *const *datas, int n, const char *cmake_out, BUILD_EDIT *out)
+{
+    int found = 0;
+    memset(out, 0, sizeof(*out));
+    if (!cmake_out)
+        return 0;
+    for (int i = 0; i < n; i++) {
+        if (!is_cmake(rels[i]) || strchr(rels[i], '/'))
+            continue;   /* the top-level CMakeLists.txt that was configured */
+        BUILD_EDIT e;
+        memset(&e, 0, sizeof(e));
+        e.file = i;
+        snprintf(e.rel, sizeof(e.rel), "%s", rels[i]);
+        if (!cmake_rules(rels, datas, n, "", i, &e, cmake_out)) {
+            free(e.text);
+            continue;
+        }
+        if (found) {
             free(e.text);
             free(out->text);
             memset(out, 0, sizeof(*out));

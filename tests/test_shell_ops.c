@@ -60,6 +60,59 @@ int main(void)
     /* no rule stated */
     CHECK(apply("#!/bin/sh\necho $1\n", "Print a greeting.", rule) == NULL);
 
+
+    {   /* syntax candidates (sh -n evidence); the caller verifies with sh -n */
+        SHELL_CAND c[32];
+        int n, found;
+#define HAS(rule_, sub_) do { found = 0; for (int i = 0; i < n; i++) if (!strcmp(c[i].rule, rule_) && strstr(c[i].text, sub_)) found = 1; CHECK(found); } while (0)
+        n = ShellSyntaxCandidates("#!/bin/sh\nif [ -f x ]\n  echo a\nfi\n", c, 32);
+        HAS("missing_then", "if [ -f x ]; then\n");
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\nfor f in a b\n  echo $f\ndone\n", c, 32);
+        HAS("missing_do", "for f in a b; do\n");
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\nif [ -f x ]; then\n  echo a\necho b\n", c, 32);
+        HAS("close_block", "  echo a\nfi\necho b\n");
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\nif [ -f x ]\nthen\n  echo a\n", c, 32);
+        HAS("close_block", "  echo a\nfi\n");
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\nif [ -f x ]; then\necho a\n", c, 32);    /* flat body: no close_block */
+        found = 0; for (int i = 0; i < n; i++) found |= !strcmp(c[i].rule, "close_block");
+        CHECK(!found);
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\necho \"hello\necho bye\n", c, 32);
+        HAS("close_quote", "echo \"hello\"\n");
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\necho a\nfi\n", c, 32);
+        HAS("stray_closer", "#!/bin/sh\necho a\n");
+        for (int i = 0; i < n; i++) if (!strcmp(c[i].rule, "stray_closer")) CHECK(c[i].tier == 2);
+        ShellSyntaxCandidatesFree(c, n);
+        n = ShellSyntaxCandidates("#!/bin/sh\n# if then \"\necho 'x \" y'\n", c, 32);  /* comment and quoted text */
+        CHECK(n == 0);
+        ShellSyntaxCandidatesFree(c, n);
+#undef HAS
+        /* fuzz: deterministic mutations never crash or yield NULL/identical text */
+        const char *seed = "#!/bin/sh\nset -e\nif [ -f \"$1\" ]; then\n  for f in a b; do\n    echo \"$f\"\n  done\nfi\ncase x in\n  x) echo y ;;\nesac\n";
+        const char alpha[] = "\"'#;|&(){}\\\n \tfidoneesacthen";
+        char buf[512];
+        unsigned r = 777u;
+        size_t len = strlen(seed);
+        for (int it = 0; it < 3000; it++) {
+            memcpy(buf, seed, len + 1);
+            for (int e = 0; e < 1 + it % 5; e++) {
+                r = r * 1103515245u + 12345u;
+                size_t at = (r >> 8) % len;
+                r = r * 1103515245u + 12345u;
+                buf[at] = alpha[(r >> 8) % (sizeof alpha - 1)];
+            }
+            if (it % 9 == 0) buf[(r >> 4) % len] = '\0';
+            n = ShellSyntaxCandidates(buf, c, 32);
+            CHECK(n >= 0 && n <= 32);
+            for (int i = 0; i < n; i++) CHECK(c[i].text && strcmp(c[i].text, buf) && c[i].tier >= 1 && c[i].tier <= 2);
+            ShellSyntaxCandidatesFree(c, n);
+        }
+    }
     printf("test_shell_ops: %s\n", fails ? "FAILED" : "ALL PASSED");
     return fails ? 1 : 0;
 }

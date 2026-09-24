@@ -66,6 +66,29 @@ int main(void)
     const char *d7b[] = {"jobs:\n  a:\n    steps:\n      - run: x\n  b:\n    steps:\n      - run: y\n"};
     CHECK(!plan(1, r7, d7b, "add a ctest step", &e));                       /* two steps lists */
 
+
+    {   /* evidence mode: cmake's own output picks the rule, task wording is not read */
+        const char *er[] = {"CMakeLists.txt", "main.c"};
+        const char *ed1[] = {"cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo)\n", "int main(void) { return 0; }\n"};
+        CHECK(BuildOpsPlanEvidence(er, ed1, 2, "CMake Error at CMakeLists.txt:3 (add_executable):\n  No SOURCES given to target: demo\n", &e) == 1 &&
+              !strcmp(e.rule, "cmake_add_source") && strstr(e.text, "add_executable(demo main.c)"));
+        free(e.text);
+        CHECK(!BuildOpsPlanEvidence(er, ed1, 2, "-- Configuring done\n", &e));                         /* no diagnostic */
+        const char *er3[] = {"CMakeLists.txt", "a.c", "b.c"};
+        const char *ed3[] = {ed1[0], "int main(void) { return 0; }\n", "int f(void) { return 0; }\n"};
+        CHECK(!BuildOpsPlanEvidence(er3, ed3, 3, "No SOURCES given to target: demo\n", &e));          /* two C files */
+        const char *ed2[] = {"cmake_minimum_required(VERSION 3.10)\n", "int main(void) { return 0; }\n"};
+        CHECK(BuildOpsPlanEvidence(er, ed2, 2, "CMake Warning (dev) in CMakeLists.txt:\n  No project() command is present.\n", &e) == 1 &&
+              !strcmp(e.rule, "cmake_project") && strstr(e.text, "project(app C)"));
+        free(e.text);
+        const char *er4[] = {"CMakeLists.txt"};
+        const char *ed4[] = {"cmake_minimum_required(VERSION 3.10)\nproject(demo C)\nadd_executable(demo main.c)\n"};
+        CHECK(BuildOpsPlanEvidence(er4, ed4, 1, "CMake Error at CMakeLists.txt:3 (add_executable):\n  Cannot find source file:\n\n    main.c\n", &e) == 1 &&
+              !strcmp(e.rule, "cmake_missing_source") && e.file == -1 && !strcmp(e.rel, "main.c"));
+        free(e.text);
+        CHECK(!BuildOpsPlanEvidence(er4, ed4, 1, "Cannot find source file:\n\n    other.c\n", &e));    /* names a different file */
+        CHECK(!BuildOpsPlanEvidence(er4, ed4, 1, NULL, &e));
+    }
     printf("test_build_ops: %s\n", fails ? "FAILED" : "ALL PASSED");
     return fails ? 1 : 0;
 }

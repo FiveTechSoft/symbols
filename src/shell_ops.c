@@ -305,5 +305,186 @@ int ShellOpsIntent(const char *data, const char *rule)
         return strstr(data, "echo ") != NULL;
     if (!strcmp(rule, "file_guard"))
         return strstr(data, "[ -f ") != NULL && strstr(data, "exit ") != NULL;
+    if (!strcmp(rule, "missing_then") || !strcmp(rule, "missing_do") || !strcmp(rule, "close_quote") ||
+        !strcmp(rule, "close_block") || !strcmp(rule, "stray_closer"))
+        return 1;   /* syntax repairs: the caller's sh -n is the evidence */
     return 0;
+}
+
+/* ------------------------------------------------ syntax candidates
+   Single edits that could repair a script `sh -n` rejects. The caller keeps
+   only an edit after which `sh -n` passes, and only when exactly one
+   candidate of the lowest passing tier does. Task wording is not read. */
+
+typedef struct { const char *p; size_t len; int indent; } SH_LINE;
+
+static int sh_lines(const char *d, SH_LINE *ln, int max)
+{
+    int n = 0;
+    for (const char *p = d; *p && n < max;) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        int ind = 0;
+        while ((size_t)ind < l && (p[ind] == ' ' || p[ind] == '\t')) ind++;
+        ln[n].p = p; ln[n].len = l; ln[n].indent = ind;
+        n++;
+        p = e ? e + 1 : p + l;
+    }
+    return n;
+}
+
+/* command-position words of one line (quotes and comments skipped) */
+static int sh_words(const SH_LINE *L, char w[][16], int max)
+{
+    int n = 0, cmdpos = 1;
+    size_t i = 0;
+    while (i < L->len && n < max) {
+        char c = L->p[i];
+        if (c == '#' && (i == 0 || isspace((unsigned char)L->p[i - 1]))) break;
+        if (c == ';' || c == '&' || c == '|' || c == '(' || c == ')' || c == '{' || c == '}') { cmdpos = 1; i++; continue; }
+        if (isspace((unsigned char)c)) { i++; continue; }
+        if (c == '"' || c == '\'') {
+            char q = c;
+            i++;
+            while (i < L->len && L->p[i] != q) i += (q == '"' && L->p[i] == '\\') ? 2 : 1;
+            i++;
+            cmdpos = 0;
+            continue;
+        }
+        size_t s = i;
+        while (i < L->len && !isspace((unsigned char)L->p[i]) && !strchr(";&|(){}\"'", L->p[i])) i++;
+        if (cmdpos && i - s < 16) {
+            memcpy(w[n], L->p + s, i - s);
+            w[n][i - s] = '\0';
+            n++;
+            const char *kw = w[n - 1];
+            cmdpos = !strcmp(kw, "then") || !strcmp(kw, "do") || !strcmp(kw, "else") || !strcmp(kw, "elif") ||
+                     !strcmp(kw, "if") || !strcmp(kw, "while") || !strcmp(kw, "until") || !strcmp(kw, "!");
+        } else
+            cmdpos = 0;
+    }
+    return n;
+}
+
+static char *sh_splice(const char *d, size_t at, size_t del, const char *ins)
+{
+    size_t n = strlen(d), il = strlen(ins);
+    char *o = (char *)malloc(n - del + il + 1);
+    if (!o) return NULL;
+    memcpy(o, d, at);
+    memcpy(o + at, ins, il);
+    memcpy(o + at + il, d + at + del, n - at - del + 1);
+    return o;
+}
+
+static int sh_add(SHELL_CAND *out, int max, int *n, char *text, int tier, const char *rule, int line)
+{
+    if (!text) return 0;
+    if (*n >= max) { free(text); return 0; }
+    out[*n].text = text;
+    out[*n].tier = tier;
+    snprintf(out[*n].rule, sizeof(out[*n].rule), "%s", rule);
+    snprintf(out[*n].detail, sizeof(out[*n].detail), "line %d: %s", line, rule);
+    (*n)++;
+    return 1;
+}
+
+static int has_word(char w[][16], int nw, const char *k)
+{
+    for (int i = 0; i < nw; i++)
+        if (!strcmp(w[i], k)) return 1;
+    return 0;
+}
+
+int ShellSyntaxCandidates(const char *d, SHELL_CAND *out, int max)
+{
+    static SH_LINE ln[2048];
+    int nl = sh_lines(d, ln, 2048), n = 0;
+    if (nl >= 2048) return 0;
+    /* block stack: opener line and closer word */
+    int st_line[256], sp = 0;
+    const char *st_close[256];
+    for (int i = 0; i < nl; i++) {
+        char w[32][16];
+        int nw = sh_words(&ln[i], w, 32);
+        for (int k = 0; k < nw; k++) {
+            const char *c = !strcmp(w[k], "if") ? "fi" : (!strcmp(w[k], "for") || !strcmp(w[k], "while") || !strcmp(w[k], "until")) ? "done"
+                          : !strcmp(w[k], "case") ? "esac" : NULL;
+            if (c && sp < 256) { st_line[sp] = i; st_close[sp] = c; sp++; }
+            else if ((!strcmp(w[k], "fi") || !strcmp(w[k], "done") || !strcmp(w[k], "esac")) && sp > 0 && !strcmp(st_close[sp - 1], w[k]))
+                sp--;
+        }
+        /* tier 1: if/elif line without then (and the next line does not start with then); for/while without do */
+        int need_then = (has_word(w, nw, "if") || has_word(w, nw, "elif")) && !has_word(w, nw, "then");
+        int need_do = (has_word(w, nw, "for") || has_word(w, nw, "while") || has_word(w, nw, "until")) && !has_word(w, nw, "do");
+        if (need_then || need_do) {
+            int j = i + 1;
+            while (j < nl && ln[j].len == (size_t)ln[j].indent) j++;
+            char nx[4][16];
+            int nn = j < nl ? sh_words(&ln[j], nx, 4) : 0;
+            const char *kw = need_then ? "then" : "do";
+            if (!(nn > 0 && !strcmp(nx[0], kw)) && memchr(ln[i].p, '#', ln[i].len) == NULL) {
+                size_t at = (size_t)(ln[i].p - d) + ln[i].len;
+                while (at > (size_t)(ln[i].p - d) && isspace((unsigned char)d[at - 1])) at--;
+                char ins[16];
+                snprintf(ins, sizeof(ins), "; %s", kw);
+                sh_add(out, max, &n, sh_splice(d, at, 0, ins), 1, need_then ? "missing_then" : "missing_do", i + 1);
+            }
+        }
+        /* tier 1: odd count of double quotes on a line with no single quote or backslash */
+        {
+            int dq = 0, other = 0;
+            for (size_t q = 0; q < ln[i].len; q++) {
+                dq += ln[i].p[q] == '"';
+                other |= ln[i].p[q] == '\'' || ln[i].p[q] == '\\' || ln[i].p[q] == '#';
+            }
+            if ((dq & 1) && !other) {
+                size_t at = (size_t)(ln[i].p - d) + ln[i].len;
+                sh_add(out, max, &n, sh_splice(d, at, 0, "\""), 1, "close_quote", i + 1);
+            }
+        }
+        /* tier 2: a closer alone on its line may be stray */
+        if (nw == 1 && (!strcmp(w[0], "fi") || !strcmp(w[0], "done") || !strcmp(w[0], "esac"))) {
+            size_t at = (size_t)(ln[i].p - d), del = ln[i].len + (ln[i].p[ln[i].len] == '\n');
+            sh_add(out, max, &n, sh_splice(d, at, del, ""), 2, "stray_closer", i + 1);
+        }
+    }
+    /* tier 1: exactly one block left open: close it where indentation returns
+       to the opener's level (or at the end), only when the body is indented */
+    if (sp == 1) {
+        int o = st_line[0], at_line = nl;
+        int body = o + 1;
+        for (;; body++) {   /* skip blank lines and a "then"/"do" line of its own */
+            if (body >= nl) break;
+            if (ln[body].len == (size_t)ln[body].indent) continue;
+            char bw[2][16];
+            int bn = sh_words(&ln[body], bw, 2);
+            if (bn == 1 && ln[body].indent == ln[o].indent && (!strcmp(bw[0], "then") || !strcmp(bw[0], "do"))) continue;
+            break;
+        }
+        if (body < nl && ln[body].indent > ln[o].indent) {
+            for (int j = body + 1; j < nl; j++) {
+                if (ln[j].len == (size_t)ln[j].indent) continue;
+                char w[4][16];
+                int nw = sh_words(&ln[j], w, 4);
+                if (ln[j].indent <= ln[o].indent && !(nw > 0 && (!strcmp(w[0], "else") || !strcmp(w[0], "elif") || !strcmp(w[0], "then") || !strcmp(w[0], "do")))) {
+                    at_line = j;
+                    break;
+                }
+            }
+            size_t at = at_line < nl ? (size_t)(ln[at_line].p - d) : strlen(d);
+            char ins[300];
+            snprintf(ins, sizeof(ins), "%s%.*s%s\n", at > 0 && d[at - 1] != '\n' ? "\n" : "", ln[o].indent, ln[o].p, st_close[0]);
+            sh_add(out, max, &n, sh_splice(d, at, 0, ins), 1, "close_block", at_line + 1);
+        }
+    }
+    return n;
+}
+
+void ShellSyntaxCandidatesFree(SHELL_CAND *c, int n)
+{
+    for (int i = 0; i < n; i++) {
+        free(c[i].text);
+        c[i].text = NULL;
+    }
 }

@@ -30,6 +30,11 @@ typedef struct
 } BUILD_EDIT;
 
 int  BuildOpsPlan(const char *const *rels, const char *const *datas, int n, const char *task, BUILD_EDIT *out);
+/* Evidence mode: the same cmake rules, chosen by cmake's own configure
+ * output instead of the task ("No project() command is present", "No
+ * SOURCES given to target", "Cannot find source file: F" naming the one
+ * missing source). Task wording is not consulted. */
+int  BuildOpsPlanEvidence(const char *const *rels, const char *const *datas, int n, const char *cmake_out, BUILD_EDIT *out);
 /* static intent on the edited text */
 int  BuildOpsIntent(const char *text, const BUILD_EDIT *e);
 

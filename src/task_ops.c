@@ -2640,6 +2640,51 @@ static int shell_syntax_ok(const char *root, const char *rel)
 
 /* --------------------------------------------------------- build repair */
 
+/* sh -n evidence: a script the shell parser rejects; the one lowest-tier
+   syntax candidate after which sh -n passes wins. Task wording not read. */
+static int shell_syntax_target(const TASK_OPS_WORKSPACE *ws, char **out, char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    int hit = -1, wins = 0;
+    *out = NULL;
+    for (int i = 0; i < ws->count; i++) {
+        const TASK_OPS_FILE *F = &ws->files[i];
+        if (!ShellOpsIsScript(F->rel, F->data) || F->len > 65536 || shell_syntax_ok(ws->root, F->rel))
+            continue;
+        static SHELL_CAND c[64];
+        int n = ShellSyntaxCandidates(F->data, c, 64), best = 99, fw = 0, pick = -1;
+        for (int tier = 1; tier <= 2 && fw == 0; tier++)
+            for (int k = 0; k < n; k++) {
+                if (c[k].tier != tier || !write_file(ws->root, F->rel, c[k].text))
+                    continue;
+                if (shell_syntax_ok(ws->root, F->rel)) {
+                    fw++;
+                    pick = k;
+                    best = tier;
+                }
+            }
+        write_file(ws->root, F->rel, F->data);   /* always restore */
+        (void)best;
+        if (fw == 1) {
+            wins++;
+            if (wins == 1) {
+                hit = i;
+                *out = c[pick].text;
+                c[pick].text = NULL;
+                snprintf(rule, rsz, "%s", c[pick].rule);
+                snprintf(detail, dsz, "sh -n: %s", c[pick].detail);
+            }
+        } else if (fw > 1)
+            wins += 2;   /* ambiguous inside one file */
+        ShellSyntaxCandidatesFree(c, n);
+    }
+    if (wins != 1) {
+        free(*out);
+        *out = NULL;
+        return -1;
+    }
+    return hit;
+}
+
 static int build_plan(const TASK_OPS_WORKSPACE *ws, const char *task, BUILD_EDIT *e)
 {
     const char *rels[TASK_OPS_MAX_FILES], *datas[TASK_OPS_MAX_FILES];
@@ -2649,6 +2694,9 @@ static int build_plan(const TASK_OPS_WORKSPACE *ws, const char *task, BUILD_EDIT
     }
     return BuildOpsPlan(rels, datas, ws->count, task, e);
 }
+
+/* cmake configure of the workspace in a scratch dir; stdout+stderr into buf */
+static int cmake_output(const TASK_OPS_WORKSPACE *ws, char *buf, size_t size);
 
 static int run_ok(const char *cmd, const char *cwd, int timeout_ms, const char *must_not, const char *must)
 {
@@ -2681,6 +2729,44 @@ static void make_dir(const char *path)
 #else
     mkdir(path, 0755);
 #endif
+}
+
+static int cmake_output(const TASK_OPS_WORKSPACE *ws, char *buf, size_t size)
+{
+    buf[0] = '\0';
+    int has = 0;
+    for (int i = 0; i < ws->count; i++)
+        has |= !strcmp(ws->files[i].rel, "CMakeLists.txt");
+    char tmp[TASK_OPS_MAX_PATH], cmd[TASK_OPS_MAX_PATH * 3];
+    temp_binary(tmp, sizeof(tmp));
+    if (!has || strchr(tmp, '"') || strchr(ws->root, '"'))
+        return 0;
+    snprintf(cmd, sizeof(cmd), "cmake -S \"%s\" -B \"%s\"", ws->root, tmp);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return 0;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 60000, r);
+    int ran = !r->execution_failed && !r->timed_out;
+    snprintf(buf, size, "%.*s%.*s", (int)(r->stdout_len < size / 2 ? r->stdout_len : size / 2 - 1), r->stdout_buf,
+             (int)(r->stderr_len < size / 2 ? r->stderr_len : size / 2 - 1), r->stderr_buf);
+    free(r);
+    snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
+    run_ok(cmd, ws->root, 30000, NULL, NULL);
+    return ran;
+}
+
+static int build_evidence_plan(const TASK_OPS_WORKSPACE *ws, BUILD_EDIT *e)
+{
+    static char out[16384];
+    if (!cmake_output(ws, out, sizeof(out)))
+        return 0;
+    const char *rels[TASK_OPS_MAX_FILES], *datas[TASK_OPS_MAX_FILES];
+    for (int i = 0; i < ws->count; i++) {
+        rels[i] = ws->files[i].rel;
+        datas[i] = ws->files[i].data;
+    }
+    return BuildOpsPlanEvidence(rels, datas, ws->count, out, e);
 }
 
 /* Evidence by really building: cmake configure (+build) out of tree,
@@ -3207,13 +3293,14 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "remove_dead_function");
             snprintf(rep->detail, sizeof(rep->detail), "%.100s removed from %d file(s)", dead, touched);
-        } else if (op == OP_SHELL && (shell_file = shell_target(ws, task, &next_shell, shell_rule, sizeof(shell_rule), shell_detail, sizeof(shell_detail))) >= 0) {
+        } else if (op == OP_SHELL && ((shell_file = shell_target(ws, task, &next_shell, shell_rule, sizeof(shell_rule), shell_detail, sizeof(shell_detail))) >= 0 ||
+                                      (shell_file = shell_syntax_target(ws, &next_shell, shell_rule, sizeof(shell_rule), shell_detail, sizeof(shell_detail))) >= 0)) {
             next[shell_file] = next_shell;
             touched = 1;
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "shell_harden");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.60s in %.120s", shell_rule, shell_detail, ws->files[shell_file].rel);
-        } else if (op == OP_BUILD && build_plan(ws, task, &bedit)) {
+        } else if (op == OP_BUILD && (build_plan(ws, task, &bedit) || build_evidence_plan(ws, &bedit))) {
             if (bedit.file >= 0)
                 next[bedit.file] = bedit.text;
             else {
