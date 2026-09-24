@@ -121,7 +121,8 @@ sys.exit(r2.returncode)
 
 def write_task(tid: str, category: str, prompt: str,
                before: dict[str, str], after: dict[str, str],
-               check: str) -> None:
+               check: str, setup: str | None = None,
+               golden: str | None = None) -> None:
     d = BANK / category / tid
     if d.exists():
         shutil.rmtree(d)
@@ -129,6 +130,10 @@ def write_task(tid: str, category: str, prompt: str,
     (d / "after").mkdir(parents=True)
     (d / "task.md").write_text(prompt.rstrip() + "\n", encoding="utf-8")
     (d / "check.py").write_text(check, encoding="utf-8")
+    if setup is not None:
+        (d / "setup.py").write_text(setup, encoding="utf-8")
+    if golden is not None:
+        (d / "golden.py").write_text(golden, encoding="utf-8")
     for rel, content in before.items():
         p = d / "before" / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -1077,6 +1082,159 @@ sys.exit(r.returncode)
         write_task(tid, "debug", prompt, b, a, c)
         tasks.append((tid, "debug"))
 
+    # git: state a plain file tree cannot hold; each task ships setup.py
+    # (runner provides fixed GIT_AUTHOR/COMMITTER identity and dates) and
+    # golden.py (self-test applies the golden git operation after setup).
+    gt_g = (
+        "import subprocess, sys\n"
+        "def g(*a, ok=(0,)):\n"
+        "    r = subprocess.run([\"git\", *a], capture_output=True, text=True,\n"
+        "                       encoding=\"utf-8\", errors=\"replace\")\n"
+        "    if r.returncode not in ok:\n"
+        "        sys.stderr.write(r.stderr or r.stdout or \"\")\n"
+        "        sys.exit(r.returncode)\n"
+        "    return r\n"
+    )
+    notes_lines = '["# release notes", "build 42"]'
+    good_c_lines = (
+        "['#include <stdio.h>',\n"
+        " 'int main(void) { printf(\"ok\\\\n\"); return 0; }', \"\"]"
+    )
+    broken_c_lines = (
+        "['#include <stdio.h>',\n"
+        " 'int main(void) { printf(\"ok\\\\n\"); return 0', \"\"]"
+    )
+    gt = [
+        ("eb_gt_001",
+         "The latest commit deleted notes.txt by mistake. Restore the file with "
+         "the exact content it had before that deletion and make sure git tracks "
+         "it again.",
+         {".gitkeep": ""},
+         {".gitkeep": ""},
+         "#!/usr/bin/env python3\n"
+         "import subprocess, sys\n"
+         "from pathlib import Path\n"
+         f"want = \"\\n\".join({notes_lines}) + \"\\n\"\n"
+         "p = Path(\"notes.txt\")\n"
+         "if not p.is_file():\n"
+         "    print(\"missing notes.txt\")\n"
+         "    sys.exit(1)\n"
+         "if p.read_text(encoding=\"utf-8\") != want:\n"
+         "    print(\"notes.txt content mismatch\")\n"
+         "    sys.exit(1)\n"
+         "r = subprocess.run([\"git\", \"ls-files\", \"--error-unmatch\", \"notes.txt\"],\n"
+         "                   capture_output=True)\n"
+         "if r.returncode != 0:\n"
+         "    print(\"notes.txt not tracked by git\")\n"
+         "    sys.exit(1)\n"
+         "sys.exit(0)\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "from pathlib import Path\n"
+         "g(\"init\", \"-b\", \"main\")\n"
+         f"Path(\"notes.txt\").write_text(\"\\n\".join({notes_lines}) + \"\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"add release notes\")\n"
+         "g(\"rm\", \"notes.txt\")\n"
+         "g(\"commit\", \"-m\", \"drop notes\")\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "g(\"checkout\", \"HEAD~1\", \"--\", \"notes.txt\")\n"),
+        ("eb_gt_002",
+         "Merging feature-b into main stopped with a conflict in conflict.txt. "
+         "Resolve it so the file keeps both changes (the alpha line and the beta "
+         "line) and complete the merge.",
+         {".gitkeep": ""},
+         {".gitkeep": ""},
+         "#!/usr/bin/env python3\n"
+         "import subprocess, sys\n"
+         "from pathlib import Path\n"
+         "p = Path(\"conflict.txt\")\n"
+         "if not p.is_file():\n"
+         "    print(\"missing conflict.txt\")\n"
+         "    sys.exit(1)\n"
+         "text = p.read_text(encoding=\"utf-8\")\n"
+         "lines = [ln.strip() for ln in text.splitlines() if ln.strip()]\n"
+         "if lines != [\"alpha\", \"beta\"]:\n"
+         "    print(\"bad resolution:\", lines)\n"
+         "    sys.exit(1)\n"
+         "for m in (\"<<<<<<<\", \">>>>>>>\", \"=======\"):\n"
+         "    if m in text:\n"
+         "        print(\"conflict marker left:\", m)\n"
+         "        sys.exit(1)\n"
+         "r = subprocess.run([\"git\", \"rev-parse\", \"-q\", \"--verify\", \"MERGE_HEAD\"],\n"
+         "                   capture_output=True)\n"
+         "if r.returncode == 0:\n"
+         "    print(\"merge not completed\")\n"
+         "    sys.exit(1)\n"
+         "r = subprocess.run([\"git\", \"status\", \"--porcelain\"], capture_output=True,\n"
+         "                   text=True, encoding=\"utf-8\", errors=\"replace\")\n"
+         "dirty = [l for l in r.stdout.splitlines()\n"
+         "         if l.strip() and not l.endswith(\"check.py\")]\n"
+         "if dirty:\n"
+         "    print(\"dirty worktree:\", dirty)\n"
+         "    sys.exit(1)\n"
+         "sys.exit(0)\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "from pathlib import Path\n"
+         "g(\"init\", \"-b\", \"main\")\n"
+         "Path(\"conflict.txt\").write_text(\"base\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"base\")\n"
+         "g(\"checkout\", \"-b\", \"feature-a\")\n"
+         "Path(\"conflict.txt\").write_text(\"alpha\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"alpha line\")\n"
+         "g(\"checkout\", \"main\")\n"
+         "g(\"checkout\", \"-b\", \"feature-b\")\n"
+         "Path(\"conflict.txt\").write_text(\"beta\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"beta line\")\n"
+         "g(\"checkout\", \"main\")\n"
+         "g(\"merge\", \"feature-a\", \"-m\", \"merge feature-a\")\n"
+         "g(\"merge\", \"feature-b\", ok=(1,))\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "from pathlib import Path\n"
+         "Path(\"conflict.txt\").write_text(\"alpha\\nbeta\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \"conflict.txt\")\n"
+         "g(\"commit\", \"-m\", \"resolve merge conflict\")\n"),
+        ("eb_gt_003",
+         "The last commit left calc.c uncompilable. Undo that commit with git so "
+         "HEAD contains the working version again.",
+         {".gitkeep": ""},
+         {".gitkeep": ""},
+         "#!/usr/bin/env python3\n"
+         "import subprocess, sys\n"
+         "from pathlib import Path\n"
+         f"good = \"\\n\".join({good_c_lines}) + \"\\n\"\n"
+         "r = subprocess.run([\"git\", \"show\", \"HEAD:calc.c\"], capture_output=True,\n"
+         "                   text=True, encoding=\"utf-8\", errors=\"replace\")\n"
+         "if r.returncode != 0 or r.stdout != good:\n"
+         "    print(\"HEAD:calc.c is not the working version\")\n"
+         "    sys.exit(1)\n"
+         "r = subprocess.run(\n"
+         "    [\"gcc\", \"-std=c11\", \"-Werror=implicit-function-declaration\",\n"
+         "     \"-o\", \"eb_bin\", \"calc.c\"], capture_output=True, text=True)\n"
+         "if r.returncode != 0:\n"
+         "    sys.stderr.write(r.stderr)\n"
+         "    sys.exit(1)\n"
+         "bin_path = Path(\"eb_bin.exe\") if Path(\"eb_bin.exe\").is_file() else Path(\"eb_bin\")\n"
+         "r = subprocess.run([str(bin_path.resolve())], capture_output=True, text=True)\n"
+         "sys.exit(0 if r.returncode == 0 else 1)\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "from pathlib import Path\n"
+         "g(\"init\", \"-b\", \"main\")\n"
+         f"Path(\"calc.c\").write_text(\"\\n\".join({good_c_lines}) + \"\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"working calc\")\n"
+         f"Path(\"calc.c\").write_text(\"\\n\".join({broken_c_lines}) + \"\\n\", encoding=\"utf-8\")\n"
+         "g(\"add\", \".\")\n"
+         "g(\"commit\", \"-m\", \"wip uncompilable calc\")\n",
+         "#!/usr/bin/env python3\n" + gt_g +
+         "g(\"reset\", \"--hard\", \"HEAD~1\")\n"),
+    ]
+    for tid, prompt, b, a, c, s, gold in gt:
+        write_task(tid, "git", prompt, b, a, c, setup=s, golden=gold)
+        tasks.append((tid, "git"))
+
     # index.tsv
     lines = ["id\tcategory\tpath"]
     for tid, cat in tasks:
@@ -1087,10 +1245,12 @@ sys.exit(r.returncode)
     man.write_text(
         "# Engineering task bank\n\n"
         f"- Tasks: {len(tasks)}\n"
-        "- Categories: compiler_repair, refactor, test_authoring, build_ci, docs, shell, multi_file, debug\n"
+        "- Categories: compiler_repair, refactor, test_authoring, build_ci, docs, shell, multi_file, debug, git\n"
         "- Contract: see COORDINATION.md\n"
         "- Self-test: `python scripts/test_engineering_bank.py`\n"
-        "- `after/` is golden end-state for self-test only; never show it to the agent under test.\n",
+        "- `after/` is golden end-state for self-test only; never show it to the agent under test.\n"
+        "- `setup.py` builds state a file tree cannot hold (git history); `golden.py`\n"
+        "  is the self-test golden operation for those tasks (run after setup).\n",
         encoding="utf-8")
 
     print(f"generated {len(tasks)} tasks under {BANK}")

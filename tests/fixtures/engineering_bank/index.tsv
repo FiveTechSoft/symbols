@@ -55,3 +55,6 @@ eb_dbg_004	debug	debug/eb_dbg_004
 eb_dbg_005	debug	debug/eb_dbg_005
 eb_dbg_006	debug	debug/eb_dbg_006
 eb_dbg_007	debug	debug/eb_dbg_007
+eb_gt_001	git	git/eb_gt_001
+eb_gt_002	git	git/eb_gt_002
+eb_gt_003	git	git/eb_gt_003
