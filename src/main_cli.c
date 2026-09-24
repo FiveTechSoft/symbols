@@ -106,13 +106,23 @@ int main(void)
     GraphSetEmbeddingTable(graph, embeds);
     GraphSetNumericTable(graph, nums);
 
-    /* Auto-load default model if it exists */
+    /* Auto-load default model if it exists (data/ first, then legacy root) */
     {
-        FILE *ftest = fopen("wiki_model.bin", "rb");
-        if (ftest != NULL)
+        static const char *const model_cands[] = {"data/wiki_model.bin", "wiki_model.bin"};
+        const char *model_path = NULL;
+        for (size_t i = 0; i < sizeof(model_cands) / sizeof(model_cands[0]); i++)
         {
-            fclose(ftest);
-            MODEL *loaded = ModelLoad("wiki_model.bin");
+            FILE *ftest = fopen(model_cands[i], "rb");
+            if (ftest != NULL)
+            {
+                fclose(ftest);
+                model_path = model_cands[i];
+                break;
+            }
+        }
+        if (model_path != NULL)
+        {
+            MODEL *loaded = ModelLoad(model_path);
             if (loaded != NULL)
             {
                 GraphDestroy(graph);
@@ -124,7 +134,7 @@ int main(void)
                 GraphSetEmbeddingTable(graph, embeds);
                 GraphSetNumericTable(graph, nums);
                 ContextReset(ctx);
-                printf("AI > Model loaded from 'wiki_model.bin'.\n\n");
+                printf("AI > Model loaded from '%s'.\n\n", model_path);
             }
         }
     }
@@ -178,10 +188,10 @@ int main(void)
             temp.embeddings = embeds;
             temp.numerics = nums;
             temp.config = LearningConfigDefault();
-            if (ModelSave(&temp, "wiki_model.bin"))
+            if (ModelSave(&temp, "data/wiki_model.bin"))
                 printf("\nAI > Goodbye! All learned knowledge is saved.\n");
             else
-                printf("\nAI > Goodbye! (Warning: could not save wiki_model.bin).\n");
+                printf("\nAI > Goodbye! (Warning: could not save data/wiki_model.bin).\n");
             break;
         }
 

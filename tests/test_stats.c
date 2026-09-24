@@ -4,7 +4,7 @@
 
 int main(int argc, char **argv)
 {
-    const char *path = (argc > 1) ? argv[1] : "wiki_model.bin";
+    const char *path = (argc > 1) ? argv[1] : "data/wiki_model.bin";
 
     printf("Loading model from %s...\n", path);
     MODEL *model = ModelLoad(path);

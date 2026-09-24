@@ -3383,6 +3383,7 @@ int main(int argc, char **argv)
             "data/texts/c_corpus.txt",
             "data/texts/corpus.txt",
             "data/corpus.txt",
+            "data/wiki_model.bin",
             "wiki_model.bin",
             "data/texts/bible.txt",
             "data/texts/jung.txt",
@@ -3438,7 +3439,7 @@ int main(int argc, char **argv)
             else
             {
                 fprintf(stderr,
-                        "corpus not found (tried wiki_model.bin, data/texts/*.txt and "
+                        "corpus not found (tried data/wiki_model.bin, data/texts/*.txt and "
                         "data/corpus.*); refusing to serve an empty "
                         "model\n");
                 return 1;

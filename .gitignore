@@ -6,9 +6,10 @@
 *.lib
 *.dll
 
-# Generated model binaries (wiki_model.bin is tracked: see negation below)
+# Generated model binaries (wiki golden is tracked under data/)
 *.bin
 !wiki_model.bin
+!data/wiki_model.bin
 
 # In-source CMake/Ninja leftovers
 CMakeCache.txt

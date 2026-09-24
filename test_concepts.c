@@ -8,7 +8,7 @@
 
 int main(void)
 {
-    MODEL *m = ModelLoad("wiki_model.bin");
+    MODEL *m = ModelLoad("data/wiki_model.bin");
     if (!m || !m->graph)
     {
         printf("Notice: wiki_model.bin not found, creating synthetic model for concepts test...\n");

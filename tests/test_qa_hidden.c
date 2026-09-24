@@ -64,7 +64,7 @@ static void FoldAccents(const char *src, char *dst, size_t dst_size)
 int main(int argc, char **argv)
 {
     const char *tsv_path = (argc > 1) ? argv[1] : "tests/qa_hidden.tsv";
-    const char *model_path = (argc > 2) ? argv[2] : "wiki_model.bin";
+    const char *model_path = (argc > 2) ? argv[2] : "data/wiki_model.bin";
 
     FILE *f = fopen(tsv_path, "r");
     if (!f)

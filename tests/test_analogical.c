@@ -20,7 +20,7 @@ void query_subject(GRAPH *g, const char *name)
 
 int main(void)
 {
-    MODEL *model = ModelLoad("wiki_model.bin");
+    MODEL *model = ModelLoad("data/wiki_model.bin");
     if (!model || !model->graph)
     {
         printf("Notice: wiki_model.bin not found, creating synthetic model for analogy test...\n");

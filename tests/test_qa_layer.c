@@ -200,7 +200,7 @@ int main(int argc, char **argv)
     test_parse_empty();
 
     /* Parts 2-4 need a CHAT — use wiki_model.bin if available */
-    const char *model_path = (argc > 1) ? argv[1] : "wiki_model.bin";
+    const char *model_path = (argc > 1) ? argv[1] : "data/wiki_model.bin";
     CHAT ch;
     memset(&ch, 0, sizeof(ch));
     int has_chat = 0;

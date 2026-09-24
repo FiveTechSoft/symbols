@@ -277,28 +277,27 @@ target_link_libraries(relprobe symbolic)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)
 target_link_libraries(symbolic-learn symbolic)
 
-# Wikidata QA tests (parked, see COORDINATION.md Ask 5). wiki_model.bin is no
-# longer tracked (removed in f4579eb), so these ten tests exit 77 and ctest
-# reports them as Skipped. They carry the ctest label qa_model; exclude them
-# with `ctest -LE qa_model`. Drop a local wiki_model.bin in the source root to
-# run them (read-only queries; tests never write it).
+# Wikidata QA tests (parked, see COORDINATION.md Ask 5). Golden model lives at
+# data/wiki_model.bin (recovered from f4579eb^, Antonio 2026-09-24). Without it
+# these ten tests exit 77 (Skipped). They carry the ctest label qa_model; exclude
+# them with `ctest -LE qa_model`. Tests are read-only and never write the model.
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
-add_test(NAME test_wiki_inference COMMAND test_wiki_inference wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_wiki_inference COMMAND test_wiki_inference data/wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_eval_qa tests/test_eval_qa.c)
 target_link_libraries(test_eval_qa symbolic)
-add_test(NAME test_eval_qa COMMAND test_eval_qa tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_count COMMAND test_eval_qa tests/qa_eval_count.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_negation COMMAND test_eval_qa tests/qa_eval_negation.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_default COMMAND test_eval_qa tests/qa_eval_default.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_reverse COMMAND test_eval_qa tests/qa_eval_reverse.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_conjunctive COMMAND test_eval_qa tests/qa_eval_conjunctive.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-add_test(NAME test_eval_multihop COMMAND test_eval_qa tests/qa_eval_multihop.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_qa COMMAND test_eval_qa tests/qa_eval.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_count COMMAND test_eval_qa tests/qa_eval_count.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_negation COMMAND test_eval_qa tests/qa_eval_negation.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_default COMMAND test_eval_qa tests/qa_eval_default.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_reverse COMMAND test_eval_qa tests/qa_eval_reverse.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_conjunctive COMMAND test_eval_qa tests/qa_eval_conjunctive.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_eval_multihop COMMAND test_eval_qa tests/qa_eval_multihop.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_qa_hygiene tests/test_qa_hygiene.c)
 target_link_libraries(test_qa_hygiene symbolic)
-add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_qa_hygiene COMMAND test_qa_hygiene tests/qa_eval.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 # Hidden QA split: measure-only runner (never a development threshold).
 # Prints HIDDEN_QA pass= total= rate=; exit 0 on well-formed set, 77 if model missing.
@@ -308,12 +307,12 @@ add_test(NAME test_output_contract COMMAND test_output_contract)
 
 add_executable(test_qa_hidden tests/test_qa_hidden.c)
 target_link_libraries(test_qa_hidden symbolic)
-add_test(NAME test_qa_hidden COMMAND test_qa_hidden tests/qa_hidden.tsv wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_qa_hidden COMMAND test_qa_hidden tests/qa_hidden.tsv data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_qa_hidden PROPERTIES SKIP_RETURN_CODE 77)
 
 add_executable(test_qa_layer tests/test_qa_layer.c)
 target_link_libraries(test_qa_layer symbolic)
-add_test(NAME test_qa_layer COMMAND test_qa_layer wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME test_qa_layer COMMAND test_qa_layer data/wiki_model.bin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 set_tests_properties(
     test_wiki_inference
@@ -335,8 +334,8 @@ set_tests_properties(
 )
 
 # test_wiki_ingest / test_wikidata_ingest write to their own scratch files
-# (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the tracked
-# wiki_model.bin, so a local model is never clobbered by a test.
+# (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the golden
+# data/wiki_model.bin, so the model is never clobbered by a test.
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
 
