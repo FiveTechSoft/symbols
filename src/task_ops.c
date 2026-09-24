@@ -2903,25 +2903,6 @@ static void warn_text(const TASK_OPS_WORKSPACE *ws, const char *flags, char *buf
     remove(bin);
 }
 
-/* does the warning text hold a diagnostic of this kind at rel:line? */
-static int warn_at(const char *w, const char *rel, int line, const char *rule)
-{
-    const char *kw = !strcmp(rule, "array_fit") ? "too long" : !strcmp(rule, "init_local") ? "uninitialized" : NULL;
-    if (!kw)
-        return 0;
-    char at[TASK_OPS_MAX_PATH + 16];
-    snprintf(at, sizeof(at), "%s:%d:", rel, line);
-    for (const char *p = strstr(w, at); p; p = strstr(p + 1, at)) {
-        const char *e = strchr(p, '\n');
-        size_t l = e ? (size_t)(e - p) : strlen(p);
-        char row[512];
-        snprintf(row, sizeof(row), "%.*s", (int)(l < 511 ? l : 511), p);
-        if (strstr(row, kw))
-            return 1;
-    }
-    return 0;
-}
-
 /* compiler evidence: exactly one identifier gcc calls undeclared, with no
    "did you mean" hint anywhere, in exactly one file; that file gets the
    declare_local edit for it. Returns the file index or -1. */
@@ -2995,7 +2976,8 @@ static void main_body_lines(const char *src, int *lo, int *hi)
     for (const char *line = src; line && *line; ln++) {
         const char *nl = strchr(line, '\n');
         size_t ll = nl ? (size_t)(nl - line) : strlen(line);
-        if (depth == 0 && !head && !open && line_defines_main(line, ll) && !memchr(line, ';', ll)) {
+        const char *semi = memchr(line, ';', ll), *brace = memchr(line, '{', ll);
+        if (depth == 0 && !head && !open && line_defines_main(line, ll) && (!semi || (brace && brace < semi))) {
             head = 1;
             *lo = ln;
         }
@@ -3059,77 +3041,108 @@ static int defines_other_fn(const char *src)
     return 0;
 }
 
+/* does the program take input the probe run cannot supply (argv use,
+   stdin reads)? Then exit 0 on the bare run is not the task's criterion. */
+static int reads_input(const TASK_OPS_WORKSPACE *ws)
+{
+    static const char *const pats[] = {"argv[", "argc", "scanf(", "getchar(", "stdin", "getline(", "read(0", "getenv(", NULL};
+    for (int i = 0; i < ws->count; i++) {
+        if (!is_c_source(ws->files[i].rel))
+            continue;
+        for (int k = 0; pats[k]; k++)
+            if (strstr(ws->files[i].data, pats[k]))
+                return 1;
+    }
+    return 0;
+}
+
+/* other evidence the bare run does not cover: test sources, build or test
+   scripts, or more than one main (several programs) */
+static int other_criteria(const TASK_OPS_WORKSPACE *ws)
+{
+    int mains = 0;
+    for (int i = 0; i < ws->count; i++) {
+        const char *rel = ws->files[i].rel, *base = strrchr(rel, '/');
+        base = base ? base + 1 : rel;
+        if (!strncmp(base, "test", 4) || strstr(rel, "tests/") || !strcmp(base, "Makefile") || !strcmp(base, "CMakeLists.txt") ||
+            ShellOpsIsScript(rel, ws->files[i].data) || (strlen(base) > 3 && !strcmp(base + strlen(base) - 3, ".py")))
+            return 1;
+        if (is_c_source(rel)) {
+            const char *d = ws->files[i].data;
+            for (const char *line = d; line && *line;) {
+                const char *nl = strchr(line, '\n');
+                size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+                const char *semi = memchr(line, ';', ll), *brace = memchr(line, '{', ll);
+                if (line_defines_main(line, ll) && (!semi || (brace && brace < semi)))
+                    mains++;   /* a definition, not a prototype */
+                line = nl ? nl + 1 : NULL;
+            }
+        }
+    }
+    return mains != 1;
+}
+
 static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int run_before, int *file, char **out,
                            char *rule, size_t rsz, char *detail, size_t dsz, int *tried)
 {
-    /* run fails: any candidate that makes it exit 0. Run passes: only a
-       tier-2 candidate on a line gcc warns about (array too long, variable
-       uninitialized) that removes that warning and keeps exit 0. */
-    static char w0[16384], w1[16384];
-    int by_warning = run_before == 0;
-    if (by_warning) {
-        warn_text(ws, flags, w0, sizeof(w0));
-        if (!w0[0])
-            return 0;
-    }
+    /* The bare run fails (non-zero exit) and that run is the only criterion
+       in sight: no input it cannot supply, no tests, scripts or second
+       program. Every candidate single edit is built and run; the edit is
+       kept only when it is the one candidate in ANY tier that makes the
+       program exit 0, and the program's stdout is unchanged (a changed
+       output is behavior this run cannot judge). A passing run is never
+       edited (a warning alone is not evidence of the task). */
     *file = -1;
     *out = NULL;
     *tried = 0;
-    int win_tier = 99, wins = 0, others = 0;
+    if (run_before == 0 || reads_input(ws) || other_criteria(ws))
+        return 0;
+    static char out0[1024], out1[1024];
+    snprintf(out0, sizeof(out0), "%s", probe_stdout[0]);
+    int wins = 0, others = 0;
     for (int f = 0; f < ws->count; f++)
         if (is_c_source(ws->files[f].rel) && !strncmp(ws->files[f].rel + strlen(ws->files[f].rel) - 2, ".c", 2))
             others |= defines_other_fn(ws->files[f].data);
-    for (int tier = 1; tier <= 3 && wins == 0; tier++) {
-        for (int f = 0; f < ws->count; f++) {
-            const TASK_OPS_FILE *F = &ws->files[f];
-            if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test") || F->len > 65536)
+    for (int f = 0; f < ws->count; f++) {
+        const TASK_OPS_FILE *F = &ws->files[f];
+        if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test") || F->len > 65536)
+            continue;
+        int main_lo = 0, main_hi = -1;
+        main_body_lines(F->data, &main_lo, &main_hi);
+        static CFIX_CAND c[EV_MAX_CANDS];
+        int n = CFixCandidates(F->data, c, EV_MAX_CANDS);
+        for (int k = 0; k < n; k++) {
+            int line = atoi(c[k].detail + 5);   /* "line N: ..." */
+            if (line >= main_lo && line <= main_hi && (others || line_has_return(F->data, line)))
+                continue;   /* main is the oracle: never edited when other functions exist, and its return never */
+            if (!write_file(ws->root, F->rel, c[k].text))
                 continue;
-            int main_lo = 0, main_hi = -1;
-            main_body_lines(F->data, &main_lo, &main_hi);
-            static CFIX_CAND c[EV_MAX_CANDS];
-            int n = CFixCandidates(F->data, c, EV_MAX_CANDS);
-            for (int k = 0; k < n; k++) {
-                if (c[k].tier != tier)
-                    continue;
-                int line = atoi(c[k].detail + 5);   /* "line N: ..." */
-                if (line >= main_lo && line <= main_hi && (others || line_has_return(F->data, line)))
-                    continue;   /* main is the oracle: never edited when other functions exist, and its return never */
-                if (by_warning && !warn_at(w0, F->rel, line, c[k].rule))
-                    continue;
-                if (!write_file(ws->root, F->rel, c[k].text))
-                    continue;
-                int cc = -1, rr = -1;
-                probe_out(ws, flags, &cc, &rr, NULL);
-                (*tried)++;
-                int ok = cc == 1 && rr == 0;
-                if (ok && by_warning) {
-                    warn_text(ws, flags, w1, sizeof(w1));
-                    ok = !warn_at(w1, F->rel, line, c[k].rule);
-                }
-                if (ok) {
-                    wins++;
-                    if (wins == 1) {
-                        *file = f;
-                        *out = c[k].text;
-                        c[k].text = NULL;
-                        win_tier = tier;
-                        snprintf(rule, rsz, "%s", c[k].rule);
-                        snprintf(detail, dsz, "%s", c[k].detail);
-                    }
-                }
+            int cc = -1, rr = -1;
+            out1[0] = '\0';
+            probe_out(ws, flags, &cc, &rr, out1);
+            (*tried)++;
+            if (cc == 1 && rr == 0) {
+                wins++;
+                if (wins == 1 && !strcmp(out0, out1)) {
+                    *file = f;
+                    *out = c[k].text;
+                    c[k].text = NULL;
+                    snprintf(rule, rsz, "%s", c[k].rule);
+                    snprintf(detail, dsz, "%s", c[k].detail);
+                } else if (wins == 1)
+                    wins = 99;   /* output changed: unjudgeable, abstain */
             }
-            CFixCandidatesFree(c, n);
-            write_file(ws->root, F->rel, F->data);   /* always restore */
         }
-        if (wins > 1) {
-            free(*out);
-            *out = NULL;
-            *file = -1;
-            return wins;
-        }
+        CFixCandidatesFree(c, n);
+        write_file(ws->root, F->rel, F->data);   /* always restore */
     }
-    (void)win_tier;
-    return wins;
+    if (wins != 1) {
+        free(*out);
+        *out = NULL;
+        *file = -1;
+        return wins > 1 ? wins : 0;
+    }
+    return 1;
 }
 
 enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_EVIDENCE, OP_COUNT };

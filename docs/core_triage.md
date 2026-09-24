@@ -112,3 +112,14 @@ Measurement: public bank still 44/56, 0 wrong edits. Neutral-wording probe 16/56
 The neutral-wording probe had one wrong edit, eb_mf_003: `add()` is defined in util.c, main.c has no include, and `declare_implicit` put a local prototype in main.c. It compiled, but the declaration belongs in a header. Now, when the definition lives in another source file and no header can take the prototype (none included, several candidates, or not editable), `declare_implicit` abstains instead of writing a local prototype. A function defined later in the same file still gets a local prototype, and the header paths (the one header the caller includes, the one the defining file includes, or a header the task names) are unchanged.
 
 Measurement: public bank 44/56, 0 wrong edits (unchanged). Neutral-wording probe 17/56 with wrong edits 1 -> 0.
+
+## Safety: evidence_fix only when the bare run is the whole criterion
+
+Mimo's counts-only blind re-runs showed evidence_fix adding a debug wrong edit (754e071: wrong_edits 1 -> 2; b29e959: 1, debug). Without looking at the blind task, the operator was made conservative in general:
+
+- Bug found: main() protection missed one-line mains (`int main(void) { return f(3) == 6 ? 0 : 1; }`). The head test rejected any line holding `;`, so the check in such a main could be flipped to make the program exit 0. A definition is now recognized when its `{` comes before the first `;` (same fix in the one-main count).
+- The bare run must be the only criterion in sight, otherwise abstain: no argv/argc, stdin reads (scanf, getchar, stdin, getline, read(0)) or getenv; no test sources, tests/ dir, Makefile, CMakeLists.txt, shell or Python scripts; exactly one main.
+- The kept edit must be the only candidate in any tier that makes the program exit 0 (no longer the lowest tier with one winner), and the program's stdout must be unchanged by it.
+- A passing run is never edited: the gcc-warning path is removed (a warning alone is not evidence of the task).
+
+Measurement: public bank 44/59 (the same 44; the 3 new git tasks are untouched), 0 wrong edits. Neutral-wording probe 17/56 -> 16/56, 0 wrong edits (dbg_007 needed the removed warning path). New tests in test_task_ops: one-line main never edited, argv program abstains, passing program with only a warning untouched.

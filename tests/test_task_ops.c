@@ -703,6 +703,27 @@ int main(void)
                    "declare_implicit: the prototype goes into the header main.c already includes");
     }
 
+    /* evidence_fix safety: a one-line main is still the oracle; input the
+       bare run cannot supply, or a passing run with only a warning, abstain */
+    {
+        char d[512]; make_dir(d, sizeof(d), "evsafe1");
+        const char *t = "static int twice(int x) { return x + x + 1; }\nint main(void) { return twice(2) == 4 ? 0 : 1; }\n";
+        put(d, "main.c", t);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(strstr(get(d, "main.c"), "twice(2) == 4 ? 0 : 1") != NULL, "evidence_fix: one-line main's check never edited");
+        char d2[512]; make_dir(d2, sizeof(d2), "evsafe2");
+        const char *t2 = "static int lim(int v) { return v < 3; }\nint main(int argc, char **argv) { (void)argv; return lim(argc + 2) ? 0 : 1; }\n";
+        put(d2, "main.c", t2);
+        TaskOpsSolve(d2, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(!strcmp(get(d2, "main.c"), t2), "evidence_fix: program reads argv -> abstain");
+        char d3[512]; make_dir(d3, sizeof(d3), "evsafe3");
+        const char *t3 = "int main(void) {\n    char buf[4] = \"abcdef\";\n    return buf[0] == 'a' ? 0 : 1;\n}\n";
+        put(d3, "main.c", t3);
+        TaskOpsSolve(d3, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(!strcmp(get(d3, "main.c"), t3), "evidence_fix: passing run with only a warning -> untouched");
+    }
+
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the
        lines that name it. */
