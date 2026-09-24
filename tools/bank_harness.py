@@ -177,6 +177,11 @@ REASON_CLASSES = [
     ("write failed", r"write failed"),
 ]
 
+# Closed vocabulary of the first compiler error class (task_ops diag_shape).
+DIAG_CLASSES = ["none", "link", "missing_header", "implicit", "undeclared", "unknown_type",
+                "conflicting_types", "arity", "no_member", "redefinition", "incompatible",
+                "invalid_operands", "lvalue", "incomplete_type", "expected", "return", "other"]
+
 
 def reason_class(log: str, agent_rc: int) -> str:
     if agent_rc in (124, 127):
@@ -187,7 +192,9 @@ def reason_class(log: str, agent_rc: int) -> str:
         m = re.search(r"no operator preconditions hold \[(c=(?:-1|0|1) run=(?:-1|0|1) sh=[01] mk=[01] "
                       r"doc=[01] test=[01] git=[01])\]", kept[-1])
         if m:
-            return "no operator preconditions hold [" + m.group(1) + "]"
+            d = re.search(r"git=[01]\] \[diag=(" + "|".join(DIAG_CLASSES) + r") nerr=([124]) nc=([12])\]", kept[-1])
+            tail = " [diag=%s nerr=%s nc=%s]" % d.groups() if d else ""
+            return "no operator preconditions hold [" + m.group(1) + "]" + tail
         for name, rx in REASON_CLASSES:
             if re.search(rx, kept[-1]):
                 return name
@@ -321,7 +328,7 @@ def main() -> int:
         res["reasons_total"] = dict(sorted(tot.items(), key=lambda kv: -kv[1]))
         flags: dict[str, dict[str, int]] = {}
         for t in tasks:
-            for kv in re.findall(r"(\w+)=(-?\d)", t["reason"]):
+            for kv in re.findall(r"(\w+)=(-?\d|" + "|".join(DIAG_CLASSES) + r")\b", t["reason"]):
                 d = flags.setdefault(kv[0], {})
                 d[kv[1]] = d.get(kv[1], 0) + 1
         res["abstain_shape_flags"] = flags

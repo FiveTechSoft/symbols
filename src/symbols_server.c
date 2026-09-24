@@ -1596,7 +1596,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (tool_resp.is_error)
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
-            snprintf(content, sizeof(content), "Una edición verificada falló al aplicarse (%.300s). Revisa `git diff`: pueden quedar cambios parciales.", tool_resp.content);
+            snprintf(content, sizeof(content), "A verified edit failed to apply (%.300s). Check `git diff`: partial changes may remain.", tool_resp.content);
             StoPlanFree(&sess->sto);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
@@ -1610,7 +1610,7 @@ static void HandleCompletions(socket_t s, const char *body,
             {
                 sess->agent_active = 0; sess->workspace_phase = 0;
                 StoPlanFree(&sess->sto);
-                SendContentForRequest(s, body, ++g_seq, "Una edición excede el tamaño de llamada permitido; me detengo. Revisa `git diff`: pueden quedar cambios parciales.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+                SendContentForRequest(s, body, ++g_seq, "An edit exceeds the allowed call size; stopping. Check `git diff`: partial changes may remain.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
                 return;
             }
             SendToolCallsForRequest(s, body, g_seq, &tc, "Applying an operator edit verified on a scratch copy of the workspace.", resp, sizeof(resp), sse, sizeof(sse));
@@ -1645,7 +1645,7 @@ static void HandleCompletions(socket_t s, const char *body,
             }
         }
         sess->agent_active = 0; sess->workspace_phase = 0;
-        snprintf(content, sizeof(content), "Operador %s: %s. Verificado en una copia temporal del workspace; %d edición(es) aplicadas. No había un comando de verificación observable para repetirlo aquí.",
+        snprintf(content, sizeof(content), "Operator %s: %s. Verified on a scratch copy of the workspace; %d edit(s) applied. No observable verification command to repeat here.",
                  sess->sto.op, sess->sto.detail, sess->sto.nhunks);
         StoPlanFree(&sess->sto);
         SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
@@ -1656,10 +1656,10 @@ static void HandleCompletions(socket_t s, const char *body,
         int ok = !tool_resp.is_error && !(tool_resp.has_exit_code && tool_resp.exit_code != 0);
         sess->agent_active = 0; sess->workspace_phase = 0;
         if (ok)
-            snprintf(content, sizeof(content), "Operador %s: %s. Verificado en una copia temporal del workspace y de nuevo aquí con `%s`.",
+            snprintf(content, sizeof(content), "Operator %s: %s. Verified on a scratch copy of the workspace and again here with `%s`.",
                      sess->sto.op, sess->sto.detail, sess->workspace_command);
         else
-            snprintf(content, sizeof(content), "Operador %s: %s. Se verificó en una copia temporal, pero `%s` falla en el workspace real. Salida:\n%.1500s\nRevisa `git diff`.",
+            snprintf(content, sizeof(content), "Operator %s: %s. Verified on a scratch copy, but `%s` fails in the real workspace. Output:\n%.1500s\nCheck `git diff`.",
                      sess->sto.op, sess->sto.detail, sess->workspace_command, tool_resp.content);
         StoPlanFree(&sess->sto);
         SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));

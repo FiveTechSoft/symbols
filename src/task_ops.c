@@ -3403,6 +3403,69 @@ static int write_file(const char *root, const char *rel, const char *data)
    blind bank. c = compile probe (-1 none, 0 fail, 1 ok), run = probe exit
    (-1 not run, 0 ok, 1 nonzero), then presence of shell scripts, build
    files, docs, tests and a git repository. */
+
+/* Fixed-vocabulary class of the first compiler error when the workspace
+   does not compile (name-free, safe to count on a blind bank): the first
+   "error:" line of gcc -fsyntax-only, or "link" when syntax passes. nerr is
+   bucketed 1 / 2 (2-3) / 4 (4+); nc is 1 or 2 (several .c files). */
+static const char *diag_class_of(const char *line)
+{
+    static const struct { const char *needle, *cls; } map[] = {
+        {"No such file", "missing_header"}, {"implicit declaration", "implicit"},
+        {"undeclared", "undeclared"}, {"unknown type name", "unknown_type"},
+        {"conflicting types", "conflicting_types"}, {"too few arguments", "arity"},
+        {"too many arguments", "arity"}, {"has no member", "no_member"},
+        {"redefinition", "redefinition"}, {"incompatible", "incompatible"},
+        {"invalid operands", "invalid_operands"}, {"lvalue", "lvalue"},
+        {"storage size", "incomplete_type"}, {"incomplete type", "incomplete_type"},
+        {"expected", "expected"}, {"return", "return"},
+    };
+    for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++)
+        if (strstr(line, map[i].needle))
+            return map[i].cls;
+    return "other";
+}
+
+static void diag_shape(const TASK_OPS_WORKSPACE *ws, char *out, size_t size)
+{
+    char srcs[3072], cmd[3200];
+    int nc = 0, nerr = 0;
+    const char *cls = "none";
+    out[0] = '\0';
+    for (int i = 0; i < ws->count; i++) {
+        size_t n = strlen(ws->files[i].rel);
+        nc += n > 2 && !strcmp(ws->files[i].rel + n - 2, ".c");
+    }
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return;
+    snprintf(cmd, sizeof(cmd), "gcc -fsyntax-only %s", srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    if (!r->execution_failed && !r->timed_out) {
+        if (r->exit_code == 0)
+            cls = "link";
+        else {
+            const char *b = r->stderr_buf;
+            for (const char *p = b; p && *p; ) {
+                const char *e = strchr(p, '\n');
+                size_t len = e ? (size_t)(e - p) : strlen(p);
+                char line[512];
+                snprintf(line, sizeof(line), "%.*s", (int)(len < 511 ? len : 511), p);
+                if (strstr(line, "error:") || strstr(line, "fatal error:")) {
+                    if (nerr++ == 0)
+                        cls = diag_class_of(strstr(line, "error:"));
+                }
+                p = e ? e + 1 : NULL;
+            }
+        }
+    }
+    free(r);
+    snprintf(out, size, " [diag=%s nerr=%d nc=%d]", cls, cls[0] == 'l' || nerr < 2 ? 1 : nerr < 4 ? 2 : 4, nc > 1 ? 2 : 1);
+}
+
 static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
 {
     int sh = 0, mk = 0, doc = 0, test = 0, git = 0, i;
@@ -3428,10 +3491,13 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
         git = 1;
         fclose(f);
     }
+    char diag[64] = "";
+    if (rep->compile_before == 0)
+        diag_shape(ws, diag, sizeof(diag));
     snprintf(rep->reason, sizeof(rep->reason),
-             "no operator preconditions hold [c=%d run=%d sh=%d mk=%d doc=%d test=%d git=%d]",
+             "no operator preconditions hold [c=%d run=%d sh=%d mk=%d doc=%d test=%d git=%d]%s",
              rep->compile_before < 0 ? -1 : rep->compile_before > 0,
-             rep->run_before < 0 ? -1 : rep->run_before != 0, sh, mk, doc, test, git);
+             rep->run_before < 0 ? -1 : rep->run_before != 0, sh, mk, doc, test, git, diag);
 }
 
 int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
