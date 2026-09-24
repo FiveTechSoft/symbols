@@ -2917,6 +2917,69 @@ static int warn_at(const char *w, const char *rel, int line, const char *rule)
     return 0;
 }
 
+/* compiler evidence: exactly one identifier gcc calls undeclared, with no
+   "did you mean" hint anywhere, in exactly one file; that file gets the
+   declare_local edit for it. Returns the file index or -1. */
+static int undeclared_target(const TASK_OPS_WORKSPACE *ws, const char *flags, char **out, char *detail, size_t dsz)
+{
+    static char w[16384];
+    *out = NULL;
+    warn_text(ws, flags, w, sizeof(w));
+    {   /* UTF-8 locales quote with U+2018/U+2019: fold them to ' */
+        char *o = w;
+        for (const char *p = w; *p;) {
+            if ((unsigned char)p[0] == 0xE2 && (unsigned char)p[1] == 0x80 && ((unsigned char)p[2] == 0x98 || (unsigned char)p[2] == 0x99)) {
+                *o++ = '\'';
+                p += 3;
+            } else
+                *o++ = *p++;
+        }
+        *o = '\0';
+    }
+    if (!w[0] || strstr(w, "did you mean"))
+        return -1;
+    char name[64] = "", file[TASK_OPS_MAX_PATH] = "";
+    int names = 0;
+    for (const char *p = strstr(w, "' undeclared (first use in this function)"); p; p = strstr(p + 1, "' undeclared (first use in this function)")) {
+        const char *q = p;
+        while (q > w && q[-1] != '\'' && q[-1] != '\n') q--;
+        if (q == w || q[-1] != '\'' || p - q <= 0 || p - q >= 63)
+            return -1;
+        char nm[64];
+        memcpy(nm, q, (size_t)(p - q));
+        nm[p - q] = '\0';
+        const char *ls = q;   /* file of this diagnostic: start of line up to ':' */
+        while (ls > w && ls[-1] != '\n') ls--;
+        const char *colon = strchr(ls, ':');
+        if (!colon || colon > q || (size_t)(colon - ls) >= sizeof(file))
+            return -1;
+        char f[TASK_OPS_MAX_PATH];
+        memcpy(f, ls, (size_t)(colon - ls));
+        f[colon - ls] = '\0';
+        if (!names) {
+            snprintf(name, sizeof(name), "%s", nm);
+            snprintf(file, sizeof(file), "%s", f);
+            names = 1;
+        } else if (strcmp(name, nm) || strcmp(file, f))
+            return -1;   /* several names or files: abstain */
+    }
+    if (!names)
+        return -1;
+    for (int i = 0; i < ws->count; i++) {
+        const char *rel = ws->files[i].rel;
+        size_t rl = strlen(rel), fl = strlen(file);
+        if (!is_c_source(rel) || !strncmp(rel, "test", 4) || strstr(rel, "/test") || fl < rl || strcmp(file + fl - rl, rel) ||
+            (fl > rl && file[fl - rl - 1] != '/' && file[fl - rl - 1] != '\\'))
+            continue;
+        char *o = CFixDeclareUndeclared(ws->files[i].data, name, detail, dsz);
+        if (!o)
+            return -1;
+        *out = o;
+        return i;
+    }
+    return -1;
+}
+
 /* 1-based line range of main()'s definition, head through closing brace
    (Allman heads included); lo > hi when there is none */
 static void main_body_lines(const char *src, int *lo, int *hi)
@@ -3343,6 +3406,15 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->op, sizeof(rep->op), "author_test");
                 snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
             }
+        } else if (op == OP_EVIDENCE && relops_found >= 0 && rep->compile_before == 0 &&
+                   (cfix_file = undeclared_target(ws, flags, &next_shell, cfix_detail, sizeof(cfix_detail))) >= 0) {
+            next[cfix_file] = next_shell;
+            next_shell = NULL;
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(cfix_rule, sizeof(cfix_rule), "undeclared_local");
+            snprintf(rep->op, sizeof(rep->op), "evidence_fix");
+            snprintf(rep->detail, sizeof(rep->detail), "undeclared_local: %.80s in %.100s (gcc: undeclared)", cfix_detail, ws->files[cfix_file].rel);
         } else if (op == OP_EVIDENCE && relops_found >= 0 && rep->compile_before == 1 && rep->run_before >= 0 && rep->run_before != 124 &&
                    (evidence_wins = evidence_search(ws, flags, rep->run_before, &cfix_file, &next_shell, cfix_rule, sizeof(cfix_rule),
                                                     cfix_detail, sizeof(cfix_detail), &evidence_tried)) == 1) {

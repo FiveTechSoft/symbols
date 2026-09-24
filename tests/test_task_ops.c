@@ -662,6 +662,27 @@ int main(void)
     }
 #endif
 
+    /* compiler evidence: one undeclared name, neutral wording */
+    {
+        char d[512]; make_dir(d, sizeof(d), "undecl");
+        put(d, "main.c", "static int f(void) {\n    return total_1;\n}\nint main(void) {\n    return f();\n}\n");
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "Fix it.", &r);
+        if (r.compile_before == -1) CHECK(1, "no compiler: undeclared evidence skipped");
+        else CHECK(!strcmp(r.op, "evidence_fix") && strstr(get(d, "main.c"), "    int total_1 = 0;\n    return total_1;"),
+                   "compiler evidence: undeclared total_1 declared in f");
+        char d2[512]; make_dir(d2, sizeof(d2), "undecl2");
+        const char *t = "int main(void) {\n    int count_1 = 0;\n    return cuont_1;\n}\n";
+        put(d2, "main.c", t);
+        TaskOpsSolve(d2, "Fix it.", &r);
+        CHECK(strstr(get(d2, "main.c"), "int cuont_1") == NULL, "compiler evidence: a typo gcc suggests a name for is never declared");
+        char d3[512]; make_dir(d3, sizeof(d3), "undecl3");
+        const char *t3 = "int main(void) {\n    return n_a + n_b;\n}\n";
+        put(d3, "main.c", t3);
+        TaskOpsSolve(d3, "Fix it.", &r);
+        CHECK(!strcmp(get(d3, "main.c"), t3), "compiler evidence: two undeclared names -> abstain");
+    }
+
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the
        lines that name it. */

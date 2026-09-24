@@ -666,3 +666,9 @@ char *CFixApply(const char *src, const char *task, char *rule, size_t rule_size,
     }
     return NULL;
 }
+
+char *CFixDeclareUndeclared(const char *src, const char *name, char *detail, size_t detail_size)
+{
+    /* the compiler named exactly this identifier; same rule as declare_local */
+    return declare_local(src, name, detail, detail_size);
+}

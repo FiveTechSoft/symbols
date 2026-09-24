@@ -115,6 +115,15 @@ int main(void)
             CFixCandidatesFree(fk, fm);
         }
     }
+
+    {   /* compiler evidence: the one name gcc called undeclared */
+        char det[96];
+        char *u = CFixDeclareUndeclared("int main(void) {\n    return buffer_size > 0 ? 0 : 0;\n}\n", "buffer_size", det, sizeof(det));
+        CHECK(u && !strcmp(u, "int main(void) {\n    int buffer_size = 0;\n    return buffer_size > 0 ? 0 : 0;\n}\n"));
+        free(u);
+        CHECK(!CFixDeclareUndeclared("int a(void) { return n_x; }\nint b(void) { return n_x; }\n", "n_x", det, sizeof(det)));  /* two functions */
+        CHECK(!CFixDeclareUndeclared("int main(void) { return n_x(); }\n", "n_x", det, sizeof(det)));                        /* a call */
+    }
     printf("test_c_fix_ops: %s\n", fails ? "FAILED" : "ALL PASSED");
     return fails ? 1 : 0;
 }

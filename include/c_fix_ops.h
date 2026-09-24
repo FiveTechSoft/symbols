@@ -55,4 +55,9 @@ typedef struct {
 int CFixCandidates(const char *src, CFIX_CAND *out, int max);
 void CFixCandidatesFree(CFIX_CAND *c, int n);
 
+/* Compiler evidence: gcc reported NAME as undeclared (first use in a
+ * function) with no "did you mean" note; declare_local's rule applies to
+ * that one name ("int NAME = 0;" opens the one function using it). */
+char *CFixDeclareUndeclared(const char *src, const char *name, char *detail, size_t detail_size);
+
 #endif

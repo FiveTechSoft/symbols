@@ -100,3 +100,9 @@ Same approach as `evidence_fix`: the tool's own output picks the edit, the task 
 - `sh -n` (`shell_harden`, syntax mode, `ShellSyntaxCandidates` in `src/shell_ops.c`): for a script the shell parser rejects, candidates are tier 1 `missing_then` / `missing_do`, `close_quote` (odd double quotes on a plain line), `close_block` (the one open if/for/while/case closed where indentation returns to the opener's level, only when the body is indented), and tier 2 `stray_closer` (a lone fi/done/esac removed). The one lowest-tier candidate after which `sh -n` passes is kept; several means abstain. A flat, unindented body leaves the closer's place open, so it abstains.
 
 Measurement: public bank with the real task text still 44/56, 0 wrong edits. Neutral-wording probe 13/56 -> 16/56 (build_ci 0/7 -> 3/7: bi_001, bi_004, bi_006). No public shell task is a syntax error, so `sh -n` does not move the public bank; unit tests, a 3000-case fuzz, and end-to-end tests in `test_task_ops` cover it. Real progress is measured on Mimo's blind batch, counts only.
+
+## Compiler-error evidence: one undeclared name
+
+When the program does not compile and gcc reports exactly one identifier as "undeclared (first use in this function)", in one file, with no "did you mean" hint anywhere, `evidence_fix` applies the existing `declare_local` rule to that name (`int NAME = 0;` opens the one function that uses it; the name must hold `_` or a digit, must never be called, declared or #defined). The edit is kept only if the program then builds and exits 0. A typo gcc can name a fix for, two undeclared names, or uses in two functions all abstain. gcc quotes with U+2018/U+2019 under UTF-8 locales (Python's subprocess coerces LC_CTYPE to C.UTF-8), so both quote styles are read.
+
+Measurement: public bank still 44/56, 0 wrong edits. Neutral-wording probe 16/56 -> 17/56 (compiler_repair 6/7 -> 7/7, cr_005).
