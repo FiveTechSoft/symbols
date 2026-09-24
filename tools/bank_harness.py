@@ -44,6 +44,7 @@ Usage (repo root, after building):
 from __future__ import annotations
 
 import argparse
+import re
 import filecmp
 import hashlib
 import json
@@ -156,6 +157,47 @@ def run_agent(template: str, workdir: Path, task_text: str, task_file: Path,
 
 TASK_TEXT_OVERRIDE = None
 
+# Closed vocabulary for --reasons: an abstention reason is reported only as one
+# of these fixed classes, so no workspace-derived text (names, paths, numbers)
+# can leave a blind run.
+REASON_CLASSES = [
+    ("ambiguous: single edits", r"ambiguous: \d+ single edits"),
+    ("ambiguous: relational swaps", r"ambiguous: \d+ relational swaps"),
+    ("ambiguous: fragment places", r"ambiguous: \d+ places fit"),
+    ("ambiguous: dead functions", r"ambiguous: \d+ dead functions"),
+    ("ambiguous: doc terms", r"ambiguous: \d+ doc terms"),
+    ("ambiguous: rename candidates", r"ambiguous: \d+ rename candidates"),
+    ("ambiguous: deleted files", r"ambiguous: \d+ deleted files"),
+    ("abstain: demoted induced pattern", r"abstain: every verified swap"),
+    ("no operator preconditions hold", r"no operator preconditions hold"),
+    ("git: merge not actionable", r"merge (in progress|conflict)"),
+    ("git: restore not asked", r"deleted file named but"),
+    ("git: revert preconditions", r"revert: needs"),
+    ("verify failed", r"verify failed"),
+    ("write failed", r"write failed"),
+]
+
+
+def reason_class(log: str, agent_rc: int) -> str:
+    if agent_rc in (124, 127):
+        return "agent error"
+    kept = re.findall(r"No edit kept: (.*)", log)
+    rolled = re.findall(r"Operator (\w+): .*\(rolled back\)", log)
+    if kept:
+        m = re.search(r"no operator preconditions hold \[(c=(?:-1|0|1) run=(?:-1|0|1) sh=[01] mk=[01] "
+                      r"doc=[01] test=[01] git=[01])\]", kept[-1])
+        if m:
+            return "no operator preconditions hold [" + m.group(1) + "]"
+        for name, rx in REASON_CLASSES:
+            if re.search(rx, kept[-1]):
+                return name
+        return "other reason"
+    if rolled:
+        return "rolled back (operator verify failed)"
+    if re.search(r"Operator \w+: .*\(verified, kept\)", log):
+        return "edit kept but check failed"
+    return "no reason line"
+
 
 def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
              timeout: int) -> dict:
@@ -205,6 +247,7 @@ def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
         "wall_ms": round((time.perf_counter() - t0) * 1000.0, 1),
         "agent_ms": round(agent_ms, 1),
         "agent_log_tail": log[-300:] if (not passed and log) else "",
+        "reason": "" if passed else reason_class(log, agent_rc),
     }
 
 
@@ -252,6 +295,9 @@ def main() -> int:
     ap.add_argument("--task-text",
                     help="replace every task.md with this text (wording-robustness probe: what the "
                          "agent can do from the code's own evidence alone)")
+    ap.add_argument("--reasons", action="store_true",
+                    help="add counts of failed tasks per closed-vocabulary abstention reason, "
+                         "by category (safe with --counts-only)")
     a = ap.parse_args()
     global TASK_TEXT_OVERRIDE
     TASK_TEXT_OVERRIDE = a.task_text
@@ -261,6 +307,24 @@ def main() -> int:
         return 2
     tasks = [run_task(tid, cat, tdir, a.agent, a.self_test, a.timeout) for tid, cat, tdir in rows]
     res = summarize(tasks, a.agent, a.self_test)
+    if a.reasons:
+        rc_: dict[str, dict[str, int]] = {}
+        for t in tasks:
+            if not t["passed"]:
+                d = rc_.setdefault(t["category"], {})
+                d[t["reason"]] = d.get(t["reason"], 0) + 1
+        res["reasons_by_category"] = dict(sorted(rc_.items()))
+        tot: dict[str, int] = {}
+        for d in rc_.values():
+            for k, v in d.items():
+                tot[k] = tot.get(k, 0) + v
+        res["reasons_total"] = dict(sorted(tot.items(), key=lambda kv: -kv[1]))
+        flags: dict[str, dict[str, int]] = {}
+        for t in tasks:
+            for kv in re.findall(r"(\w+)=(-?\d)", t["reason"]):
+                d = flags.setdefault(kv[0], {})
+                d[kv[1]] = d.get(kv[1], 0) + 1
+        res["abstain_shape_flags"] = flags
     if a.counts_only:
         res.pop("tasks", None)
     text = json.dumps(res, ensure_ascii=False)

@@ -3246,6 +3246,42 @@ static int write_file(const char *root, const char *rel, const char *data)
     return (fclose(f) == 0) && ok;
 }
 
+/* "no operator preconditions hold" plus a fixed-format workspace shape:
+   only 0/1/-1 flags, never names, so the reason stays safe to count on a
+   blind bank. c = compile probe (-1 none, 0 fail, 1 ok), run = probe exit
+   (-1 not run, 0 ok, 1 nonzero), then presence of shell scripts, build
+   files, docs, tests and a git repository. */
+static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
+{
+    int sh = 0, mk = 0, doc = 0, test = 0, git = 0, i;
+    char head[TASK_OPS_MAX_PATH + 16];
+    FILE *f;
+    for (i = 0; i < ws->count; i++) {
+        const char *rel = ws->files[i].rel;
+        const char *base = strrchr(rel, '/');
+        size_t n = strlen(rel);
+        base = base ? base + 1 : rel;
+        if ((n > 3 && !strcmp(rel + n - 3, ".sh")) || !strncmp(ws->files[i].data, "#!/bin/sh", 9) ||
+            !strncmp(ws->files[i].data, "#!/usr/bin/env bash", 19) || !strncmp(ws->files[i].data, "#!/bin/bash", 11))
+            sh = 1;
+        if (!strcmp(base, "Makefile") || !strcmp(base, "CMakeLists.txt"))
+            mk = 1;
+        if (is_doc_file(rel))
+            doc = 1;
+        if (!strncmp(base, "test", 4) || strstr(rel, "tests/"))
+            test = 1;
+    }
+    snprintf(head, sizeof(head), "%s/.git/HEAD", ws->root);
+    if ((f = fopen(head, "rb")) != NULL) {
+        git = 1;
+        fclose(f);
+    }
+    snprintf(rep->reason, sizeof(rep->reason),
+             "no operator preconditions hold [c=%d run=%d sh=%d mk=%d doc=%d test=%d git=%d]",
+             rep->compile_before < 0 ? -1 : rep->compile_before > 0,
+             rep->run_before < 0 ? -1 : rep->run_before != 0, sh, mk, doc, test, git);
+}
+
 int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 {
     TASK_OPS_REPORT local;
@@ -3512,7 +3548,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         else if (renames > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d rename candidates", renames);
         else
-            snprintf(rep->reason, sizeof(rep->reason), "no operator preconditions hold");
+            abstain_shape(ws, rep);
         trace_attempt(ws, flags, rep);
         free(created.data);
         free(created2.data);
