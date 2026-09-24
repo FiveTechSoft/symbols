@@ -6,8 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
-#include <sys/stat.h>
+#endif
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -31,6 +32,7 @@ static int has(CR_CAND *c, int n, const char *rule, const char *needle)
     return 0;
 }
 
+#ifndef _WIN32
 static int solve(const char *main_c, const char *extra_rel, const char *extra, TASK_OPS_REPORT *rep, char *out, size_t osz)
 {
     char dir[] = "/tmp/crtestXXXXXX", p[600];
@@ -44,6 +46,7 @@ static int solve(const char *main_c, const char *extra_rel, const char *extra, T
     char cmd[700]; snprintf(cmd, sizeof(cmd), "rm -rf %s", dir); if (system(cmd)) {}
     return kept;
 }
+#endif
 
 int main(void)
 {
@@ -88,6 +91,7 @@ int main(void)
     n = CompileRepairCandidates(&ws, "main.c:1:24: error: 'zzqq' undeclared (first use in this function)\n", c, 32);
     CHECK(n == 0);
 
+#ifndef _WIN32   /* end-to-end loop: POSIX temp dirs */
     if (system("gcc --version >/dev/null 2>&1") == 0) {
         TASK_OPS_REPORT rep;
         char out[4096];
@@ -100,6 +104,7 @@ int main(void)
         kept = solve("int cat1 = 1, cat2 = 2;\nint main(void){ return cat3 - 1; }\n", NULL, NULL, &rep, out, sizeof(out));
         CHECK(strcmp(rep.op, "compile_repair") != 0);
     }
+#endif
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }
