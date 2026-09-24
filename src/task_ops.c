@@ -2,6 +2,7 @@
  * task_ops.c - see include/task_ops.h.
  */
 #include "task_ops.h"
+#include "git_ops.h"
 #include "agent_shell.h"
 #include "shell_ops.h"
 #include "build_ops.h"
@@ -3245,6 +3246,20 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     rep->run_before = rep->run_after = -1;
     if (!workspace || !task)
         return 0;
+
+    /* repository state first: a merge in progress or a broken HEAD is a git
+       problem, and file edits must not paper over it */
+    GIT_OPS_RESULT gres;
+    int grc = GitOpsSolve(workspace, task, &gres);
+    if (grc >= 0) {
+        snprintf(rep->op, sizeof(rep->op), "%s", gres.op);
+        snprintf(rep->detail, sizeof(rep->detail), "%s", gres.detail);
+        snprintf(rep->reason, sizeof(rep->reason), "%s", gres.reason);
+        rep->candidates = 1;
+        rep->applied = grc == 1;
+        rep->verified = grc == 1;
+        return grc == 1;
+    }
 
     TASK_OPS_WORKSPACE *ws = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*ws));
     char **next = (char **)calloc(TASK_OPS_MAX_FILES, sizeof(char *));

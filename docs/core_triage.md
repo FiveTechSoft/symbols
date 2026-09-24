@@ -123,3 +123,20 @@ Mimo's counts-only blind re-runs showed evidence_fix adding a debug wrong edit (
 - A passing run is never edited: the gcc-warning path is removed (a warning alone is not evidence of the task).
 
 Measurement: public bank 44/59 (the same 44; the 3 new git tasks are untouched), 0 wrong edits. Neutral-wording probe 17/56 -> 16/56, 0 wrong edits (dbg_007 needed the removed warning path). New tests in test_task_ops: one-line main never edited, argv program abstains, passing program with only a warning untouched.
+
+## Git operators (repository state, verified with git)
+
+`src/git_ops.c` runs before every file operator when the workspace is the top
+of a git work tree. Git reports the state; the task text only has to agree.
+
+| operator | git evidence | task must | action | verified by |
+|---|---|---|---|---|
+| resolve_merge | `MERGE_HEAD` exists, conflicted paths from `git diff --diff-filter=U` | say to keep both sides | each hunk becomes ours then theirs, `git add`, `git commit --no-edit` | `MERGE_HEAD` gone, HEAD has two parents, clean status, no markers in HEAD's blobs |
+| restore_deleted | HEAD deleted the file (`git diff --diff-filter=D HEAD~1 HEAD`) and it is absent | name the file and ask to restore it | `git checkout HEAD~1 -- FILE` | bytes equal `git show HEAD~1:FILE`, `git ls-files --error-unmatch` |
+| revert_head | clean tree, single-parent HEAD, a changed C file fails `gcc -fsyntax-only` at HEAD while every changed C file compiled at HEAD~1 | ask to undo or revert a commit | `git revert --no-edit HEAD` (history kept, never `reset`) | HEAD tree equals old HEAD~1 tree, sources compile |
+
+A failed verification restores the prior state (conflict re-created with
+`git checkout -m`, restored file unstaged and removed, revert undone). A merge
+without "keep both" wording, a deleted file the task does not name, or a
+revert without build evidence is an abstention: nothing is edited and the
+file operators do not run on that repository state either.
