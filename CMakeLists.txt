@@ -275,7 +275,11 @@ target_link_libraries(relprobe symbolic)
 add_executable(symbolic-learn src/symbolic_learn_cli.c)
 target_link_libraries(symbolic-learn symbolic)
 
-# Read-only queries against the tracked golden wiki_model.bin
+# Wikidata QA tests (parked, see COORDINATION.md Ask 5). wiki_model.bin is no
+# longer tracked (removed in f4579eb), so these ten tests exit 77 and ctest
+# reports them as Skipped. They carry the ctest label qa_model; exclude them
+# with `ctest -LE qa_model`. Drop a local wiki_model.bin in the source root to
+# run them (read-only queries; tests never write it).
 add_executable(test_wiki_inference tests/test_wiki_inference.c)
 target_link_libraries(test_wiki_inference symbolic)
 add_test(NAME test_wiki_inference COMMAND test_wiki_inference wiki_model.bin FRANCIA CAPITAL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -321,10 +325,16 @@ set_tests_properties(
     test_qa_hygiene
     PROPERTIES SKIP_RETURN_CODE 77
 )
+set_tests_properties(
+    test_wiki_inference test_eval_qa test_eval_count test_eval_negation
+    test_eval_default test_eval_reverse test_eval_conjunctive test_eval_multihop
+    test_qa_hygiene test_qa_hidden
+    PROPERTIES LABELS qa_model
+)
 
 # test_wiki_ingest / test_wikidata_ingest write to their own scratch files
 # (wiki_model_ingest_test.bin / wikidata_model_test.bin), never the tracked
-# wiki_model.bin, so the golden model is never clobbered by a test.
+# wiki_model.bin, so a local model is never clobbered by a test.
 sllm_test(test_wiki_ingest     tests/test_wiki_ingest.c)
 sllm_test(test_wikidata_ingest tests/test_wikidata_ingest.c)
 
