@@ -199,6 +199,146 @@ static int task_exit_code(const char *task_in)
     return found;
 }
 
+/* end of the #! line and any leading set lines: where a guard goes */
+static size_t head_end(const char *d)
+{
+    size_t at = 0;
+    for (;;) {
+        const char *l = d + at;
+        if (!(starts_with(l, "#!") || starts_with(l, "set -")))
+            break;
+        const char *nl = strchr(l, '\n');
+        if (!nl)
+            return strlen(d);
+        at = (size_t)(nl - d) + 1;
+    }
+    return at;
+}
+
+static int plain_word(const char *w, size_t n)
+{
+    if (n == 0 || n > 40)
+        return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!(isalnum((unsigned char)w[i]) || w[i] == '_' || w[i] == '-'))
+            return 0;
+    return 1;
+}
+
+/* the one distinct quoted plain word ('x', "x" or `x`) in the task that is
+   not a file name; 0 when none or several */
+static int task_quoted_word(const char *t, char *out, size_t osz)
+{
+    int n = 0;
+    out[0] = '\0';
+    for (const char *p = t; *p; p++) {
+        if (*p != '\'' && *p != '"' && *p != '`')
+            continue;
+        if (p > t && isalnum((unsigned char)p[-1]))
+            continue;                              /* apostrophe in a word */
+        const char *e = strchr(p + 1, *p);
+        if (!e)
+            break;
+        size_t len = (size_t)(e - p - 1);
+        if (plain_word(p + 1, len) && len + 1 < osz) {
+            if (!n || strlen(out) != len || strncmp(out, p + 1, len)) {
+                n++;
+                memcpy(out, p + 1, len);
+                out[len] = '\0';
+            }
+        }
+        p = e;
+    }
+    return n == 1;
+}
+
+/* a file name token (word.ext) in the task that is not a shell script and
+   the content word stated for it ("content X", "contain(s/ing) X", "with X"):
+   uppercase or quoted words only. 1 when exactly one pair. */
+static int task_file_content(const char *t, char *file, size_t fsz, char *word, size_t wsz)
+{
+    int files = 0;
+    file[0] = word[0] = '\0';
+    for (const char *p = t; *p; p++) {
+        if (!(isalnum((unsigned char)*p) || *p == '_') || (p > t && (isalnum((unsigned char)p[-1]) || p[-1] == '_' || p[-1] == '.' || p[-1] == '/')))
+            continue;
+        const char *q = p;
+        while (isalnum((unsigned char)*q) || *q == '_' || *q == '-') q++;
+        if (*q != '.' || !isalpha((unsigned char)q[1]))
+            continue;
+        const char *e = q + 1;
+        while (isalnum((unsigned char)*e)) e++;
+        size_t len = (size_t)(e - p);
+        {   /* output files only: never a source, build or script file */
+            static const char *src[] = {".sh", ".c", ".h", ".cc", ".cpp", ".hpp", ".py", ".js", ".ts", ".go",
+                                        ".rs", ".java", ".rb", ".pl", ".mk", ".cmake", ".o", ".a", ".so", ".exe"};
+            int skip = len + 1 > fsz;
+            for (size_t k = 0; k < sizeof(src) / sizeof(src[0]) && !skip; k++)
+                if ((size_t)(e - q) == strlen(src[k]) && !strncmp(q, src[k], (size_t)(e - q)))
+                    skip = 1;
+            if (skip)
+                continue;
+        }
+        if (!files || strlen(file) != len || strncmp(file, p, len)) {
+            files++;
+            memcpy(file, p, len);
+            file[len] = '\0';
+        }
+    }
+    if (files != 1)
+        return 0;
+    const char *keys[] = {"content ", "contents ", "contain ", "contains ", "containing ", "with ",
+                          "word ", "write ", "writes ", "text "};
+    int words = 0;
+    for (int k = 0; k < 10; k++)
+        for (const char *p = t; (p = strstr(p, keys[k])) != NULL; p++) {
+            const char *w = p + strlen(keys[k]);
+            char q = 0;
+            if (*w == '\'' || *w == '"' || *w == '`')
+                q = *w++;
+            size_t n = 0;
+            while (isalnum((unsigned char)w[n]) || w[n] == '_') n++;
+            int upper = n > 0;
+            for (size_t i = 0; i < n; i++)
+                if (islower((unsigned char)w[i])) upper = 0;
+            if (!n || n + 1 > wsz || !(upper || (q && w[n] == q)))
+                continue;
+            if (!words || strlen(word) != n || strncmp(word, w, n)) {
+                words++;
+                memcpy(word, w, n);
+                word[n] = '\0';
+            }
+        }
+    return words == 1;
+}
+
+/* the one line that writes or touches F ("touch F", ": > F", "> F", "echo ... > F") */
+static const char *file_line(const char *d, const char *f, size_t *ll, int *count)
+{
+    const char *hit = NULL;
+    *count = 0;
+    size_t fl = strlen(f);
+    for (const char *l = d; *l;) {
+        const char *nl = strchr(l, '\n');
+        size_t n = nl ? (size_t)(nl - l) : strlen(l);
+        for (size_t i = 0; i + fl <= n; i++)
+            if (!strncmp(l + i, f, fl) && (i + fl == n || isspace((unsigned char)l[i + fl])) &&
+                i > 0 && isspace((unsigned char)l[i - 1])) {
+                const char *t = l;
+                while (*t == ' ' || *t == '\t') t++;
+                if (starts_with(t, "touch ") || strchr(l, '>') ) {
+                    (*count)++;
+                    hit = t;
+                    *ll = n - (size_t)(t - l);
+                }
+                break;
+            }
+        if (!nl) break;
+        l = nl + 1;
+    }
+    return hit;
+}
+
 char *ShellOpsApply(const char *data, const char *task, char *rule, size_t rule_size,
                     char *detail, size_t detail_size)
 {
@@ -290,6 +430,54 @@ char *ShellOpsApply(const char *data, const char *task, char *rule, size_t rule_
             return o;
         }
     }
+    /* stated argument contract: one exit code and one quoted argument word;
+       the script does not read $1 yet */
+    {
+        char arg[48];
+        int code = task_exit_code(task);
+        if (code > 0 && task_quoted_word(task, arg, sizeof(arg)) && !strstr(data, "$1") &&
+            !strstr(data, "${1")) {
+            char buf[160];
+            size_t at = head_end(data);
+            snprintf(buf, sizeof(buf), "%sif [ \"$1\" = \"%s\" ]; then\n    exit %d\nfi\n",
+                     at && data[at - 1] != '\n' ? "\n" : "", arg, code);
+            snprintf(rule, rule_size, "arg_exit");
+            snprintf(detail, detail_size, "exit %d when $1 is %s", code, arg);
+            return dup_cat3(data, at, buf, data + at);
+        }
+    }
+    /* stated file content: one output file and one content word; the one
+       line that touches/writes it becomes "echo WORD > FILE" */
+    {
+        char f[96], w[64];
+        size_t ll = 0;
+        int count = 0;
+        if (task_file_content(task, f, sizeof(f), w, sizeof(w))) {
+            const char *l = file_line(data, f, &ll, &count);
+            char buf[200];
+            snprintf(buf, sizeof(buf), "echo %s > %s", w, f);
+            if (l == NULL && count == 0 && !strstr(data, f)) {   /* nothing writes it yet: append */
+                size_t dl = strlen(data);
+                char *o = (char *)malloc(dl + strlen(buf) + 3);
+                if (!o) return NULL;
+                snprintf(o, dl + strlen(buf) + 3, "%s%s%s\n", data, dl && data[dl - 1] != '\n' ? "\n" : "", buf);
+                snprintf(rule, rule_size, "file_content");
+                snprintf(detail, detail_size, "%s (appended)", buf);
+                return o;
+            }
+            if (l && count == 1 && !(ll == strlen(buf) && !strncmp(l, buf, ll))) {
+                snprintf(rule, rule_size, "file_content");
+                snprintf(detail, detail_size, "%s", buf);
+                char *o = (char *)malloc(strlen(data) - ll + strlen(buf) + 1);
+                if (!o) return NULL;
+                size_t at = (size_t)(l - data);
+                memcpy(o, data, at);
+                strcpy(o + at, buf);
+                strcat(o, data + at + ll);
+                return o;
+            }
+        }
+    }
     return NULL;
 }
 
@@ -303,6 +491,10 @@ int ShellOpsIntent(const char *data, const char *rule)
         return quote_bare(data, NULL) == 0;
     if (!strcmp(rule, "stated_output"))
         return strstr(data, "echo ") != NULL;
+    if (!strcmp(rule, "arg_exit"))
+        return strstr(data, "[ \"$1\" = ") != NULL && strstr(data, "exit ") != NULL;
+    if (!strcmp(rule, "file_content"))
+        return strstr(data, "echo ") != NULL && strchr(data, '>') != NULL;
     if (!strcmp(rule, "file_guard"))
         return strstr(data, "[ -f ") != NULL && strstr(data, "exit ") != NULL;
     if (!strcmp(rule, "missing_then") || !strcmp(rule, "missing_do") || !strcmp(rule, "close_quote") ||

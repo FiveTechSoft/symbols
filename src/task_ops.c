@@ -2613,6 +2613,14 @@ static int shell_target(const TASK_OPS_WORKSPACE *ws, const char *task, char **o
         char *o = ShellOpsApply(ws->files[i].data, task, r, sizeof(r), d, sizeof(d));
         if (!o)
             continue;
+        if (!strcmp(r, "file_content")) {   /* the stated output must not be an existing file */
+            const char *gt = strrchr(d, '>');
+            char f[128];
+            if (!gt || sscanf(gt + 1, " %127s", f) != 1 || ws_find_named(ws, f) >= 0) {
+                free(o);
+                continue;
+            }
+        }
         if (hit >= 0) {           /* ambiguous: abstain */
             free(o);
             free(*out);
@@ -3626,7 +3634,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
              !strcmp(rep->op, "remove_dead_function")) &&
             rep->run_before == 0 && strcmp(probe_stdout[0], probe_stdout[1]) != 0)
             no_regress = 0;
-        int guard_names_missing = (!strcmp(rep->op, "shell_harden") && !strcmp(shell_rule, "file_guard")) ||
+        int guard_names_missing = (!strcmp(rep->op, "shell_harden") &&
+                                   (!strcmp(shell_rule, "file_guard") || !strcmp(shell_rule, "file_content"))) ||
                                   (!strcmp(rep->op, "build_repair") && !strcmp(bedit.rule, "cmake_missing_source"));
         if ((!guard_names_missing && !named_files_exist(ws, after, task, &named, &named_touched)) ||
             (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
