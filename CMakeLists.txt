@@ -61,6 +61,7 @@ add_library(symbolic STATIC
     src/output_contract.c
     src/c_edit_ops.c
     src/shell_ops.c
+    src/server_taskops.c
     src/build_ops.c
     src/command_policy.c
     src/c_fix_ops.c
@@ -241,6 +242,7 @@ sllm_test(test_code_graph_indexer tests/test_code_graph_indexer.c)
 sllm_test(test_agent_shell tests/test_agent_shell.c)
 sllm_test(test_task_ops tests/test_task_ops.c)
 sllm_test(test_shell_ops tests/test_shell_ops.c)
+sllm_test(test_server_taskops tests/test_server_taskops.c)
 sllm_test(test_build_ops tests/test_build_ops.c)
 sllm_test(test_command_policy tests/test_command_policy.c)
 sllm_test(test_core_fuzz tests/test_core_fuzz.c)

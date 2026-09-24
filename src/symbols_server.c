@@ -19,6 +19,7 @@
 #include "server_subagent.h"
 #include "output_contract.h"
 #include "c_edit_ops.h"
+#include "server_taskops.h"
 #include "agent_git.h"
 #include "agent_planner.h"
 #include "agent_runner.h"
@@ -352,6 +353,9 @@ typedef struct
     int               ceo_nfiles, ceo_next;
     CeoPlan           ceo_plan;
     int               ceo_hunk;
+    /* task operators run on a scratch copy (phases 30-31) */
+    StoPlan           sto;
+    int               sto_next;
     /* OpenCode child session (task tool): what this server did, reported
        in the final text because the parent sees only that text */
     int               is_subagent;
@@ -860,6 +864,7 @@ static ServerSession *GetOrCreateSession(const char *session_id)
             oldest_idx = i;
         }
     }
+    StoPlanFree(&g_sessions[oldest_idx].sto);
     memset(&g_sessions[oldest_idx], 0, sizeof(ServerSession));
     strncpy(g_sessions[oldest_idx].session_id, session_id,
             sizeof(g_sessions[oldest_idx].session_id) - 1);
@@ -906,6 +911,28 @@ static int SendContentForRequest(socket_t s, const char *body,
                              query, json, jsonsz))
         return 0;
     return SendJson(s, 200, "OK", json);
+}
+
+/* one planned hunk as an OpenCode edit (or write, for a created file) */
+static int StoHunkCall(const ServerSession *sess, const StoHunk *h, OPENAI_TOOL_CALL *call)
+{
+    static char old_esc[SERVER_ARG_JSON_MAX], new_esc[SERVER_ARG_JSON_MAX], path_esc[1200];
+    char path[1100];
+    snprintf(path, sizeof(path), "%s/%s", sess->workspace_dir, h->rel);
+    if (!ServerJsonEscape(path, path_esc, sizeof(path_esc)) ||
+        !ServerJsonEscape(h->new_text, new_esc, sizeof(new_esc)))
+        return 0;
+    if (h->created) {
+        snprintf(call->name, sizeof(call->name), "write");
+        return (size_t)snprintf(call->arguments, sizeof(call->arguments), "{\"filePath\":\"%s\",\"content\":\"%s\"}",
+                                path_esc, new_esc) < sizeof(call->arguments);
+    }
+    if (!ServerJsonEscape(h->old_text, old_esc, sizeof(old_esc)))
+        return 0;
+    snprintf(call->name, sizeof(call->name), "edit");
+    return (size_t)snprintf(call->arguments, sizeof(call->arguments),
+                            "{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
+                            path_esc, old_esc, new_esc) < sizeof(call->arguments);
 }
 
 static void HandleCompletions(socket_t s, const char *body,
@@ -1337,6 +1364,33 @@ static void HandleCompletions(socket_t s, const char *body,
         ServerInferWorkspaceCommands(tool_resp.content,
                                      sess->workspace_build, sizeof(sess->workspace_build),
                                      sess->workspace_test, sizeof(sess->workspace_test));
+        /* Task operators first: planned and verified on a scratch copy of the
+           workspace, handed back as edits OpenCode applies and shows. */
+        {
+            const char *off = getenv("SYMBOLS_SERVER_TASKOPS");
+            StoPlanFree(&sess->sto);
+            if (!(off && !strcmp(off, "0")) && HasDeclaredTool(sess, "edit") && HasDeclaredTool(sess, "write") &&
+                StoPlanTask(sess->workspace_dir, sess->current_issue, (SERVER_ARG_JSON_MAX - 1200) / 2, &sess->sto))
+            {
+                fprintf(stderr, "[taskops] %s: %s (%d hunk(s))\n", sess->sto.op, sess->sto.detail, sess->sto.nhunks);
+                memset(&tc, 0, sizeof(tc));
+                tc.count = 1;
+                snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+                if (StoHunkCall(sess, &sess->sto.hunks[0], &tc.calls[0]))
+                {
+                    sess->sto_next = 1;
+                    sess->workspace_phase = 30;
+                    snprintf(sess->last_tool_call_name, sizeof(sess->last_tool_call_name), "%s", tc.calls[0].name);
+                    SendToolCallsForRequest(s, body, g_seq, &tc,
+                                            "Applying an operator edit verified on a scratch copy of the workspace.",
+                                            resp, sizeof(resp), sse, sizeof(sse));
+                    return;
+                }
+                StoPlanFree(&sess->sto);
+            }
+            else
+                fprintf(stderr, "[taskops] abstain: %s\n", sess->sto.reason[0] ? sess->sto.reason : "operators off or edit/write not declared");
+        }
         if (!ServerSelectWorkspaceFile(sess->current_issue, tool_resp.content,
                                        sess->workspace_target,
                                        sizeof(sess->workspace_target)))
@@ -1472,6 +1526,79 @@ static void HandleCompletions(socket_t s, const char *body,
         SendToolCallsForRequest(s, body, g_seq, &tc,
                                 "Running the workspace-evidenced verification before editing.",
                                 resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 30)
+    {
+        OPENAI_TOOL_CALLS tc;
+        if (tool_resp.is_error)
+        {
+            sess->agent_active = 0; sess->workspace_phase = 0;
+            snprintf(content, sizeof(content), "Una edición verificada falló al aplicarse (%.300s). Revisa `git diff`: pueden quedar cambios parciales.", tool_resp.content);
+            StoPlanFree(&sess->sto);
+            SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        memset(&tc, 0, sizeof(tc));
+        tc.count = 1;
+        snprintf(tc.calls[0].id, sizeof(tc.calls[0].id), "call_sym_%lu", ++g_seq);
+        if (sess->sto_next < sess->sto.nhunks)
+        {
+            if (!StoHunkCall(sess, &sess->sto.hunks[sess->sto_next++], &tc.calls[0]))
+            {
+                sess->agent_active = 0; sess->workspace_phase = 0;
+                StoPlanFree(&sess->sto);
+                SendContentForRequest(s, body, ++g_seq, "Una edición excede el tamaño de llamada permitido; me detengo. Revisa `git diff`: pueden quedar cambios parciales.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+                return;
+            }
+            SendToolCallsForRequest(s, body, g_seq, &tc, "Applying an operator edit verified on a scratch copy of the workspace.", resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+        /* re-verify on the real tree: sh -n for edited scripts (never run), else the observed build */
+        {
+            char cmd[1024];
+            size_t used = 0;
+            cmd[0] = '\0';
+            for (int i = 0; i < sess->sto.nhunks; i++)
+            {
+                const char *r = sess->sto.hunks[i].rel;
+                size_t rl = strlen(r);
+                if (rl > 3 && !strcmp(r + rl - 3, ".sh") && !strchr(r, '\'') && used + rl + 16 < sizeof(cmd))
+                    used += (size_t)snprintf(cmd + used, sizeof(cmd) - used, "%ssh -n '%s'", used ? " && " : "", r);
+            }
+            if (!used && sess->workspace_build[0] && strcmp(sess->sto.op, "shell_harden") != 0)
+                snprintf(cmd, sizeof(cmd), "%s", sess->workspace_build);
+            if (cmd[0] && HasDeclaredTool(sess, "bash"))
+            {
+                char esc[1200];
+                ServerJsonEscape(cmd, esc, sizeof(esc));
+                snprintf(tc.calls[0].name, sizeof(tc.calls[0].name), "bash");
+                snprintf(tc.calls[0].arguments, sizeof(tc.calls[0].arguments), "{\"command\":\"%s\",\"description\":\"Re-verify the operator edit\"}", esc);
+                snprintf(sess->workspace_command, sizeof(sess->workspace_command), "%s", cmd);
+                sess->workspace_phase = 31;
+                SendToolCallsForRequest(s, body, g_seq, &tc, "Re-verifying on the real workspace.", resp, sizeof(resp), sse, sizeof(sse));
+                return;
+            }
+        }
+        sess->agent_active = 0; sess->workspace_phase = 0;
+        snprintf(content, sizeof(content), "Operador %s: %s. Verificado en una copia temporal del workspace; %d edición(es) aplicadas. No había un comando de verificación observable para repetirlo aquí.",
+                 sess->sto.op, sess->sto.detail, sess->sto.nhunks);
+        StoPlanFree(&sess->sto);
+        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+        return;
+    }
+    if (has_tool_resp && sess->agent_active && sess->workspace_phase == 31)
+    {
+        int ok = !tool_resp.is_error && !(tool_resp.has_exit_code && tool_resp.exit_code != 0);
+        sess->agent_active = 0; sess->workspace_phase = 0;
+        if (ok)
+            snprintf(content, sizeof(content), "Operador %s: %s. Verificado en una copia temporal del workspace y de nuevo aquí con `%s`.",
+                     sess->sto.op, sess->sto.detail, sess->workspace_command);
+        else
+            snprintf(content, sizeof(content), "Operador %s: %s. Se verificó en una copia temporal, pero `%s` falla en el workspace real. Salida:\n%.1500s\nRevisa `git diff`.",
+                     sess->sto.op, sess->sto.detail, sess->workspace_command, tool_resp.content);
+        StoPlanFree(&sess->sto);
+        SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 20)

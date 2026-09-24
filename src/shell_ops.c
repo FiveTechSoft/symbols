@@ -240,12 +240,12 @@ static int task_quoted_word(const char *t, char *out, size_t osz)
         if (!e)
             break;
         size_t len = (size_t)(e - p - 1);
-        if (plain_word(p + 1, len) && len + 1 < osz) {
-            if (!n || strlen(out) != len || strncmp(out, p + 1, len)) {
-                n++;
-                memcpy(out, p + 1, len);
-                out[len] = '\0';
-            }
+        if (!plain_word(p + 1, len))
+            continue;      /* not a quoted word: this quote may open a longer span */
+        if (len + 1 < osz && (!n || strlen(out) != len || strncmp(out, p + 1, len))) {
+            n++;
+            memcpy(out, p + 1, len);
+            out[len] = '\0';
         }
         p = e;
     }

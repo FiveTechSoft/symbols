@@ -121,6 +121,9 @@ int main(void)
     o = apply("#!/bin/sh\nset -e\necho hi\n", "Return exit code 4 if called with `stop`.", rule);
     CHECK(o && !strcmp(o, "#!/bin/sh\nset -e\nif [ \"$1\" = \"stop\" ]; then\n    exit 4\nfi\necho hi\n"));
     free(o);
+    o = apply("#!/bin/sh\nexit 0\n", "\"Exit with status 3 when given 'fail'.\"", rule);          /* request in quotes */
+    CHECK(o && !strcmp(rule, "arg_exit"));
+    free(o);
     CHECK(apply("#!/bin/sh\nexit 0\n", "Exit 3 on 'fail' or 'error' arguments.", rule) == NULL);          /* two words */
     CHECK(apply("#!/bin/sh\nexit 0\n", "Exit 3 or exit 4 when given 'fail'.", rule) == NULL);             /* two codes */
     CHECK(apply("#!/bin/sh\ncase $1 in x) exit 1;; esac\n", "Exit 3 when given 'fail'.", rule) == NULL); /* reads $1 */
