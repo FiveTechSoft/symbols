@@ -1342,7 +1342,7 @@ static void HandleCompletions(socket_t s, const char *body,
                 while (keep > 0 && tool_resp.content[keep - 1] != '\n') keep--;
                 if (keep == 0) keep = 3000;
                 snprintf(note, sizeof(note),
-                         "\n(Salida recortada: se muestran %zu de los %zu bytes recibidos; la salida completa está en el resultado de la herramienta.)",
+                         "\n(Output trimmed: showing %zu of %zu bytes received; the full output is in the tool result.)",
                          keep, total);
             }
             memcpy(shown, tool_resp.content, keep);
@@ -1415,8 +1415,8 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "No puedo planificar el cambio: no se pudo descubrir el workspace de OpenCode (%s). No he modificado archivos.",
-                     sess->workspace_dir[0] ? sess->workspace_dir : "cwd desconocido");
+                     "Cannot plan the change: the OpenCode workspace could not be discovered (%s). No files were modified.",
+                     sess->workspace_dir[0] ? sess->workspace_dir : "unknown cwd");
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
             return;
@@ -1460,7 +1460,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "He descubierto el workspace `%s`, pero la evidencia no identifica un archivo fuente inequívoco para esta tarea. No he inventado una ruta ni modificado archivos.",
+                     "Discovered workspace `%s`, but the evidence does not identify one unambiguous source file for this task. No path was invented and no files were modified.",
                      sess->workspace_dir);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
@@ -1478,7 +1478,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "El workspace se descubrió, pero OpenCode no declaró una herramienta de lectura. No he modificado archivos.");
+                     "The workspace was discovered, but OpenCode declared no read tool. No files were modified.");
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
             return;
@@ -1506,7 +1506,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "No se pudo leer `%s` en el workspace `%s`. No he modificado archivos.",
+                     "Could not read `%s` in workspace `%s`. No files were modified.",
                      sess->workspace_target, sess->workspace_dir);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
@@ -1563,7 +1563,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "He inspeccionado `%s` en `%s`, pero el workspace no aporta un comando de verificación acotado. Me abstengo de inventarlo.",
+                     "Inspected `%s` in `%s`, but the workspace provides no bounded verification command. Not inventing one.",
                      sess->workspace_target, sess->workspace_dir);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
@@ -1574,7 +1574,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 0;
             sess->workspace_phase = 0;
             SendContentForRequest(s, body, ++g_seq,
-                "OpenCode no declaró `bash`; no puedo ejecutar la verificación observada ni editar con seguridad.",
+                "OpenCode declared no `bash`; cannot run the observed verification or edit safely.",
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1669,7 +1669,7 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         OPENAI_TOOL_CALLS tc;
         if (tool_resp.is_error) { sess->agent_active = 0; sess->workspace_phase = 0;
-            snprintf(content, sizeof(content), "No pude leer `%s`. No he modificado archivos.", sess->ceo_paths[sess->ceo_next]);
+            snprintf(content, sizeof(content), "Could not read `%s`. No files were modified.", sess->ceo_paths[sess->ceo_next]);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse)); return; }
         WorkspaceReadContent(tool_resp.content, sess->ceo_srcs[sess->ceo_next], sizeof(sess->ceo_srcs[0]));
         sess->ceo_next++;
@@ -1691,7 +1691,7 @@ static void HandleCompletions(socket_t s, const char *body,
                 {
                     size_t rl = strlen(sess->ceo_plan.reason);
                     char last = rl ? sess->ceo_plan.reason[rl - 1] : '.';
-                    snprintf(content, sizeof(content), "He leído %d archivos del workspace, pero me abstengo: %s%s No he modificado archivos.",
+                    snprintf(content, sizeof(content), "Read %d workspace files, but abstaining: %s%s No files were modified.",
                              n, sess->ceo_plan.reason, (last == '?' || last == '.' || last == '!') ? "" : ".");
                 }
                 SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
@@ -1709,7 +1709,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (sess->ceo_hunk > 0 && tool_resp.is_error)
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
-            snprintf(content, sizeof(content), "Una edición planificada falló al aplicarse (%.300s). Revisa `git diff`: pueden quedar cambios parciales.", tool_resp.content);
+            snprintf(content, sizeof(content), "A planned edit failed to apply (%.300s). Check `git diff`: partial changes may remain.", tool_resp.content);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1724,14 +1724,14 @@ static void HandleCompletions(socket_t s, const char *body,
             if ((size_t)snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
                                  sess->ceo_paths[H->file], old_esc, new_esc) >= sizeof(tc.calls[0].arguments))
             { sess->agent_active = 0; sess->workspace_phase = 0;
-              SendContentForRequest(s, body, ++g_seq, "Una edición excede el tamaño de llamada permitido; me detengo.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse)); return; }
+              SendContentForRequest(s, body, ++g_seq, "An edit exceeds the allowed call size; stopping.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse)); return; }
             SendToolCallsForRequest(s,body,g_seq,&tc,"Applying an operator edit derived from the observed code.",resp,sizeof(resp),sse,sizeof(sse));
             return;
         }
         if (!sess->workspace_command[0] || !HasDeclaredTool(sess, "bash"))
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
-            snprintf(content, sizeof(content), "%s No pude ejecutar una verificación (sin comando de build observado o sin `bash`).", sess->ceo_plan.summary);
+            snprintf(content, sizeof(content), "%s Could not run a verification (no observed build command or no `bash`).", sess->ceo_plan.summary);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1749,9 +1749,9 @@ static void HandleCompletions(socket_t s, const char *body,
              strstr(tool_resp.content, "error") == NULL && strstr(tool_resp.content, want) != NULL;
         sess->agent_active = 0; sess->workspace_phase = 0;
         if (ok)
-            snprintf(content, sizeof(content), "%s\n\nVerificado: `%s` compila y ejecuta, e imprime el total esperado %s.", sess->ceo_plan.summary, sess->workspace_command, want);
+            snprintf(content, sizeof(content), "%s\n\nVerified: `%s` builds and runs, and prints the expected total %s.", sess->ceo_plan.summary, sess->workspace_command, want);
         else
-            snprintf(content, sizeof(content), "%s\n\nLa verificación NO confirma el cambio: esperaba ver %s en la salida de `%s`. Salida observada:\n%.1500s", sess->ceo_plan.summary, want, sess->workspace_command, tool_resp.content);
+            snprintf(content, sizeof(content), "%s\n\nVerification does NOT confirm the change: expected %s in the output of `%s`. Observed output:\n%.1500s", sess->ceo_plan.summary, want, sess->workspace_command, tool_resp.content);
         SendContentForRequest(s, body, ++g_seq, content, sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
         return;
     }
@@ -1762,7 +1762,7 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 8)
     {
-        OPENAI_TOOL_CALLS tc;char new_text[8192],esc[12288];if(tool_resp.is_error||!ServerPlanStockHeader(sess->workspace_feature_header_source,new_text,sizeof(new_text))){sess->agent_active=0;SendContentForRequest(s,body,++g_seq,"No pude derivar una declaración coherente desde los archivos observados.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return;}WorkspaceReadContent(tool_resp.content,sess->workspace_source,sizeof(sess->workspace_source));ServerJsonEscape(sess->workspace_feature_header_source,sess->workspace_diagnostic,sizeof(sess->workspace_diagnostic));ServerJsonEscape(new_text,esc,sizeof(esc));memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",sess->workspace_dir,sess->workspace_target,sess->workspace_diagnostic,esc);sess->workspace_phase=9;SendToolCallsForRequest(s,body,g_seq,&tc,"Updating the observed declaration coherently.",resp,sizeof(resp),sse,sizeof(sse));return;
+        OPENAI_TOOL_CALLS tc;char new_text[8192],esc[12288];if(tool_resp.is_error||!ServerPlanStockHeader(sess->workspace_feature_header_source,new_text,sizeof(new_text))){sess->agent_active=0;SendContentForRequest(s,body,++g_seq,"Could not derive a consistent declaration from the observed files.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return;}WorkspaceReadContent(tool_resp.content,sess->workspace_source,sizeof(sess->workspace_source));ServerJsonEscape(sess->workspace_feature_header_source,sess->workspace_diagnostic,sizeof(sess->workspace_diagnostic));ServerJsonEscape(new_text,esc,sizeof(esc));memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"edit");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"filePath\":\"%s/%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",sess->workspace_dir,sess->workspace_target,sess->workspace_diagnostic,esc);sess->workspace_phase=9;SendToolCallsForRequest(s,body,g_seq,&tc,"Updating the observed declaration coherently.",resp,sizeof(resp),sse,sizeof(sse));return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 9)
     {
@@ -1777,7 +1777,7 @@ static void HandleCompletions(socket_t s, const char *body,
         OPENAI_TOOL_CALLS tc;if(tool_resp.is_error){sess->agent_active=0;return;}snprintf(sess->workspace_command,sizeof(sess->workspace_command),"%s && ./app",sess->workspace_build);memset(&tc,0,sizeof(tc));tc.count=1;snprintf(tc.calls[0].id,sizeof(tc.calls[0].id),"call_sym_%lu",++g_seq);snprintf(tc.calls[0].name,sizeof(tc.calls[0].name),"bash");snprintf(tc.calls[0].arguments,sizeof(tc.calls[0].arguments),"{\"command\":\"%s\"}",sess->workspace_command);sess->workspace_phase=12;SendToolCallsForRequest(s,body,g_seq,&tc,"Building and running the changed project for behavior evidence.",resp,sizeof(resp),sse,sizeof(sse));return;
     }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 12)
-    { int failed=tool_resp.is_error||(tool_resp.has_exit_code&&tool_resp.exit_code!=0)||strstr(tool_resp.content,"total")==NULL;sess->agent_active=0;sess->workspace_phase=0;SendContentForRequest(s,body,++g_seq,failed?"El proyecto modificado no produjo evidencia de comportamiento suficiente.":"Función solicitada implementada coherentemente; el build y la ejecución observada pasaron.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return; }
+    { int failed=tool_resp.is_error||(tool_resp.has_exit_code&&tool_resp.exit_code!=0)||strstr(tool_resp.content,"total")==NULL;sess->agent_active=0;sess->workspace_phase=0;SendContentForRequest(s,body,++g_seq,failed?"The modified project produced no sufficient behavior evidence.":"Requested function implemented consistently; the build and the observed run passed.",sess->current_issue,resp,sizeof(resp),sse,sizeof(sse));return; }
     if (has_tool_resp && sess->agent_active && sess->workspace_phase == 3)
     {
         OPENAI_TOOL_CALLS tc; char old_text[512], new_text[512];
@@ -1788,7 +1788,7 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
             SendContentForRequest(s, body, ++g_seq,
-                "La verificación observada ya pasa; no he aplicado un cambio innecesario.",
+                "The observed verification already passes; no unnecessary change applied.",
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1818,7 +1818,7 @@ static void HandleCompletions(socket_t s, const char *body,
             }
             sess->agent_active = 0; sess->workspace_phase = 0;
             snprintf(content, sizeof(content),
-                     "La verificación falló, pero el diagnóstico observado no permite un parche mínimo inequívoco en `%s`. No he modificado archivos.",
+                     "Verification failed, but the observed diagnostic does not allow one unambiguous minimal patch in `%s`. No files were modified.",
                      sess->workspace_target);
             SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                                   resp, sizeof(resp), sse, sizeof(sse));
@@ -1827,7 +1827,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!HasDeclaredTool(sess, "edit"))
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
-            SendContentForRequest(s, body, ++g_seq, "OpenCode no declaró `edit`; no puedo aplicar el parche observado.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
+            SendContentForRequest(s, body, ++g_seq, "OpenCode declared no `edit`; cannot apply the observed patch.", sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
         memset(&tc, 0, sizeof(tc)); tc.count = 1;
@@ -1857,7 +1857,7 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
             SendContentForRequest(s, body, ++g_seq,
-                "Inspeccioné el test relevante, pero no demuestra un parche mínimo inequívoco. No he modificado archivos.",
+                "Inspected the relevant test, but it does not demonstrate one unambiguous minimal patch. No files were modified.",
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1883,7 +1883,7 @@ static void HandleCompletions(socket_t s, const char *body,
         {
             sess->agent_active = 0; sess->workspace_phase = 0;
             SendContentForRequest(s, body, ++g_seq,
-                "La edición mínima falló; no puedo certificar cambios.",
+                "The minimal edit failed; cannot certify changes.",
                 sess->current_issue, resp, sizeof(resp), sse, sizeof(sse));
             return;
         }
@@ -1907,11 +1907,11 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->agent_active = 0; sess->workspace_phase = 0;
         if (failed)
             snprintf(content, sizeof(content),
-                     "Apliqué un cambio mínimo en `%s`, pero la misma verificación sigue fallando. El cambio no queda certificado.",
+                     "Applied a minimal change in `%s`, but the same verification still fails. The change is not certified.",
                      sess->workspace_target);
         else
             snprintf(content, sizeof(content),
-                     "Corregido `%s`. La misma verificación observada pasó después del cambio.",
+                     "Fixed `%s`. The same observed verification passed after the change.",
                      sess->workspace_target);
         SendContentForRequest(s, body, ++g_seq, content, sess->current_issue,
                               resp, sizeof(resp), sse, sizeof(sse));
@@ -2010,7 +2010,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->pending_append = 0;
             sess->agent_active = 0;
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he modificado el archivo: la lectura no acredita la codificación, el BOM ni los finales de línea. Usa una edición que preserve bytes o confirma una conversión explícita.",
+                "File not modified: the read does not establish the encoding, BOM or line endings. Use a byte-preserving edit or confirm an explicit conversion.",
                 sess->current_issue, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -2223,7 +2223,7 @@ static void HandleCompletions(socket_t s, const char *body,
                 else
                 {
                     snprintf(content, sizeof(content),
-                             "Cambio aplicado. Las herramientas completaron %u pasos sin reportar errores.",
+                             "Change applied. The tools completed %u steps without reporting errors.",
                              sess->current_plan.step_count);
                 }
             }
@@ -2537,8 +2537,8 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!ServerExtractWorkingDir(body, workdir, sizeof(workdir)))
         {
             snprintf(content, sizeof(content),
-                     "No puedo inspeccionar el repositorio: esta sesión no "
-                     "declaró el directorio de trabajo del cliente.");
+                     "Cannot inspect the repository: this session did not "
+                     "declare the client working directory.");
         }
         else
         {
@@ -2718,7 +2718,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (sess->last_target[0] == '\0')
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he modificado ningún archivo: no hay un archivo activo inequívoco en esta conversación.",
+                "No file modified: there is no unambiguous active file in this conversation.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -2726,7 +2726,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (sess->last_target_default_lines != 2)
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he modificado el archivo: solo puedo intercambiar las líneas cuando el contexto acredita exactamente dos líneas.",
+                "File not modified: lines can only be swapped when the context establishes exactly two lines.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -2734,7 +2734,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!HasDeclaredTool(sess, "edit"))
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he modificado el archivo: el cliente no ofrece una edición que preserve el resto de los bytes.",
+                "File not modified: the client offers no edit that preserves the remaining bytes.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -2936,7 +2936,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!ServerExtractCreatePath(query, created, sizeof(created)))
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he creado ningún archivo: falta un nombre de archivo inequívoco.",
+                "No file created: an unambiguous file name is missing.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -2944,7 +2944,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!HasDeclaredTool(sess, "write"))
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No he creado el archivo: el cliente no declaró la herramienta `write`.",
+                "File not created: the client declared no `write` tool.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -3006,7 +3006,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!ServerExtractWorkingDir(body, workdir, sizeof(workdir)))
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No puedo iniciar una tarea de código: OpenCode no declaró su directorio de trabajo. No he modificado archivos.",
+                "Cannot start a code task: OpenCode did not declare its working directory. No files were modified.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
@@ -3014,7 +3014,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (!HasDeclaredTool(sess, "glob"))
         {
             ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq,
-                "No puedo descubrir el workspace: OpenCode no declaró la herramienta `glob`. No he modificado archivos.",
+                "Cannot discover the workspace: OpenCode declared no `glob` tool. No files were modified.",
                 query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
             return;
