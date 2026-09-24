@@ -36,4 +36,23 @@ typedef struct {
 int CFixSplit(const char *src, const char *src_rel, const char *task, CFIX_SPLIT *out);
 void CFixSplitFree(CFIX_SPLIT *s);
 
+/* Evidence candidates: every single edit of these kinds, for a caller that
+ * keeps only the one that makes a failing program exit 0 (task wording is
+ * not consulted):
+ *   tier 1 boundary   - < <-> <=, > <-> >= in an if/while/for condition or return
+ *   tier 2 array_fit  - char a[N] = "literal" that does not fit -> strlen + 1
+ *   tier 2 init_local - "TYPE x;" whose first use updates it (x += ..., x++) -> "= 0" (or "= 1" for *=, /=)
+ *   tier 3 direction  - < <-> >, <= <-> >= in the same places
+ *   tier 3 equality   - == <-> != in a condition or return
+ */
+typedef struct {
+    char *text;
+    int tier;
+    char rule[24];
+    char detail[96];
+} CFIX_CAND;
+
+int CFixCandidates(const char *src, CFIX_CAND *out, int max);
+void CFixCandidatesFree(CFIX_CAND *c, int n);
+
 #endif

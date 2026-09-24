@@ -486,6 +486,161 @@ void CFixSplitFree(CFIX_SPLIT *s)
     s->new_src = s->c_text = s->h_text = NULL;
 }
 
+/* ------------------------------------------------ evidence candidates
+   Every single edit of the three kinds below, for a caller that tests each
+   one against the program's own exit code (no task wording involved). */
+
+static int cand_add(CFIX_CAND *c, int n, int max, const char *d, size_t at, size_t cut, const char *ins,
+                    int tier, const char *rule, const char *detail)
+{
+    if (n >= max)
+        return n;
+    char *t = splice(d, at, cut, ins);
+    if (!t)
+        return n;
+    c[n].text = t;
+    c[n].tier = tier;
+    snprintf(c[n].rule, sizeof(c[n].rule), "%s", rule);
+    snprintf(c[n].detail, sizeof(c[n].detail), "%s", detail);
+    return n + 1;
+}
+
+/* the line number of offset p, for details */
+static int line_of(const char *d, const char *p)
+{
+    int l = 1;
+    for (const char *q = d; q < p; q++) if (*q == '\n') l++;
+    return l;
+}
+
+int CFixCandidates(const char *d, CFIX_CAND *c, int max)
+{
+    int n = 0, depth = 0, paren = 0, in_cond = 0;
+    for (const char *p = d; *p && n < max;) {
+        const char *q = skip_lit(p);
+        if (q != p) { p = q; continue; }
+        if (*p == '#') {   /* preprocessor line: #include <x.h> is not a comparison */
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        if (*p == '{') depth++;
+        else if (*p == '}') { if (depth > 0) depth--; }
+        if (depth > 0 && (word_at(d, p, "if") || word_at(d, p, "while") || word_at(d, p, "for"))) {
+            const char *a = p;
+            while (is_ident((unsigned char)*a)) a++;
+            while (*a == ' ' || *a == '\t') a++;
+            if (*a == '(') { in_cond = 1; paren = 0; p = a; continue; }
+        }
+        if (in_cond) {
+            if (*p == '(') paren++;
+            else if (*p == ')' && --paren == 0) in_cond = 0;
+        }
+        int in_ret = 0;
+        if (depth > 0 && !in_cond) {   /* inside "return ...;" */
+            const char *b = p;
+            while (b > d && b[-1] != ';' && b[-1] != '{' && b[-1] != '}') b--;
+            while (*b == ' ' || *b == '\t' || *b == '\n' || *b == '\r') b++;
+            in_ret = word_at(d, b, "return");
+        }
+        if ((in_cond || in_ret) && (*p == '<' || *p == '>') && p[1] != *p && p > d && p[-1] != *p &&
+            p[-1] != '-' && !(p[1] == '=' && p[2] == '=')) {
+            char ins[4], det[96];
+            size_t cut = p[1] == '=' ? 2 : 1;
+            snprintf(ins, sizeof(ins), "%c%s", *p, cut == 2 ? "" : "=");
+            snprintf(det, sizeof(det), "line %d: '%.*s' -> '%s'", line_of(d, p), (int)cut, p, ins);
+            n = cand_add(c, n, max, d, (size_t)(p - d), cut, ins, 1, "boundary", det);
+            char ins2[4];   /* tier 3: the comparison points the wrong way */
+            snprintf(ins2, sizeof(ins2), "%c%s", *p == '<' ? '>' : '<', cut == 2 ? "=" : "");
+            snprintf(det, sizeof(det), "line %d: '%.*s' -> '%s'", line_of(d, p), (int)cut, p, ins2);
+            n = cand_add(c, n, max, d, (size_t)(p - d), cut, ins2, 3, "direction", det);
+            p += cut;
+            continue;
+        }
+        if ((in_cond || in_ret) && (p[0] == '=' || p[0] == '!') && p[1] == '=' && p > d &&
+            !strchr("=!<>", p[-1]) && p[2] != '=') {
+            char det[96];
+            const char *ins = p[0] == '=' ? "!=" : "==";
+            snprintf(det, sizeof(det), "line %d: '%.2s' -> '%s'", line_of(d, p), p, ins);
+            n = cand_add(c, n, max, d, (size_t)(p - d), 2, ins, 3, "equality", det);
+            p += 2;
+            continue;
+        }
+        /* char NAME[N] = "literal" that does not fit */
+        if (depth >= 0 && word_at(d, p, "char")) {
+            const char *a = p + 4;
+            while (*a == ' ' || *a == '\t') a++;
+            const char *nm = a;
+            while (is_ident((unsigned char)*a)) a++;
+            if (a > nm && *a == '[' && isdigit((unsigned char)a[1])) {
+                const char *num = a + 1, *e = num;
+                while (isdigit((unsigned char)*e)) e++;
+                const char *r = e;
+                if (*r == ']') {
+                    r++;
+                    while (*r == ' ' || *r == '\t') r++;
+                    if (*r == '=') {
+                        r++;
+                        while (*r == ' ' || *r == '\t') r++;
+                        if (*r == '"') {
+                            const char *s0 = r + 1, *s1 = s0;
+                            while (*s1 && *s1 != '"' && *s1 != '\\' && *s1 != '\n') s1++;
+                            long size = strtol(num, NULL, 10), len = (long)(s1 - s0);
+                            if (*s1 == '"' && len >= size) {
+                                char ins[24], det[96];
+                                snprintf(ins, sizeof(ins), "%ld", len + 1);
+                                snprintf(det, sizeof(det), "line %d: %.*s[%ld] -> [%s]", line_of(d, p), (int)(a - nm), nm, size, ins);
+                                n = cand_add(c, n, max, d, (size_t)(num - d), (size_t)(e - num), ins, 2, "array_fit", det);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        /* TYPE NAME; inside a function, later updated before any plain assignment */
+        if (depth > 0) {
+            static const char *const ty[] = {"int", "long", "unsigned", "double", "float", "size_t", NULL};
+            for (int k = 0; ty[k]; k++) {
+                if (!word_at(d, p, ty[k])) continue;
+                const char *a = p + strlen(ty[k]);
+                while (*a == ' ' || *a == '\t') a++;
+                const char *nm = a;
+                while (is_ident((unsigned char)*a)) a++;
+                size_t nl = (size_t)(a - nm);
+                const char *semi = a;
+                while (*semi == ' ' || *semi == '\t') semi++;
+                if (nl == 0 || nl >= 48 || *semi != ';') break;
+                char name[48];
+                memcpy(name, nm, nl); name[nl] = '\0';
+                const char *u = semi + 1, *first = NULL;
+                for (; *u; u++) {
+                    const char *z = skip_lit(u);
+                    if (z != u) { u = z - 1; continue; }
+                    if (word_at(d, u, name)) { first = u; break; }
+                }
+                if (!first) break;
+                const char *after = first + nl;
+                while (*after == ' ' || *after == '\t') after++;
+                int updated = (after[0] == '+' && after[1] == '+') || (after[0] == '-' && after[1] == '-') ||
+                              (strchr("+-*/", after[0]) && after[1] == '=') ||
+                              (first >= d + 2 && ((first[-1] == '+' && first[-2] == '+') || (first[-1] == '-' && first[-2] == '-')));
+                if (!updated) break;
+                char ins[16], det[96];
+                snprintf(ins, sizeof(ins), " = %s", (after[0] == '*' || after[0] == '/') ? "1" : "0");
+                snprintf(det, sizeof(det), "line %d: %s%s", line_of(d, p), name, ins);
+                n = cand_add(c, n, max, d, (size_t)(a - d), 0, ins, 2, "init_local", det);
+                break;
+            }
+        }
+        p++;
+    }
+    return n;
+}
+
+void CFixCandidatesFree(CFIX_CAND *c, int n)
+{
+    for (int i = 0; i < n; i++) { free(c[i].text); c[i].text = NULL; }
+}
+
 char *CFixApply(const char *src, const char *task, char *rule, size_t rule_size, char *detail, size_t detail_size)
 {
     rule[0] = detail[0] = '\0';

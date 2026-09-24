@@ -69,6 +69,52 @@ int main(void)
         CHECK(CFixSplit(src, "main.c", "Split run() into run.c with a prototype in run.h", &sp) == 0);       /* not defined */
         CHECK(CFixSplit("int f(void);\nint g(void) { return f(); }\n", "main.c", "Split f() into f.c with a prototype in f.h", &sp) == 0); /* only a prototype */
     }
+
+    {   /* CFixCandidates: every single evidence edit, tiered; task text never consulted */
+        const char *src = "int f(int i, int n) {\n    int s;\n    char b[2] = \"abc\";\n    if (i < n) return 1;\n    while (i >= 0) { s += i; i--; }\n    return s == 3;\n}\n";
+        CFIX_CAND k[32];
+        int m = CFixCandidates(src, k, 32), seen = 0;
+        CHECK(m == 7);
+        for (int i = 0; i < m; i++) {
+            CHECK(k[i].text && strcmp(k[i].text, src));
+            if (!strcmp(k[i].rule, "init_local")) { seen |= 1; CHECK(k[i].tier == 2 && strstr(k[i].text, "int s = 0;")); }
+            if (!strcmp(k[i].rule, "array_fit")) { seen |= 2; CHECK(k[i].tier == 2 && strstr(k[i].text, "char b[4] = \"abc\";")); }
+            if (!strcmp(k[i].rule, "boundary") && strstr(k[i].text, "if (i <= n)")) { seen |= 4; CHECK(k[i].tier == 1); }
+            if (!strcmp(k[i].rule, "direction") && strstr(k[i].text, "if (i > n)")) { seen |= 8; CHECK(k[i].tier == 3); }
+            if (!strcmp(k[i].rule, "equality")) { seen |= 16; CHECK(k[i].tier == 3 && strstr(k[i].text, "return s != 3;")); }
+        }
+        CHECK(seen == 31);
+        CFixCandidatesFree(k, m);
+        CHECK(CFixCandidates("int main(void) { return 0; }\n", k, 32) == 0);                  /* nothing to try */
+        m = CFixCandidates("int f(int a) { if (a < 1) return 1; if (a < 2) return 2; return 0; }\n", k, 2);
+        CHECK(m == 2);                                                                          /* respects max */
+        CFixCandidatesFree(k, m);
+        m = CFixCandidates("/* a < b */ const char *s = \"x < y\";\n", k, 32);
+        CHECK(m == 0);                                                                          /* comments and strings */
+        CFixCandidatesFree(k, m);
+    }
+    {   /* fuzz: deterministic byte mutations of C text never crash, never yield NULL or identical text */
+        const char *seed = "int g(int *p, int n) {\n    int t;\n    char q[1] = \"zz\";\n    for (int i = 0; i < n; i++) t += p[i];\n    if (n >= 3 && t == 0) return -1;\n    return t != 0;\n}\n";
+        const char alpha[] = "<>=!;{}()[]\"'/*\\\n abc0123+-";
+        char buf[512];
+        unsigned r = 12345u;
+        size_t len = strlen(seed);
+        for (int it = 0; it < 3000; it++) {
+            memcpy(buf, seed, len + 1);
+            for (int e = 0; e < 1 + it % 6; e++) {
+                r = r * 1103515245u + 12345u;
+                size_t at = (r >> 8) % len;
+                r = r * 1103515245u + 12345u;
+                buf[at] = alpha[(r >> 8) % (sizeof alpha - 1)];
+            }
+            if (it % 7 == 0) buf[(r >> 4) % len] = '\0';                                        /* truncation */
+            CFIX_CAND fk[32];
+            int fm = CFixCandidates(buf, fk, 32);
+            CHECK(fm >= 0 && fm <= 32);
+            for (int i = 0; i < fm; i++) CHECK(fk[i].text && strcmp(fk[i].text, buf) && fk[i].tier >= 1 && fk[i].tier <= 3);
+            CFixCandidatesFree(fk, fm);
+        }
+    }
     printf("test_c_fix_ops: %s\n", fails ? "FAILED" : "ALL PASSED");
     return fails ? 1 : 0;
 }

@@ -154,11 +154,16 @@ def run_agent(template: str, workdir: Path, task_text: str, task_file: Path,
     return rc, (time.perf_counter() - t0) * 1000.0, log
 
 
+TASK_TEXT_OVERRIDE = None
+
+
 def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
              timeout: int) -> dict:
     t0 = time.perf_counter()
     task_md = tdir / "task.md"
     task_text = task_md.read_text(encoding="utf-8").strip() if task_md.is_file() else ""
+    if TASK_TEXT_OVERRIDE is not None:
+        task_text = TASK_TEXT_OVERRIDE
     with tempfile.TemporaryDirectory(prefix="bank_") as td:
         wd = Path(td) / "work"
         shutil.copytree(tdir / "before", wd)
@@ -244,7 +249,12 @@ def main() -> int:
     ap.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     ap.add_argument("--counts-only", action="store_true",
                     help="omit per-task rows (ids, files) from the output; for blind banks")
+    ap.add_argument("--task-text",
+                    help="replace every task.md with this text (wording-robustness probe: what the "
+                         "agent can do from the code's own evidence alone)")
     a = ap.parse_args()
+    global TASK_TEXT_OVERRIDE
+    TASK_TEXT_OVERRIDE = a.task_text
     rows = [r for r in read_index(Path(a.bank)) if a.split == "all" or split_of(r[0]) == a.split]
     if not rows:
         print("no tasks in index.tsv", file=sys.stderr)

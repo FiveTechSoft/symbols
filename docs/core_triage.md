@@ -78,3 +78,16 @@ This is a verification change only: it can turn a kept edit into a rollback, nev
 ## Bank harness: per-task setup for git tasks
 
 Git tasks need a repository with history, which a plain before/ tree cannot hold. tools/bank_harness.py now runs an optional `setup.py` in the workdir before the snapshot and the agent, with a fixed git identity and fixed dates. In self-test mode it also runs an optional `golden.py` for golden states that are git operations. The snapshot ignores .git/ internals and records HEAD, refs and status as one `@git` entry. A failing setup is a harness error, not a pass or a wrong edit. Covered by tests/test_bank_harness_setup.py (ctest). The fixtures themselves come from Mimo.
+
+## Evidence-driven C repair (`evidence_fix`)
+
+A change of approach, approved by Antonio: the edit is chosen by what the program itself does, not by matching the task's wording. New operator `evidence_fix` in `src/task_ops.c`, candidates from `CFixCandidates` in `src/c_fix_ops.c`. It runs only when the C program builds.
+
+- Run fails (non-zero exit, not a timeout): every single candidate edit is written, built and run. Tiers are tried in order: tier 1 boundary (`<` <-> `<=`, `>` <-> `>=` in a condition or return), tier 2 `array_fit` (char array too small for its literal -> strlen + 1) and `init_local` (`TYPE x;` whose first use updates it -> `= 0`, or `= 1` for `*=`/`/=`), tier 3 direction (`<` <-> `>`) and equality (`==` <-> `!=`). The first tier with exactly one candidate that makes the program exit 0 wins; several winners in that tier means abstain. Test files are never edited.
+- Run already passes: only tier-2 candidates on a line where `gcc -Wall -Wextra -O1` warns ("too long", "uninitialized"), and the warning must disappear while the exit stays 0.
+- Comments and string literals are never candidates.
+- main() is the oracle: when the program defines other functions, main is never edited; when main is the only function, its return lines are never edited. `evidence_fix` always runs after every wording-anchored operator, and never after a relop abstention on a demoted induced pattern.
+
+Measurement. Public bank with the real task text: 44/56, 0 wrong edits (unchanged). Wording probe (`tools/bank_harness.py --task-text "The program fails; fix the bug so it exits 0."`, every task gets the same neutral text): 9/56 -> 13/56; debug 0/7 -> 4/7 (dbg_001, 003, 006, 007). The one wrong edit in the probe (eb_mf_003, `declare_implicit` puts the prototype in main.c) exists before this change and is not from `evidence_fix`. dbg_004 needs two edits (comparison and main's return), so it is out of reach of a single-edit search; dbg_002 (null guard) and dbg_005 (no warning at -O1) stay open. Progress is measured on Mimo's blind batch, counts only.
+
+Tests: `test_task_ops` adds a neutral-wording fix (main untouched) and a two-winner abstention; `test_c_fix_ops` covers every candidate kind, the max limit, comments/strings, and a deterministic 3000-iteration mutation fuzz (clean under ASan/UBSan).

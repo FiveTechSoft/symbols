@@ -2786,9 +2786,201 @@ static int cfix_split_target(const TASK_OPS_WORKSPACE *ws, const char *task, CFI
     return hit;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_COUNT };
+/* ------------------------------------------------------ evidence_fix
+   Trigger: the program builds and its own run fails (non-zero exit, not a
+   timeout). Every candidate single edit from CFixCandidates is written,
+   built and run; the lowest tier with exactly one candidate that makes the
+   program exit 0 wins. Several winners in that tier: abstain. Test files
+   are never edited. Task wording is not consulted. */
+#define EV_MAX_CANDS 64
+/* gcc -Wall -Wextra -O1 diagnostics for the whole program (stderr text) */
+static void warn_text(const TASK_OPS_WORKSPACE *ws, const char *flags, char *buf, size_t size)
+{
+    char cmd[4096], srcs[3072], bin[TASK_OPS_MAX_PATH];
+    buf[0] = '\0';
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return;
+    temp_binary(bin, sizeof(bin));
+    snprintf(cmd, sizeof(cmd), "gcc %s-Wall -Wextra -O1 -o \"%s\" %s", flags, bin, srcs);
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        return;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, ws->root, 20000, r);
+    snprintf(buf, size, "%.*s", (int)(r->stderr_len < size - 1 ? r->stderr_len : size - 1), r->stderr_buf);
+    free(r);
+    remove(bin);
+}
+
+/* does the warning text hold a diagnostic of this kind at rel:line? */
+static int warn_at(const char *w, const char *rel, int line, const char *rule)
+{
+    const char *kw = !strcmp(rule, "array_fit") ? "too long" : !strcmp(rule, "init_local") ? "uninitialized" : NULL;
+    if (!kw)
+        return 0;
+    char at[TASK_OPS_MAX_PATH + 16];
+    snprintf(at, sizeof(at), "%s:%d:", rel, line);
+    for (const char *p = strstr(w, at); p; p = strstr(p + 1, at)) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        char row[512];
+        snprintf(row, sizeof(row), "%.*s", (int)(l < 511 ? l : 511), p);
+        if (strstr(row, kw))
+            return 1;
+    }
+    return 0;
+}
+
+/* 1-based line range of main()'s definition, head through closing brace
+   (Allman heads included); lo > hi when there is none */
+static void main_body_lines(const char *src, int *lo, int *hi)
+{
+    int ln = 1, depth = 0, head = 0, open = 0;
+    *lo = 0;
+    *hi = -1;
+    for (const char *line = src; line && *line; ln++) {
+        const char *nl = strchr(line, '\n');
+        size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+        if (depth == 0 && !head && !open && line_defines_main(line, ll) && !memchr(line, ';', ll)) {
+            head = 1;
+            *lo = ln;
+        }
+        for (size_t q = 0; q < ll; q++) {
+            if (line[q] == '{') { depth++; if (head) { open = 1; head = 0; } }
+            else if (line[q] == '}' && depth > 0) depth--;
+        }
+        if (open && depth == 0) {
+            *hi = ln;
+            return;
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+    if (*lo) *hi = ln;   /* unterminated: to the end */
+}
+
+/* does 1-based line ln of src hold a return statement? */
+static int line_has_return(const char *src, int ln)
+{
+    const char *line = src;
+    for (int i = 1; i < ln && line; i++) {
+        line = strchr(line, '\n');
+        if (line) line++;
+    }
+    if (!line) return 0;
+    const char *nl = strchr(line, '\n');
+    size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+    for (size_t i = 0; i + 6 <= ll; i++)
+        if (!strncmp(line + i, "return", 6) && (i == 0 || !ident_char((unsigned char)line[i - 1])) &&
+            (i + 6 == ll || !ident_char((unsigned char)line[i + 6])))
+            return 1;
+    return 0;
+}
+
+/* does src define a function other than main (a depth-0 head with "(" and
+   no ";" whose body brace follows on that line or the next)? */
+static int defines_other_fn(const char *src)
+{
+    int depth = 0, pend = 0;
+    for (const char *line = src; line && *line;) {
+        const char *nl = strchr(line, '\n');
+        size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+        const char *t = line;
+        while (t < line + ll && isspace((unsigned char)*t)) t++;
+        int brace_first = t < line + ll && *t == '{';
+        if (depth == 0 && pend && brace_first)
+            return 1;
+        pend = 0;
+        if (depth == 0 && t < line + ll && *t != '#' && memchr(line, '(', ll) && !memchr(line, ';', ll) &&
+            !line_defines_main(line, ll)) {
+            const char *ob = memchr(line, '{', ll);
+            if (ob && ob > (const char *)memchr(line, '(', ll))
+                return 1;
+            if (!ob)
+                pend = 1;
+        }
+        for (size_t q = 0; q < ll; q++)
+            depth += line[q] == '{' ? 1 : (line[q] == '}' && depth > 0) ? -1 : 0;
+        line = nl ? nl + 1 : NULL;
+    }
+    return 0;
+}
+
+static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int run_before, int *file, char **out,
+                           char *rule, size_t rsz, char *detail, size_t dsz, int *tried)
+{
+    /* run fails: any candidate that makes it exit 0. Run passes: only a
+       tier-2 candidate on a line gcc warns about (array too long, variable
+       uninitialized) that removes that warning and keeps exit 0. */
+    static char w0[16384], w1[16384];
+    int by_warning = run_before == 0;
+    if (by_warning) {
+        warn_text(ws, flags, w0, sizeof(w0));
+        if (!w0[0])
+            return 0;
+    }
+    *file = -1;
+    *out = NULL;
+    *tried = 0;
+    int win_tier = 99, wins = 0, others = 0;
+    for (int f = 0; f < ws->count; f++)
+        if (is_c_source(ws->files[f].rel) && !strncmp(ws->files[f].rel + strlen(ws->files[f].rel) - 2, ".c", 2))
+            others |= defines_other_fn(ws->files[f].data);
+    for (int tier = 1; tier <= 3 && wins == 0; tier++) {
+        for (int f = 0; f < ws->count; f++) {
+            const TASK_OPS_FILE *F = &ws->files[f];
+            if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test") || F->len > 65536)
+                continue;
+            int main_lo = 0, main_hi = -1;
+            main_body_lines(F->data, &main_lo, &main_hi);
+            static CFIX_CAND c[EV_MAX_CANDS];
+            int n = CFixCandidates(F->data, c, EV_MAX_CANDS);
+            for (int k = 0; k < n; k++) {
+                if (c[k].tier != tier)
+                    continue;
+                int line = atoi(c[k].detail + 5);   /* "line N: ..." */
+                if (line >= main_lo && line <= main_hi && (others || line_has_return(F->data, line)))
+                    continue;   /* main is the oracle: never edited when other functions exist, and its return never */
+                if (by_warning && !warn_at(w0, F->rel, line, c[k].rule))
+                    continue;
+                if (!write_file(ws->root, F->rel, c[k].text))
+                    continue;
+                int cc = -1, rr = -1;
+                probe_out(ws, flags, &cc, &rr, NULL);
+                (*tried)++;
+                int ok = cc == 1 && rr == 0;
+                if (ok && by_warning) {
+                    warn_text(ws, flags, w1, sizeof(w1));
+                    ok = !warn_at(w1, F->rel, line, c[k].rule);
+                }
+                if (ok) {
+                    wins++;
+                    if (wins == 1) {
+                        *file = f;
+                        *out = c[k].text;
+                        c[k].text = NULL;
+                        win_tier = tier;
+                        snprintf(rule, rsz, "%s", c[k].rule);
+                        snprintf(detail, dsz, "%s", c[k].detail);
+                    }
+                }
+            }
+            CFixCandidatesFree(c, n);
+            write_file(ws->root, F->rel, F->data);   /* always restore */
+        }
+        if (wins > 1) {
+            free(*out);
+            *out = NULL;
+            *file = -1;
+            return wins;
+        }
+    }
+    (void)win_tier;
+    return wins;
+}
+
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_EVIDENCE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "evidence_fix"
 };
 
 static int mem_enabled(void)
@@ -2922,6 +3114,13 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 rep->memory_reordered = 1;
             }
     }
+    {   /* evidence_fix is the last resort: every wording-anchored operator
+           (and a relop abstention on a demoted pattern) comes first */
+        int w = 0;
+        for (int o = 0; o < OP_COUNT; o++)
+            if (order[o] != OP_EVIDENCE) order[w++] = order[o];
+        order[w] = OP_EVIDENCE;
+    }
 
     /* reason: first operator (in that order) whose preconditions hold */
     char a[128] = {0}, b[128] = {0};
@@ -2930,7 +3129,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     char y_text[128] = {0};
     int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
     char da[128] = {0}, db[128] = {0}, dead[128] = {0};
-    int deads = 0, relops_found = 0;
+    int deads = 0, relops_found = 0, evidence_wins = 0, evidence_tried = 0;
     RELOP_HIT rhit;
     TEST_PLAN tplan;
     LIT_PLAN lit;
@@ -3057,6 +3256,16 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->op, sizeof(rep->op), "author_test");
                 snprintf(rep->detail, sizeof(rep->detail), "%.60s: %.120s == %ld", tplan.test_rel, tplan.call, tplan.expect);
             }
+        } else if (op == OP_EVIDENCE && relops_found >= 0 && rep->compile_before == 1 && rep->run_before >= 0 && rep->run_before != 124 &&
+                   (evidence_wins = evidence_search(ws, flags, rep->run_before, &cfix_file, &next_shell, cfix_rule, sizeof(cfix_rule),
+                                                    cfix_detail, sizeof(cfix_detail), &evidence_tried)) == 1) {
+            next[cfix_file] = next_shell;
+            next_shell = NULL;
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "evidence_fix");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.100s (%d candidates run)", cfix_rule, cfix_detail,
+                     ws->files[cfix_file].rel, evidence_tried);
         } else if (op == OP_RELOP &&
                    (relops_found = relop_search(ws, flags, task, &rhit)) == 1) {
             const TASK_OPS_FILE *F = &ws->files[rhit.file];
@@ -3085,7 +3294,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         }
     }
     if (!touched) {
-        if (relops_found > 1)
+        if (evidence_wins > 1)
+            snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d single edits make the failing program exit 0", evidence_wins);
+        else if (relops_found > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d relational swaps make it exit 0", relops_found);
         else if (relops_found < 0)
             snprintf(rep->reason, sizeof(rep->reason), "abstain: every verified swap matches a demoted induced pattern");
@@ -3158,6 +3369,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                      (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0) &&
                      (strcmp(cfix_rule, "split_function") != 0 ||
                       (ws_find_named(after, created.rel) >= 0 && ws_find_named(after, created2.rel) >= 0));
+        } else if (!strcmp(rep->op, "evidence_fix")) {
+            intent = rep->compile_after == 1 && rep->run_after == 0;
         } else if (!strcmp(rep->op, "declare_implicit")) {
             IMPLICIT_USE left[DECL_MAX];
             intent = rep->compile_after == 1 && implicit_uses(after, flags, left, DECL_MAX) < uses_before;

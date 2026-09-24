@@ -625,6 +625,26 @@ int main(void)
         CHECK(strstr(get(d, "main.c"), "== 3 ? 0 : 1") != NULL, "primitive search: main's check never edited");
     }
 
+    /* evidence_fix: neutral wording, the failing run picks the one edit;
+       main (the oracle) is never edited when helpers exist */
+    {
+        char d[512]; make_dir(d, sizeof(d), "evidence");
+        put(d, "main.c", "static int count_to(int n) { int s = 0; for (int i = 1; i < n; i++) s++; return s; }\nint main(void) { return count_to(3) == 3 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program fails; fix the bug so it exits 0.", &r);
+        if (r.compile_before == -1) CHECK(1, "no compiler: evidence_fix skipped");
+        else CHECK(!strcmp(r.op, "evidence_fix") && strstr(get(d, "main.c"), "i <= n;") && strstr(get(d, "main.c"), "== 3 ? 0 : 1"),
+                   "evidence_fix: i < n -> i <= n from the failing run, main untouched");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "evidence2");
+        const char *t = "static int lo(int v) { return v < 5; }\nstatic int hi(int v) { return v > 5; }\nint main(void) { return lo(5) || hi(5) ? 0 : 1; }\n";
+        put(d, "main.c", t);
+        TASK_OPS_REPORT r;
+        TaskOpsSolve(d, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(!strcmp(get(d, "main.c"), t), "evidence_fix: two single edits both work -> abstain");
+    }
+
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the
        lines that name it. */
