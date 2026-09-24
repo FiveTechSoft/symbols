@@ -139,6 +139,29 @@ int main(void)
         TaskOpsFreeWorkspace(&ws);
     }
 
+    /* a file the task requires must exist after the edit, one-letter names included */
+    {
+        char d[512]; make_dir(d, sizeof(d), "reqnew");
+        put(d, "main.c", "#define OLD_SIZE 3\nint main(void) { return OLD_SIZE == 3 ? 0 : 1; }\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Constant OLD_SIZE should be NEW_SIZE everywhere, and x.txt must exist.", &r);
+        CHECK(!kept && !r.verified && strstr(get(d, "main.c"), "OLD_SIZE") && !file_exists(d, "x.txt"),
+              "required new file x.txt missing: edit rolled back");
+    }
+    {
+        char d[512]; make_dir(d, sizeof(d), "reqsub");
+        put(d, "main.c", "#include \"inc/cfg.h\"\nint main(void) { return OLD_SIZE == 3 ? 0 : 1; }\n");
+        char sd[600]; snprintf(sd, sizeof(sd), "%s/inc", d); _mkdir(sd);
+        put(d, "inc/cfg.h", "#define OLD_SIZE 3\n");
+        TASK_OPS_REPORT r;
+        int kept = TaskOpsSolve(d, "Constant OLD_SIZE should be NEW_SIZE everywhere, including cfg.h.", &r);
+        CHECK(kept && r.verified, "named file found under a subdirectory still counts when it already existed");
+        char d2[512]; make_dir(d2, sizeof(d2), "reqsub2");
+        put(d2, "main.c", "#define OLD_SIZE 3\nint main(void) { return OLD_SIZE == 3 ? 0 : 1; }\n");
+        kept = TaskOpsSolve(d2, "Constant OLD_SIZE should be NEW_SIZE everywhere, e.g. in main.c.", &r);
+        CHECK(kept && r.verified, "e.g. is not a file name");
+    }
+
     /* full loop on disk: verified edit kept */
     {
         char d[512]; make_dir(d, sizeof(d), "keep");

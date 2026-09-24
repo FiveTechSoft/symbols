@@ -66,3 +66,11 @@ Three more c_fix rules, still developed only against dev tasks:
 - `split_function`: "split F() out ... into S.c with a prototype in S.h". The one top-level definition of F moves to S.c (a `static` is dropped), S.h gets a guarded prototype, and the source includes S.h. Both files must be new; the linked program must build and exit 0 with both files present, otherwise everything is rolled back, including the created files.
 
 Bank: 41/56 -> 44/56, 0 wrong edits. Dev 32/32, heldout unchanged at 12/24 (sh_002 and sh_006 stay as the generalization measure, by decision). Unit tests and fuzz stage 6 cover the new rules (ASan/UBSan clean at 200k).
+
+## Safety fix: required new files (blind wrong edit)
+
+Mimo's blind re-run on ecd9560 had 1 wrong edit: multi_file, where the agent kept an edit and reported success while a new file the task required was missing. The verify step already required every named file to exist afterwards, but it had two gaps:
+- One-letter file names (`a.h`, `x.txt`) were not recognized as file names at all. The two-letter minimum exists to skip "e.g."/"i.e.". A one-letter stem now counts when the extension is a known one (c, h, cc, cpp, hpp, py, sh, md, txt, yml, json, mk).
+- A named file that did not exist before could be satisfied by a same-named file in a subdirectory. A new file now has to exist at exactly the named path. Files that already existed keep the subdirectory match.
+
+This is a verification change only: it can turn a kept edit into a rollback, never the other way. The new test in test_task_ops fails on the old code and passes on the new. Bank unchanged at 44/56 with 0 wrong edits; ctest 106/106. This was not tuned on the blind batch. Only Mimo's category/cause line was used.

@@ -1141,7 +1141,15 @@ static int next_named_file(const char *task, size_t *pos, char *name, size_t nam
             { i = e; continue; }
         size_t x = e + 1;
         while (x < len && isalnum((unsigned char)task[x])) x++;
-        if (e - i < 2 || x - e - 1 < 1 || x - e - 1 > 4 || (x < len && (task[x] == '.' && x + 1 < len &&
+        /* a one-letter stem ("a.h") counts only with a known file extension,
+           so "e.g." and "i.e." are not file names */
+        int short_ok = 0;
+        if (e - i == 1) {
+            static const char *const ext[] = {"c", "h", "cc", "cpp", "hpp", "py", "sh", "md", "txt", "yml", "json", "mk", NULL};
+            for (int k = 0; ext[k]; k++)
+                if (strlen(ext[k]) == x - e - 1 && !strncmp(task + e + 1, ext[k], x - e - 1)) short_ok = 1;
+        }
+        if ((e - i < 2 && !short_ok) || x - e - 1 < 1 || x - e - 1 > 4 || (x < len && (task[x] == '.' && x + 1 < len &&
                                                           isalnum((unsigned char)task[x + 1]))))
             { i = x; continue; }
         if (x - i >= name_size) { i = x; continue; }
@@ -1177,10 +1185,13 @@ static int named_files_exist(const TASK_OPS_WORKSPACE *before, const TASK_OPS_WO
     char name[TASK_OPS_MAX_PATH];
     while (next_named_file(task, &pos, name, sizeof(name))) {
         int found = 0;
+        /* a file the task names that did not exist before must now exist at
+           exactly that path: a same-named file elsewhere is not the new file */
+        int was_there = ws_find_named(before, name) >= 0;
         for (int f = 0; f < after->count; f++) {
             const char *r = after->files[f].rel;
             size_t rl = strlen(r), nl = strlen(name);
-            if (!(!strcmp(r, name) || (rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name))))
+            if (!(!strcmp(r, name) || (was_there && rl > nl && r[rl - nl - 1] == '/' && !strcmp(r + rl - nl, name))))
                 continue;
             found = 1;
             (*named)++;
