@@ -18,6 +18,15 @@ static void set_memory(int on)
 #endif
 }
 
+static void set_evidence_run(int on)
+{
+#ifdef _WIN32
+    _putenv(on ? "SYMBOLS_EVIDENCE_RUN=1" : "SYMBOLS_EVIDENCE_RUN=0");
+#else
+    setenv("SYMBOLS_EVIDENCE_RUN", on ? "1" : "0", 1);
+#endif
+}
+
 static void set_trace(const char *path)
 {
     char buf[700];
@@ -625,6 +634,18 @@ int main(void)
         CHECK(strstr(get(d, "main.c"), "== 3 ? 0 : 1") != NULL, "primitive search: main's check never edited");
     }
 
+    /* run-based evidence_fix is opt-in: off by default, a failing program
+       that one boundary edit would make exit 0 is left untouched */
+    {
+        char d[512]; make_dir(d, sizeof(d), "evidence_off");
+        const char *t = "static int count_to(int n) { int s = 0; for (int i = 1; i < n; i++) s++; return s; }\nint main(void) { return count_to(3) == 3 ? 0 : 1; }\n";
+        put(d, "main.c", t);
+        TASK_OPS_REPORT r;
+        set_evidence_run(0);
+        TaskOpsSolve(d, "The program fails; fix the bug so it exits 0.", &r);
+        CHECK(!strcmp(get(d, "main.c"), t), "evidence_fix: run search off by default -> untouched");
+    }
+    set_evidence_run(1);
     /* evidence_fix: neutral wording, the failing run picks the one edit;
        main (the oracle) is never edited when helpers exist */
     {
@@ -723,6 +744,7 @@ int main(void)
         TaskOpsSolve(d3, "The program fails; fix the bug so it exits 0.", &r);
         CHECK(!strcmp(get(d3, "main.c"), t3), "evidence_fix: passing run with only a warning -> untouched");
     }
+    set_evidence_run(0);
 
     /* phase 2b: Allman braces ("{" on the next line). main's body stays the
        oracle, and the anchored function's body is searched, not only the

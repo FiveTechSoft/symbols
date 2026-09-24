@@ -3151,6 +3151,16 @@ static const char *const op_names[OP_COUNT] = {
     "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "evidence_fix"
 };
 
+/* The run-based evidence search (a candidate edit kept because the bare
+   program then exits 0) is opt-in: an exit code alone cannot tell the
+   intended fix from another edit that also passes, and the blind batch
+   showed one. SYMBOLS_EVIDENCE_RUN=1 turns it back on. */
+static int evidence_run_enabled(void)
+{
+    const char *v = getenv("SYMBOLS_EVIDENCE_RUN");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
 static int mem_enabled(void)
 {
     const char *v = getenv("SYMBOLS_TASK_OPS_MEMORY");
@@ -3448,7 +3458,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(cfix_rule, sizeof(cfix_rule), "undeclared_local");
             snprintf(rep->op, sizeof(rep->op), "evidence_fix");
             snprintf(rep->detail, sizeof(rep->detail), "undeclared_local: %.80s in %.100s (gcc: undeclared)", cfix_detail, ws->files[cfix_file].rel);
-        } else if (op == OP_EVIDENCE && relops_found >= 0 && rep->compile_before == 1 && rep->run_before >= 0 && rep->run_before != 124 &&
+        } else if (op == OP_EVIDENCE && evidence_run_enabled() && relops_found >= 0 && rep->compile_before == 1 &&
+                   rep->run_before >= 0 && rep->run_before != 124 &&
                    (evidence_wins = evidence_search(ws, flags, rep->run_before, &cfix_file, &next_shell, cfix_rule, sizeof(cfix_rule),
                                                     cfix_detail, sizeof(cfix_detail), &evidence_tried)) == 1) {
             next[cfix_file] = next_shell;

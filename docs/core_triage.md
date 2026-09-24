@@ -140,3 +140,9 @@ A failed verification restores the prior state (conflict re-created with
 without "keep both" wording, a deleted file the task does not name, or a
 revert without build evidence is an abstention: nothing is edited and the
 file operators do not run on that repository state either.
+
+## Run-based evidence_fix is opt-in
+
+Mimo's blind re-measure on 817a947 still had one debug wrong edit: the run-based evidence search kept a boundary rewrite that made the bare program exit 0, and the hidden check rejected it. An exit code alone cannot tell the intended fix from another edit that also passes, so the run-based search is now off by default and runs only with `SYMBOLS_EVIDENCE_RUN=1`. The compiler-evidence path (`undeclared_local`, chosen by gcc's own "undeclared" error) is unchanged. The search comes back on by default only with an oracle stronger than the bare run.
+
+Measurement: public bank 47/59, 0 wrong edits (no public pass used the run search). Neutral-wording probe 16/59 -> 13/59, 0 wrong edits (eb_dbg_001, 003, 006 needed it). New test: failing program that one boundary edit would fix is left untouched by default; the existing evidence tests run with the switch on.
