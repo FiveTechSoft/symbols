@@ -3692,6 +3692,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     char *lit_out = NULL;
     FRAG_HIT hit;
     rep->candidates = renames;
+    int crn = 0, crt = 0;
     for (int oi = 0; oi < OP_COUNT && !touched; oi++) {
         int op = order[oi];
         if (skip[op]) {
@@ -3790,6 +3791,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(rep->op, sizeof(rep->op), "c_fix");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.120s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
         } else if (op == OP_CREPAIR && rep->compile_before == 0 &&
+                   named_files_exist(ws, ws, task, &crn, &crt) &&   /* a named file it cannot create */
                    (touched = compile_repair_target(ws, flags, next, cfix_rule, sizeof(cfix_rule), cfix_detail, sizeof(cfix_detail))) > 0) {
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "compile_repair");

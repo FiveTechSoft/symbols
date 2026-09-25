@@ -85,6 +85,36 @@ int main(void)
     CHECK(has(c, n, "ident_near", "square"));
     CompileRepairFree(c, n);
 
+    /* implicit call, definition in another file, no header: prototype in the caller */
+    memset(&ws, 0, sizeof(ws));
+    set(0, "main.c", "#include <stdio.h>\nint main(void){ return add3(1,2,3) != 6; }\n");
+    set(1, "util.c", "int add3(int a, int b, int c){ return a+b+c; }\n");
+    n = CompileRepairCandidates(&ws, "main.c:2:24: error: implicit declaration of function 'add3' [-Werror=implicit-function-declaration]\n", c, 32);
+    CHECK(has(c, n, "proto_add", "#include <stdio.h>\nint add3(int a, int b, int c);\n"));
+    CompileRepairFree(c, n);
+
+    /* ... and in the one header both files include, when there is one (tier 1) */
+    memset(&ws, 0, sizeof(ws));
+    set(0, "src/main.c", "#include \"util.h\"\nint main(void){ return twice(4) != 8; }\n");
+    set(1, "src/util.c", "#include \"util.h\"\nint twice(int x){ return 2*x; }\n");
+    set(2, "src/util.h", "#ifndef UTIL_H\n#define UTIL_H\nint half(int x);\n#endif\n");
+    n = CompileRepairCandidates(&ws, "src/main.c:2:24: error: implicit declaration of function 'twice'\n", c, 32);
+    CHECK(has(c, n, "proto_add", "int half(int x);\nint twice(int x);\n#endif"));
+    CompileRepairFree(c, n);
+
+    /* static in another file, or defined twice: no prototype candidate */
+    memset(&ws, 0, sizeof(ws));
+    set(0, "main.c", "int main(void){ return hid(); }\n");
+    set(1, "a.c", "static int hid(void){ return 0; }\n");
+    n = CompileRepairCandidates(&ws, "main.c:1:24: error: implicit declaration of function 'hid'\n", c, 32);
+    CHECK(!has(c, n, "proto_add", NULL));
+    CompileRepairFree(c, n);
+    set(1, "a.c", "int hid(void){ return 0; }\n");
+    set(2, "b.c", "int hid(void){ return 1; }\n");
+    n = CompileRepairCandidates(&ws, "main.c:1:24: error: implicit declaration of function 'hid'\n", c, 32);
+    CHECK(!has(c, n, "proto_add", NULL));
+    CompileRepairFree(c, n);
+
     /* nothing near: no candidate */
     memset(&ws, 0, sizeof(ws));
     set(0, "main.c", "int main(void){ return zzqq; }\n");

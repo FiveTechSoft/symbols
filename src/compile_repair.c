@@ -367,6 +367,43 @@ int CompileRepairCandidates(const TASK_OPS_WORKSPACE *ws, const char *diag, CR_C
             n = push(out, n, max, fi, splice(src, at, 0, ins), 1, "include_def", d);
         }
     }
+    /* proto_add: an implicit call to a function with exactly one definition
+       in the workspace gets that definition's header as a prototype - in the
+       one local header both files include (tier 1), else in the calling file
+       after its includes (tier 2) */
+    if (implicit) {
+        int defs = 0, df = -1;
+        size_t db = 0, de = 0;
+        for (int i = 0; i < ws->count; i++) {
+            size_t b, e;
+            int k = find_def(ws->files[i].data, subj, &b, &e);
+            if (k) { defs += k; df = i; db = b; de = e; }
+        }
+        const char *ds = df >= 0 ? ws->files[df].data : NULL;
+        if (defs == 1 && de - db < 400 && !(df != fi && !strncmp(ds + db, "static", 6) && !idc((unsigned char)ds[db + 6]))) {
+            char proto[420];
+            snprintf(proto, sizeof(proto), "%.*s;\n", (int)(de - db), ds + db);
+            for (char *c = proto; c[1]; c++) if (*c == '\n' || *c == '\r' || *c == '\t') *c = ' ';
+            if (df != fi) {
+                for (int h = 0; h < ws->count; h++) {
+                    const char *rel = ws->files[h].rel, *hs = ws->files[h].data;
+                    size_t rl = strlen(rel);
+                    if (rl < 3 || strcmp(rel + rl - 2, ".h") || !includes(src, base_of(rel)) || !includes(ds, base_of(rel)))
+                        continue;
+                    size_t at = strlen(hs);
+                    const char *endif = NULL;
+                    for (const char *q = strstr(hs, "#endif"); q; q = strstr(q + 1, "#endif")) endif = q;
+                    if (endif && strstr(hs, "#ifndef")) at = (size_t)(endif - hs);
+                    char ins[440];
+                    snprintf(ins, sizeof(ins), "%s%s", at == strlen(hs) && at && hs[at - 1] != '\n' ? "\n" : "", proto);
+                    snprintf(d, sizeof(d), "%.60s declared in %.80s", subj, base_of(rel));
+                    n = push(out, n, max, h, splice(hs, at, 0, ins), 1, "proto_add", d);
+                }
+            }
+            snprintf(d, sizeof(d), "%.60s declared in %.80s", subj, base_of(ws->files[fi].rel));
+            n = push(out, n, max, fi, splice(src, after_includes(src), 0, proto), 2, "proto_add", d);
+        }
+    }
     /* loop_decl */
     if (undecl) {
         char pat[3][100];

@@ -16,6 +16,11 @@
  *   tier 1 proto_sync   - conflicting types / wrong argument count for F, and
  *                         F has one definition and a prototype that differs:
  *                         the prototype becomes the definition's header
+ *   tier 1 proto_add    - implicit call to F, F has exactly one definition
+ *                         (not static elsewhere): its header becomes a
+ *                         prototype in the one local header both files
+ *                         include; tier 2: in the calling file after its
+ *                         includes
  *   tier 1 semicolon    - expected ';': it is added at the end of the
  *                         previous code line
  *   tier 2 loop_decl    - X undeclared and assigned in "for (X =": that
