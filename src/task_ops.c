@@ -3566,6 +3566,10 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
 /* last compile_repair attempt, for the abstain shape: candidates generated
    and candidates that built (-1 = not attempted) */
 static int g_cr_cands = -1, g_cr_built = -1;
+/* why compile_repair produced no counts: 'n' the task names a file that does
+   not exist, 's' no C sources, 'e' its own build showed no error; 0 = the
+   operator was not reached */
+static char g_cr_why = 0;
 
 /* compile_repair: the first compiler (or linker) error yields single-edit
    candidates; each is compiled on a scratch copy outside the tree, and only
@@ -3578,8 +3582,10 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     char *diag = NULL;
     int touched = 0;
     g_cr_cands = g_cr_built = -1;
-    if (c_sources(ws, srcs, sizeof(srcs)) == 0)
+    if (c_sources(ws, srcs, sizeof(srcs)) == 0) {
+        g_cr_why = 's';
         return 0;
+    }
     temp_binary(bin, sizeof(bin));
     snprintf(cmd, sizeof(cmd), "gcc %s-o \"%s\" %s", flags, bin, srcs);
     SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
@@ -3597,8 +3603,10 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     }
     free(r);
     remove(bin);
-    if (!diag)
+    if (!diag) {
+        g_cr_why = 'e';
         return 0;
+    }
     CR_CAND *c = (CR_CAND *)calloc(32, sizeof(CR_CAND));
     TASK_OPS_WORKSPACE *tw = (TASK_OPS_WORKSPACE *)malloc(sizeof(*tw));
     int n = c ? CompileRepairCandidates(ws, diag, c, 32) : 0;
@@ -3841,6 +3849,9 @@ static void diag_shape(const TASK_OPS_WORKSPACE *ws, char *out, size_t size)
     char crs[32] = "";
     if (g_cr_cands >= 0)   /* compile_repair: candidates / built, bucketed 0, 1, 2+ */
         snprintf(crs, sizeof(crs), " cr=%d cb=%d", g_cr_cands > 1 ? 2 : g_cr_cands, g_cr_built > 1 ? 2 : g_cr_built);
+    else   /* no counts: say why, closed form */
+        snprintf(crs, sizeof(crs), " crskip=%s",
+                 g_cr_why == 'n' ? "named" : g_cr_why == 's' ? "nosrc" : g_cr_why == 'e' ? "noerr" : "notrun");
     snprintf(out, size, " [diag=%s nerr=%d nc=%d%s]", cls, cls[0] == 'l' || nerr < 2 ? 1 : nerr < 4 ? 2 : 4, nc > 1 ? 2 : 1, crs);
 }
 
@@ -3888,6 +3899,7 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
 static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 {
     g_cr_cands = g_cr_built = -1;
+    g_cr_why = 0;
     g_ccc_cands = g_ccc_pass = g_ccc_parsed = g_ccc_idx = -1;
     TASK_OPS_REPORT local;
     if (!rep)
@@ -4083,7 +4095,7 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
             snprintf(rep->op, sizeof(rep->op), "c_fix");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.120s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
         } else if (op == OP_CREPAIR && rep->compile_before == 0 &&
-                   named_files_exist(ws, ws, task, &crn, &crt) &&   /* a named file it cannot create */
+                   (named_files_exist(ws, ws, task, &crn, &crt) || ((g_cr_why = 'n'), 0)) &&   /* a named file it cannot create */
                    (touched = compile_repair_target(ws, flags, next, cfix_rule, sizeof(cfix_rule), cfix_detail, sizeof(cfix_detail))) > 0) {
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "compile_repair");

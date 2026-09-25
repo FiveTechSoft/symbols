@@ -216,11 +216,12 @@ def reason_class(log: str, agent_rc: int) -> str:
                       r"doc=[01] test=[01] git=[01])\]", kept[-1])
         if m:
             d = re.search(r"git=[01]\] \[diag=(" + "|".join(DIAG_CLASSES) + r") nerr=([124]) nc=([12])"
-                          r"(?: cr=([012]) cb=([012]))?\]", kept[-1])
+                          r"(?: cr=([012]) cb=([012])| crskip=(named|nosrc|noerr|notrun))?\]", kept[-1])
             tail = ""
             if d:
                 tail = " [diag=%s nerr=%s nc=%s" % d.groups()[:3]
-                tail += (" cr=%s cb=%s" % d.groups()[3:]) if d.group(4) is not None else ""
+                tail += (" cr=%s cb=%s" % d.groups()[3:5]) if d.group(4) is not None else ""
+                tail += (" crskip=%s" % d.group(6)) if d.group(6) is not None else ""
                 tail += "]"
             k = re.search(r"git=[01]\] \[cc=([01])(?: cn=([012]) cp=([012]))?\]", kept[-1])
             if k:

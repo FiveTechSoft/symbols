@@ -117,6 +117,10 @@ def main():
     check(bh.reason_class(rb % "resolve_merge" + "[symbols-agent] No edit kept: verify failed: merge not completed cleanly\n", 0)
           == "verify failed [op=resolve_merge]", "git operator tag without intent fields")
     check(bh.reason_class(rb % "c_fix", 0) == "rolled back (operator verify failed) [op=c_fix]", "rolled back tag")
+    ab = "[symbols-agent] No edit kept: no operator preconditions hold [c=0 run=-1 sh=0 mk=0 doc=0 test=0 git=0] [diag=link nerr=1 nc=1%s]\n"
+    check(bh.reason_class(ab % " crskip=named", 0).endswith("[diag=link nerr=1 nc=1 crskip=named]"), "crskip reason kept")
+    check(bh.reason_class(ab % " crskip=other", 0).endswith("git=0]"), "unknown crskip drops the tail")
+    check(bh.reason_class(ab % " cr=2 cb=0", 0).endswith("[diag=link nerr=1 nc=1 cr=2 cb=0]"), "cr/cb still kept")
     print("test_bank_harness_setup: " + ("ALL PASSED" if not fails else f"{fails} FAILED"))
     return 1 if fails else 0
 
