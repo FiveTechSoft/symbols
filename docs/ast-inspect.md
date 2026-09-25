@@ -18,13 +18,16 @@ cmake -S . -B build-ast -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 
 On Windows, use the venv's `Scripts/python.exe` and a Ninja generator to
-produce the database. This is an instruction to test, **not** a claim of
-measured native Windows execution. The 18.1.1 Windows wheel was inspected:
-it contains libclang.dll (83,988,992 bytes) and Python bindings, but not
-clang-c headers or an import library. Existing MSVC/Visual Studio-generator
-CI does not emit `compile_commands.json`; CMake only exports it with Makefile
-and Ninja generators. No native C linkage or new library requirement has been
-added to the C core or its CI jobs.
+produce the database. Native Windows execution is measured by the
+`ast-inspect-windows-ninja` CI job on `windows-latest`: Python 3.11 x64,
+`libclang==18.1.1`, `ninja==1.12.1`, and CMake's Ninja generator produce
+`compile_commands.json` and run `tests/test_ast_inspect.py -v`. This corpus
+passed on commit `2f1ee43` ([CI run](https://github.com/FiveTechSoft/symbols/actions/runs/36133603060)).
+The 18.1.1 Windows wheel was inspected: it contains libclang.dll (83,988,992
+bytes) and Python bindings, but not clang-c headers or an import library.
+Existing MSVC/Visual Studio-generator CI does not emit `compile_commands.json`;
+CMake only exports it with Makefile and Ninja generators. No native C linkage
+or new library requirement has been added to the C core.
 
 Choose an exact TU and, when the database has multiple entries for that file,
 pass the zero-based database `--variant` index explicitly. The command reads
@@ -50,9 +53,10 @@ staleness; concurrent writes remain outside the guarantee.
 
 Tests cover nested shadowing, conditional variants, header closure, unresolved
 and indirect calls, and changed source/command provenance. They are skipped
-when the optional package is absent. Installing it and running this corpus on
-Windows Ninja is a future measured gate. The official LLVM developer archive
-is much larger than this opt-in adapter; no archive or binary is vendored.
+when the optional package is absent. The optional corpus ran successfully on
+native Windows Ninja CI for commit `2f1ee43`. The official LLVM developer
+archive is much larger than this opt-in adapter; no archive or binary is
+vendored.
 
 Sources: [libclang C interface](https://clang.llvm.org/docs/LibClang.html),
 [CMake compilation database generator limit](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html),
