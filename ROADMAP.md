@@ -94,6 +94,13 @@ reflexion learning loop
 
 Security capabilities, provenance, metrics, and cross-platform CI cut across every phase. Later phases may be prototyped early, but they do not exit before their dependencies.
 
+### Sequencing decisions (September 2026)
+
+These decisions change the order of work, not the dependency chain above. No pulled-forward item closes its phase early; each still has to meet its phase's exit criteria when that phase is reached.
+
+- **Minimal Reflexion loop before full Phase 7.** A small slice of Phase 7 is built now: attempt, structured reflection ("tried X, failed because Y") with source and timestamp, read back on a retry of the same task. Only reflections whose feedback came from the real toolchain are stored or read back. It is measured on analogue tasks against a reflection-off baseline, under the same gates as any other change (bank runs with zero wrong edits, full test suite, CI green on the final SHA). The rest of Phase 7 (full episodic record, bounded cross-task retrieval, restart and forgetting exit criteria on the external benchmark) stays where it is.
+- **AST design spike before Phase 4 proper.** A design spike starts now: tree-sitter versus libclang, the cost of each in the CMake build on Linux and MSVC, and which consumer comes first (candidate generation for the repair operators, or impact analysis). The spike produces prototypes and a written recommendation only; it changes no core code. Phase 4 deliverables and exit criteria are unchanged, and a syntax-only parser is not treated as compiler-grounded semantics (see "Explicitly out of scope").
+
 ## Phase 0: Safe shell execution
 
 **Goal:** make subprocess execution a bounded, observable primitive rather than an implicit source of repository state.
@@ -241,6 +248,8 @@ Security capabilities, provenance, metrics, and cross-platform CI cut across eve
 - Invalidation when toolchain, compile command, dependency, file, symbol, or test evidence changes.
 - Negative episodes for failed or unsafe approaches.
 
+**Vector search, if added, only proposes.** Today memory is triples plus an episodic TSV log, with small embeddings used only to rank or break ties; there is no vector database. If vector or similarity search is added in this phase, it acts only as a candidate generator: it may suggest episodes to consider, but every suggestion still passes the structural compatibility and evidence checks above, and only verified outcomes are written back. Similarity alone never authorizes an action or satisfies a gate.
+
 ### Exit criteria
 
 - Only episodes with completed verification gates can influence automatic action selection.
@@ -319,6 +328,7 @@ Benchmark thresholds belong beside versioned fixtures and should be tightened on
 - **False autonomy claims:** verifying a supplied candidate patch is not the same as resolving an issue from a natural-language report. Control: report proposal, selection, mutation, and verification success separately.
 - **Capability creep:** a general shell or Git token can bypass narrower contracts. Control: least-privilege capabilities and a complete mutation manifest.
 - **Memory poisoning:** an unverified episode can reinforce an earlier mistake. Control: verification-gated promotion, provenance, negative results, and invalidation.
+- **Server handles one request at a time (known infrastructure gap):** `symbols-server` accepts and serves connections serially, so one slow request blocks every other client. Control until fixed: clients run sequentially and use timeouts; closing the gap needs a bounded worker model with per-request isolation, measured under the concurrency and timeout stress set before it is claimed.
 
 ## Explicitly out of scope for this roadmap
 
@@ -329,6 +339,7 @@ Benchmark thresholds belong beside versioned fixtures and should be tightened on
 - Claiming full SWE-bench issue resolution from candidate-patch verification results.
 - Expanding to languages beyond C/C++ before their semantics, build/test evidence, and workflow recovery meet their gates.
 - Maximizing conversational breadth at the expense of engineering reliability.
+- Building a tool-protocol adapter (for example MCP) into the core. Such an adapter is a possible future distribution layer that would expose existing, already-gated operators to other agents; it adds no capability and no trust, and it is not scheduled in any phase.
 
 ## Next gate
 
