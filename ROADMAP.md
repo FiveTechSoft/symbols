@@ -13,6 +13,7 @@ This roadmap does not encode one behavior per situation. It builds mechanisms: *
 5. **Reversible changes.** Mutations use dry runs, precondition checks, atomic replacement where possible, and explicit rollback or compensation.
 6. **Facts and derived knowledge stay separate.** Source facts carry provenance. Heuristics, scores, diagnoses, and prior experiences are marked as derived and can be invalidated.
 7. **Natural conversation, grounded in evidence.** symbols behaves as a technical partner, not a legacy command bot. It reports what it did, what it verified, and what it does not know in plain language, grounded in the real state of the work. Conversational quality is a measured capability with its own fixtures, never a cosmetic layer over canned responses.
+8. **Memory + verification.** Memory is what makes learning accumulate; verification is what makes what accumulates true. Neither is enough alone: memory without verification gets poisoned (a false result is stored, recalled with confidence, and reinforced), and verification without memory repeats itself (every attempt starts from zero and makes the same mistakes). The loop between them is the point, and its order is fixed: perceive, test, correct, and only then consolidate; abstain when there is no verified evidence. Nothing enters memory as reusable experience before the real toolchain has checked it.
 
 ## Domain orientation
 
@@ -61,9 +62,9 @@ The shell hardening at commit `ba90e1d4ba648e844c3e975ad8e870df38877c89` adds th
 
 Local evidence for that patch was 70/70 `test_agent_shell` assertions, 82/82 in the exercised suite, and repeated stress runs passing. The guarded apply workflow also passed its Ubuntu build and CTest gate.
 
-### Known verification gap
+### Closed: final-SHA CI gap
 
-A push made by `github-actions[bot]` from the apply workflow does not trigger workflows configured only for `on: push`. As a result, the independent Linux/MSVC/ASan matrix did not run for the shell-hardening SHA. Until CI can be dispatched or called explicitly for an exact SHA and that run passes, Windows behavior for this patch remains unverified. The roadmap therefore treats reusable, final-SHA CI as an immediate gate, not as completed evidence.
+A push made by `github-actions[bot]` from the apply workflow does not trigger workflows configured only for `on: push`, so the Linux/MSVC/ASan matrix once did not run for the commit the apply workflow created. This is closed: `ci.yml` is now a reusable workflow (`workflow_call`), and the apply workflow calls it for the exact SHA it pushed, so every applied commit gets a Linux, MSVC, and MSVC ASan run on that SHA. A commit counts as verified only when that run is green.
 
 ## Dependency chain
 
@@ -343,4 +344,9 @@ Benchmark thresholds belong beside versioned fixtures and should be tightened on
 
 ## Next gate
 
-Finish Phase 0 by making the existing CI matrix callable for an exact SHA, invoking it from the patch workflow after commit creation, and obtaining green Linux, MSVC, and MSVC ASan evidence for the shell-hardening commit. Then begin the structured filesystem API without weakening the shell invariants.
+Final-SHA CI is in place (see "Closed: final-SHA CI gap"). The current work, in order (see "Sequencing decisions"):
+
+1. **Minimal Reflexion loop:** attempt, structured reflection from real toolchain feedback, read back on a retry of the same task; measured on analogue tasks against a reflection-off baseline, with bank runs at zero wrong edits, the full test suite, and green CI on the final SHA.
+2. **AST design spike:** tree-sitter versus libclang, CMake cost on Linux and MSVC, and the first consumer; prototypes and a written recommendation only, no core changes.
+
+The phase gates above are unchanged: no phase exits before its dependencies and exit criteria are met, and new work does not weaken the shell invariants.
