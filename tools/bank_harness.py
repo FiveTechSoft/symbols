@@ -199,6 +199,11 @@ def reason_class(log: str, agent_rc: int) -> str:
                 tail = " [diag=%s nerr=%s nc=%s" % d.groups()[:3]
                 tail += (" cr=%s cb=%s" % d.groups()[3:]) if d.group(4) is not None else ""
                 tail += "]"
+            k = re.search(r"git=[01]\] \[cc=([01])(?: cn=([012]) cp=([012]))?\]", kept[-1])
+            if k:
+                tail = " [cc=%s" % k.group(1)
+                tail += (" cn=%s cp=%s" % k.groups()[1:]) if k.group(2) is not None else ""
+                tail += "]"
             return "no operator preconditions hold [" + m.group(1) + "]" + tail
         for name, rx in REASON_CLASSES:
             if re.search(rx, kept[-1]):

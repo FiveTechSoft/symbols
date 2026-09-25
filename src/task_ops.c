@@ -9,6 +9,7 @@
 #include "c_fix_ops.h"
 #include "compile_repair.h"
 #include "shell_contract.h"
+#include "c_contract.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -3407,6 +3408,134 @@ static int shell_contract_target(const TASK_OPS_WORKSPACE *ws, const char *task,
     return idx;
 }
 
+/* c_contract: build and run the program (with text in place of file idx)
+   in a throwaway copy; 1 when it exits 0 and prints exactly the stated
+   output (trailing newlines ignored) */
+static int ccc_check(const TASK_OPS_WORKSPACE *ws, const char *flags, int idx, const char *text, const C_CONTRACT *c)
+{
+    char dir[TASK_OPS_MAX_PATH], cmd[4096], srcs[3072];
+    int ok = 0;
+    temp_binary(dir, sizeof(dir));
+    strncat(dir, "_ccc", sizeof(dir) - strlen(dir) - 1);
+    if (strchr(dir, '"') || c_sources(ws, srcs, sizeof(srcs)) == 0)
+        return 0;
+    make_dir(dir);
+    for (int i = 0; i < ws->count; i++) {
+        char sub[TASK_OPS_MAX_PATH * 2];
+        const char *r = ws->files[i].rel;
+        for (const char *q = strchr(r, '/'); q; q = strchr(q + 1, '/')) {
+            snprintf(sub, sizeof(sub), "%s/%.*s", dir, (int)(q - r), r);
+            make_dir(sub);
+        }
+        if (!write_file(dir, r, i == idx ? text : ws->files[i].data))
+            goto out;
+    }
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        goto out;
+    snprintf(cmd, sizeof(cmd), "gcc %s-o ccc_bin %s", flags, srcs);
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, dir, 20000, r);
+    if (!r->execution_failed && r->exit_code == 0) {
+#ifdef _WIN32
+        snprintf(cmd, sizeof(cmd), "ccc_bin.exe");
+#else
+        snprintf(cmd, sizeof(cmd), "./ccc_bin </dev/null");
+#endif
+        AgentShellResultInit(r);
+        AgentShellExec(cmd, dir, 5000, r);
+        if (!r->execution_failed && !r->timed_out && r->exit_code == 0) {
+            size_t n = r->stdout_len;
+            while (n && (r->stdout_buf[n - 1] == '\n' || r->stdout_buf[n - 1] == '\r')) n--;
+            ok = n == strlen(c->out) && !strncmp(r->stdout_buf, c->out, n);
+        }
+    }
+    free(r);
+out:
+    sc_rm_tree(dir, 0);
+    return ok;
+}
+
+static int count_main_defs(const TASK_OPS_WORKSPACE *ws)
+{
+    int mains = 0;
+    for (int i = 0; i < ws->count; i++) {
+        if (!is_c_source(ws->files[i].rel))
+            continue;
+        for (const char *line = ws->files[i].data; line && *line;) {
+            const char *nl = strchr(line, '\n');
+            size_t ll = nl ? (size_t)(nl - line) : strlen(line);
+            const char *semi = memchr(line, ';', ll), *brace = memchr(line, '{', ll);
+            if (line_defines_main(line, ll) && (!semi || (brace && brace < semi)))
+                mains++;
+            line = nl ? nl + 1 : NULL;
+        }
+    }
+    return mains;
+}
+
+/* last c_contract attempt, for the abstain line: candidates / passing */
+static int g_ccc_cands = -1, g_ccc_pass = -1, g_ccc_parsed = -1;
+
+/* c_contract: the program builds, the task states its wanted stdout, and
+   the program does not print it; single-edit candidates over every C
+   source (tests excluded) are each run in a throwaway copy, and only the
+   one candidate of the lowest passing tier is kept */
+static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, char **next,
+                             char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    C_CONTRACT cc;
+    g_ccc_cands = g_ccc_pass = -1;
+    g_ccc_parsed = CContractParse(task, &cc);
+    if (!g_ccc_parsed || count_main_defs(ws) != 1 || reads_input(ws))
+        return -1;
+    if (ccc_check(ws, flags, -1, NULL, &cc))
+        return -1;   /* already meets the stated output */
+    int fns = 0;
+    for (int f = 0; f < ws->count; f++)
+        if (is_c_source(ws->files[f].rel))
+            fns += defines_other_fn(ws->files[f].data);
+    int best_f = -1, best_k = -1, tier = 99, dup = 0, builds = 0;
+    static C_CAND c[16][96];
+    int nc[16] = {0}, nfiles = 0, fidx[16];
+    g_ccc_cands = g_ccc_pass = 0;
+    for (int f = 0; f < ws->count && nfiles < 16; f++) {
+        const TASK_OPS_FILE *F = &ws->files[f];
+        if (!is_c_source(F->rel) || !strncmp(F->rel, "test", 4) || strstr(F->rel, "/test") || F->len > 65536)
+            continue;
+        fidx[nfiles] = f;
+        nc[nfiles] = CContractCandidates(F->data, &cc, fns == 0, c[nfiles], 96);
+        g_ccc_cands += nc[nfiles];
+        nfiles++;
+    }
+    /* tiers run in order and stop at the first tier with a passing edit;
+       that tier must hold exactly one */
+    for (int t = 1; t <= 4 && best_k < 0; t++)
+        for (int x = 0; x < nfiles; x++)
+            for (int k = 0; k < nc[x]; k++) {
+                if (c[x][k].tier != t || builds >= 160)
+                    continue;
+                builds++;
+                if (!ccc_check(ws, flags, fidx[x], c[x][k].text, &cc))
+                    continue;
+                g_ccc_pass++;
+                if (best_k < 0) { tier = t; best_f = x; best_k = k; }
+                else dup = 1;
+            }
+    (void)tier;
+    int idx = -1;
+    if (best_k >= 0 && !dup) {
+        idx = fidx[best_f];
+        next[idx] = c[best_f][best_k].text;
+        c[best_f][best_k].text = NULL;
+        snprintf(rule, rsz, "%s", c[best_f][best_k].rule);
+        snprintf(detail, dsz, "%s", c[best_f][best_k].detail);
+    }
+    for (int x = 0; x < nfiles; x++)
+        CContractFree(c[x], nc[x]);
+    return idx;
+}
+
 /* last compile_repair attempt, for the abstain shape: candidates generated
    and candidates that built (-1 = not attempted) */
 static int g_cr_cands = -1, g_cr_built = -1;
@@ -3511,9 +3640,9 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     return touched;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_CREPAIR, OP_SHCONTRACT, OP_EVIDENCE, OP_COUNT };
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_CREPAIR, OP_SHCONTRACT, OP_CCONTRACT, OP_EVIDENCE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "compile_repair", "shell_contract", "evidence_fix"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "compile_repair", "shell_contract", "c_contract", "evidence_fix"
 };
 
 /* The run-based evidence search (a candidate edit kept because the bare
@@ -3710,6 +3839,13 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
     char diag[96] = "";
     if (rep->compile_before == 0)
         diag_shape(ws, diag, sizeof(diag));
+    else if (rep->compile_before == 1 && g_ccc_parsed >= 0) {   /* c_contract: stated output read / candidates / passing, bucketed */
+        if (g_ccc_cands >= 0)
+            snprintf(diag, sizeof(diag), " [cc=%d cn=%d cp=%d]", g_ccc_parsed, g_ccc_cands > 1 ? 2 : g_ccc_cands,
+                     g_ccc_pass > 1 ? 2 : g_ccc_pass);
+        else
+            snprintf(diag, sizeof(diag), " [cc=%d]", g_ccc_parsed);
+    }
     snprintf(rep->reason, sizeof(rep->reason),
              "no operator preconditions hold [c=%d run=%d sh=%d mk=%d doc=%d test=%d git=%d]%s",
              rep->compile_before < 0 ? -1 : rep->compile_before > 0,
@@ -3719,6 +3855,7 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
 int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 {
     g_cr_cands = g_cr_built = -1;
+    g_ccc_cands = g_ccc_pass = g_ccc_parsed = -1;
     TASK_OPS_REPORT local;
     if (!rep)
         rep = &local;
@@ -3922,6 +4059,12 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "shell_contract");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.100s", shell_rule, shell_detail, ws->files[shell_file].rel);
+        } else if (op == OP_CCONTRACT && rep->compile_before == 1 &&
+                   (cfix_file = c_contract_target(ws, flags, task, next, cfix_rule, sizeof(cfix_rule), cfix_detail, sizeof(cfix_detail))) >= 0) {
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "c_contract");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.100s", cfix_rule, cfix_detail, ws->files[cfix_file].rel);
         } else if (op == OP_CFIX && (cfix_file = cfix_split_target(ws, task, &split)) >= 0) {
             next[cfix_file] = split.new_src;
             snprintf(created.rel, sizeof(created.rel), "%s", split.c_rel);
