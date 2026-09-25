@@ -1,8 +1,19 @@
 # Changelog
 
+Los conteos de tests de cada fase son resultados históricos de las ejecuciones indicadas, no una garantía de CI verde en el SHA actual. Consulte los límites actuales en `README.md` §§6-7.
+
 Todas las novedades, mejoras y correcciones notables de **Symbolic LLM / symbols-server** quedan documentadas en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
+
+## [Trabajo acotado posterior a Phase 26] - 2026-09-25
+- `a2ddbfec`: pregunta CLI opt-in para `stdout-goal-missing` en un programa C sin entradas, solo tras abstención sin edición. Un clasificador natural anterior fue rechazado por preguntar en casos inseguros. Véase `docs/abstain-and-ask.md`.
+- `1f07a11`: continuación CLI con clave del workspace y respuesta stdout suministrada por quien invoca la herramienta; prueba todos los candidatos del primer nivel que pasa, exige unicidad, compilación y ejecución. Comprueba una salida de una línea normalizada, no bytes exactos ni la verdad semántica del objetivo. No persiste episodios de éxito en esta versión.
+- `650741f`: inspector opcional libclang de solo lectura para una TU C y variante explícita de `compile_commands.json`; se abstiene si hay diagnósticos o binding no resuelto. No edita, no da permiso de edición, no demuestra impacto de todo el proyecto y no soporta C++.
+- `2f1ee43` y `80bdf08`: job Windows nativo con Ninja, Python 3.11 y `libclang==18.1.1`; el corpus opcional pasó en el SHA `2f1ee43`, con límites documentados en `docs/ast-inspect.md`. No es una afirmación sobre toda la matriz de un SHA posterior.
+- `a04ab07`: el test del harness conserva el umbral de 50 MB en builds normales y lo omite bajo ASan, cuyo overhead disparaba el umbral. No atribuye a producción una garantía de RAM fija.
+
+---
 
 ## [Phase 26] - 2026-09-21
 - **Expansión del Corpus Técnico C11, Grafo de Biblioteca Estándar y Síntesis Directa de Estructuras Canónicas**:
@@ -10,7 +21,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
     - Sección 15 formalizada con alineación bidireccional ES/EN de conceptos esenciales: puntero/pointer, memoria dinámica/dynamic memory, fuga de memoria/memory leak, desbordamiento de buffer/buffer overflow, lista enlazada/linked list, vector redimensionable/dynamic array, pila/stack LIFO, cola/queue FIFO, lectura y escritura de archivos/file I/O, quicksort, búsqueda binaria/binary search, operaciones a nivel de bits, preprocesador, estructuras/structs y parámetros de compilación.
     - Conocimiento técnico indexado sobre herramientas de desarrollo y diagnóstico: AddressSanitizer, UndefinedBehaviorSanitizer, Valgrind, GDB y CMake.
   - **Modelo de Grafo y Tipos de la Biblioteca Estándar C11 (`data/c_lang/c_std_lib.h`)**:
-    - Estructuras canónicas indexadas en el Grafo de Código AST: `C_NODE` (nodo para listas enlazadas) y `C_VECTOR` (array dinámico geométrico).
+    - Estructuras canónicas indexadas en el grafo léxico de símbolos de código (no AST de libclang): `C_NODE` (nodo para listas enlazadas) y `C_VECTOR` (array dinámico geométrico).
     - Incorporación de firmas libc: operaciones de archivo (`fopen`, `fgets`, `fseek`, etc.), utilidades (`qsort`, `bsearch`, conversiones numéricas, `system`), manipulación de cadenas y memoria, clasificación de caracteres (`ctype.h`), matemáticas (`math.h`), tiempo (`time.h`) y diagnósticos (`perror`, `strerror`).
   - **Discriminación de Intenciones y Priorización de Síntesis (`src/server_proto.c`)**:
     - `ServerIsInspectionTask`: blindaje para no clasificar estructuras como `lista enlazada` / `linked list` como comandos de inspección del sistema de archivos (`dir`/`ls`).
@@ -45,8 +56,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
     - Corregida la verificación del campo JSON `"status"`: ahora inspecciona estrictamente el valor del campo tras los dos puntos (`"error"`, `"fail"`), evitando que respuestas exitosas con campos posteriores como `"error": null` o `"error": false` activen falsamente `is_error = 1`.
     - Detección precisa de campos de error JSON (`"isError": true`, `"is_error": true`, `"error": "<mensaje>"`), ignorando valores neutros (`null`, `false`, `""`, `0`).
     - Detección segura de códigos de salida numéricos en JSON (`"exit_code"`, `"returncode"`, `"exitCode"`, etc.) exigiendo dígitos o signo entero tras `:`, previniendo colisiones con campos de texto como `"code": "printf(...)"`.
-  - **Inmunidad para Herramientas de Inspección y Lectura de Código**:
-    - Herramientas de solo lectura (`glob`, `read`, `grep`, `locate_symbol`, `view_file`, `find_by_name`, `grep_search`) quedan exentas del escaneo por patrones de error de compilador o de pruebas (`DiagnosticParseOutput` y cadenas como `error:`, `FAILED`, `Permission denied`), impidiendo que rutas de archivo o código leído conteniendo esas palabras disparen bucles de replanificación o fallos espurios de verificación.
+  - **Separación de contenido leído y diagnósticos en los casos probados**:
+    - Herramientas de solo lectura (`glob`, `read`, `grep`, `locate_symbol`, `view_file`, `find_by_name`, `grep_search`) se excluyen del escaneo por patrones de error de compilador o de pruebas (`DiagnosticParseOutput` y cadenas como `error:`, `FAILED`, `Permission denied`), impidiendo que rutas de archivo o código leído conteniendo esas palabras disparen bucles de replanificación o fallos espurios de verificación.
   - **Extracción de Contenido Multiformato en `ServerExtractLastToolResponse` (`TakeJsonContent`)**:
     - Soporte transparente para contenidos de herramientas tanto en cadena de texto plano (`"content": "..."`) como en arrays de partes (`"content": [{"type": "text", "text": "..."}]`) o listas JSON crudas de coincidencias (`["file1", "file2"]`).
   - **Formateo Limpio de Salida de Exploración (`ServerFormatInspectionOutput`)**:
@@ -65,7 +76,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - `data/c_lang/c_corpus.txt` (estándar C11, memoria dinámica, tipos e invariantes de libc) establecido como corpus de conocimiento predeterminado en `symbols-server` y `chat_main`.
   - Actualizados los scripts de lanzamiento (`run_symbols_server.bat`, `run_symbols_server.ps1`, `run_symbols_server.sh`) para arrancar con el corpus de C11 por defecto.
   - Los textos bíblicos (`bible.txt`) y de psicología analítica (`jung.txt`) se desvinculan del arranque predeterminado, preservándose intacta la capacidad de carga explícita mediante argumento en línea de comandos o vía `/load`.
-  - Las consultas técnicas como *"What causes memory leaks?"* se resuelven directamente con las directrices de C11 (`"Failing to free allocated memory causes memory leaks that exhaust available system resources."`), sin riesgo de secuestro léxico o respuestas anacrónicas.
+  - Las consultas técnicas como *"What causes memory leaks?"* se resuelven directamente con las directrices de C11 (`"Failing to free allocated memory causes memory leaks that exhaust available system resources."`), en los casos probados; no hay garantía contra toda interferencia léxica o respuesta anacrónica.
   - Aislamiento de estado en peticiones HTTP individuales (`nmsg <= 1`): reseteo automático de diálogo y oraciones ya mostradas (`ntshown = 0`), evitando contaminación cruzada entre clientes stateless.
   - Wrap-around determinista en `src/chat.c` (`INT_TEXTQ`): cuando todas las oraciones candidatas han sido emitidas en un diálogo y se recibe una consulta directa (`!p->t_following`), reinicia el historial de oraciones en lugar de responder "No entendi la pregunta".
   - Validación completa con CTest (67 Passed, 9 Skipped, 0 Failed de 76 tests), 212/212 pruebas unitarias de protocolo agéntico y 100% éxito en los harnesses de prueba OpenCode (`test_opencode_user_cases.py` y `test_opencode_copilot_e2e.py`).
@@ -96,11 +107,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ---
 
 ## [Phase 20] - 2026-09-21
-- **Soporte universal para relaciones genéricas en modelos binarios (`GenericRelToConn`, `ChatLoadModel`)**:
-  - Eliminada la barrera de relaciones fijas: cualquier relación arbitraria o personalizada (p. ej. `contains`, `part_of`, `requires`, `kit_contains`, `component_of`, `directed_by`, etc.) se normaliza de forma automática y composicional a conectivos naturales reconocibles por el motor de QA sin perder semántica (`HARDCODING=0`).
+- **Soporte de relaciones genéricas probadas en modelos binarios (`GenericRelToConn`, `ChatLoadModel`)**:
+  - Eliminada la barrera de relaciones fijas: las relaciones personalizadas probadas (p. ej. `contains`, `part_of`, `requires`, `kit_contains`, `component_of`, `directed_by`, etc.) se normalizan de forma automática y composicional a conectivos naturales reconocibles por el motor de QA según la normalización implementada; las pruebas no cubren toda semántica posible.
   - Mapeo declarativo de sinónimos canónicos frecuentes en `COMPILED_RELMAP` (`CONTIENE`, `CONTAINS`, `PART_OF`, `PARTE_DE`, `REQUIRES`, `REQUIERE`, `COMPONENT_OF`, `COMPONENTE_DE`, `GENTILICIO`).
-  - Las relaciones ya no se descartan en silencio: 100% de las tripletas válidas del grafo entran al motor de preguntas y respuestas (`ChatFactCount > 0`).
-  - Normalización de entidades compuestas: los espacios en nombres de símbolos se convierten en guiones bajos para garantizar sintaxis unívoca en `LearnerLearnLine`.
+  - Las relaciones ya no se descartan en silencio: las tripletas válidas de los fixtures del harness llegaron al motor de preguntas y respuestas (`ChatFactCount > 0` en los casos probados).
+  - Normalización de entidades compuestas: los espacios en nombres de símbolos se convierten en guiones bajos para formar la sintaxis esperada en `LearnerLearnLine`.
   - Ingesta coordinada en el grafo semántico de sesión (`ch->tgraph`) mediante `IngestTripleSource` para habilitar recuperación difusa Levenshtein y memoria asociativa.
   - Función de telemetría de hechos cargados: `ChatFactCount(const CHAT *ch)`.
 - **Métricas transparentes en la carga de modelos (`/v1/model/load`, `/load`)**:
@@ -111,26 +122,26 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   - Cobertura de consultas en español e inglés con artículos determinados (`¿qué incluye el kit_a?`, `que contiene el kit_pro`, `what includes the kit_a`, `a que aplica el kit_b`).
 - **Síntesis Directa de Código C y Algoritmos (`ServerIsCodeSynthesisTask`, `ServerSynthesizeCode`)**:
   - Reconocimiento preciso de consultas de generación o síntesis de código en lenguaje natural (`escribe en C la funcion de fibonacci`, `write a C function to calculate factorial`, `invertir cadena`, `busqueda binaria`, etc.).
-  - Emite directamente la solución en Markdown estructurado con bloques de código C11 (````c`) completamente documentados, con funciones iterativas seguras ante desbordamiento, función de prueba `main()` y análisis de complejidad $O(n)$ / $O(1)$, retornando `finish_reason: "stop"`.
-  - Opera tanto en modo chat directo como en modo agéntico con herramientas declaradas en OpenCode, impidiendo que una solicitud de código puro dispare erróneamente el plan STRIPS SWE-bench sobre archivos de proyecto o degrade a preguntas factuales ("I don't know").
+  - Emite directamente la solución en Markdown estructurado con bloques de código C11 (````c`) para el catálogo de plantillas probado, con comprobaciones de desbordamiento en las funciones cubiertas, función de prueba `main()` y análisis de complejidad $O(n)$ / $O(1)$, retornando `finish_reason: "stop"`.
+  - Opera tanto en modo chat directo como en modo agéntico con herramientas declaradas en OpenCode, evitando en los casos de prueba que una solicitud de código puro dispare el plan STRIPS SWE-bench sobre archivos de proyecto o degrade a preguntas factuales ("I don't know").
 - **Robustez HTTP y Lectura Inmune a Variantes de Cabecera (`FindHttpHeader`, `ReadHttpBody`)**:
   - Función de búsqueda de cabeceras RFC `FindHttpHeader` insensible a mayúsculas/minúsculas y tolerante a espacios antes de `:` (`Content-Length`, `content-length`, etc.).
   - `ReadHttpBody` mejorado para aceptar payloads recibidos íntegramente en el paquete de cabeceras y recuperación no bloqueante de payloads JSON completos ante desconexiones anticipadas del cliente.
 - **Deserialización Segura de Cadenas Largas en JSON (`TakeJsonString`)**:
   - Truncamiento seguro para textos que exceden el tamaño de buffer destino: almacena de forma acotada y avanza el cursor hasta la comilla de cierre, evitando fallos `400 Bad Request` en historiales multi-turno voluminosos.
 
-  - Reconocimiento de intenciones de creación de ficheros (p. ej. `crea un fichero test.txt`, `nuevo archivo config.json`, `create file foo.c`), formulando un plan atómico de 1 paso que despacha directamente la herramienta `write` con `filePath` y contenido inicial.
+  - Reconocimiento de intenciones de creación de ficheros (p. ej. `crea un fichero test.txt`, `nuevo archivo config.json`, `create file foo.c`), formulando un plan de una llamada a `write` (sin transacción de archivos) que despacha directamente la herramienta `write` con `filePath` y contenido inicial.
   - Se evita la ejecución espuria del ciclo de compilación STRIPS (`cmake --build` / `ctest`) sobre tareas de creación de documentos o scripts auxiliares.
   - Finalización limpia con confirmación Markdown explícita (`### Archivo Creado con Exito ('test.txt')`).
 - **Gestión de Cargas HTTP de Gran Tamaño en Sesiones Multi-Turno (`SERVER_BODY_MAX`)**:
   - Ampliado el buffer máximo de peticiones HTTP a 2 MB (`2097152` bytes) y trasladado a memoria estática (`g_http_body`), eliminando de raíz el error `400 Bad Request: bad content length` que se producía cuando el cliente OpenCode enviaba esquemas de herramientas y varias vueltas de historial con salidas de archivo superiores a 64 KB.
-  - Búferes estáticos de respuesta (`content`: 32 KB, `resp`: 64 KB, `last_tool_output`: 16 KB) previniendo desbordamientos de pila y truncamientos en inspección de árboles de directorio extensos.
+  - Búferes estáticos de respuesta (`content`: 32 KB, `resp`: 64 KB, `last_tool_output`: 16 KB) acotando uso de pila y longitud de respuesta; un búfer finito aún puede truncar salidas largas.
 - **Compatibilidad RFC para Cabeceras HTTP (`Content-Length`)**:
   - Comprobación insensible a mayúsculas/minúsculas para `Content-Length:`, `content-length:` y `Content-length:`.
 - **Ampliación Léxica de Exploración e Inspección**:
   - Soporte en `ServerIsInspectionTask`, `ServerIsCodingTask` y `IsFolderOrGlobQuery` para comandos de exploración natural como `lista las subcarpetas`, `subdirectorios`, `subfolders`, `listar`, etc., despachando automáticamente la herramienta `glob` de OpenCode.
 - **Corrección de Extracción de Nombres de Archivo (`FindFileForIssue`)**:
-  - Eliminado el punto `.` como delimitador en `strtok` y añadido saneamiento de puntuación de cola (`.` `,` `;` `?` `)`), permitiendo extraer con total fidelidad nombres reales con extensión (`test.txt`, `main.c`, `config.json`, etc.) en lugar de degradar erróneamente a `CMakeLists.txt`.
+  - Eliminado el punto `.` como delimitador en `strtok` y añadido saneamiento de puntuación de cola (`.` `,` `;` `?` `)`), permitiendo extraer nombres con extensión en los casos probados con extensión (`test.txt`, `main.c`, `config.json`, etc.) en lugar de degradar erróneamente a `CMakeLists.txt`.
 - **Detección Rigurosa de Errores de Terminal y Herramientas (`ServerInspectToolResponse`)**:
   - `ServerInspectToolResponse` detecta ahora salidas de fallo en texto plano de herramientas como `bash` y `cmake` (p. ej. `Error: could not load cache`, `No tests were found`, `command not found`, `Permission denied`), impidiendo reportes falsos de verificación aprobada cuando una herramienta falla sin código JSON explícito.
 - **Soporte para Formato de Contenido de Usuario en Array**:
@@ -142,8 +153,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ### Añadido
 - **Integración Agéntica Nativa y Copiloto Local OpenCode (Modo E)**:
   - Implementación del protocolo OpenAI Tool Calling sobre `/v1/chat/completions` en C11 puro.
-  - Bucle ReAct continuo con formulación de planes STRIPS óptimos y resolución autónoma de tareas de ingeniería.
-  - Discriminación estricta entre intenciones de programación (shell, inspección, parches AST) y consultas factuales de conocimiento.
+  - Bucle ReAct continuo con formulación de planes STRIPS acotados y cierre de los flujos de ingeniería cubiertos por las pruebas.
+  - Discriminación estricta entre intenciones de programación (shell, inspección, parches de texto acotados) y consultas factuales de conocimiento.
   - Soporte para comandos de terminal (`dir`, `ls`, comodines `*.*`) sin fallback espurio de texto.
 
 ---
@@ -151,8 +162,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ## [Phase 18] - 2026-09-20
 ### Añadido
 - **Serialización Binaria de Alto Rendimiento y Mmap para Grafos**:
-  - Carga en memoria mapeada (`mmap`) de grafos de conocimiento a escala sin latencia de parseo.
-  - Empaquetamiento compacto de tripletas y persistencia atómica en disco.
+  - Carga en memoria mapeada (`mmap`) de grafos de conocimiento a escala sin parsear el texto original en el paso de mapeo; no supone latencia cero ni instantánea.
+  - Empaquetamiento compacto de tripletas y persistencia binaria probada en fixtures; no equivale a una transacción durable del almacén episódico.
 
 ---
 
@@ -169,7 +180,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - **Modulación Pragmática, Filtro Cuántico-Pirata y Cero Hardcoding**:
   - Perfil declarativo `PERSONA_PIRATE_QUANTUM` implementado con tablas léxicas formales (`g_persona_lexicons`).
   - Conmutación dinámica de perspectiva conversacional (`/persona <name>`, `:persona <name>`, `modo pirata`).
-  - Teorema formal de no-interferencia factual verificado empíricamente: $\text{Facts}(\Pi(Q)) \equiv \text{Facts}(Q)$.
+  - `PersonaVerifyNonInterference` comprueba no-interferencia factual en sus fixtures, no un teorema para toda consulta.
 
 ---
 
@@ -187,5 +198,5 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - **Los Cuatro Pilares Cognitivos en C11 (Zero Dependencies)**:
   - **Pilar 1 (VSA / HDC)**: Computación hiperdimensional con vectores Kanerva de 256 bits, popcount AVX2 y memoria de limpieza asociativa.
   - **Pilar 2 (CCG Realizer)**: Realizador sintáctico de superficie basado en Gramática Categorial Combinatoria con combinadores formales ($>, <, >B, <B$) y tablas de concordancia multilingüe (EN, ES, FR).
-  - **Pilar 3 (Sentido Común en RAM)**: Ingesta en flujo continuo de ConceptNet 5.8 (10M tripletas en ~305 MB RAM) con razonamiento de contención y affordances.
-  - **Pilar 4 (Perspectivas Epistémicas & Persona)**: Filtros de perspectiva matemática (`neutral`, `architect`, `auditor`, `tutor`, `concise`, `socratic`) con abstención honesta y 0 alucinaciones.
+  - **Pilar 3 (Sentido Común en RAM)**: Ingesta en flujo continuo de datos de ConceptNet; el snapshot local de 5.7.0 (5,64M tripletas, 251 MB) se describe en AGENTS.md con razonamiento de contención y affordances.
+  - **Pilar 4 (Perspectivas Epistémicas & Persona)**: Filtros de perspectiva matemática (`neutral`, `architect`, `auditor`, `tutor`, `concise`, `socratic`) con abstención en casos probados; sin garantía de cero alucinaciones.
