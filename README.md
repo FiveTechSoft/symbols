@@ -226,18 +226,17 @@ The current episodic store persists records of:
 (subject, relation, object, source, timestamp)
 ```
 
-It loads them at startup, deduplicates triples case-insensitively, grows dynamically, and can rewrite or clear a TSV file. `test_episodic_memory` exercises initialization, append, duplicate handling, save/load into a second store, attributes, timestamps, accumulation, and clear.
+It loads them at startup, deduplicates triples case-insensitively, grows dynamically, and can rewrite or clear a TSV file. Saves write a sibling temporary file, check `fflush` and `fclose`, then replace the destination by rename (`MoveFileExA` on Windows). A failed auto-save rolls an append back in memory; a failed save during selective forgetting restores the removed record. `test_episodic_memory` exercises initialization, append, duplicate handling, save/load into a second store, attributes, timestamps, accumulation, selective forgetting, failed-write propagation, atomic replacement, and clear.
 
 It is a prototype, not the verified episodic memory specified in Roadmap Phase 6:
 
 - lookup is a linear scan;
 - records do not contain repository SHA, problem signature, diagnosis, chosen operator, patch hash, evaluator evidence, outcome, or negative episode;
 - there is no confidence model, contradiction resolution, selective correction, or invalidation policy;
-- save rewrites the destination directly rather than using atomic replacement and durability checks;
-- an auto-save failure is not currently propagated by append;
+- the atomic replacement does not include `fsync` of the file and parent directory, so crash-durable persistence is not guaranteed;
 - clearing the store does not prove that an already injected fact stops influencing the live graph in the same process.
 
-These are active correctness gaps. A message saying that a fact was learned must not be treated as durable evidence until write errors are propagated and tested.
+These are active correctness gaps. A reported successful write does not by itself prove crash durability or remove a fact already injected into the live graph.
 
 ## 7. Boundaries
 
