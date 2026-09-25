@@ -75,6 +75,12 @@ int  TaskOpsFindRename(const TASK_OPS_WORKSPACE *ws, const char *task,
 int TaskOpsClarification(const char *workspace, const char *task,
                          const TASK_OPS_REPORT *rep, char *question, size_t size);
 
+/* CLI-only typed continuation. The answer is user-asserted via typed CLI, not
+   independently established truth. A successful result proves one safe edit
+   reaches that normalized single-line goal; no episode is persisted. */
+int TaskOpsContinueStdout(const char *workspace, const char *task,
+                          const char *key, const char *answer, TASK_OPS_REPORT *rep);
+
 /* Full loop on a workspace directory. Returns 1 when an edit was kept. */
 int  TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep);
 

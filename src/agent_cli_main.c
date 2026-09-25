@@ -13,6 +13,8 @@
      -i, --index              Index workspace and display structural stats
      -r, --replans <n>        Max replan attempts on failure (default: 3)
      --ask-missing-goal     Ask only for a typed stdout-goal-missing task
+     --continue-stdout-goal --workspace-key HEX --stdout-answer TEXT
+                            Continue a bound typed request noninteractively
      -h, --help               Show this help message
    ============================================================ */
 
@@ -43,6 +45,7 @@ static void PrintHelp(const char *prog)
     printf("  -i, --index              Scan and index workspace, display stats\n");
     printf("  -r, --replans <num>      Max healing replans on failure (default: 3)\n");
     printf("  --ask-missing-goal      Ask only for a typed stdout-goal-missing task\n");
+    printf("  --continue-stdout-goal --workspace-key HEX --stdout-answer TEXT\n");
     printf("  -h, --help               Display this help guide\n\n");
     printf("Examples:\n");
     printf("  %s -b AgentProcessObservation\n", prog);
@@ -76,6 +79,11 @@ int main(int argc, char **argv)
     char task_desc[4096] = {0}; /* full task text; the runner copy is bounded */
     bool do_index_only = false;
     bool ask_missing_goal = false;
+    bool continue_stdout_goal = false;
+    char workspace_key[32] = {0};
+    char stdout_answer[128] = {0};
+    bool has_key = false, has_answer = false, bad_input = false, extraneous = false;
+    bool has_workspace = false, has_task = false;
     uint32_t max_replans = 3;
 
     if (argc < 2)
@@ -93,30 +101,67 @@ int main(int argc, char **argv)
         }
         else if ((strcmp(argv[i], "-w") == 0 || strcmp(argv[i], "--workspace") == 0) && i + 1 < argc)
         {
-            strncpy(workspace, argv[++i], sizeof(workspace) - 1);
+            const char *v = argv[++i];
+            if (has_workspace || !v[0] || strlen(v) >= sizeof(workspace)) bad_input = true;
+            else snprintf(workspace, sizeof(workspace), "%s", v);
+            has_workspace = true;
         }
         else if ((strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--blast-radius") == 0) && i + 1 < argc)
         {
+            extraneous = true;
             strncpy(blast_symbol, argv[++i], sizeof(blast_symbol) - 1);
         }
         else if ((strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--diagnose") == 0) && i + 1 < argc)
         {
+            extraneous = true;
             strncpy(diagnose_file, argv[++i], sizeof(diagnose_file) - 1);
         }
         else if ((strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--replans") == 0) && i + 1 < argc)
         {
+            extraneous = true;
             max_replans = (uint32_t)atoi(argv[++i]);
         }
         else if (strcmp(argv[i], "--ask-missing-goal") == 0)
         {
+            if (ask_missing_goal) bad_input = true;
             ask_missing_goal = true;
+        }
+        else if (strcmp(argv[i], "--continue-stdout-goal") == 0)
+        {
+            if (continue_stdout_goal) bad_input = true;
+            continue_stdout_goal = true;
+        }
+        else if (strcmp(argv[i], "--workspace-key") == 0 && i + 1 < argc && !has_key)
+        {
+            const char *v = argv[++i];
+            has_key = true;
+            if (strlen(v) >= sizeof(workspace_key)) bad_input = true;
+            else snprintf(workspace_key, sizeof(workspace_key), "%s", v);
+        }
+        else if (strcmp(argv[i], "--stdout-answer") == 0 && i + 1 < argc && !has_answer)
+        {
+            const char *v = argv[++i];
+            has_answer = true;
+            if (strlen(v) >= sizeof(stdout_answer)) bad_input = true;
+            else snprintf(stdout_answer, sizeof(stdout_answer), "%s", v);
+        }
+        else if (strcmp(argv[i], "--workspace-key") == 0 || strcmp(argv[i], "--stdout-answer") == 0)
+        {
+            bad_input = true;
         }
         else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--index") == 0)
         {
+            extraneous = true;
             do_index_only = true;
+        }
+        else if (argv[i][0] == '-')
+        {
+            bad_input = true;
         }
         else if (argv[i][0] != '-')
         {
+            if (has_task) extraneous = true;
+            has_task = true;
             if (task_desc[0] == '\0')
                 strncpy(task_desc, argv[i], sizeof(task_desc) - 1);
             else
@@ -125,6 +170,29 @@ int main(int argc, char **argv)
                 snprintf(task_desc + len, sizeof(task_desc) - len, " %s", argv[i]);
             }
         }
+    }
+
+    if (continue_stdout_goal)
+    {
+        TASK_OPS_REPORT continuation;
+        if (bad_input || extraneous || !has_key || !has_answer || ask_missing_goal ||
+            strcmp(task_desc, "stdout-goal-missing"))
+        {
+            fprintf(stderr, "[symbols-agent] Continuation refused: exact typed request, key and single-line answer required.\n");
+            return 1;
+        }
+        if (!TaskOpsContinueStdout(workspace, task_desc, workspace_key, stdout_answer, &continuation))
+        {
+            fprintf(stderr, "[symbols-agent] %s\n", continuation.reason);
+            return 1;
+        }
+        printf("[symbols-agent] Verified: your stated goal is reachable by exactly one safe edit.\n");
+        printf("[symbols-agent] Goal: user-asserted via typed CLI; edit: executed (normalized stdout, exit 0, no regression). No durable episode.\n");
+        return 0;
+    }
+    if (bad_input || has_key || has_answer) {
+        fprintf(stderr, "[symbols-agent] Continuation flags require --continue-stdout-goal.\n");
+        return 1;
     }
 
     printf("[symbols-agent] Target Workspace: '%s'\n", workspace);
@@ -262,7 +330,7 @@ int main(int argc, char **argv)
             {
                 char question[256];
                 if (TaskOpsClarification(workspace, task_desc, &ops, question, sizeof(question)))
-                    printf("[symbols-agent] Clarification: %s\n", question);
+                    printf("[symbols-agent] Clarification: %s\n[symbols-agent] Workspace key: %s\n", question, ops.clarification_key);
             }
             if (ops.op[0])
                 printf("[symbols-agent] Probe compile %d->%d, run %d->%d\n", ops.compile_before,

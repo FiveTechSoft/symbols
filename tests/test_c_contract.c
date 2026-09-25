@@ -36,6 +36,16 @@ int main(void)
     CHECK(has(c, n, "init_mul", 2, "long r = 1;"));
     CContractFree(c, n);
 
+    /* A declaration with two initialized declarators has two distinct
+       init_mul sites, even when the first initializer ends at a comma. */
+    CHECK(CContractParse("It must print 3.", &k));
+    n = CContractCandidates("#include <stdio.h>\nint main(void){ int p=0,q=0; p*=3; q*=3; printf(\"%d\\n\", p+q); return 0; }\n", &k, 1, c, 96);
+    CHECK(has(c, n, "init_mul", 2, "int p=1,q=0;") && has(c, n, "init_mul", 2, "int p=0,q=1;"));
+    CContractFree(c, n);
+    n = CContractCandidates("int main(void){ int a=0 , b=0 ; a *= 4; b *= 4; return a+b; }\n", &k, 1, c, 96);
+    CHECK(has(c, n, "init_mul", 2, "a=1 , b=0") && has(c, n, "init_mul", 2, "a=0 , b=1"));
+    CContractFree(c, n);
+
     CHECK(CContractParse("After swap the program must print \"2 1\".", &k) && !strcmp(k.out, "2 1"));
     n = CContractCandidates("void swap(int *a, int *b) { int t = *a; *a = *b; *b = *a; }\n", &k, 0, c, 96);
     CHECK(has(c, n, "stale_swap", 2, "*b = t;"));

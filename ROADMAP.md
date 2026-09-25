@@ -305,7 +305,7 @@ For code, the reference that learning needs is free: the toolchain compiles or i
 - Levels change with evidence: a claim that is later corroborated moves up; one that is contradicted moves down and invalidates what depended on it (the Phase 6 invalidation machinery).
 - "I don't know" stays a correct answer, reported with the evidence and gaps that exist so far.
 
-**Abstain and ask (approved direction, design only).** The proposed first slice asks only for an explicit typed `stdout-goal-missing` CLI request in a bound, single-file, input-free C workspace. Natural-language tasks never infer a question from missing parser output. [`docs/abstain-and-ask.md`](docs/abstain-and-ask.md) records the pilot and the separately gated answer-to-edit continuation; neither is shipped yet. An earlier free-form question classifier failed the independent unsafe-question gate and is discarded.
+**Abstain and ask (typed CLI pilot).** Slice 1 shipped: only the exact `stdout-goal-missing` task with opt-in `--ask-missing-goal` can ask in a single input-free C workspace. Natural-language tasks never infer a question. The proposed slice 2 is a separate noninteractive key-bound answer-to-edit continuation (not shipped): a user-asserted normalized stdout goal enters a `C_CONTRACT` data field and can produce an edit only after unique throwaway compile/run and final verification. Its claim is reachability, not semantic correctness of the assertion; no durable episode yet. [`docs/abstain-and-ask.md`](docs/abstain-and-ask.md) records exact limits and the earlier rejected free-form question design.
 
 **Memory hygiene (named piece, owner to be assigned in Phases 6-7).** Keeping memory clean has four layers:
 

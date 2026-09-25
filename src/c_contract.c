@@ -488,8 +488,12 @@ static void gen_fn(GEN *g, const char *s, const char *m, const FN *f, int code_o
                     snprintf(to, sizeof(to), "%ld", v + d);
                     push(g, splice(g->src, i, e - i, to), 4, "int_literal", i, from, to);
                 }
-                /* init_mul: "x = 0;" and a later "x *=" in this function */
-                if (v == 0 && s[e] == ';') {
+                /* init_mul: a zero initializer ending at a declarator comma or
+                   statement semicolon, with a later "x *=" in this function.
+                   Treat each declarator as a separate edit site. */
+                size_t delim = e;
+                while (delim < f->hi && isspace((unsigned char)s[delim])) delim++;
+                if (v == 0 && (s[delim] == ';' || s[delim] == ',')) {
                     size_t q = i;
                     while (q > f->lo && s[q - 1] == ' ') q--;
                     if (q > f->lo && s[q - 1] == '=' && !strchr("=!<>+-*/", s[q - 2])) {

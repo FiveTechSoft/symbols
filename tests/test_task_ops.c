@@ -140,6 +140,78 @@ int main(void)
               "extra text file makes the workspace ineligible even with a fresh solve");
     }
 
+    /* Continuation accepts a key from the read-only question only. A
+       unique reachable normalized answer can land; no claims about the
+       semantic correctness of the user's assertion are made. */
+    {
+        char d[512], q[256], key[32], original[256]; make_dir(d,sizeof(d),"answergoal");
+        put(d,"main.c","#include <stdio.h>\nint main(void){for(int i=0;i<3;i++) printf(\"x\"); puts(\"\");}\n");
+        snprintf(original,sizeof(original),"%s",get(d,"main.c"));
+        TASK_OPS_REPORT ask,r;
+        CHECK(!TaskOpsSolve(d,"stdout-goal-missing",&ask) &&
+              TaskOpsClarification(d,"stdout-goal-missing",&ask,q,sizeof(q)),
+              "typed continuation starts from a valid question");
+        snprintf(key,sizeof(key),"%s",ask.clarification_key);
+        CHECK(!TaskOpsContinueStdout(d,"Fix stdout",key,"xxxx",&r) && !strcmp(get(d,"main.c"),original),
+              "natural-language continuation refused");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing","0000000000000000","xxxx",&r) &&
+              !strcmp(get(d,"main.c"),original),"mismatched key refused without write");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xxx",&r) &&
+              !strcmp(get(d,"main.c"),original),"already-current answer refused without write");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xxxxxxxxxxx",&r) &&
+              !strcmp(get(d,"main.c"),original),"unreachable assertion refused without write");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xx\nxx",&r) &&
+              !strcmp(get(d,"main.c"),original),"multiline answer refused without write");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xx\rxx",&r) &&
+              !strcmp(get(d,"main.c"),original),"control-byte answer refused without write");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"",&r) &&
+              !strcmp(get(d,"main.c"),original),"empty answer refused without write");
+        char oversized[129]; memset(oversized,'x',sizeof(oversized)-1); oversized[128]='\0';
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,oversized,&r) &&
+              !strcmp(get(d,"main.c"),original),"oversized answer refused without write");
+
+        CHECK(TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xxxx",&r) && r.verified &&
+              strstr(get(d,"main.c"),"i<=3") && !file_exists(d,".symbols/episodes.tsv"),
+              "unique reachable answer kept without a durable episode");
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"xxxx",&r),
+              "key becomes stale after the successful edit");
+        CHECK(!file_exists(d,".symbols/task_ops_memory.tsv") &&
+              !file_exists(d,".symbols/reflections.tsv"),
+              "continuation did not write operator memory or reflections");
+    }
+
+    /* Two independent init_mul repairs at the same lowest tier both reach
+       output 2. The tier scan must see both, refuse, and leave bytes intact. */
+    {
+        char d[512], q[256], key[32], before[256]; make_dir(d,sizeof(d),"twomul");
+        put(d,"main.c","#include <stdio.h>\nint main(void){int a=0; int b=0; a *= 2; b *= 2; printf(\"%d\\n\",a+b); }\n");
+        snprintf(before,sizeof(before),"%s",get(d,"main.c"));
+        TASK_OPS_REPORT ask,r;
+        CHECK(!TaskOpsSolve(d,"stdout-goal-missing",&ask) &&
+              TaskOpsClarification(d,"stdout-goal-missing",&ask,q,sizeof(q)),
+              "ambiguous two-init_mul program is eligible to ask");
+        snprintf(key,sizeof(key),"%s",ask.clarification_key);
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"2",&r) &&
+              !strcmp(get(d,"main.c"),before) && !file_exists(d,".symbols/episodes.tsv"),
+              "two passing init_mul edits at same tier refuse without mutation");
+    }
+
+    /* Exact paired-declarator fixture: two zero initializers in one C
+       declaration, each independently reaching the asserted stdout. */
+    {
+        char d[512], q[256], key[32], before[256]; make_dir(d,sizeof(d),"twomulcomma");
+        put(d,"main.c","#include <stdio.h>\nint main(void){ int p=0,q=0; p*=3; q*=3; printf(\"%d\\n\", p+q); return 0; }\n");
+        snprintf(before,sizeof(before),"%s",get(d,"main.c"));
+        TASK_OPS_REPORT ask,r;
+        CHECK(!TaskOpsSolve(d,"stdout-goal-missing",&ask) &&
+              TaskOpsClarification(d,"stdout-goal-missing",&ask,q,sizeof(q)),
+              "paired-declarator init_mul case is eligible to ask");
+        snprintf(key,sizeof(key),"%s",ask.clarification_key);
+        CHECK(!TaskOpsContinueStdout(d,"stdout-goal-missing",key,"3",&r) &&
+              !strcmp(get(d,"main.c"),before) && !file_exists(d,".symbols/episodes.tsv"),
+              "both paired-declarator init_mul edits count as a tie and refuse");
+    }
+
     /* reasoning only */
     {
         TASK_OPS_WORKSPACE ws; memset(&ws, 0, sizeof(ws));

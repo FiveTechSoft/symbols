@@ -1,8 +1,9 @@
 # Abstain and ask: explicit stdout-missing pilot
 
-Status: proposed slice 1, not yet shipped. The natural-language ask classifier
+Status: slice 1 is shipped (commit a2ddbfec). Slice 2 below is proposed,
+not shipped until independently gated. The natural-language ask classifier
 failed an independent safety gate: seven unsafe questions in 24 must-not-ask
-cases. It is replaced, not patched with more text exclusions.
+cases. It was replaced, not patched with more text exclusions.
 
 ## Slice 1: typed CLI request, no answer or file edit
 
@@ -33,18 +34,59 @@ other abstention reasons never ask. A successful build/run does not prove a
 natural-language repair needs a new stdout target: a refactor can already
 satisfy its intended output.
 
-## Future answer-to-edit continuation, not in slice 1
+## Slice 2: CLI-only typed answer-to-edit continuation
 
-Only a separate validated handoff can pair the original request, workspace
-revision, and user's exact answer. The answer is a proposed oracle, not proof
-of a correct edit. It must never be appended as unescaped free-form
-instructions. Bound and validate an exact stdout value and terminal newline;
-reject dynamic, ambiguous, conflicting or unsupported multiline values. The
-existing C contract candidate path can then try edits in throwaway copies,
-requiring one passing candidate at the lowest tier, exit 0, exact stdout,
-intent, scope, and no regression. Any failed check leaves the workspace
-unchanged. Never treat an unanswered question as a verified episode.
+A separate noninteractive command receives exactly `stdout-goal-missing`, the
+workspace key printed by the slice-1 question, and a `--stdout-answer` value.
+It never reads stdin, infers intent from natural language, or runs on server or
+OpenCode. The caller is responsible for sourcing the goal from the user. The
+CLI cannot authenticate the typist: the provenance label is **user-asserted
+via typed CLI**, not a claim that the answer is independently true.
 
-Independently authored fresh holdouts require zero unsafe questions. Engineering
+The continuation checks the typed task, 16-lowercase-hex key, and a nonempty
+single-line printable ASCII answer shorter than 128 bytes, with no control
+characters. It checks that the workspace still matches the key and has only
+one C text source with one input-free `main`, no tests or build scripts, and
+that the original program builds and exits 0. It reruns the slice-1 no-edit
+ask gate in a scratch workspace. It refuses a goal the current program already
+prints. The answer enters a `C_CONTRACT` data field, never task prose. Program
+output is compared after trailing CR/LF are stripped; this is normalized
+single-line stdout, **not** exact-byte matching. Multiline, dynamic, empty,
+nonprintable, truncated and oversized output is outside this pilot.
+
+The existing candidate tiers are tried in throwaway copies. A candidate must
+build, exit 0, and print the asserted normalized stdout. Only exactly one
+candidate at the lowest passing tier can be chosen; the whole tier is
+examined before a decision, and a build-budget exhaustion cannot prove
+uniqueness. A literal inserted solely to echo the answer is excluded: compile/run
+matching a user assertion does not prove a direct replacement of the printed
+constant is the intended repair. An asserted number whose only route is
+changing the literal being printed is therefore a designed unreachable class,
+not a missed positive. Independent gates: I was rejected for an unsafe same-tier two-edit
+landing; J was rejected because a comma-separated initializer before another
+declarator generated no candidate, despite its tier-scan repair. K passed its
+first-run gate with 0 unsafe edits in 26 cases, all three paired-declarator
+shapes refusing, all four regression ambiguity tiers refusing, replay checks
+on real landings, and 6/6 positives. The scan now completes the tier, and each supported initialized
+declarator is considered separately. The chosen edit is checked again in a
+throwaway copy, then the single real C source is atomically replaced and rebuilt/run for final
+verification. A failed final check attempts atomic restoration of the original
+bytes; if restoration fails, the CLI warns explicitly rather than claiming no
+effect. No unsuccessful assertion becomes a verified episode. No durable
+episode is written in this first version: without an atomic source-plus-record
+transaction, persistence might claim a success whose source was rolled back.
+The CLI returns the two truth levels without conflating them: goal =
+user-asserted via typed CLI; edit = executed (unique, normalized match, exit 0,
+no regression). Its narrow success claim is: "Verified: your stated goal is
+reachable by exactly one safe edit." That proves reachability of the supplied
+goal, not the semantic truth of the goal. A wrong-but-reachable assertion may
+therefore land; the caller must not present the tool as a judge of goal
+correctness.
+
+This pilot also does not solve concurrent edits by other processes during its
+probe/write window. A production adapter needs locking or an equivalent
+compare-and-swap file guard before broadening the scope.
+
+Independently authored fresh holdouts require zero unsafe edits. Engineering
 banks, self-test, CTest and CI on the committed SHA are separate gates. This
 document does not authorize automatic user messages.

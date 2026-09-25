@@ -3368,7 +3368,7 @@ static int shc_check(const TASK_OPS_WORKSPACE *ws, int idx, const char *text, co
         if (ok && c->has_out) {
             size_t n = r->stdout_len;
             while (n && (r->stdout_buf[n - 1] == '\n' || r->stdout_buf[n - 1] == '\r')) n--;
-            ok = n == strlen(c->out) && !strncmp(r->stdout_buf, c->out, n);
+            ok = !r->stdout_truncated && n == strlen(c->out) && !memcmp(r->stdout_buf, c->out, n);
         }
         if (ok && c->has_file) {
             char p[TASK_OPS_MAX_PATH * 2], buf[128];
@@ -3467,7 +3467,7 @@ static int ccc_check(const TASK_OPS_WORKSPACE *ws, const char *flags, int idx, c
         if (!r->execution_failed && !r->timed_out && r->exit_code == 0) {
             size_t n = r->stdout_len;
             while (n && (r->stdout_buf[n - 1] == '\n' || r->stdout_buf[n - 1] == '\r')) n--;
-            ok = n == strlen(c->out) && !strncmp(r->stdout_buf, c->out, n);
+            ok = !r->stdout_truncated && n == strlen(c->out) && !memcmp(r->stdout_buf, c->out, n);
         }
     }
     free(r);
@@ -3503,12 +3503,14 @@ static C_CONTRACT g_ccc;
    the program does not print it; single-edit candidates over every C
    source (tests excluded) are each run in a throwaway copy, and only the
    one candidate of the lowest passing tier is kept */
-static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task, char **next,
-                             char *rule, size_t rsz, char *detail, size_t dsz)
+static int c_contract_target_with(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task,
+                                  const C_CONTRACT *supplied, char **next,
+                                  char *rule, size_t rsz, char *detail, size_t dsz)
 {
     C_CONTRACT cc;
     g_ccc_cands = g_ccc_pass = -1;
-    g_ccc_parsed = CContractParse(task, &cc);
+    if (supplied) { cc = *supplied; g_ccc_parsed = cc.has_out; }
+    else g_ccc_parsed = CContractParse(task, &cc);
     snprintf(g_ccc_why, sizeof(g_ccc_why), "%s", cc.why[0] ? cc.why : "nogoal");
     if (!g_ccc_parsed || count_main_defs(ws) != 1 || reads_input(ws))
         return -1;
@@ -3518,7 +3520,7 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
     for (int f = 0; f < ws->count; f++)
         if (is_c_source(ws->files[f].rel))
             fns += defines_other_fn(ws->files[f].data);
-    int best_f = -1, best_k = -1, tier = 99, dup = 0, builds = 0;
+    int best_f = -1, best_k = -1, dup = 0, builds = 0, exhausted = 0;
     static C_CAND c[16][96];
     int nc[16] = {0}, nfiles = 0, fidx[16];
     g_ccc_cands = g_ccc_pass = 0;
@@ -3531,27 +3533,28 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
         g_ccc_cands += nc[nfiles];
         nfiles++;
     }
-    /* tiers run in order and stop at the first tier with a passing edit;
-       that tier must hold exactly one */
-    for (int t = 1; t <= 4 && best_k < 0; t++)
+    /* Complete the whole lowest passing tier before choosing. Stopping when
+       best_k first becomes nonnegative silently turns a tie into a guess.
+       An exhausted build budget also cannot establish uniqueness. */
+    for (int t = 1; t <= 4 && best_k < 0 && !exhausted; t++)
         for (int x = 0; x < nfiles; x++)
             for (int k = 0; k < nc[x]; k++) {
-                if (c[x][k].tier != t || builds >= 160)
+                if (c[x][k].tier != t)
                     continue;
                 char dk[256];
                 snprintf(dk, sizeof(dk), "%s: %.80s in %.100s", c[x][k].rule, c[x][k].detail, ws->files[fidx[x]].rel);
                 if (is_excluded("c_contract", dk))
-                    continue;   /* refuted on an earlier attempt */
+                    continue;
+                if (builds >= 160) { exhausted = 1; break; }
                 builds++;
                 if (!ccc_check(ws, flags, fidx[x], c[x][k].text, &cc))
                     continue;
                 g_ccc_pass++;
-                if (best_k < 0) { tier = t; best_f = x; best_k = k; }
+                if (best_k < 0) { best_f = x; best_k = k; }
                 else dup = 1;
             }
-    (void)tier;
     int idx = -1;
-    if (best_k >= 0 && !dup) {
+    if (best_k >= 0 && !dup && !exhausted) {
         idx = fidx[best_f];
         g_ccc = cc;
         g_ccc_idx = idx;
@@ -3563,6 +3566,12 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
     for (int x = 0; x < nfiles; x++)
         CContractFree(c[x], nc[x]);
     return idx;
+}
+
+static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, const char *task,
+                             char **next, char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    return c_contract_target_with(ws, flags, task, NULL, next, rule, rsz, detail, dsz);
 }
 
 /* last compile_repair attempt, for the abstain shape: candidates generated
@@ -4378,6 +4387,163 @@ int TaskOpsClarification(const char *workspace, const char *task,
     if (!safe) return 0;
     snprintf(question,size,"This input-free C program builds and runs, but the stdout target was not supplied. What exact stdout should it produce?");
     return 1;
+}
+
+/* Continuation only: replace one source atomically after the scratch checks.
+   A failed rename never truncates the original. The post-write probe may still
+   fail, so the caller retains the original bytes for rollback. */
+static int continuation_replace(const char *root, const char *rel, const char *data)
+{
+    char target[TASK_OPS_MAX_PATH*2], tmp[TASK_OPS_MAX_PATH*2+48];
+    snprintf(target,sizeof(target),"%s/%s",root,rel);
+    static unsigned counter;
+    ++counter;
+#ifdef _WIN32
+    snprintf(tmp,sizeof(tmp),"%s.symbols-tmp-%lu-%u",target,(unsigned long)GetCurrentProcessId(),counter);
+#else
+    snprintf(tmp,sizeof(tmp),"%s.symbols-tmp-%ld-%u",target,(long)getpid(),counter);
+#endif
+    FILE *f=fopen(tmp,"wb");
+    if (!f) return 0;
+    size_t n=strlen(data);
+    int ok=fwrite(data,1,n,f)==n;
+    if (fflush(f)!=0) ok=0;
+    if (fclose(f)!=0) ok=0;
+    if (!ok) { remove(tmp); return 0; }
+#ifdef _WIN32
+    ok=MoveFileExA(tmp,target,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
+#else
+    ok=rename(tmp,target)==0;
+#endif
+    if (!ok) remove(tmp);
+    return ok;
+}
+
+/* A second noninteractive invocation consumes a bound, single-line assertion.
+   The assertion never enters the free-form task parser or the task memory.
+   Work outside the candidate checks is confined to the same one-file gate. */
+int TaskOpsContinueStdout(const char *workspace, const char *task,
+                          const char *key, const char *answer, TASK_OPS_REPORT *rep)
+{
+    TASK_OPS_REPORT local;
+    if (!rep) rep=&local;
+    memset(rep,0,sizeof(*rep));
+    snprintf(rep->reason,sizeof(rep->reason),"continuation refused");
+    if (!workspace || !task || strcmp(task,"stdout-goal-missing") || !key || !answer ||
+        strlen(key)!=16 || !answer[0] || strlen(answer)>=sizeof(((C_CONTRACT *)0)->out)) return 0;
+    for (const char *p=key; *p; p++)
+        if (!((*p>='0' && *p<='9') || (*p>='a' && *p<='f'))) return 0;
+    for (const unsigned char *p=(const unsigned char *)answer; *p; p++)
+        if (*p<32 || *p>126) return 0; /* printable ASCII, one normalized line */
+    TASK_OPS_WORKSPACE *ws=(TASK_OPS_WORKSPACE *)calloc(1,sizeof(*ws));
+    if (!ws) return 0;
+    int loaded=TaskOpsLoadWorkspace(workspace,ws);
+    char actual[32]="", flags[512]="";
+    if (loaded) mem_key(ws,task,actual,sizeof(actual));
+    int ok=loaded && ws->count==1 && is_c_source(ws->files[0].rel) &&
+           !strcmp(actual,key) && !other_criteria(ws) && !reads_input(ws) && count_main_defs(ws)==1;
+    /* A failed loader read can silently omit a file. Refuse the continuation
+       unless the file bytes on disk match the loaded source exactly. */
+    if (ok) {
+        char path[TASK_OPS_MAX_PATH*2];
+        size_t disk_len=0;
+        snprintf(path,sizeof(path),"%s/%s",workspace,ws->files[0].rel);
+        char *disk=read_all(path,&disk_len);
+        ok=disk && disk_len==ws->files[0].len &&
+           !memcmp(disk,ws->files[0].data,disk_len);
+        free(disk);
+    }
+    /* Ignore only the trailing line terminators, as ccc_check does. The
+       existing probe stores 1023 bytes; a longer or embedded-control output
+       is outside this pilot's normalized single-line contract. */
+    if (ok) {
+        char observed[1024];
+        int comp=-1,run=-1;
+        probe_out(ws,flags,&comp,&run,observed);
+        if (comp!=1 || run!=0) ok=0;
+        size_t n=strlen(observed);
+        if (n>=1023) ok=0;
+        while (n && (observed[n-1]=='\n' || observed[n-1]=='\r')) observed[--n]='\0';
+        for (size_t i=0;i<n;i++) if ((unsigned char)observed[i]<32 || (unsigned char)observed[i]>126) ok=0;
+    }
+    C_CONTRACT parsed;
+    if (ok) {
+        CContractParse(task,&parsed);
+        ok=!parsed.has_out && !strcmp(parsed.why,"nogoal");
+    }
+    if (ok) {
+        /* Re-run slice 1's exact no-edit gate in a temporary copy. The
+           report and clarification must refer to that same copied root;
+           the binding to the original root was checked separately above. */
+        char scratch[TASK_OPS_MAX_PATH], q[256];
+        temp_binary(scratch,sizeof(scratch));
+        strncat(scratch,"_ask",sizeof(scratch)-strlen(scratch)-1);
+        make_dir(scratch);
+        if (write_file(scratch,ws->files[0].rel,ws->files[0].data)) {
+            TASK_OPS_REPORT preflight;
+            int kept=TaskOpsSolve(scratch,task,&preflight);
+            ok=!kept && TaskOpsClarification(scratch,task,&preflight,q,sizeof(q)) &&
+               !strcmp(preflight.clarification_key,key);
+            rep->compile_before=preflight.compile_before;
+            rep->run_before=preflight.run_before;
+        } else ok=0;
+        sc_rm_tree(scratch,0);
+    }
+    C_CONTRACT cc={0};
+    cc.has_out=1;
+    snprintf(cc.out,sizeof(cc.out),"%s",answer);
+    if (ok) ok=!ccc_check(ws,flags,-1,NULL,&cc); /* already-current is not a repair */
+    char *next[TASK_OPS_MAX_FILES]={0};
+    char rule[24]="",detail[120]="";
+    int chosen=-1;
+    if (ok) {
+        g_nexcl=0;
+        chosen=c_contract_target_with(ws,flags,task,&cc,next,rule,sizeof(rule),detail,sizeof(detail));
+        ok=chosen==0 && next[0] && g_ccc_pass==1;
+    }
+    if (ok) {
+        /* Verify final candidate once more in a throwaway copy before
+           touching the real file; the ordinary final check also runs after. */
+        ok=ccc_check(ws,flags,0,next[0],&cc);
+    }
+    if (ok) {
+        /* Keep pre-edit bytes until final readback. Atomic replacement
+           avoids truncating the source when the initial write fails.
+           A second before-write read catches a change during scratch work.
+           A concurrent writer between this check and rename is still outside
+           v1's guarantee; docs mark that limitation. */
+        size_t before_len=0;
+        char target[TASK_OPS_MAX_PATH*2];
+        snprintf(target,sizeof(target),"%s/%s",workspace,ws->files[0].rel);
+        char *before=read_all(target,&before_len);
+        ok=before && before_len==ws->files[0].len &&
+           !memcmp(before,ws->files[0].data,before_len);
+        free(before);
+        if (ok) ok=continuation_replace(workspace,ws->files[0].rel,next[0]);
+        if (ok) {
+            TASK_OPS_WORKSPACE *after=(TASK_OPS_WORKSPACE *)calloc(1,sizeof(*after));
+            int got=after && TaskOpsLoadWorkspace(workspace,after);
+            if (got) {
+                probe_out(after,flags,&rep->compile_after,&rep->run_after,NULL);
+                ok=after->count==1 && rep->compile_after==1 && rep->run_after==0 &&
+                   ccc_check(after,flags,-1,NULL,&cc);
+            } else ok=0;
+            if (after) TaskOpsFreeWorkspace(after);
+            free(after);
+            if (!ok && !continuation_replace(workspace,ws->files[0].rel,ws->files[0].data))
+                snprintf(rep->reason,sizeof(rep->reason),"continuation rollback failed; inspect source file");
+        }
+    }
+    if (ok) {
+        rep->verified=1; rep->applied=1; rep->candidates=1;
+        snprintf(rep->op,sizeof(rep->op),"c_contract");
+        snprintf(rep->detail,sizeof(rep->detail),"%s: %s",rule,detail);
+        snprintf(rep->reason,sizeof(rep->reason),"verified: user-asserted via typed CLI goal reachable by one executed safe edit; normalized stdout, exit 0, no regression; no durable episode");
+    } else if (strncmp(rep->reason,"continuation rollback failed",28))
+        snprintf(rep->reason,sizeof(rep->reason),"continuation refused: no unique safe edit to the user-asserted normalized stdout goal");
+    for (int i=0;i<TASK_OPS_MAX_FILES;i++) free(next[i]);
+    TaskOpsFreeWorkspace(ws);free(ws);
+    return ok;
 }
 
 static int reflexion_enabled(void)
