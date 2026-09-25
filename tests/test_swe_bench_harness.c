@@ -93,7 +93,15 @@ static void test_harness_run_evaluation(void)
     TEST_ASSERT(summary->failed_tasks == 0, "Zero task failures");
     TEST_ASSERT(summary->pass_rate_pct == 100.0, "100.0% benchmark pass rate");
     TEST_ASSERT(summary->hallucination_rate_pct == 0.00, "Hallucination rate is strictly 0.00%");
+    /* The 80bdf08 ASan run flapped on this working-set limit: sanitizer
+       instrumentation adds runtime memory unrelated to the benchmark budget.
+       Keep the 50 MB assertion for ordinary builds; ASan still runs every
+       functional assertion and its own memory-safety checks. */
+#if defined(__SANITIZE_ADDRESS__)
+    printf("  [SKIP] 50 MB working-set gate under AddressSanitizer\n");
+#else
     TEST_ASSERT(summary->memory_footprint_mb < 50.0, "Memory footprint is under 50 MB RAM");
+#endif
     TEST_ASSERT(summary->avg_latency_ms < 50.0, "Average task latency is < 50 ms (orders of magnitude faster than neural LLMs)");
 
     /* Verify leaderboard markdown report */
