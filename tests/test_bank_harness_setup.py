@@ -123,6 +123,7 @@ def main():
     check(bh.reason_class(ab % " cr=2 cb=0", 0).endswith("[diag=link nerr=1 nc=1 cr=2 cb=0]"), "cr/cb still kept")
     cb = "[symbols-agent] No edit kept: no operator preconditions hold [c=1 run=0 sh=0 mk=0 doc=0 test=0 git=0] [cc=%s]\n"
     check(bh.reason_class(cb % "0 ccw=noval", 0).endswith("git=0] [cc=0 ccw=noval]"), "ccw reason kept")
+    check(bh.reason_class(cb % "0 ccw=no_output", 0).endswith("git=0] [cc=0 ccw=no_output]"), "explicit no-output veto kept")
     check(bh.reason_class(cb % "0 ccw=print_this", 0).endswith("git=0]"), "unknown ccw drops the tail")
     check(bh.reason_class(cb % "1 cn=2 cp=0", 0).endswith("[cc=1 cn=2 cp=0]"), "cn/cp still kept")
     print("test_bank_harness_setup: " + ("ALL PASSED" if not fails else f"{fails} FAILED"))

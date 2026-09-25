@@ -33,8 +33,8 @@ typedef struct {
        nogoal (no clause states a goal), now (goal words only in clauses about
        the current state), exit (a goal of non-zero exit), file (goal clauses
        are about a file), noval (a goal clause, no value found), multi (two
-       different wanted outputs) */
-    char why[8];
+       different wanted outputs), no_output (explicit denial of output goal) */
+    char why[12];
 } C_CONTRACT;
 
 typedef struct {

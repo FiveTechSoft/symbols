@@ -305,6 +305,8 @@ For code, the reference that learning needs is free: the toolchain compiles or i
 - Levels change with evidence: a claim that is later corroborated moves up; one that is contradicted moves down and invalidates what depended on it (the Phase 6 invalidation machinery).
 - "I don't know" stays a correct answer, reported with the evidence and gaps that exist so far.
 
+**Abstain and ask (approved direction, design only).** The proposed first slice asks only for an explicit typed `stdout-goal-missing` CLI request in a bound, single-file, input-free C workspace. Natural-language tasks never infer a question from missing parser output. [`docs/abstain-and-ask.md`](docs/abstain-and-ask.md) records the pilot and the separately gated answer-to-edit continuation; neither is shipped yet. An earlier free-form question classifier failed the independent unsafe-question gate and is discarded.
+
 **Memory hygiene (named piece, owner to be assigned in Phases 6-7).** Keeping memory clean has four layers:
 
 1. *The door:* the tribunal. The cheapest cleanup is the one never needed: only verified experience is consolidated, and reflections are read back only when their source is the toolchain (already in place).

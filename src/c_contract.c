@@ -167,7 +167,7 @@ static int no_output_goal(const char *task)
 int CContractParse(const char *task, C_CONTRACT *c)
 {
     memset(c, 0, sizeof(*c));
-    if (no_output_goal(task)) { snprintf(c->why,sizeof(c->why),"nogoal"); return 0; }
+    if (no_output_goal(task)) { snprintf(c->why,sizeof(c->why),"no_output"); return 0; }
     const char *s = task;
     /* the bare-value fallback below needs the task to be about stdout at all,
        and never applies when it mentions a file */

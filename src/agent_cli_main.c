@@ -12,6 +12,7 @@
      -d, --diagnose <file>    Diagnose compiler/linter error output from file
      -i, --index              Index workspace and display structural stats
      -r, --replans <n>        Max replan attempts on failure (default: 3)
+     --ask-missing-goal     Ask only for a typed stdout-goal-missing task
      -h, --help               Show this help message
    ============================================================ */
 
@@ -41,6 +42,7 @@ static void PrintHelp(const char *prog)
     printf("  -d, --diagnose <file>    Abductive diagnosis of compiler/linter errors\n");
     printf("  -i, --index              Scan and index workspace, display stats\n");
     printf("  -r, --replans <num>      Max healing replans on failure (default: 3)\n");
+    printf("  --ask-missing-goal      Ask only for a typed stdout-goal-missing task\n");
     printf("  -h, --help               Display this help guide\n\n");
     printf("Examples:\n");
     printf("  %s -b AgentProcessObservation\n", prog);
@@ -73,6 +75,7 @@ int main(int argc, char **argv)
     char diagnose_file[MAX_PATCH_PATH] = {0};
     char task_desc[4096] = {0}; /* full task text; the runner copy is bounded */
     bool do_index_only = false;
+    bool ask_missing_goal = false;
     uint32_t max_replans = 3;
 
     if (argc < 2)
@@ -103,6 +106,10 @@ int main(int argc, char **argv)
         else if ((strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--replans") == 0) && i + 1 < argc)
         {
             max_replans = (uint32_t)atoi(argv[++i]);
+        }
+        else if (strcmp(argv[i], "--ask-missing-goal") == 0)
+        {
+            ask_missing_goal = true;
         }
         else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--index") == 0)
         {
@@ -251,6 +258,12 @@ int main(int argc, char **argv)
                        ops.verified ? "verified, kept" : "rolled back");
             if (!ops.verified && ops.reason[0])
                 printf("[symbols-agent] No edit kept: %s\n", ops.reason);
+            if (ask_missing_goal && !ops.verified)
+            {
+                char question[256];
+                if (TaskOpsClarification(workspace, task_desc, &ops, question, sizeof(question)))
+                    printf("[symbols-agent] Clarification: %s\n", question);
+            }
             if (ops.op[0])
                 printf("[symbols-agent] Probe compile %d->%d, run %d->%d\n", ops.compile_before,
                        ops.compile_after, ops.run_before, ops.run_after);

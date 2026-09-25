@@ -3496,7 +3496,7 @@ static int count_main_defs(const TASK_OPS_WORKSPACE *ws)
 
 /* last c_contract attempt, for the abstain line: candidates / passing */
 static int g_ccc_cands = -1, g_ccc_pass = -1, g_ccc_parsed = -1, g_ccc_idx = -1;
-static char g_ccc_why[8];   /* CContractParse's closed-form reason when nothing was read */
+static char g_ccc_why[12];   /* CContractParse's closed-form reason when nothing was read */
 static C_CONTRACT g_ccc;
 
 /* c_contract: the program builds, the task states its wanted stdout, and
@@ -4352,6 +4352,34 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
     return verified;
 }
 
+/* A question needs an affirmative, typed missing-oracle request. Free-form task
+   text is never promoted by lexical clues, even if a parser failed to read it. */
+int TaskOpsClarification(const char *workspace, const char *task,
+                         const TASK_OPS_REPORT *rep, char *question, size_t size)
+{
+    static const char typed_task[] = "stdout-goal-missing";
+    if (question && size) question[0] = '\0';
+    if (!workspace || !task || strcmp(task, typed_task) || !rep || !question || size < 144 ||
+        rep->verified || rep->op[0] || rep->applied || !rep->clarification_key[0] ||
+        rep->compile_before != 1 || rep->run_before != 0 ||
+        strncmp(rep->reason, "no operator preconditions hold ", 31) ||
+        !strstr(rep->reason, "[cc=0 ccw=nogoal]")) return 0;
+    TASK_OPS_WORKSPACE *ws=(TASK_OPS_WORKSPACE *)calloc(1,sizeof(*ws));
+    if (!ws) return 0;
+    int loaded=TaskOpsLoadWorkspace(workspace,ws);
+    char key[32]="";
+    if (loaded) mem_key(ws,task,key,sizeof(key));
+    /* The recorded solve must describe this exact task and these file bytes.
+       A stale report, added scope or unreadable workspace cannot ask. */
+    int safe=loaded && ws->count==1 && is_c_source(ws->files[0].rel) &&
+             !strcmp(key,rep->clarification_key) &&
+             !other_criteria(ws) && !reads_input(ws) && count_main_defs(ws)==1;
+    TaskOpsFreeWorkspace(ws);free(ws);
+    if (!safe) return 0;
+    snprintf(question,size,"This input-free C program builds and runs, but the stdout target was not supplied. What exact stdout should it produce?");
+    return 1;
+}
+
 static int reflexion_enabled(void)
 {
     const char *v = getenv("SYMBOLS_REFLEXION");
@@ -4421,5 +4449,15 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     }
     if (trail[0] && !v)
         snprintf(rep->reason + strlen(rep->reason), sizeof(rep->reason) - strlen(rep->reason), " (%s)", trail);
+    /* Bind the read-only question gate to the task and post-solve workspace.
+       Failed loads, attempted writes and verified edits do not mint a key. */
+    rep->clarification_key[0] = '\0';
+    if (!v && !rep->op[0] && !rep->applied && workspace && task) {
+        TASK_OPS_WORKSPACE *w = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*w));
+        if (w && TaskOpsLoadWorkspace(workspace, w))
+            mem_key(w, task, rep->clarification_key, sizeof(rep->clarification_key));
+        if (w) TaskOpsFreeWorkspace(w);
+        free(w);
+    }
     return v;
 }

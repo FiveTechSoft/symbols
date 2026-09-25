@@ -117,6 +117,29 @@ int main(void)
     printf("=== task_ops ===\n");
     char a[128], b[128];
 
+    /* A natural-language task is never evidence of a missing stdout goal.
+       Only an exact typed request and a bound no-edit solve can ask. */
+    {
+        char d[512], q[256], before[256]; make_dir(d, sizeof(d), "askgoal");
+        put(d, "main.c", "#include <stdio.h>\nint main(void){ puts(\"4\"); return 0; }\n");
+        snprintf(before, sizeof(before), "%s", "#include <stdio.h>\nint main(void){ puts(\"4\"); return 0; }\n");
+        TASK_OPS_REPORT r;
+        CHECK(!TaskOpsSolve(d, "stdout-goal-missing", &r) &&
+              TaskOpsClarification(d, "stdout-goal-missing", &r, q, sizeof(q)) &&
+              strstr(q, "What exact stdout") && !strcmp(get(d, "main.c"), before),
+              "typed missing C stdout goal asks without writing");
+        CHECK(!TaskOpsClarification(d, "Fix the C program so it prints the correct stdout.", &r, q, sizeof(q)) && !q[0],
+              "free-form text never receives typed gate");
+        CHECK(!TaskOpsClarification(d, "stdout-goal-missing", NULL, q, sizeof(q)),
+              "no report cannot authorize a question");
+        put(d, "note.log", "unrelated scope\n");
+        CHECK(!TaskOpsClarification(d, "stdout-goal-missing", &r, q, sizeof(q)) && !q[0],
+              "changed workspace invalidates solve report");
+        CHECK(!TaskOpsSolve(d, "stdout-goal-missing", &r) &&
+              !TaskOpsClarification(d, "stdout-goal-missing", &r, q, sizeof(q)),
+              "extra text file makes the workspace ineligible even with a fresh solve");
+    }
+
     /* reasoning only */
     {
         TASK_OPS_WORKSPACE ws; memset(&ws, 0, sizeof(ws));

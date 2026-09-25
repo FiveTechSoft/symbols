@@ -97,7 +97,7 @@ int main(void)
     CHECK(!CContractParse("It should print `5`. It must print `6`.", &k) && !strcmp(k.why, "multi"));
     CHECK(CContractParse("It should print `5`.", &k) && k.why[0] == '\0');
     /* explicit no-output disclaimers veto nearby quoted samples */
-    CHECK(!CContractParse("Fix a C memory bug; no expected output is specified; stdout 5 was observed.", &k) && !strcmp(k.why, "nogoal"));
+    CHECK(!CContractParse("Fix a C memory bug; no expected output is specified; stdout 5 was observed.", &k) && !strcmp(k.why, "no_output"));
     CHECK(!CContractParse("A test once printed 8; there is no specified output to assert.", &k));
     CHECK(!CContractParse("This task has no concrete stdout goal; 7 is only a sample run.", &k));
     CHECK(!CContractParse("Fix the leak without any expected stdout; it once printed 9.", &k));

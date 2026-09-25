@@ -52,6 +52,7 @@ typedef struct
     int  reflections_written;  /* refuted edits reflected on in this solve */
     int  reflections_recalled; /* reflections read back for this task */
     char reflection[512]; /* the last reflection written, "" when none */
+    char clarification_key[32]; /* task + post-solve workspace binding; never a permission */
 } TASK_OPS_REPORT;
 
 /* Load text files (no NUL bytes, <= TASK_OPS_MAX_FILE) under root. */
@@ -66,6 +67,13 @@ int  TaskOpsCountToken(const TASK_OPS_WORKSPACE *ws, const char *ident);
    Returns number of distinct qualifying pairs; fills a/b when exactly one. */
 int  TaskOpsFindRename(const TASK_OPS_WORKSPACE *ws, const char *task,
                        char *a, size_t a_size, char *b, size_t b_size);
+
+/* Read-only question classifier after an ordinary abstention. Returns 1 and a
+   bounded question only for the exact typed task "stdout-goal-missing", after
+   a bound no-edit solve with a safe, input-free C workspace. It never
+   reads stdin, executes the program, writes files, or changes the task. */
+int TaskOpsClarification(const char *workspace, const char *task,
+                         const TASK_OPS_REPORT *rep, char *question, size_t size);
 
 /* Full loop on a workspace directory. Returns 1 when an edit was kept. */
 int  TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep);
