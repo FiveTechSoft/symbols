@@ -123,9 +123,51 @@ static int clause_value(C_CONTRACT *c, const char *cl, size_t o, const char *key
     return 0;
 }
 
+/* Explicit denial of a concrete output goal is stronger than a quoted
+   sample or a nearby "expected" word. Abstain before value extraction. */
+static int no_output_goal(const char *task)
+{
+    size_t n=strlen(task);
+    static const char *const neg[]={"no", "not", "without", "unspecified", "unknown", "none", "lacks"};
+    static const char *const role[]={"stdout", "standard output", "output", "console output", "printed output", "terminal output"};
+    for (size_t i=0;i<sizeof(neg)/sizeof(*neg);i++) {
+        const char *p=task;
+        while ((p=ci_word(p,n-(size_t)(p-task),neg[i]))!=NULL) {
+            const char *q=p+strlen(neg[i]);size_t left=n-(size_t)(q-task);
+            if (left>85) left=85;
+            for (size_t j=0;j<sizeof(role)/sizeof(*role);j++) {
+                const char *r=ci_find_n(q,left,role[j]);
+                if (!r) continue;
+                size_t gap=(size_t)(r-q);
+                if (gap<40 && (gap==0 || ci_find_n(q,gap,"expected") || ci_find_n(q,gap,"specified") ||
+                    ci_find_n(q,gap,"required") || ci_find_n(q,gap,"defined") || ci_find_n(q,gap,"target") ||
+                    ci_find_n(q,gap,"goal") || ci_find_n(q,gap,"particular") || ci_find_n(q,gap,"concrete") ||
+                    ci_find_n(q,gap,"fixed") || ci_find_n(q,gap,"known") || ci_find_n(q,gap,"desired"))) return 1;
+            }
+            p=q;
+        }
+    }
+    static const char *const first[]={"expected stdout", "expected standard output", "required output", "stdout goal", "output target"};
+    static const char *const dis[]={"unknown", "unspecified", "not specified", "not known", "not provided", "absent", "missing", "none"};
+    for (size_t i=0;i<sizeof(first)/sizeof(*first);i++) {
+        const char *p=task;
+        while ((p=ci_find_n(p,strlen(p),first[i]))!=NULL) {
+            const char *q=p+strlen(first[i]);size_t left=n-(size_t)(q-task);
+            if (left>48) left=48;
+            for (size_t j=0;j<sizeof(dis)/sizeof(*dis);j++) {
+                const char *d=ci_find_n(q,left,dis[j]);
+                if (d && (size_t)(d-q)<24) return 1;
+            }
+            p=q;
+        }
+    }
+    return 0;
+}
+
 int CContractParse(const char *task, C_CONTRACT *c)
 {
     memset(c, 0, sizeof(*c));
+    if (no_output_goal(task)) { snprintf(c->why,sizeof(c->why),"nogoal"); return 0; }
     const char *s = task;
     /* the bare-value fallback below needs the task to be about stdout at all,
        and never applies when it mentions a file */
