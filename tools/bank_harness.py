@@ -183,6 +183,29 @@ DIAG_CLASSES = ["none", "link", "missing_header", "implicit", "undeclared", "unk
                 "invalid_operands", "lvalue", "incomplete_type", "expected", "return", "other"]
 
 
+# Closed vocabulary of operator names (task_ops.c op_names[] plus git_ops). A
+# name outside this list is never echoed; the tag is dropped instead.
+OP_NAMES = ["author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit",
+            "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search",
+            "shell_harden", "build_repair", "c_fix", "compile_repair", "shell_contract", "c_contract",
+            "evidence_fix", "resolve_merge", "restore_deleted", "revert_head"]
+
+
+def op_tag(log: str, kept_line: str) -> str:
+    """Closed-form tag for a verify failure: which operator's edit was rolled
+    back, whether its intent check held, and whether the edit was outside the
+    file the task names. Only fixed tokens are emitted, never task text."""
+    ops = re.findall(r"Operator (\w+): .*\(rolled back\)", log)
+    if not ops or ops[-1] not in OP_NAMES:
+        return ""
+    tag = " [op=" + ops[-1]
+    m = re.match(r"verify failed: intent=([01]) compile -?\d+->-?\d+ run -?\d+->-?\d+"
+                 r"( \(the edit is outside the file the task names\))?", kept_line)
+    if m:
+        tag += " intent=%s scope=%s" % (m.group(1), "0" if m.group(2) else "1")
+    return tag + "]"
+
+
 def reason_class(log: str, agent_rc: int) -> str:
     if agent_rc in (124, 127):
         return "agent error"
@@ -207,10 +230,10 @@ def reason_class(log: str, agent_rc: int) -> str:
             return "no operator preconditions hold [" + m.group(1) + "]" + tail
         for name, rx in REASON_CLASSES:
             if re.search(rx, kept[-1]):
-                return name
+                return name + (op_tag(log, kept[-1]) if name == "verify failed" else "")
         return "other reason"
     if rolled:
-        return "rolled back (operator verify failed)"
+        return "rolled back (operator verify failed)" + op_tag(log, "")
     if re.search(r"Operator \w+: .*\(verified, kept\)", log):
         return "edit kept but check failed"
     return "no reason line"

@@ -101,6 +101,22 @@ def main():
             check(bank_harness.run_script(bank / "git_commit" / "setup.py", wd, 60) == 0, f"setup run {i} succeeds")
             heads.append(subprocess.run(["git", "rev-parse", "HEAD"], cwd=wd, capture_output=True, text=True).stdout.strip())
         check(heads[0] and heads[0] == heads[1], "setup history is reproducible (same HEAD)")
+    # verify-failed reasons carry only a closed-form operator tag
+    sys.path.insert(0, str(HARNESS.parent))
+    import bank_harness as bh
+    rb = "[symbols-agent] Operator %s: detail with task text (rolled back)\n"
+    vf = "[symbols-agent] No edit kept: verify failed: intent=%s compile 1->1 run 0->0%s\n"
+    out = " (the edit is outside the file the task names)"
+    check(bh.reason_class(rb % "c_contract" + vf % ("0", out), 0) == "verify failed [op=c_contract intent=0 scope=0]",
+          "verify failed tags operator, intent and scope")
+    check(bh.reason_class(rb % "c_fix" + vf % ("1", ""), 0) == "verify failed [op=c_fix intent=1 scope=1]",
+          "verify failed in scope")
+    check(bh.reason_class(rb % "not_an_op" + vf % ("0", ""), 0) == "verify failed", "unknown operator name is dropped")
+    check(bh.reason_class(rb % "c_fix" + vf % ("1", " task text"), 0) == "verify failed [op=c_fix intent=1 scope=1]",
+          "trailing text never echoed")
+    check(bh.reason_class(rb % "resolve_merge" + "[symbols-agent] No edit kept: verify failed: merge not completed cleanly\n", 0)
+          == "verify failed [op=resolve_merge]", "git operator tag without intent fields")
+    check(bh.reason_class(rb % "c_fix", 0) == "rolled back (operator verify failed) [op=c_fix]", "rolled back tag")
     print("test_bank_harness_setup: " + ("ALL PASSED" if not fails else f"{fails} FAILED"))
     return 1 if fails else 0
 
