@@ -3300,6 +3300,10 @@ static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int 
 }
 
 
+/* last compile_repair attempt, for the abstain shape: candidates generated
+   and candidates that built (-1 = not attempted) */
+static int g_cr_cands = -1, g_cr_built = -1;
+
 /* compile_repair: the first compiler (or linker) error yields single-edit
    candidates; each is compiled on a scratch copy outside the tree, and only
    the one candidate of the lowest tier that builds (and, when the program
@@ -3310,6 +3314,7 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     char cmd[4096], srcs[3072], bin[TASK_OPS_MAX_PATH];
     char *diag = NULL;
     int touched = 0;
+    g_cr_cands = g_cr_built = -1;
     if (c_sources(ws, srcs, sizeof(srcs)) == 0)
         return 0;
     temp_binary(bin, sizeof(bin));
@@ -3335,6 +3340,8 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     TASK_OPS_WORKSPACE *tw = (TASK_OPS_WORKSPACE *)malloc(sizeof(*tw));
     int n = c ? CompileRepairCandidates(ws, diag, c, 32) : 0;
     free(diag);
+    g_cr_cands = n;
+    g_cr_built = 0;
     int ok[32] = {0};
     for (int k = 0; k < n && tw; k++) {
         char dir[TASK_OPS_MAX_PATH];
@@ -3369,6 +3376,8 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
             free(tmp[i]);
     }
     free(tw);
+    for (int k = 0; k < n; k++)
+        g_cr_built += ok[k] != 0;
     int best = -1, tier = 99, dup = 0;
     for (int k = 0; k < n; k++)
         if (ok[k]) {
@@ -3560,7 +3569,10 @@ static void diag_shape(const TASK_OPS_WORKSPACE *ws, char *out, size_t size)
         }
     }
     free(r);
-    snprintf(out, size, " [diag=%s nerr=%d nc=%d]", cls, cls[0] == 'l' || nerr < 2 ? 1 : nerr < 4 ? 2 : 4, nc > 1 ? 2 : 1);
+    char crs[32] = "";
+    if (g_cr_cands >= 0)   /* compile_repair: candidates / built, bucketed 0, 1, 2+ */
+        snprintf(crs, sizeof(crs), " cr=%d cb=%d", g_cr_cands > 1 ? 2 : g_cr_cands, g_cr_built > 1 ? 2 : g_cr_built);
+    snprintf(out, size, " [diag=%s nerr=%d nc=%d%s]", cls, cls[0] == 'l' || nerr < 2 ? 1 : nerr < 4 ? 2 : 4, nc > 1 ? 2 : 1, crs);
 }
 
 static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
@@ -3588,7 +3600,7 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
         git = 1;
         fclose(f);
     }
-    char diag[64] = "";
+    char diag[96] = "";
     if (rep->compile_before == 0)
         diag_shape(ws, diag, sizeof(diag));
     snprintf(rep->reason, sizeof(rep->reason),
@@ -3599,6 +3611,7 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
 
 int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 {
+    g_cr_cands = g_cr_built = -1;
     TASK_OPS_REPORT local;
     if (!rep)
         rep = &local;

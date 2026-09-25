@@ -6,9 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
+#include <time.h>
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -32,21 +30,36 @@ static int has(CR_CAND *c, int n, const char *rule, const char *needle)
     return 0;
 }
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0700)
+#endif
+
 static int solve(const char *main_c, const char *extra_rel, const char *extra, TASK_OPS_REPORT *rep, char *out, size_t osz)
 {
-    char dir[] = "/tmp/crtestXXXXXX", p[600];
-    if (!mkdtemp(dir)) return -1;
+    static int seq;
+    char dir[600], p[700];
+    const char *t = getenv("TMPDIR");
+    if (!t || !*t) t = getenv("TEMP");
+    if (!t || !*t) t = "/tmp";
+    int made = 0;
+    for (int tries = 0; tries < 1000 && !made; tries++) {   /* first free name */
+        snprintf(dir, sizeof(dir), "%s/crtest_%ld_%d", t, (long)time(NULL), seq++);
+        made = MKDIR(dir) == 0;
+    }
+    if (!made) return -1;
     snprintf(p, sizeof(p), "%s/main.c", dir);
-    FILE *f = fopen(p, "w"); fputs(main_c, f); fclose(f);
-    if (extra_rel) { snprintf(p, sizeof(p), "%s/%s", dir, extra_rel); f = fopen(p, "w"); fputs(extra, f); fclose(f); }
+    FILE *f = fopen(p, "wb"); if (!f) return -1; fputs(main_c, f); fclose(f);
+    if (extra_rel) { snprintf(p, sizeof(p), "%s/%s", dir, extra_rel); f = fopen(p, "wb"); if (f) { fputs(extra, f); fclose(f); } }
     int kept = TaskOpsSolve(dir, "Make it compile.", rep);
     snprintf(p, sizeof(p), "%s/main.c", dir);
-    f = fopen(p, "r"); size_t n = fread(out, 1, osz - 1, f); out[n] = 0; fclose(f);
-    char cmd[700]; snprintf(cmd, sizeof(cmd), "rm -rf %s", dir); if (system(cmd)) {}
+    out[0] = 0;
+    f = fopen(p, "rb"); if (f) { size_t n = fread(out, 1, osz - 1, f); out[n] = 0; fclose(f); }
     return kept;
 }
-#endif
 
 int main(void)
 {
@@ -121,8 +134,7 @@ int main(void)
     n = CompileRepairCandidates(&ws, "main.c:1:24: error: 'zzqq' undeclared (first use in this function)\n", c, 32);
     CHECK(n == 0);
 
-#ifndef _WIN32   /* end-to-end loop: POSIX temp dirs */
-    if (system("gcc --version >/dev/null 2>&1") == 0) {
+    if (system("gcc --version") == 0) {   /* end-to-end loop, every platform */
         TASK_OPS_REPORT rep;
         char out[4096];
         memset(&rep, 0, sizeof(rep));
@@ -134,7 +146,6 @@ int main(void)
         kept = solve("int cat1 = 1, cat2 = 2;\nint main(void){ return cat3 - 1; }\n", NULL, NULL, &rep, out, sizeof(out));
         CHECK(strcmp(rep.op, "compile_repair") != 0);
     }
-#endif
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }
