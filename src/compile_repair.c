@@ -369,8 +369,8 @@ int CompileRepairCandidates(const TASK_OPS_WORKSPACE *ws, const char *diag, CR_C
     }
     /* proto_add: an implicit call to a function with exactly one definition
        in the workspace gets that definition's header as a prototype - in the
-       one local header both files include (tier 1), else in the calling file
-       after its includes (tier 2) */
+       one local header both files include (tier 1), or, when it is defined
+       later in the calling file itself, after that file's includes (tier 2) */
     if (implicit) {
         int defs = 0, df = -1;
         size_t db = 0, de = 0;
@@ -400,8 +400,11 @@ int CompileRepairCandidates(const TASK_OPS_WORKSPACE *ws, const char *diag, CR_C
                     n = push(out, n, max, h, splice(hs, at, 0, ins), 1, "proto_add", d);
                 }
             }
-            snprintf(d, sizeof(d), "%.60s declared in %.80s", subj, base_of(ws->files[fi].rel));
-            n = push(out, n, max, fi, splice(src, after_includes(src), 0, proto), 2, "proto_add", d);
+            if (df == fi) {   /* defined later in the same file; a definition in
+                                 another source needs a header, not a local copy */
+                snprintf(d, sizeof(d), "%.60s declared in %.80s", subj, base_of(ws->files[fi].rel));
+                n = push(out, n, max, fi, splice(src, after_includes(src), 0, proto), 2, "proto_add", d);
+            }
         }
     }
     /* loop_decl */

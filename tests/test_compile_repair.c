@@ -85,12 +85,12 @@ int main(void)
     CHECK(has(c, n, "ident_near", "square"));
     CompileRepairFree(c, n);
 
-    /* implicit call, definition in another file, no header: prototype in the caller */
+    /* implicit call, definition in another file, no header: no local copy */
     memset(&ws, 0, sizeof(ws));
     set(0, "main.c", "#include <stdio.h>\nint main(void){ return add3(1,2,3) != 6; }\n");
     set(1, "util.c", "int add3(int a, int b, int c){ return a+b+c; }\n");
     n = CompileRepairCandidates(&ws, "main.c:2:24: error: implicit declaration of function 'add3' [-Werror=implicit-function-declaration]\n", c, 32);
-    CHECK(has(c, n, "proto_add", "#include <stdio.h>\nint add3(int a, int b, int c);\n"));
+    CHECK(!has(c, n, "proto_add", NULL));
     CompileRepairFree(c, n);
 
     /* ... and in the one header both files include, when there is one (tier 1) */

@@ -19,8 +19,9 @@
  *   tier 1 proto_add    - implicit call to F, F has exactly one definition
  *                         (not static elsewhere): its header becomes a
  *                         prototype in the one local header both files
- *                         include; tier 2: in the calling file after its
- *                         includes
+ *                         include; tier 2: F defined later in the calling
+ *                         file, prototype after its includes (never a local
+ *                         copy of a definition in another source)
  *   tier 1 semicolon    - expected ';': it is added at the end of the
  *                         previous code line
  *   tier 2 loop_decl    - X undeclared and assigned in "for (X =": that
