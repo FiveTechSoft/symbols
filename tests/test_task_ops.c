@@ -9,6 +9,15 @@
 #include "compat.h"
 #include "task_ops.h"
 
+static void set_reflexion(int on)
+{
+#ifdef _WIN32
+    _putenv(on ? "SYMBOLS_REFLEXION=1" : "SYMBOLS_REFLEXION=0");
+#else
+    setenv("SYMBOLS_REFLEXION", on ? "1" : "0", 1);
+#endif
+}
+
 static void set_memory(int on)
 {
 #ifdef _WIN32
@@ -390,8 +399,10 @@ int main(void)
         const char *t = "Declare it and write notes.txt; build with -Werror=implicit-function-declaration.";
         TASK_OPS_REPORT r1, r2;
         set_memory(1);
+        set_reflexion(0);   /* the coarse operator-level skip (Reflexion off) */
         int k1 = TaskOpsSolve(d, t, &r1);
         int k2 = TaskOpsSolve(d, t, &r2);
+        set_reflexion(1);
         set_memory(0);
         char mp[600]; snprintf(mp, sizeof(mp), "%s/.symbols/task_ops_memory.tsv", d);
         FILE *mf = fopen(mp, "rb"); char line[256] = {0};
@@ -427,6 +438,52 @@ int main(void)
         int kept = TaskOpsSolve(d, "Rename old_n to new_n; build with -Werror=implicit-function-declaration.", &r);
         CHECK(kept && !strcmp(r.op, "rename_symbol") && !r.memory_reordered,
               "memory off (default): fixed operator order");
+    }
+
+    /* minimal Reflexion loop: a refuted edit is reflected on, excluded, and the next attempt succeeds */
+    {
+        char d[512]; make_dir(d, sizeof(d), "reflex");
+        const char *u = "int max_of(const int *a, int n) { int m = a[0]; for (int i = 1; i < n; i++) if (a[i] < m) m = a[i]; return m; }\n";
+        const char *o = "int bonus(int k) { return k < 3 ? 8 : 0; }\n";
+        const char *m = "#include <stdio.h>\nint max_of(const int *a, int n);\nint bonus(int k);\n"
+                        "int main(void) { int a[] = {3, 9, 1, 4}; printf(\"%d\\n\", max_of(a, 4) + bonus(3)); return 0; }\n";
+        const char *t = "The bug is in util.c: the program must print 9.";
+        put(d, "util.c", u); put(d, "other.c", o); put(d, "main.c", m);
+        TASK_OPS_REPORT r0, r1;
+        set_reflexion(0);
+        int k0 = TaskOpsSolve(d, t, &r0);
+        set_reflexion(1);
+        int k1 = TaskOpsSolve(d, t, &r1);
+        printf("    reflexion: off kept=%d | on kept=%d attempts=%d written=%d %s | %s\n", k0, k1, r1.attempts,
+               r1.reflections_written, r1.detail, r1.reflection);
+        if (r1.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(!k0 && !strcmp(get(d, "other.c"), o) && k1 && r1.attempts == 2 && r1.reflections_written == 1 &&
+                   !strcmp(r1.op, "c_contract") && strstr(r1.detail, "util.c") && strstr(r1.reflection, "other.c") &&
+                   strstr(r1.reflection, "outside the file the task names") && !strcmp(get(d, "other.c"), o),
+                   "refuted edit is reflected on and excluded; the next attempt keeps the fix in the named file");
+    }
+    {   /* persisted reflection is read back on a retry of the same task; no alternative: abstain, files untouched */
+        char d[512]; make_dir(d, sizeof(d), "reflexmem");
+        const char *c = "int triple(int x) { return x * 3; }\n";
+        const char *h = "int base(void) { int b = 1; if (b < 1) b = 2; return b; }\n";
+        const char *m = "#include <stdio.h>\nint triple(int x);\nint base(void);\nint main(void) { printf(\"%d\\n\", triple(base())); return 0; }\n";
+        const char *t = "Only fix calc.c; the program must print 6.";
+        put(d, "calc.c", c); put(d, "helper.c", h); put(d, "main.c", m);
+        TASK_OPS_REPORT r1, r2;
+        set_memory(1);
+        int k1 = TaskOpsSolve(d, t, &r1);
+        int k2 = TaskOpsSolve(d, t, &r2);
+        set_memory(0);
+        char rp[600]; snprintf(rp, sizeof(rp), "%s/.symbols/reflections.tsv", d);
+        FILE *rf = fopen(rp, "rb"); char line[1400] = {0};
+        if (rf) { if (!fgets(line, sizeof(line), rf)) line[0] = 0; fclose(rf); }
+        printf("    reflexion memory: run1 written=%d | run2 recalled=%d written=%d attempts=%d\n", r1.reflections_written,
+               r2.reflections_recalled, r2.reflections_written, r2.attempts);
+        if (r1.compile_before == -1) CHECK(1, "no compiler: skipped");
+        else CHECK(!k1 && !k2 && r1.reflections_written == 1 && r2.reflections_recalled == 1 && r2.reflections_written == 0 &&
+                   r2.attempts == 1 && strstr(line, "\ttoolchain\t") && strstr(line, "helper.c") &&
+                   !strcmp(get(d, "helper.c"), h) && !strcmp(get(d, "calc.c"), c),
+                   "the reflection persists, is read back on the retry, and the refuted edit is not tried again");
     }
 
     /* operator 6: doc_sync */

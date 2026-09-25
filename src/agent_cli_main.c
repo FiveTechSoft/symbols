@@ -240,6 +240,12 @@ int main(int argc, char **argv)
         if (!solved)
         {
             solved = TaskOpsSolve(workspace, task_desc, &ops);
+            if (ops.reflections_recalled > 0)
+                printf("[symbols-agent] Reflexion: %d reflection(s) on this task read back; those edits are excluded\n",
+                       ops.reflections_recalled);
+            if (ops.reflections_written > 0)
+                printf("[symbols-agent] Reflection (attempt %d of %d): %s\n", ops.reflections_written, ops.attempts,
+                       ops.reflection);
             if (ops.op[0])
                 printf("[symbols-agent] Operator %s: %s (%s)\n", ops.op, ops.detail,
                        ops.verified ? "verified, kept" : "rolled back");

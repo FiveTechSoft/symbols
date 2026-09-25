@@ -10,6 +10,7 @@
 #include "compile_repair.h"
 #include "shell_contract.h"
 #include "c_contract.h"
+#include "reflect.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -3303,6 +3304,23 @@ static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int 
 
 
 
+static int reflexion_enabled(void);
+
+/* Reflexion: edits the toolchain refuted on this task (op + report detail);
+   an operator never proposes one of them again for the same task */
+#define EXCL_MAX 8
+static char g_excl[EXCL_MAX][300];
+static int g_nexcl;
+
+static int is_excluded(const char *op, const char *detail)
+{
+    char k[300];
+    snprintf(k, sizeof(k), "%s\t%s", op, detail);
+    for (int i = 0; i < g_nexcl; i++)
+        if (!strcmp(g_excl[i], k)) return 1;
+    return 0;
+}
+
 /* shell_contract: run the script (with text in place of file idx) in a
    throwaway copy with the stated invocation; 1 when every stated
    expectation holds */
@@ -3391,7 +3409,9 @@ static int shell_contract_target(const TASK_OPS_WORKSPACE *ws, const char *task,
     static SH_CAND c[48];
     int n = ShellContractCandidates(ws->files[idx].data, &g_shc, c, 48), best = -1, tier = 99, dup = 0;
     for (int k = 0; k < n; k++) {
-        if (c[k].tier > tier || !shc_check(ws, idx, c[k].text, &g_shc))
+        char dk[256];
+        snprintf(dk, sizeof(dk), "%s: %.80s in %.100s", c[k].rule, c[k].detail, ws->files[idx].rel);
+        if (c[k].tier > tier || is_excluded("shell_contract", dk) || !shc_check(ws, idx, c[k].text, &g_shc))
             continue;
         if (c[k].tier < tier) { tier = c[k].tier; best = k; dup = 0; }
         else dup = 1;
@@ -3475,7 +3495,8 @@ static int count_main_defs(const TASK_OPS_WORKSPACE *ws)
 }
 
 /* last c_contract attempt, for the abstain line: candidates / passing */
-static int g_ccc_cands = -1, g_ccc_pass = -1, g_ccc_parsed = -1;
+static int g_ccc_cands = -1, g_ccc_pass = -1, g_ccc_parsed = -1, g_ccc_idx = -1;
+static C_CONTRACT g_ccc;
 
 /* c_contract: the program builds, the task states its wanted stdout, and
    the program does not print it; single-edit candidates over every C
@@ -3515,6 +3536,10 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
             for (int k = 0; k < nc[x]; k++) {
                 if (c[x][k].tier != t || builds >= 160)
                     continue;
+                char dk[256];
+                snprintf(dk, sizeof(dk), "%s: %.80s in %.100s", c[x][k].rule, c[x][k].detail, ws->files[fidx[x]].rel);
+                if (is_excluded("c_contract", dk))
+                    continue;   /* refuted on an earlier attempt */
                 builds++;
                 if (!ccc_check(ws, flags, fidx[x], c[x][k].text, &cc))
                     continue;
@@ -3526,6 +3551,8 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
     int idx = -1;
     if (best_k >= 0 && !dup) {
         idx = fidx[best_f];
+        g_ccc = cc;
+        g_ccc_idx = idx;
         next[idx] = c[best_f][best_k].text;
         c[best_f][best_k].text = NULL;
         snprintf(rule, rsz, "%s", c[best_f][best_k].rule);
@@ -3615,6 +3642,12 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     for (int k = 0; k < n; k++)
         g_cr_built += ok[k] != 0;
     int best = -1, tier = 99, dup = 0;
+    for (int k = 0; k < n; k++) {
+        char dk[256];
+        snprintf(dk, sizeof(dk), "%s: %.160s", c[k].rule, c[k].detail);
+        if (ok[k] && is_excluded("compile_repair", dk))
+            ok[k] = 0;   /* refuted on an earlier attempt */
+    }
     for (int k = 0; k < n; k++)
         if (ok[k]) {
             if (c[k].tier < tier) { tier = c[k].tier; best = k; dup = 0; }
@@ -3852,10 +3885,10 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
              rep->run_before < 0 ? -1 : rep->run_before != 0, sh, mk, doc, test, git, diag);
 }
 
-int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
+static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
 {
     g_cr_cands = g_cr_built = -1;
-    g_ccc_cands = g_ccc_pass = g_ccc_parsed = -1;
+    g_ccc_cands = g_ccc_pass = g_ccc_parsed = g_ccc_idx = -1;
     TASK_OPS_REPORT local;
     if (!rep)
         rep = &local;
@@ -3908,6 +3941,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     if (use_mem) {
         mem_key(ws, task, key, sizeof(key));
         mem_recall(ws->root, key, skip, net);
+        if (reflexion_enabled())   /* reflections exclude the refuted edit itself, not the whole operator */
+            memset(skip, 0, sizeof(skip));
         for (int i = 1; i < OP_COUNT; i++)   /* stable insertion sort by net success */
             for (int j = i; j > 0 && net[order[j]] > net[order[j - 1]]; j--) {
                 int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
@@ -4135,6 +4170,16 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 snprintf(rep->detail, sizeof(rep->detail), "stray '}' removed in %.100s", ws->files[bf].rel);
             }
         }
+        if (touched && is_excluded(rep->op, rep->detail)) {
+            /* the toolchain refuted exactly this edit on an earlier attempt */
+            for (int i = 0; i < TASK_OPS_MAX_FILES; i++) { free(next[i]); next[i] = NULL; }
+            free(created.data); free(created2.data);
+            memset(&created, 0, sizeof(created));
+            memset(&created2, 0, sizeof(created2));
+            touched = 0;
+            rep->op[0] = rep->detail[0] = '\0';
+            rep->candidates = 0;
+        }
     }
     if (!touched) {
         if (evidence_wins > 1)
@@ -4216,6 +4261,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
         } else if (!strcmp(rep->op, "shell_contract")) {
             intent = g_shc_idx >= 0 && g_shc_idx < after->count &&
                      shc_check(after, g_shc_idx, after->files[g_shc_idx].data, &g_shc);
+        } else if (!strcmp(rep->op, "c_contract")) {
+            intent = g_ccc_idx >= 0 && g_ccc_idx < after->count &&
+                     ccc_check(after, flags, -1, NULL, &g_ccc);
         } else if (!strcmp(rep->op, "compile_repair")) {
             intent = rep->compile_after == 1 && rep->run_after <= 0;
         } else if (!strcmp(rep->op, "evidence_fix")) {
@@ -4240,16 +4288,20 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                                    (!strcmp(shell_rule, "file_guard") || !strcmp(shell_rule, "file_content"))) ||
                                   (!strcmp(rep->op, "build_repair") && !strcmp(bedit.rule, "cmake_missing_source")) ||
                                   (!strcmp(rep->op, "shell_contract") && g_shc.has_file);   /* the stated output file */
+        int scope_fail = 0;
         if ((!guard_names_missing && !named_files_exist(ws, after, task, &named, &named_touched)) ||
-            (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
+            (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0)) {
+            scope_fail = intent;   /* the operator's own check held; the scope did not */
             intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
+        }
         if (!strcmp(rep->op, "author_test"))
             no_regress = 1;   /* sources untouched; the test's own build and run is the evidence */
         verified = intent && no_regress;
         if (!verified)
             snprintf(rep->reason, sizeof(rep->reason),
-                     "verify failed: intent=%d compile %d->%d run %d->%d", intent,
-                     rep->compile_before, rep->compile_after, rep->run_before, rep->run_after);
+                     "verify failed: intent=%d compile %d->%d run %d->%d%s", intent,
+                     rep->compile_before, rep->compile_after, rep->run_before, rep->run_after,
+                     scope_fail ? " (the edit is outside the file the task names)" : "");
         TaskOpsFreeWorkspace(after);
         free(after);
     } else {
@@ -4284,4 +4336,76 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     TaskOpsFreeWorkspace(ws);
     free(ws);
     return verified;
+}
+
+static int reflexion_enabled(void)
+{
+    const char *v = getenv("SYMBOLS_REFLEXION");
+    return !(v && !strcmp(v, "0"));
+}
+
+/* Minimal Reflexion loop: attempt; when the toolchain refutes the kept
+   candidate (applied, rechecked, rolled back) write a reflection - what was
+   tried, what the toolchain reported, what changes - exclude that exact edit
+   and attempt again (at most 3 attempts). With SYMBOLS_TASK_OPS_MEMORY the
+   reflections persist in <ws>/.symbols/reflections.tsv and are read back on
+   a retry of the same task on the same files. Abstentions, guesses and write
+   failures are never reflected. */
+int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
+{
+    TASK_OPS_REPORT local;
+    if (!rep)
+        rep = &local;
+    g_nexcl = 0;
+    int reflex = reflexion_enabled(), persist = reflex && mem_enabled();
+    char key[32] = "", path[TASK_OPS_MAX_PATH * 2] = "";
+    int recalled = 0;
+    if (workspace && task && persist) {
+        TASK_OPS_WORKSPACE *w = (TASK_OPS_WORKSPACE *)calloc(1, sizeof(*w));
+        if (w && TaskOpsLoadWorkspace(workspace, w)) {
+            mem_key(w, task, key, sizeof(key));
+            TaskOpsFreeWorkspace(w);
+        }
+        free(w);
+        mem_path(workspace, path, sizeof(path), 0);
+        size_t pl = strlen(path);
+        if (pl > 20) snprintf(path + pl - strlen("task_ops_memory.tsv"), sizeof(path) - (pl - strlen("task_ops_memory.tsv")), "reflections.tsv");
+        static REFLECTION prior[EXCL_MAX];
+        int n = key[0] ? ReflectLoad(path, key, prior, EXCL_MAX) : 0;
+        for (int i = 0; i < n && g_nexcl < EXCL_MAX; i++)
+            snprintf(g_excl[g_nexcl++], sizeof(g_excl[0]), "%s\t%s", prior[i].op, prior[i].detail);
+        recalled = g_nexcl;
+    }
+    int v = 0, written = 0;
+    char trail[512] = "";
+    static char last[512];
+    last[0] = '\0';
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        v = task_ops_attempt(workspace, task, rep);
+        rep->attempts = attempt;
+        rep->reflections_recalled = recalled;
+        rep->reflections_written = written;
+        snprintf(rep->reflection, sizeof(rep->reflection), "%s", last);
+        if (v || !reflex || !rep->op[0] || strncmp(rep->reason, "verify failed", 13) || g_nexcl >= EXCL_MAX ||
+            is_excluded(rep->op, rep->detail))
+            break;
+        REFLECTION r;
+        memset(&r, 0, sizeof(r));
+        snprintf(r.key, sizeof(r.key), "%s", key);
+        r.attempt = attempt;
+        snprintf(r.op, sizeof(r.op), "%s", rep->op);
+        snprintf(r.detail, sizeof(r.detail), "%s", rep->detail);
+        snprintf(r.feedback, sizeof(r.feedback), "%s", rep->reason);
+        r.ts = (long long)time(NULL);
+        ReflectCompose(&r);
+        snprintf(g_excl[g_nexcl++], sizeof(g_excl[0]), "%s\t%s", r.op, r.detail);
+        snprintf(last, sizeof(last), "%s", r.text);
+        snprintf(rep->reflection, sizeof(rep->reflection), "%s", r.text);
+        if (persist && key[0] && !ReflectAppend(path, &r))
+            snprintf(trail, sizeof(trail), "reflection not persisted");
+        rep->reflections_written = ++written;
+    }
+    if (trail[0] && !v)
+        snprintf(rep->reason + strlen(rep->reason), sizeof(rep->reason) - strlen(rep->reason), " (%s)", trail);
+    return v;
 }

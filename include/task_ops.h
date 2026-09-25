@@ -48,6 +48,10 @@ typedef struct
     int  run_after;
     int  memory_skipped;  /* operators skipped: they rolled back before on this workspace+task */
     int  memory_reordered;/* 1 = operator order came from remembered outcomes */
+    int  attempts;        /* attempts made (Reflexion loop, <= 3) */
+    int  reflections_written;  /* refuted edits reflected on in this solve */
+    int  reflections_recalled; /* reflections read back for this task */
+    char reflection[512]; /* the last reflection written, "" when none */
 } TASK_OPS_REPORT;
 
 /* Load text files (no NUL bytes, <= TASK_OPS_MAX_FILE) under root. */
