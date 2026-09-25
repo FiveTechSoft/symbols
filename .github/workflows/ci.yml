@@ -55,6 +55,35 @@ jobs:
       - name: Corpus lint (gate)
         run: python3 tools/lint_corpus.py --check
 
+  ast-inspect-windows-ninja:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
+      - name: Set up Python 3.11 x64
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - name: Install pinned libclang and Ninja
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check libclang==18.1.1 ninja==1.12.1
+          python -c "import importlib.metadata as m; assert m.version('libclang') == '18.1.1'; print('libclang', m.version('libclang'))"
+          ninja --version
+      - name: Generate compilation database with Ninja
+        shell: pwsh
+        run: |
+          cmake -S . -B build-ast -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          if (-not (Test-Path build-ast/compile_commands.json)) { throw 'compile_commands.json not generated' }
+          python -c "import json; from pathlib import Path; p=Path('build-ast/compile_commands.json'); d=json.loads(p.read_text()); assert d and any(Path(x['file']).name == 'task_ops.c' for x in d); print('compile DB entries:', len(d))"
+      - name: Run native Windows AST corpus with pinned libclang
+        shell: pwsh
+        run: |
+          python tests/test_ast_inspect.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   asan-msvc:
     runs-on: windows-latest
     steps:
