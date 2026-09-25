@@ -29,6 +29,12 @@
 typedef struct {
     int  has_out;
     char out[128];
+    /* when has_out is 0, why no wanted stdout was read, closed form:
+       nogoal (no clause states a goal), now (goal words only in clauses about
+       the current state), exit (a goal of non-zero exit), file (goal clauses
+       are about a file), noval (a goal clause, no value found), multi (two
+       different wanted outputs) */
+    char why[8];
 } C_CONTRACT;
 
 typedef struct {

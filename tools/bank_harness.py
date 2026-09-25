@@ -223,10 +223,11 @@ def reason_class(log: str, agent_rc: int) -> str:
                 tail += (" cr=%s cb=%s" % d.groups()[3:5]) if d.group(4) is not None else ""
                 tail += (" crskip=%s" % d.group(6)) if d.group(6) is not None else ""
                 tail += "]"
-            k = re.search(r"git=[01]\] \[cc=([01])(?: cn=([012]) cp=([012]))?\]", kept[-1])
+            k = re.search(r"git=[01]\] \[cc=([01])(?: cn=([012]) cp=([012])| ccw=(nogoal|now|exit|file|noval|multi))?\]", kept[-1])
             if k:
                 tail = " [cc=%s" % k.group(1)
-                tail += (" cn=%s cp=%s" % k.groups()[1:]) if k.group(2) is not None else ""
+                tail += (" cn=%s cp=%s" % k.groups()[1:3]) if k.group(2) is not None else ""
+                tail += (" ccw=%s" % k.group(4)) if k.group(4) is not None else ""
                 tail += "]"
             return "no operator preconditions hold [" + m.group(1) + "]" + tail
         for name, rx in REASON_CLASSES:

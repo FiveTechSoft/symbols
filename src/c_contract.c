@@ -136,6 +136,8 @@ int CContractParse(const char *task, C_CONTRACT *c)
         outputish = 0;
         for (size_t k = 0; k < sizeof(ow) / sizeof(ow[0]); k++) outputish |= ci_find_n(task, tl_, ow[k]) != NULL;
     }
+    int saw_goal = 0, saw_now = 0, saw_file = 0;
+#define CC_WHY(w) (snprintf(c->why, sizeof(c->why), "%s", (w)), 0)
     while (*s) {
         size_t n = 0;
         int inq = 0;
@@ -166,7 +168,9 @@ int CContractParse(const char *task, C_CONTRACT *c)
             for (const char *h = cl; (h = ci_find_n(h, o - (size_t)(h - cl), now[k])) != NULL; h++)
                 if (!(h - cl >= 3 && ci_eq_n(h - 3, "so ", 3))) { is_now = 1; break; }   /* "so it prints X" states the goal */
         for (size_t k = 0; k < sizeof(want) / sizeof(want[0]); k++) is_want |= ci_word(cl, o, want[k]) != NULL;
+        if (is_want && is_now) saw_now = 1;
         if (is_want && !is_now) {
+            saw_goal = 1;
             /* exit: only 0 is supported */
             static const char *ek[] = {"exit code ", "exit status ", "status ", "exit with ", "exit "};
             for (size_t k = 0; k < 5; k++) {
@@ -174,10 +178,10 @@ int CContractParse(const char *task, C_CONTRACT *c)
                 if (!e) continue;
                 e += strlen(ek[k]);
                 if (!strncmp(e, "status ", 7)) e += 7;
-                if (isdigit((unsigned char)*e) && atoi(e) != 0) return 0;
+                if (isdigit((unsigned char)*e) && atoi(e) != 0) return CC_WHY("exit");
                 break;
             }
-            if (ci_find_n(cl, o, "non-zero") || ci_find_n(cl, o, "nonzero")) return 0;
+            if (ci_find_n(cl, o, "non-zero") || ci_find_n(cl, o, "nonzero")) return CC_WHY("exit");
             static const char *keys[] = {"print", "output", "stdout", "produce", "display", "show", "give", "write", "report",
                                          "expected", "result"};
             if (!ci_find_n(cl, o, "file")) {   /* a file's content is not stdout */
@@ -187,7 +191,7 @@ int CContractParse(const char *task, C_CONTRACT *c)
                         if (key > cl && isalpha((unsigned char)key[-1]))
                             continue;
                         int r = clause_value(c, cl, o, key);
-                        if (r < 0) return 0;   /* two different wanted outputs */
+                        if (r < 0) return CC_WHY("multi");   /* two different wanted outputs */
                         got |= r > 0;
                     }
                 /* no output verb matched: a goal clause that names exactly one
@@ -215,13 +219,19 @@ int CContractParse(const char *task, C_CONTRACT *c)
                         }
                         i++;
                     }
-                    if (cnt == 1 && set_out(c, val, vl) < 0) return 0;
+                    if (cnt == 1 && set_out(c, val, vl) < 0) return CC_WHY("multi");
+                    if (cnt > 1) snprintf(c->why, sizeof(c->why), "multi");
                 }
-            }
+            } else
+                saw_file = 1;
         }
         s += n;
         if (*s) s++;
     }
+    if (!c->has_out && !c->why[0])
+        snprintf(c->why, sizeof(c->why), "%s", saw_goal ? (saw_file ? "file" : "noval") : saw_now ? "now" : "nogoal");
+    if (c->has_out) c->why[0] = '\0';
+#undef CC_WHY
     return c->has_out;
 }
 

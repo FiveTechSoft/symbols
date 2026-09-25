@@ -88,6 +88,14 @@ int main(void)
     CHECK(!CContractParse("Write the result to out.txt; it should contain 42.", &k));   /* a file */
     CHECK(!CContractParse("It shows 6 right now.", &k));
 
+    /* closed-form reason when nothing was read */
+    CHECK(!CContractParse("Refactor the parser for readability.", &k) && !strcmp(k.why, "nogoal"));
+    CHECK(!CContractParse("It currently should print 5 but prints 4.", &k) && !strcmp(k.why, "now"));
+    CHECK(!CContractParse("The program must exit with status 2 on bad input.", &k) && !strcmp(k.why, "exit"));
+    CHECK(!CContractParse("The output file must contain the total.", &k) && !strcmp(k.why, "file"));
+    CHECK(!CContractParse("The program should print the sum of the list.", &k) && !strcmp(k.why, "noval"));
+    CHECK(!CContractParse("It should print `5`. It must print `6`.", &k) && !strcmp(k.why, "multi"));
+    CHECK(CContractParse("It should print `5`.", &k) && k.why[0] == '\0');
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }

@@ -3496,6 +3496,7 @@ static int count_main_defs(const TASK_OPS_WORKSPACE *ws)
 
 /* last c_contract attempt, for the abstain line: candidates / passing */
 static int g_ccc_cands = -1, g_ccc_pass = -1, g_ccc_parsed = -1, g_ccc_idx = -1;
+static char g_ccc_why[8];   /* CContractParse's closed-form reason when nothing was read */
 static C_CONTRACT g_ccc;
 
 /* c_contract: the program builds, the task states its wanted stdout, and
@@ -3508,6 +3509,7 @@ static int c_contract_target(const TASK_OPS_WORKSPACE *ws, const char *flags, co
     C_CONTRACT cc;
     g_ccc_cands = g_ccc_pass = -1;
     g_ccc_parsed = CContractParse(task, &cc);
+    snprintf(g_ccc_why, sizeof(g_ccc_why), "%s", cc.why[0] ? cc.why : "nogoal");
     if (!g_ccc_parsed || count_main_defs(ws) != 1 || reads_input(ws))
         return -1;
     if (ccc_check(ws, flags, -1, NULL, &cc))
@@ -3888,7 +3890,7 @@ static void abstain_shape(const TASK_OPS_WORKSPACE *ws, TASK_OPS_REPORT *rep)
             snprintf(diag, sizeof(diag), " [cc=%d cn=%d cp=%d]", g_ccc_parsed, g_ccc_cands > 1 ? 2 : g_ccc_cands,
                      g_ccc_pass > 1 ? 2 : g_ccc_pass);
         else
-            snprintf(diag, sizeof(diag), " [cc=%d]", g_ccc_parsed);
+            snprintf(diag, sizeof(diag), g_ccc_parsed ? " [cc=%d]" : " [cc=%d ccw=%s]", g_ccc_parsed, g_ccc_why);
     }
     snprintf(rep->reason, sizeof(rep->reason),
              "no operator preconditions hold [c=%d run=%d sh=%d mk=%d doc=%d test=%d git=%d]%s",
