@@ -294,6 +294,7 @@ For code, the reference that learning needs is free: the toolchain compiles or i
 
 - **The Oracle asks the questions that help find the answers.** It does not hand down verdicts. Asked "is X true?", it answers "what evidence is there about X, who states it, and how much does it weigh?", and names what would settle the question.
 - **Above all, know thyself** (*temet nosce*). The system knows what it knows, knows what it does not know, and does not lie to itself about the difference. Its own analogue results are a mirror it wrote itself; held-out and blind evaluations are where that self-image is checked.
+- **The tribunal is always present.** Every claim is judged, not just stored: it faces evidence (what was run or observed), witnesses (sources, each with its authority), and precedent (verified memory), and it gets a verdict that states how sure the system is and why. No claim becomes an answer or a memory without facing the tribunal. For code the tribunal already sits with one judge, the real toolchain; the Oracle extends the same court to knowledge where no compiler can rule.
 
 **Design direction (discussed, not implemented).**
 
@@ -303,6 +304,13 @@ For code, the reference that learning needs is free: the toolchain compiles or i
 - Only *executed* and *corroborated* claims are consolidated as reusable facts; lower levels are kept with their label. Before a reflection or episode is consolidated, it passes through the same check.
 - Levels change with evidence: a claim that is later corroborated moves up; one that is contradicted moves down and invalidates what depended on it (the Phase 6 invalidation machinery).
 - "I don't know" stays a correct answer, reported with the evidence and gaps that exist so far.
+
+**Memory hygiene (named piece, owner to be assigned in Phases 6-7).** Keeping memory clean has four layers:
+
+1. *The door:* the tribunal. The cheapest cleanup is the one never needed: only verified experience is consolidated, and reflections are read back only when their source is the toolchain (already in place).
+2. *The user:* `/forget` (`/olvida`) removes any fact immediately and across restarts; the user is the highest authority (already in place).
+3. *Invalidation on contradiction:* when a claim is contradicted it moves down a level and invalidates what depended on it (Phase 6 invalidation, designed, not implemented).
+4. *The periodic sweep* (informally, the tribunal's janitor): a scheduled pass that ages *asserted* claims that were never corroborated, removes reflections whose task or workspace no longer exists, and lists accumulated contradictions awaiting resolution. It reuses the Phase 6 invalidation and Phase 7 forgetting machinery, reports what it changed, and never deletes a verified fact on its own; removing or demoting one needs new evidence or the user. Not implemented.
 
 ## Measurable targets per phase
 
