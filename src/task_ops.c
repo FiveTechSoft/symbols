@@ -8,6 +8,7 @@
 #include "build_ops.h"
 #include "c_fix_ops.h"
 #include "compile_repair.h"
+#include "shell_contract.h"
 #include "code_graph.h"
 
 #include <ctype.h>
@@ -3300,6 +3301,112 @@ static int evidence_search(const TASK_OPS_WORKSPACE *ws, const char *flags, int 
 }
 
 
+
+/* shell_contract: run the script (with text in place of file idx) in a
+   throwaway copy with the stated invocation; 1 when every stated
+   expectation holds */
+static int shc_check(const TASK_OPS_WORKSPACE *ws, int idx, const char *text, const SH_CONTRACT *c)
+{
+    char dir[TASK_OPS_MAX_PATH], cmd[TASK_OPS_MAX_PATH * 4];
+    int ok = 0;
+    temp_binary(dir, sizeof(dir));
+    strncat(dir, "_shc", sizeof(dir) - strlen(dir) - 1);
+    if (strchr(dir, '"'))
+        return 0;
+    make_dir(dir);
+    for (int i = 0; i < ws->count; i++) {
+        char sub[TASK_OPS_MAX_PATH * 2];
+        const char *r = ws->files[i].rel;
+        for (const char *q = strchr(r, '/'); q; q = strchr(q + 1, '/')) {
+            snprintf(sub, sizeof(sub), "%s/%.*s", dir, (int)(q - r), r);
+            make_dir(sub);
+        }
+        if (!write_file(dir, r, i == idx ? text : ws->files[i].data))
+            goto out;
+    }
+    {
+        size_t o = 0;
+#ifdef _WIN32
+        o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, "sh \"%s\"", c->script);
+#else
+        o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, "HOME=\"%s\" sh \"%s\"", dir, c->script);
+#endif
+        for (int a = 0; a < c->nargs && o < sizeof(cmd); a++)
+            o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, " \"%s\"", c->args[a]);
+#ifndef _WIN32
+        if (o < sizeof(cmd)) snprintf(cmd + o, sizeof(cmd) - o, " </dev/null");
+#endif
+    }
+    SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
+    if (!r)
+        goto out;
+    AgentShellResultInit(r);
+    AgentShellExec(cmd, dir, 3000, r);
+    if (!r->execution_failed && !r->timed_out) {
+        ok = 1;
+        if (c->exit_want == -2) ok = r->exit_code != 0;
+        else if (c->exit_want >= 0) ok = r->exit_code == c->exit_want;
+        if (ok && c->has_out) {
+            size_t n = r->stdout_len;
+            while (n && (r->stdout_buf[n - 1] == '\n' || r->stdout_buf[n - 1] == '\r')) n--;
+            ok = n == strlen(c->out) && !strncmp(r->stdout_buf, c->out, n);
+        }
+        if (ok && c->has_file) {
+            char p[TASK_OPS_MAX_PATH * 2], buf[128];
+            snprintf(p, sizeof(p), "%s/%s", dir, c->file);
+            FILE *f = fopen(p, "rb");
+            ok = 0;
+            if (f) {
+                size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+                fclose(f);
+                buf[n] = '\0';
+                while (n && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) buf[--n] = '\0';
+                ok = !strcmp(buf, c->word);
+            }
+        }
+    }
+    free(r);
+out:
+    sc_rm_tree(dir, 0);
+    return ok;
+}
+
+static SH_CONTRACT g_shc;
+static int g_shc_idx = -1;
+
+static int shell_contract_target(const TASK_OPS_WORKSPACE *ws, const char *task, char **next,
+                                 char *rule, size_t rsz, char *detail, size_t dsz)
+{
+    const char *v = getenv("SYMBOLS_SHELL_RUN");
+    g_shc_idx = -1;
+    if ((v && !strcmp(v, "0")) || !ShellContractParse(task, &g_shc))
+        return -1;
+    int idx = -1;
+    for (int i = 0; i < ws->count; i++)
+        if (!strcmp(ws->files[i].rel, g_shc.script))
+            idx = i;
+    if (idx < 0 || ws->files[idx].len > 65536 || shc_check(ws, idx, ws->files[idx].data, &g_shc))
+        return -1;   /* no such script, or it already meets the contract */
+    static SH_CAND c[48];
+    int n = ShellContractCandidates(ws->files[idx].data, &g_shc, c, 48), best = -1, tier = 99, dup = 0;
+    for (int k = 0; k < n; k++) {
+        if (c[k].tier > tier || !shc_check(ws, idx, c[k].text, &g_shc))
+            continue;
+        if (c[k].tier < tier) { tier = c[k].tier; best = k; dup = 0; }
+        else dup = 1;
+    }
+    if (best >= 0 && !dup) {
+        next[idx] = c[best].text;
+        c[best].text = NULL;
+        snprintf(rule, rsz, "%s", c[best].rule);
+        snprintf(detail, dsz, "%s", c[best].detail);
+        g_shc_idx = idx;
+    } else
+        idx = -1;
+    ShellContractFree(c, n);
+    return idx;
+}
+
 /* last compile_repair attempt, for the abstain shape: candidates generated
    and candidates that built (-1 = not attempted) */
 static int g_cr_cands = -1, g_cr_built = -1;
@@ -3404,9 +3511,9 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     return touched;
 }
 
-enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_CREPAIR, OP_EVIDENCE, OP_COUNT };
+enum { OP_TEST, OP_RENAME, OP_FRAGMENT, OP_LITERAL, OP_DECLARE, OP_FIXIT, OP_DOCSYNC, OP_DEADFN, OP_BRACE, OP_RELOP, OP_SHELL, OP_BUILD, OP_CFIX, OP_CREPAIR, OP_SHCONTRACT, OP_EVIDENCE, OP_COUNT };
 static const char *const op_names[OP_COUNT] = {
-    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "compile_repair", "evidence_fix"
+    "author_test", "rename_symbol", "stated_fragment", "literal_to_constant", "declare_implicit", "compiler_fixit", "doc_sync", "remove_dead_function", "unmatched_brace", "relop_search", "shell_harden", "build_repair", "c_fix", "compile_repair", "shell_contract", "evidence_fix"
 };
 
 /* The run-based evidence search (a candidate edit kept because the bare
@@ -3809,6 +3916,12 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             rep->candidates = 1;
             snprintf(rep->op, sizeof(rep->op), "compile_repair");
             snprintf(rep->detail, sizeof(rep->detail), "%s: %.160s", cfix_rule, cfix_detail);
+        } else if (op == OP_SHCONTRACT &&
+                   (shell_file = shell_contract_target(ws, task, next, shell_rule, sizeof(shell_rule), shell_detail, sizeof(shell_detail))) >= 0) {
+            touched = 1;
+            rep->candidates = 1;
+            snprintf(rep->op, sizeof(rep->op), "shell_contract");
+            snprintf(rep->detail, sizeof(rep->detail), "%s: %.80s in %.100s", shell_rule, shell_detail, ws->files[shell_file].rel);
         } else if (op == OP_CFIX && (cfix_file = cfix_split_target(ws, task, &split)) >= 0) {
             next[cfix_file] = split.new_src;
             snprintf(created.rel, sizeof(created.rel), "%s", split.c_rel);
@@ -3957,6 +4070,9 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                      (strcmp(cfix_rule, "goto_return") != 0 || TaskOpsCountToken(after, "goto") == 0) &&
                      (strcmp(cfix_rule, "split_function") != 0 ||
                       (ws_find_named(after, created.rel) >= 0 && ws_find_named(after, created2.rel) >= 0));
+        } else if (!strcmp(rep->op, "shell_contract")) {
+            intent = g_shc_idx >= 0 && g_shc_idx < after->count &&
+                     shc_check(after, g_shc_idx, after->files[g_shc_idx].data, &g_shc);
         } else if (!strcmp(rep->op, "compile_repair")) {
             intent = rep->compile_after == 1 && rep->run_after <= 0;
         } else if (!strcmp(rep->op, "evidence_fix")) {
@@ -3979,7 +4095,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             no_regress = 0;
         int guard_names_missing = (!strcmp(rep->op, "shell_harden") &&
                                    (!strcmp(shell_rule, "file_guard") || !strcmp(shell_rule, "file_content"))) ||
-                                  (!strcmp(rep->op, "build_repair") && !strcmp(bedit.rule, "cmake_missing_source"));
+                                  (!strcmp(rep->op, "build_repair") && !strcmp(bedit.rule, "cmake_missing_source")) ||
+                                  (!strcmp(rep->op, "shell_contract") && g_shc.has_file);   /* the stated output file */
         if ((!guard_names_missing && !named_files_exist(ws, after, task, &named, &named_touched)) ||
             (named > 0 && named_touched == 0 && strcmp(rep->op, "doc_sync") != 0))
             intent = 0;   /* doc_sync edits docs only; named sources are where B was read */
