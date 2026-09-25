@@ -191,6 +191,8 @@ These decisions change the order of work, not the dependency chain above. No pul
 - Test reports distinguish not-run, skipped, passed, failed, timed out, and crashed.
 - Performance claims in `README.md` are produced by versioned benchmark commands, with median and tail latency plus memory high-water mark.
 
+A slice-3 opt-in, read-only AST inspection adapter is described in [docs/ast-inspect.md](docs/ast-inspect.md). It is not a Phase 4 exit-criterion claim and authorizes no edits. Native Windows execution remains unmeasured.
+
 ## Phase 4: Clang AST and `compile_commands.json`
 
 **Goal:** replace lightweight C scanning with compiler-grounded semantics for C and C++ while keeping the graph auditable.

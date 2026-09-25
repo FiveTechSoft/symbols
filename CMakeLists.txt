@@ -393,3 +393,11 @@ sllm_test(test_episodic_session tests/test_episodic_session.c)
 # Universal Generic Relation Ingestion & Binary Model QA
 sllm_test(test_model_generic_rel tests/test_model_generic_rel.c)
 
+
+# Opt-in, read-only libclang consumer. The C core and default CI build never
+# download or link LLVM. Install the pinned package to run the corpus check.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_ast_inspect
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ast_inspect.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
