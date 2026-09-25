@@ -12,8 +12,16 @@ on:
         required: true
         type: string
       patch_base64:
-        description: Base64-encoded unified diff to apply
-        required: true
+        description: Base64-encoded unified diff (choose this or patch_url)
+        required: false
+        type: string
+      patch_url:
+        description: Pinned raw GitHub URL of a .patch file (choose this or inline)
+        required: false
+        type: string
+      patch_sha256:
+        description: Lowercase SHA-256 of URL payload; required with patch_url
+        required: false
         type: string
 
 permissions:
@@ -39,6 +47,8 @@ jobs:
       - name: Validate request and patch
         env:
           PATCH_BASE64: ${{ inputs.patch_base64 }}
+          PATCH_URL: ${{ inputs.patch_url }}
+          PATCH_SHA256: ${{ inputs.patch_sha256 }}
           EXPECTED_HEAD: ${{ inputs.expected_head }}
           COMMIT_MESSAGE: ${{ inputs.message }}
         shell: bash
@@ -46,8 +56,36 @@ jobs:
           set -euo pipefail
           test -n "${COMMIT_MESSAGE//[[:space:]]/}" || { echo 'Commit message is empty'; exit 1; }
           test "$EXPECTED_HEAD" = "$(git rev-parse HEAD)" || { echo 'master moved; refusing stale patch'; exit 1; }
-          test -n "${PATCH_BASE64//[[:space:]]/}" || { echo 'Patch is empty'; exit 1; }
-          printf '%s' "$PATCH_BASE64" | base64 --decode > "$RUNNER_TEMP/change.patch"
+          # Exactly one source. Keep the existing inline decoding path for small diffs.
+          if [ -n "$PATCH_BASE64" ]; then
+            test -z "$PATCH_URL" && test -z "$PATCH_SHA256" || { echo 'Choose one patch source'; exit 1; }
+            printf '%s' "$PATCH_BASE64" | base64 --decode > "$RUNNER_TEMP/change.patch"
+          else
+            test -n "$PATCH_URL" || { echo 'Patch is empty'; exit 1; }
+            case "$PATCH_URL" in
+              https://*) ;;
+              *) echo 'Patch URL must use HTTPS'; exit 1 ;;
+            esac
+            # Refuse credentials, fragments, ports and non-public hosts before requesting bytes.
+            [[ "$PATCH_URL" =~ ^https://([a-zA-Z0-9.-]+)(:[0-9]+)?/[^[:space:]#@]*$ ]] || { echo 'Invalid patch URL'; exit 1; }
+            host="${BASH_REMATCH[1],,}"
+            test -z "${BASH_REMATCH[2]}" || { echo 'Nondefault port is not allowed'; exit 1; }
+            case "$host" in
+              raw.githubusercontent.com) ;;
+              *) echo 'Patch URL host is not allowlisted'; exit 1 ;;
+            esac
+            # Stage the patch on another branch/commit of this repo; master stays guarded.
+            # Pin source bytes to an immutable commit, not a moving branch name.
+            [[ "$PATCH_URL" =~ ^https://raw\.githubusercontent\.com/FiveTechSoft/symbols/[0-9a-f]{40}/[A-Za-z0-9_./-]+\.patch$ ]] || { echo 'Patch URL must be a pinned Symbols raw file'; exit 1; }
+            [[ "$PATCH_URL" != *"/../"* && "$PATCH_URL" != *"/./"* ]] || { echo 'Dot segments in URL are not allowed'; exit 1; }
+            [[ "$PATCH_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo 'URL patch needs a lowercase SHA-256'; exit 1; }
+            curl --fail --silent --show-error --proto '=https' --max-redirs 0 \
+              --connect-timeout 10 --max-time 30 --max-filesize 2097152 \
+              --output "$RUNNER_TEMP/change.patch" -- "$PATCH_URL"
+            test "$(sha256sum "$RUNNER_TEMP/change.patch" | cut -d ' ' -f 1)" = "$PATCH_SHA256" || { echo 'Patch SHA-256 mismatch'; exit 1; }
+          fi
+          test -s "$RUNNER_TEMP/change.patch" || { echo 'Patch is empty'; exit 1; }
+          test "$(wc -c < "$RUNNER_TEMP/change.patch")" -le 2097152 || { echo 'Patch exceeds 2 MiB'; exit 1; }
           grep -q '^diff --git a/.* b/.*$' "$RUNNER_TEMP/change.patch" || { echo 'Not a unified git diff'; exit 1; }
           git apply --numstat "$RUNNER_TEMP/change.patch" > "$RUNNER_TEMP/numstat"
           test -s "$RUNNER_TEMP/numstat" || { echo 'Patch changes no files'; exit 1; }
