@@ -58,6 +58,47 @@ native Windows Ninja CI for commit `2f1ee43`. The official LLVM developer
 archive is much larger than this opt-in adapter; no archive or binary is
 vendored.
 
+## Slice 4: semantic-veto experiment (not shipped)
+
+We tested two opt-in policies for letting the inspector veto a unique
+`c_contract` edit. Both were prototypes only. Neither policy was committed or
+connected to the shipped edit path. The constraint was one-way: AST facts
+could reject a candidate already accepted by the existing syntactic search
+and whole-program compile/run check, never generate, rank, or authorize edits.
+An unavailable inspector or compilation database had to leave the old result
+unchanged.
+
+The first policy vetoed an edit when its changed operator fell within the
+smallest expression containing a resolved reference to a declaration outside
+the translation unit. Counterexample: `ext.h` declared `extern int ext;`,
+`ext.c` defined `ext=3`, and `main.c` evaluated `if (ext<3) puts("good");
+else puts("bad");`. For the stated goal "It should print good", the existing
+`c_contract` search uniquely changed `<` to `<=`, compiled, ran, and kept the
+correct repair. The prototype nevertheless vetoed it because `ext` resolved
+to the header declaration and the operator fell in `ext<3`. It failed the
+false-veto control, so we did not dispatch it.
+
+The second policy limited that veto to writes: the changed byte had to fall
+within an assignment whose left-hand reference resolved outside the TU.
+The first counterexample then passed without a veto. A new counterexample
+showed the same flaw: with `ext.h` declaring `extern int ext;`, `ext.c`
+defining `ext=3`, and `main.c` evaluating `ext=0; ext*=3; if(ext==3)
+puts("good"); else puts("bad");`, the same stated stdout goal uniquely
+selected `ext=0` to `ext=1` (`init_mul`). The baseline compiled, ran, and
+kept the correct repair, but the write-aware prototype vetoed it. With a
+missing DB, the baseline candidate still landed byte-for-byte. This second
+false veto also disqualified the policy before an independent blind gate.
+
+Within the current `c_contract` edit space, these vetoes rejected legitimate
+repairs that the whole-program execution check already verified. That is an
+observed failure of these two policies, not a proof that semantics can never
+help. Cross-TU effects that stdout tests might miss need a different,
+well-scoped consumer and evidence. Header macro-value and external-definition
+edits were **unsupported**, not passing or failing test cases: `c_contract`
+generates function-body edits, masks preprocessor lines, and the inspector
+selects one exact `.c` TU. No code or authority was widened to manufacture
+coverage. Master stayed unchanged throughout the experiment.
+
 Sources: [libclang C interface](https://clang.llvm.org/docs/LibClang.html),
 [CMake compilation database generator limit](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html),
 [LLVM Windows release packages](https://github.com/llvm/llvm-project/releases/tag/llvmorg-22.1.8).
