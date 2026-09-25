@@ -74,13 +74,14 @@ static int clause_value(C_CONTRACT *c, const char *cl, size_t o, const char *key
         }
     }
     /* next token, after filler */
-    static const char *fill[] = {"as", "out", "exactly", "is", "should", "be", "must", ":", "the number", "the value"};
+    static const char *fill[] = {"as", "out", "exactly", "is", "should", "be", "must", ":", "the number", "the value",
+                                 "equal to", "equals", "equal", "to"};
     for (int again = 1; again; ) {
         again = 0;
         while (p < end && (*p == ' ' || *p == ':')) p++;
         for (size_t f = 0; f < sizeof(fill) / sizeof(fill[0]); f++) {
             size_t fl = strlen(fill[f]);
-            if ((size_t)(end - p) > fl && ci_eq_n(p, fill[f], fl) && p[fl] == ' ') { p += fl; again = 1; break; }
+            if ((size_t)(end - p) > fl && ci_eq_n(p, fill[f], fl) && (p[fl] == ' ' || p[fl] == ':')) { p += fl; again = 1; break; }
         }
     }
     const char *t = p;
@@ -108,6 +109,17 @@ static int clause_value(C_CONTRACT *c, const char *cl, size_t o, const char *key
         while (te < end && !isspace((unsigned char)*te) && *te != ',') te++;
         if (te > e && is_num(e, (size_t)(te - e))) return set_out(c, e, (size_t)(te - e));
     }
+    /* "report a maximum of 9", "show 15 on the console": the first number
+       within four words of the key, if no other word in between is a number */
+    const char *w = t;
+    for (int k = 0; k < 4 && w < end; k++) {
+        while (w < end && isspace((unsigned char)*w)) w++;
+        const char *we = w;
+        while (we < end && !isspace((unsigned char)*we) && *we != ',') we++;
+        if (we > w && is_num(w, (size_t)(we - w))) return set_out(c, w, (size_t)(we - w));
+        if (we < end && *we == ',') break;
+        w = we;
+    }
     return 0;
 }
 
@@ -115,6 +127,15 @@ int CContractParse(const char *task, C_CONTRACT *c)
 {
     memset(c, 0, sizeof(*c));
     const char *s = task;
+    /* the bare-value fallback below needs the task to be about stdout at all,
+       and never applies when it mentions a file */
+    size_t tl_ = strlen(task);
+    int outputish = !ci_find_n(task, tl_, "file");
+    if (outputish) {
+        static const char *ow[] = {"print", "output", "stdout", "display", "show", "emit", "console", "screen"};
+        outputish = 0;
+        for (size_t k = 0; k < sizeof(ow) / sizeof(ow[0]); k++) outputish |= ci_find_n(task, tl_, ow[k]) != NULL;
+    }
     while (*s) {
         size_t n = 0;
         int inq = 0;
@@ -137,9 +158,13 @@ int CContractParse(const char *task, C_CONTRACT *c)
         if (!but) but = ci_find_n(cl, o, " instead of");
         if (but) { o = (size_t)(but - cl); cl[o] = '\0'; }
         static const char *now[] = {"currently", "right now", "at the moment", "instead", "fails with", "is printing", "it prints", "prints out"};
-        static const char *want[] = {"should", "must", "expected", "expect", "needs to", "need to", "has to", "have to", "so that", "want", "required", "supposed to"};
+        static const char *want[] = {"should", "must", "expected", "expect", "needs to", "need to", "has to", "have to", "so that", "want", "required", "supposed to",
+                                     "meant to", "make it", "so it", "so the program", "after the fix", "correct output", "correct result",
+                                     "ought to", "desired", "would like", "bug fixed", "once fixed", "after fixing"};
         int is_now = 0, is_want = 0;
-        for (size_t k = 0; k < sizeof(now) / sizeof(now[0]); k++) is_now |= ci_find_n(cl, o, now[k]) != NULL;
+        for (size_t k = 0; k < sizeof(now) / sizeof(now[0]); k++)
+            for (const char *h = cl; (h = ci_find_n(h, o - (size_t)(h - cl), now[k])) != NULL; h++)
+                if (!(h - cl >= 3 && ci_eq_n(h - 3, "so ", 3))) { is_now = 1; break; }   /* "so it prints X" states the goal */
         for (size_t k = 0; k < sizeof(want) / sizeof(want[0]); k++) is_want |= ci_word(cl, o, want[k]) != NULL;
         if (is_want && !is_now) {
             /* exit: only 0 is supported */
@@ -153,10 +178,11 @@ int CContractParse(const char *task, C_CONTRACT *c)
                 break;
             }
             if (ci_find_n(cl, o, "non-zero") || ci_find_n(cl, o, "nonzero")) return 0;
-            static const char *keys[] = {"print", "output", "stdout"};
+            static const char *keys[] = {"print", "output", "stdout", "produce", "display", "show", "give", "write", "report",
+                                         "expected", "result"};
             if (!ci_find_n(cl, o, "file")) {   /* a file's content is not stdout */
                 int got = 0;
-                for (size_t k = 0; k < 3 && !got; k++)
+                for (size_t k = 0; k < sizeof(keys) / sizeof(keys[0]) && !got; k++)
                     for (const char *key = cl; (key = ci_find_n(key, o - (size_t)(key - cl), keys[k])) != NULL; key++) {
                         if (key > cl && isalpha((unsigned char)key[-1]))
                             continue;
@@ -164,6 +190,33 @@ int CContractParse(const char *task, C_CONTRACT *c)
                         if (r < 0) return 0;   /* two different wanted outputs */
                         got |= r > 0;
                     }
+                /* no output verb matched: a goal clause that names exactly one
+                   quoted value or number (a trailing "not N" is dropped) */
+                if (!got && !c->has_out && outputish) {
+                    const char *nt = ci_find_n(cl, o, ", not ");
+                    size_t lim = nt ? (size_t)(nt - cl) : o;
+                    const char *val = NULL;
+                    size_t vl = 0;
+                    int cnt = 0;
+                    for (size_t i = 0; i < lim; ) {
+                        if (cl[i] == '`' || cl[i] == '"') {
+                            const char *e = memchr(cl + i + 1, cl[i], lim - i - 1);
+                            if (!e) break;
+                            val = cl + i + 1; vl = (size_t)(e - val); cnt++;
+                            i = (size_t)(e - cl) + 1;
+                            continue;
+                        }
+                        if ((i == 0 || isspace((unsigned char)cl[i - 1])) && (isdigit((unsigned char)cl[i]) || cl[i] == '-')) {
+                            size_t j = i;
+                            while (j < lim && !isspace((unsigned char)cl[j]) && cl[j] != ',') j++;
+                            if (is_num(cl + i, j - i)) { val = cl + i; vl = j - i; cnt++; }
+                            i = j;
+                            continue;
+                        }
+                        i++;
+                    }
+                    if (cnt == 1 && set_out(c, val, vl) < 0) return 0;
+                }
             }
         }
         s += n;

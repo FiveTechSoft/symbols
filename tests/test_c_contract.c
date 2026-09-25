@@ -73,6 +73,21 @@ int main(void)
     CHECK(!CContractParse("The program should write 5 to the file out.txt and print nothing else.", &k));
     CHECK(!CContractParse("It should print `a` and must print `b`.", &k));   /* two values: no contract */
 
+    /* varied goal wording: other output verbs, labels, goal markers, and a
+       goal clause that names exactly one value */
+    CHECK(CContractParse("It should display 15.", &k) && !strcmp(k.out, "15"));
+    CHECK(CContractParse("Correct output: 9", &k) && !strcmp(k.out, "9"));
+    CHECK(CContractParse("The output should be: 15", &k) && !strcmp(k.out, "15"));
+    CHECK(CContractParse("Fix it so it prints 15.", &k) && !strcmp(k.out, "15"));
+    CHECK(CContractParse("The average printed must equal 2.5.", &k) && !strcmp(k.out, "2.5"));
+    CHECK(CContractParse("The program should report a maximum of 9.", &k) && !strcmp(k.out, "9"));
+    CHECK(CContractParse("The count displayed should be 7, not 6.", &k) && !strcmp(k.out, "7"));
+    CHECK(CContractParse("Running it gives 14; it should give 15.", &k) && !strcmp(k.out, "15"));
+    CHECK(!CContractParse("The function should take 3 arguments.", &k));        /* nothing about output */
+    CHECK(!CContractParse("The buffer should be 64 bytes.", &k));
+    CHECK(!CContractParse("Write the result to out.txt; it should contain 42.", &k));   /* a file */
+    CHECK(!CContractParse("It shows 6 right now.", &k));
+
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }
