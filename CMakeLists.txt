@@ -76,6 +76,8 @@ add_library(symbolic STATIC
     src/ccg_realizer.c
     src/commonsense.c
     src/persona.c
+    src/atomic_store.c
+    src/engineering_episode.c
     src/episodic_memory.c
 )
 
@@ -401,3 +403,9 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ast_inspect.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
+
+sllm_test(test_atomic_store tests/test_atomic_store.c)
+sllm_test(test_engineering_episode tests/test_engineering_episode.c)
+add_executable(engineering_episode_report tools/engineering_episode_report.c)
+target_link_libraries(engineering_episode_report symbolic)
+add_dependencies(test_engineering_episode engineering_episode_report)

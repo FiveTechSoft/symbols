@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "episodic_memory.h"
+#include "atomic_store.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -38,28 +39,6 @@ static void ToLowerStr(char *str)
     for (; *str; str++)
     {
         *str = (char)tolower((unsigned char)*str);
-    }
-}
-
-static void EnsureParentDir(const char *filepath)
-{
-    if (!filepath) return;
-    char path[512];
-    strncpy(path, filepath, sizeof(path) - 1);
-    path[sizeof(path) - 1] = '\0';
-
-    for (char *p = path; *p; p++)
-    {
-        if (*p == '/' || *p == '\\')
-        {
-            char save = *p;
-            *p = '\0';
-            if (path[0] != '\0')
-            {
-                MKDIR(path);
-            }
-            *p = save;
-        }
     }
 }
 
@@ -186,54 +165,29 @@ int EpisodicStoreAppend(EPISODIC_STORE *store, const char *subject, const char *
 static int WriteStoreAtomic(const char *filepath, const char *header,
                             const EPISODIC_RECORD *records, uint32_t count)
 {
-    char tmp_path[520];
-    int ok = 1;
-
-    if (!filepath || filepath[0] == '\0') return 0;
-    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", filepath);
-    tmp_path[sizeof(tmp_path) - 1] = '\0';
-
-    EnsureParentDir(filepath);
-
-    FILE *f = fopen(tmp_path, "w");
-    if (!f) return 0;
-
-    if (fprintf(f, "%s", header) < 0) ok = 0;
-    for (uint32_t i = 0; ok && i < count; i++)
-    {
-        const EPISODIC_RECORD *rec = &records[i];
-        if (fprintf(f, "%s\t%s\t%s\t%s\t%llu\n",
-                    rec->subject, rec->relation, rec->object,
-                    rec->source[0] ? rec->source : "user",
-                    (unsigned long long)rec->timestamp) < 0)
-        {
-            ok = 0;
-        }
+    if (!filepath || !*filepath) return 0;
+    size_t n = strlen(header) + 1;
+    for (uint32_t i = 0; i < count; ++i) {
+        const EPISODIC_RECORD *r = &records[i];
+        n += strlen(r->subject) + strlen(r->relation) + strlen(r->object) +
+             strlen(r->source[0] ? r->source : "user") + 4 + 20 + 1;
+        if (n > 16 * 1024 * 1024) return 0;
     }
-    if (ok && fflush(f) != 0) ok = 0;
-    if (fclose(f) != 0) ok = 0;
-
-    if (!ok)
-    {
-        remove(tmp_path);
-        return 0;
+    char *buf = (char *)malloc(n);
+    if (!buf) return 0;
+    size_t used = (size_t)snprintf(buf, n, "%s", header);
+    for (uint32_t i = 0; i < count; ++i) {
+        const EPISODIC_RECORD *r = &records[i];
+        int wrote = snprintf(buf + used, n - used, "%s\t%s\t%s\t%s\t%llu\n",
+                             r->subject, r->relation, r->object,
+                             r->source[0] ? r->source : "user",
+                             (unsigned long long)r->timestamp);
+        if (wrote < 0 || (size_t)wrote >= n - used) { free(buf); return 0; }
+        used += (size_t)wrote;
     }
-
-#ifdef _WIN32
-    if (!MoveFileExA(tmp_path, filepath,
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-    {
-        remove(tmp_path);
-        return 0;
-    }
-#else
-    if (rename(tmp_path, filepath) != 0)
-    {
-        remove(tmp_path);
-        return 0;
-    }
-#endif
-    return 1;
+    int ok = AtomicStoreReplace(filepath, buf, used);
+    free(buf);
+    return ok;
 }
 
 int EpisodicStoreSave(const EPISODIC_STORE *store)
