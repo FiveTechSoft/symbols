@@ -209,6 +209,7 @@ int main(void)
         ModelDestroy(m2);
     }
 
+    EmbeddingTableDestroy(embeddings);
     GraphDestroy(graph);
     remove("wikidata_model_test.bin");
     printf("\n=== COMPLETE ===\n");
