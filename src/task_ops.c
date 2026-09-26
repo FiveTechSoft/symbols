@@ -15,6 +15,7 @@
 #include "engineering_episode.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3793,6 +3794,48 @@ static int write_file(const char *root, const char *rel, const char *data)
     return (fclose(f) == 0) && ok;
 }
 
+/* This seam is compiled only into the isolated test library. No environment
+   variable or runtime switch can enable it in production. */
+#ifdef TASK_OPS_TEST_FAULTS
+static int restore_write_call, restore_remove_call;
+static int fail_restore_write, fail_restore_remove, fail_after_operation;
+void TaskOpsTestFailRestore(int write_call, int remove_call, int after_operation)
+{
+    restore_write_call = restore_remove_call = 0;
+    fail_restore_write = write_call;
+    fail_restore_remove = remove_call;
+    fail_after_operation = after_operation;
+}
+#endif
+
+static int restore_file(const char *root, const char *rel, const char *data)
+{
+#ifdef TASK_OPS_TEST_FAULTS
+    int fail = fail_restore_write > 0 && ++restore_write_call == fail_restore_write;
+    if (fail && !fail_after_operation) return 0;
+#endif
+    int ok = write_file(root, rel, data);
+#ifdef TASK_OPS_TEST_FAULTS
+    if (fail) return 0;
+#endif
+    return ok;
+}
+
+static int remove_created(const char *path)
+{
+#ifdef TASK_OPS_TEST_FAULTS
+    int fail = fail_restore_remove > 0 && ++restore_remove_call == fail_restore_remove;
+    if (fail && !fail_after_operation) return 0;
+#endif
+    /* A failed creation need not leave an entry. Absence already satisfies
+       removal, but any other remove error must be reported. */
+    int ok = remove(path) == 0 || errno == ENOENT;
+#ifdef TASK_OPS_TEST_FAULTS
+    if (fail) return 0;
+#endif
+    return ok;
+}
+
 /* "no operator preconditions hold" plus a fixed-format workspace shape:
    only 0/1/-1 flags, never names, so the reason stays safe to count on a
    blind bank. c = compile probe (-1 none, 0 fail, 1 ok), run = probe exit
@@ -4332,25 +4375,31 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
         snprintf(rep->reason, sizeof(rep->reason), "write failed");
     }
 
-    /* roll back unless verified */
+    /* Roll back every touched path even if an earlier restoration fails.
+       A matching readback cannot prove a failed write/remove call succeeded. */
+    int rollback_ok = 1;
     if (!verified)
         for (int i = 0; i < ws->count; i++)
-            if (next[i])
-                write_file(ws->root, ws->files[i].rel, ws->files[i].data);
+            if (next[i] && !restore_file(ws->root, ws->files[i].rel, ws->files[i].data))
+                rollback_ok = 0;
     if (!verified && created.data) {
         char path[TASK_OPS_MAX_PATH * 2];
         snprintf(path, sizeof(path), "%s/%s", ws->root, created.rel);
-        remove(path);
+        if (!remove_created(path)) rollback_ok = 0;
     }
     if (!verified && created2.data) {
         char path[TASK_OPS_MAX_PATH * 2];
         snprintf(path, sizeof(path), "%s/%s", ws->root, created2.rel);
-        remove(path);
+        if (!remove_created(path)) rollback_ok = 0;
+    }
+    if (!rollback_ok) {
+        rep->rollback_failed = 1;
+        snprintf(rep->reason, sizeof(rep->reason), "rollback failed; inspect workspace files");
     }
     free(created.data);
     free(created2.data);
     /* learn: remember what this operator did on this workspace+task */
-    if (use_mem && rep->op[0])
+    if (use_mem && rep->op[0] && rollback_ok)
         mem_record(ws->root, key, rep->op, verified);
     for (int i = 0; i < TASK_OPS_MAX_FILES; i++)
         free(next[i]);
@@ -4610,11 +4659,15 @@ static void audit_attempt(const char *workspace, const char *task,
     snprintf(e.oracle,sizeof(e.oracle),"task_ops_probe");
     snprintf(e.oracle_version,sizeof(e.oracle_version),"unversioned");
     snprintf(e.diagnostic,sizeof(e.diagnostic),"%s",
+             rep->rollback_failed?"rollback_failed":
              !rep->op[0]?"no_candidate":
              !strncmp(rep->reason,"verify failed",13)?"verify_failed":
              !strncmp(rep->reason,"write failed",12)?"write_failed":"reported_status");
     int restored=loaded && snapshot_equal(before,after);
-    if(rep->verified && loaded) {
+    if(rep->rollback_failed) {
+        snprintf(e.outcome,sizeof(e.outcome),"rollback_failed");
+        snprintf(e.rollback,sizeof(e.rollback),"failed");
+    } else if(rep->verified && loaded) {
         snprintf(e.outcome,sizeof(e.outcome),"verified");
         snprintf(e.rollback,sizeof(e.rollback),"not_needed");
     } else if(!rep->op[0] && !rep->applied && loaded && restored) {

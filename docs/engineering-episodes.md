@@ -18,18 +18,21 @@ count them: do not interpret zero as observed absence. No raw task or output
 text is stored. The typed stdout continuation is audit-off, including its
 internal scratch preflight.
 
-For a negative attempt, the audit rereads source bytes after the solver's
-rollback. Matching loaded bytes support `confirmed`; mismatch or failed load
-receives `verification_incomplete` and `unknown`, never a confident refutation.
-The existing solver does not check each rollback write/remove return value,
-so a source readback cannot distinguish a failed rollback call that happened
-to leave matching bytes from a successful one. Slice-2 tests exercise an
-actual refuted/restored attempt, opt-in equivalence, corrupt-store refusal,
-and a deterministic audit-lock refusal without changing solve results. They do
-**not** induce disk-full or rollback-write failure; those two injection gates
-remain unexercised. They must be added before claiming coverage of those
-failure modes. Similarly, the store is historical; a verified row does not
-establish that the workspace is unchanged now.
+For a negative attempt, task-ops now checks every attempted file restoration
+and removal before reporting the rollback. A failed call sets
+`TASK_OPS_REPORT.rollback_failed`, reports `rollback failed; inspect workspace
+files`, and stops Reflexion from trying another edit in an uncertain workspace.
+The episode records `rollback_failed` / rollback `failed` even when a
+subsequent readback happens to match. A successful rollback call is followed
+by a source snapshot readback; matching bytes support `confirmed`, while a
+failed load or mismatch receives `verification_incomplete` / rollback
+`unknown`, never a confident refutation. The test-only, compile-time fault
+seam exercises both restoration-write and created-file removal failure,
+including a failed-call result with matching bytes. It is absent from the
+production library. Ordinary opt-in equivalence, corrupt-store refusal, and
+audit-lock refusal are also tested. These tests do not simulate disk-full or
+prove the workspace is unchanged later; the store and source edits remain
+separate transactions.
 
 ## Runner shadow emission (slice 3)
 

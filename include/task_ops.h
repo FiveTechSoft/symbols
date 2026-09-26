@@ -42,6 +42,7 @@ typedef struct
     int  candidates;      /* operator instances whose preconditions held */
     int  applied;         /* files written */
     int  verified;        /* 1 = kept after verification */
+    int  rollback_failed; /* 1 = at least one restoration call failed; workspace may be dirty */
     int  compile_before;  /* -1 = no C sources / no compiler, 0 fail, 1 ok */
     int  compile_after;
     int  run_before;      /* -1 = not run, otherwise exit code */
@@ -80,6 +81,11 @@ int TaskOpsClarification(const char *workspace, const char *task,
    reaches that normalized single-line goal; no episode is persisted. */
 int TaskOpsContinueStdout(const char *workspace, const char *task,
                           const char *key, const char *answer, TASK_OPS_REPORT *rep);
+
+/* Test-only hooks. The production symbolic target never defines this macro. */
+#ifdef TASK_OPS_TEST_FAULTS
+void TaskOpsTestFailRestore(int write_call, int remove_call, int after_operation);
+#endif
 
 /* Full loop on a workspace directory. Returns 1 when an edit was kept. */
 int  TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep);
