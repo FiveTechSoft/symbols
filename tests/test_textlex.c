@@ -311,8 +311,13 @@ int main(void)
         }
         check("bit-identical vectors across graphs", same);
         TextLexFree(tl2);
+        EmbeddingTableDestroy(emb2);
+        GraphDestroy(g2);
     }
 
+    TextLexFree(tl);
+    EmbeddingTableDestroy(emb);
+    GraphDestroy(g);
     printf("test_textlex: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
