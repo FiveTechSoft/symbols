@@ -373,6 +373,7 @@ sllm_test(test_multi_hop tests/test_multi_hop.c)
 
 # L3: graph_reasoning on the chat hot path (deductive closure)
 sllm_test(test_chat_reasoning tests/test_chat_reasoning.c)
+sllm_test(test_chat_text_cleanup tests/test_chat_text_cleanup.c)
 
 # Open-domain QA: entity-grounded retrieval (no Lev false friends)
 sllm_test(test_open_qa tests/test_open_qa.c)

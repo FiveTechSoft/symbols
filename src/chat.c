@@ -8008,6 +8008,9 @@ void ChatDestroy(CHAT *ch)
 {
     if (!ch) return;
     EpisodicStoreDestroy(&ch->episodic);
+    /* These are embedded TEXTLEX values, not heap-owned TEXTLEX pointers. */
+    for (uint32_t f = 0; f < CHAT_TEXT_FILES_MAX; f++)
+        TextLexClear(&ch->tlex[f]);
     if (ch->tgraph != NULL)
     {
         GraphDestroy(ch->tgraph);
