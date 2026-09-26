@@ -416,6 +416,11 @@ endif()
 
 sllm_test(test_atomic_store tests/test_atomic_store.c)
 sllm_test(test_engineering_episode tests/test_engineering_episode.c)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_episode_replay_contract
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_episode_replay.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
 sllm_test(test_episode_shadow tests/test_episode_shadow.c)
 # Isolated copy of the library: only this test sees rollback fault hooks.
 # The production symbolic archive is compiled without TASK_OPS_TEST_FAULTS.
