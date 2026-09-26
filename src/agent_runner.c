@@ -9,13 +9,77 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
+#include "engineering_episode.h"
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 #include "agent_runner.h"
+
+/* Audit-only shadow writer. The runner never reads this store. Source bytes
+   and returned solve status remain authoritative when audit persistence fails. */
+static unsigned long runner_audit_sequence;
+static int runner_audit_enabled(void)
+{
+    const char *v=getenv("SYMBOLS_ENGINEERING_EPISODES");
+    return v && v[0] && strcmp(v,"0")!=0;
+}
+static unsigned long long runner_hash(const void *p,size_t n)
+{
+    const unsigned char *b=(const unsigned char *)p;
+    unsigned long long h=1469598103934665603ULL;
+    for(size_t i=0;i<n;++i){h^=b[i];h*=1099511628211ULL;}
+    return h;
+}
+static int runner_file_hash(const char *path,char out[EE_STR])
+{
+    FILE *f=fopen(path,"rb");if(!f)return 0;
+    unsigned char buf[4096];size_t n;
+    unsigned long long h=1469598103934665603ULL;
+    while((n=fread(buf,1,sizeof(buf),f))>0)
+        for(size_t i=0;i<n;++i){h^=buf[i];h*=1099511628211ULL;}
+    int ok=!ferror(f);
+    if(fclose(f))ok=0;
+    if(!ok)return 0;
+    snprintf(out,EE_STR,"fnv64:%016llx",h);return 1;
+}
+static void runner_audit(const AGENT_RUNNER *runner,const SWE_BENCH_TASK *task,
+                         const char *run,unsigned attempt,const char *before,
+                         const char *outcome,const char *rollback,const char *diagnostic,
+                         unsigned calls)
+{
+    ENGINEERING_EPISODE e={0};
+    snprintf(e.run_id,sizeof(e.run_id),"%s",run);
+    snprintf(e.attempt_id,sizeof(e.attempt_id),"%u",attempt);
+    snprintf(e.episode_id,sizeof(e.episode_id),"%s.%u",run,attempt);
+    if(attempt>1)snprintf(e.parent_id,sizeof(e.parent_id),"%u",attempt-1);
+    snprintf(e.repo_sha,sizeof(e.repo_sha),"unavailable");
+    snprintf(e.workspace_before,sizeof(e.workspace_before),"%s",before);
+    int after_ok=runner_file_hash(task->target_file,e.workspace_after);
+    if(!after_ok && !strcmp(outcome,"verified")) {
+        outcome="verification_incomplete";
+        diagnostic="state_unavailable";
+    }
+    snprintf(e.task_signature,sizeof(e.task_signature),"fnv64:%016llx",
+             runner_hash(task->issue_description,strlen(task->issue_description)));
+    snprintf(e.goal_provenance,sizeof(e.goal_provenance),"task_text_unverified");
+    snprintf(e.engine,sizeof(e.engine),"agent_runner");
+    snprintf(e.op,sizeof(e.op),"surgical_patch");
+    snprintf(e.oracle,sizeof(e.oracle),"runner_build_test");
+    snprintf(e.oracle_version,sizeof(e.oracle_version),"unversioned");
+    snprintf(e.diagnostic,sizeof(e.diagnostic),"%s",diagnostic);
+    snprintf(e.outcome,sizeof(e.outcome),"%s",outcome);
+    snprintf(e.rollback,sizeof(e.rollback),"%s",rollback);
+    e.tool_calls=calls;
+    char path[MAX_PATCH_PATH+64];
+    int n=snprintf(path,sizeof(path),"%s/.symbols/engineering_episodes.v1",runner->workspace_dir);
+    if(n<=0 || (size_t)n>=sizeof(path) || !EpisodeAppend(path,&e))
+        fprintf(stderr,"engineering episode audit not persisted (runner result unchanged)\n");
+}
 
 /* ============================================================
    Lifecycle API
@@ -406,9 +470,22 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
        no new constraint and another identical retry cannot be justified. */
     char previous_reflection[MAX_REFLECTION_LEN] = {0};
     bool solved = false;
+    int audit=runner_audit_enabled();
+    char audit_run[EE_STR]={0};
+    if(audit) {
+#ifdef _WIN32
+        unsigned long pid=(unsigned long)GetCurrentProcessId();
+#else
+        unsigned long pid=(unsigned long)getpid();
+#endif
+        snprintf(audit_run,sizeof(audit_run),"runner-%lu-%lu-%lu",pid,
+                 (unsigned long)time(NULL),++runner_audit_sequence);
+    }
 
     for (uint32_t attempt = 0; attempt <= runner->max_replans; attempt++)
     {
+        char before[EE_STR]={0};
+        int before_ok=audit && runner_file_hash(task->target_file,before);
         if (!PatchApplyAtomic(&patch))
             break;
 
@@ -434,6 +511,10 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
 
         if (build_rc == 0 && test_rc == 0)
         {
+            if(audit)runner_audit(runner,task,audit_run,attempt+1,before,
+                                  before_ok?"verified":"verification_incomplete",
+                                  "not_needed",before_ok?"build_test_pass":"state_unavailable",
+                                  out_result->total_tool_calls);
             solved = true;
             break;
         }
@@ -456,11 +537,22 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
         /* Fail closed before any decision to retry. */
         if (!PatchRollback(&patch))
         {
+            if(audit)runner_audit(runner,task,audit_run,attempt+1,before,
+                                  "rollback_failed","failed","rollback_failed",
+                                  out_result->total_tool_calls);
             PatchPlanFree(&patch);
             out_result->is_solved = false;
             return 0;
         }
 
+        if(audit) {
+            char after[EE_STR]={0};
+            int restored=before_ok && runner_file_hash(task->target_file,after) && !strcmp(before,after);
+            runner_audit(runner,task,audit_run,attempt+1,before,
+                         restored?"refuted":"verification_incomplete",
+                         restored?"confirmed":"unknown",
+                         build_rc?"build_failed":"test_failed",out_result->total_tool_calls);
+        }
         if (attempt >= runner->max_replans)
             break;
 

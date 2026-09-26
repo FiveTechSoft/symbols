@@ -30,3 +30,26 @@ and a deterministic audit-lock refusal without changing solve results. They do
 remain unexercised. They must be added before claiming coverage of those
 failure modes. Similarly, the store is historical; a verified row does not
 establish that the workspace is unchanged now.
+
+## Runner shadow emission (slice 3)
+
+The same opt-in switch writes `agent_runner` rows at the outer applied-attempt
+boundary. A build/test pass is recorded after the target file can be reread;
+its provenance remains `task_text_unverified`. A failed build/test is recorded
+as `refuted` only after `PatchRollback` succeeds and a readback matches the
+pre-attempt target bytes. A failed rollback call is labelled `rollback_failed`
+with rollback `failed`; successful rollback with unreadable/mismatched bytes is
+`verification_incomplete` with rollback `unknown`. A failed `PatchApplyAtomic`
+is not counted as an applied attempt by the
+existing runner, so no shadow row is emitted there; if it writes partial bytes
+without setting `is_applied`, this slice cannot assert restored source.
+No raw diagnostic, command, task, or source bytes are written to the store.
+The target-file FNV64 fingerprints are **not** complete workspace snapshots;
+other files mutated by commands are outside this audit. This slice does not
+inject patch-apply, verification, rollback-write or audit-write faults at every
+boundary; a deterministic audit-lock refusal is tested, but rollback failure
+labels are not exercised with a forced failed `PatchRollback`. Those cases
+remain a known untested gate, not evidence of recovery. The old runner result
+and its planner's decision inputs are unchanged. `test_agent_runner` had a
+flaky Windows MSVC attempt-count assertion in slice 2: the first run failed
+39/40, and an unchanged rerun passed. It is not modified here.
