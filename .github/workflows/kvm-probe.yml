@@ -1,0 +1,45 @@
+name: KVM availability probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check KVM device and API version (no guest launch)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import fcntl
+          import os
+          import stat
+
+          path = '/dev/kvm'
+          print('path:', path)
+          if not os.path.exists(path):
+              print('exists: no')
+              raise SystemExit(0)
+          info = os.stat(path)
+          print('exists: yes')
+          print('character_device:', stat.S_ISCHR(info.st_mode))
+          print('mode:', oct(stat.S_IMODE(info.st_mode)))
+          print('uid:', info.st_uid, 'gid:', info.st_gid)
+          print('process_uid:', os.geteuid(), 'groups:', os.getgroups())
+          print('readable:', os.access(path, os.R_OK))
+          print('writable:', os.access(path, os.W_OK))
+          try:
+              fd = os.open(path, os.O_RDWR | os.O_CLOEXEC)
+          except OSError as exc:
+              print('open_rdwr_error:', type(exc).__name__, exc.errno)
+          else:
+              try:
+                  print('kvm_api_version:', fcntl.ioctl(fd, 0xAE00, 0))
+              except OSError as exc:
+                  print('kvm_api_error:', type(exc).__name__, exc.errno)
+              finally:
+                  os.close(fd)
+          PY
