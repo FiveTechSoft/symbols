@@ -396,6 +396,16 @@ sllm_test(test_episodic_session tests/test_episodic_session.c)
 sllm_test(test_model_generic_rel tests/test_model_generic_rel.c)
 
 
+add_executable(lexical_impact tools/ast_inspect/lexical_impact.c)
+target_link_libraries(lexical_impact symbolic)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_impact_compare
+             COMMAND ${CMAKE_COMMAND} -E env
+                     LEXICAL_IMPACT_BIN=$<TARGET_FILE:lexical_impact>
+                     ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_impact_compare.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+
 # Opt-in, read-only libclang consumer. The C core and default CI build never
 # download or link LLVM. Install the pinned package to run the corpus check.
 if(Python3_Interpreter_FOUND)
