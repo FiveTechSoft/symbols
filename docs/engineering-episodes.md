@@ -53,3 +53,13 @@ remain a known untested gate, not evidence of recovery. The old runner result
 and its planner's decision inputs are unchanged. `test_agent_runner` had a
 flaky Windows MSVC attempt-count assertion in slice 2: the first run failed
 39/40, and an unchanged rerun passed. It is not modified here.
+
+## Why the legacy trace remains
+
+The episode store is not a replacement for `SYMBOLS_TRACE`. The trace records
+pre-edit compile/run observations, a masked first compiler diagnostic, and an
+operator-specific detail field that the v1 episode schema does not carry.
+`tools/mutation_corpus.py` still reads trace rows for `relop_search` operator
+labels used by the induction evaluation. Suppressing trace emission would lose
+those features and change that consumer's labeled data. Both opt-in streams
+remain available; neither is a solver decision input by virtue of this audit.

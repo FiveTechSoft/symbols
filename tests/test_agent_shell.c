@@ -327,7 +327,9 @@ static void test_large_and_interleaved_output(void)
     const char *mixed_cmd =
         "i=0; while [ $i -lt 5000 ]; do echo OUT; echo ERR >&2; i=$((i+1)); done";
 #endif
-    ok = AgentShellExec(large_cmd, ".", 10000, &res);
+    /* PowerShell startup and pipe draining can be slow under Windows ASan.
+       These bounded-output tests are not exercising the timeout contract. */
+    ok = AgentShellExec(large_cmd, ".", 60000, &res);
     TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out,
                 "Large dual-stream output completes without false timeout");
     TEST_ASSERT(res.stdout_len == SHELL_BUFFER_MAX - 1 && res.stderr_len == SHELL_BUFFER_MAX - 1,
@@ -337,7 +339,7 @@ static void test_large_and_interleaved_output(void)
     TEST_ASSERT(res.stdout_truncated && res.stderr_truncated,
                 "Large output explicitly signals both stream truncations");
 
-    ok = AgentShellExec(mixed_cmd, ".", 10000, &res);
+    ok = AgentShellExec(mixed_cmd, ".", 60000, &res);
     TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out,
                 "Interleaved stdout/stderr completes without deadlock");
     TEST_ASSERT(res.stdout_total_len >= 20000 && res.stderr_total_len >= 20000,
@@ -403,6 +405,8 @@ static void test_timeout_terminates_process_tree(void)
 
 int main(void)
 {
+    /* Preserve the exact last completed assertion in CTest failure output. */
+    setvbuf(stdout, NULL, _IONBF, 0);
     printf("======================================================================\n");
     printf("  TEST SUITE: CROSS-PLATFORM AGENT SHELL & REPAIR ENGINE (agent_shell)\n");
     printf("======================================================================\n");

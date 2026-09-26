@@ -281,6 +281,11 @@ static void test_did_you_mean_repair(void)
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);
     TEST_ASSERT(rc == 1 && result.is_solved, "Supported typo is solved on repaired attempt");
+    if (result.attempts_executed != 2)
+        fprintf(stderr, "did-you-mean attempts=%u repairs=%u replans=%u build_exit=%d timed_out=%d execution_failed=%d\n",
+                result.attempts_executed, result.repairs_applied, result.replans_triggered,
+                result.last_shell_exec.exit_code, result.last_shell_exec.timed_out,
+                result.last_shell_exec.execution_failed);
     TEST_ASSERT(result.attempts_executed == 2, "Repair required exactly two attempts");
     TEST_ASSERT(result.repairs_applied == 1, "Exactly one deterministic repair applied");
     TEST_ASSERT(strcmp(result.last_repair_operator, "compiler-did-you-mean") == 0,
