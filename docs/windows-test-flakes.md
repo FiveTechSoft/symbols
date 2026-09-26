@@ -39,3 +39,22 @@ That Windows cause remains unknown. On POSIX, the timeout path currently
 ignores the return from `kill(-pid, SIGKILL)` while marking the result timed
 out; a future instrumentation pass should expose failed signaling. This slice
 changes no production shell code and does not claim all Phase 0 exit gates.
+
+## Windows MSVC Test 6 follow-up instrumentation
+
+The native Phase 0 shell stress passed 100/100 on Windows Release at
+`73f2dbe`, separately from the runner's intermittent Test 6 did-you-mean
+failure. The shell liveness race therefore is not an explanation for Test 6.
+Two MSVC Release Test 6 failures within a day, followed by unchanged passing
+reruns, warrant a separate diagnosis. Test 6 invokes `gcc` through PATH on
+Windows; GCC availability and compiler stderr on the failing run are unknown.
+The test now prints failure-only evidence: `gcc --version` availability,
+first failed build's exit/timeout/execution status and bounded stdout/stderr,
+parsed diagnostic class/symbol/suggestion, whether the repair was generated,
+then hunk/preflight/applicability stages. These fields are observation only;
+they neither choose a repair nor weaken any assertion. A passing CI run does
+not establish the cause. Wait for a failure with this evidence before a
+production fix. Also known: local GCC ASan `test_commonsense` throughput can
+fail the >500,000 triples/s assertion on an unmodified `73f2dbe` checkout;
+one standalone baseline run measured 371,903/s. Do not treat that benchmark
+as a comparator or runner correctness regression, and do not lower its gate.

@@ -50,6 +50,23 @@ typedef struct
     char test_command[MAX_CMD_LEN];
 } SWE_BENCH_TASK;
 
+/* Bounded read-only first-failed-build evidence for runner test diagnosis.
+   Never used to choose, rank, or authorize a repair. */
+typedef struct
+{
+    bool captured;
+    int build_exit;
+    bool timed_out, execution_failed;
+    size_t stdout_len, stderr_len;
+    char stdout_excerpt[512], stderr_excerpt[512];
+    bool stdout_truncated, stderr_truncated;
+    uint32_t diagnostic_errors;
+    DIAGNOSTIC_ERROR_TYPE root_type;
+    char root_file[MAX_DIAG_PATH], root_symbol[MAX_DIAG_SYMBOL];
+    char root_suggestion[MAX_DIAG_SYMBOL];
+    bool repair_generated, hunk_added, preflight_checked, preflight_applicable;
+} RUNNER_BUILD_DIAGNOSTIC;
+
 /* Execution and verification report for a task */
 typedef struct
 {
@@ -67,6 +84,7 @@ typedef struct
     char              risk_level[16];
     char              unified_diff[MAX_DIFF_BUFFER];
     DIAGNOSTIC_REPORT diagnostic_report;
+    RUNNER_BUILD_DIAGNOSTIC first_failed_build;
     SHELL_EXEC_RESULT last_shell_exec;
     char              senior_engineer_report[MAX_REPORT_SIZE];
 } SWE_BENCH_RESULT;

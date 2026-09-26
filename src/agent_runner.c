@@ -524,6 +524,24 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
                                  shell_res.stderr_buf : shell_res.stdout_buf;
         DiagnosticParseOutput(err_output, &diag);
         out_result->diagnostic_report = diag;
+        RUNNER_BUILD_DIAGNOSTIC *first = &out_result->first_failed_build;
+        if (build_rc != 0 && !first->captured) {
+            first->captured = true;
+            first->build_exit = build_rc;
+            first->timed_out = shell_res.timed_out;
+            first->execution_failed = shell_res.execution_failed;
+            first->stdout_len = shell_res.stdout_len;
+            first->stderr_len = shell_res.stderr_len;
+            first->stdout_truncated = shell_res.stdout_truncated;
+            first->stderr_truncated = shell_res.stderr_truncated;
+            snprintf(first->stdout_excerpt, sizeof(first->stdout_excerpt), "%s", shell_res.stdout_buf);
+            snprintf(first->stderr_excerpt, sizeof(first->stderr_excerpt), "%s", shell_res.stderr_buf);
+            first->diagnostic_errors = diag.error_count;
+            first->root_type = diag.root_type;
+            snprintf(first->root_file, sizeof(first->root_file), "%s", diag.root_file);
+            snprintf(first->root_symbol, sizeof(first->root_symbol), "%s", diag.root_symbol);
+            snprintf(first->root_suggestion, sizeof(first->root_suggestion), "%s", diag.root_suggestion);
+        }
 
         char reflection[MAX_REFLECTION_LEN];
         format_reflection(&diag, build_rc != 0, reflection, sizeof(reflection));
@@ -558,18 +576,26 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
 
         bool repaired = false;
         char repaired_replacement[MAX_HUNK_TEXT];
-        if (build_rc != 0 && out_result->repairs_applied == 0 &&
+        bool generated = build_rc != 0 && out_result->repairs_applied == 0 &&
             build_did_you_mean_repair(task, &diag, repaired_replacement,
-                                      sizeof(repaired_replacement)))
+                                      sizeof(repaired_replacement));
+        if (first->captured && out_result->attempts_executed == 1)
+            first->repair_generated = generated;
+        if (generated)
         {
             PATCH_PLAN candidate;
             PATCH_VERIFY_REPORT candidate_rep;
             PatchPlanInit(&candidate, task->target_file);
-            if (PatchPlanAddHunk(&candidate, task->target_line,
-                                 task->context_before, task->buggy_snippet,
-                                 repaired_replacement, task->context_after) &&
-                PatchVerifyPlan(&candidate, &candidate_rep) &&
-                candidate_rep.is_applicable)
+            bool added = PatchPlanAddHunk(&candidate, task->target_line,
+                                          task->context_before, task->buggy_snippet,
+                                          repaired_replacement, task->context_after);
+            bool checked = added && PatchVerifyPlan(&candidate, &candidate_rep);
+            if (first->captured && out_result->attempts_executed == 1) {
+                first->hunk_added = added;
+                first->preflight_checked = checked;
+                first->preflight_applicable = checked && candidate_rep.is_applicable;
+            }
+            if (checked && candidate_rep.is_applicable)
             {
                 PatchPlanFree(&patch);
                 patch = candidate;

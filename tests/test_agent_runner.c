@@ -280,6 +280,33 @@ static void test_did_you_mean_repair(void)
 
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);
+    if (!(rc == 1 && result.is_solved && result.attempts_executed == 2 &&
+          result.repairs_applied == 1 &&
+          strcmp(result.last_repair_operator, "compiler-did-you-mean") == 0 &&
+          strstr(result.unified_diff, "+int Value(int buffer_size) { return buffer_size; }") &&
+          strstr(result.unified_diff, "buff_size") == NULL)) {
+        RUNNER_BUILD_DIAGNOSTIC *d = &result.first_failed_build;
+        SHELL_EXEC_RESULT gcc_probe;
+        AgentShellResultInit(&gcc_probe);
+        AgentShellExecGuarded("gcc --version", ".", 10000, &gcc_probe);
+        fprintf(stderr, "Test 6 diagnostic: gcc_probe_exit=%d probe_execution_failed=%d "
+                "attempts=%u repairs=%u replans=%u solved=%d operator=%s\n",
+                gcc_probe.exit_code, gcc_probe.execution_failed,
+                result.attempts_executed, result.repairs_applied,
+                result.replans_triggered, result.is_solved, result.last_repair_operator);
+        fprintf(stderr, "first_build: captured=%d exit=%d timeout=%d execution_failed=%d "
+                "stdout_len=%zu stderr_len=%zu stdout_truncated=%d stderr_truncated=%d "
+                "errors=%u type=%d file=%s symbol=%s suggestion=%s "
+                "generated=%d hunk=%d preflight=%d applicable=%d\n",
+                d->captured, d->build_exit, d->timed_out, d->execution_failed,
+                d->stdout_len, d->stderr_len, d->stdout_truncated, d->stderr_truncated,
+                d->diagnostic_errors, d->root_type,
+                d->root_file, d->root_symbol, d->root_suggestion,
+                d->repair_generated, d->hunk_added, d->preflight_checked, d->preflight_applicable);
+        fprintf(stderr, "first_build stderr excerpt: %s\nfirst_build stdout excerpt: %s\n",
+                d->stderr_excerpt, d->stdout_excerpt);
+        fprintf(stderr, "gcc probe stderr excerpt: %.300s\n", gcc_probe.stderr_buf);
+    }
     TEST_ASSERT(rc == 1 && result.is_solved, "Supported typo is solved on repaired attempt");
     if (result.attempts_executed != 2)
         fprintf(stderr, "did-you-mean attempts=%u repairs=%u replans=%u build_exit=%d timed_out=%d execution_failed=%d\n",
@@ -297,8 +324,12 @@ static void test_did_you_mean_repair(void)
 
     FILE *check = fopen(target_file, "rb");
     char buf[256] = {0};
-    fread(buf, 1, sizeof(buf) - 1, check);
-    fclose(check);
+    if (check) {
+        fread(buf, 1, sizeof(buf) - 1, check);
+        fclose(check);
+    }
+    if (!strstr(buf, "return buffer_size;"))
+        fprintf(stderr, "Test 6 disk readback: open=%d bytes='%s'\n", check != NULL, buf);
     TEST_ASSERT(strstr(buf, "return buffer_size;") != NULL,
                 "Only compiler-suggested identifier reaches disk");
 
