@@ -254,7 +254,9 @@ static void test_real_project_ingestion(void)
 static void test_fail_closed(void)
 {
     CODE_GRAPH *cg = CodeGraphCreate(128, 256);
-    TEST_ASSERT(CodeGraphCreate(0, 0) != NULL, "CodeGraphCreate with zeros uses safe defaults");
+    CODE_GRAPH *defaults = CodeGraphCreate(0, 0);
+    TEST_ASSERT(defaults != NULL, "CodeGraphCreate with zeros uses safe defaults");
+    CodeGraphDestroy(defaults);
     TEST_ASSERT(CodeGraphIngestSource(NULL, "a.c", "int a;") == 0, "NULL graph rejected");
     TEST_ASSERT(CodeGraphIngestSource(cg, NULL, "int a;") == 0, "NULL path rejected");
     TEST_ASSERT(CodeGraphIngestSource(cg, "a.c", NULL) == 0, "NULL source rejected");
