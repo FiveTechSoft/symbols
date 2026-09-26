@@ -27,3 +27,15 @@ Both tests run from the source root under CTest. The CI workflow calls CTest
 without `-j`, so CTest itself is not parallel in these jobs, but runner image
 load and spawned process timing can vary. The patch changes no production
 execution, audit, candidate ordering, or decision-store behavior.
+
+A separate Linux Release 100-repeat run on 2026-09-26 found a transient
+`test_agent_shell` child-liveness assertion failure on repetition 72. The
+single immediate `kill(pid, 0)` check could see a child still exiting while
+`/proc/<pid>` vanished before the next read; the test now waits a bounded
+window for only gone/zombie, checking the PID start-time to avoid reuse.
+This does not explain the earlier Windows ASan failure: Windows takes the
+Job Object branch, and its earlier buffered output did not locate the check.
+That Windows cause remains unknown. On POSIX, the timeout path currently
+ignores the return from `kill(-pid, SIGKILL)` while marking the result timed
+out; a future instrumentation pass should expose failed signaling. This slice
+changes no production shell code and does not claim all Phase 0 exit gates.

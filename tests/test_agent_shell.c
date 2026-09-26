@@ -374,27 +374,68 @@ static void test_timeout_terminates_process_tree(void)
         (void)fscanf(f, "%ld", &child_pid);
         fclose(f);
     }
-    alive = child_pid > 0 && (kill((pid_t)child_pid, 0) == 0 || errno != ESRCH);
+    /* The group kill is asynchronous with respect to orphan reaping. A
+       single kill(pid, 0) can see a dying child just before /proc vanishes.
+       Keep the strong check: only gone/zombie is a pass. A changed Linux
+       start-time is PID reuse, not a surviving copy of this child. */
+    alive = child_pid > 0;
 #if defined(__linux__)
-    /* A killed orphan can briefly remain as a zombie until init reaps it. */
     if (alive)
     {
-        char proc_path[64];
-        char proc_line[256];
-        char state = '\0';
-        FILE *proc;
+        char proc_path[64], proc_line[512], state = '\0';
+        unsigned long long first_start = 0, current_start = 0;
+        int have_first = 0;
         snprintf(proc_path, sizeof(proc_path), "/proc/%ld/stat", child_pid);
-        proc = fopen(proc_path, "rb");
-        if (proc && fgets(proc_line, sizeof(proc_line), proc))
+        for (int tries = 0; tries < 50 && alive; tries++)
         {
-            char *after_name = strrchr(proc_line, ')');
-            if (after_name && after_name[1] == ' ')
-                state = after_name[2];
+            FILE *proc = fopen(proc_path, "rb");
+            if (!proc && errno == ENOENT)
+            {
+                alive = 0;
+                break;
+            }
+            if (proc)
+            {
+                if (fgets(proc_line, sizeof(proc_line), proc))
+                {
+                    char *after_name = strrchr(proc_line, ')');
+                    if (after_name && after_name[1] == ' ')
+                    {
+                        /* /proc stat: state is field 3, starttime field 22. */
+                        char *field = after_name + 2;
+                        state = *field;
+                        field += 2;
+                        for (int n = 4; n < 22 && field && *field; n++)
+                        {
+                            field = strchr(field, ' ');
+                            if (field) field++;
+                        }
+                        current_start = field && *field ? strtoull(field, NULL, 10) : 0;
+                        if (!have_first && current_start)
+                        {
+                            first_start = current_start;
+                            have_first = 1;
+                        }
+                        if (state == 'Z' || (have_first && current_start && current_start != first_start))
+                            alive = 0;
+                    }
+                }
+                fclose(proc);
+            }
+            if (alive && tries < 49)
+                usleep(10000); /* at most 490 ms to settle after SIGKILL */
         }
-        if (proc)
-            fclose(proc);
-        if (state == 'Z')
-            alive = 0;
+        if (alive)
+            fprintf(stderr, "process-group survivor: pid=%ld state=%c start=%llu\n",
+                    child_pid, state ? state : '?', current_start);
+    }
+#else
+    /* Other POSIX platforms have no /proc stat identity here. Poll for
+       ESRCH; a persistent process after the bounded window fails. */
+    for (int tries = 0; tries < 50 && alive; tries++)
+    {
+        if (kill((pid_t)child_pid, 0) != 0 && errno == ESRCH) alive = 0;
+        if (alive && tries < 49) usleep(10000);
     }
 #endif
     TEST_ASSERT(child_pid > 0, "Background child PID was recorded before timeout");
