@@ -131,5 +131,6 @@ int main(void)
           "directos.");
 
     printf("test_clarify: %d passed, %d failed\n", g_pass, g_fail);
+    ChatDestroy(&w.ch);
     return g_fail == 0 ? 0 : 1;
 }

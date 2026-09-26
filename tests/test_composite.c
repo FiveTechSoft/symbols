@@ -145,5 +145,6 @@ int main(void)
           "esposa de Nabal: Abigail. esposa de Esau: Adah.");
 
     printf("test_composite: %d passed, %d failed\n", g_pass, g_fail);
+    ChatDestroy(&ch);
     return g_fail == 0 ? 0 : 1;
 }

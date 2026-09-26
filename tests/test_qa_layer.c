@@ -228,6 +228,7 @@ int main(int argc, char **argv)
         test_qa_gibberish(&ch);
         test_chat_fallback(&ch);
         test_chat_greeting(&ch);
+        ChatDestroy(&ch);
     }
 
     printf("\n=== Results: %u passed, %u failed ===\n", pass, fail);

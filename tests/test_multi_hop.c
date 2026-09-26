@@ -245,6 +245,7 @@ int main(void)
         if (f == NULL)
         {
             printf("  FAIL cannot write taxonomy scratch\n");
+            ChatDestroy(&ch);
             return 1;
         }
         fputs("robin\tHIJO_DE\tbird\n", f);
@@ -278,6 +279,7 @@ int main(void)
         passed += check_unk("quien es el padre del abuelo de robin?", out,
                             "taxonomy 3-hop negative: no 3rd isa link",
                             &wrong);
+        ChatDestroy(&tax);
     }
 
     printf("\n=== MULTI-HOP RESULTS ===\n");
@@ -286,5 +288,6 @@ int main(void)
     printf("KB pairs (bible): %u\n", ch.kb.num_pairs);
 
     /* named 1-hop + constraint wrappers + 3-hop + taxonomy. WRONG = 0. */
+    ChatDestroy(&ch);
     return (passed >= 20 && wrong == 0) ? 0 : 1;
 }

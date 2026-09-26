@@ -80,6 +80,7 @@ int main(void)
     if (ch.num_kws < 4)
     {
         printf("FAIL deduced kws (got %u want >= 4)\n", ch.num_kws);
+        ChatDestroy(&ch);
         return 1;
     }
     printf("  PASS deduced %u relation stems (>= 4 scratch)\n", ch.num_kws);
@@ -187,5 +188,6 @@ int main(void)
     }
 
     printf("test_queryplan: %d passed, %d failed\n", g_pass, g_fail);
+    ChatDestroy(&ch);
     return g_fail == 0 ? 0 : 1;
 }
