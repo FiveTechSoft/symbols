@@ -466,19 +466,29 @@ static void SubjectIndexRebuild(RELATION_TABLE *table)
     if (cap < 16) cap = 16;
 
     uint32_t *heads = (uint32_t *)malloc(cap * sizeof(uint32_t));
-    uint32_t *next = (uint32_t *)realloc(table->subj_next, cap * sizeof(uint32_t));
-    if (heads == NULL || next == NULL)
+    uint32_t *next;
+    if (heads == NULL)
+    {
+        free(table->subj_heads);
+        table->subj_heads = NULL;
+        table->subj_capacity = 0;
+        table->subj_mask = 0;
+        return;
+    }
+    next = (uint32_t *)realloc(table->subj_next, cap * sizeof(uint32_t));
+    if (next == NULL)
     {
         free(heads);
-        free(table->subj_heads); /* keep next: realloc keeps old block on fail */
+        free(table->subj_heads);
         table->subj_heads = NULL;
-        table->subj_next = next;
+        /* realloc failure leaves the old next block owned by the table. */
         table->subj_capacity = 0;
         table->subj_mask = 0;
         return;
     }
 
     memset(heads, 0xFF, cap * sizeof(uint32_t));
+    free(table->subj_heads); /* replace the previous index only after both allocations succeed */
     table->subj_heads = heads;
     table->subj_next = next;
     table->subj_capacity = cap;
