@@ -45,15 +45,13 @@ int main(void)
     assert(!EpisodeAppend(path,&b));assert(EpisodeAppend(path,&a));
     assert(EpisodeAppend(path,&b));assert(EpisodeLoad(path,s)==1 && s->count==2);
     assert(!strcmp(s->rows[1].parent_id,"first"));
-    /* The standalone report is read-only and exposes aggregate truth. */
-#ifdef _WIN32
-    const char *report_cmd="build\\Release\\engineering_episode_report.exe build/engineering-episode-test-dir/engineering-episode-test.v1 > build/engineering-episode-report.txt";
-#else
-    const char *report_cmd="./build/engineering_episode_report build/engineering-episode-test-dir/engineering-episode-test.v1 > build/engineering-episode-report.txt";
-#endif
-    assert(system(report_cmd)==0);
-    FILE *report=fopen("build/engineering-episode-report.txt","rb");assert(report);
-    char summary[512]={0};assert(fgets(summary,sizeof(summary),report));fclose(report);
+    /* Invoke the exact CLI report logic in process: no shell or child can
+       wait forever on a wrong Debug/Release path under Windows ASan. */
+    FILE *report=tmpfile(),*err=tmpfile();assert(report && err);
+    assert(EpisodeReport(path,report,err)==0);
+    rewind(report);
+    char summary[512]={0};assert(fgets(summary,sizeof(summary),report));
+    fclose(report);fclose(err);
     assert(strstr(summary,"records=2 verified=2") && strstr(summary,"candidate_builds=4"));
     char original[8192],current[8192];size_t n=readfile(path,original,sizeof(original));
     assert(!EpisodeAppend(path,&a));

@@ -2,6 +2,7 @@
 #define ENGINEERING_EPISODE_H
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #define EE_MAX_RECORDS 256
 #define EE_STR 96
 #define EE_MAX_IMAGE (1024 * 1024)
@@ -21,4 +22,6 @@ typedef struct { ENGINEERING_EPISODE rows[EE_MAX_RECORDS]; size_t count; } EPISO
 int EpisodeLoad(const char *path, EPISODE_STORE *out);
 /* 1 persisted, 0 refused. No solver is connected to this API. */
 int EpisodeAppend(const char *path, const ENGINEERING_EPISODE *row);
+/* Read-only aggregate printer; same function used by the CLI and tests. */
+int EpisodeReport(const char *path, FILE *out, FILE *error);
 #endif
