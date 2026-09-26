@@ -412,6 +412,9 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME test_ast_inspect
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ast_inspect.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_test(NAME test_c_source_qa
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_c_source_qa.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 
 sllm_test(test_atomic_store tests/test_atomic_store.c)

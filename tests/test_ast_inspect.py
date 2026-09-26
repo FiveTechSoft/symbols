@@ -99,5 +99,8 @@ class AstInspectTest(unittest.TestCase):
         self.assertEqual([x['target']['line'] for x in refs], [2])
 
 
+from test_c_source_qa import SourceQATest  # Also run the source-fact QA corpus in native Windows AST CI.
+
+
 if __name__ == '__main__':
     unittest.main()
