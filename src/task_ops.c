@@ -12,6 +12,7 @@
 #include "c_contract.h"
 #include "reflect.h"
 #include "code_graph.h"
+#include "engineering_episode.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -4422,6 +4423,7 @@ static int continuation_replace(const char *root, const char *rel, const char *d
 /* A second noninteractive invocation consumes a bound, single-line assertion.
    The assertion never enters the free-form task parser or the task memory.
    Work outside the candidate checks is confined to the same one-file gate. */
+static int audit_preflight_suppressed;
 int TaskOpsContinueStdout(const char *workspace, const char *task,
                           const char *key, const char *answer, TASK_OPS_REPORT *rep)
 {
@@ -4481,7 +4483,9 @@ int TaskOpsContinueStdout(const char *workspace, const char *task,
         make_dir(scratch);
         if (write_file(scratch,ws->files[0].rel,ws->files[0].data)) {
             TASK_OPS_REPORT preflight;
+            ++audit_preflight_suppressed;
             int kept=TaskOpsSolve(scratch,task,&preflight);
+            --audit_preflight_suppressed;
             ok=!kept && TaskOpsClarification(scratch,task,&preflight,q,sizeof(q)) &&
                !strcmp(preflight.clarification_key,key);
             rep->compile_before=preflight.compile_before;
@@ -4552,6 +4556,89 @@ static int reflexion_enabled(void)
     return !(v && !strcmp(v, "0"));
 }
 
+/* Engineering audit is opt-in and write-only from this solver. These hashes are
+   explicitly FNV64 fingerprints, not SHA-256 or source-of-truth identities.
+   No raw task text, asserted answer or toolchain output enters the store. */
+static int episode_enabled(void)
+{
+    const char *v = getenv("SYMBOLS_ENGINEERING_EPISODES");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static unsigned long long snapshot_fingerprint(const TASK_OPS_WORKSPACE *w)
+{
+    unsigned long long h = 1469598103934665603ULL;
+    for (int i=0; i<w->count; ++i) {
+        h=fnv_add(h,w->files[i].rel,strlen(w->files[i].rel)+1);
+        h=fnv_add(h,w->files[i].data,w->files[i].len);
+    }
+    return h;
+}
+
+static int snapshot_equal(const TASK_OPS_WORKSPACE *a, const TASK_OPS_WORKSPACE *b)
+{
+    if (!a || !b || a->count!=b->count) return 0;
+    for (int i=0; i<a->count; ++i)
+        if (strcmp(a->files[i].rel,b->files[i].rel) ||
+            a->files[i].len!=b->files[i].len ||
+            memcmp(a->files[i].data,b->files[i].data,a->files[i].len)) return 0;
+    return 1;
+}
+
+static unsigned long audit_sequence;
+static void audit_attempt(const char *workspace, const char *task,
+                          const TASK_OPS_REPORT *rep, int attempt,
+                          const char *run_id, const TASK_OPS_WORKSPACE *before)
+{
+    if (!workspace || !task || !rep || !before) return;
+    TASK_OPS_WORKSPACE *after=(TASK_OPS_WORKSPACE *)calloc(1,sizeof(*after));
+    if (!after) return;
+    int loaded=TaskOpsLoadWorkspace(workspace,after);
+    ENGINEERING_EPISODE e={0};
+    snprintf(e.run_id,sizeof(e.run_id),"%s",run_id);
+    snprintf(e.attempt_id,sizeof(e.attempt_id),"%d",attempt);
+    snprintf(e.episode_id,sizeof(e.episode_id),"%s.%d",run_id,attempt);
+    if(attempt>1) snprintf(e.parent_id,sizeof(e.parent_id),"%d",attempt-1);
+    snprintf(e.repo_sha,sizeof(e.repo_sha),"unavailable");
+    snprintf(e.workspace_before,sizeof(e.workspace_before),"fnv64:%016llx",snapshot_fingerprint(before));
+    if(loaded) snprintf(e.workspace_after,sizeof(e.workspace_after),"fnv64:%016llx",snapshot_fingerprint(after));
+    snprintf(e.task_signature,sizeof(e.task_signature),"fnv64:%016llx",
+             fnv_add(1469598103934665603ULL,task,strlen(task)));
+    snprintf(e.goal_provenance,sizeof(e.goal_provenance),"task_text_unverified");
+    snprintf(e.engine,sizeof(e.engine),"task_ops");
+    snprintf(e.op,sizeof(e.op),"%s",rep->op[0]?rep->op:"none");
+    snprintf(e.oracle,sizeof(e.oracle),"task_ops_probe");
+    snprintf(e.oracle_version,sizeof(e.oracle_version),"unversioned");
+    snprintf(e.diagnostic,sizeof(e.diagnostic),"%s",
+             !rep->op[0]?"no_candidate":
+             !strncmp(rep->reason,"verify failed",13)?"verify_failed":
+             !strncmp(rep->reason,"write failed",12)?"write_failed":"reported_status");
+    int restored=loaded && snapshot_equal(before,after);
+    if(rep->verified && loaded) {
+        snprintf(e.outcome,sizeof(e.outcome),"verified");
+        snprintf(e.rollback,sizeof(e.rollback),"not_needed");
+    } else if(!rep->op[0] && !rep->applied && loaded && restored) {
+        snprintf(e.outcome,sizeof(e.outcome),"abstained");
+        snprintf(e.rollback,sizeof(e.rollback),"not_needed");
+    } else if(restored) {
+        snprintf(e.outcome,sizeof(e.outcome),"%s",
+                 !strncmp(rep->reason,"write failed",12)?"write_failed":"refuted");
+        snprintf(e.rollback,sizeof(e.rollback),"confirmed");
+    } else {
+        /* A failed restore must never become a confident negative episode.
+           A mismatch could also mean an external concurrent mutation. */
+        snprintf(e.outcome,sizeof(e.outcome),"verification_incomplete");
+        snprintf(e.rollback,sizeof(e.rollback),"unknown");
+    }
+    e.candidate_builds=0; e.probes=0; e.tool_calls=0; /* not counted by this API */
+    char path[TASK_OPS_MAX_PATH*2];
+    int n=snprintf(path,sizeof(path),"%s/.symbols/engineering_episodes.v1",workspace);
+    if(n<=0 || (size_t)n>=sizeof(path) || !EpisodeAppend(path,&e))
+        fprintf(stderr,"engineering episode audit not persisted (solve result unchanged)\n");
+    if(loaded) TaskOpsFreeWorkspace(after);
+    free(after);
+}
+
 /* Minimal Reflexion loop: attempt; when the toolchain refutes the kept
    candidate (applied, rechecked, rolled back) write a reflection - what was
    tried, what the toolchain reported, what changes - exclude that exact edit
@@ -4588,8 +4675,30 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
     char trail[512] = "";
     static char last[512];
     last[0] = '\0';
+    int audit=episode_enabled() && !audit_preflight_suppressed;
+    char audit_run[EE_STR]={0};
+    if(audit) {
+#ifdef _WIN32
+        unsigned long pid=(unsigned long)GetCurrentProcessId();
+#else
+        unsigned long pid=(unsigned long)getpid();
+#endif
+        snprintf(audit_run,sizeof(audit_run),"%lu-%lu-%lu",pid,
+                 (unsigned long)time(NULL),++audit_sequence);
+    }
     for (int attempt = 1; attempt <= 3; attempt++) {
+        TASK_OPS_WORKSPACE *audit_before=NULL;
+        if(audit && workspace && task) {
+            audit_before=(TASK_OPS_WORKSPACE *)calloc(1,sizeof(*audit_before));
+            if(audit_before && !TaskOpsLoadWorkspace(workspace,audit_before)) {
+                TaskOpsFreeWorkspace(audit_before);free(audit_before);audit_before=NULL;
+            }
+        }
         v = task_ops_attempt(workspace, task, rep);
+        if(audit_before) {
+            audit_attempt(workspace,task,rep,attempt,audit_run,audit_before);
+            TaskOpsFreeWorkspace(audit_before);free(audit_before);
+        }
         rep->attempts = attempt;
         rep->reflections_recalled = recalled;
         rep->reflections_written = written;
