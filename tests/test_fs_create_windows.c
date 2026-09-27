@@ -1,0 +1,116 @@
+#ifdef _WIN32
+#include "fs_write.h"
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <direct.h>
+static void ck(int ok,const char *what){if(!ok){fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());exit(1);}}
+static void put(const char *path,const char *v)
+{FILE *f=fopen(path,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
+static void read_exact(FS_READ_ROOT *r,const char *p,const void *expected,size_t len)
+{unsigned char *b=NULL;size_t n;FS_READ_META m;
+ ck(FsReadFile(r,p,&b,&n,&m)==FS_READ_OK&&n==len&&
+    (!len||!memcmp(b,expected,len)),"read exact");free(b);}
+int main(void)
+{
+ FS_READ_ROOT *r;FS_READ_META m;unsigned char binary[]={0,1,255,10};
+ HANDLE lock;char longname[244],longpath[256];
+ ck(_mkdir("test_fs_wincreate_scratch")==0,"root");
+ ck(_mkdir("test_fs_wincreate_scratch\\inside")==0,"inside");
+ put("test_fs_wincreate_scratch\\existing","original");
+ put("test_fs_wincreate_outside","outside");
+ ck(FsReadOpen("test_fs_wincreate_scratch",&r)==FS_READ_OK,"open root");
+ ck(FsCreateFile(r,"inside/new","created",7,0666)==FS_READ_OK,"create");
+ read_exact(r,"inside/new","created",7);
+ ck(FsCreateFile(r,"inside/NEW","bad",3,0666)==FS_READ_DENIED,"case alias no overwrite");
+ read_exact(r,"inside/new","created",7);
+ ck(FsCreateFile(r,"existing","bad",3,0666)==FS_READ_DENIED,"existing name");
+ read_exact(r,"existing","original",8);
+ ck(FsCreateFile(r,"empty","",0,0666)==FS_READ_OK,"empty");
+ read_exact(r,"empty","",0);
+ ck(FsCreateFile(r,"binary",binary,sizeof(binary),0666)==FS_READ_OK,"binary");
+ read_exact(r,"binary",binary,sizeof(binary));
+ ck(FsCreateFile(r,"readonly","r",1,0444)==FS_READ_OK,"readonly create");
+ ck(FsReadStat(r,"readonly",&m)==FS_READ_OK&&m.mode==0444,"readonly metadata");
+ read_exact(r,"readonly","r",1);
+ ck(SetFileAttributesA("test_fs_wincreate_scratch\\readonly",FILE_ATTRIBUTE_NORMAL),
+    "reset readonly fixture");
+ ck(FsCreateFile(r,"badsize",binary,1024u*1024u+1,0666)==FS_READ_INVALID,"length limit");
+ ck(FsReadStat(r,"badsize",&m)==FS_READ_MISSING,"no oversized file");
+ ck(FsCreateFile(r,"inside","bad",3,0666)==FS_READ_DENIED,"directory leaf");
+ ck(FsCreateFile(r,"../test_fs_wincreate_outside","bad",3,0666)==FS_READ_INVALID,"parent escape");
+ ck(FsCreateFile(r,"C:/escape","bad",3,0666)==FS_READ_INVALID,"drive escape");
+ ck(FsCreateFile(r,"inside\\escape","bad",3,0666)==FS_READ_INVALID,"separator escape");
+ ck(FsCreateFile(r,".fstxn.lock","bad",3,0666)==FS_READ_DENIED,"control name");
+ ck(FsCreateFile(r,".FSTXN.LOCK","bad",3,0666)==FS_READ_DENIED,"case-folded control name");
+ ck(FsCreateFile(r,"inside/.FsRp-evil","bad",3,0666)==FS_READ_DENIED,"nested stage alias");
+ ck(FsCreateFile(r,"inside/trailing.","bad",3,0666)==FS_READ_INVALID,"trailing dot alias");
+ ck(FsCreateFile(r,"inside/trailing ","bad",3,0666)==FS_READ_INVALID,"trailing space alias");
+ ck(FsCreateFile(r,"inside/.fstxn.pcommit","bad",3,0666)==FS_READ_DENIED,
+    "nested control marker");
+ _putenv_s("FS_WIN_CREATE_TEST_FAIL_AFTER_CREATE","1");
+ ck(FsCreateFile(r,"pending","data",4,0666)==FS_READ_PENDING,"post-create pending");
+ _putenv_s("FS_WIN_CREATE_TEST_FAIL_AFTER_CREATE","");
+ ck(FsReadStat(r,"pending",&m)==FS_READ_OK&&m.size==0,"pending name visible");
+ ck(FsCreateFile(r,"pending","again",5,0666)==FS_READ_DENIED,"pending not retried");
+ memset(longname,'a',240);longname[240]=0;
+ snprintf(longpath,sizeof(longpath),"inside/%s",longname);
+ ck(FsCreateFile(r,longpath,"long",4,0666)==FS_READ_OK,"long component");
+ read_exact(r,longpath,"long",4);
+ lock=CreateFileA("test_fs_wincreate_scratch\\inside\\new",GENERIC_READ,0,NULL,OPEN_EXISTING,0,NULL);
+ ck(lock!=INVALID_HANDLE_VALUE,"lock existing");
+ ck(FsCreateFile(r,"inside/new","bad",3,0666)!=FS_READ_OK,"locked existing");
+ CloseHandle(lock);read_exact(r,"inside/new","created",7);
+ /* A junction is a reparse parent and requires no symlink privilege. */
+ {char absolute[MAX_PATH],cmd[2*MAX_PATH+128];DWORD n;
+  n=GetFullPathNameA("test_fs_wincreate_scratch\\inside",MAX_PATH,absolute,NULL);
+  ck(n>0&&n<MAX_PATH,"junction target path");
+  ck(snprintf(cmd,sizeof(cmd),"cmd /D /C mklink /J \"test_fs_wincreate_scratch\\dirlink\" \"%s\" >NUL",absolute)>0,
+     "junction command");
+  ck(system(cmd)==0,"junction fixture");}
+ ck(FsCreateFile(r,"dirlink/nope","bad",3,0666)!=FS_READ_OK,"reparse parent");
+ ck(FsReadStat(r,"inside/nope",&m)==FS_READ_MISSING,"no reparse traversal");
+ ck(RemoveDirectoryA("test_fs_wincreate_scratch\\dirlink"),"unlink junction");
+ /* CreateSymbolicLink may require a local privilege, so exercise it if the
+    runner permits it; the junction above is the unconditional reparse test. */
+ if(CreateSymbolicLinkA("test_fs_wincreate_scratch\\symparent","inside",
+       SYMBOLIC_LINK_FLAG_DIRECTORY|0x2 /* ALLOW_UNPRIVILEGED_CREATE */)){
+  ck(FsCreateFile(r,"symparent/nope","bad",3,0666)!=FS_READ_OK,
+     "directory symlink parent");
+  ck(RemoveDirectoryA("test_fs_wincreate_scratch\\symparent"),"remove symlink");
+ }
+ if(CreateSymbolicLinkA("test_fs_wincreate_scratch\\symleaf",
+       "..\\test_fs_wincreate_outside",0x2)){
+  ck(FsCreateFile(r,"symleaf","bad",3,0666)==FS_READ_DENIED,"symlink leaf");
+  ck(DeleteFileA("test_fs_wincreate_scratch\\symleaf"),"remove leaf symlink");
+ }
+ /* Existing leaf must never be opened or overwritten. */
+ ck(FsCreateFile(r,"existing","bad",3,0666)==FS_READ_DENIED,"leaf no overwrite");
+ ck(MoveFileA("test_fs_wincreate_scratch","test_fs_wincreate_moved"),"move held root");
+ ck(_mkdir("test_fs_wincreate_scratch")==0,"replacement root");
+ ck(FsCreateFile(r,"held","safe",4,0666)==FS_READ_OK,"create held root");
+ read_exact(r,"held","safe",4);
+ ck(GetFileAttributesA("test_fs_wincreate_scratch\\held")==INVALID_FILE_ATTRIBUTES,
+    "replacement root untouched");
+ ck(_rmdir("test_fs_wincreate_scratch")==0,"remove replacement root");
+ ck(MoveFileA("test_fs_wincreate_moved","test_fs_wincreate_scratch"),"restore root");
+ ck(FsCreateRecover(r)==FS_READ_UNSUPPORTED,"no Windows recovery");
+ FsReadClose(r);
+ ck(DeleteFileA("test_fs_wincreate_scratch\\inside\\new"),"cleanup new");
+ {char full[300];snprintf(full,sizeof(full),"test_fs_wincreate_scratch\\inside\\%s",longname);
+  ck(DeleteFileA(full),"cleanup long");}
+ ck(_rmdir("test_fs_wincreate_scratch\\inside")==0,"cleanup inside");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\existing"),"cleanup existing");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\empty"),"cleanup empty");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\binary"),"cleanup binary");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\pending"),"cleanup pending");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\readonly"),"cleanup readonly");
+ ck(DeleteFileA("test_fs_wincreate_scratch\\held"),"cleanup held");
+ ck(_rmdir("test_fs_wincreate_scratch")==0,"cleanup root");
+ ck(DeleteFileA("test_fs_wincreate_outside"),"cleanup outside");
+ puts("Windows handle-relative create passed");return 0;
+}
+#else
+int main(void){return 0;}
+#endif

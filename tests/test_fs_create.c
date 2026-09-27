@@ -108,9 +108,14 @@ int main(void)
     UNLINK("test_fs_create_scratch/inside/link");
     UNLINK("test_fs_create_scratch/dirlink");
 #else
-    ck(FsCreateFile(root,"inside/new.txt","new-data",8,0600)==FS_READ_UNSUPPORTED,
-       "Windows fails closed without handle-relative publish");
-    ck(FsReadStat(root,"inside/new.txt",&m)==FS_READ_MISSING,"no new file");
+    ck(FsCreateFile(root,"inside/new.txt","new-data",8,0600)==FS_READ_OK,
+       "Windows handle-relative create");
+    ck(FsReadFile(root,"inside/new.txt",&b,&n,&m)==FS_READ_OK&&n==8&&
+       !memcmp(b,"new-data",8),"Windows created bytes");free(b);
+    ck((m.mode&0777)==0644,"Windows writable mode maps to 0644");
+    ck(FsCreateFile(root,"inside/existing.txt","wrong",5,0600)==FS_READ_DENIED,
+       "Windows existing name refused");
+    ck(UNLINK("test_fs_create_scratch/inside/new.txt")==0,"Windows fixture cleanup");
 #endif
     FsReadClose(root);
     UNLINK("test_fs_create_scratch/inside/existing.txt");

@@ -13,7 +13,12 @@
    A crash before intent publication or during final cleanup may leave
    untracked random stage/record files; they cannot be safely removed by
    automatic replay. Crash-point tests model process termination; actual
-   power-loss persistence remains filesystem-dependent. */
+   power-loss persistence remains filesystem-dependent.
+   Windows create-only is deliberately NOT atomic or journaled: FILE_CREATE
+   publishes the name before content is written. After publication, a short
+   write or flush failure returns FS_READ_PENDING; a partial file may remain.
+   Inspect and clean it manually, never blindly retry. FsCreateRecover is
+   unsupported on Windows. A future journal layer owns atomicity. */
 FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *root);
 /* Copy a byte-exact expected source to a new destination, no replace. The
    expected pointer is mandatory even for zero bytes. POSIX only; participates
