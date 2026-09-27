@@ -293,6 +293,14 @@ sllm_test(test_agent_runner_learning tests/test_agent_runner_learning.c)
 # Per-commit bank report: runs external+heldout+learning, appends one JSONL row.
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME test_typed_c_schema
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_schema.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_test(NAME test_typed_c_preview
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_preview.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+if(Python3_Interpreter_FOUND)
     add_custom_target(bank_report
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/bank_report.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -333,6 +341,9 @@ sllm_test(test_c_fix_ops tests/test_c_fix_ops.c)
 sllm_test(test_compile_repair tests/test_compile_repair.c)
 sllm_test(test_shell_contract tests/test_shell_contract.c)
 sllm_test(test_c_contract tests/test_c_contract.c)
+# Trusted static source transformer for the typed, non-executing preview.
+add_executable(c_contract_static src/c_contract_static_main.c)
+target_link_libraries(c_contract_static symbolic)
 sllm_test(test_reflect tests/test_reflect.c)
 sllm_test(test_git_ops tests/test_git_ops.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
