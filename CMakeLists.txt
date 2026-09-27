@@ -155,6 +155,12 @@ if(WIN32)
     target_compile_definitions(test_fs_create_windows PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_create_windows COMMAND test_fs_create_windows
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_journal tests/test_fs_win_journal.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_journal PRIVATE include)
+    target_compile_definitions(test_fs_win_journal PRIVATE FS_CREATE_TEST_CRASH=1)
+    add_test(NAME test_fs_win_journal COMMAND test_fs_win_journal
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 else()
     sllm_test(test_fs_create_windows tests/test_fs_create_windows.c)
 endif()

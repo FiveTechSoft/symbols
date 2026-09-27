@@ -85,11 +85,12 @@ int main(void)
  ck(FsCreateFile(r,"inside/trailing ","bad",3,0666)==FS_READ_INVALID,"trailing space alias");
  ck(FsCreateFile(r,"inside/.fstxn.pcommit","bad",3,0666)==FS_READ_DENIED,
     "nested control marker");
- _putenv_s("FS_WIN_CREATE_TEST_FAIL_AFTER_CREATE","1");
- ck(FsCreateFile(r,"pending","data",4,0666)==FS_READ_PENDING,"post-create pending");
- _putenv_s("FS_WIN_CREATE_TEST_FAIL_AFTER_CREATE","");
- ck(FsReadStat(r,"pending",&m)==FS_READ_OK&&m.size==0,"pending name visible");
- ck(FsCreateFile(r,"pending","again",5,0666)==FS_READ_DENIED,"pending not retried");
+ /* A-G process-termination crash matrix runs separately below. */
+ ck(FsCreateRecover(r)==FS_READ_OK,"empty recovery");
+ _putenv_s("FS_WIN_TEST_SIMULATE_NON_NTFS","1");
+ ck(FsCreateFile(r,"nonntfs","data",4,0666)==FS_READ_UNSUPPORTED,
+    "simulated capability rejection (not a real non-NTFS volume)");
+ _putenv_s("FS_WIN_TEST_SIMULATE_NON_NTFS","");
  memset(longname,'a',240);longname[240]=0;
  snprintf(longpath,sizeof(longpath),"inside/%s",longname);
  ck(FsCreateFile(r,longpath,"long",4,0666)==FS_READ_OK,"long component");
@@ -131,7 +132,7 @@ int main(void)
     "replacement root untouched");
  ck(cleanup_dir("test_fs_wincreate_scratch"),"remove replacement root");
  ck(MoveFileA("test_fs_wincreate_moved","test_fs_wincreate_scratch"),"restore root");
- ck(FsCreateRecover(r)==FS_READ_UNSUPPORTED,"no Windows recovery");
+ ck(FsCreateRecover(r)==FS_READ_OK,"Windows recovery idempotent");
  FsReadClose(r);
  ck(cleanup_file("test_fs_wincreate_scratch\\inside\\new"),"cleanup new");
  {char full[300];snprintf(full,sizeof(full),"test_fs_wincreate_scratch\\inside\\%s",longname);
@@ -140,9 +141,10 @@ int main(void)
  ck(cleanup_file("test_fs_wincreate_scratch\\existing"),"cleanup existing");
  ck(cleanup_file("test_fs_wincreate_scratch\\empty"),"cleanup empty");
  ck(cleanup_file("test_fs_wincreate_scratch\\binary"),"cleanup binary");
- ck(cleanup_file("test_fs_wincreate_scratch\\pending"),"cleanup pending");
+
  ck(cleanup_file("test_fs_wincreate_scratch\\readonly"),"cleanup readonly");
  ck(cleanup_file("test_fs_wincreate_scratch\\held"),"cleanup held");
+ ck(cleanup_file("test_fs_wincreate_scratch\\.fstxn.lock"),"cleanup lock");
  ck(cleanup_dir("test_fs_wincreate_scratch"),"cleanup root");
  ck(cleanup_file("test_fs_wincreate_outside"),"cleanup outside");
  puts("Windows handle-relative create passed");return 0;

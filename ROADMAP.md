@@ -136,6 +136,7 @@ These decisions change the order of work, not the dependency chain above. No pul
 - Typed operations for stat, list, read, create, replace, move, copy, and remove.
 - A workspace-root capability with canonical path checks, symlink policy, and explicit handling for paths that do not yet exist.
 - Atomic single-file replacement and a journaled multi-file transaction with rollback.
+- Windows create uses an NTFS-only handle-relative journal for process-termination recovery. Directory FlushFileBuffers, where accepted, is a best-effort ordering hint; neither Windows nor POSIX promises power-loss persistence here. Power-loss durability and atomic replace claims remain deferred until an NTFS-specific primitive and real fault-injection evidence support them.
 - Encoding, newline, permission, file-kind, size, and binary/text metadata.
 - Dry-run manifests that state every intended read, write, rename, and delete.
 
