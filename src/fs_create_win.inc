@@ -51,23 +51,26 @@ static int wc_reserved(const WCHAR *s)
        !_wcsnicmp(leaf,L".fsrp-",6)||!_wcsnicmp(leaf,L".fsrb-",6)||
        !_wcsnicmp(leaf,L".fsrm-",6)||!_wcsnicmp(leaf,L".fsmv-",6);
 }
-static int wc_target_valid(const WCHAR *s)
+/* Validate the whole path before classifying reserved control leaves. A malformed
+   suffix must stay INVALID even if an earlier component is reserved. */
+static FS_READ_STATUS wc_target_status(const WCHAR *s)
 {
-    WCHAR segment[241];size_t n=0;
-    if(!*s)return 0;
+    WCHAR segment[241];size_t n=0;int reserved=0;
+    if(!*s)return FS_READ_INVALID;
     for(const WCHAR *p=s;;p++){
         if(*p==L'/'||!*p){
-            if(!n||n>240)return 0;
+            if(!n||n>240)return FS_READ_INVALID;
             segment[n]=0;
-            if(wc_reserved(segment)||segment[n-1]==L'.'||segment[n-1]==L' '||
-               !wcscmp(segment,L".")||!wcscmp(segment,L".."))return 0;
+            if(segment[n-1]==L'.'||segment[n-1]==L' '||
+               !wcscmp(segment,L".")||!wcscmp(segment,L".."))return FS_READ_INVALID;
+            if(wc_reserved(segment))reserved=1;
             n=0;if(!*p)break;
         }else{
-            if(*p==L'\\'||*p==L':'||*p<32||n>=240)return 0;
+            if(*p==L'\\'||*p==L':'||*p<32||n>=240)return FS_READ_INVALID;
             segment[n++]=*p;
         }
     }
-    return 1;
+    return reserved?FS_READ_DENIED:FS_READ_OK;
 }
 static unsigned wc_checksum(const WC_RECORD *r)
 {
@@ -230,7 +233,7 @@ static FS_READ_STATUS wc_record_read(HANDLE root,const WCHAR *name,WC_RECORD *r,
        r->checksum!=wc_checksum(r)||
        !wc_terminated(r->target,WC_MAX_PATH)||
        !wc_terminated(r->stage,48)||!wc_terminated(r->pin,48)||
-       !wc_target_valid(r->target)||!wcscmp(r->stage,r->pin)||
+       wc_target_status(r->target)!=FS_READ_OK||!wcscmp(r->stage,r->pin)||
        !wc_random_name(r->stage,L".fst-")||
        !wc_random_name(r->pin,L".fsp-")||
        r->size>FS_READ_MAX||r->mode>0777){s=FS_READ_DENIED;}
@@ -371,7 +374,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
     target=win_wide(rel);if(!target)return FS_READ_INVALID;
     if(wcslen(target)>=WC_MAX_PATH){s=FS_READ_INVALID;goto end;}
-    if(!wc_target_valid(target)){s=FS_READ_INVALID;goto end;}
+    s=wc_target_status(target);if(s!=FS_READ_OK)goto end;
     s=wc_parent(r,target,&parent,&leaf);
     WC_TRACE("wc_create parent open status=%d\n",(int)s);
     if(s!=FS_READ_OK)goto end;
