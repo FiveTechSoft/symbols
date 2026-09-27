@@ -13,7 +13,11 @@
 #endif
 #define WC_OPTIONS (FILE_OPEN_REPARSE_POINT|FILE_SYNCHRONOUS_IO_NONALERT|FILE_NON_DIRECTORY_FILE)
 #define WC_FILE_ID(h,p) GetFileInformationByHandleEx((h),FileIdInfo,(p),sizeof(*(p)))
-typedef NTSTATUS (NTAPI *WC_NT_SET)(HANDLE,PIO_STATUS_BLOCK,PVOID,ULONG,FILE_INFORMATION_CLASS);
+/* The public user-mode winternl.h omits these FILE_INFORMATION_CLASS enum
+   members. WDK's stable ABI values are rename=10 and link=11 (72 is LinkEx). */
+#define WC_NT_RENAME 10u
+#define WC_NT_LINK 11u
+typedef NTSTATUS (NTAPI *WC_NT_SET)(HANDLE,PIO_STATUS_BLOCK,PVOID,ULONG,ULONG);
 typedef struct { BOOLEAN replace; HANDLE root; ULONG length; WCHAR name[1]; } WC_NAME_INFO;
 typedef struct {
     unsigned magic, version, checksum, reserved;
@@ -108,7 +112,7 @@ static FS_READ_STATUS wc_open(HANDLE dir,const WCHAR *leaf,ACCESS_MASK access,UL
 }
 /* No path-based renames or deletion. The object is always accessed through
    the source handle; target names are simple leaves of held directories. */
-static int wc_set_name(HANDLE source,HANDLE dir,const WCHAR *leaf,FILE_INFORMATION_CLASS type)
+static int wc_set_name(HANDLE source,HANDLE dir,const WCHAR *leaf,ULONG type)
 {
     WC_NT_SET f=wc_set_fn();IO_STATUS_BLOCK io;WC_NAME_INFO *v;size_t n=wcslen(leaf);
     size_t size=offsetof(WC_NAME_INFO,name)+(n+1)*sizeof(WCHAR);NTSTATUS st;
@@ -120,9 +124,9 @@ static int wc_set_name(HANDLE source,HANDLE dir,const WCHAR *leaf,FILE_INFORMATI
 }
 static int wc_delete(HANDLE h)
 {
-    WC_NT_SET f=wc_set_fn();IO_STATUS_BLOCK io;FILE_DISPOSITION_INFORMATION d;
-    if(!f)return 0;d.DeleteFile=TRUE;
-    return NT_SUCCESS(f(h,&io,&d,sizeof(d),FileDispositionInformation));
+    FILE_DISPOSITION_INFO d;
+    d.DeleteFile=TRUE;
+    return SetFileInformationByHandle(h,FileDispositionInfo,&d,sizeof(d))!=FALSE;
 }
 static FS_READ_STATUS wc_lookup(HANDLE dir,const WCHAR *name,const FILE_ID_INFO *id,int *exists)
 {
@@ -210,7 +214,7 @@ static FS_READ_STATUS wc_record_publish(HANDLE root,const WCHAR *final,const WC_
     s=wc_open(root,tmp,GENERIC_WRITE|DELETE,FILE_CREATE,&h);if(s!=FS_READ_OK)return s;
     if(!WriteFile(h,r,sizeof(*r),&written,NULL)||written!=sizeof(*r)||
        !FlushFileBuffers(h)){s=FS_READ_IO;goto done;}
-    if(!wc_set_name(h,root,final,FileRenameInformation)){s=FS_READ_DENIED;goto done;}
+    if(!wc_set_name(h,root,final,WC_NT_RENAME)){s=FS_READ_DENIED;goto done;}
     wc_probe_dir(root);s=FS_READ_OK;
 done:
     /* An uncertain rename result may have published the record. Leave its
@@ -254,7 +258,7 @@ static FS_READ_STATUS wc_recover_locked(const FS_READ_ROOT *r)
     if(!intent)i=c;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||
        !wc_ntfs(r->handle))return FS_READ_DENIED;
-    s=wc_parent(r,&i.target,&parent,&leaf);if(s!=FS_READ_OK)return s;
+    s=wc_parent(r,i.target,&parent,&leaf);if(s!=FS_READ_OK)return s;
     if(!wc_id(parent,&pid)||!wc_same(&pid,&i.parent)||
        pid.VolumeSerialNumber!=i.root.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
     s=wc_lookup(r->handle,i.pin,&i.file,&pin);if(s!=FS_READ_OK)goto done;
@@ -374,7 +378,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     if(!FlushFileBuffers(stage)||!wc_id(stage,&rec.file)||!wc_same(&rec.file,&rootid)){
         s=FS_READ_IO;goto end;
     }
-    if(!wc_set_name(stage,r->handle,rec.pin,FileLinkInformation)){
+    if(!wc_set_name(stage,r->handle,rec.pin,WC_NT_LINK)){
         s=FS_READ_UNSUPPORTED;goto end;
     }
     {int pin_exists=0;FS_READ_STATUS verified=wc_lookup(r->handle,rec.pin,&rec.file,&pin_exists);
@@ -386,7 +390,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     wc_probe_dir(r->handle);
     s=wc_record_publish(r->handle,WC_INTENT,&rec);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
     wc_crash(3); /* C: complete intent */
-    if(!wc_set_name(stage,parent,leaf,FileRenameInformation)){
+    if(!wc_set_name(stage,parent,leaf,WC_NT_RENAME)){
         s=FS_READ_PENDING;goto end;
     }
     wc_crash(4); /* D: target published, no marker */
