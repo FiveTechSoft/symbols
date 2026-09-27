@@ -483,12 +483,91 @@ static int find_functions(const char *s, const char *m, size_t n, FN *fn, int ma
     return k;
 }
 
+/* Drop one whole, independent emission with no argument evaluation or
+   control-flow effects. A caller's complete stdout oracle and uniqueness gate
+   decide whether dropping this one statement is a valid repair. */
+static void gen_pure_emission_drop(GEN *g, const char *s, const char *m, const FN *f)
+{
+    for (size_t i=f->lo;i<f->hi;i++) {
+        if (m[i] || (i>f->lo && is_idc((unsigned char)s[i-1]))) continue;
+        const char *name=NULL;
+        if (!strncmp(s+i,"puts",4) && !is_idc((unsigned char)s[i+4])) name="puts";
+        else if (!strncmp(s+i,"printf",6) && !is_idc((unsigned char)s[i+6])) name="printf";
+        if (!name) continue;
+        size_t p=i+strlen(name);
+        while (p<f->hi && isspace((unsigned char)s[p])) p++;
+        if (s[p++]!='(') continue;
+        while (p<f->hi && isspace((unsigned char)s[p])) p++;
+        if (s[p]!='"' || m[p]!=1) continue;
+        p++;
+        for (;p<f->hi && s[p]!='"';p++) {
+            if (s[p]=='\\' && p+1<f->hi) p++;
+            else if (m[p]!=2) break;
+        }
+        if (s[p++]!='"') continue;
+        while (p<f->hi && isspace((unsigned char)s[p])) p++;
+        if (s[p++]!=')') continue; /* no expressions, not even a variable */
+        while (p<f->hi && isspace((unsigned char)s[p])) p++;
+        if (s[p]!=';' || m[p]) continue;
+        size_t prev=i;
+        while (prev>f->lo && isspace((unsigned char)s[prev-1])) prev--;
+        /* Unbraced if/loop bodies cannot be deleted as a statement. A
+           preceding semicolon is not enough: "if (x) act(); puts(...)" is
+           safe, but "if (x) puts(...)" is not. */
+        if (prev>f->lo && s[prev-1]!=';' && s[prev-1]!='{' && s[prev-1]!='}') continue;
+        if (prev>f->lo && s[prev-1]==';') {
+            /* No AST: reject a same-line unbraced control body, and reject
+               a preceding control header whose body may be this call. */
+            size_t line=prev;
+            while (line>f->lo && s[line-1]!='\n' && s[line-1]!='{') line--;
+            if (ci_find_n(s+line,prev-line,"if (") || ci_find_n(s+line,prev-line,"for (") ||
+                ci_find_n(s+line,prev-line,"while (") || ci_find_n(s+line,prev-line,"if(") ||
+                ci_find_n(s+line,prev-line,"for(") || ci_find_n(s+line,prev-line,"while(")) continue;
+        }
+        push(g,splice(s,i,p+1-i,""),4,"drop_emission",i,name,"remove");
+        i=p;
+    }
+}
+
 static void gen_fn(GEN *g, const char *s, const char *m, const FN *f, int code_ok)
 {
     char from[48], to[48];
     for (size_t i = f->lo; i < f->hi; i++) {
         /* format widths in string literals */
         if (m[i] == 2 && s[i] == '%') {
+            /* One decimal precision digit in a printf float conversion.
+               Refuse escaped %% and width/flags/asterisk forms. The outer
+               verifier still requires the exact complete stdout and a
+               unique passing candidate in its lowest passing tier. */
+            /* The opening quote must be the first argument of printf; a
+               matching format token in puts, scanf or another string is
+               not a printf precision edit. */
+            size_t q=i;
+            while (q>f->lo && m[q-1]==2) q--;
+            int printf_format= q>f->lo && s[q-1]=='"';
+            if (printf_format) {
+                size_t b=q-1;
+                while (b>f->lo && isspace((unsigned char)s[b-1])) b--;
+                if (b==f->lo || s[b-1]!='(') printf_format=0;
+                else {
+                    b--;
+                    while (b>f->lo && isspace((unsigned char)s[b-1])) b--;
+                    if (b<6 || strncmp(s+b-6,"printf",6) ||
+                        (b>6 && is_idc((unsigned char)s[b-7]))) printf_format=0;
+                }
+            }
+            if (printf_format && (i == 0 || s[i - 1] != '%') && s[i + 1] == '.' &&
+                isdigit((unsigned char)s[i + 2]) && s[i + 3] == 'f' &&
+                m[i + 1] == 2 && m[i + 2] == 2 && m[i + 3] == 2) {
+                for (char precision = '0'; precision <= '9'; precision++) {
+                    if (precision == s[i + 2]) continue;
+                    char digit[2] = {precision, 0};
+                    char old[5] = {'%', '.', s[i + 2], 'f', 0};
+                    char next[5] = {'%', '.', precision, 'f', 0};
+                    push(g, splice(g->src, i + 2, 1, digit), 3,
+                         "float_precision", i, old, next);
+                }
+            }
             static const char *w[] = {"%d", "%ld", "%lld", "%i"};
             for (int a = 0; a < 4; a++) {
                 size_t al = strlen(w[a]);
@@ -501,7 +580,29 @@ static void gen_fn(GEN *g, const char *s, const char *m, const FN *f, int code_o
             }
             continue;
         }
-        if (m[i] || !code_ok) continue;
+        if (m[i] && !(s[i] == '\'' && m[i] == 1)) continue;
+        if (!code_ok) continue;
+        /* Change one simple printable ASCII character literal in code, not
+           a quoted output string or an escape. Search is bounded locally;
+           neither the target stdout nor a value from the task chooses a
+           replacement. New complete answer literals are rejected by push. */
+        if (s[i] == '\'' && i + 2 < f->hi && s[i + 2] == '\'' &&
+            m[i + 1] == 2 && (unsigned char)s[i + 1] >= 32 &&
+            (unsigned char)s[i + 1] <= 126 &&
+            s[i + 1] != '\'' && s[i + 1] != '\\') {
+            for (int delta = -8; delta <= 8; delta++) {
+                int replacement = (unsigned char)s[i + 1] + delta;
+                if (!delta || replacement < 32 || replacement > 126 ||
+                    replacement == '\'' || replacement == '\\') continue;
+                char digit[2] = {(char)replacement, 0};
+                char old[4] = {'\'', s[i + 1], '\'', 0};
+                char next[4] = {'\'', (char)replacement, '\'', 0};
+                push(g, splice(g->src, i + 1, 1, digit), 4,
+                     "char_literal", i, old, next);
+            }
+            i += 2;
+            continue;
+        }
         char ch = s[i], nx = s[i + 1], pv = i > 0 ? s[i - 1] : ' ';
         if ((ch == '<' || ch == '>') && nx != ch && pv != ch && !(ch == '>' && pv == '-')) {
             int eq = nx == '=';
@@ -666,8 +767,11 @@ int CContractCandidates(const char *src, const C_CONTRACT *c, int allow_main, C_
     if (!m) return 0;
     FN fn[64];
     int nf = find_functions(src, m, n, fn, 64);
-    for (int k = 0; k < nf; k++)
-        gen_fn(&g, src, m, &fn[k], !fn[k].is_main || allow_main);
+    for (int k = 0; k < nf; k++) {
+        int code_ok=!fn[k].is_main || allow_main;
+        gen_fn(&g, src, m, &fn[k], code_ok);
+        if (code_ok) gen_pure_emission_drop(&g, src, m, &fn[k]);
+    }
     free(m);
     return g.n;
 }

@@ -141,6 +141,39 @@ int main(void)
         snprintf(text,sizeof(text),"The required stdout is exactly:\n%0128d",0);
         CHECK(!CContractParse(text,&k));
     }
+    /* New one-edit operators: source-derived candidates, never task answer
+       literals. Each is checked again by the integration verifier. */
+    CHECK(CContractParse("The program must print `RUNE: H`.", &k));
+    n = CContractCandidates("#include <stdio.h>\nint main(void){ char ch='B'; printf(\"RUNE: %c\\n\",ch+2); return 0; }\n", &k, 1, c, 96);
+    CHECK(has(c,n,"char_literal",4,"ch='F'"));
+    CHECK(has(c,n,"char_literal",4,"ch='H'")); /* enumeration is source-local, never goal-derived */
+    CContractFree(c,n);
+    n = CContractCandidates("#include <stdio.h>\nint main(void){ char ch='\\n'; puts(\"ok\"); return ch; }\n", &k, 1, c, 96);
+    CHECK(!has(c,n,"char_literal",4,NULL)); /* escaped literals excluded */
+    CContractFree(c,n);
+
+    CHECK(CContractParse("It must print MEAN: 2.50.", &k));
+    n = CContractCandidates("#include <stdio.h>\nint main(void){double x=2.5; printf(\"MEAN: %.3f\\n\",x); return 0;}\n", &k, 1, c, 96);
+    CHECK(has(c,n,"float_precision",3,"%.2f"));
+    CContractFree(c,n);
+    n = CContractCandidates("#include <stdio.h>\nint main(void){double x=2.5; printf(\"%%.3f %*.3f\",2,x);return 0;}\n", &k, 1, c, 96);
+    CHECK(!has(c,n,"float_precision",3,NULL)); /* escaped/width forms */
+    CContractFree(c,n);
+    n = CContractCandidates("#include <stdio.h>\nint main(void){puts(\"%.3f\");return 0;}\n", &k, 1, c, 96);
+    CHECK(!has(c,n,"float_precision",3,NULL)); /* only printf format argument */
+    CContractFree(c,n);
+
+    CHECK(CContractParse("The program must print `OK`.", &k));
+    n = CContractCandidates("#include <stdio.h>\nint main(void){puts(\"noise\");puts(\"OK\");return 0;}\n", &k, 1, c, 96);
+    CHECK(has(c,n,"drop_emission",4,"puts(\"OK\");"));
+    CContractFree(c,n);
+    n = CContractCandidates("#include <stdio.h>\nint main(void){ int x=1; printf(\"%d\", x++); return 0;}\n", &k, 1, c, 96);
+    CHECK(!has(c,n,"drop_emission",4,NULL)); /* expression side effects */
+    CContractFree(c,n);
+    n = CContractCandidates("#include <stdio.h>\nint main(void){if(1) puts(\"noise\");return 0;}\n", &k, 1, c, 96);
+    CHECK(!has(c,n,"drop_emission",4,NULL)); /* unbraced control body */
+    CContractFree(c,n);
+
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }

@@ -15,8 +15,11 @@
  *          int_div     (return A / B in a double/float function -> (double)A / B),
  *          stale_swap  (t = X; X = Y; Y = X; -> Y = t;)
  *   tier 3 direction   (< <-> >, <= <-> >=), equality (== <-> !=),
- *          format      (%d / %ld / %lld width in a format string)
- *   tier 4 plus_minus  (binary + <-> -), int_literal (N -> N +/- 1)
+ *          format      (%d / %ld / %lld width in a format string),
+ *          float_precision (one static printf %.Nf precision digit, N=0..9)
+ *   tier 4 plus_minus  (binary + <-> -), int_literal (N -> N +/- 1),
+ *          char_literal (one simple printable ASCII character within +/-8),
+ *          drop_emission (one pure puts/printf string-literal statement)
  * A candidate that writes the wanted output into the code as a new literal
  * is dropped.
  * Verify (caller): each candidate is built and run in a throwaway copy; only
