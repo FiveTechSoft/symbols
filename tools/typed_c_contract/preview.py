@@ -21,7 +21,9 @@ def file_identity(path, observed=None):
     """Return link count and stable metadata; Windows DirEntry.stat is incomplete."""
     if os.name != 'nt':
         st=observed if observed is not None else path.stat(follow_symlinks=False)
-        return st.st_nlink,st
+        identity=(st.st_dev,st.st_ino,st.st_mode,st.st_nlink,st.st_uid,st.st_gid,
+                  st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+        return st.st_nlink,identity
     from ctypes import wintypes
     class FILETIME(ctypes.Structure):
         _fields_=[('low',wintypes.DWORD),('high',wintypes.DWORD)]

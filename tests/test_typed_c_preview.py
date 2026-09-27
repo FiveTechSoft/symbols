@@ -50,6 +50,15 @@ class PreviewTests(unittest.TestCase):
         self.assertTrue(any('int x=1' in c['unified_diff'] for c in r['candidates']))
         self.assertFalse(marker.exists())
         self.assertEqual(self.source.read_bytes(),before)
+    def test_old_atime_is_not_a_source_race(self):
+        if os.name=='nt': self.skipTest('POSIX atime fixture')
+        # A read of an old file may advance atime under relatime; contents and identity are stable.
+        mtime=self.source.stat().st_mtime_ns
+        os.utime(self.source,ns=(mtime-7*24*3600*10**9,mtime))
+        r=self.run_preview()
+        self.assertEqual(r['status'],'static_candidate_unverified')
+        self.assertGreater(r['candidate_count'],0)
+        self.assertEqual(self.source.read_bytes(),self.initial)
     def test_scope_and_predicates(self):
         self.obj['source_predicates']=[{'kind':'file_bytes_equal','path':'main.c','sha256':sha(self.initial)}]
         self.assertEqual(self.run_preview()['status'],'no_static_candidate')
