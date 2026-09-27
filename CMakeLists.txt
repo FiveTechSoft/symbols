@@ -77,6 +77,7 @@ add_library(symbolic STATIC
     src/commonsense.c
     src/persona.c
     src/atomic_store.c
+    src/fs_read.c
     src/engineering_episode.c
     src/episodic_memory.c
 )
@@ -142,6 +143,7 @@ sllm_test(test_ingest          tests/test_ingest.c)
 add_executable(test_relation_subject_index tests/test_relation_subject_index.c)
 target_include_directories(test_relation_subject_index PRIVATE include)
 add_test(NAME test_relation_subject_index COMMAND test_relation_subject_index)
+sllm_test(test_fs_read tests/test_fs_read.c)
 sllm_test(test_contradictions  tests/test_contradictions.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
