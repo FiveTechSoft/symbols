@@ -15,8 +15,10 @@ static void child(int phase,int recovering)
  FS_READ_ROOT *r;char value[20];
  check(FsReadOpen(ROOT,&r)==FS_READ_OK,"child open");
  sprintf(value,"%d",phase);_putenv_s("FS_WIN_JOURNAL_CRASH",value);
- if(recovering)(void)FsCreateRecover(r);
- else (void)FsCreateFile(r,"inside/new","payload",7,0666);
+ {FS_READ_STATUS status=recovering?FsCreateRecover(r):
+       FsCreateFile(r,"inside/new","payload",7,0666);
+  fprintf(stderr,"journal child phase=%d recovery=%d FS_READ_STATUS=%d\n",
+          phase,recovering,(int)status);}
  FsReadClose(r);ExitProcess(200);
 }
 static int run_child(const char *exe,int point,int recovery)

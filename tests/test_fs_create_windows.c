@@ -57,7 +57,9 @@ int main(void)
  put("test_fs_wincreate_scratch\\existing","original");
  put("test_fs_wincreate_outside","outside");
  ck(FsReadOpen("test_fs_wincreate_scratch",&r)==FS_READ_OK,"open root");
- ck(FsCreateFile(r,"inside/new","created",7,0666)==FS_READ_OK,"create");
+ {FS_READ_STATUS status=FsCreateFile(r,"inside/new","created",7,0666);
+  if(status!=FS_READ_OK)fprintf(stderr,"create FS_READ_STATUS=%d\n",(int)status);
+  ck(status==FS_READ_OK,"create");}
  read_exact(r,"inside/new","created",7);
  ck(FsCreateFile(r,"inside/NEW","bad",3,0666)==FS_READ_DENIED,"case alias no overwrite");
  read_exact(r,"inside/new","created",7);

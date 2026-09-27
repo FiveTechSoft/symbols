@@ -27,6 +27,13 @@ typedef struct {
     WCHAR target[WC_MAX_PATH];
     WCHAR stage[48], pin[48];
 } WC_RECORD;
+/* Diagnostic-only tracing: compiled only into the native crash-test binaries.
+   Production code and its return values are untouched by these probes. */
+#ifdef FS_CREATE_TEST_CRASH
+#define WC_TRACE(...) fprintf(stderr,__VA_ARGS__)
+#else
+#define WC_TRACE(...) ((void)0)
+#endif
 static int wc_terminated(const WCHAR *s,size_t cap)
 {for(size_t i=0;i<cap;i++)if(!s[i])return 1;return 0;}
 static int wc_random_name(const WCHAR *s,const WCHAR *prefix)
@@ -79,15 +86,27 @@ static unsigned long long wc_hash(const unsigned char *p,size_t n)
 static int wc_same(const FILE_ID_INFO *a,const FILE_ID_INFO *b)
 {return a->VolumeSerialNumber==b->VolumeSerialNumber&&memcmp(&a->FileId,&b->FileId,sizeof(a->FileId))==0;}
 static int wc_id(HANDLE h,FILE_ID_INFO *out)
-{return WC_FILE_ID(h,out)&&out->VolumeSerialNumber!=0;}
+{
+    BOOL ok=WC_FILE_ID(h,out);DWORD error=ok?0:GetLastError();
+    WC_TRACE("wc_id FileIdInfo ok=%d error=%lu serial=%llu\n",(int)ok,
+             (unsigned long)error,ok?(unsigned long long)out->VolumeSerialNumber:0ULL);
+    (void)error;
+    return ok&&out->VolumeSerialNumber!=0;
+}
 static int wc_ntfs(HANDLE root)
 {
     WCHAR type[32];
 #ifdef FS_CREATE_TEST_CRASH
-    if(getenv("FS_WIN_TEST_SIMULATE_NON_NTFS"))return 0; /* simulation, not a volume test */
+    if(getenv("FS_WIN_TEST_SIMULATE_NON_NTFS")){
+        WC_TRACE("wc_ntfs simulated non-NTFS rejection\n");return 0;
+    } /* simulation, not a volume test */
 #endif
-    return GetVolumeInformationByHandleW(root,NULL,0,NULL,NULL,NULL,type,32)&&
-           wcscmp(type,L"NTFS")==0;
+    BOOL ok=GetVolumeInformationByHandleW(root,NULL,0,NULL,NULL,NULL,type,32);
+    DWORD error=ok?0:GetLastError();
+    WC_TRACE("wc_ntfs GetVolumeInformationByHandleW ok=%d error=%lu fs=%ls\n",
+             (int)ok,(unsigned long)error,ok?type:L"(unavailable)");
+    (void)error;
+    return ok&&wcscmp(type,L"NTFS")==0;
 }
 static FS_NT_CREATE wc_create_fn(void)
 {HMODULE dll=GetModuleHandleW(L"ntdll.dll");return dll?(FS_NT_CREATE)(void*)GetProcAddress(dll,"NtCreateFile"):NULL;}
@@ -97,13 +116,16 @@ static FS_READ_STATUS wc_open(HANDLE dir,const WCHAR *leaf,ACCESS_MASK access,UL
 {
     FS_NT_CREATE f=wc_create_fn();UNICODE_STRING name;OBJECT_ATTRIBUTES a;IO_STATUS_BLOCK io;
     NTSTATUS nt;size_t len=wcslen(leaf);
-    if(!f)return FS_READ_UNSUPPORTED;
+    if(!f){WC_TRACE("wc_open NtCreateFile unavailable name=%ls error=%lu\n",
+                    leaf,(unsigned long)GetLastError());return FS_READ_UNSUPPORTED;}
     if(!len||len>240||wcschr(leaf,L'/')||wcschr(leaf,L'\\'))return FS_READ_INVALID;
     name.Buffer=(PWSTR)leaf;name.Length=(USHORT)(len*sizeof(WCHAR));name.MaximumLength=name.Length;
     memset(&a,0,sizeof(a));a.Length=sizeof(a);a.RootDirectory=dir;
     a.ObjectName=&name;a.Attributes=OBJ_CASE_INSENSITIVE;
     nt=f(out,access|FILE_READ_ATTRIBUTES|SYNCHRONIZE,&a,&io,NULL,FILE_ATTRIBUTE_NORMAL,
          WC_SHARE,disposition,WC_OPTIONS,NULL,0);
+    WC_TRACE("wc_open NtCreateFile name=%ls disposition=%lu access=0x%lx NTSTATUS=0x%08lx\n",
+             leaf,(unsigned long)disposition,(unsigned long)access,(unsigned long)nt);
     if(NT_SUCCESS(nt))return FS_READ_OK;
     *out=INVALID_HANDLE_VALUE;
     if(nt==(NTSTATUS)0xC0000034L||nt==(NTSTATUS)0xC000003AL)return FS_READ_MISSING;
@@ -120,13 +142,19 @@ static int wc_set_name(HANDLE source,HANDLE dir,const WCHAR *leaf,ULONG type)
     v=(WC_NAME_INFO*)calloc(1,size);if(!v)return 0;
     v->replace=FALSE;v->root=dir;v->length=(ULONG)(n*sizeof(WCHAR));
     memcpy(v->name,leaf,(n+1)*sizeof(WCHAR));
-    st=f(source,&io,v,(ULONG)size,type);free(v);return NT_SUCCESS(st);
+    st=f(source,&io,v,(ULONG)size,type);
+    WC_TRACE("wc_set_name NtSetInformationFile type=%lu leaf=%ls NTSTATUS=0x%08lx\n",
+             (unsigned long)type,leaf,(unsigned long)st);
+    free(v);return NT_SUCCESS(st);
 }
 static int wc_delete(HANDLE h)
 {
     FILE_DISPOSITION_INFO d;
     d.DeleteFile=TRUE;
-    return SetFileInformationByHandle(h,FileDispositionInfo,&d,sizeof(d))!=FALSE;
+    BOOL ok=SetFileInformationByHandle(h,FileDispositionInfo,&d,sizeof(d));
+    WC_TRACE("wc_delete SetFileInformationByHandle ok=%d error=%lu\n",
+             (int)ok,(unsigned long)(ok?0:GetLastError()));
+    return ok!=FALSE;
 }
 static FS_READ_STATUS wc_lookup(HANDLE dir,const WCHAR *name,const FILE_ID_INFO *id,int *exists)
 {
@@ -159,6 +187,8 @@ static int wc_random(WCHAR out[48],const WCHAR *prefix)
     typedef BOOLEAN (APIENTRY *WC_RANDOM)(PVOID,ULONG);
     WC_RANDOM f=dll?(WC_RANDOM)(void*)GetProcAddress(dll,"SystemFunction036"):NULL;
     int ok=n+32<48&&f&&f(b,sizeof(b));
+    WC_TRACE("wc_random LoadLibrary=%d SystemFunction036=%d result=%d error=%lu\n",
+             dll!=NULL,f!=NULL,ok,(unsigned long)(ok?0:GetLastError()));
     if(dll)FreeLibrary(dll);
     if(!ok)return 0;
     wcscpy(out,prefix);
@@ -228,7 +258,10 @@ static FS_READ_STATUS wc_lock(HANDLE root,HANDLE *out,OVERLAPPED *overlap)
     if(s!=FS_READ_OK)return s;
     if(win_meta(*out,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=0){s=FS_READ_DENIED;goto bad;}
     memset(overlap,0,sizeof(*overlap));
-    if(!LockFileEx(*out,LOCKFILE_EXCLUSIVE_LOCK,0,1,0,overlap)){s=FS_READ_IO;goto bad;}
+    {BOOL ok=LockFileEx(*out,LOCKFILE_EXCLUSIVE_LOCK,0,1,0,overlap);
+     WC_TRACE("wc_lock LockFileEx ok=%d error=%lu\n",(int)ok,
+              (unsigned long)(ok?0:GetLastError()));
+     if(!ok){s=FS_READ_IO;goto bad;}}
     return FS_READ_OK;
 bad:CloseHandle(*out);*out=INVALID_HANDLE_VALUE;return s;
 }
@@ -339,14 +372,20 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     target=win_wide(rel);if(!target)return FS_READ_INVALID;
     if(wcslen(target)>=WC_MAX_PATH){s=FS_READ_INVALID;goto end;}
     if(!wc_target_valid(target)){s=FS_READ_INVALID;goto end;}
-    s=wc_parent(r,target,&parent,&leaf);if(s!=FS_READ_OK)goto end;
+    s=wc_parent(r,target,&parent,&leaf);
+    WC_TRACE("wc_create parent open status=%d\n",(int)s);
+    if(s!=FS_READ_OK)goto end;
     if(!wc_id(r->handle,&rootid)||!wc_id(parent,&pid)||rootid.VolumeSerialNumber!=pid.VolumeSerialNumber){
         s=FS_READ_UNSUPPORTED;goto end;
     }
-    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)goto end;
+    s=wc_lock(r->handle,&lock,&overlap);
+    WC_TRACE("wc_create lock status=%d\n",(int)s);
+    if(s!=FS_READ_OK)goto end;
     s=wc_record_read(r->handle,WC_INTENT,&other,&ignored,&intent);
+    WC_TRACE("wc_create intent probe status=%d present=%d\n",(int)s,intent);
     if(s!=FS_READ_OK||intent){s=s==FS_READ_OK?FS_READ_PENDING:s;goto end;}
     s=wc_record_read(r->handle,WC_COMMIT,&other,&ignored,&commit);
+    WC_TRACE("wc_create commit probe status=%d present=%d\n",(int)s,commit);
     if(s!=FS_READ_OK||commit){s=s==FS_READ_OK?FS_READ_PENDING:s;goto end;}
     /* Other transaction formats are not implemented on Windows, but an
        unexpected control name must never be ignored by this writer. */
@@ -356,12 +395,14 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
      for(size_t k=0;k<sizeof(names)/sizeof(names[0]);k++){
        HANDLE other_file=INVALID_HANDLE_VALUE;
        FS_READ_STATUS found=wc_open(r->handle,names[k],FILE_READ_ATTRIBUTES,FILE_OPEN,&other_file);
+       WC_TRACE("wc_create control probe name=%ls status=%d\n",names[k],(int)found);
        if(found==FS_READ_OK){CloseHandle(other_file);s=FS_READ_DENIED;goto end;}
        if(found!=FS_READ_MISSING){s=FS_READ_DENIED;goto end;}
      }
     }
     {HANDLE existing=INVALID_HANDLE_VALUE;
      s=wc_open(parent,leaf,FILE_READ_ATTRIBUTES,FILE_OPEN,&existing);
+     WC_TRACE("wc_create target absence probe name=%ls status=%d\n",leaf,(int)s);
      if(s==FS_READ_OK){CloseHandle(existing);s=FS_READ_DENIED;goto end;}
      if(s!=FS_READ_MISSING)goto end;
     }
@@ -369,6 +410,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
         s=FS_READ_IO;goto end;
     }
     s=wc_open(r->handle,rec.stage,GENERIC_WRITE|GENERIC_READ|DELETE,FILE_CREATE,&stage);
+    WC_TRACE("wc_create stage open status=%d\n",(int)s);
     if(s!=FS_READ_OK)goto end;
     started=1;wc_crash(1); /* A: stage only */
     while(used<len){
@@ -406,6 +448,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     wc_crash(7); /* G: committed cleanup complete */
     s=FS_READ_OK;
 end:
+    WC_TRACE("wc_create return status=%d started=%d\n",(int)s,started);
     if(started&&s!=FS_READ_OK&&s!=FS_READ_PENDING)s=FS_READ_PENDING;
     if(stage!=INVALID_HANDLE_VALUE)CloseHandle(stage);
     if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);

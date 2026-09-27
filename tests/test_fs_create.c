@@ -108,8 +108,9 @@ int main(void)
     UNLINK("test_fs_create_scratch/inside/link");
     UNLINK("test_fs_create_scratch/dirlink");
 #else
-    ck(FsCreateFile(root,"inside/new.txt","new-data",8,0600)==FS_READ_OK,
-       "Windows handle-relative create");
+    {FS_READ_STATUS status=FsCreateFile(root,"inside/new.txt","new-data",8,0600);
+     if(status!=FS_READ_OK)fprintf(stderr,"Windows create FS_READ_STATUS=%d\n",(int)status);
+     ck(status==FS_READ_OK,"Windows handle-relative create");}
     ck(FsReadFile(root,"inside/new.txt",&b,&n,&m)==FS_READ_OK&&n==8&&
        !memcmp(b,"new-data",8),"Windows created bytes");free(b);
     ck((m.mode&0777)==0644,"Windows writable mode maps to 0644");
