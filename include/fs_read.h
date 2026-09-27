@@ -4,9 +4,8 @@
 #include <stdint.h>
 
 /* Read-only workspace capability. POSIX children are opened relative to a
-   held directory with no-follow semantics. Windows currently inspects only
-   the held root: child paths fail closed until handle-relative traversal is
-   available; no pathname-based containment check is treated as secure. */
+   held directory with no-follow semantics. Windows child paths are opened component-wise relative to held directory
+   handles through NtCreateFile; missing API support fails closed. */
 typedef struct FS_READ_ROOT FS_READ_ROOT;
 typedef enum { FS_READ_OK=0, FS_READ_INVALID, FS_READ_MISSING,
                FS_READ_DENIED, FS_READ_UNSUPPORTED, FS_READ_IO } FS_READ_STATUS;

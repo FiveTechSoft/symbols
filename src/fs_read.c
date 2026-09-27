@@ -50,27 +50,120 @@ void FsReadFreeList(FS_READ_ENTRY *e,size_t n)
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winternl.h>
+#include <wchar.h>
+#ifndef FILE_OPEN_REPARSE_POINT
+#define FILE_OPEN_REPARSE_POINT 0x00200000
+#endif
+#ifndef FILE_DIRECTORY_FILE
+#define FILE_DIRECTORY_FILE 0x00000001
+#endif
+#ifndef FILE_SYNCHRONOUS_IO_NONALERT
+#define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
+#endif
+#ifndef FILE_OPEN
+#define FILE_OPEN 0x00000001
+#endif
+#ifndef NT_SUCCESS
+#define NT_SUCCESS(s) ((NTSTATUS)(s) >= 0)
+#endif
 struct FS_READ_ROOT { HANDLE handle; };
-/* Until Windows has handle-relative traversal, never interpret a child path
-   through a mutable namespace. A root handle is safe to inspect directly. */
+typedef NTSTATUS (NTAPI *FS_NT_CREATE)(PHANDLE,ACCESS_MASK,POBJECT_ATTRIBUTES,
+    PIO_STATUS_BLOCK,PLARGE_INTEGER,ULONG,ULONG,ULONG,ULONG,PVOID,ULONG);
+static FS_READ_STATUS win_error(DWORD e)
+{
+    if(e==ERROR_FILE_NOT_FOUND || e==ERROR_PATH_NOT_FOUND)return FS_READ_MISSING;
+    if(e==ERROR_ACCESS_DENIED || e==ERROR_CANT_ACCESS_FILE)return FS_READ_DENIED;
+    return FS_READ_IO;
+}
+static wchar_t *win_wide(const char *s)
+{
+    int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,-1,NULL,0);
+    wchar_t *w;if(n<=0)return NULL;
+    w=(wchar_t*)malloc((size_t)n*sizeof(wchar_t));if(!w)return NULL;
+    if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,-1,w,n)){free(w);return NULL;}
+    return w;
+}
+static FS_READ_STATUS win_meta(HANDLE h,FS_READ_META *m)
+{
+    BY_HANDLE_FILE_INFORMATION i;
+    FILE_STANDARD_INFO std;
+    if(!GetFileInformationByHandle(h,&i))return win_error(GetLastError());
+    if(!GetFileInformationByHandleEx(h,FileStandardInfo,&std,sizeof(std)))return FS_READ_IO;
+    if(i.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)return FS_READ_DENIED;
+    if(!!(i.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=!!std.Directory)return FS_READ_DENIED;
+    if(i.dwFileAttributes & FILE_ATTRIBUTE_DEVICE)return FS_READ_UNSUPPORTED;
+    m->kind=std.Directory?FS_KIND_DIR:FS_KIND_FILE;
+    m->size=((uint64_t)i.nFileSizeHigh<<32)|i.nFileSizeLow;
+    m->mode=(i.dwFileAttributes & FILE_ATTRIBUTE_READONLY)?0444:0644;
+    m->binary=-1;m->newline=FS_NEWLINE_NONE;return FS_READ_OK;
+}
+/* Each component is resolved by the kernel relative to the currently held
+   directory handle. A reparse point is opened itself and rejected, never
+   traversed. No validation/reopen-by-path gap is possible. */
+static FS_READ_STATUS win_open(const FS_READ_ROOT *r,const char *rel,HANDLE *out)
+{
+    FS_NT_CREATE create;HMODULE dll;wchar_t *w,*part,*next;
+    HANDLE current=INVALID_HANDLE_VALUE,child=INVALID_HANDLE_VALUE;
+    FS_READ_STATUS s=FS_READ_IO;
+    if(!valid_relative(rel,1))return FS_READ_INVALID;
+    if(!*rel){
+        if(!DuplicateHandle(GetCurrentProcess(),r->handle,GetCurrentProcess(),out,
+                            0,FALSE,DUPLICATE_SAME_ACCESS))return FS_READ_IO;
+        return FS_READ_OK;
+    }
+    dll=GetModuleHandleW(L"ntdll.dll");
+    if(!dll)return FS_READ_UNSUPPORTED;
+    create=(FS_NT_CREATE)(void*)GetProcAddress(dll,"NtCreateFile");
+    if(!create)return FS_READ_UNSUPPORTED;
+    w=win_wide(rel);if(!w)return FS_READ_INVALID;
+    current=r->handle;part=w;
+    while(*part){
+        UNICODE_STRING name;OBJECT_ATTRIBUTES attrs;IO_STATUS_BLOCK ios;
+        FS_READ_META meta;NTSTATUS status;size_t length;
+        next=wcschr(part,L'/');if(next)*next++=0;
+        length=wcslen(part);if(length>32767){s=FS_READ_INVALID;goto done;}
+        name.Buffer=part;name.Length=(USHORT)(length*sizeof(wchar_t));
+        name.MaximumLength=name.Length;
+        memset(&attrs,0,sizeof(attrs));
+        attrs.Length=sizeof(attrs);attrs.RootDirectory=current;
+        attrs.ObjectName=&name;attrs.Attributes=OBJ_CASE_INSENSITIVE;
+        /* Bit 1 is FILE_READ_DATA for files, FILE_LIST_DIRECTORY for dirs. */
+        status=create(&child,FILE_READ_DATA|FILE_READ_ATTRIBUTES|SYNCHRONIZE,
+                      &attrs,&ios,NULL,FILE_ATTRIBUTE_NORMAL,
+                      FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,FILE_OPEN,
+                      FILE_OPEN_REPARSE_POINT|FILE_SYNCHRONOUS_IO_NONALERT|
+                          (next?FILE_DIRECTORY_FILE:0),NULL,0);
+        if(!NT_SUCCESS(status)){
+            /* STATUS_OBJECT_NAME_NOT_FOUND / STATUS_OBJECT_PATH_NOT_FOUND. */
+            s=(status==(NTSTATUS)0xC0000034L || status==(NTSTATUS)0xC000003AL)?
+                FS_READ_MISSING:FS_READ_DENIED;
+            goto done;
+        }
+        s=win_meta(child,&meta);if(s!=FS_READ_OK)goto done;
+        if(next && meta.kind!=FS_KIND_DIR){s=FS_READ_UNSUPPORTED;goto done;}
+        if(current!=r->handle)CloseHandle(current);
+        current=child;child=INVALID_HANDLE_VALUE;
+        if(!next)break;
+        part=next;
+    }
+    *out=current;current=INVALID_HANDLE_VALUE;s=FS_READ_OK;
+done:
+    if(child!=INVALID_HANDLE_VALUE)CloseHandle(child);
+    if(current!=INVALID_HANDLE_VALUE && current!=r->handle)CloseHandle(current);
+    free(w);return s;
+}
 FS_READ_STATUS FsReadOpen(const char *root,FS_READ_ROOT **out)
 {
-    int n;wchar_t *w;HANDLE h;BY_HANDLE_FILE_INFORMATION info;FS_READ_ROOT *r;
+    wchar_t *w;HANDLE h;FS_READ_META m;FS_READ_ROOT *r;FS_READ_STATUS s;
     if(!root||!out||!*root)return FS_READ_INVALID;
-    *out=NULL;n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,root,-1,NULL,0);
-    if(n<=0)return FS_READ_INVALID;
-    w=(wchar_t*)malloc((size_t)n*sizeof(wchar_t));if(!w)return FS_READ_IO;
-    if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,root,-1,w,n)){
-        free(w);return FS_READ_INVALID;
-    }
-    h=CreateFileW(w,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+    *out=NULL;w=win_wide(root);if(!w)return FS_READ_INVALID;
+    h=CreateFileW(w,FILE_READ_ATTRIBUTES|FILE_LIST_DIRECTORY,
+                  FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
                   NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
-    free(w);
-    if(h==INVALID_HANDLE_VALUE)return FS_READ_IO;
-    if(!GetFileInformationByHandle(h,&info) ||
-       !(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
-       (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)){
-        CloseHandle(h);return FS_READ_DENIED;
+    free(w);if(h==INVALID_HANDLE_VALUE)return win_error(GetLastError());
+    s=win_meta(h,&m);if(s!=FS_READ_OK || m.kind!=FS_KIND_DIR){
+        CloseHandle(h);return s!=FS_READ_OK?s:FS_READ_UNSUPPORTED;
     }
     r=(FS_READ_ROOT*)malloc(sizeof(*r));if(!r){CloseHandle(h);return FS_READ_IO;}
     r->handle=h;*out=r;return FS_READ_OK;
@@ -78,27 +171,67 @@ FS_READ_STATUS FsReadOpen(const char *root,FS_READ_ROOT **out)
 void FsReadClose(FS_READ_ROOT *r){if(r){CloseHandle(r->handle);free(r);}}
 FS_READ_STATUS FsReadStat(const FS_READ_ROOT *r,const char *rel,FS_READ_META *m)
 {
-    BY_HANDLE_FILE_INFORMATION info;
-    if(!r||!m||!valid_relative(rel,1))return FS_READ_INVALID;
-    if(*rel)return FS_READ_UNSUPPORTED;
-    if(!GetFileInformationByHandle(r->handle,&info))return FS_READ_IO;
-    if(!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
-       (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))return FS_READ_DENIED;
-    m->kind=FS_KIND_DIR;m->size=((uint64_t)info.nFileSizeHigh<<32)|info.nFileSizeLow;
-    m->mode=(info.dwFileAttributes & FILE_ATTRIBUTE_READONLY)?0444:0755;
-    m->binary=-1;m->newline=FS_NEWLINE_NONE;return FS_READ_OK;
+    HANDLE h;FS_READ_STATUS s;if(!r||!m)return FS_READ_INVALID;
+    s=win_open(r,rel,&h);if(s!=FS_READ_OK)return s;
+    s=win_meta(h,m);CloseHandle(h);return s;
 }
 FS_READ_STATUS FsReadFile(const FS_READ_ROOT *r,const char *rel,unsigned char **b,size_t *n,FS_READ_META *m)
 {
+    HANDLE h;FS_READ_STATUS s;unsigned char *p;DWORD got,extra;unsigned char one;
     if(!r||!b||!n||!m||!valid_relative(rel,0))return FS_READ_INVALID;
-    *b=NULL;*n=0;return FS_READ_UNSUPPORTED;
+    *b=NULL;*n=0;s=win_open(r,rel,&h);if(s!=FS_READ_OK)return s;
+    s=win_meta(h,m);if(s!=FS_READ_OK){CloseHandle(h);return s;}
+    if(m->kind!=FS_KIND_FILE || m->size>FS_READ_MAX){CloseHandle(h);return FS_READ_UNSUPPORTED;}
+    p=(unsigned char*)malloc((size_t)m->size+1);if(!p){CloseHandle(h);return FS_READ_IO;}
+    if(!ReadFile(h,p,(DWORD)m->size,&got,NULL) || got!=m->size ||
+       !ReadFile(h,&one,1,&extra,NULL) || extra!=0){free(p);CloseHandle(h);return FS_READ_IO;}
+    CloseHandle(h);*b=p;*n=got;scan_bytes(p,*n,m);return FS_READ_OK;
 }
-FS_READ_STATUS FsReadList(const FS_READ_ROOT *r,const char *rel,FS_READ_ENTRY **e,size_t *n)
+FS_READ_STATUS FsReadList(const FS_READ_ROOT *r,const char *rel,FS_READ_ENTRY **entries,size_t *count)
 {
-    if(!r||!e||!n||!valid_relative(rel,1))return FS_READ_INVALID;
-    *e=NULL;*n=0;return FS_READ_UNSUPPORTED;
+    HANDLE h;FS_READ_META m;FS_READ_STATUS s;
+    union { unsigned long long aligned; unsigned char bytes[65536]; } buffer;
+    FS_READ_ENTRY *list=NULL;size_t n=0,cap=0;
+    if(!r||!entries||!count)return FS_READ_INVALID;
+    *entries=NULL;*count=0;s=win_open(r,rel,&h);if(s!=FS_READ_OK)return s;
+    s=win_meta(h,&m);if(s!=FS_READ_OK||m.kind!=FS_KIND_DIR){CloseHandle(h);return s!=FS_READ_OK?s:FS_READ_UNSUPPORTED;}
+    while(1){
+        FILE_ID_BOTH_DIR_INFO *item;
+        if(!GetFileInformationByHandleEx(h,FileIdBothDirectoryInfo,buffer.bytes,sizeof(buffer.bytes))){
+            DWORD e=GetLastError();if(e!=ERROR_NO_MORE_FILES){s=win_error(e);goto done;}break;
+        }
+        item=(FILE_ID_BOTH_DIR_INFO*)buffer.bytes;
+        while(1){
+            size_t offset=(size_t)((unsigned char*)item-buffer.bytes);
+            if(offset>sizeof(buffer.bytes)-sizeof(*item) ||
+               item->FileNameLength>sizeof(buffer.bytes)-offset-
+                                      offsetof(FILE_ID_BOTH_DIR_INFO,FileName)){s=FS_READ_IO;goto done;}
+            int wn=(int)(item->FileNameLength/sizeof(wchar_t));
+            if(wn>0 && !(wn==1 && item->FileName[0]==L'.') &&
+               !(wn==2 && item->FileName[0]==L'.' && item->FileName[1]==L'.')){
+                int k;FS_READ_ENTRY *newlist;
+                if(item->FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT){s=FS_READ_DENIED;goto done;}
+                k=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,item->FileName,wn,NULL,0,NULL,NULL);
+                if(k<=0){s=FS_READ_IO;goto done;}
+                if(n==cap){size_t nc=cap?cap*2:16;
+                    newlist=(FS_READ_ENTRY*)realloc(list,nc*sizeof(*list));
+                    if(!newlist){s=FS_READ_IO;goto done;}list=newlist;cap=nc;}
+                list[n].name=(char*)malloc((size_t)k+1);if(!list[n].name){s=FS_READ_IO;goto done;}
+                if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,item->FileName,wn,
+                                        list[n].name,k,NULL,NULL)){free(list[n].name);s=FS_READ_IO;goto done;}
+                list[n].name[k]=0;
+                list[n].kind=(item->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)?FS_KIND_DIR:FS_KIND_FILE;
+                n++;
+            }
+            if(!item->NextEntryOffset)break;
+            if(item->NextEntryOffset>sizeof(buffer.bytes)-offset ||
+               item->NextEntryOffset<sizeof(*item)){s=FS_READ_IO;goto done;}
+            item=(FILE_ID_BOTH_DIR_INFO*)((unsigned char*)item+item->NextEntryOffset);
+        }
+    }
+    qsort(list,n,sizeof(*list),entry_cmp);*entries=list;*count=n;list=NULL;n=0;s=FS_READ_OK;
+done:FsReadFreeList(list,n);CloseHandle(h);return s;
 }
-
 #else
 #include <sys/stat.h>
 #include <fcntl.h>
