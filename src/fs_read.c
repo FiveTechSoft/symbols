@@ -240,6 +240,7 @@ done:FsReadFreeList(list,n);CloseHandle(h);return s;
 #include <unistd.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <sys/file.h>
 struct FS_READ_ROOT { int fd; };
 FS_READ_STATUS FsReadOpen(const char *root,FS_READ_ROOT **out)
 {
@@ -338,6 +339,25 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
     return FS_READ_UNSUPPORTED;
 }
 #else
+/* The lock is an inode under the held root, not a path reopened by name.
+   External processes that unlink or ignore it are outside cooperative isolation. */
+static FS_READ_STATUS lock_workspace(const FS_READ_ROOT *r,int *lockfd)
+{
+    int fd;struct stat held,named;
+    fd=openat(r->fd,".fstxn.lock",O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(fd<0)return error_status();
+    if(fstat(fd,&held)<0||!S_ISREG(held.st_mode)||held.st_nlink!=1||
+       (held.st_mode&077)!=0){close(fd);return FS_READ_DENIED;}
+    if(flock(fd,LOCK_EX)<0){close(fd);return FS_READ_IO;}
+    if(fstatat(r->fd,".fstxn.lock",&named,AT_SYMLINK_NOFOLLOW)<0||
+       named.st_dev!=held.st_dev||named.st_ino!=held.st_ino||
+       !S_ISREG(named.st_mode)||named.st_nlink!=1){
+        flock(fd,LOCK_UN);close(fd);return FS_READ_DENIED;
+    }
+    *lockfd=fd;return FS_READ_OK;
+}
+static void unlock_workspace(int fd)
+{ if(fd>=0){(void)flock(fd,LOCK_UN);close(fd);} }
 static int write_all(int fd,const unsigned char *bytes,size_t len)
 {
     size_t used=0;
@@ -349,15 +369,19 @@ static int write_all(int fd,const unsigned char *bytes,size_t len)
 FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
                             const void *bytes,size_t len,unsigned mode)
 {
-    char *parent=NULL,*slash,*leaf;int dir=-1,temp=-1,random_fd=-1;
+    char *parent=NULL,*slash,*leaf;int dir=-1,temp=-1,random_fd=-1,lockfd=-1;
     char temp_name[48]={0};unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;
     FS_MANIFEST plan={0};FS_OP_REQUEST request={FS_OP_CREATE,NULL,rel};
     if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
         return FS_READ_INVALID;
+    /* Keep control names unavailable to application writes. */
+    if(!strcmp(rel,".fstxn.lock")||!strncmp(rel,".fstxn/",7)||
+       !strcmp(rel,".fstxn"))return FS_READ_DENIED;
+    s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
     s=FsManifestPlan(r,&request,1,&plan);
-    if(s!=FS_READ_OK)return s;
+    if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
-    parent=(char*)malloc(strlen(rel)+1);if(!parent)return FS_READ_IO;
+    parent=(char*)malloc(strlen(rel)+1);if(!parent){s=FS_READ_IO;goto done;}
     strcpy(parent,rel);slash=strrchr(parent,'/');
     if(slash){*slash=0;leaf=slash+1;}else{*parent=0;leaf=(char*)rel;}
     s=posix_open(r,parent,&dir);if(s!=FS_READ_OK)goto done;
@@ -397,6 +421,6 @@ done:
     if(dir>=0){if(temp_name[0] && temp>=0)unlinkat(dir,temp_name,0);
         close(dir);}
     if(random_fd>=0)close(random_fd);
-    free(parent);return s;
+    free(parent);unlock_workspace(lockfd);return s;
 }
 #endif

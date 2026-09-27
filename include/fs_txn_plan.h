@@ -5,8 +5,9 @@
    not durable and NOT permission to execute. All participating writers must
    acquire one workspace lock, revalidate byte-exact expected images while
    holding it, durably journal old images and effects, then publish/rollback.
-   The existing create primitive is not yet a participant and must be brought
-   under the same lock before this protocol can claim cooperative isolation.
+   The POSIX create-new primitive now holds a workspace lock, but this planner
+   neither acquires it nor executes under it; the transaction protocol cannot
+   claim cooperative isolation until all executable operations join it.
    An outside process ignoring the lock may still change the namespace.
    No transaction lock, durable journal, recovery, or executable transition
    is implemented here. This is only a snapshot/preflight data contract. */

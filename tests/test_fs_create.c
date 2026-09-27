@@ -13,6 +13,11 @@
 #else
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/file.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <errno.h>
 #define MKDIR(p) mkdir(p,0700)
 #define RMDIR(p) rmdir(p)
 #define UNLINK(p) unlink(p)
@@ -30,7 +35,50 @@ int main(void)
     put("test_fs_create_outside.txt","outside");
     ck(FsReadOpen("test_fs_create_scratch",&root)==FS_READ_OK,"open root");
 #ifndef _WIN32
+    ck(FsCreateFile(root,".fstxn.lock","bad",3,0600)==FS_READ_DENIED,
+       "lock control name reserved");
+    ck(FsCreateFile(root,".fstxn/escape","bad",3,0600)==FS_READ_DENIED,
+       "journal control subtree reserved");
     ck(FsCreateFile(root,"inside/new.txt","new-data",8,0600)==FS_READ_OK,"create new");
+    {int fd=open("test_fs_create_scratch/.fstxn.lock",O_RDWR|O_NOFOLLOW);
+     struct stat st;ck(fd>=0&&fstat(fd,&st)==0&&S_ISREG(st.st_mode)&&
+       (st.st_mode&077)==0,"private lock exists");
+     close(fd);}
+    /* Another process holds the lock. A child creator must wait, not publish. */
+    {int fd=open("test_fs_create_scratch/.fstxn.lock",O_RDWR|O_NOFOLLOW);
+     int signal_pipe[2],status;pid_t child;char token;
+     ck(fd>=0&&pipe(signal_pipe)==0&&flock(fd,LOCK_EX)==0,"hold lock");
+     child=fork();ck(child>=0,"fork");
+     if(child==0){FS_READ_ROOT *other;int competing;close(fd);close(signal_pipe[0]);
+       competing=open("test_fs_create_scratch/.fstxn.lock",O_RDWR|O_NOFOLLOW);
+       if(competing<0||flock(competing,LOCK_EX|LOCK_NB)!=-1||
+          (errno!=EWOULDBLOCK&&errno!=EAGAIN))_exit(12);
+       close(competing);token='r';(void)write(signal_pipe[1],&token,1);
+       if(FsReadOpen("test_fs_create_scratch",&other)!=FS_READ_OK)_exit(10);
+       if(FsCreateFile(other,"inside/serialized.txt","yes",3,0600)!=FS_READ_OK)_exit(11);
+       FsReadClose(other);token='x';(void)write(signal_pipe[1],&token,1);_exit(0);
+     }
+     close(signal_pipe[1]);
+     ck(read(signal_pipe[0],&token,1)==1&&token=='r',"child observed contention");
+     ck(FsReadStat(root,"inside/serialized.txt",&m)==FS_READ_MISSING,
+        "no pre-lock publication");
+     ck(flock(fd,LOCK_UN)==0,"release lock");close(fd);
+     alarm(10);ck(read(signal_pipe[0],&token,1)==1&&token=='x',"child committed");
+     ck(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==0,
+        "serialized child successful");alarm(0);close(signal_pipe[0]);
+     ck(FsReadFile(root,"inside/serialized.txt",&b,&n,&m)==FS_READ_OK&&n==3&&
+        !memcmp(b,"yes",3),"serialized bytes");free(b);
+    }
+    {int fd=open("test_fs_create_scratch/.fstxn.lock",O_RDWR|O_NOFOLLOW);
+     ck(fd>=0,"open lock");close(fd);
+     ck(UNLINK("test_fs_create_scratch/.fstxn.lock")==0,"remove lock for attack");
+     ck(symlink("../test_fs_create_outside.txt","test_fs_create_scratch/.fstxn.lock")==0,
+        "symlink lock attack");
+     ck(FsCreateFile(root,"inside/rejected.txt","no",2,0600)!=FS_READ_OK,
+        "symlinked lock fails closed");
+     ck(FsReadStat(root,"inside/rejected.txt",&m)==FS_READ_MISSING,"no attack publish");
+     ck(UNLINK("test_fs_create_scratch/.fstxn.lock")==0,"remove attack link");
+    }
     ck(FsReadFile(root,"inside/new.txt",&b,&n,&m)==FS_READ_OK&&n==8&&
        !memcmp(b,"new-data",8),"created bytes");free(b);
     ck((m.mode&0777)==0600,"mode");
@@ -54,6 +102,8 @@ int main(void)
     ck(RMDIR("test_fs_create_scratch")==0,"remove replacement");
     ck(rename("test_fs_create_moved","test_fs_create_scratch")==0,"restore root");
     UNLINK("test_fs_create_scratch/inside/new.txt");
+    UNLINK("test_fs_create_scratch/inside/serialized.txt");
+    UNLINK("test_fs_create_scratch/.fstxn.lock");
     UNLINK("test_fs_create_scratch/inside/after.txt");
     UNLINK("test_fs_create_scratch/inside/link");
     UNLINK("test_fs_create_scratch/dirlink");
