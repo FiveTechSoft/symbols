@@ -83,6 +83,10 @@ add_library(symbolic STATIC
 
 target_include_directories(symbolic PUBLIC include)
 if(MSVC)
+    # MSVC marks portable C runtime calls such as fopen, strcpy and tmpfile
+    # as deprecated (C4996). Keep the shared C source portable rather than
+    # replacing them with MSVC-only *_s variants.
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
     target_compile_definitions(symbolic PUBLIC
         strcasecmp=_stricmp
         strncasecmp=_strnicmp
