@@ -417,7 +417,8 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
         if(!WriteFile(stage,(const unsigned char*)bytes+used,(DWORD)(len-used),&written,NULL)||!written){s=FS_READ_IO;goto end;}
         used+=written;
     }
-    if(!FlushFileBuffers(stage)||!wc_id(stage,&rec.file)||!wc_same(&rec.file,&rootid)){
+    if(!FlushFileBuffers(stage)||!wc_id(stage,&rec.file)||
+       rec.file.VolumeSerialNumber!=rootid.VolumeSerialNumber){
         s=FS_READ_IO;goto end;
     }
     if(!wc_set_name(stage,r->handle,rec.pin,WC_NT_LINK)){
