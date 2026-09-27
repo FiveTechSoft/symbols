@@ -13,6 +13,7 @@
 #include "reflect.h"
 #include "code_graph.h"
 #include "engineering_episode.h"
+#include "attempt_capture.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -4747,7 +4748,18 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
                 TaskOpsFreeWorkspace(audit_before);free(audit_before);audit_before=NULL;
             }
         }
+        ATTEMPT_CAPTURE capture={0};
+        int capturing=audit && workspace && task &&
+            getenv("SYMBOLS_ATTEMPT_CAPTURE") && *getenv("SYMBOLS_ATTEMPT_CAPTURE");
+        if(capturing && !AttemptCaptureBegin(&capture,workspace,audit_run,(unsigned)attempt))
+            fprintf(stderr,"attempt capture unavailable (solve result unchanged)\n");
         v = task_ops_attempt(workspace, task, rep);
+        if(capturing && capture.ready) {
+            const char *outcome=rep->rollback_failed?"rollback_failed":
+                rep->verified?"verified":rep->op[0]?"refuted":"abstained";
+            if(!AttemptCaptureEnd(&capture,workspace,outcome))
+                fprintf(stderr,"attempt capture unavailable (solve result unchanged)\n");
+        }
         if(audit_before) {
             audit_attempt(workspace,task,rep,attempt,audit_run,audit_before);
             TaskOpsFreeWorkspace(audit_before);free(audit_before);

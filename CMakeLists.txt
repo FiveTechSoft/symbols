@@ -81,6 +81,7 @@ add_library(symbolic STATIC
     src/fs_manifest.c
     src/fs_txn_plan.c
     src/engineering_episode.c
+    src/attempt_capture.c
     src/episodic_memory.c
 )
 
@@ -529,3 +530,8 @@ target_compile_definitions(engineering_episode_report_lib PRIVATE EPISODE_REPORT
 target_link_libraries(test_engineering_episode engineering_episode_report_lib)
 add_executable(engineering_episode_report tools/engineering_episode_report.c)
 target_link_libraries(engineering_episode_report symbolic)
+
+add_executable(test_attempt_capture tests/test_attempt_capture.c src/attempt_capture.c)
+target_compile_definitions(test_attempt_capture PRIVATE ATTEMPT_CAPTURE_TEST_CRASH=1)
+target_include_directories(test_attempt_capture PRIVATE include)
+add_test(NAME test_attempt_capture COMMAND test_attempt_capture WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

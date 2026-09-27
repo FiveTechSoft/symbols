@@ -3,6 +3,7 @@
 #endif
 #include "task_ops.h"
 #include "engineering_episode.h"
+#include "attempt_capture.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 #define MKDIR(d) mkdir(d,0700)
 #define SETENV(k,v) setenv(k,v,1)
 #endif
@@ -149,6 +151,56 @@ int main(void)
         assert(TaskOpsContinueStdout(d,"stdout-goal-missing",ask.clarification_key,"xxxx",&r));
         snprintf(audit,sizeof(audit),"%s/.symbols/engineering_episodes.v1",d);
         FILE *f=fopen(audit,"rb");assert(!f);
+    }
+    /* Opt-in per-attempt private snapshots: exact off/on behavior and a
+       two-attempt chain with a verified rollback boundary. */
+    {
+        const char *u="int max_of(const int *a, int n) { int m = a[0]; for (int i = 1; i < n; i++) if (a[i] < m) m = a[i]; return m; }\n";
+        const char *o="int bonus(int k) { return k < 3 ? 8 : 0; }\n";
+        const char *m="#include <stdio.h>\nint max_of(const int *a, int n);\nint bonus(int k);\n"
+                      "int main(void) { int a[] = {3, 9, 1, 4}; printf(\"%d\\n\", max_of(a, 4) + bonus(3)); return 0; }\n";
+        const char *t="The bug is in util.c: the program must print 9.";
+        const char *cap="/tmp/symbols-shadow-attempt-capture";
+#ifdef _WIN32
+        char temp[MAX_PATH];DWORD got=GetTempPathA(sizeof(temp),temp);
+        assert(got>0&&got<sizeof(temp));
+        static char base[512];snprintf(base,sizeof(base),"%ssymbols-shadow-attempt-capture",temp);
+        cap=base;
+#endif
+        char off[256]="build/shadow_capture_off",on[256]="build/shadow_capture_on";
+        MKDIR(off);MKDIR(on);remove_audit(on);
+        write_text(off,"util.c",u);write_text(off,"other.c",o);write_text(off,"main.c",m);
+        write_text(on,"util.c",u);write_text(on,"other.c",o);write_text(on,"main.c",m);
+        char capbuf[512];
+#ifdef _WIN32
+        snprintf(capbuf,sizeof(capbuf),"%s-%lu",cap,(unsigned long)GetCurrentProcessId());
+#else
+        snprintf(capbuf,sizeof(capbuf),"%s-%lu",cap,(unsigned long)getpid());
+#endif
+        cap=capbuf;
+        assert(MKDIR(cap)==0);SETENV("SYMBOLS_ATTEMPT_CAPTURE",cap);
+        TASK_OPS_REPORT x,y;
+        SETENV("SYMBOLS_ENGINEERING_EPISODES","0");int a=TaskOpsSolve(off,t,&x);
+        SETENV("SYMBOLS_ENGINEERING_EPISODES","1");int b=TaskOpsSolve(on,t,&y);
+        assert(a==b&&a==1&&x.attempts==2&&!memcmp(&x,&y,sizeof(x)));
+        char fa[4096],fb[4096];
+        for(int i=0;i<3;i++){
+            const char *n=i==0?"util.c":i==1?"other.c":"main.c";
+            read_text(off,n,fa,sizeof(fa));read_text(on,n,fb,sizeof(fb));assert(!strcmp(fa,fb));
+        }
+        /* The private capture root contains one freshly minted run. */
+#ifdef _WIN32
+        WIN32_FIND_DATAA fd;char pattern[512];snprintf(pattern,sizeof(pattern),"%s/*",cap);
+        HANDLE h=FindFirstFileA(pattern,&fd);assert(h!=INVALID_HANDLE_VALUE);
+        do {if(strcmp(fd.cFileName,".")&&strcmp(fd.cFileName,".."))break;}
+        while(FindNextFileA(h,&fd));assert(strcmp(fd.cFileName,".")&&strcmp(fd.cFileName,".."));
+        assert(AttemptCaptureValidate(cap,fd.cFileName,2));FindClose(h);
+#else
+        DIR *d=opendir(cap);assert(d);struct dirent *e;
+        do {e=readdir(d);assert(e);}while(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."));
+        assert(AttemptCaptureValidate(cap,e->d_name,2));closedir(d);
+#endif
+        SETENV("SYMBOLS_ATTEMPT_CAPTURE","");
     }
     SETENV("SYMBOLS_ENGINEERING_EPISODES","0");
     puts("shadow behavior and provenance checks passed");return 0;
