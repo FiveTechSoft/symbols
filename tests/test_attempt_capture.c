@@ -42,8 +42,8 @@ int main(int argc,char **argv)
  const char *root="/tmp/symbols-attempt-capture-test";
  char path[1200],ws[1024],cap[1024],runpath[1200],ownroot[1024];
 #ifdef _WIN32
- char temp[MAX_PATH];DWORD got=GetTempPathA(sizeof(temp),temp);
- assert(got>0&&got<sizeof(temp));
+ char temp[MAX_PATH];DWORD temp_len=GetTempPathA(sizeof(temp),temp);
+ assert(temp_len>0&&temp_len<sizeof(temp));
  static char base[1024];snprintf(base,sizeof(base),"%ssymbols-attempt-capture-test",temp);
  root=base;
 #endif
