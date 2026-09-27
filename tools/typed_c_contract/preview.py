@@ -17,10 +17,11 @@ MAX_FILE=256*1024
 MAX_TOTAL=4*1024*1024
 
 
-def link_count(path, observed=None):
-    """Get the real hard-link count; Windows Python st_nlink can be zero."""
+def file_identity(path, observed=None):
+    """Return link count and stable metadata; Windows DirEntry.stat is incomplete."""
     if os.name != 'nt':
-        return observed.st_nlink if observed is not None else path.stat().st_nlink
+        st=observed if observed is not None else path.stat(follow_symlinks=False)
+        return st.st_nlink,st
     from ctypes import wintypes
     class FILETIME(ctypes.Structure):
         _fields_=[('low',wintypes.DWORD),('high',wintypes.DWORD)]
@@ -43,7 +44,9 @@ def link_count(path, observed=None):
         if not k.GetFileInformationByHandle(handle,ctypes.byref(info)):
             fail('file_identity')
         if info.attributes & 0x400: fail('symlink')
-        return info.links
+        identity=(info.volume,info.index_high,info.index_low,
+                  info.high,info.low,info.written.high,info.written.low)
+        return info.links,identity
     finally:
         k.CloseHandle(handle)
 
@@ -71,9 +74,13 @@ def snapshot(root):
             st=entry.stat(follow_symlinks=False)
             if stat.S_ISDIR(st.st_mode): walk(Path(entry.path), rel, depth+1)
             elif stat.S_ISREG(st.st_mode):
-                if link_count(Path(entry.path),st)!=1 or st.st_size>MAX_FILE or len(files)>=MAX_FILES: fail('file_limit')
-                data=Path(entry.path).read_bytes()
-                if Path(entry.path).stat(follow_symlinks=False)!=st: fail('binary_or_race')
+                path=Path(entry.path)
+                links,identity=file_identity(path,st)
+                if links!=1 or st.st_size>MAX_FILE or len(files)>=MAX_FILES: fail('file_limit')
+                data=path.read_bytes()
+                after_links,after_identity=file_identity(path)
+                if after_links!=1: fail('file_limit')
+                if after_identity!=identity: fail('binary_or_race')
                 if len(data)!=st.st_size or b'\x00' in data: fail('binary_or_race')
                 total+=len(data)
                 if total>MAX_TOTAL: fail('total_limit')
@@ -160,7 +167,7 @@ def static_candidates(files, contract, expected):
 def validate(contract_file, root):
     contract_file=Path(contract_file);root=Path(root)
     if contract_file.is_symlink() or not contract_file.is_file(): fail('contract_file')
-    if link_count(contract_file,contract_file.stat()) != 1: fail('contract_link')
+    if file_identity(contract_file,contract_file.stat())[0] != 1: fail('contract_link')
     if contract_file.stat().st_size>8192: fail('contract_limit')
     if root.resolve()==contract_file.resolve() or root.resolve() in contract_file.resolve().parents: fail('contract_in_workspace')
     raw=contract_file.read_bytes();obj,expected,identity=parse(raw)
