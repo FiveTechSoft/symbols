@@ -9,9 +9,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'typed_c_contract'))
-from preview import snapshot,validate,sha
+from preview import snapshot,validate,sha,installed_generator
 
-GENERATOR=Path(__file__).resolve().parents[1]/'build'/'c_contract_static'
 
 class PreviewTests(unittest.TestCase):
     def setUp(self):
@@ -28,8 +27,17 @@ class PreviewTests(unittest.TestCase):
     def run_preview(self):
         self.contract.write_text(json.dumps(self.obj))
         return validate(self.contract,self.work)
+    def test_generator_is_release_fixed(self):
+        generator=installed_generator()
+        relative=generator.relative_to(Path(__file__).resolve().parents[1]).as_posix()
+        expected={'build/c_contract_static'} if os.name!='nt' else {
+            'build/c_contract_static.exe','build/Release/c_contract_static.exe',
+            'build/Debug/c_contract_static.exe','build-asan/Debug/c_contract_static.exe'}
+        self.assertIn(relative,expected)
+        self.assertFalse(generator.is_symlink())
     def test_genuine_candidates_and_no_execution(self):
-        self.assertTrue(GENERATOR.is_file(),f'build c_contract_static first: {GENERATOR}')
+        generator=installed_generator()
+        self.assertTrue(generator.is_file(),f'build c_contract_static first: {generator}')
         marker=self.root/'executed'
         self.source.write_text(self.initial.decode()+f'/* If executed, write {marker} */\n')
         self.obj['workspace_digest']=snapshot(self.work)[1]

@@ -110,11 +110,25 @@ def source_checks(files, contract, original=None):
             if original[path][a:a+b]!=region: fail('span_changed')
     return True
 
+def installed_generator():
+    """Only release-fixed build locations, never caller-supplied paths."""
+    base=Path(__file__).resolve().parents[2]
+    names=(('build/c_contract_static',) if os.name!='nt' else
+           ('build/c_contract_static.exe','build/Release/c_contract_static.exe',
+            'build/Debug/c_contract_static.exe',
+            'build-asan/Debug/c_contract_static.exe'))
+    for name in names:
+        candidate=base/name
+        if candidate.is_symlink() or any(p.is_symlink() for p in candidate.parents if p!=base and base in p.parents):
+            fail('generator_unavailable')
+        if candidate.is_file():
+            if candidate.resolve()!=candidate: fail('generator_unavailable')
+            return candidate
+    fail('generator_unavailable')
+
 def static_candidates(files, contract, expected):
     if not any(p.endswith('.c') for p in files): fail('no_c_source')
-    generator=Path(__file__).resolve().parents[2]/'build'/'c_contract_static'
-    if not generator.is_file() or generator.is_symlink(): fail('generator_unavailable')
-    if generator.parent.is_symlink() or generator.resolve()!=generator: fail('generator_unavailable')
+    generator=installed_generator()
     # The legacy generator's answer-literal guard is C-string based. An
     # unrepresentable answer refuses; never disable this guard for coverage.
     if b'\x00' in expected or any(ch>127 for ch in expected):
