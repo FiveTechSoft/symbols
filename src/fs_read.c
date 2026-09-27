@@ -338,6 +338,8 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
     /* No path-by-name fallback: handle-relative Windows publish is pending. */
     return FS_READ_UNSUPPORTED;
 }
+FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
+{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else
 /* The lock is an inode under the held root, not a path reopened by name.
    External processes that unlink or ignore it are outside cooperative isolation. */
@@ -358,6 +360,119 @@ static FS_READ_STATUS lock_workspace(const FS_READ_ROOT *r,int *lockfd)
 }
 static void unlock_workspace(int fd)
 { if(fd>=0){(void)flock(fd,LOCK_UN);close(fd);} }
+#define FS_INTENT_NAME ".fstxn.intent"
+#define FS_INTENT_MAGIC 0x46535458u
+#define FS_INTENT_MAX_PATH 1024
+/* Fixed-size versioned record, checked in full before any cleanup. Same-host
+   crash replay only, not an interchange format or protection from hostile writes. */
+typedef struct {
+    uint32_t magic,version;
+    uint64_t dev,ino;
+    char target[FS_INTENT_MAX_PATH];
+    char stage[48];
+} FS_CREATE_INTENT;
+static void crash_point(int step)
+{
+#ifdef FS_CREATE_TEST_CRASH
+    const char *v=getenv("FS_CREATE_TEST_CRASH");
+    if(v && atoi(v)==step)_exit(90+step);
+#else
+    (void)step;
+#endif
+}
+static int intent_valid(const FS_CREATE_INTENT *i)
+{
+    return i->magic==FS_INTENT_MAGIC && i->version==1 &&
+        memchr(i->target,0,sizeof(i->target)) &&
+        memchr(i->stage,0,sizeof(i->stage)) &&
+        valid_relative(i->target,0) &&
+        strncmp(i->stage,".fst-",5)==0 && strlen(i->stage)==37 &&
+        strspn(i->stage+5,"0123456789abcdef")==32 &&
+        strcmp(i->target,".fstxn.lock") &&
+        strcmp(i->target,FS_INTENT_NAME) &&
+        strcmp(i->target,".fstxn") &&
+        strncmp(i->target,".fstxn/",7) &&
+        strncmp(i->target,".fst-",5) &&
+        strncmp(i->target,".fstxn-",7);
+}
+static FS_READ_STATUS pending_intent(const FS_READ_ROOT *r,int *present)
+{
+    struct stat st;
+    if(fstatat(r->fd,FS_INTENT_NAME,&st,AT_SYMLINK_NOFOLLOW)==0){
+        *present=1;return FS_READ_OK;
+    }
+    if(errno==ENOENT){*present=0;return FS_READ_OK;}
+    return error_status();
+}
+static int durable_remove(int dir,const char *name)
+{
+    return unlinkat(dir,name,0)==0 && fsync(dir)==0;
+}
+/* Caller holds the workspace lock. Validate every name and inode before
+   unlinking either record or stage. A foreign target is never removed. */
+static FS_READ_STATUS recover_locked(const FS_READ_ROOT *r)
+{
+    FS_CREATE_INTENT i;struct stat st,target,stage;int fd=-1,dir=-1;
+    char parent[FS_INTENT_MAX_PATH],*slash,*leaf;int present=0;
+    FS_READ_STATUS s=pending_intent(r,&present);
+    if(s!=FS_READ_OK||!present)return s;
+    fd=openat(r->fd,FS_INTENT_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+    if(fd<0)return FS_READ_DENIED;
+    if(fstat(fd,&st)<0||!S_ISREG(st.st_mode)||(st.st_nlink<1||st.st_nlink>2)||
+       (st.st_mode&077)!=0||st.st_size!=(off_t)sizeof(i)||read(fd,&i,sizeof(i))!=(ssize_t)sizeof(i)||
+       !intent_valid(&i)){close(fd);return FS_READ_DENIED;}
+    close(fd);
+    {char record_tmp[48];struct stat temp_record;
+     snprintf(record_tmp,sizeof(record_tmp),".fstxn-%.32s",i.stage+5);
+     if(fstatat(r->fd,record_tmp,&temp_record,AT_SYMLINK_NOFOLLOW)==0){
+         if(!S_ISREG(temp_record.st_mode)||temp_record.st_ino!=st.st_ino||
+            temp_record.st_dev!=st.st_dev||st.st_nlink!=2)return FS_READ_DENIED;
+     }else if(errno!=ENOENT||st.st_nlink!=1)return FS_READ_DENIED;
+    }
+    /* Avoid any write until both the stage and target identities are checked. */
+    if(fstatat(r->fd,i.stage,&stage,AT_SYMLINK_NOFOLLOW)<0){
+        if(errno!=ENOENT)return FS_READ_DENIED;
+        memset(&stage,0,sizeof(stage));
+    }else if(!S_ISREG(stage.st_mode)||stage.st_dev!=(dev_t)i.dev||
+             stage.st_ino!=(ino_t)i.ino||stage.st_nlink>2)return FS_READ_DENIED;
+    strcpy(parent,i.target);slash=strrchr(parent,'/');
+    if(slash){*slash=0;leaf=slash+1;}else{*parent=0;leaf=i.target;}
+    s=posix_open(r,parent,&dir);if(s!=FS_READ_OK)return s;
+    if(fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)==0){
+        if(!stage.st_ino||!S_ISREG(target.st_mode)||
+           target.st_dev!=(dev_t)i.dev||target.st_ino!=(ino_t)i.ino){
+            s=FS_READ_DENIED;goto done;
+        }
+        if(fsync(dir)<0){s=FS_READ_IO;goto done;}
+    }else if(errno!=ENOENT){s=FS_READ_DENIED;goto done;}
+    else if(!stage.st_ino){s=FS_READ_DENIED;goto done;}
+    {char record_tmp[48];struct stat tmp;
+     snprintf(record_tmp,sizeof(record_tmp),".fstxn-%.32s",i.stage+5);
+     if(fstatat(r->fd,record_tmp,&tmp,AT_SYMLINK_NOFOLLOW)==0){
+         if(!durable_remove(r->fd,record_tmp)){s=FS_READ_IO;goto done;}
+     }else if(errno!=ENOENT){s=FS_READ_DENIED;goto done;}
+    }
+    /* Recheck the published target before removing the last recovery marker.
+       Cooperative writers cannot change it while the lock is held. */
+    if(fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)==0){
+        if(!S_ISREG(target.st_mode)||target.st_dev!=(dev_t)i.dev||
+           target.st_ino!=(ino_t)i.ino){s=FS_READ_DENIED;goto done;}
+    }else if(errno!=ENOENT||!stage.st_ino){s=FS_READ_DENIED;goto done;}
+    if(!durable_remove(r->fd,FS_INTENT_NAME)){s=FS_READ_IO;goto done;}
+    /* The last marker is gone. Removing a stage before it would leave a
+       target-absent replay with neither target nor stage, indistinguishable
+       from interference. A crash here may leave an orphan stage instead. */
+    if(stage.st_ino && !durable_remove(r->fd,i.stage)){s=FS_READ_IO;goto done;}
+    s=FS_READ_OK;
+done:close(dir);return s;
+}
+FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
+{
+    int lockfd=-1;FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;
+    s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
+    s=recover_locked(r);unlock_workspace(lockfd);return s;
+}
 static int write_all(int fd,const unsigned char *bytes,size_t len)
 {
     size_t used=0;
@@ -369,58 +484,78 @@ static int write_all(int fd,const unsigned char *bytes,size_t len)
 FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
                             const void *bytes,size_t len,unsigned mode)
 {
-    char *parent=NULL,*slash,*leaf;int dir=-1,temp=-1,random_fd=-1,lockfd=-1;
-    char temp_name[48]={0};unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;
+    char parent[FS_INTENT_MAX_PATH],*slash,*leaf,temp_name[48]={0};
+    char intent_tmp[48]={0};int dir=-1,temp=-1,record=-1,random_fd=-1,lockfd=-1,record_owned=0;
+    unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;int published=0,pending=0;
+    struct stat st;FS_CREATE_INTENT intent={0};
     FS_MANIFEST plan={0};FS_OP_REQUEST request={FS_OP_CREATE,NULL,rel};
-    if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
-        return FS_READ_INVALID;
-    /* Keep control names unavailable to application writes. */
-    if(!strcmp(rel,".fstxn.lock")||!strncmp(rel,".fstxn/",7)||
-       !strcmp(rel,".fstxn"))return FS_READ_DENIED;
+    if(!r||!valid_relative(rel,0)||strlen(rel)>=sizeof(parent)||
+       (!bytes&&len)||len>FS_READ_MAX||mode>0777)return FS_READ_INVALID;
+    if(!strcmp(rel,".fstxn.lock")||!strcmp(rel,FS_INTENT_NAME)||
+       !strncmp(rel,".fstxn/",7)||!strcmp(rel,".fstxn")||
+       !strncmp(rel,".fst-",5)||!strncmp(rel,".fstxn-",7))return FS_READ_DENIED;
     s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
-    s=FsManifestPlan(r,&request,1,&plan);
-    if(s!=FS_READ_OK)goto done;
+    s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
+    if(pending){s=FS_READ_DENIED;goto done;}
+    s=FsManifestPlan(r,&request,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
-    parent=(char*)malloc(strlen(rel)+1);if(!parent){s=FS_READ_IO;goto done;}
     strcpy(parent,rel);slash=strrchr(parent,'/');
     if(slash){*slash=0;leaf=slash+1;}else{*parent=0;leaf=(char*)rel;}
     s=posix_open(r,parent,&dir);if(s!=FS_READ_OK)goto done;
-    {FS_READ_META meta;s=posix_meta(dir,&meta);
-     if(s!=FS_READ_OK||meta.kind!=FS_KIND_DIR){s=FS_READ_UNSUPPORTED;goto done;}}
-    /* A kernel-generated nonce prevents predictable temporary siblings. */
+    {FS_READ_META m;s=posix_meta(dir,&m);
+     if(s!=FS_READ_OK||m.kind!=FS_KIND_DIR){s=FS_READ_UNSUPPORTED;goto done;}}
     random_fd=open("/dev/urandom",O_RDONLY|O_CLOEXEC);
     if(random_fd<0||read(random_fd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
         s=FS_READ_IO;goto done;
     }
     close(random_fd);random_fd=-1;
     memcpy(temp_name,".fst-",5);
-    for(size_t i=0;i<sizeof(nonce);i++)sprintf(temp_name+5+i*2,"%02x",nonce[i]);
+    for(size_t k=0;k<sizeof(nonce);k++)sprintf(temp_name+5+k*2,"%02x",nonce[k]);
     temp_name[37]=0;
-    temp=openat(dir,temp_name,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    temp=openat(r->fd,temp_name,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(temp<0){s=error_status();goto done;}
-    if(!write_all(temp,(const unsigned char*)bytes,len) ||
-       fchmod(temp,(mode_t)mode)<0 || fsync(temp)<0){
-        s=FS_READ_IO;goto done;
+    if(!write_all(temp,(const unsigned char*)bytes,len)||
+       fchmod(temp,(mode_t)mode)<0||fsync(temp)<0||fstat(temp,&st)<0||
+       fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    crash_point(1); /* durable stage, no intent */
+    intent.magic=FS_INTENT_MAGIC;intent.version=1;
+    intent.dev=(uint64_t)st.st_dev;intent.ino=(uint64_t)st.st_ino;
+    strcpy(intent.target,rel);strcpy(intent.stage,temp_name);
+    /* Distinct temporary record; the pending name is published only after
+       the complete record has been synced. */
+    snprintf(intent_tmp,sizeof(intent_tmp),".fstxn-%.32s",temp_name+5);
+    record=openat(r->fd,intent_tmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(record<0){s=error_status();goto done;}
+    record_owned=1;
+    if(!write_all(record,(const unsigned char*)&intent,sizeof(intent))||
+       fsync(record)<0){s=FS_READ_IO;goto done;}
+    close(record);record=-1;
+    if(linkat(r->fd,intent_tmp,r->fd,FS_INTENT_NAME,0)<0){
+        s=error_status();goto done;
     }
-    /* No-replace publish: linkat refuses an existing target atomically. */
-    {FS_READ_META current;FS_READ_STATUS check=FsReadStat(r,rel,&current);
-     if(check!=FS_READ_MISSING){s=check==FS_READ_OK?FS_READ_DENIED:check;goto done;}}
-    if(linkat(dir,temp_name,dir,leaf,0)<0){
+    pending=1;
+    if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    crash_point(2); /* durable intent, no target */
+    if(linkat(r->fd,temp_name,dir,leaf,0)<0){
         s=(errno==EEXIST)?FS_READ_DENIED:error_status();goto done;
     }
-    /* Publish has completed. Remove the temporary sibling. */
-    if(unlinkat(dir,temp_name,0)==0)temp_name[0]=0;
-    /* A cleanup failure leaves an extra hard link, but the requested name
-       is already published. Return success rather than invite duplicate work. */
-    /* The file was published; directory fsync only strengthens durability.
-       Do not report failure after a visible publish and invite an unsafe retry. */
-    (void)fsync(dir);
+    published=1;
+    crash_point(3); /* target visible but parent not synced */
+    if(fsync(dir)<0){s=FS_READ_IO;goto done;}
+    crash_point(4); /* durable target, pending intent */
+    /* Target is visible. Cleanup failure is not a failed create: future
+       creates refuse the pending intent until explicit recovery. */
+    (void)recover_locked(r);
     s=FS_READ_OK;
 done:
+    if(record>=0)close(record);
+    if(record_owned){(void)unlinkat(r->fd,intent_tmp,0);(void)fsync(r->fd);}
     if(temp>=0)close(temp);
-    if(dir>=0){if(temp_name[0] && temp>=0)unlinkat(dir,temp_name,0);
-        close(dir);}
+    if(!pending&&temp_name[0]){(void)unlinkat(r->fd,temp_name,0);(void)fsync(r->fd);}
+    if(dir>=0)close(dir);
     if(random_fd>=0)close(random_fd);
-    free(parent);unlock_workspace(lockfd);return s;
+    unlock_workspace(lockfd);
+    /* A successful link must never be reported as failure and invite retry. */
+    return published?FS_READ_OK:s;
 }
 #endif
