@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only typed contract validator and bounded C candidate preview."""
 import argparse
+import ctypes
 import difflib
 import hashlib
 import os
@@ -14,6 +15,37 @@ from schema import parse
 MAX_FILES=64
 MAX_FILE=256*1024
 MAX_TOTAL=4*1024*1024
+
+
+def link_count(path, observed=None):
+    """Get the real hard-link count; Windows Python st_nlink can be zero."""
+    if os.name != 'nt':
+        return observed.st_nlink if observed is not None else path.stat().st_nlink
+    from ctypes import wintypes
+    class FILETIME(ctypes.Structure):
+        _fields_=[('low',wintypes.DWORD),('high',wintypes.DWORD)]
+    class BY_HANDLE_FILE_INFORMATION(ctypes.Structure):
+        _fields_=[('attributes',wintypes.DWORD),('created',FILETIME),
+                  ('accessed',FILETIME),('written',FILETIME),('volume',wintypes.DWORD),
+                  ('high',wintypes.DWORD),('low',wintypes.DWORD),('links',wintypes.DWORD),
+                  ('index_high',wintypes.DWORD),('index_low',wintypes.DWORD)]
+    k=ctypes.WinDLL('kernel32',use_last_error=True)
+    k.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,
+                            wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
+    k.CreateFileW.restype=wintypes.HANDLE
+    k.GetFileInformationByHandle.argtypes=[wintypes.HANDLE,ctypes.POINTER(BY_HANDLE_FILE_INFORMATION)]
+    k.GetFileInformationByHandle.restype=wintypes.BOOL
+    k.CloseHandle.argtypes=[wintypes.HANDLE];k.CloseHandle.restype=wintypes.BOOL
+    handle=k.CreateFileW(str(path),0x80,0x1|0x2|0x4,None,3,0x200000,None)
+    if handle in (None,wintypes.HANDLE(-1).value): fail('file_identity')
+    try:
+        info=BY_HANDLE_FILE_INFORMATION()
+        if not k.GetFileInformationByHandle(handle,ctypes.byref(info)):
+            fail('file_identity')
+        if info.attributes & 0x400: fail('symlink')
+        return info.links
+    finally:
+        k.CloseHandle(handle)
 
 def sha(data): return hashlib.sha256(data).hexdigest()
 def fail(reason): raise ValueError(reason)
@@ -39,7 +71,7 @@ def snapshot(root):
             st=entry.stat(follow_symlinks=False)
             if stat.S_ISDIR(st.st_mode): walk(Path(entry.path), rel, depth+1)
             elif stat.S_ISREG(st.st_mode):
-                if st.st_nlink!=1 or st.st_size>MAX_FILE or len(files)>=MAX_FILES: fail('file_limit')
+                if link_count(Path(entry.path),st)!=1 or st.st_size>MAX_FILE or len(files)>=MAX_FILES: fail('file_limit')
                 data=Path(entry.path).read_bytes()
                 if Path(entry.path).stat(follow_symlinks=False)!=st: fail('binary_or_race')
                 if len(data)!=st.st_size or b'\x00' in data: fail('binary_or_race')
@@ -128,7 +160,7 @@ def static_candidates(files, contract, expected):
 def validate(contract_file, root):
     contract_file=Path(contract_file);root=Path(root)
     if contract_file.is_symlink() or not contract_file.is_file(): fail('contract_file')
-    if contract_file.stat().st_nlink != 1: fail('contract_link')
+    if link_count(contract_file,contract_file.stat()) != 1: fail('contract_link')
     if contract_file.stat().st_size>8192: fail('contract_limit')
     if root.resolve()==contract_file.resolve() or root.resolve() in contract_file.resolve().parents: fail('contract_in_workspace')
     raw=contract_file.read_bytes();obj,expected,identity=parse(raw)
@@ -157,7 +189,7 @@ def main():
         if reason not in {'limit','utf8_bom','duplicate_key','fields','version','digest','stdout',
             'base64','exit','probe','scope','predicates','path','span','predicate',
             'contract_file','contract_link','contract_limit','contract_in_workspace',
-            'workspace_root','depth','audit_dir','git_dir','path_limit','path_encoding',
+            'workspace_root','file_identity','depth','audit_dir','git_dir','path_limit','path_encoding',
             'symlink','file_limit','binary_or_race','total_limit','unsupported_entry',
             'allow_path','deny_path','predicate_path','span_range','predicate_mismatch',
             'span_changed','no_c_source','generator_unavailable','generator_source_limit',

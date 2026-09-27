@@ -1,6 +1,7 @@
 """Static preview fixtures: no target build, run or workspace mutation."""
 import base64
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -83,6 +84,25 @@ class PreviewTests(unittest.TestCase):
         r=self.run_preview()
         self.assertEqual((r['status'],r['candidate_count']),('no_static_candidate',0))
         self.assertEqual(self.source.read_bytes(),original)
+    def test_hardlink_refused_on_both_platforms(self):
+        linked=self.root/'hardlink.c'
+        try:os.link(self.source,linked)
+        except OSError as exc:self.skipTest(f'hard links unavailable: {exc}')
+        with self.assertRaisesRegex(ValueError,'file_limit'):
+            self.run_preview()
+        linked.unlink()
+        linked_inside=self.work/'second.c'
+        try:os.link(self.source,linked_inside)
+        except OSError as exc:self.skipTest(f'workspace hard links unavailable: {exc}')
+        with self.assertRaisesRegex(ValueError,'file_limit'):
+            self.run_preview()
+    def test_contract_hardlink_refused_on_both_platforms(self):
+        self.contract.write_text(json.dumps(self.obj))
+        linked=self.root/'contract_link.json'
+        try:os.link(self.contract,linked)
+        except OSError as exc:self.skipTest(f'hard links unavailable: {exc}')
+        with self.assertRaisesRegex(ValueError,'contract_link'):
+            validate(self.contract,self.work)
     def test_binary_goal_refuses_candidate_without_downgrade(self):
         self.obj['stdout']={'bytes_b64':base64.b64encode(b'A\x00B').decode(),
                             'length':3,'termination':'exact'}
