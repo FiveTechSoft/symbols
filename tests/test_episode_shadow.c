@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
+#include <windows.h>
 #include <direct.h>
 #include <io.h>
 #define MKDIR _mkdir
