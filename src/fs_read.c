@@ -341,6 +341,10 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
 }
 FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
+                          const void *expected,size_t len)
+{ (void)src;(void)dst;(void)expected;(void)len;
+  return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size_t n)
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
@@ -498,11 +502,11 @@ static int write_all(int fd,const unsigned char *bytes,size_t len)
         used+=(size_t)n;}
     return 1;
 }
-FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
+static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
                             const void *bytes,size_t len,unsigned mode)
 {
     char parent[FS_INTENT_MAX_PATH],*slash,*leaf,temp_name[48]={0};
-    char intent_tmp[48]={0};int dir=-1,temp=-1,record=-1,random_fd=-1,lockfd=-1,record_owned=0;
+    char intent_tmp[48]={0};int dir=-1,temp=-1,record=-1,random_fd=-1,record_owned=0;
     unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;int published=0,pending=0;
     struct stat st;FS_CREATE_INTENT intent={0};
     FS_MANIFEST plan={0};FS_OP_REQUEST request={FS_OP_CREATE,NULL,rel};
@@ -512,7 +516,6 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
        !strcmp(rel,FS_BATCH_NAME)||!strcmp(rel,FS_BATCH_COMMIT)||
        !strncmp(rel,".fstxn/",7)||!strcmp(rel,".fstxn")||
        !strncmp(rel,".fst-",5)||!strncmp(rel,".fstxn-",7))return FS_READ_DENIED;
-    s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
     s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
     if(pending){s=FS_READ_DENIED;goto done;}
     {int batch=0,commit=0;
@@ -576,7 +579,6 @@ done:
     if(!pending&&temp_name[0]){(void)unlinkat(r->fd,temp_name,0);(void)fsync(r->fd);}
     if(dir>=0)close(dir);
     if(random_fd>=0)close(random_fd);
-    unlock_workspace(lockfd);
     /* A successful link must never be reported as failure and invite retry. */
     return published?FS_READ_OK:s;
 }
@@ -807,5 +809,38 @@ done:
     /* If any name became visible, report an interrupted transaction as IO,
        never invite blind retry. Caller must recover explicitly. */
     return committed_here?FS_READ_OK:(visible?FS_READ_IO:s);
+}
+FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
+                            const void *bytes,size_t len,unsigned mode)
+{
+    int lock=-1;FS_READ_STATUS s;
+    if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
+        return FS_READ_INVALID;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=create_locked(r,rel,bytes,len,mode);
+    unlock_workspace(lock);return s;
+}
+FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
+                          const void *expected,size_t expected_len)
+{
+    FS_OP_REQUEST request={FS_OP_COPY,src,dst};FS_MANIFEST plan={0};
+    FS_READ_META meta;unsigned char *bytes=NULL;size_t len=0;
+    FS_READ_STATUS s;int lock=-1;
+    if(!r||!src||!dst||!expected||expected_len>FS_READ_MAX||
+       !valid_relative(src,0)||!valid_relative(dst,0))return FS_READ_INVALID;
+    if(!strcmp(dst,".fstxn.lock")||!strcmp(dst,FS_INTENT_NAME)||
+       !strcmp(dst,FS_BATCH_NAME)||!strcmp(dst,FS_BATCH_COMMIT)||
+       !strncmp(dst,".fstxn/",7)||!strcmp(dst,".fstxn")||
+       !strncmp(dst,".fst-",5)||!strncmp(dst,".fstxn-",7))return FS_READ_DENIED;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=FsManifestPlan(r,&request,1,&plan);if(s!=FS_READ_OK)goto done;
+    FsManifestFree(&plan);
+    s=FsReadFile(r,src,&bytes,&len,&meta);if(s!=FS_READ_OK)goto done;
+    if(len!=expected_len||(len&&memcmp(bytes,expected,len))){
+        s=FS_READ_DENIED;goto done;
+    }
+    s=create_locked(r,dst,bytes,len,meta.mode);
+done:
+    free(bytes);FsManifestFree(&plan);unlock_workspace(lock);return s;
 }
 #endif

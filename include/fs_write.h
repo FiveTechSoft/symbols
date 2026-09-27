@@ -15,6 +15,11 @@
    automatic replay. Crash-point tests model process termination; actual
    power-loss persistence remains filesystem-dependent. */
 FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *root);
+/* Copy a byte-exact expected source to a new destination, no replace. The
+   expected pointer is mandatory even for zero bytes. POSIX only; participates
+   in the workspace lock and create intent recovery. */
+FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *root,const char *source,
+                          const char *target,const void *expected,size_t expected_len);
 FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *root,const char *relative,
                             const void *bytes,size_t len,unsigned mode);
 #endif
