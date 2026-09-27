@@ -6,7 +6,10 @@
    restores the original inode; after commit it retains removal. A marker-only
    state fails closed for manual inspection. This is not atomic visibility to
    outside readers and power-loss behavior depends on filesystem durability.
-   Windows writes are unsupported. */
+   A non-cooperating external writer can replace a checked name before the
+   following unlink; the workspace lock does not protect against that writer.
+   The hard identity guarantee covers participating writers only. Windows
+   writes are unsupported. */
 FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *root,const char *path,
                             const void *expected,size_t expected_len);
 FS_READ_STATUS FsRemoveRecover(const FS_READ_ROOT *root);

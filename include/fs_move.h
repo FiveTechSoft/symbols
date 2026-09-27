@@ -6,7 +6,10 @@
    Recovery rolls back before commit or retains the target after commit;
    foreign names and marker-only state fail closed. Cooperative process-crash
    safety, not atomic two-name visibility or a universal power-loss guarantee.
-   Windows writes remain unsupported. */
+   A non-cooperating external writer can replace a checked name before the
+   following unlink; the workspace lock does not protect against that writer.
+   The hard identity guarantee covers participating writers only. Windows
+   writes remain unsupported. */
 FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *root,const char *source,
                           const char *target,const void *expected,size_t expected_len);
 FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *root);
