@@ -5,6 +5,11 @@
 #define WC_INTENT L".fstxn.intent"
 #define WC_COMMIT L".fstxn.ccommit"
 #define WC_LOCK L".fstxn.lock"
+#define WO_REMOVE L".fstxn.remove"
+#define WO_RCOMMIT L".fstxn.rcommit"
+#define WO_MOVE L".fstxn.move"
+#define WO_MCOMMIT L".fstxn.mcommit"
+#define WO_MAGIC 0x574F5031u
 #define WC_MAGIC 0x57435231u
 #define WC_MAX_PATH 4096
 #define WC_SHARE (FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE)
@@ -34,6 +39,12 @@ typedef struct {
 #else
 #define WC_TRACE(...) ((void)0)
 #endif
+typedef struct {
+    unsigned magic,version,checksum,kind;
+    FILE_ID_INFO root,source_parent,target_parent,file;
+    unsigned long long size,digest;
+    WCHAR source[WC_MAX_PATH],target[WC_MAX_PATH],pin[48];
+} WO_RECORD;
 static int wc_terminated(const WCHAR *s,size_t cap)
 {for(size_t i=0;i<cap;i++)if(!s[i])return 1;return 0;}
 static int wc_random_name(const WCHAR *s,const WCHAR *prefix)
@@ -85,6 +96,14 @@ static unsigned long long wc_hash(const unsigned char *p,size_t n)
     unsigned long long h=14695981039346656037ULL;
     for(size_t i=0;i<n;i++)h=(h^p[i])*1099511628211ULL;
     return h;
+}
+static unsigned wo_checksum(const WO_RECORD *r)
+{
+    const unsigned char *p=(const unsigned char*)r;unsigned h=2166136261u;
+    for(size_t i=0;i<sizeof(*r);i++){
+        if(i>=offsetof(WO_RECORD,checksum)&&i<offsetof(WO_RECORD,checksum)+sizeof(r->checksum))continue;
+        h=(h^p[i])*16777619u;
+    }return h;
 }
 static int wc_same(const FILE_ID_INFO *a,const FILE_ID_INFO *b)
 {return a->VolumeSerialNumber==b->VolumeSerialNumber&&memcmp(&a->FileId,&b->FileId,sizeof(a->FileId))==0;}
@@ -240,6 +259,37 @@ static FS_READ_STATUS wc_record_read(HANDLE root,const WCHAR *name,WC_RECORD *r,
     else s=FS_READ_OK;
     CloseHandle(h);return s;
 }
+static FS_READ_STATUS wo_publish(HANDLE root,const WCHAR *final,const WO_RECORD *r)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;WCHAR tmp[48];DWORD written=0;FS_READ_STATUS s;
+    if(!wc_random(tmp,L".fsj-"))return FS_READ_IO;
+    s=wc_open(root,tmp,GENERIC_WRITE|DELETE,FILE_CREATE,&h);if(s!=FS_READ_OK)return s;
+    if(!WriteFile(h,r,sizeof(*r),&written,NULL)||written!=sizeof(*r)||
+       !FlushFileBuffers(h)){s=FS_READ_IO;goto done;}
+    if(!wc_set_name(h,root,final,WC_NT_RENAME)){s=FS_READ_PENDING;goto done;}
+    wc_probe_dir(root);s=FS_READ_OK;
+done:CloseHandle(h);return s;
+}
+static FS_READ_STATUS wo_read(HANDLE root,const WCHAR *name,unsigned kind,
+                             WO_RECORD *r,FILE_ID_INFO *record_id,int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;DWORD n=0;FS_READ_META m;
+    FS_READ_STATUS s=wc_open(root,name,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    if(win_meta(h,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=sizeof(*r)||
+       !wc_id(h,record_id)||!ReadFile(h,r,sizeof(*r),&n,NULL)||n!=sizeof(*r)||
+       r->magic!=WO_MAGIC||r->version!=1||r->kind!=kind||
+       r->checksum!=wo_checksum(r)||r->size>FS_READ_MAX||
+       !wc_terminated(r->source,WC_MAX_PATH)||!wc_terminated(r->target,WC_MAX_PATH)||
+       !wc_terminated(r->pin,48)||!wc_random_name(r->pin,kind==1?L".fsrm-":L".fsmv-")||
+       wc_target_status(r->source)!=FS_READ_OK||
+       (kind==2?(wc_target_status(r->target)!=FS_READ_OK||
+                  !_wcsicmp(r->source,r->target)):r->target[0]!=0))s=FS_READ_DENIED;
+    else s=FS_READ_OK;
+    CloseHandle(h);return s;
+}
 static FS_READ_STATUS wc_record_publish(HANDLE root,const WCHAR *final,const WC_RECORD *r)
 {
     HANDLE h=INVALID_HANDLE_VALUE;WCHAR tmp[48];DWORD written=0;FS_READ_STATUS s;
@@ -281,6 +331,143 @@ static FS_READ_STATUS wc_parent(const FS_READ_ROOT *r,const WCHAR *target,HANDLE
     n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path,-1,utf8,sizeof(utf8),NULL,NULL);
     if(!n||!valid_relative(utf8,1))return FS_READ_DENIED;
     return win_open(r,utf8,dir);
+}
+/* All operation families share one workspace lock. An unknown control name
+   blocks rather than having its content interpreted by an unrelated writer. */
+static FS_READ_STATUS wo_clear_other(HANDLE root,unsigned self)
+{
+    const WCHAR *names[]={WC_INTENT,WC_COMMIT,WO_REMOVE,WO_RCOMMIT,
+        WO_MOVE,WO_MCOMMIT,L".fstxn.batch",L".fstxn.commit",
+        L".fstxn.replace",L".fstxn.pcommit"};
+    for(unsigned k=0;k<sizeof(names)/sizeof(names[0]);k++){
+        HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s;
+        if((self==0&&k<2)||(self==1&&k>=2&&k<4)||
+           (self==2&&k>=4&&k<6))continue;
+        s=wc_open(root,names[k],FILE_READ_ATTRIBUTES,FILE_OPEN,&h);
+        if(s==FS_READ_OK){CloseHandle(h);return FS_READ_DENIED;}
+        if(s!=FS_READ_MISSING)return FS_READ_DENIED;
+    }
+    return FS_READ_OK;
+}
+static FS_READ_STATUS wo_bytes(HANDLE h,const FILE_ID_INFO *id,
+                              size_t size,unsigned long long digest)
+{
+    FILE_ID_INFO check;FS_READ_META m;LARGE_INTEGER zero;unsigned char buf[8192];
+    DWORD got;size_t total=0;unsigned long long hash=14695981039346656037ULL;
+    if(win_meta(h,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=size||
+       !wc_id(h,&check)||!wc_same(&check,id))return FS_READ_DENIED;
+    zero.QuadPart=0;if(!SetFilePointerEx(h,zero,NULL,FILE_BEGIN))return FS_READ_DENIED;
+    do {
+        if(!ReadFile(h,buf,sizeof(buf),&got,NULL))return FS_READ_DENIED;
+        if(total+got>FS_READ_MAX)return FS_READ_DENIED;
+        for(DWORD k=0;k<got;k++)hash=(hash^buf[k])*1099511628211ULL;
+        total+=got;
+    }while(got);
+    return total==size&&hash==digest?FS_READ_OK:FS_READ_DENIED;
+}
+static FS_READ_STATUS wo_named(HANDLE dir,const WCHAR *leaf,const FILE_ID_INFO *id,
+                               int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_META m;FILE_ID_INFO found;
+    FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    s=(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&
+       wc_id(h,&found)&&wc_same(&found,id))?FS_READ_OK:FS_READ_DENIED;
+    CloseHandle(h);return s;
+}
+#ifdef FS_CREATE_TEST_CRASH
+static void wo_crash(unsigned kind,int phase)
+{
+    const char *v=getenv("FS_WIN_OP_CRASH");
+    if(v&&atoi(v)==(int)(kind*10+phase))ExitProcess((UINT)(100+kind*10+phase));
+}
+#else
+#define wo_crash(k,p) ((void)0)
+#endif
+static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
+{
+    const WCHAR *intent_name=kind==1?WO_REMOVE:WO_MOVE;
+    const WCHAR *mark_name=kind==1?WO_RCOMMIT:WO_MCOMMIT;
+    WO_RECORD i,c;FILE_ID_INFO iid,cid,rid,pid,tid;
+    HANDLE source_dir=INVALID_HANDLE_VALUE,target_dir=INVALID_HANDLE_VALUE;
+    HANDLE pin_h=INVALID_HANDLE_VALUE,target_h=INVALID_HANDLE_VALUE;
+    const WCHAR *source_leaf=NULL,*target_leaf=NULL;
+    int intent=0,mark=0,pin=0,source=0,target=0;
+    FS_READ_STATUS s=wo_clear_other(r->handle,kind);
+    if(s!=FS_READ_OK)return s;
+    s=wo_read(r->handle,intent_name,kind,&i,&iid,&intent);if(s!=FS_READ_OK)return s;
+    s=wo_read(r->handle,mark_name,kind,&c,&cid,&mark);if(s!=FS_READ_OK)return s;
+    if(!intent&&!mark)return FS_READ_OK;
+    if(intent&&mark&&memcmp(&i,&c,sizeof(i)))return FS_READ_DENIED;
+    if(!intent)i=c;
+    if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||!wc_ntfs(r->handle))return FS_READ_DENIED;
+    s=wc_parent(r,i.source,&source_dir,&source_leaf);if(s!=FS_READ_OK)goto done;
+    if(!wc_id(source_dir,&pid)||!wc_same(&pid,&i.source_parent)||
+       pid.VolumeSerialNumber!=rid.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
+    if(kind==2){
+        s=wc_parent(r,i.target,&target_dir,&target_leaf);if(s!=FS_READ_OK)goto done;
+        if(!wc_id(target_dir,&tid)||!wc_same(&tid,&i.target_parent)||
+           tid.VolumeSerialNumber!=rid.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
+    }
+    s=wo_named(source_dir,source_leaf,&i.file,&source);if(s!=FS_READ_OK)goto done;
+    if(kind==2){s=wo_named(target_dir,target_leaf,&i.file,&target);if(s!=FS_READ_OK)goto done;}
+    s=wo_named(r->handle,i.pin,&i.file,&pin);if(s!=FS_READ_OK)goto done;
+    if(!pin){s=FS_READ_DENIED;goto done;}
+    s=wc_open(r->handle,i.pin,GENERIC_READ|DELETE,FILE_OPEN,&pin_h);
+    if(s!=FS_READ_OK)goto done;
+    s=wo_bytes(pin_h,&i.file,(size_t)i.size,i.digest);if(s!=FS_READ_OK)goto done;
+    {FILE_STANDARD_INFO links;
+     unsigned expected_links=1u+(unsigned)source+(unsigned)target;
+     if(!GetFileInformationByHandleEx(pin_h,FileStandardInfo,&links,sizeof(links))||
+        links.NumberOfLinks!=expected_links){s=FS_READ_DENIED;goto done;}}
+
+    if(mark){
+        if(source||(kind==2&&!target)){s=FS_READ_DENIED;goto done;}
+        if(kind==2){
+            s=wc_open(target_dir,target_leaf,GENERIC_READ,FILE_OPEN,&target_h);
+            if(s!=FS_READ_OK)goto done;
+            s=wo_bytes(target_h,&i.file,(size_t)i.size,i.digest);
+            if(s!=FS_READ_OK)goto done;
+        }
+        if(intent){s=wc_remove(r->handle,intent_name,&iid);if(s!=FS_READ_OK)goto done;}
+        wo_crash(kind,9); /* marker-only, with verified pin still present */
+        /* Keep pin through marker retirement: marker-only remove still has
+           the original bytes to verify. A crash after marker retirement
+           leaves an untracked, never-auto-deleted pin. */
+        s=wc_remove(r->handle,mark_name,&cid);if(s!=FS_READ_OK)goto done;
+        wo_crash(kind,5);
+        CloseHandle(pin_h);pin_h=INVALID_HANDLE_VALUE;
+        s=wc_remove(r->handle,i.pin,&i.file);
+    }else{
+        if(!source){
+            if(!wc_set_name(pin_h,source_dir,source_leaf,WC_NT_LINK)){s=FS_READ_PENDING;goto done;}
+            wo_crash(kind,6);
+            s=wo_named(source_dir,source_leaf,&i.file,&source);
+            if(s!=FS_READ_OK||!source){s=FS_READ_DENIED;goto done;}
+        }
+        if(target){
+            s=wc_open(target_dir,target_leaf,GENERIC_READ,FILE_OPEN,&target_h);
+            if(s!=FS_READ_OK)goto done;
+            s=wo_bytes(target_h,&i.file,(size_t)i.size,i.digest);if(s!=FS_READ_OK)goto done;
+            CloseHandle(target_h);target_h=INVALID_HANDLE_VALUE;
+            s=wc_remove(target_dir,target_leaf,&i.file);if(s!=FS_READ_OK)goto done;
+        }
+        wc_probe_dir(source_dir);if(kind==2)wc_probe_dir(target_dir);
+        wo_crash(kind,7);
+        s=wc_remove(r->handle,intent_name,&iid);if(s!=FS_READ_OK)goto done;
+        wo_crash(kind,8);
+        CloseHandle(pin_h);pin_h=INVALID_HANDLE_VALUE;
+        s=wc_remove(r->handle,i.pin,&i.file);
+    }
+    wc_probe_dir(r->handle);
+done:
+    if(target_h!=INVALID_HANDLE_VALUE)CloseHandle(target_h);
+    if(pin_h!=INVALID_HANDLE_VALUE)CloseHandle(pin_h);
+    if(target_dir!=INVALID_HANDLE_VALUE)CloseHandle(target_dir);
+    if(source_dir!=INVALID_HANDLE_VALUE)CloseHandle(source_dir);
+    return s;
 }
 static FS_READ_STATUS wc_recover_locked(const FS_READ_ROOT *r)
 {
@@ -360,7 +547,8 @@ FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
     HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED o;FS_READ_STATUS s;
     if(!r)return FS_READ_INVALID;if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
     s=wc_lock(r->handle,&lock,&o);if(s!=FS_READ_OK)return s;
-    s=wc_recover_locked(r);wc_unlock(lock,&o);return s;
+    s=wo_clear_other(r->handle,0);if(s==FS_READ_OK)s=wc_recover_locked(r);
+    wc_unlock(lock,&o);return s;
 }
 /* Source verification is repeated at the last gate before staging copy bytes.
    The workspace lock coordinates our writers, not an external writer editing
@@ -412,19 +600,7 @@ static FS_READ_STATUS wc_create_locked(const FS_READ_ROOT *r,const char *rel,
     s=wc_record_read(r->handle,WC_COMMIT,&other,&ignored,&commit);
     WC_TRACE("wc_create commit probe status=%d present=%d\n",(int)s,commit);
     if(s!=FS_READ_OK||commit){s=s==FS_READ_OK?FS_READ_PENDING:s;goto end;}
-    /* Other transaction formats are not implemented on Windows, but an
-       unexpected control name must never be ignored by this writer. */
-    {const WCHAR *names[]={L".fstxn.batch",L".fstxn.commit",L".fstxn.remove",
-      L".fstxn.rcommit",L".fstxn.move",L".fstxn.mcommit",
-      L".fstxn.replace",L".fstxn.pcommit"};
-     for(size_t k=0;k<sizeof(names)/sizeof(names[0]);k++){
-       HANDLE other_file=INVALID_HANDLE_VALUE;
-       FS_READ_STATUS found=wc_open(r->handle,names[k],FILE_READ_ATTRIBUTES,FILE_OPEN,&other_file);
-       WC_TRACE("wc_create control probe name=%ls status=%d\n",names[k],(int)found);
-       if(found==FS_READ_OK){CloseHandle(other_file);s=FS_READ_DENIED;goto end;}
-       if(found!=FS_READ_MISSING){s=FS_READ_DENIED;goto end;}
-     }
-    }
+    s=wo_clear_other(r->handle,0);if(s!=FS_READ_OK)goto end;
     {HANDLE existing=INVALID_HANDLE_VALUE;
      s=wc_open(parent,leaf,FILE_READ_ATTRIBUTES,FILE_OPEN,&existing);
      WC_TRACE("wc_create target absence probe name=%ls status=%d\n",leaf,(int)s);
@@ -526,3 +702,124 @@ done:
     if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
     free(ws);free(wd);return s;
 }
+static FS_READ_STATUS wo_write(const FS_READ_ROOT *r,unsigned kind,
+  const char *src,const char *dst,const void *expected,size_t len)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE,source_dir=INVALID_HANDLE_VALUE;
+    HANDLE target_dir=INVALID_HANDLE_VALUE,source=INVALID_HANDLE_VALUE;
+    HANDLE check=INVALID_HANDLE_VALUE;OVERLAPPED overlap;
+    const WCHAR *src_leaf=NULL,*dst_leaf=NULL;
+    WCHAR *ws=NULL,*wd=NULL;WO_RECORD rec={0};
+    FILE_STANDARD_INFO standard;FS_READ_META m;FS_READ_STATUS s=FS_READ_IO;
+    int operation_started=0;unsigned long long digest;
+    if(!r||!src||!expected||len>FS_READ_MAX||!valid_relative(src,0)||
+       (kind==2&&(!dst||!valid_relative(dst,0))))return FS_READ_INVALID;
+    if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    ws=win_wide(src);wd=kind==2?win_wide(dst):NULL;
+    if(!ws||(kind==2&&!wd)||wcslen(ws)>=WC_MAX_PATH||
+       (wd&&wcslen(wd)>=WC_MAX_PATH)){s=FS_READ_INVALID;goto done;}
+    s=wc_target_status(ws);if(s!=FS_READ_OK)goto done;
+    if(wd){s=wc_target_status(wd);if(s!=FS_READ_OK)goto done;
+       if(!_wcsicmp(ws,wd)){s=FS_READ_DENIED;goto done;}}
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)goto done;
+    s=wo_clear_other(r->handle,kind);if(s!=FS_READ_OK)goto done;
+    {WO_RECORD other;FILE_ID_INFO ignored;int present=0;
+     s=wo_read(r->handle,kind==1?WO_REMOVE:WO_MOVE,kind,&other,&ignored,&present);
+     if(s!=FS_READ_OK||present){s=s==FS_READ_OK?FS_READ_PENDING:s;goto done;}
+     s=wo_read(r->handle,kind==1?WO_RCOMMIT:WO_MCOMMIT,kind,&other,&ignored,&present);
+     if(s!=FS_READ_OK||present){s=s==FS_READ_OK?FS_READ_PENDING:s;goto done;}}
+    s=wc_parent(r,ws,&source_dir,&src_leaf);if(s!=FS_READ_OK)goto done;
+    if(wd){s=wc_parent(r,wd,&target_dir,&dst_leaf);if(s!=FS_READ_OK)goto done;}
+    if(!wc_id(r->handle,&rec.root)||!wc_id(source_dir,&rec.source_parent)||
+       rec.root.VolumeSerialNumber!=rec.source_parent.VolumeSerialNumber||
+       (wd&&(!wc_id(target_dir,&rec.target_parent)||
+        rec.root.VolumeSerialNumber!=rec.target_parent.VolumeSerialNumber))){s=FS_READ_UNSUPPORTED;goto done;}
+    s=wc_open(source_dir,src_leaf,GENERIC_READ|DELETE,FILE_OPEN,&source);
+    if(s!=FS_READ_OK)goto done;
+    if(win_meta(source,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=len||
+       !wc_id(source,&rec.file)||rec.file.VolumeSerialNumber!=rec.root.VolumeSerialNumber||
+       !GetFileInformationByHandleEx(source,FileStandardInfo,&standard,sizeof(standard))||
+       standard.NumberOfLinks!=1){s=FS_READ_DENIED;goto done;}
+    digest=wc_hash((const unsigned char*)expected,len);
+    s=wo_bytes(source,&rec.file,len,digest);if(s!=FS_READ_OK)goto done;
+    {int source_present=0;
+     s=wo_named(source_dir,src_leaf,&rec.file,&source_present);
+     if(s!=FS_READ_OK||!source_present){s=FS_READ_DENIED;goto done;}}
+    if(wd){
+        s=wc_open(target_dir,dst_leaf,FILE_READ_ATTRIBUTES,FILE_OPEN,&check);
+        if(s==FS_READ_OK){s=FS_READ_DENIED;goto done;}
+        if(s!=FS_READ_MISSING)goto done;
+    }
+    /* Revalidate identity and bytes immediately before the first journal effect.
+       External writers editing the same FileId in place are not serialized. */
+    s=wc_open(source_dir,src_leaf,GENERIC_READ,FILE_OPEN,&check);
+    if(s!=FS_READ_OK)goto done;
+    s=wo_bytes(check,&rec.file,len,digest);if(s!=FS_READ_OK)goto done;
+    CloseHandle(check);check=INVALID_HANDLE_VALUE;
+    s=wo_bytes(source,&rec.file,len,digest);if(s!=FS_READ_OK)goto done;
+    if(!wc_random(rec.pin,kind==1?L".fsrm-":L".fsmv-")){s=FS_READ_IO;goto done;}
+    if(!wc_set_name(source,r->handle,rec.pin,WC_NT_LINK)){s=FS_READ_UNSUPPORTED;goto done;}
+    operation_started=1;wo_crash(kind,0);
+    {int exists=0;s=wo_named(r->handle,rec.pin,&rec.file,&exists);
+     if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto done;}}
+    rec.magic=WO_MAGIC;rec.version=1;rec.kind=kind;
+    rec.size=len;rec.digest=digest;wcscpy(rec.source,ws);
+    if(wd)wcscpy(rec.target,wd);
+    rec.checksum=wo_checksum(&rec);
+    s=wo_publish(r->handle,kind==1?WO_REMOVE:WO_MOVE,&rec);
+    if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    wo_crash(kind,1);
+    if(wd){
+        if(!wc_set_name(source,target_dir,dst_leaf,WC_NT_LINK)){s=FS_READ_PENDING;goto done;}
+        wo_crash(kind,2);
+        {int exists=0;s=wo_named(target_dir,dst_leaf,&rec.file,&exists);
+         if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto done;}}
+    }
+    /* The handle-relative delete helper reopens by name and checks FileId.
+       Cooperative writers are serialized; an external same-FileId editor is
+       outside this protocol's isolation guarantee. */
+    {int exists=0;s=wo_named(source_dir,src_leaf,&rec.file,&exists);
+     if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto done;}}
+    CloseHandle(source);source=INVALID_HANDLE_VALUE;
+    s=wc_remove(source_dir,src_leaf,&rec.file);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    {HANDLE absent=INVALID_HANDLE_VALUE;
+     s=wc_open(source_dir,src_leaf,FILE_READ_ATTRIBUTES,FILE_OPEN,&absent);
+     if(s==FS_READ_OK){CloseHandle(absent);s=FS_READ_PENDING;goto done;}
+     if(s!=FS_READ_MISSING){s=FS_READ_PENDING;goto done;}}
+    wo_crash(kind,3);
+    wc_probe_dir(source_dir);if(wd)wc_probe_dir(target_dir);
+    s=wo_publish(r->handle,kind==1?WO_RCOMMIT:WO_MCOMMIT,&rec);
+    if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    wo_crash(kind,4);
+    if(check!=INVALID_HANDLE_VALUE){CloseHandle(check);check=INVALID_HANDLE_VALUE;}
+    s=wo_recover_locked(r,kind);if(s!=FS_READ_OK)s=FS_READ_PENDING;
+done:
+    if(check!=INVALID_HANDLE_VALUE)CloseHandle(check);
+    if(source!=INVALID_HANDLE_VALUE)CloseHandle(source);
+    if(operation_started&&s!=FS_READ_OK)s=FS_READ_PENDING;
+
+    if(target_dir!=INVALID_HANDLE_VALUE)CloseHandle(target_dir);
+    if(source_dir!=INVALID_HANDLE_VALUE)CloseHandle(source_dir);
+    if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
+    free(ws);free(wd);return s;
+}
+FS_READ_STATUS FsRemoveRecover(const FS_READ_ROOT *r)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED overlap;FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)return s;
+    s=wo_recover_locked(r,1);wc_unlock(lock,&overlap);return s;
+}
+FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *r)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED overlap;FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)return s;
+    s=wo_recover_locked(r,2);wc_unlock(lock,&overlap);return s;
+}
+FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
+                            const void *expected,size_t len)
+{return wo_write(r,1,path,NULL,expected,len);}
+FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
+                          const void *expected,size_t len)
+{return wo_write(r,2,src,dst,expected,len);}

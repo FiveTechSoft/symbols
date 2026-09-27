@@ -345,17 +345,6 @@ FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
-                            const void *expected,size_t len)
-{ (void)path;(void)expected;(void)len;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsRemoveRecover(const FS_READ_ROOT *r)
-{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
-                          const void *expected,size_t len)
-{ (void)src;(void)dst;(void)expected;(void)len;
-  return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *r)
-{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
  const void *expected,size_t expected_len,const void *replacement,size_t replacement_len)
 { (void)path;(void)expected;(void)expected_len;(void)replacement;(void)replacement_len;
