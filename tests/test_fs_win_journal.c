@@ -15,7 +15,8 @@ static void child(int phase,int recovering)
  FS_READ_ROOT *r;char value[20];
  check(FsReadOpen(ROOT,&r)==FS_READ_OK,"child open");
  sprintf(value,"%d",phase);_putenv_s("FS_WIN_JOURNAL_CRASH",value);
- {FS_READ_STATUS status=recovering?FsCreateRecover(r):
+ {FS_READ_STATUS status=recovering==1?FsCreateRecover(r):
+       recovering==2?FsCopyFile(r,"outside","inside/new","foreign",7):
        FsCreateFile(r,"inside/new","payload",7,0666);
   fprintf(stderr,"journal child phase=%d recovery=%d FS_READ_STATUS=%d\n",
           phase,recovering,(int)status);}
@@ -59,18 +60,18 @@ int main(int argc,char **argv)
  exelen=GetModuleFileNameA(NULL,exe,sizeof(exe));check(exelen&&exelen<sizeof(exe),"exe");
  /* Each row gets an independent workspace. Rows 1-2 intentionally leave
     untracked stage/pin orphans and are cleaned by this test, not recovery. */
- for(int row=1;row<=7;row++){
+ for(int operation=0;operation<2;operation++)for(int row=1;row<=7;row++){
    check(_mkdir(ROOT)==0,"mkdir root");
    check(_mkdir(ROOT "\\inside")==0,"mkdir inside");
    {FILE *f=fopen(ROOT "\\outside","wb");check(f&&fwrite("foreign",1,7,f)==7&&fclose(f)==0,"foreign fixture");}
    foreign=file_id(ROOT "\\outside");
    check(FsReadOpen(ROOT,&r)==FS_READ_OK,"open root");
    if(row==1)probe_directory();
-   check(run_child(exe,row,0)==80+row,"crash point reached");
+   check(run_child(exe,row,operation?2:0)==80+row,"crash point reached");
    check(FsCreateRecover(r)==FS_READ_OK,"first recovery");
    check(FsCreateRecover(r)==FS_READ_OK,"second recovery");
    check(FsReadStat(r,"inside/new",&m)==(row>=6?FS_READ_OK:FS_READ_MISSING),"target state");
-   if(row>=6){read_bytes(r,"inside/new","payload",7);post=file_id(ROOT "\\inside\\new");
+   if(row>=6){read_bytes(r,"inside/new",operation?"foreign":"payload",7);post=file_id(ROOT "\\inside\\new");
      check(post.VolumeSerialNumber==foreign.VolumeSerialNumber&&
        memcmp(&post.FileId,&foreign.FileId,sizeof(post.FileId))!=0,"new ID distinct");}
    read_bytes(r,"outside","foreign",7);
@@ -105,7 +106,7 @@ int main(int argc,char **argv)
    check(remove_file(ROOT "\\.fstxn.lock"),"remove lock");
    check(_rmdir(ROOT "\\inside")==0&&_rmdir(ROOT)==0,"remove root");
  }
- puts("Windows process-crash journal matrix passed");return 0;
+ puts("Windows create/copy process-crash journal matrix passed");return 0;
 }
 #else
 int main(void){return 0;}

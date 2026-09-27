@@ -65,6 +65,30 @@ int main(void)
  read_exact(r,"inside/new","created",7);
  ck(FsCreateFile(r,"existing","bad",3,0666)==FS_READ_DENIED,"existing name");
  read_exact(r,"existing","original",8);
+ put("test_fs_wincreate_scratch\\inside\\copy-src","source");
+ {FILE *f=fopen("test_fs_wincreate_scratch\\inside\\empty-source","wb");
+  ck(f&&fclose(f)==0,"empty source");}
+ ck(FsCopyFile(r,"inside/copy-src","inside/copied","wrong",5)==FS_READ_DENIED,
+    "copy stale source");
+ ck(FsReadStat(r,"inside/copied",&m)==FS_READ_MISSING,"stale copy absent");
+ ck(FsCopyFile(r,"inside/copy-src","inside/copied","source",6)==FS_READ_OK,
+    "copy source");
+ read_exact(r,"inside/copied","source",6);
+ ck(FsCopyFile(r,"inside/copy-src","inside/COPIED","source",6)==FS_READ_DENIED,
+    "copy no case alias replacement");
+ ck(FsCopyFile(r,"inside/copy-src",".FSTXN.INTENT","source",6)==FS_READ_DENIED,
+    "copy reserved destination");
+ ck(FsCopyFile(r,"inside/copy-src","inside/copy-src","source",6)==FS_READ_DENIED,
+    "copy same source and destination");
+ ck(FsCopyFile(r,"../escape","inside/escaped","source",6)==FS_READ_INVALID,
+    "copy traversal");
+ ck(FsCopyFile(r,"inside/copy-src","inside/no-expected",NULL,0)==FS_READ_INVALID,
+    "copy expected pointer required");
+ ck(FsCopyFile(r,"inside/empty-source","inside/empty-copy","",0)==FS_READ_OK,
+    "copy empty source");
+ read_exact(r,"inside/empty-copy","",0);
+ ck(FsCreateRecover(r)==FS_READ_OK&&FsCreateRecover(r)==FS_READ_OK,
+    "copy clean recovery idempotent");
  ck(FsCreateFile(r,"empty","",0,0666)==FS_READ_OK,"empty");
  read_exact(r,"empty","",0);
  ck(FsCreateFile(r,"binary",binary,sizeof(binary),0666)==FS_READ_OK,"binary");
@@ -110,6 +134,8 @@ int main(void)
   ck(system(cmd)==0,"junction fixture");}
  ck(FsCreateFile(r,"dirlink/nope","bad",3,0666)!=FS_READ_OK,"reparse parent");
  ck(FsReadStat(r,"inside/nope",&m)==FS_READ_MISSING,"no reparse traversal");
+ ck(FsCopyFile(r,"dirlink/new","inside/escaped","source",6)!=FS_READ_OK,
+    "copy reparse parent refused");
  ck(cleanup_dir("test_fs_wincreate_scratch\\dirlink"),"unlink junction");
  /* CreateSymbolicLink may require a local privilege, so exercise it if the
     runner permits it; the junction above is the unconditional reparse test. */
@@ -122,6 +148,8 @@ int main(void)
  if(CreateSymbolicLinkA("test_fs_wincreate_scratch\\symleaf",
        "..\\test_fs_wincreate_outside",0x2)){
   ck(FsCreateFile(r,"symleaf","bad",3,0666)==FS_READ_DENIED,"symlink leaf");
+  ck(FsCopyFile(r,"symleaf","inside/from-symlink","outside",7)!=FS_READ_OK,
+     "copy symlink source refused");
   ck(cleanup_file("test_fs_wincreate_scratch\\symleaf"),"remove leaf symlink");
  }
  /* Existing leaf must never be opened or overwritten. */
@@ -137,6 +165,10 @@ int main(void)
  ck(FsCreateRecover(r)==FS_READ_OK,"Windows recovery idempotent");
  FsReadClose(r);
  ck(cleanup_file("test_fs_wincreate_scratch\\inside\\new"),"cleanup new");
+ ck(cleanup_file("test_fs_wincreate_scratch\\inside\\copy-src"),"cleanup copy source");
+ ck(cleanup_file("test_fs_wincreate_scratch\\inside\\copied"),"cleanup copied");
+ ck(cleanup_file("test_fs_wincreate_scratch\\inside\\empty-source"),"cleanup empty source");
+ ck(cleanup_file("test_fs_wincreate_scratch\\inside\\empty-copy"),"cleanup empty copy");
  {char full[300];snprintf(full,sizeof(full),"test_fs_wincreate_scratch\\inside\\%s",longname);
   ck(cleanup_file(full),"cleanup long");}
  ck(cleanup_dir("test_fs_wincreate_scratch\\inside"),"cleanup inside");

@@ -341,10 +341,6 @@ done:FsReadFreeList(list,n);closedir(dir);return s;
    reacquired for each call; a dry-run manifest never grants write authority. */
 #ifdef _WIN32
 #include "fs_create_win.inc"
-FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
-                          const void *expected,size_t len)
-{ (void)src;(void)dst;(void)expected;(void)len;
-  return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size_t n)
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)

@@ -23,8 +23,10 @@
    unsupported. No Windows atomic replace or power-loss durability is claimed. */
 FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *root);
 /* Copy a byte-exact expected source to a new destination, no replace. The
-   expected pointer is mandatory even for zero bytes. POSIX only; participates
-   in the workspace lock and create intent recovery. */
+   expected pointer is mandatory even for zero bytes. On POSIX and NTFS Windows
+   it participates in the workspace lock and create intent recovery. On Windows
+   a non-cooperating external writer editing the same FileId in place is outside
+   the snapshot guarantee. Windows directory flush is diagnostic only. */
 FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *root,const char *source,
                           const char *target,const void *expected,size_t expected_len);
 FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *root,const char *relative,

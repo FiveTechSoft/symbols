@@ -362,10 +362,35 @@ FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
     s=wc_lock(r->handle,&lock,&o);if(s!=FS_READ_OK)return s;
     s=wc_recover_locked(r);wc_unlock(lock,&o);return s;
 }
-FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *bytes,size_t len,unsigned mode)
+/* Source verification is repeated at the last gate before staging copy bytes.
+   The workspace lock coordinates our writers, not an external writer editing
+   the same FileId in place; no snapshot guarantee is claimed against that. */
+static FS_READ_STATUS wc_copy_source(const FS_READ_ROOT *r,const char *src,
+  HANDLE held,const FILE_ID_INFO *id,const unsigned char *expected,size_t len)
 {
-    FS_READ_STATUS s;HANDLE lock=INVALID_HANDLE_VALUE,parent=INVALID_HANDLE_VALUE;
-    HANDLE stage=INVALID_HANDLE_VALUE;OVERLAPPED overlap;WC_RECORD rec={0};
+    HANDLE current=INVALID_HANDLE_VALUE;FILE_ID_INFO check;FS_READ_META m;
+    unsigned char *buf=NULL;DWORD got=0,extra=0;unsigned char one;
+    LARGE_INTEGER zero;FS_READ_STATUS s=win_open(r,src,&current);
+    if(s!=FS_READ_OK)return s;
+    if(win_meta(current,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||
+       m.size!=len||!wc_id(current,&check)||!wc_same(&check,id)||
+       !wc_id(held,&check)||!wc_same(&check,id)){
+        s=FS_READ_DENIED;goto done;
+    }
+    buf=(unsigned char*)malloc(len+1);if(!buf){s=FS_READ_IO;goto done;}
+    zero.QuadPart=0;
+    if(!SetFilePointerEx(held,zero,NULL,FILE_BEGIN)||
+       !ReadFile(held,buf,(DWORD)len,&got,NULL)||got!=len||
+       !ReadFile(held,&one,1,&extra,NULL)||extra!=0){s=FS_READ_DENIED;goto done;}
+    s=(len&&memcmp(buf,expected,len))?FS_READ_DENIED:FS_READ_OK;
+done:free(buf);CloseHandle(current);return s;
+}
+static FS_READ_STATUS wc_create_locked(const FS_READ_ROOT *r,const char *rel,
+  const void *bytes,size_t len,unsigned mode,const char *src,
+  HANDLE source,const FILE_ID_INFO *source_id)
+{
+    FS_READ_STATUS s;HANDLE parent=INVALID_HANDLE_VALUE;
+    HANDLE stage=INVALID_HANDLE_VALUE;WC_RECORD rec={0};
     WCHAR *target=NULL;const WCHAR *leaf;FILE_ID_INFO rootid,pid;
     DWORD written;size_t used=0;int intent=0,commit=0,started=0;
     FILE_ID_INFO ignored;WC_RECORD other;
@@ -381,9 +406,6 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
     if(!wc_id(r->handle,&rootid)||!wc_id(parent,&pid)||rootid.VolumeSerialNumber!=pid.VolumeSerialNumber){
         s=FS_READ_UNSUPPORTED;goto end;
     }
-    s=wc_lock(r->handle,&lock,&overlap);
-    WC_TRACE("wc_create lock status=%d\n",(int)s);
-    if(s!=FS_READ_OK)goto end;
     s=wc_record_read(r->handle,WC_INTENT,&other,&ignored,&intent);
     WC_TRACE("wc_create intent probe status=%d present=%d\n",(int)s,intent);
     if(s!=FS_READ_OK||intent){s=s==FS_READ_OK?FS_READ_PENDING:s;goto end;}
@@ -409,6 +431,7 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,const void *by
      if(s==FS_READ_OK){CloseHandle(existing);s=FS_READ_DENIED;goto end;}
      if(s!=FS_READ_MISSING)goto end;
     }
+    if(src){s=wc_copy_source(r,src,source,source_id,bytes,len);if(s!=FS_READ_OK)goto end;}
     if(!wc_random(rec.stage,L".fst-")||!wc_random(rec.pin,L".fsp-")){
         s=FS_READ_IO;goto end;
     }
@@ -455,7 +478,51 @@ end:
     WC_TRACE("wc_create return status=%d started=%d\n",(int)s,started);
     if(started&&s!=FS_READ_OK&&s!=FS_READ_PENDING)s=FS_READ_PENDING;
     if(stage!=INVALID_HANDLE_VALUE)CloseHandle(stage);
-    if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
     if(parent!=INVALID_HANDLE_VALUE)CloseHandle(parent);
     free(target);return s;
+}
+
+FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
+                             const void *bytes,size_t len,unsigned mode)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED overlap;FS_READ_STATUS s;
+    if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
+        return FS_READ_INVALID;
+    if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    {WCHAR *target=win_wide(rel);
+     if(!target)return FS_READ_INVALID;
+     s=wcslen(target)>=WC_MAX_PATH?FS_READ_INVALID:wc_target_status(target);
+     free(target);if(s!=FS_READ_OK)return s;}
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)return s;
+    s=wc_create_locked(r,rel,bytes,len,mode,NULL,INVALID_HANDLE_VALUE,NULL);
+    wc_unlock(lock,&overlap);return s;
+}
+FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
+                          const void *expected,size_t len)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE,source=INVALID_HANDLE_VALUE;
+    OVERLAPPED overlap;FILE_ID_INFO id,rootid;FS_READ_META m;
+    FS_READ_STATUS s;WCHAR *ws=NULL,*wd=NULL;
+    if(!r||!src||!dst||!expected||len>FS_READ_MAX||
+       !valid_relative(src,0)||!valid_relative(dst,0))return FS_READ_INVALID;
+    if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    ws=win_wide(src);wd=win_wide(dst);
+    if(!ws||!wd||wcslen(ws)>=WC_MAX_PATH||wcslen(wd)>=WC_MAX_PATH){s=FS_READ_INVALID;goto done;}
+    s=wc_target_status(ws);if(s!=FS_READ_OK)goto done;
+    s=wc_target_status(wd);if(s!=FS_READ_OK)goto done;
+    if(!_wcsicmp(ws,wd)){s=FS_READ_DENIED;goto done;}
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)goto done;
+    s=win_open(r,src,&source);if(s!=FS_READ_OK)goto done;
+    s=win_meta(source,&m);
+    if(s!=FS_READ_OK)goto done;
+    if(m.kind!=FS_KIND_FILE||m.size!=len||
+       !wc_id(source,&id)||!wc_id(r->handle,&rootid)||
+       id.VolumeSerialNumber!=rootid.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
+    s=wc_copy_source(r,src,source,&id,(const unsigned char*)expected,len);
+    if(s!=FS_READ_OK)goto done;
+    s=wc_create_locked(r,dst,expected,len,m.mode,src,source,&id);
+done:
+    if(source!=INVALID_HANDLE_VALUE)CloseHandle(source);
+    if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
+    free(ws);free(wd);return s;
 }
