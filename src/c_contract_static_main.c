@@ -23,7 +23,7 @@ int main(int argc,char **argv)
         memcpy(c.out,argv[3],goal_len+1);c.has_out=1;
     }
     C_CAND cand[96]={0};
-    int count=CContractCandidates(src,&c,1,cand,96);
+    int count=CContractStaticCandidates(src,&c,cand,96);
     for(int i=0;i<count;i++){
         char out[1024];
         int z=snprintf(out,sizeof(out),"%s/%03d.c",argv[2],i);

@@ -783,3 +783,177 @@ void CContractFree(C_CAND *c, int n)
         c[i].text = NULL;
     }
 }
+
+/* Typed static preview, separate from the executable repair enumerator above.
+   This parser deliberately accepts only an entire, unconditional, literal
+   emission followed by return 0 in the sole function. Uncertain shapes
+   never gain a literal-injection exemption. */
+static size_t static_space(const char *s,size_t p)
+{
+    while (isspace((unsigned char)s[p])) p++;
+    return p;
+}
+
+static int static_literal(const char *s,size_t *p,unsigned char *out,size_t *length)
+{
+    size_t i=*p,n=0;
+    if (s[i++]!='"') return 0;
+    while (s[i] && s[i]!='"') {
+        unsigned char ch=(unsigned char)s[i++];
+        if (ch=='\\') {
+            ch=(unsigned char)s[i++];
+            if (ch=='n') ch='\n';
+            else if (ch=='r') ch='\r';
+            else if (ch=='t') ch='\t';
+            else if (ch!='"' && ch!='\\') return 0;
+        } else if (ch<32 || ch>126) return 0;
+        if (ch==0 || n>=127) return 0;
+        out[n++]=ch;
+    }
+    if (s[i]!='"') return 0;
+    *p=i+1;*length=n;
+    return 1;
+}
+
+static int static_render(const unsigned char *s,size_t n,int printf_call,char *out,size_t cap)
+{
+    size_t p=0;
+    for (size_t i=0;i<n;i++) {
+        unsigned char c=s[i]; const char *escape=NULL;
+        if (c=='\n') escape="\\n";
+        else if (c=='\r') escape="\\r";
+        else if (c=='\t') escape="\\t";
+        else if (c=='"') escape="\\\"";
+        else if (c=='\\') escape="\\\\";
+        else if (c=='%' && printf_call) escape="%%";
+        else if (c<32 || c>126) return 0;
+        size_t z=escape?strlen(escape):1;
+        if (p+z>=cap) return 0;
+        if (escape) memcpy(out+p,escape,z);
+        else out[p]=c;
+        p+=z;
+    }
+    out[p]=0;return 1;
+}
+
+/* Return 1 only for the independently checkable simple shape; 0 means
+   abstain from a goal-literal edit, not a parser failure or runtime claim. */
+static int static_simple(const char *src,const C_CONTRACT *c,C_CAND *out,int max)
+{
+    size_t size=strlen(src);char *mask=make_mask(src,size);
+    if (!mask) return 0;
+    FN fn[2];int nf=find_functions(src,mask,size,fn,2);
+    if (nf!=1 || !fn[0].is_main) { free(mask);return 0; }
+    size_t p=static_space(src,fn[0].lo);
+    int isprintf=p+6<size && !strncmp(src+p,"printf",6) && !is_idc((unsigned char)src[p+6]);
+    int isputs=p+4<size && !strncmp(src+p,"puts",4) && !is_idc((unsigned char)src[p+4]);
+    if ((!isprintf && !isputs) || mask[p]) { free(mask);return 0; }
+    p+=isprintf?6:4;p=static_space(src,p);
+    if (p>=fn[0].hi || src[p++]!='(') { free(mask);return 0; }
+    p=static_space(src,p);size_t litstart=p,oldlen=0;
+    if (p>=fn[0].hi) {free(mask);return 0;}
+    unsigned char decoded[128],emitted[129];
+    if (!static_literal(src,&p,decoded,&oldlen) || p>fn[0].hi) { free(mask);return 0; }
+    size_t litend=p;
+    for (size_t k=litstart+1;k+1<litend;k++)
+        if (mask[k]!=2) { free(mask);return 0; }
+    if (litend<=litstart+1) {free(mask);return 0;}
+    p=static_space(src,p);
+    if (p>=fn[0].hi || src[p++]!=')') { free(mask);return 0; }
+    p=static_space(src,p);
+    if (p>=fn[0].hi || src[p++]!=';') { free(mask);return 0; }
+    p=static_space(src,p);
+    if (p+6>=fn[0].hi || strncmp(src+p,"return",6) || is_idc((unsigned char)src[p+6]) || mask[p]) { free(mask);return 0; }
+    p=static_space(src,p+6);
+    if (p>=fn[0].hi || src[p++]!='0' || isdigit((unsigned char)src[p])) { free(mask);return 0; }
+    p=static_space(src,p);
+    if (p>=fn[0].hi || src[p++]!=';' || static_space(src,p)!=fn[0].hi) { free(mask);return 0; }
+    /* Reject code hidden outside the function, except whitespace and #include
+       lines; this is not a general C parser. */
+    size_t header=fn[0].lo-1;
+    while (header>0 && src[header-1]!='\n' && src[header-1]!=';' && src[header-1]!='}') header--;
+    char signature[32];size_t siglen=0;
+    for (size_t k=header;k<fn[0].lo-1;k++)
+        if (!isspace((unsigned char)src[k])) {
+            if (siglen+1>=sizeof(signature)) {free(mask);return 0;}
+            signature[siglen++]=src[k];
+        }
+    signature[siglen]=0;
+    if (strcmp(signature,"intmain(void)") && strcmp(signature,"intmain()")) {free(mask);return 0;}
+    size_t k=0;
+    while (k<header) {
+        k=static_space(src,k);
+        if (k>=header) break;
+        if (strncmp(src+k,"#include <stdio.h>",18)) {free(mask);return 0;}
+        k+=18;
+        while (k<header && src[k]!='\n')
+            if (!isspace((unsigned char)src[k++])) {free(mask);return 0;}
+    }
+    for (k=fn[0].hi+1;k<size;k++) if (!isspace((unsigned char)src[k])) { free(mask);return 0; }
+    free(mask);
+    size_t outlen=oldlen;memcpy(emitted,decoded,oldlen);
+    if (isprintf) {
+        size_t w=0;
+        for (size_t j=0;j<oldlen;j++) {
+            if (decoded[j]=='%') {
+                if (j+1>=oldlen || decoded[j+1]!='%') return 0;
+                j++;
+            }
+            emitted[w++]=decoded[j];
+        }
+        outlen=w;
+    } else emitted[outlen++]='\n';
+    size_t goal_len=c&&c->has_out?strlen(c->out):0;
+    if (!c || !c->has_out) return 0;
+    if (goal_len==0) return 1;
+    if (goal_len==outlen && !memcmp(emitted,c->out,outlen)) return 1; /* identity */
+    if (isputs && c->out[goal_len-1]!='\n') return 1;
+    char rendered[384],quoted[386];
+    size_t literal_goal=goal_len-(isputs?1:0);
+    if (!static_render((const unsigned char *)c->out,literal_goal,isprintf,rendered,sizeof(rendered))) return 1;
+    snprintf(quoted,sizeof(quoted),"\"%s\"",rendered);
+    if (max>0) {
+        char *edited=splice(src,litstart,litend-litstart,quoted);
+        if (edited && strcmp(edited,src)) {
+            out[0].text=edited;out[0].tier=4;
+            snprintf(out[0].rule,sizeof(out[0].rule),"answer_literal");
+            snprintf(out[0].detail,sizeof(out[0].detail),"line %d: directed literal",line_of(src,litstart));
+            return 2;
+        }
+        free(edited);
+    }
+    return 1;
+}
+
+int CContractStaticCandidates(const char *src,const C_CONTRACT *c,C_CAND *out,int max)
+{
+    /* There is no runtime verifier in this path. Unknown source shapes must
+       abstain rather than export goal-independent legacy mutations. */
+    int simple=static_simple(src,c,out,max);
+    if (simple) return simple==2?1:0;
+    /* The legacy enumerator keeps its answer-literal veto. Its proposals
+       remain unverified, but a typed preview drops edits known to contradict
+       exit 0 or the declared nonempty stdout. */
+    int n=CContractCandidates(src,c,1,out,max),w=0;
+    for (int i=0;i<n;i++) {
+        int contradiction=c && c->has_out && c->out[0] &&
+            !strcmp(out[i].rule,"drop_emission");
+        if (!strcmp(out[i].rule,"int_literal")) {
+            size_t pos=0;
+            while (src[pos] && out[i].text[pos] && src[pos]==out[i].text[pos]) pos++;
+            size_t begin=pos;
+            while (begin>0 && isspace((unsigned char)src[begin-1])) begin--;
+            if (begin>=6 && !strncmp(src+begin-6,"return",6) &&
+                src[pos]=='0' && out[i].text[pos]!='0') {
+                char *mask=make_mask(src,strlen(src));FN funcs[64];
+                int count=mask?find_functions(src,mask,strlen(src),funcs,64):0;
+                for (int j=0;j<count;j++)
+                    if (funcs[j].is_main && pos>=funcs[j].lo && pos<funcs[j].hi) contradiction=1;
+                free(mask);
+            }
+        }
+        if (contradiction) {free(out[i].text);out[i].text=NULL;}
+        else {if (w!=i) out[w]=out[i];w++;}
+    }
+    return w;
+}

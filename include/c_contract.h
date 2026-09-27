@@ -51,6 +51,8 @@ typedef struct {
 int  CContractParse(const char *task, C_CONTRACT *c);
 /* allow_main: main's body may be edited (it is the only function) */
 int  CContractCandidates(const char *src, const C_CONTRACT *c, int allow_main, C_CAND *out, int max);
+/* Read-only typed preview: goal-directed static source candidates, not executable verification. */
+int CContractStaticCandidates(const char *src, const C_CONTRACT *c, C_CAND *out, int max);
 void CContractFree(C_CAND *c, int n);
 
 #endif

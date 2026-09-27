@@ -341,6 +341,7 @@ sllm_test(test_c_fix_ops tests/test_c_fix_ops.c)
 sllm_test(test_compile_repair tests/test_compile_repair.c)
 sllm_test(test_shell_contract tests/test_shell_contract.c)
 sllm_test(test_c_contract tests/test_c_contract.c)
+sllm_test(test_c_contract_static tests/test_c_contract_static.c)
 # Trusted static source transformer for the typed, non-executing preview.
 add_executable(c_contract_static src/c_contract_static_main.c)
 target_link_libraries(c_contract_static symbolic)

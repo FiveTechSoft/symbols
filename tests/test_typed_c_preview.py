@@ -59,6 +59,19 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(r['status'],'static_candidate_unverified')
         self.assertGreater(r['candidate_count'],0)
         self.assertEqual(self.source.read_bytes(),self.initial)
+    def test_simple_goal_literal_and_identity(self):
+        self.source.write_text('#include <stdio.h>\nint main(void){ printf("ship\\n"); return 0; }\n')
+        self.obj['workspace_digest']=snapshot(self.work)[1]
+        self.obj['stdout']={'bytes_b64':base64.b64encode(b'arrive\n').decode(),
+                            'length':7,'termination':'exact'}
+        result=self.run_preview()
+        self.assertEqual(result['candidate_count'],1)
+        self.assertEqual(result['candidates'][0]['rule'],'answer_literal')
+        self.assertIn('printf("arrive\\n")',result['candidates'][0]['unified_diff'])
+        self.obj['stdout']={'bytes_b64':base64.b64encode(b'ship\n').decode(),
+                            'length':5,'termination':'exact'}
+        result=self.run_preview()
+        self.assertEqual((result['status'],result['candidate_count']),('no_static_candidate',0))
     def test_scope_and_predicates(self):
         self.obj['source_predicates']=[{'kind':'file_bytes_equal','path':'main.c','sha256':sha(self.initial)}]
         self.assertEqual(self.run_preview()['status'],'no_static_candidate')
