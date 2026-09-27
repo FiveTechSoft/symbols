@@ -54,7 +54,10 @@ int main(int argc,char **argv)
 {char exe[768];DWORD got;FS_READ_ROOT *r;FS_READ_META m;
  if(argc==5&&!strcmp(argv[1],"child")){child(atoi(argv[2]),atoi(argv[3]),atoi(argv[4]));return 200;}
  got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");
+ /* Writer hooks: remove 0=pin, 1=intent, 3=source removed,
+    4=marker. Move adds 2=target linked. There is no remove hook 2. */
  for(int kind=1;kind<=2;kind++)for(int phase=0;phase<=4;phase++){
+   if(kind==1&&phase==2)continue;
    fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open");
    ck(run_child(exe,kind,phase,0)==100+kind*10+phase,"write kill");
    ck((kind==1?FsRemoveRecover(r):FsMoveRecover(r))==FS_READ_OK,"replay");
@@ -66,6 +69,10 @@ int main(int argc,char **argv)
    if(kind==2&&phase==4)ck(DeleteFileA(ROOT "\\inside\\target"),"clean target");
    cleanup();
  }
+ /* Recovery hooks, both operations: 5=marker retired/pin orphan,
+    6=source restored, 7=rollback names settled, 8=intent retired,
+    9=marker-only. Only 5 and 9 follow a committed setup (hook 4);
+    6-8 follow uncommitted setup (hook 3). */
  for(int kind=1;kind<=2;kind++)for(int phase=5;phase<=9;phase++){
    int committed=phase==5||phase==9;
    fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open recovery");
