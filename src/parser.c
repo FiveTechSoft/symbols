@@ -1972,7 +1972,6 @@ QUESTION ParserDetectQuestion(const GRAPH *graph, const char *input)
                 char r1[64] = {0};
                 int trusted = 0;
                 SYMBOL_ID r1id;
-                uint32_t qi;
                 int has_que = 0;
                 if (!ResolveRelationPass(graph,
                                          tokens.tokens[(uint32_t)order[o]],
