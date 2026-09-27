@@ -2,6 +2,8 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "fs_read.h"
+#include "fs_write.h"
+#include "fs_manifest.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -237,6 +239,7 @@ done:FsReadFreeList(list,n);CloseHandle(h);return s;
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <stdio.h>
 struct FS_READ_ROOT { int fd; };
 FS_READ_STATUS FsReadOpen(const char *root,FS_READ_ROOT **out)
 {
@@ -320,5 +323,80 @@ FS_READ_STATUS FsReadList(const FS_READ_ROOT *r,const char *rel,FS_READ_ENTRY **
     if(errno){s=error_status();goto done;}
     qsort(list,n,sizeof(*list),entry_cmp);*entries=list;*count=n;list=NULL;n=0;s=FS_READ_OK;
 done:FsReadFreeList(list,n);closedir(dir);return s;
+}
+#endif
+
+/* Create is separate from the read API contract. The parent handle is
+   reacquired for each call; a dry-run manifest never grants write authority. */
+#ifdef _WIN32
+FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
+                            const void *bytes,size_t len,unsigned mode)
+{
+    if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
+        return FS_READ_INVALID;
+    /* No path-by-name fallback: handle-relative Windows publish is pending. */
+    return FS_READ_UNSUPPORTED;
+}
+#else
+static int write_all(int fd,const unsigned char *bytes,size_t len)
+{
+    size_t used=0;
+    while(used<len){ssize_t n=write(fd,bytes+used,len-used);
+        if(n<=0)return 0;
+        used+=(size_t)n;}
+    return 1;
+}
+FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
+                            const void *bytes,size_t len,unsigned mode)
+{
+    char *parent=NULL,*slash,*leaf;int dir=-1,temp=-1,random_fd=-1;
+    char temp_name[48]={0};unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;
+    FS_MANIFEST plan={0};FS_OP_REQUEST request={FS_OP_CREATE,NULL,rel};
+    if(!r||!valid_relative(rel,0)||(!bytes&&len)||len>FS_READ_MAX||mode>0777)
+        return FS_READ_INVALID;
+    s=FsManifestPlan(r,&request,1,&plan);
+    if(s!=FS_READ_OK)return s;
+    FsManifestFree(&plan);
+    parent=(char*)malloc(strlen(rel)+1);if(!parent)return FS_READ_IO;
+    strcpy(parent,rel);slash=strrchr(parent,'/');
+    if(slash){*slash=0;leaf=slash+1;}else{*parent=0;leaf=(char*)rel;}
+    s=posix_open(r,parent,&dir);if(s!=FS_READ_OK)goto done;
+    {FS_READ_META meta;s=posix_meta(dir,&meta);
+     if(s!=FS_READ_OK||meta.kind!=FS_KIND_DIR){s=FS_READ_UNSUPPORTED;goto done;}}
+    /* A kernel-generated nonce prevents predictable temporary siblings. */
+    random_fd=open("/dev/urandom",O_RDONLY|O_CLOEXEC);
+    if(random_fd<0||read(random_fd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
+        s=FS_READ_IO;goto done;
+    }
+    close(random_fd);random_fd=-1;
+    memcpy(temp_name,".fst-",5);
+    for(size_t i=0;i<sizeof(nonce);i++)sprintf(temp_name+5+i*2,"%02x",nonce[i]);
+    temp_name[37]=0;
+    temp=openat(dir,temp_name,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(temp<0){s=error_status();goto done;}
+    if(!write_all(temp,(const unsigned char*)bytes,len) ||
+       fchmod(temp,(mode_t)mode)<0 || fsync(temp)<0){
+        s=FS_READ_IO;goto done;
+    }
+    /* No-replace publish: linkat refuses an existing target atomically. */
+    {FS_READ_META current;FS_READ_STATUS check=FsReadStat(r,rel,&current);
+     if(check!=FS_READ_MISSING){s=check==FS_READ_OK?FS_READ_DENIED:check;goto done;}}
+    if(linkat(dir,temp_name,dir,leaf,0)<0){
+        s=(errno==EEXIST)?FS_READ_DENIED:error_status();goto done;
+    }
+    /* Publish has completed. Remove the temporary sibling. */
+    if(unlinkat(dir,temp_name,0)==0)temp_name[0]=0;
+    /* A cleanup failure leaves an extra hard link, but the requested name
+       is already published. Return success rather than invite duplicate work. */
+    /* The file was published; directory fsync only strengthens durability.
+       Do not report failure after a visible publish and invite an unsafe retry. */
+    (void)fsync(dir);
+    s=FS_READ_OK;
+done:
+    if(temp>=0)close(temp);
+    if(dir>=0){if(temp_name[0] && temp>=0)unlinkat(dir,temp_name,0);
+        close(dir);}
+    if(random_fd>=0)close(random_fd);
+    free(parent);return s;
 }
 #endif
