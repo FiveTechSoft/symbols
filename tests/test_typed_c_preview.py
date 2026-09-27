@@ -64,7 +64,9 @@ class PreviewTests(unittest.TestCase):
         self.obj['edit_scope']['allow']=['helper.c']
         with self.assertRaisesRegex(ValueError,'allow_path'):self.run_preview()
         self.obj['edit_scope']['allow']=['main.c']
-        link=self.work/'link.c';link.symlink_to(self.source)
+        link=self.work/'link.c'
+        try:link.symlink_to(self.source)
+        except OSError as exc:self.skipTest(f'symlinks unavailable: {exc}')
         with self.assertRaisesRegex(ValueError,'symlink'):self.run_preview()
     def test_multifile_allow_deny_and_preserve(self):
         helper=self.work/'helper.c'
