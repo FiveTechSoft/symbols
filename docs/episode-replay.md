@@ -23,11 +23,15 @@ upload or publish it. Delete it after authorized local evaluation when its
 retention is not needed.
 
 **Important boundary:** v1 episodes do not store replayable workspace bytes.
-Any episode written before this opt-in capture remains unreplayable. Because
-this harness captures only task-entry and task-exit trees, it accepts only a
-single recorded attempt per task. Multi-attempt tasks are counted as
-`unavailable`, not collapsed into a fictitious parent-child replay tree.
-Parent links in v1 are observations, not proof of saved intermediate state.
+Any episode written before slice-6 opt-in capture remains unreplayable. This
+harness now requires a private v2 pair for *every* recorded task_ops attempt.
+A separate read-only C validator checks exact manifests, actual source bytes,
+SHA-256 hashes, run shape, and adjacency before Python binds the v1 run ID,
+attempt ordinal, parent ordinal and outcome to the v2 pairs and checks external
+entry/exit source boundaries. Missing, mixed, altered, or partial pairs are
+`unavailable`; v1 FNV fingerprints are never treated as source images.
+A validated multi-attempt task is represented as an ordered attempt tree rather
+than being rejected or collapsed into one task-entry/task-exit edge.
 The strict chronology uses only completed prior baseline tasks, excludes
 identical initial workspaces, and freezes the prior list before either target
 branch runs. It never reads a target's or future task's checker or result for
@@ -48,6 +52,7 @@ is frozen:
 python3 tools/episode_replay.py --sealed-bank /private/sealed-bank \
   --expected-digest SHA256 --agent-bin /absolute/build/symbols-agent \
   --episode-report-bin /absolute/build/engineering_episode_report \
+  --capture-report-bin /absolute/build/attempt_capture_report \
   --capture-root /private/new-capture-directory
 ```
 
@@ -57,3 +62,12 @@ history gates abstain, a no-change result is still a negative experiment.
 Never infer replay gain from these development smoke tests. The true result
 requires an independent, first-run sealed set and frozen oracles. The parser
 and existing v1 audit store are not a new source of live solver decisions.
+
+The v2 report lists each attempt's ordinal, outcome and source-tree digest;
+these are provenance data only, not policy input. The replay gate's existing
+historical veto is unchanged. Neither the old replay gate nor a development
+smoke test measures the new parser's resolution gain. Freeze implementation,
+evaluator, policy, binaries and commit SHA before an independent sealed set,
+then compare old baseline and candidate on identical immutable inputs in one
+paired first run. Report correct positives, wrong edits, abstentions, errors,
+unavailable reasons and valid capture coverage. Set O remains archived.

@@ -13,3 +13,8 @@ assert Unix-style 0700 ACL equivalence. An evaluator must provide a private
 per-run directory with suitable Windows ACLs before enabling capture. This
 module does not create that ACL or authenticate a path supplied in the
 process environment.
+
+An offline evaluator can call `attempt_capture_report ROOT RUN COUNT` to run
+the same read-only v2 validation as the C tests. It does not reinterpret v1
+fingerprints or promote a pending pair. Captures are private and never passed
+to the solver for candidate selection.

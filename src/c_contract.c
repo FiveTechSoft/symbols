@@ -164,10 +164,52 @@ static int no_output_goal(const char *task)
     return 0;
 }
 
+/* A newline may join a single bounded value only after an explicit stdout
+   marker. It never creates a goal from a paraphrase or from two clauses. */
+static int explicit_stdout_line(const char *s, size_t prefix)
+{
+    if (prefix >= 500 || s[prefix] != '\n') return 0;
+    /* Only the marker's own line participates; earlier clauses stay separate. */
+    const char *line = s;
+    for (size_t i=0;i<prefix;i++) if (s[i]=='\n') line=s+i+1;
+    size_t n=prefix-(size_t)(line-s);
+    const char *marker=ci_find_n(line,n,"stdout");
+    if (!marker || ci_find_n(line,n,"file") || !ci_find_n(line,n,"required")) return 0;
+    /* A second marker is not a one-line continuation. */
+    if (ci_find_n(marker+6,n-(size_t)(marker+6-line),"stdout")) return 0;
+    size_t end=prefix;
+    while (end>(size_t)(line-s) && (s[end-1]==' ' || s[end-1]=='\t' || s[end-1]=='\r')) end--;
+    int colon=end && s[end-1]==':';
+    size_t word_end=colon ? end-1 : end;
+    while (word_end>(size_t)(line-s) && (s[word_end-1]==' ' || s[word_end-1]=='\t')) word_end--;
+    int exactly=word_end>=7 && ci_eq_n(s+word_end-7,"exactly",7) &&
+        (word_end==7 || !isalpha((unsigned char)s[word_end-8]));
+    int is=word_end>=2 && ci_eq_n(s+word_end-2,"is",2) &&
+        (word_end==2 || !isalpha((unsigned char)s[word_end-3]));
+    if (!colon && !exactly && !is) return 0;
+    const char *v=s+prefix+1;
+    size_t len=strcspn(v,"\r\n"),skip=0;
+    while (skip<len && (v[skip]==' ' || v[skip]=='\t')) skip++;
+    while (len>skip && (v[len-1]==' ' || v[len-1]=='\t')) len--;
+    if (len==skip || len-skip>127 || prefix+len+1>=512) return 0;
+    /* One bounded value line only; unrelated trailing instructions may carry
+       a competing goal that the old grammar cannot recognize. Fail closed. */
+    const char *tail=v+strcspn(v,"\r\n");
+    while (*tail=='\r' || *tail=='\n') tail++;
+    if (*tail) return -1;
+    /* This value grammar is deliberately narrower than prose. */
+    for (size_t i=skip;i<len;i++) {
+        unsigned char ch=(unsigned char)v[i];
+        if (!(isalnum(ch)||ch=='='||ch=='-'||ch=='.'||ch=='_')) return 0;
+    }
+    return 1;
+}
+
 int CContractParse(const char *task, C_CONTRACT *c)
 {
     memset(c, 0, sizeof(*c));
     if (no_output_goal(task)) { snprintf(c->why,sizeof(c->why),"no_output"); return 0; }
+
     const char *s = task;
     /* the bare-value fallback below needs the task to be about stdout at all,
        and never applies when it mentions a file */
@@ -185,8 +227,20 @@ int CContractParse(const char *task, C_CONTRACT *c)
         int inq = 0;
         while (s[n]) {   /* clause ends at . ; ! ? followed by space or end, outside quotes */
             if (s[n] == '`' || s[n] == '"') inq = !inq;
-            if (!inq && strchr(".;!?\n", s[n]) && (s[n + 1] == '\0' || isspace((unsigned char)s[n + 1]))) break;
+            if (!inq && strchr(".;!?", s[n]) && (s[n + 1] == '\0' || isspace((unsigned char)s[n + 1]))) break;
+            if (!inq && s[n] == '\r' && s[n+1] == '\n') { n++; continue; }
+            if (!inq && s[n] == '\n') {
+                int joined=explicit_stdout_line(s,n);
+                if (joined<0) return CC_WHY("multi");
+                if (!joined) break;
+            }
             n++;
+        }
+        size_t joined = n;
+        for (size_t j=0;j<n;j++) {
+            if (s[j]=='\n' && explicit_stdout_line(s,j)>0) {
+                joined=j;break;
+            }
         }
         char cl[512];
         size_t o = 0;
@@ -194,7 +248,7 @@ int CContractParse(const char *task, C_CONTRACT *c)
         for (size_t i = 0; i < n && o + 1 < sizeof(cl); i++) {   /* drop (...) */
             if (s[i] == '(') par++;
             else if (s[i] == ')' && par) par--;
-            else if (!par) cl[o++] = s[i];
+            else if (!par) cl[o++] = i==joined || s[i]=='\r' ? ' ' : s[i];
         }
         cl[o] = '\0';
         const char *but = ci_find_n(cl, o, ", but");

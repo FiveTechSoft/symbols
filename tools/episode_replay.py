@@ -49,6 +49,33 @@ def tree_digest(root):
     return hashlib.sha256(canonical).hexdigest(), digests
 
 
+def source_digest_with_audit(root):
+    """Hash final source bytes without treating .symbols audit data as source."""
+    root = Path(root)
+    audit = root / '.symbols'
+    if audit.is_symlink() or not audit.is_dir():
+        raise Unavailable('missing_or_unsafe_audit')
+    result, total = {}, 0
+    for path in sorted(root.rglob('*')):
+        rel = path.relative_to(root)
+        if rel.parts[0] == '.symbols':
+            continue
+        if path.is_symlink() or not (path.is_file() or path.is_dir()):
+            raise Unavailable('unsafe_source_entry')
+        if path.is_dir():
+            continue
+        if path.stat().st_nlink != 1:
+            raise Unavailable('unsafe_source_file')
+        data = path.read_bytes()
+        if len(data) > MAX_FILE or b'\0' in data:
+            raise Unavailable('source_limit')
+        total += len(data)
+        result[rel.as_posix()] = hashlib.sha256(data).hexdigest()
+    if len(result) > MAX_FILES or total > MAX_TOTAL:
+        raise Unavailable('source_limit')
+    return result
+
+
 def sealed_digest(root):
     # The sealed set includes the oracle and task text; only this digest is exposed.
     files = {}
@@ -125,11 +152,66 @@ def oracle(task, snapshot):
         return result.returncode == 0
 
 
-def run_agent(task, initial, branch, exe, report_bin, snapshots, seq, mode):
+def capture_v2(root, report_bin, episode, initial, final):
+    """Validate the whole run before accepting any node as replayable.
+
+    The C validator owns its SHA-256 tree formula, exact manifest parsing,
+    run shape and adjacency. Python checks v1 identity/outcome and the two
+    external boundaries, but never upgrades a v1 fingerprint into a tree.
+    """
+    lines = episode.read_bytes().splitlines()
+    # The v1 report already checked its checksum/schema; identifiers below
+    # are fixed-position escaped fields. Refuse escaping rather than guessing.
+    rows = []
+    for line in lines[1:]:
+        if line.startswith(b'CHECKSUM\t'):
+            break
+        cols = line.split(b'\t')
+        if len(cols) != 20 or any(b'%' in cols[i] for i in (1, 2, 3, 15)):
+            raise Unavailable('v1_v2_identity_unavailable')
+        rows.append((cols[1].decode('ascii'), cols[2].decode('ascii'),
+                     cols[3].decode('ascii'), cols[15].decode('ascii')))
+    if not rows or len(rows) > 3 or len({r[0] for r in rows}) != 1:
+        raise Unavailable('v1_v2_identity_unavailable')
+    run = rows[0][0]
+    if not re.fullmatch(r'[0-9]+-[0-9]+-[0-9]+', run):
+        raise Unavailable('v1_v2_identity_unavailable')
+    dest = root / run
+    if root.is_symlink() or not dest.is_dir() or dest.is_symlink() or len(list(root.iterdir())) != 1:
+        raise Unavailable('capture_run_shape')
+    check = call([str(report_bin), str(root), run, str(len(rows))], root)
+    if check.returncode or check.stdout.strip() != f'validated={len(rows)}':
+        raise Unavailable('capture_v2_invalid')
+    nodes = []
+    for i, row in enumerate(rows, 1):
+        rid, attempt, parent, outcome = row
+        if rid != run or attempt != str(i) or parent != (str(i-1) if i>1 else ''):
+            raise Unavailable('v1_v2_identity_unavailable')
+        pair = dest / f'{i:03d}'
+        fields = (pair / 'manifest.v2').read_text(encoding='ascii').splitlines()
+        expect = ['SYMBOLS-ATTEMPT-CAPTURE\t2', f'run\t{run}',
+                  f'attempt\t{i}', f'parent\t{i-1}', f'outcome\t{outcome}']
+        if fields[:5] != expect:
+            raise Unavailable('v1_v2_outcome_mismatch')
+        before, _ = tree_digest(pair / 'before')
+        after, _ = tree_digest(pair / 'after')
+        nodes.append({'attempt': i, 'outcome': outcome,
+                      'before': before, 'after': after})
+    if tree_digest(initial)[1] != tree_digest(dest / '001' / 'before')[1] or \
+       source_digest_with_audit(final) != tree_digest(dest / f'{len(rows):03d}' / 'after')[1]:
+        raise Unavailable('capture_external_boundary')
+    return nodes
+
+
+def run_agent(task, initial, branch, exe, report_bin, capture_report_bin, snapshots, seq, mode):
     private_copy(initial, branch)
     task_text = (task / 'task.md').read_text(encoding='utf-8').strip()
     env = dict(os.environ)
     env['SYMBOLS_ENGINEERING_EPISODES'] = '1'
+    private_root = branch.parent / f'{mode}-capture'
+    private_root.mkdir(mode=0o700)
+    private_root.chmod(0o700)
+    env['SYMBOLS_ATTEMPT_CAPTURE'] = str(private_root.resolve())
     # No inherited decision-memory or trace switch.
     for key in ('SYMBOLS_TASK_OPS_MEMORY', 'SYMBOLS_TRACE'):
         env.pop(key, None)
@@ -141,23 +223,24 @@ def run_agent(task, initial, branch, exe, report_bin, snapshots, seq, mode):
     match = re.search(r'records=([1-9][0-9]*)', audit.stdout)
     if audit.returncode or not match:
         raise Unavailable('invalid_episode')
-    # v1 rows have no immutable per-attempt workspace bytes. Until a snapshot
-    # boundary is implemented, only one-attempt tasks can be paired honestly.
-    if int(match.group(1)) != 1:
-        raise Unavailable('multi_attempt_snapshot_absent')
+    # A validated v2 run, not old v1 FNV fingerprints, owns the replay bytes.
+    nodes = capture_v2(private_root, capture_report_bin, episode, initial, branch)
+    if int(match.group(1)) != len(nodes):
+        raise Unavailable('v1_v2_count_mismatch')
     # Strip the private audit store before hashing source. Capture it separately
     # for validation only, not policy: old v1 rows have no workspace bytes.
     shutil.rmtree(branch / '.symbols')
     digest, after = tree_digest(branch)
     op_matches = OP.findall(result.stdout)
-    operator = op_matches[-1][0] if op_matches else None
+    operator = op_matches[-1] if op_matches else None
     snap = snapshots / f'{seq:03d}-{mode}-post'
     private_copy(branch, snap)
     return {'agent_rc': result.returncode, 'operator': operator,
-            'post_sha256': digest, 'after': after, 'snapshot': snap}
+            'post_sha256': digest, 'after': after, 'snapshot': snap,
+            'attempts': nodes}
 
 
-def evaluate(bank, tasks, exe, report_bin, output):
+def evaluate(bank, tasks, exe, report_bin, capture_report_bin, output):
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     output.chmod(0o700)
     snapshots = output / 'snapshots'
@@ -183,7 +266,7 @@ def evaluate(bank, tasks, exe, report_bin, output):
             branches = {}
             for mode in ('baseline', 'replay'):
                 try:
-                    run = run_agent(task, original, temp / mode, exe, report_bin, snapshots, seq, mode)
+                    run = run_agent(task, original, temp / mode, exe, report_bin, capture_report_bin, snapshots, seq, mode)
                     if tree_digest(original)[0] != before_digest:
                         raise Unavailable('initial_snapshot_changed')
                     changed = bool(source_changes(before, run['after']))
@@ -201,7 +284,8 @@ def evaluate(bank, tasks, exe, report_bin, output):
                     branches[mode] = {'status': status, 'operator': run['operator'],
                                       'wrong_edit': status == 'wrong_edits', 'veto': veto,
                                       'initial_sha256': before_digest,
-                                      'final_sha256': before_digest if veto else run['post_sha256']}
+                                      'final_sha256': before_digest if veto else run['post_sha256'],
+                                      'attempts': run['attempts']}
                 except (Unavailable, OSError, ValueError, UnicodeError):
                     aggregate[mode]['unavailable'] += 1
                     branches[mode] = {'status': 'unavailable'}
@@ -216,7 +300,7 @@ def evaluate(bank, tasks, exe, report_bin, output):
             'history_rule': 'strict_prior_baseline_only_exclude_identical_workspace',
             'candidate_gate': 'abstain_if_prior_same_operator_wrong_edit',
             'task_count': len(tasks), 'aggregate': aggregate, 'paired': counts,
-            'caveats': ['fresh_snapshots_only', 'v1_pre_snapshot_rows_unreplayable', 'multi_attempt_tasks_unavailable',
+            'caveats': ['fresh_snapshots_only', 'v1_pre_snapshot_rows_unreplayable', 'validated_v2_attempts_only',
                         'mechanical_oracle_not_user_intent', 'offline_only_no_policy_change']}
 
 
@@ -226,6 +310,7 @@ def main():
     p.add_argument('--expected-digest', required=True)
     p.add_argument('--agent-bin', required=True)
     p.add_argument('--episode-report-bin', required=True)
+    p.add_argument('--capture-report-bin', required=True)
     p.add_argument('--capture-root', required=True)
     a = p.parse_args()
     bank = Path(a.sealed_bank).resolve()
@@ -234,12 +319,13 @@ def main():
         raise Unavailable('sealed_set_digest_mismatch')
     tasks = collect(bank, bank / 'index.tsv')
     exe, report = Path(a.agent_bin).resolve(), Path(a.episode_report_bin).resolve()
-    if not exe.is_file() or not report.is_file():
+    capture_report = Path(a.capture_report_bin).resolve()
+    if not exe.is_file() or not report.is_file() or not capture_report.is_file():
         raise Unavailable('missing_binaries')
     output = Path(a.capture_root).resolve()
     if output.is_relative_to(bank) or bank.is_relative_to(output):
         raise Unavailable('capture_overlaps_sealed_set')
-    result = evaluate(bank, tasks, exe, report, output)
+    result = evaluate(bank, tasks, exe, report, capture_report, output)
     if sealed_digest(bank) != digest:
         raise Unavailable('sealed_set_changed_during_run')
     result['sealed_set_sha256'] = digest

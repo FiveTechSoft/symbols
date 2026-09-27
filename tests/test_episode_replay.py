@@ -44,6 +44,86 @@ class ReplayContractTest(unittest.TestCase):
         with self.assertRaises(replay.Unavailable):
             replay.collect(self.root, self.root / 'index.tsv')
 
+    def test_v2_multi_attempt_identity_and_damage(self):
+        import os
+        import shutil
+        import subprocess
+        report = os.environ.get('ATTEMPT_CAPTURE_REPORT_BIN')
+        agent = os.environ.get('SYMBOLS_AGENT_BIN')
+        if not report or not agent:
+            self.skipTest('integration executables not configured')
+        src = self.root / 'initial'
+        src.mkdir()
+        (src / 'main.c').write_text('int old_name(void){return 1;} int main(void){return old_name()-1;}\n')
+        task = 'Rename old_name to new_name.'
+        # A real task_ops capture; perturbation tests below use only an isolated
+        # copy of the captured tree, never a sealed evaluation task.
+        branch = self.root / 'work'
+        shutil.copytree(src, branch)
+        cap = self.root / 'private'
+        cap.mkdir(mode=0o700)
+        env = os.environ.copy()
+        env.update(SYMBOLS_ENGINEERING_EPISODES='1', SYMBOLS_ATTEMPT_CAPTURE=str(cap),
+                   SYMBOLS_REFLEXION='1', SYMBOLS_TASK_OPS_MEMORY='0')
+        p = subprocess.run([agent, '-w', str(branch), task], cwd=branch, env=env,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        rows = (branch / '.symbols' / 'engineering_episodes.v1').read_text().splitlines()
+        self.assertEqual(len(rows), 3)  # header, record, checksum
+        nodes = replay.capture_v2(cap, Path(report),
+                                  branch / '.symbols' / 'engineering_episodes.v1',src,branch)
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0]['outcome'], 'verified')
+        run = next(cap.iterdir())
+        marker = run / '001' / 'manifest.v2'
+        original = marker.read_bytes()
+        marker.write_bytes(original.replace(b'outcome\tverified',b'outcome\tabstained'))
+        with self.assertRaises(replay.Unavailable):
+            replay.capture_v2(cap, Path(report),
+                              branch / '.symbols' / 'engineering_episodes.v1',src,branch)
+        marker.write_bytes(original)
+        before=run/'001'/'before'/'main.c'
+        before.write_bytes(before.read_bytes()+b'\n')
+        with self.assertRaises(replay.Unavailable):
+            replay.capture_v2(cap, Path(report),
+                              branch / '.symbols' / 'engineering_episodes.v1',src,branch)
+
+    def test_v2_two_attempt_chain(self):
+        import os
+        import shutil
+        import subprocess
+        agent = os.environ.get('SYMBOLS_AGENT_BIN')
+        report = os.environ.get('ATTEMPT_CAPTURE_REPORT_BIN')
+        if not agent or not report:
+            self.skipTest('integration executables not configured')
+        src = self.root / 'source'
+        src.mkdir()
+        (src / 'util.c').write_text('int max_of(const int *a, int n) { int m = a[0]; for (int i = 1; i < n; i++) if (a[i] < m) m = a[i]; return m; }\n')
+        (src / 'other.c').write_text('int bonus(int k) { return k < 3 ? 8 : 0; }\n')
+        (src / 'main.c').write_text('#include <stdio.h>\nint max_of(const int *a, int n);\nint bonus(int k);\n'
+          'int main(void) { int a[] = {3, 9, 1, 4}; printf("%d\\n", max_of(a, 4) + bonus(3)); return 0; }\n')
+        branch=self.root / 'work'
+        shutil.copytree(src,branch)
+        cap=self.root / 'capture'
+        cap.mkdir(mode=0o700)
+        env=os.environ.copy()
+        env.update(SYMBOLS_ENGINEERING_EPISODES='1',SYMBOLS_ATTEMPT_CAPTURE=str(cap),
+                   SYMBOLS_REFLEXION='1',SYMBOLS_TASK_OPS_MEMORY='0')
+        task='The bug is in util.c: the program must print 9.'
+        p=subprocess.run([agent,'-w',str(branch),task],cwd=branch,env=env,
+                         capture_output=True,text=True,timeout=60)
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        nodes=replay.capture_v2(cap,Path(report),
+              branch/'.symbols'/'engineering_episodes.v1',src,branch)
+        self.assertEqual([n['outcome'] for n in nodes],['refuted','verified'])
+        self.assertEqual(nodes[0]['after'],nodes[1]['before'])
+        self.assertEqual(nodes[0]['before'],nodes[0]['after'])
+        run=next(cap.iterdir())
+        modified=run/'002'/'after'/'util.c'
+        modified.write_bytes(modified.read_bytes()+b'\n')
+        with self.assertRaises(replay.Unavailable):
+            replay.capture_v2(cap,Path(report),branch/'.symbols'/'engineering_episodes.v1',src,branch)
+
     def test_changes_and_prior_only_veto(self):
         self.assertEqual(replay.source_changes({'a': 'old'}, {'a': 'new'}), ['a'])
         self.assertEqual(replay.source_changes({'a': 'old'}, {'a': 'old'}), [])

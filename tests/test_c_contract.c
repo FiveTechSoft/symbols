@@ -113,6 +113,34 @@ int main(void)
     CHECK(!CContractParse("Fix the leak without any expected stdout; it once printed 9.", &k));
     CHECK(!CContractParse("Expected stdout is unknown; observed output was 10.", &k));
     CHECK(CContractParse("The program should print 7, not 6.", &k) && !strcmp(k.out,"7"));
+    /* A literal value on the next line is one clause only with an explicit
+       stdout marker; the original candidate tiers and verifier are unchanged. */
+    CHECK(CContractParse("The required stdout is exactly:\ncount=12", &k) && !strcmp(k.out,"count=12"));
+    CHECK(!CContractParse("It must print exactly:\nspaces=4", &k)); /* marker lacks stdout */
+    CHECK(CContractParse("The required stdout is\r\ncount=12", &k) && !strcmp(k.out,"count=12"));
+    CHECK(!CContractParse("The counter is one short of a dozen. Make it right.", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\n\ncount=12", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12\nIt must print count=13.", &k));
+    CHECK(!CContractParse("No required stdout is specified:\ncount=12", &k));
+    CHECK(!CContractParse("The required output file is exactly:\ncount=12", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12 extra", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\n", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\n count=12 and more", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12; run it", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12\nNext instruction unrelated", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\np=4 q=9", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12\nIt must print count=13.", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12,", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12\rnot a second line", &k));
+    CHECK(!CContractParse("The required stdout is exactly:\ncount=12\nThe required stdout is exactly:\ncount=13", &k));
+    CHECK(!CContractParse("The value of p must be 4. Separately: q must print as 9.", &k));
+    {
+        char text[400];
+        snprintf(text,sizeof(text),"The required stdout is exactly:\n%0127d",0);
+        CHECK(CContractParse(text,&k) && strlen(k.out)==127);
+        snprintf(text,sizeof(text),"The required stdout is exactly:\n%0128d",0);
+        CHECK(!CContractParse(text,&k));
+    }
     printf("%s\n", fails ? "FAILED" : "OK");
     return fails != 0;
 }

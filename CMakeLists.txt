@@ -499,7 +499,10 @@ sllm_test(test_atomic_store tests/test_atomic_store.c)
 sllm_test(test_engineering_episode tests/test_engineering_episode.c)
 if(Python3_Interpreter_FOUND)
     add_test(NAME test_episode_replay_contract
-             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_episode_replay.py
+             COMMAND ${CMAKE_COMMAND} -E env
+                     ATTEMPT_CAPTURE_REPORT_BIN=$<TARGET_FILE:attempt_capture_report>
+                     SYMBOLS_AGENT_BIN=$<TARGET_FILE:symbols-agent>
+                     ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_episode_replay.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 sllm_test(test_episode_shadow tests/test_episode_shadow.c)
@@ -530,6 +533,9 @@ target_compile_definitions(engineering_episode_report_lib PRIVATE EPISODE_REPORT
 target_link_libraries(test_engineering_episode engineering_episode_report_lib)
 add_executable(engineering_episode_report tools/engineering_episode_report.c)
 target_link_libraries(engineering_episode_report symbolic)
+
+add_executable(attempt_capture_report tools/attempt_capture_report.c src/attempt_capture.c)
+target_include_directories(attempt_capture_report PRIVATE include)
 
 add_executable(test_attempt_capture tests/test_attempt_capture.c src/attempt_capture.c)
 target_compile_definitions(test_attempt_capture PRIVATE ATTEMPT_CAPTURE_TEST_CRASH=1)
