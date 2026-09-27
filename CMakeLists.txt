@@ -79,6 +79,7 @@ add_library(symbolic STATIC
     src/atomic_store.c
     src/fs_read.c
     src/fs_manifest.c
+    src/fs_txn_plan.c
     src/engineering_episode.c
     src/episodic_memory.c
 )
@@ -147,6 +148,7 @@ add_test(NAME test_relation_subject_index COMMAND test_relation_subject_index)
 sllm_test(test_fs_read tests/test_fs_read.c)
 sllm_test(test_fs_manifest tests/test_fs_manifest.c)
 sllm_test(test_fs_create tests/test_fs_create.c)
+sllm_test(test_fs_txn_plan tests/test_fs_txn_plan.c)
 sllm_test(test_contradictions  tests/test_contradictions.c)
 sllm_test(test_stats           tests/test_stats.c)
 sllm_test(test_analogical      tests/test_analogical.c)
