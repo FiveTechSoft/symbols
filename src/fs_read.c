@@ -6,6 +6,7 @@
 #include "fs_batch.h"
 #include "fs_remove.h"
 #include "fs_move.h"
+#include "fs_replace.h"
 #include "fs_manifest.h"
 #include <stdlib.h>
 #include <string.h>
@@ -362,6 +363,12 @@ FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
   return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
+ const void *expected,size_t expected_len,const void *replacement,size_t replacement_len)
+{ (void)path;(void)expected;(void)expected_len;(void)replacement;(void)replacement_len;
+ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *r)
+{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else
 /* The lock is an inode under the held root, not a path reopened by name.
    External processes that unlink or ignore it are outside cooperative isolation. */
@@ -389,6 +396,8 @@ static void unlock_workspace(int fd)
 #define FS_REMOVE_COMMIT ".fstxn.rcommit"
 #define FS_MOVE_NAME ".fstxn.move"
 #define FS_MOVE_COMMIT ".fstxn.mcommit"
+#define FS_REPLACE_NAME ".fstxn.replace"
+#define FS_REPLACE_COMMIT ".fstxn.pcommit"
 #define FS_INTENT_MAGIC 0x46535458u
 #define FS_INTENT_MAX_PATH 1024
 /* Fixed-size versioned record, checked in full before any cleanup. Same-host
@@ -424,6 +433,8 @@ static int intent_valid(const FS_CREATE_INTENT *i)
         strcmp(i->target,FS_REMOVE_COMMIT) &&
         strcmp(i->target,FS_MOVE_NAME) &&
         strcmp(i->target,FS_MOVE_COMMIT) &&
+        strcmp(i->target,FS_REPLACE_NAME) &&
+        strcmp(i->target,FS_REPLACE_COMMIT) &&
         strcmp(i->target,".fstxn") &&
         strncmp(i->target,".fstxn/",7) &&
         strncmp(i->target,".fst-",5) &&
@@ -432,6 +443,7 @@ static int intent_valid(const FS_CREATE_INTENT *i)
 static FS_READ_STATUS batch_state(const FS_READ_ROOT *r,int *batch,int *commit);
 static FS_READ_STATUS remove_state(const FS_READ_ROOT *r,int *intent,int *commit);
 static FS_READ_STATUS move_state(const FS_READ_ROOT *r,int *intent,int *commit);
+static FS_READ_STATUS replace_state(const FS_READ_ROOT *r,int *intent,int *commit);
 static FS_READ_STATUS pending_intent(const FS_READ_ROOT *r,int *present)
 {
     struct stat st;
@@ -525,6 +537,11 @@ FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
      if(s!=FS_READ_OK||mv||commit){unlock_workspace(lockfd);
          return s==FS_READ_OK?FS_READ_DENIED:s;}
     }
+    {int repl=0,commit=0;
+     s=replace_state(r,&repl,&commit);
+     if(s!=FS_READ_OK||repl||commit){unlock_workspace(lockfd);
+         return s==FS_READ_OK?FS_READ_DENIED:s;}
+    }
     s=recover_locked(r);unlock_workspace(lockfd);return s;
 }
 static int write_all(int fd,const unsigned char *bytes,size_t len)
@@ -549,9 +566,11 @@ static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
        !strcmp(rel,FS_BATCH_NAME)||!strcmp(rel,FS_BATCH_COMMIT)||
        !strcmp(rel,FS_REMOVE_NAME)||!strcmp(rel,FS_REMOVE_COMMIT)||
        !strcmp(rel,FS_MOVE_NAME)||!strcmp(rel,FS_MOVE_COMMIT)||
+       !strcmp(rel,FS_REPLACE_NAME)||!strcmp(rel,FS_REPLACE_COMMIT)||
        !strncmp(rel,".fstxn/",7)||!strcmp(rel,".fstxn")||
        !strncmp(rel,".fst-",5)||!strncmp(rel,".fstxn-",7)||
-       !strncmp(rel,".fsrm-",6)||!strncmp(rel,".fsmv-",6))return FS_READ_DENIED;
+       !strncmp(rel,".fsrm-",6)||!strncmp(rel,".fsmv-",6)||
+       !strncmp(rel,".fsrp-",6)||!strncmp(rel,".fsrb-",6))return FS_READ_DENIED;
     s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
     if(pending){s=FS_READ_DENIED;goto done;}
     {int batch=0,commit=0;
@@ -565,6 +584,10 @@ static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
     {int mv=0,committed=0;
      s=move_state(r,&mv,&committed);
      if(s!=FS_READ_OK||mv||committed){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
+    {int repl=0,commit=0;
+     s=replace_state(r,&repl,&commit);
+     if(s!=FS_READ_OK||repl||commit){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
     }
     s=FsManifestPlan(r,&request,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
@@ -645,9 +668,11 @@ static int batch_name_ok(const char *p)
       strcmp(p,FS_BATCH_NAME) && strcmp(p,FS_BATCH_COMMIT) &&
       strcmp(p,FS_REMOVE_NAME) && strcmp(p,FS_REMOVE_COMMIT) &&
       strcmp(p,FS_MOVE_NAME) && strcmp(p,FS_MOVE_COMMIT) &&
+      strcmp(p,FS_REPLACE_NAME) && strcmp(p,FS_REPLACE_COMMIT) &&
       strcmp(p,".fstxn") && strncmp(p,".fstxn/",7) &&
       strncmp(p,".fst-",5) && strncmp(p,".fstxn-",7) &&
-      strncmp(p,".fsrm-",6) && strncmp(p,".fsmv-",6);
+      strncmp(p,".fsrm-",6) && strncmp(p,".fsmv-",6) &&
+      strncmp(p,".fsrp-",6) && strncmp(p,".fsrb-",6);
 }
 static int batch_valid(const FS_BATCH_RECORD *b)
 {
@@ -764,8 +789,11 @@ FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
       s=remove_state(r,&removal,&committed);
       if(s==FS_READ_OK){int mv=0,mc=0;
       s=move_state(r,&mv,&mc);
-      if(s==FS_READ_OK)s=(pending||removal||committed||mv||mc)?
-          FS_READ_DENIED:batch_recover_locked(r);
+      if(s==FS_READ_OK){int repl=0,pc=0;
+       s=replace_state(r,&repl,&pc);
+       if(s==FS_READ_OK)s=(pending||removal||committed||mv||mc||repl||pc)?
+           FS_READ_DENIED:batch_recover_locked(r);
+      }
     }
     }
     unlock_workspace(lock);return s;
@@ -797,6 +825,10 @@ FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *entrie
     {int mv=0,mc=0;
      s=move_state(r,&mv,&mc);
      if(s!=FS_READ_OK||mv||mc){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
+    {int repl=0,pc=0;
+     s=replace_state(r,&repl,&pc);
+     if(s!=FS_READ_OK||repl||pc){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
     }
     s=FsManifestPlan(r,req,count,&manifest);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&manifest);
@@ -894,9 +926,11 @@ FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
        !strcmp(dst,FS_BATCH_NAME)||!strcmp(dst,FS_BATCH_COMMIT)||
        !strcmp(dst,FS_REMOVE_NAME)||!strcmp(dst,FS_REMOVE_COMMIT)||
        !strcmp(dst,FS_MOVE_NAME)||!strcmp(dst,FS_MOVE_COMMIT)||
+       !strcmp(dst,FS_REPLACE_NAME)||!strcmp(dst,FS_REPLACE_COMMIT)||
        !strncmp(dst,".fstxn/",7)||!strcmp(dst,".fstxn")||
        !strncmp(dst,".fst-",5)||!strncmp(dst,".fstxn-",7)||
-       !strncmp(dst,".fsrm-",6)||!strncmp(dst,".fsmv-",6))return FS_READ_DENIED;
+       !strncmp(dst,".fsrm-",6)||!strncmp(dst,".fsmv-",6)||
+       !strncmp(dst,".fsrp-",6)||!strncmp(dst,".fsrb-",6))return FS_READ_DENIED;
     s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
     s=FsManifestPlan(r,&request,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
@@ -933,6 +967,7 @@ static int remove_valid(const FS_REMOVE_RECORD *i)
         batch_name_ok(i->target)&&
         strcmp(i->target,FS_REMOVE_NAME)&&strcmp(i->target,FS_REMOVE_COMMIT)&&
         strcmp(i->target,FS_MOVE_NAME)&&strcmp(i->target,FS_MOVE_COMMIT)&&
+        strcmp(i->target,FS_REPLACE_NAME)&&strcmp(i->target,FS_REPLACE_COMMIT)&&
         strncmp(i->stage,".fsrm-",6)==0&&strlen(i->stage)==38&&
         strspn(i->stage+6,"0123456789abcdef")==32;
 }
@@ -998,8 +1033,11 @@ FS_READ_STATUS FsRemoveRecover(const FS_READ_ROOT *r)
     if(s==FS_READ_OK)s=batch_state(r,&batch,&commit);
     if(s==FS_READ_OK){int mv=0,mc=0;
       s=move_state(r,&mv,&mc);
-      if(s==FS_READ_OK)s=(pending||batch||commit||mv||mc)?
-          FS_READ_DENIED:remove_recover_locked(r);
+      if(s==FS_READ_OK){int repl=0,pc=0;
+       s=replace_state(r,&repl,&pc);
+       if(s==FS_READ_OK)s=(pending||batch||commit||mv||mc||repl||pc)?
+           FS_READ_DENIED:remove_recover_locked(r);
+      }
     }
     unlock_workspace(lock);return s;
 }
@@ -1017,7 +1055,9 @@ FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
        strlen(path)>=sizeof(parent)||!batch_name_ok(path)||
        !strcmp(path,FS_REMOVE_NAME)||!strcmp(path,FS_REMOVE_COMMIT)||
        !strncmp(path,".fsrm-",6)||!strcmp(path,FS_MOVE_NAME)||
-       !strcmp(path,FS_MOVE_COMMIT)||!strncmp(path,".fsmv-",6))return FS_READ_INVALID;
+       !strcmp(path,FS_MOVE_COMMIT)||!strncmp(path,".fsmv-",6)||
+       !strcmp(path,FS_REPLACE_NAME)||!strcmp(path,FS_REPLACE_COMMIT)||
+       !strncmp(path,".fsrp-",6)||!strncmp(path,".fsrb-",6))return FS_READ_INVALID;
     s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
     s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
     s=batch_state(r,&batch,&committed);if(s!=FS_READ_OK)goto done;
@@ -1026,6 +1066,10 @@ FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
     {int mv=0,mc=0;
      s=move_state(r,&mv,&mc);
      if(s!=FS_READ_OK||mv||mc){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
+    {int repl=0,pc=0;
+     s=replace_state(r,&repl,&pc);
+     if(s!=FS_READ_OK||repl||pc){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
     }
     s=FsManifestPlan(r,&req,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
@@ -1111,9 +1155,13 @@ static int move_valid(const FS_MOVE_RECORD *i)
        !batch_name_ok(i->source)||!batch_name_ok(i->target)||
        !strcmp(i->source,i->target)||
        !strcmp(i->source,FS_MOVE_NAME)||!strcmp(i->source,FS_MOVE_COMMIT)||
+       !strcmp(i->source,FS_REPLACE_NAME)||!strcmp(i->source,FS_REPLACE_COMMIT)||
        !strcmp(i->target,FS_MOVE_NAME)||!strcmp(i->target,FS_MOVE_COMMIT)||
+       !strcmp(i->target,FS_REPLACE_NAME)||!strcmp(i->target,FS_REPLACE_COMMIT)||
        !strncmp(i->source,".fsrm-",6)||!strncmp(i->target,".fsrm-",6)||
        !strncmp(i->source,".fsmv-",6)||!strncmp(i->target,".fsmv-",6)||
+       !strncmp(i->source,".fsrp-",6)||!strncmp(i->target,".fsrp-",6)||
+       !strncmp(i->source,".fsrb-",6)||!strncmp(i->target,".fsrb-",6)||
        strncmp(i->stage,".fsmv-",6)||strlen(i->stage)!=38||
        strspn(i->stage+6,"0123456789abcdef")!=32)return 0;
     return 1;
@@ -1193,8 +1241,11 @@ FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *r)
     s=pending_intent(r,&pending);
     if(s==FS_READ_OK)s=batch_state(r,&batch,&commit);
     if(s==FS_READ_OK)s=remove_state(r,&remove,&rc);
-    if(s==FS_READ_OK)s=(pending||batch||commit||remove||rc)?
-        FS_READ_DENIED:move_recover_locked(r);
+    if(s==FS_READ_OK){int repl=0,pc=0;
+     s=replace_state(r,&repl,&pc);
+     if(s==FS_READ_OK)s=(pending||batch||commit||remove||rc||repl||pc)?
+         FS_READ_DENIED:move_recover_locked(r);
+    }
     unlock_workspace(lock);return s;
 }
 FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
@@ -1212,14 +1263,23 @@ FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
        !batch_name_ok(src)||!batch_name_ok(dst)||!strcmp(src,dst)||
        !strcmp(src,FS_MOVE_NAME)||!strcmp(src,FS_MOVE_COMMIT)||
        !strcmp(dst,FS_MOVE_NAME)||!strcmp(dst,FS_MOVE_COMMIT)||
+       !strcmp(dst,FS_REPLACE_NAME)||!strcmp(dst,FS_REPLACE_COMMIT)||
        !strncmp(src,".fsmv-",6)||!strncmp(dst,".fsmv-",6)||
-       !strncmp(src,".fsrm-",6)||!strncmp(dst,".fsrm-",6))return FS_READ_INVALID;
+       !strncmp(src,".fsrm-",6)||!strncmp(dst,".fsrm-",6)||
+       !strcmp(src,FS_REPLACE_NAME)||!strcmp(dst,FS_REPLACE_NAME)||
+       !strcmp(src,FS_REPLACE_COMMIT)||!strcmp(dst,FS_REPLACE_COMMIT)||
+       !strncmp(src,".fsrp-",6)||!strncmp(dst,".fsrp-",6)||
+       !strncmp(src,".fsrb-",6)||!strncmp(dst,".fsrb-",6))return FS_READ_INVALID;
     s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
     s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
     s=batch_state(r,&batch,&bc);if(s!=FS_READ_OK)goto done;
     s=remove_state(r,&remove,&rc);if(s!=FS_READ_OK)goto done;
     s=move_state(r,&mv,&mc);if(s!=FS_READ_OK)goto done;
     if(pending||batch||bc||remove||rc||mv||mc){s=FS_READ_DENIED;goto done;}
+    {int repl=0,pc=0;
+     s=replace_state(r,&repl,&pc);
+     if(s!=FS_READ_OK||repl||pc){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
     s=FsManifestPlan(r,&req,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
     s=FsReadFile(r,src,&bytes,&len,&m);if(s!=FS_READ_OK)goto done;
@@ -1284,5 +1344,273 @@ done:
     if(!journaled&&stage_owned)(void)durable_remove(r->fd,i.stage);
     unlock_workspace(lock);
     return marked?FS_READ_OK:((target_visible||source_removed)?FS_READ_IO:s);
+}
+#define FS_REPLACE_MAGIC 0x46535250u
+#define FS_REPLACE_MARK_MAGIC 0x46535243u
+typedef struct {
+    uint32_t magic,version;
+    uint64_t olddev,oldino,newdev,newino;
+    char target[FS_INTENT_MAX_PATH],oldstage[48],newstage[48];
+} FS_REPLACE_RECORD;
+typedef struct {
+    uint32_t magic,version;
+    uint64_t intentdev,intentino;
+    FS_REPLACE_RECORD image;
+} FS_REPLACE_MARK;
+static FS_READ_STATUS replace_state(const FS_READ_ROOT *r,int *intent,int *commit)
+{
+    struct stat st;*intent=*commit=0;
+    if(fstatat(r->fd,FS_REPLACE_NAME,&st,AT_SYMLINK_NOFOLLOW)==0)*intent=1;
+    else if(errno!=ENOENT)return FS_READ_DENIED;
+    if(fstatat(r->fd,FS_REPLACE_COMMIT,&st,AT_SYMLINK_NOFOLLOW)==0)*commit=1;
+    else if(errno!=ENOENT)return FS_READ_DENIED;
+    return FS_READ_OK;
+}
+static int replace_valid(const FS_REPLACE_RECORD *i)
+{
+    if(i->magic!=FS_REPLACE_MAGIC||i->version!=1||
+       !memchr(i->target,0,sizeof(i->target))||
+       !memchr(i->oldstage,0,sizeof(i->oldstage))||
+       !memchr(i->newstage,0,sizeof(i->newstage))||
+       !batch_name_ok(i->target)||
+       !strncmp(i->target,".fsrp-",6)||!strncmp(i->target,".fsrb-",6)||
+       !strcmp(i->oldstage,i->newstage)||
+       strncmp(i->oldstage,".fsrp-",6)||strncmp(i->newstage,".fsrp-",6)||
+       (i->olddev==i->newdev&&i->oldino==i->newino)||
+       strlen(i->oldstage)!=38||strlen(i->newstage)!=38||
+       strspn(i->oldstage+6,"0123456789abcdef")!=32||
+       strspn(i->newstage+6,"0123456789abcdef")!=32)return 0;
+    return 1;
+}
+static int replace_read(int root,const char *name,void *out,size_t size,
+                        struct stat *st)
+{
+    int fd=openat(root,name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+    int ok=fd>=0&&fstat(fd,st)==0&&S_ISREG(st->st_mode)&&
+       st->st_nlink>=1&&st->st_nlink<=2&&(st->st_mode&077)==0&&st->st_size==(off_t)size&&
+       read(fd,out,size)==(ssize_t)size;
+    if(fd>=0)close(fd);
+    return ok;
+}
+static int replace_id(const struct stat *st,uint64_t dev,uint64_t ino)
+{ return S_ISREG(st->st_mode)&&st->st_dev==(dev_t)dev&&st->st_ino==(ino_t)ino; }
+/* A named stage or temporary link may already have been removed in cleanup.
+   A present name is *always* checked before removal; unknown names fail shut. */
+static int replace_name_check(int dir,const char *name,uint64_t dev,uint64_t ino,
+                              int *present)
+{
+    struct stat st;
+    if(fstatat(dir,name,&st,AT_SYMLINK_NOFOLLOW)==0){
+        *present=1;return replace_id(&st,dev,ino);
+    }
+    *present=0;return errno==ENOENT;
+}
+static void replace_temp_names(const FS_REPLACE_RECORD *i,char *pub,char *rb)
+{
+    snprintf(pub,48,".fsrp-p%.31s",i->newstage+6);
+    snprintf(rb,48,".fsrb-%.32s",i->newstage+6);
+}
+static FS_READ_STATUS replace_recover_locked(const FS_READ_ROOT *r)
+{
+    FS_REPLACE_RECORD i={0},record={0};FS_REPLACE_MARK m={0};
+    struct stat rec,mark,target;int present=0,commit=0,dir=-1;
+    int oldstage=0,newstage=0,pub=0,rb=0,exists=0;
+    const char *leaf;char publish[48],rollback[48];
+    FS_READ_STATUS s=replace_state(r,&present,&commit);
+    if(s!=FS_READ_OK||(!present&&!commit))return s;
+    if(commit){
+        if(!replace_read(r->fd,FS_REPLACE_COMMIT,&m,sizeof(m),&mark)||
+           m.magic!=FS_REPLACE_MARK_MAGIC||m.version!=1||
+           !replace_valid(&m.image)||!m.intentdev||!m.intentino)
+            return FS_READ_DENIED;
+        i=m.image;
+    }
+    if(present){
+        if(!replace_read(r->fd,FS_REPLACE_NAME,&record,sizeof(record),&rec)||
+           !replace_valid(&record))return FS_READ_DENIED;
+        if(commit&&(memcmp(&record,&i,sizeof(i))||
+            rec.st_dev!=(dev_t)m.intentdev||rec.st_ino!=(ino_t)m.intentino))
+            return FS_READ_DENIED;
+        if(!commit)i=record;
+    }
+    replace_temp_names(&i,publish,rollback);
+    s=move_parent(r,i.target,&dir,&leaf);if(s!=FS_READ_OK)return s;
+    if(!replace_name_check(r->fd,i.oldstage,i.olddev,i.oldino,&oldstage)||
+       !replace_name_check(r->fd,i.newstage,i.newdev,i.newino,&newstage)||
+       !replace_name_check(dir,publish,i.newdev,i.newino,&pub)||
+       !replace_name_check(dir,rollback,i.olddev,i.oldino,&rb)){
+        s=FS_READ_DENIED;goto done;
+    }
+    exists=fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)==0;
+    if(!exists||!replace_id(&target,commit?i.newdev:i.olddev,
+                             commit?i.newino:i.oldino)){
+        if(!exists||commit||!replace_id(&target,i.newdev,i.newino)){
+            s=FS_READ_DENIED;goto done;
+        }
+    }
+    if(!commit&&(!oldstage||!newstage)) {s=FS_READ_DENIED;goto done;}
+    /* The target identity is validated before every rename. The cooperating
+       lock serializes participants; outside actors ignoring it are excluded. */
+    if(!commit&&replace_id(&target,i.newdev,i.newino)){
+        if(!rb){
+            if(linkat(r->fd,i.oldstage,dir,rollback,0)<0){s=FS_READ_IO;goto done;}
+            crash_point(44); /* rollback link exists, target new */
+        }
+        if(fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)<0||
+           !replace_id(&target,i.newdev,i.newino)){s=FS_READ_DENIED;goto done;}
+        if(renameat(dir,rollback,dir,leaf)<0){s=FS_READ_IO;goto done;}
+        rb=0;
+        crash_point(45); /* rollback rename visible, parent unsynced */
+    }
+    if(fsync(dir)<0){s=FS_READ_IO;goto done;}
+    if(!commit)crash_point(46); /* rollback synced, intent remains */
+    /* Commit marker is self-contained. Once the intent is gone, stage names
+       are optional: a crash may interrupt their checked cleanup. */
+    if(present){
+        if(!durable_remove(r->fd,FS_REPLACE_NAME)){s=FS_READ_IO;goto done;}
+        crash_point(commit?49:47); /* committed marker-only or rollback orphan */
+    }
+    if(pub&&!durable_remove(dir,publish)){s=FS_READ_IO;goto done;}
+    if(rb&&!durable_remove(dir,rollback)){s=FS_READ_IO;goto done;}
+    if(oldstage&&!durable_remove(r->fd,i.oldstage)){s=FS_READ_IO;goto done;}
+    crash_point(commit?54:55); /* staged cleanup partly complete */
+    if(newstage&&!durable_remove(r->fd,i.newstage)){s=FS_READ_IO;goto done;}
+    if(commit){
+        crash_point(50); /* marker only, stage cleanup completed */
+        if(!durable_remove(r->fd,FS_REPLACE_COMMIT)){s=FS_READ_IO;goto done;}
+    }
+    s=FS_READ_OK;
+done:close(dir);return s;
+}
+FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *r)
+{
+    int lock=-1,pending=0,batch=0,bc=0,rem=0,rc=0,mv=0,mc=0;
+    FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=pending_intent(r,&pending);
+    if(s==FS_READ_OK)s=batch_state(r,&batch,&bc);
+    if(s==FS_READ_OK)s=remove_state(r,&rem,&rc);
+    if(s==FS_READ_OK)s=move_state(r,&mv,&mc);
+    if(s==FS_READ_OK)s=(pending||batch||bc||rem||rc||mv||mc)?
+        FS_READ_DENIED:replace_recover_locked(r);
+    unlock_workspace(lock);return s;
+}
+FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
+ const void *expected,size_t expected_len,const void *replacement,size_t replacement_len)
+{
+    FS_REPLACE_RECORD i={0};FS_REPLACE_MARK marker={0};
+    FS_READ_META meta;unsigned char *bytes=NULL;size_t len=0;
+    unsigned char nonce[16];struct stat old,st,record_st,target;
+    const char *leaf;char publish[48],rollback[48],inttmp[48],marktmp[48];
+    int lock=-1,dir=-1,oldfd=-1,newfd=-1,randomfd=-1,record=-1,mark=-1;
+    int oldstage=0,newstage=0,journal=0,published=0,committed=0;
+    int p=0,b=0,bc=0,rem=0,rc=0,mv=0,mc=0,rp=0,rpc=0;
+    FS_READ_STATUS s=FS_READ_IO;
+    if(!r||!path||!expected||(!replacement&&replacement_len)||
+       expected_len>FS_READ_MAX||replacement_len>FS_READ_MAX||
+       strlen(path)>=FS_INTENT_MAX_PATH||!batch_name_ok(path)||
+       !strncmp(path,".fsrp-",6)||!strncmp(path,".fsrb-",6))return FS_READ_INVALID;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=pending_intent(r,&p);if(s!=FS_READ_OK)goto done;
+    s=batch_state(r,&b,&bc);if(s!=FS_READ_OK)goto done;
+    s=remove_state(r,&rem,&rc);if(s!=FS_READ_OK)goto done;
+    s=move_state(r,&mv,&mc);if(s!=FS_READ_OK)goto done;
+    s=replace_state(r,&rp,&rpc);if(s!=FS_READ_OK)goto done;
+    if(p||b||bc||rem||rc||mv||mc||rp||rpc){s=FS_READ_DENIED;goto done;}
+    s=FsReadFile(r,path,&bytes,&len,&meta);if(s!=FS_READ_OK)goto done;
+    if(len!=expected_len||(len&&memcmp(bytes,expected,len))){s=FS_READ_DENIED;goto done;}
+    s=posix_open(r,path,&oldfd);if(s!=FS_READ_OK)goto done;
+    if(fstat(oldfd,&old)<0||!S_ISREG(old.st_mode)||old.st_nlink!=1){s=FS_READ_DENIED;goto done;}
+    s=move_parent(r,path,&dir,&leaf);if(s!=FS_READ_OK)goto done;
+    if(fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)<0||
+       !replace_id(&target,(uint64_t)old.st_dev,(uint64_t)old.st_ino)||
+       target.st_nlink!=1){s=FS_READ_DENIED;goto done;}
+    randomfd=open("/dev/urandom",O_RDONLY|O_CLOEXEC);
+    if(randomfd<0||read(randomfd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
+        s=FS_READ_IO;goto done;
+    }
+    i.magic=FS_REPLACE_MAGIC;i.version=1;
+    i.olddev=(uint64_t)old.st_dev;i.oldino=(uint64_t)old.st_ino;
+    strcpy(i.target,path);memcpy(i.oldstage,".fsrp-",6);
+    for(size_t k=0;k<sizeof(nonce);k++)sprintf(i.oldstage+6+2*k,"%02x",nonce[k]);
+    i.oldstage[38]=0;
+    if(read(randomfd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
+        s=FS_READ_IO;goto done;
+    }
+    memcpy(i.newstage,".fsrp-",6);
+    for(size_t k=0;k<sizeof(nonce);k++)sprintf(i.newstage+6+2*k,"%02x",nonce[k]);
+    i.newstage[38]=0;
+    replace_temp_names(&i,publish,rollback);
+    snprintf(inttmp,sizeof(inttmp),".fstxn-%.32s",i.newstage+6);
+    snprintf(marktmp,sizeof(marktmp),".fstxn-c%.31s",i.newstage+6);
+    if(linkat(dir,leaf,r->fd,i.oldstage,0)<0){s=error_status();goto done;}
+    oldstage=1;
+    newfd=openat(r->fd,i.newstage,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(newfd<0){s=error_status();goto done;}
+    newstage=1;
+    if(!write_all(newfd,replacement,replacement_len)||
+       fchmod(newfd,old.st_mode&0777)<0||fsync(newfd)<0||
+       fstat(newfd,&st)<0||fsync(oldfd)<0||fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    i.newdev=(uint64_t)st.st_dev;i.newino=(uint64_t)st.st_ino;
+    crash_point(40); /* two pinned images, no journal */
+    record=openat(r->fd,inttmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(record<0){s=error_status();goto done;}
+    if(!write_all(record,(const unsigned char*)&i,sizeof(i))||
+       fsync(record)<0||fstat(record,&record_st)<0){s=FS_READ_IO;goto done;}
+    if(linkat(r->fd,inttmp,r->fd,FS_REPLACE_NAME,0)<0){s=error_status();goto done;}
+    journal=1;
+    if(fsync(r->fd)<0){s=FS_READ_PENDING;goto done;}
+    crash_point(41); /* durable intent, old target */
+    if(linkat(r->fd,i.newstage,dir,publish,0)<0){s=error_status();goto done;}
+    crash_point(42); /* publish link, old target */
+    if(fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)<0||
+       !replace_id(&target,i.olddev,i.oldino)){s=FS_READ_DENIED;goto done;}
+    if(renameat(dir,publish,dir,leaf)<0){s=error_status();goto done;}
+    published=1;
+    crash_point(43); /* new target, parent unsynced */
+#ifdef FS_CREATE_TEST_CRASH
+    if(getenv("FS_REPLACE_TEST_FAIL_SYNC")){errno=EIO;s=FS_READ_PENDING;goto done;}
+#endif
+    if(fsync(dir)<0){s=FS_READ_PENDING;goto done;}
+    crash_point(48); /* new target synced, no marker */
+    marker.magic=FS_REPLACE_MARK_MAGIC;marker.version=1;
+    marker.intentdev=(uint64_t)record_st.st_dev;marker.intentino=(uint64_t)record_st.st_ino;
+    marker.image=i;
+    mark=openat(r->fd,marktmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(mark<0){s=FS_READ_PENDING;goto done;}
+    if(!write_all(mark,(const unsigned char*)&marker,sizeof(marker))||fsync(mark)<0){
+        s=FS_READ_PENDING;goto done;
+    }
+    crash_point(52); /* complete marker temp, no commit name */
+    if(linkat(r->fd,marktmp,r->fd,FS_REPLACE_COMMIT,0)<0){s=FS_READ_PENDING;goto done;}
+    crash_point(53); /* complete marker linked, root not synced */
+    /* An existing marker already selects commit on process-crash replay.
+       A failed durability flush after publication remains pending/unknown. */
+    if(fsync(r->fd)<0){s=FS_READ_PENDING;goto done;}
+    committed=1;
+    crash_point(51); /* durable commit, cleanup pending */
+    (void)replace_recover_locked(r);
+    s=FS_READ_OK;
+done:
+    if(mark>=0)close(mark);
+    if(record>=0)close(record);
+    if(oldfd>=0)close(oldfd);
+    if(newfd>=0)close(newfd);
+    if(dir>=0)close(dir);
+    if(randomfd>=0)close(randomfd);
+    free(bytes);
+    if(i.newstage[0]){
+        /* Random pre-publication temp records are never replay inputs. */
+        (void)unlinkat(r->fd,inttmp,0);
+        (void)unlinkat(r->fd,marktmp,0);
+        (void)fsync(r->fd);
+    }
+    if(!journal){
+        if(oldstage)(void)durable_remove(r->fd,i.oldstage);
+        if(newstage)(void)durable_remove(r->fd,i.newstage);
+    }
+    unlock_workspace(lock);
+    return committed?FS_READ_OK:(published?FS_READ_PENDING:s);
 }
 #endif
