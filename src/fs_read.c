@@ -345,12 +345,6 @@ FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
- const void *expected,size_t expected_len,const void *replacement,size_t replacement_len)
-{ (void)path;(void)expected;(void)expected_len;(void)replacement;(void)replacement_len;
- return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
-FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *r)
-{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else
 /* The lock is an inode under the held root, not a path reopened by name.
    External processes that unlink or ignore it are outside cooperative isolation. */

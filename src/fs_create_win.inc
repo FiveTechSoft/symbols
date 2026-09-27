@@ -9,6 +9,9 @@
 #define WO_RCOMMIT L".fstxn.rcommit"
 #define WO_MOVE L".fstxn.move"
 #define WO_MCOMMIT L".fstxn.mcommit"
+#define WR_INTENT L".fstxn.replace"
+#define WR_COMMIT L".fstxn.pcommit"
+#define WR_MAGIC 0x57525031u
 #define WO_MAGIC 0x574F5031u
 #define WC_MAGIC 0x57435231u
 #define WC_MAX_PATH 4096
@@ -45,6 +48,12 @@ typedef struct {
     unsigned long long size,digest;
     WCHAR source[WC_MAX_PATH],target[WC_MAX_PATH],pin[48];
 } WO_RECORD;
+typedef struct {
+    unsigned magic,version,checksum,reserved;
+    FILE_ID_INFO root,parent,old_id,new_id;
+    unsigned long long old_size,old_digest,new_size,new_digest;
+    WCHAR target[WC_MAX_PATH],old_pin[48],new_stage[48],new_pin[48],rollback[48];
+} WR_RECORD;
 static int wc_terminated(const WCHAR *s,size_t cap)
 {for(size_t i=0;i<cap;i++)if(!s[i])return 1;return 0;}
 static int wc_random_name(const WCHAR *s,const WCHAR *prefix)
@@ -102,6 +111,14 @@ static unsigned wo_checksum(const WO_RECORD *r)
     const unsigned char *p=(const unsigned char*)r;unsigned h=2166136261u;
     for(size_t i=0;i<sizeof(*r);i++){
         if(i>=offsetof(WO_RECORD,checksum)&&i<offsetof(WO_RECORD,checksum)+sizeof(r->checksum))continue;
+        h=(h^p[i])*16777619u;
+    }return h;
+}
+static unsigned wr_checksum(const WR_RECORD *r)
+{
+    const unsigned char *p=(const unsigned char*)r;unsigned h=2166136261u;
+    for(size_t i=0;i<sizeof(*r);i++){
+        if(i>=offsetof(WR_RECORD,checksum)&&i<offsetof(WR_RECORD,checksum)+sizeof(r->checksum))continue;
         h=(h^p[i])*16777619u;
     }return h;
 }
@@ -167,6 +184,18 @@ static int wc_set_name(HANDLE source,HANDLE dir,const WCHAR *leaf,ULONG type)
     st=f(source,&io,v,(ULONG)size,type);
     WC_TRACE("wc_set_name NtSetInformationFile type=%lu leaf=%ls NTSTATUS=0x%08lx\n",
              (unsigned long)type,leaf,(unsigned long)st);
+    free(v);return NT_SUCCESS(st);
+}
+static int wr_replace_name(HANDLE source,HANDLE dir,const WCHAR *leaf)
+{
+    WC_NT_SET f=wc_set_fn();IO_STATUS_BLOCK io;WC_NAME_INFO *v;size_t n=wcslen(leaf);
+    size_t size=offsetof(WC_NAME_INFO,name)+(n+1)*sizeof(WCHAR);NTSTATUS st;
+    if(!f||!n||n>240||wcschr(leaf,L'/')||wcschr(leaf,L'\\'))return 0;
+    v=(WC_NAME_INFO*)calloc(1,size);if(!v)return 0;
+    v->replace=TRUE;v->root=dir;v->length=(ULONG)(n*sizeof(WCHAR));
+    memcpy(v->name,leaf,(n+1)*sizeof(WCHAR));
+    st=f(source,&io,v,(ULONG)size,WC_NT_RENAME);
+    WC_TRACE("wr_replace_name leaf=%ls NTSTATUS=0x%08lx\n",leaf,(unsigned long)st);
     free(v);return NT_SUCCESS(st);
 }
 static int wc_delete(HANDLE h)
@@ -290,6 +319,72 @@ static FS_READ_STATUS wo_read(HANDLE root,const WCHAR *name,unsigned kind,
     else s=FS_READ_OK;
     CloseHandle(h);return s;
 }
+static FS_READ_STATUS wo_bytes(HANDLE h,const FILE_ID_INFO *id,size_t size,unsigned long long digest);
+static FS_READ_STATUS wr_publish(HANDLE root,const WCHAR *final,const WR_RECORD *r)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;WCHAR tmp[48];DWORD written=0;FS_READ_STATUS s;
+    if(!wc_random(tmp,L".fsj-"))return FS_READ_IO;
+    s=wc_open(root,tmp,GENERIC_WRITE|DELETE,FILE_CREATE,&h);if(s!=FS_READ_OK)return s;
+    if(!WriteFile(h,r,sizeof(*r),&written,NULL)||written!=sizeof(*r)||
+       !FlushFileBuffers(h)){s=FS_READ_IO;goto done;}
+    if(!wc_set_name(h,root,final,WC_NT_RENAME)){s=FS_READ_PENDING;goto done;}
+    wc_probe_dir(root);s=FS_READ_OK;
+done:CloseHandle(h);return s;
+}
+static FS_READ_STATUS wr_read(HANDLE root,const WCHAR *name,WR_RECORD *r,
+                             FILE_ID_INFO *record_id,int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;DWORD n=0;FS_READ_META m;
+    FS_READ_STATUS s=wc_open(root,name,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    if(win_meta(h,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=sizeof(*r)||
+       !wc_id(h,record_id)||!ReadFile(h,r,sizeof(*r),&n,NULL)||n!=sizeof(*r)||
+       r->magic!=WR_MAGIC||r->version!=1||r->reserved||
+       r->checksum!=wr_checksum(r)||r->old_size>FS_READ_MAX||r->new_size>FS_READ_MAX||
+       !wc_terminated(r->target,WC_MAX_PATH)||
+       !wc_terminated(r->old_pin,48)||!wc_terminated(r->new_stage,48)||
+       !wc_terminated(r->new_pin,48)||!wc_terminated(r->rollback,48)||
+       wc_target_status(r->target)!=FS_READ_OK||
+       !wc_random_name(r->old_pin,L".fsrp-")||
+       !wc_random_name(r->new_stage,L".fsrp-")||
+       !wc_random_name(r->new_pin,L".fsrp-")||
+       !wc_random_name(r->rollback,L".fsrb-")||
+       !wcscmp(r->old_pin,r->new_pin)||!wcscmp(r->old_pin,r->new_stage)||
+       !wcscmp(r->new_pin,r->new_stage)||
+       wc_same(&r->old_id,&r->new_id))s=FS_READ_DENIED;
+    else s=FS_READ_OK;
+    CloseHandle(h);return s;
+}
+#ifdef FS_CREATE_TEST_CRASH
+static void wr_crash(int phase)
+{
+    const char *v=getenv("FS_WIN_REPLACE_CRASH");
+    if(v&&atoi(v)==phase)ExitProcess((UINT)(140+phase));
+}
+#else
+#define wr_crash(p) ((void)0)
+#endif
+static FS_READ_STATUS wr_named(HANDLE dir,const WCHAR *leaf,const FILE_ID_INFO *id,
+                               int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_META m;FILE_ID_INFO found;
+    FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    s=(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&
+       wc_id(h,&found)&&wc_same(&found,id))?FS_READ_OK:FS_READ_DENIED;
+    CloseHandle(h);return s;
+}
+static FS_READ_STATUS wr_verify(HANDLE dir,const WCHAR *leaf,
+       const FILE_ID_INFO *id,size_t len,unsigned long long digest)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+    if(s!=FS_READ_OK)return s;
+    s=wo_bytes(h,id,len,digest);CloseHandle(h);return s;
+}
 static FS_READ_STATUS wc_record_publish(HANDLE root,const WCHAR *final,const WC_RECORD *r)
 {
     HANDLE h=INVALID_HANDLE_VALUE;WCHAR tmp[48];DWORD written=0;FS_READ_STATUS s;
@@ -338,11 +433,11 @@ static FS_READ_STATUS wo_clear_other(HANDLE root,unsigned self)
 {
     const WCHAR *names[]={WC_INTENT,WC_COMMIT,WO_REMOVE,WO_RCOMMIT,
         WO_MOVE,WO_MCOMMIT,L".fstxn.batch",L".fstxn.commit",
-        L".fstxn.replace",L".fstxn.pcommit"};
+        WR_INTENT,WR_COMMIT};
     for(unsigned k=0;k<sizeof(names)/sizeof(names[0]);k++){
         HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s;
         if((self==0&&k<2)||(self==1&&k>=2&&k<4)||
-           (self==2&&k>=4&&k<6))continue;
+           (self==2&&k>=4&&k<6)||(self==3&&k>=8&&k<10))continue;
         s=wc_open(root,names[k],FILE_READ_ATTRIBUTES,FILE_OPEN,&h);
         if(s==FS_READ_OK){CloseHandle(h);return FS_READ_DENIED;}
         if(s!=FS_READ_MISSING)return FS_READ_DENIED;
@@ -467,6 +562,106 @@ done:
     if(pin_h!=INVALID_HANDLE_VALUE)CloseHandle(pin_h);
     if(target_dir!=INVALID_HANDLE_VALUE)CloseHandle(target_dir);
     if(source_dir!=INVALID_HANDLE_VALUE)CloseHandle(source_dir);
+    return s;
+}
+static FS_READ_STATUS wr_recover_locked(const FS_READ_ROOT *r)
+{
+    WR_RECORD i,c;FILE_ID_INFO iid,cid,rid,pid;
+    HANDLE parent=INVALID_HANDLE_VALUE,old_h=INVALID_HANDLE_VALUE;
+    const WCHAR *leaf=NULL;int intent=0,mark=0,oldpin=0,newpin=0,stage=0,rb=0;
+    int target_old=0,target_new=0;FS_READ_STATUS s=wo_clear_other(r->handle,3);
+    if(s!=FS_READ_OK)return s;
+    s=wr_read(r->handle,WR_INTENT,&i,&iid,&intent);if(s!=FS_READ_OK)return s;
+    s=wr_read(r->handle,WR_COMMIT,&c,&cid,&mark);if(s!=FS_READ_OK)return s;
+    if(!intent&&!mark)return FS_READ_OK;
+    if(intent&&mark&&memcmp(&i,&c,sizeof(i)))return FS_READ_DENIED;
+    if(!intent)i=c;
+    if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||!wc_ntfs(r->handle))return FS_READ_DENIED;
+    s=wc_parent(r,i.target,&parent,&leaf);if(s!=FS_READ_OK)goto done;
+    if(!wc_id(parent,&pid)||!wc_same(&pid,&i.parent)||
+       pid.VolumeSerialNumber!=rid.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
+    s=wr_named(r->handle,i.old_pin,&i.old_id,&oldpin);if(s!=FS_READ_OK)goto done;
+    s=wr_named(r->handle,i.new_pin,&i.new_id,&newpin);if(s!=FS_READ_OK)goto done;
+    s=wr_named(r->handle,i.new_stage,&i.new_id,&stage);if(s!=FS_READ_OK)goto done;
+    s=wr_named(parent,i.rollback,&i.old_id,&rb);if(s!=FS_READ_OK)goto done;
+    if(!oldpin||!newpin){s=FS_READ_DENIED;goto done;}
+    s=wr_verify(r->handle,i.old_pin,&i.old_id,(size_t)i.old_size,i.old_digest);
+    if(s!=FS_READ_OK)goto done;
+    s=wr_verify(r->handle,i.new_pin,&i.new_id,(size_t)i.new_size,i.new_digest);
+    if(s!=FS_READ_OK)goto done;
+    if(stage){s=wr_verify(r->handle,i.new_stage,&i.new_id,(size_t)i.new_size,i.new_digest);
+       if(s!=FS_READ_OK)goto done;}
+    if(rb){s=wr_verify(parent,i.rollback,&i.old_id,(size_t)i.old_size,i.old_digest);
+       if(s!=FS_READ_OK)goto done;}
+    {HANDLE target=INVALID_HANDLE_VALUE;FILE_ID_INFO found;FS_READ_META m;
+     s=wc_open(parent,leaf,GENERIC_READ,FILE_OPEN,&target);
+     if(s!=FS_READ_OK)goto done;
+     if(win_meta(target,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||!wc_id(target,&found)){
+         CloseHandle(target);s=FS_READ_DENIED;goto done;}
+     target_old=wc_same(&found,&i.old_id);target_new=wc_same(&found,&i.new_id);
+     CloseHandle(target);
+     if(!target_old&&!target_new){s=FS_READ_DENIED;goto done;}}
+    {HANDLE h=INVALID_HANDLE_VALUE;FILE_STANDARD_INFO links;
+     s=wc_open(r->handle,i.old_pin,GENERIC_READ,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
+     if(!GetFileInformationByHandleEx(h,FileStandardInfo,&links,sizeof(links))||
+        links.NumberOfLinks!=(DWORD)(1+target_old+rb)){
+        CloseHandle(h);s=FS_READ_DENIED;goto done;}
+     CloseHandle(h);h=INVALID_HANDLE_VALUE;
+     s=wc_open(r->handle,i.new_pin,GENERIC_READ,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
+     if(!GetFileInformationByHandleEx(h,FileStandardInfo,&links,sizeof(links))||
+        links.NumberOfLinks!=(DWORD)(1+stage+target_new)){
+        CloseHandle(h);s=FS_READ_DENIED;goto done;}
+     CloseHandle(h);
+    }
+    if(mark){
+        if(!target_new||rb){s=FS_READ_DENIED;goto done;}
+        s=wr_verify(parent,leaf,&i.new_id,(size_t)i.new_size,i.new_digest);
+        if(s!=FS_READ_OK)goto done;
+        if(intent){s=wc_remove(r->handle,WR_INTENT,&iid);if(s!=FS_READ_OK)goto done;}
+        wr_crash(9); /* marker only, both pins remain */
+        if(stage){s=wc_remove(r->handle,i.new_stage,&i.new_id);if(s!=FS_READ_OK)goto done;}
+        s=wc_remove(r->handle,WR_COMMIT,&cid);if(s!=FS_READ_OK)goto done;
+        wr_crash(10); /* no journal, old/new pins still available as orphans */
+    }else{
+        if(target_new){
+            s=wr_verify(parent,leaf,&i.new_id,(size_t)i.new_size,i.new_digest);
+            if(s!=FS_READ_OK)goto done;
+            if(!rb){
+                s=wc_open(r->handle,i.old_pin,GENERIC_READ,FILE_OPEN,&old_h);
+                if(s!=FS_READ_OK)goto done;
+                if(!wc_set_name(old_h,parent,i.rollback,WC_NT_LINK)){
+                    s=FS_READ_PENDING;goto done;}
+                CloseHandle(old_h);old_h=INVALID_HANDLE_VALUE;
+                wr_crash(7); /* rollback temp old, target new */
+                s=wr_verify(parent,i.rollback,&i.old_id,(size_t)i.old_size,i.old_digest);
+                if(s!=FS_READ_OK)goto done;
+            }
+            s=wr_verify(parent,leaf,&i.new_id,(size_t)i.new_size,i.new_digest);
+            if(s!=FS_READ_OK)goto done;
+            s=wc_open(parent,i.rollback,DELETE,FILE_OPEN,&old_h);
+            if(s!=FS_READ_OK)goto done;
+            if(!wr_replace_name(old_h,parent,leaf)){s=FS_READ_PENDING;goto done;}
+            CloseHandle(old_h);old_h=INVALID_HANDLE_VALUE;
+            wr_crash(8); /* old target restored, intent remains */
+        }else if(rb){
+            /* A crash after the rename may leave an old-name alias only if
+               another actor intervened. Never discard it without identity. */
+            s=FS_READ_DENIED;goto done;
+        }
+        s=wr_verify(parent,leaf,&i.old_id,(size_t)i.old_size,i.old_digest);
+        if(s!=FS_READ_OK)goto done;
+        wc_probe_dir(parent);
+        if(intent){s=wc_remove(r->handle,WR_INTENT,&iid);if(s!=FS_READ_OK)goto done;}
+        if(stage){s=wc_remove(r->handle,i.new_stage,&i.new_id);if(s!=FS_READ_OK)goto done;}
+    }
+    /* Both pins survive as long as a checked record exists. An interruption
+       after record retirement can leave old bytes in a manual-cleanup pin. */
+    s=wc_remove(r->handle,i.old_pin,&i.old_id);if(s!=FS_READ_OK)goto done;
+    s=wc_remove(r->handle,i.new_pin,&i.new_id);
+    wc_probe_dir(r->handle);
+done:
+    if(old_h!=INVALID_HANDLE_VALUE)CloseHandle(old_h);
+    if(parent!=INVALID_HANDLE_VALUE)CloseHandle(parent);
     return s;
 }
 static FS_READ_STATUS wc_recover_locked(const FS_READ_ROOT *r)
@@ -823,3 +1018,109 @@ FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
 FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
                           const void *expected,size_t len)
 {return wo_write(r,2,src,dst,expected,len);}
+FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *r)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED overlap;FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)return s;
+    s=wr_recover_locked(r);wc_unlock(lock,&overlap);return s;
+}
+FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
+ const void *expected,size_t expected_len,const void *replacement,size_t replacement_len)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE,parent=INVALID_HANDLE_VALUE;
+    HANDLE old=INVALID_HANDLE_VALUE,new_file=INVALID_HANDLE_VALUE;
+    HANDLE target=INVALID_HANDLE_VALUE;OVERLAPPED overlap;WR_RECORD rec={0};
+    FILE_STANDARD_INFO standard;FS_READ_META meta;FILE_ID_INFO found;
+    WCHAR *name=NULL;const WCHAR *leaf=NULL;FS_READ_STATUS s=FS_READ_IO;
+    DWORD wrote;size_t used=0;int started=0;
+    if(!r||!path||!expected||(!replacement&&replacement_len)||
+       expected_len>FS_READ_MAX||replacement_len>FS_READ_MAX||
+       !valid_relative(path,0))return FS_READ_INVALID;
+    if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    name=win_wide(path);
+    if(!name||wcslen(name)>=WC_MAX_PATH){s=FS_READ_INVALID;goto done;}
+    s=wc_target_status(name);if(s!=FS_READ_OK)goto done;
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)goto done;
+    s=wo_clear_other(r->handle,3);if(s!=FS_READ_OK)goto done;
+    {WR_RECORD other;FILE_ID_INFO ignored;int present=0;
+     s=wr_read(r->handle,WR_INTENT,&other,&ignored,&present);
+     if(s!=FS_READ_OK||present){s=s==FS_READ_OK?FS_READ_PENDING:s;goto done;}
+     s=wr_read(r->handle,WR_COMMIT,&other,&ignored,&present);
+     if(s!=FS_READ_OK||present){s=s==FS_READ_OK?FS_READ_PENDING:s;goto done;}}
+    s=wc_parent(r,name,&parent,&leaf);if(s!=FS_READ_OK)goto done;
+    if(!wc_id(r->handle,&rec.root)||!wc_id(parent,&rec.parent)||
+       rec.root.VolumeSerialNumber!=rec.parent.VolumeSerialNumber){s=FS_READ_UNSUPPORTED;goto done;}
+    s=wc_open(parent,leaf,GENERIC_READ|DELETE,FILE_OPEN,&old);if(s!=FS_READ_OK)goto done;
+    if(win_meta(old,&meta)!=FS_READ_OK||meta.kind!=FS_KIND_FILE||
+       meta.size!=expected_len||!wc_id(old,&rec.old_id)||
+       rec.old_id.VolumeSerialNumber!=rec.root.VolumeSerialNumber||
+       !GetFileInformationByHandleEx(old,FileStandardInfo,&standard,sizeof(standard))||
+       standard.NumberOfLinks!=1){s=FS_READ_DENIED;goto done;}
+    rec.old_size=expected_len;
+    rec.old_digest=wc_hash((const unsigned char*)expected,expected_len);
+    rec.new_size=replacement_len;
+    rec.new_digest=wc_hash((const unsigned char*)replacement,replacement_len);
+    s=wo_bytes(old,&rec.old_id,expected_len,rec.old_digest);if(s!=FS_READ_OK)goto done;
+    if(!wc_random(rec.old_pin,L".fsrp-")||!wc_random(rec.new_stage,L".fsrp-")||
+       !wc_random(rec.new_pin,L".fsrp-")||!wc_random(rec.rollback,L".fsrb-")){
+       s=FS_READ_IO;goto done;}
+    if(!wc_set_name(old,r->handle,rec.old_pin,WC_NT_LINK)){s=FS_READ_UNSUPPORTED;goto done;}
+    started=1;wr_crash(0);
+    s=wc_open(r->handle,rec.new_stage,GENERIC_WRITE|GENERIC_READ|DELETE,FILE_CREATE,&new_file);
+    if(s!=FS_READ_OK)goto done;
+    while(used<replacement_len){
+        if(!WriteFile(new_file,(const unsigned char*)replacement+used,
+                      (DWORD)(replacement_len-used),&wrote,NULL)||!wrote){s=FS_READ_IO;goto done;}
+        used+=wrote;
+    }
+    if(!FlushFileBuffers(new_file)||!wc_id(new_file,&rec.new_id)||
+       rec.new_id.VolumeSerialNumber!=rec.root.VolumeSerialNumber||
+       wc_same(&rec.old_id,&rec.new_id)){s=FS_READ_IO;goto done;}
+    wr_crash(1);
+    if(!wc_set_name(new_file,r->handle,rec.new_pin,WC_NT_LINK)){s=FS_READ_PENDING;goto done;}
+    wr_crash(2);
+    {int exists=0;
+     s=wr_named(r->handle,rec.old_pin,&rec.old_id,&exists);
+     if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto done;}
+     s=wr_named(r->handle,rec.new_pin,&rec.new_id,&exists);
+     if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto done;}}
+    s=wr_verify(r->handle,rec.old_pin,&rec.old_id,expected_len,rec.old_digest);
+    if(s!=FS_READ_OK)goto done;
+    s=wr_verify(r->handle,rec.new_pin,&rec.new_id,replacement_len,rec.new_digest);
+    if(s!=FS_READ_OK)goto done;
+    /* Revalidate old identity and exact bytes at the final pre-intent gate. */
+    s=wr_verify(parent,leaf,&rec.old_id,expected_len,rec.old_digest);
+    if(s!=FS_READ_OK)goto done;
+    rec.magic=WR_MAGIC;rec.version=1;wcscpy(rec.target,name);
+    rec.checksum=wr_checksum(&rec);
+    s=wr_publish(r->handle,WR_INTENT,&rec);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    wr_crash(3);
+    s=wc_open(parent,leaf,GENERIC_READ,FILE_OPEN,&target);if(s!=FS_READ_OK)goto done;
+    if(!wc_id(target,&found)||!wc_same(&found,&rec.old_id)){
+        s=FS_READ_PENDING;goto done;}
+    CloseHandle(target);target=INVALID_HANDLE_VALUE;
+    s=wr_verify(parent,leaf,&rec.old_id,expected_len,rec.old_digest);
+    if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    /* ReplaceIfExists applies only within the held parent. A non-cooperating
+       external swap between this check and rename is outside the guarantee. */
+    CloseHandle(old);old=INVALID_HANDLE_VALUE;
+    if(!wr_replace_name(new_file,parent,leaf)){s=FS_READ_PENDING;goto done;}
+    wr_crash(4);
+    s=wr_verify(parent,leaf,&rec.new_id,replacement_len,rec.new_digest);
+    if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    wc_probe_dir(parent);wr_crash(5);
+    s=wr_publish(r->handle,WR_COMMIT,&rec);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto done;}
+    wr_crash(6);
+    CloseHandle(new_file);new_file=INVALID_HANDLE_VALUE;
+    CloseHandle(old);old=INVALID_HANDLE_VALUE;
+    s=wr_recover_locked(r);if(s!=FS_READ_OK)s=FS_READ_PENDING;
+done:
+    if(target!=INVALID_HANDLE_VALUE)CloseHandle(target);
+    if(new_file!=INVALID_HANDLE_VALUE)CloseHandle(new_file);
+    if(old!=INVALID_HANDLE_VALUE)CloseHandle(old);
+    if(started&&s!=FS_READ_OK)s=FS_READ_PENDING;
+    if(parent!=INVALID_HANDLE_VALUE)CloseHandle(parent);
+    if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
+    free(name);return s;
+}

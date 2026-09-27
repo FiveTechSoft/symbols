@@ -11,8 +11,15 @@
    never blindly retry. External in-place writes to the same inode are excluded
    even if their bytes change while the lock is held. External actors that
    ignore or replace the lock may change a target between identity checks and
-   rename. The guarantee applies only to cooperating writers. No universal
-   power-loss guarantee or Windows write support. */
+   rename. The guarantee applies only to cooperating writers. On Windows,
+   NTFS process-crash replay uses a single intent with old and new pinned FileIds
+   and a self-contained commit marker. Sources with preexisting hard links are
+   refused. Recovery requires exact IDs and byte digests, including marker-only
+   replay; ambiguous names fail closed. A crash after intent or marker removal
+   but before old-pin deletion can leave an untracked pin in the journal area
+   containing the bytes the caller believed replaced. It is never deleted
+   automatically; inspect and remove it manually. Directory flush is only a
+   diagnostic, not a power-loss persistence guarantee. */
 FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *root,const char *path,
  const void *expected,size_t expected_len,const void *replacement,size_t replacement_len);
 FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *root);
