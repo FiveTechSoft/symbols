@@ -2,6 +2,7 @@
 #include "c_contract.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -801,6 +802,7 @@ static int static_literal(const char *s,size_t *p,unsigned char *out,size_t *len
     while (s[i] && s[i]!='"') {
         unsigned char ch=(unsigned char)s[i++];
         if (ch=='\\') {
+            if (!s[i]) return 0;
             ch=(unsigned char)s[i++];
             if (ch=='n') ch='\n';
             else if (ch=='r') ch='\r';
@@ -925,12 +927,134 @@ static int static_simple(const char *src,const C_CONTRACT *c,C_CAND *out,int max
     return 1;
 }
 
+/* Closed, straight-line source grammar for one int and one simple decimal
+   conversion. A recognized shape owns the result even when the asserted goal
+   cannot be reached: do not substitute goal-independent legacy proposals. */
+static int static_word(const char *s,size_t *p,const char *word)
+{
+    size_t n=strlen(word),i=static_space(s,*p);
+    if (strlen(s+i)<n || strncmp(s+i,word,n) || is_idc((unsigned char)s[i+n])) return 0;
+    *p=i+n;return 1;
+}
+
+static int static_char(const char *s,size_t *p,char ch)
+{
+    size_t i=static_space(s,*p);
+    if (s[i]!=ch) return 0;
+    *p=i+1;return 1;
+}
+
+/* Require canonical decimal so a byte-for-byte goal has a unique value.
+   INT_MIN's magnitude is allowed only for signed conversions. */
+static int static_decimal(const char *s,size_t n,int unsigned_conversion,int *value)
+{
+    size_t i=0;int negative=0;
+    if (n && s[i]=='-') {negative=1;i++;}
+    if (negative && unsigned_conversion) return 0;
+    if (i>=n || (s[i]=='0' && (negative || i+1<n))) return 0;
+    unsigned int limit=negative?(unsigned int)INT_MAX+1U:(unsigned int)INT_MAX,number=0;
+    for (;i<n;i++) {
+        if (s[i]<'0' || s[i]>'9') return 0;
+        unsigned int digit=(unsigned int)(s[i]-'0');
+        if (number>limit/10U || (number==limit/10U && digit>limit%10U)) return 0;
+        number=number*10U+digit;
+    }
+    *value=negative?(number==(unsigned int)INT_MAX+1U?INT_MIN:-(int)number):(int)number;
+    return 1;
+}
+
+static int static_value(const char *src,const C_CONTRACT *c,C_CAND *out,int max)
+{
+    /* No preprocessor, comments, other declarations/functions, concatenated
+       strings or expressions: accepting one intact source envelope is safer
+       than assuming a partial function scanner proves this C grammar. */
+    size_t p=static_space(src,0);
+    if (strlen(src+p)<18 || strncmp(src+p,"#include <stdio.h>",18)) return 0;
+    p+=18;
+    while (src[p]==' ' || src[p]=='\t' || src[p]=='\r') p++;
+    if (src[p]!='\n') return 0;
+    p++;
+    if (!static_word(src,&p,"int") || !static_word(src,&p,"main") ||
+        !static_char(src,&p,'(')) return 0;
+    if (src[static_space(src,p)]!=')') {
+        if (!static_word(src,&p,"void")) return 0;
+    }
+    if (!static_char(src,&p,')') || !static_char(src,&p,'{') ||
+        !static_word(src,&p,"int")) return 0;
+    p=static_space(src,p);size_t name_start=p;
+    if (!(isalpha((unsigned char)src[p]) || src[p]=='_')) return 0;
+    do {p++;} while (is_idc((unsigned char)src[p]));
+    size_t name_len=p-name_start;
+    if (name_len>64 || (name_len==4 && !strncmp(src+name_start,"main",4))) return 0;
+    if (!static_char(src,&p,'=')) return 0;
+    p=static_space(src,p);size_t init_start=p;
+    if (src[p]=='-') p++;
+    while (isdigit((unsigned char)src[p])) p++;
+    size_t init_end=p;int old_value;
+    if (!static_decimal(src+init_start,init_end-init_start,0,&old_value) ||
+        !static_char(src,&p,';') || !static_word(src,&p,"printf") ||
+        !static_char(src,&p,'(')) return 0;
+    p=static_space(src,p);unsigned char decoded[128];size_t length=0;
+    if (src[p]!='"' || !static_literal(src,&p,decoded,&length) ||
+        !static_char(src,&p,',')) return 0;
+    p=static_space(src,p);
+    if (strlen(src+p)<name_len || strncmp(src+p,src+name_start,name_len) ||
+        is_idc((unsigned char)src[p+name_len])) return 0;
+    p+=name_len;
+    if (!static_char(src,&p,')') || !static_char(src,&p,';') ||
+        !static_word(src,&p,"return")) return 0;
+    p=static_space(src,p);
+    if (src[p]!='0') return 0;
+    p++;
+    if (is_idc((unsigned char)src[p]) ||
+        !static_char(src,&p,';') || !static_char(src,&p,'}') ||
+        src[static_space(src,p)]!='\0') return 0;
+
+    unsigned char emitted[128];size_t out_len=0,prefix_len=0;char conversion=0;
+    for (size_t i=0;i<length;i++) {
+        if (decoded[i]=='%') {
+            if (++i>=length) return 0;
+            if (decoded[i]=='%') emitted[out_len++]='%';
+            else if (!conversion && (decoded[i]=='d' || decoded[i]=='i' || decoded[i]=='u')) {
+                conversion=(char)decoded[i];prefix_len=out_len;
+            } else return 0;
+        } else emitted[out_len++]=decoded[i];
+    }
+    if (!conversion) return 0;
+    /* The source initializer itself is a supported signed int. A negative
+       int used with %u is deliberately outside this narrow rule. */
+    if (conversion=='u' && old_value<0) return 0;
+    if (!c || !c->has_out) return 1;
+    size_t goal_len=strlen(c->out),suffix_len=out_len-prefix_len;
+    if (goal_len<prefix_len+suffix_len ||
+        memcmp(c->out,emitted,prefix_len) ||
+        memcmp(c->out+goal_len-suffix_len,emitted+prefix_len,suffix_len)) return 1;
+    int wanted;
+    if (!static_decimal(c->out+prefix_len,goal_len-prefix_len-suffix_len,
+                        conversion=='u',&wanted)) return 1;
+    char number[32];
+    int written=conversion=='u'?snprintf(number,sizeof(number),"%u",(unsigned int)wanted)
+                               :snprintf(number,sizeof(number),"%d",wanted);
+    if (written<0 || (size_t)written>=sizeof(number) ||
+        goal_len!=out_len+(size_t)written ||
+        memcmp(c->out+prefix_len,number,(size_t)written)) return 1;
+    if (old_value==wanted || max<=0) return 1;
+    char *edited=splice(src,init_start,init_end-init_start,number);
+    if (!edited) return 1;
+    out[0].text=edited;out[0].tier=4;
+    snprintf(out[0].rule,sizeof(out[0].rule),"answer_value");
+    snprintf(out[0].detail,sizeof(out[0].detail),"line %d: directed int initializer",line_of(src,init_start));
+    return 2;
+}
+
 int CContractStaticCandidates(const char *src,const C_CONTRACT *c,C_CAND *out,int max)
 {
-    /* There is no runtime verifier in this path. Unknown source shapes must
-       abstain rather than export goal-independent legacy mutations. */
+    /* Recognized source shapes own directed results; unknown shapes retain
+       the legacy enumerator as unverified, goal-independent fallback. */
     int simple=static_simple(src,c,out,max);
     if (simple) return simple==2?1:0;
+    int value=static_value(src,c,out,max);
+    if (value) return value==2?1:0;
     /* The legacy enumerator keeps its answer-literal veto. Its proposals
        remain unverified, but a typed preview drops edits known to contradict
        exit 0 or the declared nonempty stdout. */

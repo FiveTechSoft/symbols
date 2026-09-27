@@ -72,6 +72,27 @@ class PreviewTests(unittest.TestCase):
                             'length':5,'termination':'exact'}
         result=self.run_preview()
         self.assertEqual((result['status'],result['candidate_count']),('no_static_candidate',0))
+    def test_directed_value_exact_candidate_and_abstention(self):
+        self.source.write_text('#include <stdio.h>\nint main(void){int total=3; printf("paid=%d\\n",total); return 0;}\n')
+        original=self.source.read_bytes()
+        self.obj['workspace_digest']=snapshot(self.work)[1]
+        def goal(data):
+            self.obj['stdout']={'bytes_b64':base64.b64encode(data).decode(),
+                                'length':len(data),'termination':'exact'}
+            return self.run_preview()
+        result=goal(b'paid=-12\n')
+        self.assertEqual((result['status'],result['candidate_count']),('static_candidate_unverified',1))
+        item=result['candidates'][0]
+        self.assertEqual((item['rule'],item['tier'],item['path']),('answer_value',4,'main.c'))
+        self.assertIn('-int main(void){int total=3;',item['unified_diff'])
+        self.assertIn('+int main(void){int total=-12;',item['unified_diff'])
+        self.assertEqual(item['before_sha256'],sha(original))
+        self.assertEqual(item['after_sha256'],sha(original.replace(b'int total=3;',b'int total=-12;')))
+        for data in (b'paid=3\n',b'paid=+12\n',b'paid=999999999999999999999\n',b'paid=12',b'nope=12\n'):
+            result=goal(data)
+            self.assertEqual((result['status'],result['candidate_count']),('no_static_candidate',0))
+        self.assertEqual(self.source.read_bytes(),original)
+
     def test_scope_and_predicates(self):
         self.obj['source_predicates']=[{'kind':'file_bytes_equal','path':'main.c','sha256':sha(self.initial)}]
         self.assertEqual(self.run_preview()['status'],'no_static_candidate')
