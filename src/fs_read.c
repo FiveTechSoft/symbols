@@ -3,6 +3,7 @@
 #endif
 #include "fs_read.h"
 #include "fs_write.h"
+#include "fs_batch.h"
 #include "fs_manifest.h"
 #include <stdlib.h>
 #include <string.h>
@@ -340,6 +341,10 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
 }
 FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size_t n)
+{ (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
+{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else
 /* The lock is an inode under the held root, not a path reopened by name.
    External processes that unlink or ignore it are outside cooperative isolation. */
@@ -361,6 +366,8 @@ static FS_READ_STATUS lock_workspace(const FS_READ_ROOT *r,int *lockfd)
 static void unlock_workspace(int fd)
 { if(fd>=0){(void)flock(fd,LOCK_UN);close(fd);} }
 #define FS_INTENT_NAME ".fstxn.intent"
+#define FS_BATCH_NAME ".fstxn.batch"
+#define FS_BATCH_COMMIT ".fstxn.commit"
 #define FS_INTENT_MAGIC 0x46535458u
 #define FS_INTENT_MAX_PATH 1024
 /* Fixed-size versioned record, checked in full before any cleanup. Same-host
@@ -390,11 +397,14 @@ static int intent_valid(const FS_CREATE_INTENT *i)
         strspn(i->stage+5,"0123456789abcdef")==32 &&
         strcmp(i->target,".fstxn.lock") &&
         strcmp(i->target,FS_INTENT_NAME) &&
+        strcmp(i->target,FS_BATCH_NAME) &&
+        strcmp(i->target,FS_BATCH_COMMIT) &&
         strcmp(i->target,".fstxn") &&
         strncmp(i->target,".fstxn/",7) &&
         strncmp(i->target,".fst-",5) &&
         strncmp(i->target,".fstxn-",7);
 }
+static FS_READ_STATUS batch_state(const FS_READ_ROOT *r,int *batch,int *commit);
 static FS_READ_STATUS pending_intent(const FS_READ_ROOT *r,int *present)
 {
     struct stat st;
@@ -471,6 +481,13 @@ FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
     int lockfd=-1;FS_READ_STATUS s;
     if(!r)return FS_READ_INVALID;
     s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
+    {struct stat st;
+     if(fstatat(r->fd,FS_BATCH_NAME,&st,AT_SYMLINK_NOFOLLOW)==0||
+        fstatat(r->fd,FS_BATCH_COMMIT,&st,AT_SYMLINK_NOFOLLOW)==0){
+         unlock_workspace(lockfd);return FS_READ_DENIED;
+     }
+     if(errno!=ENOENT){unlock_workspace(lockfd);return FS_READ_DENIED;}
+    }
     s=recover_locked(r);unlock_workspace(lockfd);return s;
 }
 static int write_all(int fd,const unsigned char *bytes,size_t len)
@@ -492,11 +509,16 @@ FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
     if(!r||!valid_relative(rel,0)||strlen(rel)>=sizeof(parent)||
        (!bytes&&len)||len>FS_READ_MAX||mode>0777)return FS_READ_INVALID;
     if(!strcmp(rel,".fstxn.lock")||!strcmp(rel,FS_INTENT_NAME)||
+       !strcmp(rel,FS_BATCH_NAME)||!strcmp(rel,FS_BATCH_COMMIT)||
        !strncmp(rel,".fstxn/",7)||!strcmp(rel,".fstxn")||
        !strncmp(rel,".fst-",5)||!strncmp(rel,".fstxn-",7))return FS_READ_DENIED;
     s=lock_workspace(r,&lockfd);if(s!=FS_READ_OK)return s;
     s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
     if(pending){s=FS_READ_DENIED;goto done;}
+    {int batch=0,commit=0;
+     s=batch_state(r,&batch,&commit);
+     if(s!=FS_READ_OK||batch||commit){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
     s=FsManifestPlan(r,&request,1,&plan);if(s!=FS_READ_OK)goto done;
     FsManifestFree(&plan);
     strcpy(parent,rel);slash=strrchr(parent,'/');
@@ -557,5 +579,233 @@ done:
     unlock_workspace(lockfd);
     /* A successful link must never be reported as failure and invite retry. */
     return published?FS_READ_OK:s;
+}
+#define FS_BATCH_LIMIT 8
+#define FS_BATCH_MAGIC 0x46534241u
+/* Format is same-host only; fixed-size records never accept partial reads. */
+typedef struct {
+    char target[FS_INTENT_MAX_PATH];
+    char stage[48];
+    uint64_t dev,ino;
+} FS_BATCH_ITEM;
+typedef struct {
+    uint32_t magic,version,count,reserved;
+    FS_BATCH_ITEM items[FS_BATCH_LIMIT];
+} FS_BATCH_RECORD;
+static int batch_name_ok(const char *p)
+{
+    return p && valid_relative(p,0) && strlen(p)<FS_INTENT_MAX_PATH &&
+      strcmp(p,".fstxn.lock") && strcmp(p,FS_INTENT_NAME) &&
+      strcmp(p,FS_BATCH_NAME) && strcmp(p,FS_BATCH_COMMIT) &&
+      strcmp(p,".fstxn") && strncmp(p,".fstxn/",7) &&
+      strncmp(p,".fst-",5) && strncmp(p,".fstxn-",7);
+}
+static int batch_valid(const FS_BATCH_RECORD *b)
+{
+    if(b->magic!=FS_BATCH_MAGIC||b->version!=1||b->count<2||
+       b->count>FS_BATCH_LIMIT||b->reserved)return 0;
+    for(unsigned k=0;k<b->count;k++){
+        const FS_BATCH_ITEM *i=&b->items[k];
+        if(!memchr(i->target,0,sizeof(i->target))||
+           !memchr(i->stage,0,sizeof(i->stage))||
+           !batch_name_ok(i->target)||strncmp(i->stage,".fst-",5)||
+           strlen(i->stage)!=37||strspn(i->stage+5,"0123456789abcdef")!=32)return 0;
+        for(unsigned j=0;j<k;j++)
+            if(!strcmp(i->target,b->items[j].target)||
+               !strcmp(i->stage,b->items[j].stage))return 0;
+    }
+    for(unsigned k=b->count;k<FS_BATCH_LIMIT;k++){
+        const unsigned char *p=(const unsigned char*)&b->items[k];
+        for(size_t j=0;j<sizeof(b->items[k]);j++)if(p[j])return 0;
+    }
+    return 1;
+}
+static FS_READ_STATUS batch_state(const FS_READ_ROOT *r,int *batch,int *commit)
+{
+    struct stat st;
+    *batch=*commit=0;
+    if(fstatat(r->fd,FS_BATCH_NAME,&st,AT_SYMLINK_NOFOLLOW)==0)*batch=1;
+    else if(errno!=ENOENT)return FS_READ_DENIED;
+    if(fstatat(r->fd,FS_BATCH_COMMIT,&st,AT_SYMLINK_NOFOLLOW)==0)*commit=1;
+    else if(errno!=ENOENT)return FS_READ_DENIED;
+    return FS_READ_OK;
+}
+static FS_READ_STATUS batch_recover_locked(const FS_READ_ROOT *r)
+{
+    FS_BATCH_RECORD b;struct stat journal,mark,stage[FS_BATCH_LIMIT],target[FS_BATCH_LIMIT];
+    int dirs[FS_BATCH_LIMIT],present[FS_BATCH_LIMIT],stages[FS_BATCH_LIMIT];
+    char parent[FS_INTENT_MAX_PATH],*slash,*leaf;
+    int fd=-1,exists=0,commit=0;FS_READ_STATUS s=batch_state(r,&exists,&commit);
+    if(s!=FS_READ_OK)return s;
+    if(!exists){
+        /* The target list is gone. A marker-only crash remains fail-closed;
+           the caller must inspect it manually, never infer safe cleanup. */
+        return commit?FS_READ_DENIED:FS_READ_OK;
+    }
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=-1;
+    fd=openat(r->fd,FS_BATCH_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+    if(fd<0)return FS_READ_DENIED;
+    if(fstat(fd,&journal)<0||!S_ISREG(journal.st_mode)||
+       (journal.st_mode&077)!=0||journal.st_nlink!=1||
+       journal.st_size!=(off_t)sizeof(b)||read(fd,&b,sizeof(b))!=(ssize_t)sizeof(b)||
+       !batch_valid(&b)){close(fd);return FS_READ_DENIED;}
+    close(fd);
+    if(commit){int markfd=openat(r->fd,FS_BATCH_COMMIT,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+        uint64_t identity=0;
+        if(markfd<0)return FS_READ_DENIED;
+        if(fstat(markfd,&mark)<0||!S_ISREG(mark.st_mode)||mark.st_nlink!=1||
+           mark.st_size!=(off_t)sizeof(identity)||
+           read(markfd,&identity,sizeof(identity))!=(ssize_t)sizeof(identity)||
+           identity!=(uint64_t)journal.st_ino){close(markfd);return FS_READ_DENIED;}
+        close(markfd);
+    }
+    /* Validate every target and stage before any unlink; no partial rollback
+       on an identity conflict discovered in a later entry. */
+    for(unsigned k=0;k<b.count;k++){
+        FS_BATCH_ITEM *i=&b.items[k];
+        stages[k]=fstatat(r->fd,i->stage,&stage[k],AT_SYMLINK_NOFOLLOW)==0;
+        if(!stages[k]&&errno!=ENOENT){s=FS_READ_DENIED;goto done;}
+        if(stages[k]&&(!S_ISREG(stage[k].st_mode)||
+             stage[k].st_dev!=(dev_t)i->dev||stage[k].st_ino!=(ino_t)i->ino||
+             stage[k].st_nlink>2)){s=FS_READ_DENIED;goto done;}
+        strcpy(parent,i->target);slash=strrchr(parent,'/');
+        if(slash)*slash=0;else *parent=0;
+        s=posix_open(r,parent,&dirs[k]);if(s!=FS_READ_OK)goto done;
+        leaf=slash?slash+1:i->target;
+        present[k]=fstatat(dirs[k],leaf,&target[k],AT_SYMLINK_NOFOLLOW)==0;
+        if(!present[k]&&errno!=ENOENT){s=FS_READ_DENIED;goto done;}
+        if(present[k]&&(!S_ISREG(target[k].st_mode)||
+            target[k].st_dev!=(dev_t)i->dev||target[k].st_ino!=(ino_t)i->ino||
+            !stages[k]||target[k].st_nlink>2)){s=FS_READ_DENIED;goto done;}
+        if(!present[k]&&!stages[k]){s=FS_READ_DENIED;goto done;}
+        if(commit&&!present[k]){s=FS_READ_DENIED;goto done;}
+    }
+    for(unsigned k=0;k<b.count;k++){
+        FS_BATCH_ITEM *i=&b.items[k];
+        strcpy(parent,i->target);slash=strrchr(parent,'/');leaf=slash?slash+1:i->target;
+        /* Commit preserves every target. No marker means roll back matching
+           published targets, then sync each parent before retiring journal. */
+        if(!commit&&present[k]){
+            if(unlinkat(dirs[k],leaf,0)<0||fsync(dirs[k])<0){s=FS_READ_IO;goto done;}
+        }else if(commit&&fsync(dirs[k])<0){s=FS_READ_IO;goto done;}
+    }
+    /* Keep staged files until the journal is retired. Crashes during cleanup
+       leave orphans, rather than making an interrupted replay ambiguous. */
+    if(commit){
+        /* A commit marker is never removed before the journal. If power is
+           lost between removals, marker-only state remains fail-closed. */
+        if(!durable_remove(r->fd,FS_BATCH_NAME)){s=FS_READ_IO;goto done;}
+        crash_point(8); /* committed target list retired, marker remains */
+        if(!durable_remove(r->fd,FS_BATCH_COMMIT)){s=FS_READ_IO;goto done;}
+    }else if(!durable_remove(r->fd,FS_BATCH_NAME)){s=FS_READ_IO;goto done;}
+    for(unsigned k=0;k<b.count;k++)if(stages[k])
+        (void)durable_remove(r->fd,b.items[k].stage);
+    s=FS_READ_OK;
+done:
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)if(dirs[k]>=0)close(dirs[k]);
+    return s;
+}
+FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
+{
+    int lock=-1,pending=0;FS_READ_STATUS s;
+    if(!r)return FS_READ_INVALID;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=pending_intent(r,&pending);
+    if(s==FS_READ_OK)s=pending?FS_READ_DENIED:batch_recover_locked(r);
+    unlock_workspace(lock);return s;
+}
+FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *entries,size_t count)
+{
+    FS_BATCH_RECORD b={0};FS_OP_REQUEST req[FS_BATCH_LIMIT];FS_MANIFEST manifest={0};
+    unsigned char nonce[16];int lock=-1,random_fd=-1,record=-1;
+    int dirs[FS_BATCH_LIMIT],stagefd[FS_BATCH_LIMIT];
+    char parent[FS_INTENT_MAX_PATH],*slash,*leaf;int pending=0,other=0,commit=0;
+    int journaled=0,visible=0,committed_here=0;FS_READ_STATUS s=FS_READ_IO;
+    struct stat st;
+    if(!r||!entries||count<2||count>FS_BATCH_LIMIT)return FS_READ_INVALID;
+    for(size_t k=0;k<count;k++){
+        if(!batch_name_ok(entries[k].target)||
+           (!entries[k].bytes&&entries[k].len)||entries[k].len>FS_READ_MAX||
+           entries[k].mode>0777)return FS_READ_INVALID;
+        req[k]=(FS_OP_REQUEST){FS_OP_CREATE,NULL,entries[k].target};
+    }
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=stagefd[k]=-1;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=pending_intent(r,&pending);if(s!=FS_READ_OK)goto done;
+    s=batch_state(r,&other,&commit);if(s!=FS_READ_OK)goto done;
+    if(pending||other||commit){s=FS_READ_DENIED;goto done;}
+    s=FsManifestPlan(r,req,count,&manifest);if(s!=FS_READ_OK)goto done;
+    FsManifestFree(&manifest);
+    b.magic=FS_BATCH_MAGIC;b.version=1;b.count=(uint32_t)count;
+    random_fd=open("/dev/urandom",O_RDONLY|O_CLOEXEC);
+    if(random_fd<0){s=FS_READ_IO;goto done;}
+    for(size_t k=0;k<count;k++){
+        FS_BATCH_ITEM *i=&b.items[k];
+        struct stat file;
+        strcpy(i->target,entries[k].target);
+        strcpy(parent,i->target);slash=strrchr(parent,'/');
+        if(slash)*slash=0;else *parent=0;
+        s=posix_open(r,parent,&dirs[k]);if(s!=FS_READ_OK)goto done;
+        if(read(random_fd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
+            s=FS_READ_IO;goto done;}
+        memcpy(i->stage,".fst-",5);
+        for(size_t j=0;j<sizeof(nonce);j++)sprintf(i->stage+5+j*2,"%02x",nonce[j]);
+        i->stage[37]=0;
+        stagefd[k]=openat(r->fd,i->stage,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+        if(stagefd[k]<0){s=error_status();goto done;}
+        if(!write_all(stagefd[k],entries[k].bytes,entries[k].len)||
+           fchmod(stagefd[k],(mode_t)entries[k].mode)<0||
+           fsync(stagefd[k])<0||fstat(stagefd[k],&file)<0){s=FS_READ_IO;goto done;}
+        i->dev=(uint64_t)file.st_dev;i->ino=(uint64_t)file.st_ino;
+    }
+    if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    record=openat(r->fd,FS_BATCH_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(record<0){s=error_status();goto done;}
+    journaled=1;
+    if(!write_all(record,(const unsigned char*)&b,sizeof(b))||
+       fsync(record)<0||fstat(record,&st)<0||fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    crash_point(5); /* durable journal; no target */
+    for(size_t k=0;k<count;k++){
+        strcpy(parent,b.items[k].target);slash=strrchr(parent,'/');
+        leaf=slash?slash+1:b.items[k].target;
+        if(linkat(r->fd,b.items[k].stage,dirs[k],leaf,0)<0){
+            s=errno==EEXIST?FS_READ_DENIED:error_status();goto done;
+        }
+        visible=1;
+        if(fsync(dirs[k])<0){s=FS_READ_IO;goto done;}
+        if(k==0)crash_point(6); /* partial published batch */
+    }
+    /* A synced commit marker names the exact journal inode; no rollback
+       after this point. If marking fails, recovery rolls the batch back. */
+    {uint64_t id=(uint64_t)st.st_ino;
+     int mark=openat(r->fd,FS_BATCH_COMMIT,
+             O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+     if(mark<0){s=error_status();goto done;}
+     if(!write_all(mark,(const unsigned char*)&id,sizeof(id))||fsync(mark)<0){
+         close(mark);s=FS_READ_IO;goto done;
+     }
+     close(mark);
+    }
+    if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    committed_here=1;
+    crash_point(7); /* committed, cleanup still pending */
+    (void)batch_recover_locked(r);
+    s=FS_READ_OK;
+done:
+    if(record>=0)close(record);
+    for(size_t k=0;k<FS_BATCH_LIMIT;k++){
+        if(stagefd[k]>=0)close(stagefd[k]);
+        if(dirs[k]>=0)close(dirs[k]);
+    }
+    if(!journaled){
+        for(size_t k=0;k<count;k++)if(b.items[k].stage[0])
+            (void)unlinkat(r->fd,b.items[k].stage,0);
+        (void)fsync(r->fd);
+    }
+    if(random_fd>=0)close(random_fd);
+    unlock_workspace(lock);
+    /* If any name became visible, report an interrupted transaction as IO,
+       never invite blind retry. Caller must recover explicitly. */
+    return committed_here?FS_READ_OK:(visible?FS_READ_IO:s);
 }
 #endif
