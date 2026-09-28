@@ -302,6 +302,9 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME test_typed_c_preview
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_preview.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_test(NAME test_typed_c_binary_preview
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_binary_preview.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 if(Python3_Interpreter_FOUND)
     add_custom_target(bank_report
