@@ -20,6 +20,7 @@ jobs:
           test -n "$kernel" && test -s "$kernel"
           sudo cp "$kernel" "$RUNNER_TEMP/preflight-vmlinuz"
           sudo chmod 644 "$RUNNER_TEMP/preflight-vmlinuz"
+          sudo usermod -aG kvm runner
           printf '%s\n' "$RUNNER_TEMP/preflight-vmlinuz" > "$RUNNER_TEMP/preflight-kernel-path"
       - name: Fetch commit-pinned probe and verify SHA-256
         shell: bash
@@ -28,19 +29,19 @@ jobs:
           curl --fail --silent --show-error --proto '=https' --max-redirs 0 \
             --connect-timeout 10 --max-time 30 --max-filesize 100000 \
             --output "$RUNNER_TEMP/kvm_preflight.py" \
-            -- 'https://raw.githubusercontent.com/FiveTechSoft/symbols/c043ba68030ed92a189fb78d0a60d219e7425881/tools/kvm_preflight/probe.py'
-          printf '%s  %s\n' 'a2f745b60cf53b66aa0271ee397f0932f0daf9a6ccdb1fd910fec21467e49c0b' "$RUNNER_TEMP/kvm_preflight.py" | sha256sum --check --status
-      - name: Diagnose KVM and one root-run capability boot
+            -- 'https://raw.githubusercontent.com/FiveTechSoft/symbols/4e8de689b37f80dca2440f0bb7ef025b364c45b3/tools/kvm_preflight/probe.py'
+          printf '%s  %s\n' '28103744bb7e9bb2ed9854f4b525721ee1d4bf9a3f3fe7bd2d4e8e1b1b81526b' "$RUNNER_TEMP/kvm_preflight.py" | sha256sum --check --status
+      - name: Diagnose KVM and three unprivileged group boots
         shell: bash
         run: |
           set -uo pipefail
           kernel=$(cat "$RUNNER_TEMP/preflight-kernel-path")
           set +e
+          # sg starts a fresh, non-root runner process with kvm as its effective group.
+          export PREFLIGHT_KERNEL="$kernel"
+          export RUNNER_TEMP ImageVersion
           timeout --signal=TERM --kill-after=5s 120s \
-            sudo -n --preserve-env=ImageVersion python3 "$RUNNER_TEMP/kvm_preflight.py" \
-              --kernel "$kernel" --busybox /usr/bin/busybox \
-              --qemu /usr/bin/qemu-system-x86_64 \
-              --boot-timeout 20 --sudo-one-boot --json-out "$RUNNER_TEMP/preflight.json"
+            sg kvm -c 'python3 "$RUNNER_TEMP/kvm_preflight.py" --kernel "$PREFLIGHT_KERNEL" --busybox /usr/bin/busybox --qemu /usr/bin/qemu-system-x86_64 --boot-timeout 20 --kvm-group-boots --json-out "$RUNNER_TEMP/preflight.json"'
           status=$?
           set -e
           if test -s "$RUNNER_TEMP/preflight.json"; then
