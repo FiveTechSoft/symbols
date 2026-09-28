@@ -92,6 +92,37 @@ class BinaryPreviewTests(unittest.TestCase):
             self.source.write_bytes(bad)
             self.assertEqual(self.check(b'new')['candidate_count'], 0)
 
+    def test_whitespace_tolerant_closed_origins(self):
+        examples = [
+            (b'#include <stdio.h>\n\nint main(void)\n{\n'
+             b'    printf("old");\n    return 0;\n}\n', b'old', b'new'),
+            (b' #include <stdio.h>\nint  main ( void ) { puts ( "old" ) ; return  0 ; } ',
+             b'old\n', b'new\x00'),
+            (b'#include <stdio.h>\nint main(void)\n{ return 0; }\n', b'', b'new'),
+        ]
+        for source, identity, changed in examples:
+            with self.subTest(source=source):
+                self.source.write_bytes(source)
+                self.assertEqual(self.check(identity)['candidate_count'], 0)
+                proposal = self.check(changed)
+                self.assertEqual((proposal['status'], proposal['candidate_count']),
+                                 ('static_candidate_unverified', 1))
+                self.assertEqual(proposal['candidates'][0]['rule'], 'answer_bytes')
+        invalid = [
+            b'//comment\n#include <stdio.h>\nint main(void){puts("x");return 0;}\n',
+            b'#include <stdio.h>\n#include <stdlib.h>\nint main(void){puts("x");return 0;}\n',
+            b'#include <stdio.h>\nint main(void){printf("%d",3);return 0;}\n',
+            b'#include <stdio.h>\nint main(void){puts("x");puts("y");return 0;}\n',
+            b'#include <stdio.h>\nint main(void){puts("x");return 1;}\n',
+            b'#include <stdio.h>\nint main(void){puts("x"); return 0;}\nint main(void){return 0;}\n',
+            b'#include <stdio.h>\nint main(void){printf("%s");return 0;}\n',
+            b'#include <stdio.h>\nint main(void){printf("x");return 0;}\n' + b'\n' * 32,
+        ]
+        for source in invalid:
+            with self.subTest(invalid=source[:80]):
+                self.source.write_bytes(source)
+                self.assertEqual(self.check(b'new')['candidate_count'], 0)
+
     def test_closed_schema_and_v1_invariance(self):
         self.obj['schema'] = 'symbols.c-repair-contract.v1'
         self.contract.write_text(json.dumps(self.obj))

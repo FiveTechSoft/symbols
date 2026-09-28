@@ -17,9 +17,18 @@ MODE = (b'#ifdef _WIN32\n'
         b'if (_setmode(_fileno(stdout), _O_BINARY) == -1) return 1;\n'
         b'#endif\n')
 # Fullmatch over ASCII bytes, never tokenize an arbitrary C translation unit.
-LITERAL = re.compile(rb'#include <stdio\.h>\nint main\(void\)\{(?:\s*)'
-                     rb'(printf|puts)\("((?:[\x20-\x21\x23-\x5b\x5d-\x7e]|\\[nrt"\\])*)"\);'
-                     rb'\s*return 0;\s*\}\n?')
+# Whitespace is permitted only between fixed tokens, not inside identifiers,
+# the include target, or the literal. A required gap separates C keywords.
+WS = rb'[ \t\r\n]*'
+GAP = rb'[ \t\r\n]+'
+INCLUDE = rb'[ \t]*\#include[ \t]+<stdio\.h>[ \t]*\r?\n'
+MAIN = rb'int' + GAP + rb'main' + WS + rb'\(' + WS + rb'void' + WS + rb'\)' + WS + rb'\{'
+END = rb'return' + GAP + rb'0' + WS + rb';' + WS + rb'\}' + WS
+LITERAL = re.compile(WS + INCLUDE + WS + MAIN + WS +
+                     rb'(printf|puts)' + WS + rb'\(' + WS + rb'"'
+                     rb'((?:[\x20-\x21\x23-\x5b\x5d-\x7e]|\\[nrt"\\])*)'
+                     rb'"' + WS + rb'\)' + WS + rb';' + WS + END)
+EMPTY_SOURCE = re.compile(WS + INCLUDE + WS + MAIN + WS + END)
 ELEMENTS = rb'0x[0-9a-f]{2}(?:,0x[0-9a-f]{2}){0,126}'
 ARRAY = re.compile(rb'#include <stdio\.h>\n' + re.escape(WIN) +
                    rb'static const unsigned char B\[\] = \{(' + ELEMENTS + rb')\};\n'
@@ -50,7 +59,7 @@ def literal_bytes(raw, call):
 def recognize(source, original=False):
     if original and (len(source) > 768 or len(source.splitlines()) > 32):
         return None
-    if source == EMPTY:
+    if EMPTY_SOURCE.fullmatch(source):
         return b''
     match = LITERAL.fullmatch(source)
     if match:
