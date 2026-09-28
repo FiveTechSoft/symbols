@@ -214,10 +214,12 @@ def main():
     parser.add_argument('--verify-c-contract',required=True)
     parser.add_argument('-w','--workspace',required=True)
     args=parser.parse_args()
-    try:print(json.dumps(verify(args.verify_c_contract,args.workspace),sort_keys=True,separators=(',',':')))
+    try:
+        payload=json.dumps(verify(args.verify_c_contract,args.workspace),sort_keys=True,separators=(',',':')).encode('utf-8')
+        sys.stdout.buffer.write(payload+b'\n')
     except (ValueError,OSError,UnicodeError,subprocess.TimeoutExpired) as exc:
         reason=str(exc)
         if reason not in REASONS:reason='invalid_or_unavailable'
-        print('refused: '+reason,file=sys.stderr);return 2
+        sys.stderr.buffer.write(b'refused: '+reason.encode('ascii')+b'\n');return 2
     return 0
 if __name__=='__main__':sys.exit(main())

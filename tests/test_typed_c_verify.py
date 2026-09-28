@@ -38,6 +38,9 @@ class VerifyTests(unittest.TestCase):
         p=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'tools/typed_c_contract/verify.py'),
                           '--verify-c-contract',str(self.contract),'-w',str(self.work)],capture_output=True)
         self.assertEqual((p.returncode,p.stderr),(0,b''))
+        self.assertNotIn(b'\r',p.stdout)
+        self.assertEqual(p.stdout.count(b'\n'),1)
+        self.assertTrue(p.stdout.endswith(b'\n'))
         self.assertEqual(json.loads(p.stdout)['status'],'probe_unavailable')
     def test_v1_cannot_activate(self):
         self.obj['schema']='symbols.c-repair-contract.v1'
@@ -51,7 +54,15 @@ class VerifyTests(unittest.TestCase):
         self.contract.write_text(json.dumps(self.obj))
         p=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'tools/typed_c_contract/preview.py'),
                           '--preview-c-contract',str(self.contract),'-w',str(self.work)],capture_output=True)
-        self.assertEqual((p.returncode,p.stdout,p.stderr),(2,b'',b'refused: version\n'))
+        # v1 keeps its inherited platform text newline translation.
+        self.assertEqual(p.returncode,2)
+        self.assertEqual(p.stdout,b'')
+        self.assertEqual(p.stderr.splitlines(),[b'refused: version'])
+        self.obj['schema']='symbols.c-repair-contract.v1'
+        self.contract.write_text(json.dumps(self.obj))
+        v2=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'tools/typed_c_contract/verify.py'),
+                          '--verify-c-contract',str(self.contract),'-w',str(self.work)],capture_output=True)
+        self.assertEqual((v2.returncode,v2.stdout,v2.stderr),(2,b'',b'refused: version\n'))
     def test_ineligible_and_no_broker(self):
         class Spy:
             def observe(self,request):raise AssertionError('broker called')
