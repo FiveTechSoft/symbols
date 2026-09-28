@@ -131,7 +131,9 @@ def main():
     p.add_argument('--qemu', default='/usr/bin/qemu-system-x86_64', type=Path)
     p.add_argument('--boot-timeout', default=20, type=int)
     p.add_argument('--json-out', type=Path)
-    p.add_argument('--sudo-one-boot', action='store_true', help='one root-run capability boot only')
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument('--sudo-one-boot', action='store_true', help='one root-run capability boot only')
+    mode.add_argument('--kvm-group-boots', action='store_true', help='three unprivileged boots with active kvm group')
     args = p.parse_args()
     result = {'schema': 'symbols.kvm-hosted-preflight.v1', 'status': 'fail',
               'classification': 'exploratory-capability-only', 'environment': {},
@@ -142,6 +144,10 @@ def main():
             result['classification'] = 'capability-only, qemu-as-root, NO acredita aislamiento'
             if os.geteuid() != 0 or 'SUDO_UID' not in os.environ:
                 raise ProbeError('sudo_one_boot_requires_sudo')
+        if args.kvm_group_boots:
+            result['classification'] = 'capability-only, unprivileged-qemu-via-kvm-group, NO acredita aislamiento aún'
+            if os.geteuid() == 0 or 'SUDO_UID' in os.environ:
+                raise ProbeError('kvm_group_boots_requires_nonroot')
         runner_uid = int(os.environ.get('SUDO_UID', os.getuid()))
         runner_gid = int(os.environ.get('SUDO_GID', os.getgid()))
         runner_name = pwd.getpwuid(runner_uid).pw_name
@@ -155,7 +161,10 @@ def main():
             'runner_groups_from_account_db': sorted(set(runner_groups)),
             'runner_id_output': subprocess.run(['id', runner_name], capture_output=True,
                 text=True, timeout=10, check=False).stdout.strip()[:300],
-            'probe_euid': os.geteuid()}
+            'probe_euid': os.geteuid(), 'probe_egid': os.getegid(),
+            'probe_group_gids': sorted(set(os.getgroups()) | {os.getegid()})}
+        if args.kvm_group_boots and kvm_stat.st_gid not in (set(os.getgroups()) | {os.getegid()}):
+            raise ProbeError('kvm_group_not_active_in_process')
         if not (1 <= args.boot_timeout <= 60):
             raise ProbeError('invalid_boot_timeout')
         if os.uname().machine != 'x86_64':
