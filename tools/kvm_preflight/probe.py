@@ -2,9 +2,11 @@
 """Exploratory, secret-free KVM and QEMU microvm capability probe. No workspace code."""
 import argparse
 import fcntl
+import grp
 import hashlib
 import json
 import os
+import pwd
 from pathlib import Path
 import selectors
 import signal
@@ -129,12 +131,31 @@ def main():
     p.add_argument('--qemu', default='/usr/bin/qemu-system-x86_64', type=Path)
     p.add_argument('--boot-timeout', default=20, type=int)
     p.add_argument('--json-out', type=Path)
+    p.add_argument('--sudo-one-boot', action='store_true', help='one root-run capability boot only')
     args = p.parse_args()
     result = {'schema': 'symbols.kvm-hosted-preflight.v1', 'status': 'fail',
               'classification': 'exploratory-capability-only', 'environment': {},
               'phases': [], 'boot_attempts': [], 'p50_boot_ms': None, 'error': None}
     phase = 'environment'
     try:
+        if args.sudo_one_boot:
+            result['classification'] = 'capability-only, qemu-as-root, NO acredita aislamiento'
+            if os.geteuid() != 0 or 'SUDO_UID' not in os.environ:
+                raise ProbeError('sudo_one_boot_requires_sudo')
+        runner_uid = int(os.environ.get('SUDO_UID', os.getuid()))
+        runner_gid = int(os.environ.get('SUDO_GID', os.getgid()))
+        runner_name = pwd.getpwuid(runner_uid).pw_name
+        kvm_stat = os.stat('/dev/kvm')
+        kvm_group = grp.getgrgid(kvm_stat.st_gid).gr_name
+        runner_groups = [grp.getgrgid(gid).gr_name for gid in os.getgrouplist(runner_name, runner_gid)]
+        result['environment']['kvm_permissions'] = {'device': '/dev/kvm',
+            'mode': oct(stat.S_IMODE(kvm_stat.st_mode)), 'owner_uid': kvm_stat.st_uid,
+            'group_gid': kvm_stat.st_gid, 'group': kvm_group,
+            'runner_uid': runner_uid, 'runner_gid': runner_gid, 'runner_name': runner_name,
+            'runner_groups_from_account_db': sorted(set(runner_groups)),
+            'runner_id_output': subprocess.run(['id', runner_name], capture_output=True,
+                text=True, timeout=10, check=False).stdout.strip()[:300],
+            'probe_euid': os.geteuid()}
         if not (1 <= args.boot_timeout <= 60):
             raise ProbeError('invalid_boot_timeout')
         if os.uname().machine != 'x86_64':
@@ -170,7 +191,7 @@ def main():
             image = Path(temp) / 'initramfs.cpio'
             result['environment']['initramfs_sha256'] = initrd(image, args.busybox)
             result['phases'].append({'phase': phase, 'pass': True, 'error': None})
-            for attempt in range(1, 4):
+            for attempt in range(1, 2 if args.sudo_one_boot else 4):
                 phase = f'boot_kill_{attempt}'
                 record, proc = boot(args.qemu, args.kernel, image, args.boot_timeout)
                 try:
@@ -183,7 +204,7 @@ def main():
                 result['boot_attempts'].append(record)
                 result['phases'].append({'phase': phase, 'pass': True, 'error': None})
         vals = sorted(x['boot_ms'] for x in result['boot_attempts'])
-        result['p50_boot_ms'] = vals[1]
+        result['p50_boot_ms'] = vals[1] if not args.sudo_one_boot else None
         result['status'] = 'pass'
     except Exception as exc:
         error = str(exc) if isinstance(exc, ProbeError) else f'{type(exc).__name__}: {exc}'
