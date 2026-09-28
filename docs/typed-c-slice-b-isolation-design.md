@@ -1,0 +1,68 @@
+# Typed C Slice B: isolated observation design (not an implementation)
+
+Status: design gate, September 28, 2026. This document does not enable target-code execution. The current v2 CLI still returns `probe_unavailable` for an eligible candidate. It proposes a future, Linux x86-64-only, disposable hosted-runner backend. The hosted KVM preflight demonstrated three QEMU microvm boots as the non-root runner with an active `kvm` group, at 3659.636, 3856.535 and 3990.032 ms (p50 3856.535 ms) in runner image `20260920.314.1`. That is capability evidence, not an isolation finding. Run: https://github.com/FiveTechSoft/symbols/actions/runs/36406181849/job/108875367605 . The v2 Slice A contract and candidate gate remain authoritative for schema, scope, eligibility and provenance; this design does not broaden them.
+
+## Trust boundary and threat model
+
+The approved candidate's C bytes, generated binary, runtime stdout/stderr, repository task text and any guest-controlled serial output are hostile. Parsing a C file, compiling it, linking it and running it may all execute or process attacker-controlled input. The host controller, broker, VM bootstrap, guest supervisor, fixed toolchain, kernel and QEMU are trusted components only after independent review and pinning. The GitHub runner and underlying hypervisor are outside our control; the VM security boundary depends on the host kernel/KVM and QEMU. A vulnerability in either may breach it.
+
+The host job must be disposable, Linux x86-64, secret-free, with `permissions: {}`; it cannot receive `WORKFLOW_PAT` or other repository secrets. It must not use privileged PR triggers to check out untrusted code or persist credentials. The image and binaries are pinned by measured hashes, not just package names. VM process runs as a non-root runner with active `kvm` group, not under `sudo`. The bootstrap may use sudo for package installation and membership setup before any hostile input arrives; it cannot pass that privilege to the guest workload or QEMU. No network device, disk/share/virtiofs, writable host mount, host workspace or inherited host credential/FD is exposed to the VM. A kernel/initramfs transport is an implementation detail requiring its own review; sending source as an initramfs file avoids shell interpolation but does not alone establish security. Compiler and target executable must both run inside the VM, with the target under a distinct unprivileged guest UID, no access to the result channel, supervisor state or serial device. Reject if that separation cannot be enforced.
+
+The host enforces finite wall, CPU, process, memory and output limits and kills/reaps the QEMU process group on deadline or error. A cgroup-v2 budget, if chosen, must be checked on the actual hosted runner for delegation and effective counters (`cpu.max`, `memory.max`, `pids.max`), including QEMU overhead; unsupported or unenforceable limits are an infrastructure refusal. No timeout is a guest promise alone. Close inherited handles, bound temporary storage, verify cleanup and preserve host canaries. An OOM, timeout, QEMU crash, incomplete output, missing pin, unavailable KVM or failed containment check is `infrastructure_error` or an explicit phase failure, never a clean stdout mismatch. Do not infer guest isolation from QEMU's support of `microvm` or from the preflight.
+
+## Closed request envelope and host/guest split
+
+The existing v2 `verify.py` first checks strict typed contract, complete workspace digest, source predicates and exact one-file/tier-4/unique candidate eligibility. Only then may its internal broker receive a request. The broker must independently bind a version, exact contract SHA-256, full snapshot digest, candidate path and before/after SHA-256, raw candidate source length+digest, goal length+digest, fixed probe timeout and a unique invocation nonce to that selection. This envelope is internal, never a repository instruction or authorization receipt. The byte values, not display strings, are authoritative. A mismatch, stale snapshot, duplicate/unknown field, overlong byte string or path, noncanonical encoding, or inconsistent digest refuses before guest creation. The broker sends only bounded candidate C bytes as a file in a reviewed guest input image. Do not interpolate C, task text, goal bytes, paths or variable fragments into a shell string, QEMU argument, environment variable, filename, compiler flag or logging command. Build QEMU arguments from a fixed allowlist of literals and vetted generated paths; no network/share defaults.
+
+The guest supervisor uses a fixed compiler and flags to compile the source *inside* the VM, executes at most one input-free executable there, captures exact stdout bytes through a bounded pipe, and sends a single result frame over a private supervisor channel. Target stderr is bounded and not a return channel; no raw output is logged by default. The target cannot write the supervisor channel or run with guest-root privileges. The host reads one frame with a wall/byte cap, checks version, declared length, digest, completion and end-of-stream, then compares captured stdout to the contract's exact goal bytes. One byte too few, too many, or different is not an `observed_match`. The broker supplies truthful `started` and phase outcome to the existing v2 `interpret` seam. `observed_match` additionally requires compile success, target start, normal exit 0, complete stdout capture and the required pinned image/compiler/platform/limit evidence; it remains an observation of this one input, not a repair.
+
+### Proposed binary result frame v1
+
+The guest supervisor writes exactly one frame and closes the channel. Fixed layout: ASCII magic `SBO1` (4 bytes), status (1 byte), stdout byte length (unsigned 32-bit big-endian, bounded to at most 127 for v2), SHA-256 of stdout (32 raw bytes), then exactly that many stdout bytes. Total frame size is 41 + length; there is no delimiter, JSON or newline outside the payload. Status `00` means target completed with exit 0; status `01` means compile error before target start and MUST have length zero; other status values refuse until versioned. A `00` frame with stdout equal to goal is only the byte-observation component of a match: the independently bound broker metadata and host-enforced limits also must pass. Serial noise, a second frame, trailing bytes, early EOF, extra field, over-limit length, changed digest and a status/phase inconsistency refuse. Host does not let guest-supplied status establish isolation or an execution claim on its own. Status/frame decoding is not an authentication mechanism against a compromised guest supervisor. A shared serial device visible to target code would defeat this design; the supervisor must own the channel and the target must be unable to open, inherit or spoof it. Until tests prove that separation, do not accept a frame as target execution evidence.
+
+The input transport is separately versioned; the parser must not confuse request and result. A minimal illustrative source frame: magic `SBI1`, unsigned 32-bit big-endian source length, 32-byte SHA-256 of the source, then source bytes. Its parser must reject extra/truncated bytes, changed hash, zero/oversized or non-ASCII source where the v2 candidate gate requires ASCII. Other envelope fields travel in a separately fixed, bounded manifest with its own version and digest. Exact canonical manifest serialization and max size must be frozen and tested before implementation. The illustrative source frame below is a parser fixture, not permission to use an unaudited writable transport.
+
+## Exact parser vectors for the next commit
+
+All hex strings below are the complete frame bytes. Tests decode hex as bytes and compare exact parser results, not pretty-printed strings. The SHA-256 values were calculated over payload bytes only. Each negative starts from the named positive frame; the listed byte change is exact. No output frame may contain a second frame or trailing byte.
+
+| Vector | Full bytes (hex) | Expected parser result |
+| --- | --- | --- |
+| `empty_ok` | `53424f310000000000e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | status `00`, stdout `b''`, complete true, length 0 |
+| `ok_no_lf` | `53424f310000000002565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb34f4b` | status `00`, stdout `b'OK'`, length 2 |
+| `ok_lf` | `53424f310000000003a12b7cb43c9d9134b5bb1b35e9096b66775d9e92e7611d1cc92b02edd6782a874f4b0a` | status `00`, stdout `b'OK\n'`, length 3; must NOT match goal `b'OK'` |
+| `nul` | `53424f31000000000376fe3925c7167317f2df68454339f5ec3650e4062178b4f2be219b105a507907410042` | status `00`, stdout `b'A\x00B'`, length 3 |
+| `crlf` | `53424f31000000000326ffd5886253906a36a7ea0f6e26056fc36472626cb4894bcb100a34dc69d1db410d0a` | status `00`, stdout `b'A\r\n'`, length 3; must NOT normalize to LF |
+| `compile_error` | `53424f310100000000e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | status `01`, stdout `b''`, started false; cannot be a match |
+| `source_min` | `5342493100000019fb8b40ec02a97167bb21beb678bf459694a83050a770271e50879784c4992785696e74206d61696e28766f6964297b72657475726e20303b7d` | input source `b'int main(void){return 0;}'`, length 25 |
+
+Negative mutations (hex byte offsets are zero-based within the frame):
+
+- `wrong_magic`: `ok_no_lf` with byte 0 changed `53` to `00` -> refuse `magic`.
+- `unknown_status`: `ok_no_lf` with byte 4 changed `00` to `02` -> refuse `status`.
+- `hash_mismatch`: `ok_no_lf` with final byte 42 changed `4b` to `4c` -> refuse `digest`.
+- `early_eof`: `ok_no_lf` with its final byte 42 removed -> refuse `truncated`.
+- `trailing`: `ok_no_lf` followed by one `00` byte -> refuse `trailing`.
+- `second_frame`: `empty_ok` immediately followed by `empty_ok` -> refuse `trailing`/multiple, never accept first alone.
+- `declared_128`: `empty_ok` with bytes 5..8 changed from `00000000` to `00000080` -> refuse `length_limit` before allocation.
+- `false_compile_payload`: `compile_error` with bytes 5..8 changed to `00000002` and appending `4f4b` -> refuse `phase_length` even though digest also mismatches.
+- `source_trailing`: `source_min` followed by `00` -> refuse `trailing`.
+- `source_digest`: `source_min` with final byte 64 changed `7d` to `7e` -> refuse `digest`.
+
+For each vector also assert the broker emits no `observed_match` on any refusal, no raw source/stdout in default logs, and no host compiler/target process launch. Parser tests use fixed bytes only; integration and hostile-code tests require later security gates.
+
+## Evidence gates and proposed commits
+
+1. **This docs-only commit:** threat model, closed envelope, exact parser vectors and refusals. No target code is executed; no runtime claim is earned.
+2. Implement framing parser and pinned guest image/build recipe with fixed-fixture-only VM compile/run. Prove bytes, toolchain and package/image digest, request bounds, error classes and no target compile/run on the host. A passing fixture proves functional transport, not isolation.
+3. Implement disposable host controller and v2 broker integration behind a disabled-by-default gate; verify process tree kill/reap, host-enforced wall/resource/output limits, actual hosted cgroup availability, no network/share, immutable toolchain, metadata and fail-closed paths. Tests use fixed fixtures and fake broker vectors. Do not enable arbitrary C yet.
+4. Independent security review and real adversarial VM tests before enabling arbitrary candidate C: host filesystem and secret canaries, denied network, fork/memory/CPU exhaustion, malicious compiler input, symlink/device/serial spoofing, QEMU crash, timeout cleanup, residual processes, untrusted PR workflow and privilege boundary. Measure host effects, not guest claims. Failed/unavailable limits block release.
+5. Only after gate 4 passes, enable the v2 production broker for its existing narrow candidate class on Linux; Windows stays `probe_unavailable`. Preserve v1/legacy behavior byte-for-byte. Test exact stdout/exit, already-correct/no candidate/tie, source predicate refusals and all error outcomes. Freeze new independent sealed set, candidate/CI SHAs and evaluator before one paired measurement. No silent fallback to static success or executable host probe.
+
+Every code commit gets its own byte gate, specific regression tests, CI result and readback. A green workflow or three preflight boots is never substituted for the independent security gate.
+
+## What this design does NOT accredit
+
+This document and the existing preflight do **not** accredit guest/host isolation, QEMU or kernel resistance to guest escapes, compiler containment, cgroup delegation, host cleanup under attack, network denial, supply-chain safety, Windows/macOS behavior, arbitrary C execution, correct user intent, source constraints missing from the contract, authenticated approval or permission to mutate/commit. The v2 CLI remains `probe_unavailable` until a separately implemented and approved broker passes the adversarial gate. A later `observed_match` would show one bounded byte-exact compile/run observation in the approved environment, not a universally correct repair.
+
+Sources: repo Slice A specification `docs/typed-c-contract-v2-slice-a.md` and implementation `tools/typed_c_contract/verify.py` at master `bb6d3baeca377deb52056d3de517cb43d56cee13`; QEMU security model https://www.qemu.org/docs/master/system/security.html ; QEMU microvm https://www.qemu.org/docs/master/system/i386/microvm.html ; GitHub Actions secure use https://docs.github.com/en/actions/reference/security/secure-use ; cgroup v2 https://docs.kernel.org/admin-guide/cgroup-v2.html ; KVM API https://docs.kernel.org/virt/kvm/api.html .
