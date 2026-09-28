@@ -166,10 +166,25 @@ jobs:
         shell: bash
         env:
           COMMIT_MESSAGE: ${{ inputs.message }}
+          PUSH_TOKEN: ${{ secrets.WORKFLOW_PAT }}
         run: |
           set -euo pipefail
+          test -n "$PUSH_TOKEN" || { echo "WORKFLOW_PAT secret missing"; exit 1; }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "$COMMIT_MESSAGE"
+          # Askpass keeps the token out of the remote URL, arguments, config, and logs.
+          helper=$(mktemp "$RUNNER_TEMP/workflow-push-askpass.XXXXXX")
+          chmod 700 "$helper"
+          trap 'rm -f "$helper"' EXIT
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'case "$1" in' \
+            '  *Username*) printf "%s\n" "x-access-token" ;;' \
+            '  *Password*) printf "%s\n" "$PUSH_TOKEN" ;;' \
+            '  *) exit 1 ;;' \
+            'esac' > "$helper"
+          export GIT_ASKPASS="$helper" GIT_TERMINAL_PROMPT=0
+          # Empty extraheader resets checkout's persisted GITHUB_TOKEN auth for this command.
           # Normal non-force push refuses a concurrent master change.
-          git push origin HEAD:master
+          git -c http.https://github.com/.extraheader= -c credential.helper= push origin HEAD:master
