@@ -36,7 +36,8 @@ class BinaryPreviewTests(unittest.TestCase):
         return validate(self.contract, self.work)
 
     def test_all_binary_boundaries_and_candidate_execution(self):
-        compiler = shutil.which('cl') if os.name == 'nt' else shutil.which('cc')
+        compiler = shutil.which('cc') if os.name != 'nt' else shutil.which('cmake')
+        self.assertIsNotNone(compiler, 'fixture compiler is required by this CI test')
         goals = [b'', b'\x00', b'a\x00b', b'\x80\xff', b'\r\n', b'no LF', b'LF\n',
                  b'100% \\ \x0f\xaf', bytes(range(127)), b'\xff' * 127]
         for goal in goals:
@@ -50,18 +51,33 @@ class BinaryPreviewTests(unittest.TestCase):
                 self.assertLessEqual(len(item['unified_diff'].encode('utf-8')), 4096)
                 self.assertEqual(self.source.read_bytes(),
                                  b'#include <stdio.h>\nint main(void){printf("old");return 0;}\n')
-                if compiler:
-                    generated = self.root / 'candidate.c'; generated.write_bytes(after)
-                    executable = self.root / ('candidate.exe' if os.name == 'nt' else 'candidate')
-                    command = ([compiler, '/nologo', str(generated), '/Fe:'+str(executable)]
-                               if os.name == 'nt' else [compiler, '-std=c11', '-pedantic-errors', str(generated), '-o', str(executable)])
-                    compile_result = subprocess.run(command, cwd=self.root, capture_output=True, timeout=20)
+                generated = self.root / 'candidate.c'; generated.write_bytes(after)
+                if os.name == 'nt':
+                    # CMake configures MSVC's INCLUDE/LIB/SDK environment. Plain cl.exe
+                    # on this PowerShell runner has PATH but no stdio.h include path.
+                    project = self.root / 'candidate-fixture'
+                    project.mkdir(exist_ok=True)
+                    (project / 'CMakeLists.txt').write_text(
+                        'cmake_minimum_required(VERSION 3.16)\n'
+                        'project(binary_preview_fixture C)\n'
+                        'add_executable(candidate ../candidate.c)\n', encoding='ascii')
+                    build = self.root / 'candidate-build'
+                    commands = [[compiler, '-S', str(project), '-B', str(build)],
+                                [compiler, '--build', str(build), '--config', 'Release']]
+                    executable = build / 'Release' / 'candidate.exe'
+                else:
+                    executable = self.root / 'candidate'
+                    commands = [[compiler, '-std=c11', '-pedantic-errors',
+                                 str(generated), '-o', str(executable)]]
+                for command in commands:
+                    compile_result = subprocess.run(command, cwd=self.root,
+                                                    capture_output=True, timeout=60)
                     if compile_result.returncode:
-                        self.fail('compiler exit %d: stdout=%r stderr=%r' % (
-                            compile_result.returncode, compile_result.stdout[:2048],
-                            compile_result.stderr[:2048]))
-                    output = subprocess.run([str(executable)], capture_output=True, timeout=5)
-                    self.assertEqual((output.returncode, output.stdout), (0, goal))
+                        self.fail('fixture compiler exit %d: stdout=%r stderr=%r' % (
+                            compile_result.returncode, compile_result.stdout[-2048:],
+                            compile_result.stderr[-2048:]))
+                output = subprocess.run([str(executable)], capture_output=True, timeout=5)
+                self.assertEqual((output.returncode, output.stdout), (0, goal))
 
     def test_identity_and_abstention(self):
         self.assertEqual(self.check(b'old')['candidate_count'], 0)
