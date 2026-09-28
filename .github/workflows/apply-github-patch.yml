@@ -1,0 +1,175 @@
+name: Apply validated GitHub workflow patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Commit message
+        required: true
+        type: string
+      expected_head:
+        description: Expected master SHA before applying
+        required: true
+        type: string
+      patch_base64:
+        description: Base64-encoded unified git diff; no secrets
+        required: true
+        type: string
+      patch_sha256:
+        description: Lowercase SHA-256 of decoded patch bytes
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# Share the existing apply-patch lock; a stale expected_head fails closed.
+concurrency:
+  group: apply-validated-patch-master
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - name: Validate bytes, HEAD, and target paths
+        shell: bash
+        env:
+          PATCH_BASE64: ${{ inputs.patch_base64 }}
+          PATCH_SHA256: ${{ inputs.patch_sha256 }}
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+          COMMIT_MESSAGE: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid HEAD'; exit 1; }
+          test "$EXPECTED_HEAD" = "$(git rev-parse HEAD)" || { echo 'Master moved'; exit 1; }
+          test -n "${COMMIT_MESSAGE//[[:space:]]/}" || { echo 'Empty message'; exit 1; }
+          [[ "$PATCH_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid digest'; exit 1; }
+          test -n "$PATCH_BASE64" && test "${#PATCH_BASE64}" -le 65536 || { echo 'Invalid encoded size'; exit 1; }
+          # Decode canonical base64 and verify the actual patch bytes before parsing.
+          python3 - <<'PY'
+          import base64, binascii, hashlib, os
+          from pathlib import Path
+          encoded = os.environ['PATCH_BASE64']
+          try:
+              raw = base64.b64decode(encoded, validate=True)
+          except (ValueError, binascii.Error):
+              raise SystemExit('Invalid base64')
+          if base64.b64encode(raw).decode('ascii') != encoded or not 0 < len(raw) <= 49152:
+              raise SystemExit('Noncanonical base64 or patch size')
+          if hashlib.sha256(raw).hexdigest() != os.environ['PATCH_SHA256']:
+              raise SystemExit('Patch SHA-256 mismatch')
+          Path(os.environ['RUNNER_TEMP'], 'change.patch').write_bytes(raw)
+          PY
+          # Read both sides of every diff; never trust only --numstat's displayed path.
+          python3 - <<'PY'
+          import os, re, subprocess
+          from pathlib import Path
+          patch = Path(os.environ['RUNNER_TEMP'], 'change.patch')
+          raw = patch.read_bytes()
+          if b'\r' in raw or b'\0' in raw or not raw.startswith(b'diff --git '):
+              raise SystemExit('Invalid patch format')
+          chunks = raw.split(b'diff --git ')
+          if chunks[0] or not 1 <= len(chunks)-1 <= 20:
+              raise SystemExit('Invalid diff count')
+          path_rule = re.compile(rb'\.github/workflows/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.ya?ml\Z')
+          approved = set()
+          for chunk in chunks[1:]:
+              first, _, body = chunk.partition(b'\n')
+              match = re.fullmatch(rb'a/([^\s]+) b/([^\s]+)', first)
+              if not match or match.group(1) != match.group(2):
+                  raise SystemExit('Ambiguous path or rename')
+              path = match.group(1)
+              if (not path_rule.fullmatch(path) or any(part in (b'.', b'..') for part in path.split(b'/')) or
+                  path == b'.github/workflows/apply-github-patch.yml' or path in approved):
+                  raise SystemExit('Disallowed workflow path')
+              approved.add(path)
+              # The bootstrap may never edit itself. Updating it requires manual editing.
+              for line in body.splitlines():
+                  if line.startswith((b'rename ', b'copy ', b'old mode ', b'new mode ',
+                                      b'GIT binary patch', b'Binary files ')):
+                      raise SystemExit('Unsupported patch metadata')
+                  if line.startswith((b'new file mode ', b'deleted file mode ')) and line.split()[-1] != b'100644':
+                      raise SystemExit('Only regular files allowed')
+              if b'\ndiff --git ' in body:
+                  raise SystemExit('Unexpected diff separator')
+              old = [x for x in body.splitlines() if x.startswith(b'--- ')]
+              new = [x for x in body.splitlines() if x.startswith(b'+++ ')]
+              if len(old) != 1 or len(new) != 1 or old[0][4:] not in (b'a/'+path, b'/dev/null') or new[0][4:] not in (b'b/'+path, b'/dev/null'):
+                  raise SystemExit('Ambiguous patch paths')
+              # Refuse symlink targets or ancestors in the checked-out tree.
+              relative = Path(os.fsdecode(path))
+              if any(p.is_symlink() for p in (relative, *relative.parents)):
+                  raise SystemExit('Symlink path')
+          stat = subprocess.run(['git', 'apply', '--numstat', '-z', str(patch)],
+                                check=True, capture_output=True).stdout
+          listed = set()
+          rows = stat.split(b'\0')
+          if rows[-1:] != [b'']:
+              raise SystemExit('Invalid git path list')
+          for row in rows[:-1]:
+              match = re.fullmatch(rb'[0-9]+\t[0-9]+\t([^\t\0]+)', row)
+              if not match or match.group(1) not in approved or match.group(1) in listed:
+                  raise SystemExit('Git path list disagrees with diff')
+              listed.add(match.group(1))
+          if listed != approved:
+              raise SystemExit('Incomplete git path list')
+          PY
+          git apply --check --index "$RUNNER_TEMP/change.patch"
+      - name: Apply and audit staged paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --index "$RUNNER_TEMP/change.patch"
+          git diff --cached --check
+          # Staged paths and status must match the validated patch, without renames.
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          raw = Path(os.environ['RUNNER_TEMP'], 'change.patch').read_bytes()
+          expected = {c.split(b'\n', 1)[0].split(b' b/', 1)[0][2:] for c in raw.split(b'diff --git ')[1:]}
+          out = subprocess.run(['git', 'diff', '--cached', '--name-status', '-z'],
+                               check=True, capture_output=True).stdout.split(b'\0')
+          if out[-1:] != [b''] or len(out) != 2*len(expected)+1:
+              raise SystemExit('Unexpected staged count')
+          actual = set()
+          for status, path in zip(out[0:-1:2], out[1:-1:2]):
+              if status not in (b'A', b'M', b'D') or path not in expected or path in actual:
+                  raise SystemExit('Unexpected staged change')
+              actual.add(path)
+          if actual != expected:
+              raise SystemExit('Staged paths differ')
+          # A name-status match alone does not prove regular-file mode.
+          staged = subprocess.run(['git', 'ls-files', '--stage', '-z', '--', '.github/workflows'],
+                                  check=True, capture_output=True).stdout
+          modes = {}
+          for entry in staged.split(b'\0')[:-1]:
+              meta, path = entry.split(b'\t', 1)
+              mode, _object, stage = meta.split(b' ')
+              modes[path] = (mode, stage)
+          for path in actual:
+              status = next(out[i] for i in range(0, len(out)-1, 2) if out[i+1] == path)
+              if status == b'D':
+                  if path in modes:
+                      raise SystemExit('Deleted path still staged')
+              elif modes.get(path) != (b'100644', b'0'):
+                  raise SystemExit('Nonregular staged workflow')
+          PY
+          if git diff --cached --quiet; then echo 'No staged changes'; exit 1; fi
+      - name: Commit and update master
+        shell: bash
+        env:
+          COMMIT_MESSAGE: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "$COMMIT_MESSAGE"
+          # Normal non-force push refuses a concurrent master change.
+          git push origin HEAD:master
