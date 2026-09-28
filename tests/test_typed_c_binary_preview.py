@@ -55,7 +55,11 @@ class BinaryPreviewTests(unittest.TestCase):
                     executable = self.root / ('candidate.exe' if os.name == 'nt' else 'candidate')
                     command = ([compiler, '/nologo', str(generated), '/Fe:'+str(executable)]
                                if os.name == 'nt' else [compiler, '-std=c11', '-pedantic-errors', str(generated), '-o', str(executable)])
-                    subprocess.run(command, cwd=self.root, capture_output=True, check=True, timeout=20)
+                    compile_result = subprocess.run(command, cwd=self.root, capture_output=True, timeout=20)
+                    if compile_result.returncode:
+                        self.fail('compiler exit %d: stdout=%r stderr=%r' % (
+                            compile_result.returncode, compile_result.stdout[:2048],
+                            compile_result.stderr[:2048]))
                     output = subprocess.run([str(executable)], capture_output=True, timeout=5)
                     self.assertEqual((output.returncode, output.stdout), (0, goal))
 
