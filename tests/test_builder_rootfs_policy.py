@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+import sys
 
-from tools.builder_rootfs.policy import Entry, PolicyRefusal, check_entries
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "builder_rootfs"))
+from policy import Entry, PolicyRefusal, check_entries
 
 
 class PolicyTests(unittest.TestCase):
