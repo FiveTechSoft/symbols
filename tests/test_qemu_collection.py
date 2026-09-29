@@ -121,6 +121,33 @@ class CollectionTests(unittest.TestCase):
         for forbidden in ('private','relative-name','SIGUSR1','SIGKILL','secret','52'):
             self.assertNotIn(forbidden,repr(r))
 
+    @unittest.skipUnless(sys.platform=='linux' and hasattr(os,'O_PATH'),'openat2 diagnostic is Linux-only')
+    def test_relative_open_diagnostic_does_not_publish_arbitrary_name(self):
+        from collect import relative_open_diagnostic
+        from tempfile import TemporaryDirectory
+        import hashlib
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'public').write_bytes(b'public snapshot bytes')
+            (root/'SECRET-agent-file').write_bytes(b'private bytes')
+            (root/'escape').symlink_to(root/'SECRET-agent-file')
+            source={'public':{'size':len(b'public snapshot bytes'),'sha256':hashlib.sha256(b'public snapshot bytes').hexdigest()}}
+            lines=['77  openat(AT_FDCWD, "public", O_RDONLY) = 3',
+                   '77  openat(AT_FDCWD, "SECRET-agent-file", O_RDONLY) = 4',
+                   '77  openat(AT_FDCWD, "escape", O_RDONLY) = 5',
+                   '77  openat(AT_FDCWD, "../outside-secret", O_RDONLY) = 6',
+                   '77  openat(AT_FDCWD, "gone", O_RDONLY) = 7']
+            r=relative_open_diagnostic(lines,[1,2,3,4,5],root,source)
+            self.assertEqual(r['launch_cwd'],'stage')
+            self.assertEqual(r['candidates'][0]['inventory_path'],'public')
+            self.assertEqual(r['candidates'][0]['sha256'],source['public']['sha256'])
+            self.assertEqual(r['candidates'][1]['sha256'],hashlib.sha256(b'private bytes').hexdigest())
+            self.assertNotIn('inventory_path',r['candidates'][1])
+            self.assertEqual([x['state'] for x in r['candidates'][2:]],['unresolved','path_unsafe','unresolved'])
+            self.assertNotIn('SECRET-agent-file',repr(r))
+            self.assertNotIn('outside-secret',repr(r))
+            moved=relative_open_diagnostic(['77  chdir("/private") = 0',lines[0]],[2],root,source)
+            self.assertEqual(moved['candidates'][0]['state'],'cwd_changed')
+
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',

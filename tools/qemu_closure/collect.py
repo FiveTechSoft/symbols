@@ -202,6 +202,85 @@ def structured_trace_details(lines, indices):
             'host_attempts_truncated':host_attempt_count>100}
 
 
+def relative_open_diagnostic(lines, indices, stage, source):
+    """Post-run diagnostic only; never accredits identity at QEMU's open time."""
+    import ctypes  # Linux x86_64; do not import into offline tests on Windows.
+    class OpenHow(ctypes.Structure):
+        _fields_=[('flags',ctypes.c_uint64),('mode',ctypes.c_uint64),('resolve',ctypes.c_uint64)]
+    result=[]
+    # chdir/fchdir in this captured trace invalidates the launch cwd assumption.
+    cwd_changed=any(re.match(r'^'+PID_PREFIX+r'(?:chdir|fchdir)\(',line) for line in lines)
+    root_fd=os.open(stage,os.O_PATH|os.O_DIRECTORY|os.O_CLOEXEC)
+    libc=ctypes.CDLL(None,use_errno=True)
+    try:
+        for n in indices[:100]:
+            if not isinstance(n,int) or n<1 or n>len(lines):continue
+            m=LINE.fullmatch(lines[n-1]);entry={'line':n,'state':'not_candidate'}
+            if not m or m.group(1)!='openat' or not FD.fullmatch(m.group(3)):
+                result.append(entry);continue
+            args=m.group(2)
+            dirfd,path_class,_,escaped=missed_path_shape('openat',args)
+            if dirfd!='AT_FDCWD' or path_class!='relative' or escaped:
+                entry['state']='wrong_shape';result.append(entry);continue
+            if cwd_changed:
+                entry['state']='cwd_changed';result.append(entry);continue
+            operand=args.split(',',1)[1]
+            match=re.match(r'^\s*"([^"\\]*)"',operand)
+            if not match:
+                entry['state']='path_unparsed';result.append(entry);continue
+            name=match.group(1)
+            if not name or len(name)>256 or any(part in ('','.', '..') for part in name.split('/')):
+                entry['state']='path_unsafe';result.append(entry);continue
+            # O_PATH prevents file content reads and side effects on special files;
+            # BENEATH forbids escape; symlinks and magiclinks are forbidden.
+            how=OpenHow(os.O_PATH|os.O_CLOEXEC,0,0x08|0x04|0x02)
+            fd=libc.syscall(437,root_fd,ctypes.c_char_p(os.fsencode(name)),ctypes.byref(how),ctypes.sizeof(how))
+            if fd<0:
+                entry['state']='unresolved';result.append(entry);continue
+            try:
+                meta=os.fstat(fd)
+                if stat.S_ISREG(meta.st_mode):kind='regular'
+                elif stat.S_ISDIR(meta.st_mode):kind='directory'
+                else:kind='other'
+                entry.update(state='stage_candidate',kind=kind)
+                if name in source:
+                    entry['inventory_path']=name  # public authenticated inventory only
+                    row=source[name] if isinstance(source[name],dict) else {}
+                    if kind=='regular' and row.get('sha256') and row.get('size')==meta.st_size:
+                        entry['inventory_metadata_match']=True
+                    else:entry['inventory_metadata_match']=False
+                if kind=='regular' and meta.st_size<=40_000_000:
+                    # Reopen through the same no-symlink resolution rules; compare
+                    # inode and device to the O_PATH fd before reading bounded bytes.
+                    read_how=OpenHow(os.O_RDONLY|os.O_NONBLOCK|os.O_CLOEXEC,0,0x08|0x04|0x02)
+                    read_fd=libc.syscall(437,root_fd,ctypes.c_char_p(os.fsencode(name)),ctypes.byref(read_how),ctypes.sizeof(read_how))
+                    if read_fd<0:entry['state']='read_unresolved'
+                    else:
+                        try:
+                            rmeta=os.fstat(read_fd)
+                            if (rmeta.st_dev,rmeta.st_ino,rmeta.st_size)!=(meta.st_dev,meta.st_ino,meta.st_size):
+                                entry['state']='changed_after_trace'
+                            else:
+                                h=hashlib.sha256();total=0
+                                while True:
+                                    block=os.read(read_fd,1024*1024)
+                                    if not block:break
+                                    total+=len(block)
+                                    if total>40_000_000:break
+                                    h.update(block)
+                                if total==meta.st_size and total<=40_000_000:
+                                    entry['sha256']=h.hexdigest()
+                                    if name in source and isinstance(source[name],dict) and source[name].get('sha256')!=entry['sha256']:
+                                        entry['state']='inventory_drift'
+                                else:entry['state']='read_incomplete'
+                        finally:os.close(read_fd)
+                result.append(entry)
+            finally:os.close(fd)
+    finally:os.close(root_fd)
+    return {'launch_cwd': 'stage', 'cwd_change_seen':cwd_changed,'candidates':result,
+            'limitation':'post_run_resolution_not_open_time_identity'}
+
+
 def trace_shapes(lines, unsupported_line_numbers):
     """Summarize parser misses using only bounded, fixed-vocabulary shapes."""
     shapes={};samples=[];unsupported=set(unsupported_line_numbers)
@@ -465,6 +544,7 @@ def main():
         result['observed']=observed
         result['trace_shapes']=trace_shapes(trace,observed['unsupported_line_numbers'])
         result['structured_trace_details']=structured_trace_details(trace,observed['unsupported_line_numbers'])
+        result['relative_open_diagnostic']=relative_open_diagnostic(trace,observed['unsupported_line_numbers'],stage,src)
         serial=(stage/'serial.bin').read_bytes()
         result['serial_marker_once']=(serial.count(MARKER)==1 or serial.count(MARKER[:-2]+b'\n')==1)
         result['serial_sha256']=hashlib.sha256(serial).hexdigest()
