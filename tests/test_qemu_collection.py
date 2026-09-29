@@ -5,9 +5,17 @@ import unittest
 import ast
 import re
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'))
-from collect import diagnostic,MARKER
+from collect import diagnostic,MARKER,checked_kvm_identity,Refusal
 
 class CollectionTests(unittest.TestCase):
+    def test_kvm_identity_requires_active_nonroot_group(self):
+        data=dict(uid=1001,euid=1001,egid=1001,groups=[1001,994],device_gid=994,device_mode=0o660,kvm_gid=994)
+        self.assertEqual(checked_kvm_identity(**data)['active_gids'],[994,1001])
+        for change in ({'groups':[1001]},{'euid':0},{'uid':0},{'device_gid':995},
+                       {'device_mode':0o600},{'kvm_gid':995}):
+            with self.subTest(change=change),self.assertRaisesRegex(Refusal,'kvm_identity'):
+                checked_kvm_identity(**{**data,**change})
+
     def test_selected_snapshot_firmware_names(self):
         rule=r'[A-Za-z0-9._+,/-]+'
         for name in ('usr/share/qemu/QEMU,VGA.bin','usr/share/qemu/QEMU,cgthree.bin','usr/share/qemu/QEMU,tcx.bin'):
@@ -21,6 +29,7 @@ class CollectionTests(unittest.TestCase):
         top_imports=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom))]
         self.assertNotIn('resource',[a.name for n in top_imports for a in getattr(n,'names',[])])
         self.assertIn('import resource  # Linux-only',source)
+        self.assertNotIn('grp',[a.name for n in top_imports for a in getattr(n,'names',[])])
 
     def test_ambient_and_unknown_are_visible(self):
         result=diagnostic(['execve("/stage/usr/bin/qemu-system-x86_64", ["qemu"], 0x0) = 0',

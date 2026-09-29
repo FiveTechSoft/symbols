@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import re
 import signal
@@ -60,6 +61,14 @@ def diagnostic(lines, root):
     return {'opened':sorted(opened),'probes':sorted(probes),'outside':sorted(outside),
             'unsupported_line_numbers':unsupported[:100],'unsupported_count':len(unsupported)}
 
+
+def checked_kvm_identity(*, uid, euid, egid, groups, device_gid, device_mode, kvm_gid):
+    active=sorted(set(groups) | {egid})
+    if (uid==0 or euid==0 or kvm_gid!=device_gid or kvm_gid not in active or
+        not (device_mode & stat.S_IRGRP and device_mode & stat.S_IWGRP)):
+        raise Refusal('kvm_identity')
+    return {'uid':uid,'euid':euid,'egid':egid,'active_gids':active,
+            'device_gid':device_gid,'device_mode':oct(device_mode),'kvm_gid':kvm_gid}
 
 def main():
     p=argparse.ArgumentParser()
@@ -132,6 +141,12 @@ def main():
         busybox=stage/BUSYBOX
         subprocess.run(['python3',str(Path(__file__).parents[1]/'minimal_initramfs/pack.py'),'--busybox',str(busybox),'--out',str(stage/'initramfs.cpio')],check=True,timeout=15)
         if digest(stage/'initramfs.cpio')!=INITRD_SHA:raise Refusal('initrd_drift')
+        import grp  # Linux-only; pure tests remain importable on Windows.
+        device=os.stat('/dev/kvm')
+        result['kvm_identity']=checked_kvm_identity(
+            uid=os.getuid(),euid=os.geteuid(),egid=os.getegid(),groups=os.getgroups(),
+            device_gid=device.st_gid,device_mode=stat.S_IMODE(device.st_mode),
+            kvm_gid=grp.getgrnam('kvm').gr_gid)
         if not os.access('/dev/kvm',os.R_OK|os.W_OK):raise Refusal('kvm_permission')
         fd=os.open('/dev/kvm',os.O_RDWR|os.O_CLOEXEC);os.close(fd)
         qemu=stage/BINARY;kernel=stage/KERNEL;initrd=stage/'initramfs.cpio'
