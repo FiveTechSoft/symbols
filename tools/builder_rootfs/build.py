@@ -16,6 +16,8 @@ import tarfile
 import tempfile
 import lzma
 import urllib.request
+import urllib.error
+import time
 
 from policy import Entry, PolicyRefusal, check_entries
 
@@ -41,13 +43,23 @@ def digest(data: bytes) -> str:
 def fetch(url: str, size: int, sha: str) -> bytes:
     if not url.startswith(BASE) or not 0 < size <= 200_000_000 or not re.fullmatch('[0-9a-f]{64}', sha):
         raise Refusal('fetch_input')
-    with urllib.request.build_opener(NoRedirect()).open(url, timeout=40) as response:
-        if response.url != url or response.status != 200:
-            raise Refusal('fetch_location')
-        raw = response.read(size + 1)
-    if len(raw) != size or digest(raw) != sha:
-        raise Refusal('fetch_digest')
-    return raw
+    opener = urllib.request.build_opener(NoRedirect())
+    for attempt in range(2):
+        try:
+            with opener.open(url, timeout=40) as response:
+                if response.url != url or response.status != 200:
+                    raise Refusal('fetch_location')
+                raw = response.read(size + 1)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (502, 503, 504) or attempt == 1:
+                raise Refusal(f'fetch_http_{exc.code}') from exc
+            print(f'transient_http_{exc.code} attempt_1 {url}', flush=True)
+            time.sleep(5)
+            continue
+        if len(raw) != size or digest(raw) != sha:
+            raise Refusal('fetch_digest')
+        return raw
+    raise Refusal('fetch_exhausted')
 
 
 def bounded_xz(raw: bytes, limit: int = 20_000_000) -> bytes:
@@ -95,6 +107,7 @@ def signed_indexes(manifest: dict, keyring: Path) -> dict[str, bytes]:
         url = BASE + 'dists/' + pocket + '/InRelease'
         if release['url'] != url:
             raise Refusal('release_url')
+        print(f'fetch InRelease {pocket} {url}',flush=True)
         raw = fetch(url, release['size'], release['sha256'])
         with tempfile.NamedTemporaryFile() as temp:
             temp.write(raw); temp.flush()
@@ -122,6 +135,7 @@ def signed_indexes(manifest: dict, keyring: Path) -> dict[str, bytes]:
         matches = [m for line in lines if (m := re.fullmatch(r'\s*([0-9a-f]{64})\s+([0-9]+)\s+([^\s]+)', line)) and m[3] == relative]
         if len(matches) != 1 or matches[0][1] != sha or int(matches[0][2]) != size:
             raise Refusal('index_signature_binding')
+        print(f'fetch Packages {pocket} {path}',flush=True)
         raw = fetch(BASE + 'dists/' + path, size, sha)
         if len(raw) > 2_000_000: raise Refusal('index_size')
         data = bounded_xz(raw)
@@ -167,6 +181,7 @@ def stage_packages(manifest: dict, stage: Path, *, loader: Path, executable: Pat
         url = BASE + row['Filename']
         deb = local_debs / (sha + '.deb') if local_debs else None
         if deb and deb.stat().st_size != size: raise Refusal('package_size')
+        if not deb: print(f'fetch package {package} {row["Filename"]}',flush=True)
         raw = deb.read_bytes() if deb else fetch(url, size, sha)
         if len(raw) != size or digest(raw) != sha: raise Refusal('package_digest')
         with tempfile.NamedTemporaryFile(suffix='.deb') as tmp:

@@ -23,6 +23,7 @@ def bootstrap(manifest: dict, destination: Path, *, local_debs: Path | None = No
         row=packages[package]; size=int(row['Size']); sha=row['SHA256']
         deb=local_debs/(sha+'.deb') if local_debs else None
         if deb and deb.stat().st_size != size: raise Refusal('bootstrap_size')
+        if not deb: print(f'fetch bootstrap {package} {row["Filename"]}',flush=True)
         data=deb.read_bytes() if deb else fetch(BASE+row['Filename'],size,sha)
         if len(data)!=size or digest(data)!=sha: raise Refusal('bootstrap_deb')
         with tempfile.NamedTemporaryFile(suffix='.deb') as t:

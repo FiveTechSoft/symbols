@@ -1,6 +1,8 @@
 """Offline test vectors for the signed metadata and deterministic candidate archive."""
 import copy
 import json
+import io
+import urllib.error
 from pathlib import Path
 import sys
 import unittest
@@ -65,6 +67,43 @@ class SourceTests(unittest.TestCase):
             bounded_xz(lzma.compress(b'abc'),limit=2)
         with self.assertRaisesRegex(Refusal,'index_xz'):
             bounded_xz(b'not xz')
+
+    def test_transient_http_retry_and_terminal_errors(self):
+        url='https://snapshot.ubuntu.com/ubuntu/20260927T000000Z/test'
+        class Response:
+            status=200
+            def __init__(self, data):self.url=url;self.data=data
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,n):return self.data[:n]
+        def error(code):return urllib.error.HTTPError(url,code,'failure',{},io.BytesIO())
+        with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
+            op=open_builder.return_value
+            op.open.side_effect=[error(503),Response(b'abc')]
+            self.assertEqual(fetch(url,3,digest(b'abc')),b'abc')
+            self.assertEqual(op.open.call_count,2)
+            delay.assert_called_once_with(5)
+        with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
+            op=open_builder.return_value
+            op.open.side_effect=[error(503),error(503)]
+            with self.assertRaisesRegex(Refusal,'fetch_http_503'):
+                fetch(url,3,digest(b'abc'))
+            self.assertEqual(op.open.call_count,2)
+            delay.assert_called_once_with(5)
+        with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
+            op=open_builder.return_value
+            op.open.side_effect=error(404)
+            with self.assertRaisesRegex(Refusal,'fetch_http_404'):
+                fetch(url,3,digest(b'abc'))
+            op.open.assert_called_once()
+            delay.assert_not_called()
+        with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
+            op=open_builder.return_value
+            op.open.side_effect=Refusal('redirect')
+            with self.assertRaisesRegex(Refusal,'redirect'):
+                fetch(url,3,digest(b'abc'))
+            op.open.assert_called_once()
+            delay.assert_not_called()
 
     def test_fetch_refuses_non_snapshot_and_changed_bytes(self):
         for url in ('http://snapshot.ubuntu.com/ubuntu/20260927T000000Z/x', 'https://evil.example/x'):
