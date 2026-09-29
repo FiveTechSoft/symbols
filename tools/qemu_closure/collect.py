@@ -202,6 +202,23 @@ def structured_trace_details(lines, indices):
             'host_attempts_truncated':host_attempt_count>100}
 
 
+def relative_path_components(name):
+    parts=name.split('/')
+    flags={'leading_dot_slash':name.startswith('./'),
+           'dot_component':'.' in parts,
+           'dotdot_component':'..' in parts,
+           'empty_component':'' in parts,
+           'absolute':name.startswith('/')}
+    # Only one literal leading ./ may be stripped. The remaining path must be
+    # nonempty, bounded, relative and free of empty/dot/dotdot components.
+    normalized=name[2:] if flags['leading_dot_slash'] else name
+    normal_parts=normalized.split('/')
+    allowed=(not flags['absolute'] and 0<len(normalized)<=256 and
+             all(part not in ('','.','..') for part in normal_parts) and
+             (not flags['dot_component'] or flags['leading_dot_slash'] and parts.count('.')==1))
+    return flags,normalized if allowed else None
+
+
 def relative_open_diagnostic(lines, indices, stage, source):
     """Post-run diagnostic only; never accredits identity at QEMU's open time."""
     import ctypes  # Linux x86_64; do not import into offline tests on Windows.
@@ -220,7 +237,7 @@ def relative_open_diagnostic(lines, indices, stage, source):
                 result.append(entry);continue
             args=m.group(2)
             dirfd,path_class,_,escaped=missed_path_shape('openat',args)
-            if dirfd!='AT_FDCWD' or path_class!='relative' or escaped:
+            if dirfd!='AT_FDCWD' or escaped:
                 entry['state']='wrong_shape';result.append(entry);continue
             if cwd_changed:
                 entry['state']='cwd_changed';result.append(entry);continue
@@ -229,8 +246,11 @@ def relative_open_diagnostic(lines, indices, stage, source):
             if not match:
                 entry['state']='path_unparsed';result.append(entry);continue
             name=match.group(1)
-            if not name or len(name)>256 or any(part in ('','.', '..') for part in name.split('/')):
+            flags,normalized=relative_path_components(name)
+            entry['path_flags']=flags
+            if normalized is None:
                 entry['state']='path_unsafe';result.append(entry);continue
+            name=normalized
             # O_PATH prevents file content reads and side effects on special files;
             # BENEATH forbids escape; symlinks and magiclinks are forbidden.
             how=OpenHow(os.O_PATH|os.O_CLOEXEC,0,0x08|0x04|0x02)

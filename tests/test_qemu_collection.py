@@ -148,6 +148,29 @@ class CollectionTests(unittest.TestCase):
             moved=relative_open_diagnostic(['77  chdir("/private") = 0',lines[0]],[2],root,source)
             self.assertEqual(moved['candidates'][0]['state'],'cwd_changed')
 
+    @unittest.skipUnless(sys.platform=='linux' and hasattr(os,'O_PATH'),'openat2 diagnostic is Linux-only')
+    def test_only_single_leading_dot_slash_is_normalized(self):
+        from collect import relative_open_diagnostic,relative_path_components
+        from tempfile import TemporaryDirectory
+        import hashlib
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'known').write_bytes(b'pinned')
+            source={'known':{'size':6,'sha256':hashlib.sha256(b'pinned').hexdigest()}}
+            names=['./known','././known','../known','./../known','known//other','/known','./','./known/.','./known/..']
+            lines=['123  openat(AT_FDCWD, "'+name+'", O_RDONLY) = 3' for name in names]
+            r=relative_open_diagnostic(lines,list(range(1,len(lines)+1)),root,source)
+            self.assertEqual(r['candidates'][0]['state'],'stage_candidate')
+            self.assertEqual(r['candidates'][0]['inventory_path'],'known')
+            self.assertEqual(r['candidates'][0]['sha256'],source['known']['sha256'])
+            self.assertTrue(r['candidates'][0]['path_flags']['leading_dot_slash'])
+            self.assertEqual([x['state'] for x in r['candidates'][1:]],['path_unsafe']*8)
+            self.assertEqual([x['path_flags']['dotdot_component'] for x in r['candidates'][1:4]],
+                             [False,True,True])
+            self.assertTrue(r['candidates'][4]['path_flags']['empty_component'])
+            self.assertTrue(r['candidates'][5]['path_flags']['absolute'])
+            self.assertNotIn('./known',repr(r))
+            self.assertEqual(relative_path_components('known')[1],'known')
+
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',
