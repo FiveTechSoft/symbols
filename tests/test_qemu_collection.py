@@ -127,7 +127,8 @@ class CollectionTests(unittest.TestCase):
                 row={'sha256':checksum,'size':len(data)}
                 collect.stage_microvm_bios({src_name:row},stage)
                 self.assertEqual((stage/dest_name).read_bytes(),data)
-                self.assertEqual((stage/dest_name).stat().st_mode & 0o777,0o644)
+                if os.name=='posix':
+                    self.assertEqual((stage/dest_name).stat().st_mode & 0o777,0o644)
                 with self.assertRaisesRegex(Refusal,'bios_source_or_destination'):
                     collect.stage_microvm_bios({src_name:row},stage)
                 (stage/dest_name).unlink()
