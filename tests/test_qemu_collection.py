@@ -311,6 +311,8 @@ class CollectionTests(unittest.TestCase):
         variant=policy_shape_measurement(['12  openat(AT_FDCWD, "./secret", O_PATH) = 4'],[1])
         self.assertEqual(variant['entries'][0]['kind'],'other')
 
+    @unittest.skipUnless(sys.platform=='linux' and hasattr(os,'O_PATH'),
+                         'stage cwd FD check is Linux-only')
     def test_exact_shape_screen_fail_closed_and_no_names(self):
         from collect import trace_shape_match,ambient_shape_match
         from tempfile import TemporaryDirectory
