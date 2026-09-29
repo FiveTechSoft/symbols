@@ -69,7 +69,9 @@ def diagnostic(lines, root):
 SAFE_WORDS=frozenset(('qemu strace kvm kernel initrd rom firmware memory machine cpu device accelerator accel '
     'failed failure error invalid unsupported unable cannot could not open load initialize access permission denied '
     'no such file or directory operation allowed available requested specified argument option bus pci microvm '
-    'network block serial address space size out of for with to from on at in the a an is was').split())
+    'network block serial address space size out of for with to from on at in the a an is was '
+    'configuration config module library plugin rom bios image binary executable format elf '
+    'migration state qboot firmware requested').split())
 
 
 def redacted_stderr(data):
@@ -107,7 +109,18 @@ def trace_shapes(lines, unsupported_line_numbers):
         shapes[key]=shapes.get(key,0)+1
         # Only first few parser misses; never a raw line, path, quoted value or arbitrary name.
         if len(samples)<8 and index in unsupported:
+            # Only separator class/length and known syscall after it, never arguments.
+            gap=re.match(r'^(?:[0-9]{1,12}|\[pid +[0-9]{1,12}\])(\s{1,16})',line)
+            after=line[gap.end():] if gap else ''
+            after_call=re.match(r'^([a-z][a-z0-9_]{0,31})\(',after)
+            after_name=after_call.group(1) if after_call and after_call.group(1) in (
+                'execve','open','openat','openat2','access','faccessat','faccessat2',
+                'newfstatat','stat','lstat','statx','readlink','readlinkat') else 'other'
             samples.append({'line':index,'prefix':prefix,'kind':kind,'call':name,
+                'gap_length':len(gap.group(1)) if gap else 0,
+                'gap_class':('space' if gap and gap.group(1).strip(' ')=='' else
+                             'tab_or_mixed' if gap else 'other'),
+                'after_gap_call':after_name,
                 'starts_parenthesis':bool(syscall),
                 'has_return_delimiter':' = ' in line,'contains_quoted_value':'"' in line})
     return {'counts':[{'prefix':a,'kind':b,'call':c,'count':n}

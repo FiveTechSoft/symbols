@@ -21,6 +21,8 @@ class CollectionTests(unittest.TestCase):
         from collect import redacted_stderr
         self.assertEqual(redacted_stderr(b'qemu-system-x86_64: /private/token: No such file or directory')['words'][-5:],
                          ['no','such','file','or','directory'])
+        self.assertEqual(redacted_stderr(b'qemu: could not load microvm configuration')['words'],
+                         ['qemu','could','not','load','microvm','configuration'])
         self.assertEqual(redacted_stderr(b'kvm: secretword 123 /tmp/secret')['words'],
                          ['kvm','[unknown]','[value]','[value]'])
         self.assertEqual(redacted_stderr(b'\x00secret')['status'],'suppressed')
@@ -48,6 +50,11 @@ class CollectionTests(unittest.TestCase):
         self.assertNotIn('instruction',repr(shapes))
         self.assertEqual(len(shapes['samples']),3)
         self.assertEqual([x['line'] for x in shapes['samples']],[1,2,3])
+        weird=trace_shapes(['1234  openat(AT_FDCWD, "/secret", O_RDONLY) = 3',
+                            '1234\topenat(AT_FDCWD, "/private", O_RDONLY) = 3'],[1,2])
+        self.assertEqual([(x['gap_length'],x['gap_class'],x['after_gap_call']) for x in weird['samples']],
+                         [(2,'space','openat'),(1,'tab_or_mixed','openat')])
+        self.assertNotIn('/secret',repr(weird))
 
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
