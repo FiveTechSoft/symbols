@@ -72,6 +72,30 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(refused['opened'],[])
 
 
+    def test_structured_trace_diagnostic_is_fixed_vocabulary_only(self):
+        from collect import structured_trace_details
+        raw=['812  openat(AT_FDCWD, "/etc/ld.so.preload", O_RDONLY) = -1 ENOENT (No such file or directory)',
+             '812  access("/etc/selinux/config", F_OK) = -1 EACCES (Permission denied)',
+             '812  openat(AT_FDCWD, "relative", O_RDONLY) = -1 ENOENT (No such file or directory)',
+             '812  readlink("/proc/self/exe", "\\x01private", 4096) = 12',
+             '812  openat(AT_FDCWD, "/private/SECRET_TOKEN", O_RDONLY) = -1 EVIL (private)',
+             '812  --- SIGCHLD {si_pid=99, si_addr=0x123} ---',
+             '812  +++ killed by SIGTERM +++',
+             '812  <... openat resumed> ) = 3']
+        r=structured_trace_details(raw,[2,3,4,5,6,7,8])
+        self.assertEqual([x['line'] for x in r['unsupported']],[2,3,4,5,6,7,8])
+        self.assertEqual(r['unsupported'][0]['known_probe_paths'],['/etc/selinux/config'])
+        self.assertEqual(r['unsupported'][1]['rejection'],'no_absolute_quoted_path')
+        self.assertEqual(r['unsupported'][2]['rejection'],'escape')
+        self.assertEqual(r['unsupported'][3]['errno_class'],'other')
+        self.assertEqual([x['rejection'] for x in r['unsupported'][4:]],['signal','killed','resumed'])
+        self.assertEqual([(x['path'],x['errno_class'],x['parser_supported']) for x in r['host_attempts']],
+                         [('/etc/ld.so.preload','ENOENT',True),('/etc/selinux/config','EACCES',False),
+                          ('/proc/self/exe','none',False)])
+        for forbidden in ('private','SECRET_TOKEN','EVIL','si_pid','si_addr','SIGCHLD','SIGTERM','812'):
+            self.assertNotIn(forbidden,repr(r))
+        self.assertLessEqual(len(structured_trace_details(raw*20,list(range(1,161)))['host_attempts']),100)
+
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',

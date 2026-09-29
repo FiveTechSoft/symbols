@@ -114,6 +114,63 @@ def redacted_stderr(data):
     return {'status':'redacted','words':out,'truncated':len(tokens)>40}
 
 
+TRACE_CALLS=frozenset(('execve open openat openat2 access faccessat faccessat2 newfstatat '
+    'stat lstat statx readlink readlinkat getcwd chdir mkdir unlink rename').split())
+PROBE_PATHS=frozenset(('/dev/sgx_vepc','/etc/ld.so.preload','/etc/libnl/classid',
+    '/etc/selinux/config','/proc/self/exe','/selinux','/sys/fs/selinux'))
+AMBIENT_PATHS=frozenset(('/dev/kvm','/dev/urandom','/etc/gnutls/config',
+    '/proc/filesystems','/proc/self/status','/sys/bus/nd/devices',
+    '/sys/devices/system/cpu/possible','/sys/devices/system/node'))
+TRACE_KNOWN_PATHS=PROBE_PATHS | AMBIENT_PATHS
+TRACE_ERRNOS=frozenset(('ENOENT','EACCES','EPERM','ENODEV','ENOTDIR','EINVAL','EIO'))
+
+
+def trace_status(status):
+    if FD.fullmatch(status):return ('integer_or_fd','none')
+    if status=='0':return ('zero','none')
+    error=re.match(r'^-1 ([A-Z][A-Z0-9_]+) ',status)
+    if error:return ('negative_errno',error.group(1) if error.group(1) in TRACE_ERRNOS else 'other')
+    return ('other','none')
+
+
+def structured_trace_details(lines, indices):
+    """Bounded parser misses and allowlisted host path attempts only; never raw text."""
+    unsupported=[];host_attempts=[];host_attempt_count=0;unsupported_set=set(indices)
+    for n,line in enumerate(lines,1):
+        m=LINE.fullmatch(line)
+        stripped=re.sub(r'^'+PID_PREFIX,'',line)
+        call_match=re.match(r'^([a-z][a-z0-9_]{0,31})\(',stripped)
+        call=call_match.group(1) if call_match and call_match.group(1) in TRACE_CALLS else 'other'
+        reason='grammar';ret='absent';errno='none';paths=[]
+        if m:
+            raw_call,args,status=m.groups()
+            paths=QUOTED.findall(args)
+            ret,errno=trace_status(status)
+            if '<unfinished ...>' in args or '<... ' in args:reason='unfinished'
+            elif '\\' in args:reason='escape'
+            elif not paths:reason='no_absolute_quoted_path'
+            elif raw_call in ('open','openat','openat2','execve'):reason='return_or_dirfd'
+            else:reason='metadata_return'
+            # Report only exact allowlisted path strings; never extract or echo other args.
+            for path in sorted(set(paths)&TRACE_KNOWN_PATHS):
+                host_attempt_count+=1
+                if len(host_attempts)<100:
+                    host_attempts.append({'line':n,'path':path,'call':raw_call if raw_call in TRACE_CALLS else 'other',
+                                          'return_class':ret,'errno_class':errno,
+                                          'parser_supported':n not in unsupported_set})
+        elif stripped.startswith('+++ exited with '):reason='exit_other'
+        elif stripped.startswith('+++ killed by '):reason='killed'
+        elif stripped.startswith('--- '):reason='signal'
+        elif stripped.startswith('<... '):reason='resumed'
+        elif '<unfinished ...>' in stripped:reason='unfinished'
+        elif re.match(r'^[a-z][a-z0-9_]{0,31}\(',stripped):reason='grammar_call'
+        if n in unsupported_set and len(unsupported)<100:
+            unsupported.append({'line':n,'call':call,'rejection':reason,'return_class':ret,
+                                'errno_class':errno,'known_probe_paths':sorted(set(paths)&PROBE_PATHS)})
+    return {'unsupported':unsupported,'host_attempts':host_attempts,
+            'host_attempts_truncated':host_attempt_count>100}
+
+
 def trace_shapes(lines, unsupported_line_numbers):
     """Summarize parser misses using only bounded, fixed-vocabulary shapes."""
     shapes={};samples=[];unsupported=set(unsupported_line_numbers)
@@ -376,6 +433,7 @@ def main():
         observed=diagnostic(trace,stage)
         result['observed']=observed
         result['trace_shapes']=trace_shapes(trace,observed['unsupported_line_numbers'])
+        result['structured_trace_details']=structured_trace_details(trace,observed['unsupported_line_numbers'])
         serial=(stage/'serial.bin').read_bytes()
         result['serial_marker_once']=(serial.count(MARKER)==1 or serial.count(MARKER[:-2]+b'\n')==1)
         result['serial_sha256']=hashlib.sha256(serial).hexdigest()
