@@ -178,6 +178,31 @@ class CollectionTests(unittest.TestCase):
             self.assertNotIn('known/./other',repr(r))
             self.assertEqual(relative_path_components('known')[1],'known')
 
+    @unittest.skipUnless(sys.platform=='linux' and hasattr(os,'O_PATH'),'stage directory fstat is Linux-only')
+    def test_only_exact_literal_dot_is_named_and_checked(self):
+        from collect import literal_dot_diagnostic
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            lines=['123  openat(AT_FDCWD, ".", O_RDONLY|O_DIRECTORY) = 3',
+                   '123  access(".", F_OK) = -1 ENOENT (No such file or directory)',
+                   '123  access("./secret", F_OK) = -1 ENOENT (No such file or directory)',
+                   '123  openat(8, ".", O_RDONLY) = 4',
+                   '123  openat(AT_FDCWD, "\\x2e", O_RDONLY) = 5',
+                   '123  openat(AT_FDCWD, "..", O_RDONLY) = 6',
+                   '123  openat(AT_FDCWD, ".", O_RDONLY) = -1 ENOENT (No such file or directory)']
+            r=literal_dot_diagnostic(lines,list(range(1,len(lines)+1)),root)
+            self.assertTrue(all(x['stage_cwd_directory'] is True for x in r['entries']))
+            self.assertEqual([(x['literal_dot'],x['result']) for x in r['entries']],
+                             [(True,'successful_fd'),(True,'negative_ENOENT'),
+                              (False,'unparsed'),(False,'unparsed'),(False,'unparsed'),
+                              (False,'unparsed'),(True,'negative_ENOENT')])
+            for forbidden in ('secret','x2e','123','O_RDONLY','AT_FDCWD'):
+                self.assertNotIn(forbidden,repr(r))
+            changed=literal_dot_diagnostic(['123  chdir("/private") = 0',lines[0]],[2],root)
+            self.assertTrue(changed['entries'][0]['cwd_change_seen'])
+            self.assertIsNone(changed['entries'][0]['stage_cwd_directory'])
+
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',

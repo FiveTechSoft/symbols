@@ -219,6 +219,43 @@ def relative_path_components(name):
     return flags,normalized
 
 
+def literal_dot_diagnostic(lines, indices, stage):
+    """Recognize only the exact dot operand; no arbitrary names or trace args."""
+    entries=[]
+    cwd_changed=any(re.match(r'^'+PID_PREFIX+r'(?:chdir|fchdir)\(',line) for line in lines)
+    stage_dir=None
+    if not cwd_changed:
+        fd=os.open(stage,os.O_PATH|os.O_DIRECTORY|os.O_CLOEXEC)
+        try:stage_dir=stat.S_ISDIR(os.fstat(fd).st_mode)
+        finally:os.close(fd)
+    for n in indices[:100]:
+        if not isinstance(n,int) or n<1 or n>len(lines):continue
+        m=LINE.fullmatch(lines[n-1]);entry={'line':n,'call':'other','literal_dot':False,
+                                               'result':'unparsed','stage_cwd_directory':stage_dir,
+                                               'cwd_change_seen':cwd_changed}
+        if not m:
+            entries.append(entry);continue
+        call,args,status=m.groups()
+        if call not in ('openat','access'):
+            entries.append(entry);continue
+        entry['call']=call
+        if call=='openat':
+            first,sep,operand=args.partition(',')
+            if first.strip()!='AT_FDCWD' or not sep:
+                entries.append(entry);continue
+        else:operand=args
+        # Exact first pathname token only. A quoted longer path or an escape
+        # remains unclassified and is never output.
+        match=re.match(r'^\s*"([^"\\]*)"(?=\s*(?:,|$))',operand)
+        if match and match.group(1)=='.':entry['literal_dot']=True
+        if entry['literal_dot'] and not cwd_changed:
+            entry['result']=('successful_fd' if call=='openat' and FD.fullmatch(status) else
+                             'negative_ENOENT' if ERROR.match(status) and status.startswith('-1 ENOENT ') else
+                             'other')
+        entries.append(entry)
+    return {'entries':entries,'limitation':'diagnostic_only_unsupported_trace'}
+
+
 def relative_open_diagnostic(lines, indices, stage, source):
     """Post-run diagnostic only; never accredits identity at QEMU's open time."""
     import ctypes  # Linux x86_64; do not import into offline tests on Windows.
@@ -565,6 +602,7 @@ def main():
         result['trace_shapes']=trace_shapes(trace,observed['unsupported_line_numbers'])
         result['structured_trace_details']=structured_trace_details(trace,observed['unsupported_line_numbers'])
         result['relative_open_diagnostic']=relative_open_diagnostic(trace,observed['unsupported_line_numbers'],stage,src)
+        result['literal_dot_diagnostic']=literal_dot_diagnostic(trace,observed['unsupported_line_numbers'],stage)
         serial=(stage/'serial.bin').read_bytes()
         result['serial_marker_once']=(serial.count(MARKER)==1 or serial.count(MARKER[:-2]+b'\n')==1)
         result['serial_sha256']=hashlib.sha256(serial).hexdigest()
