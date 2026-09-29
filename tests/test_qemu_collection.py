@@ -4,6 +4,7 @@ import sys
 import unittest
 import ast
 import re
+import os
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'))
 from collect import diagnostic,MARKER,checked_kvm_identity,Refusal,bounded_failure,exec_probe,loader_preflight
 
@@ -26,6 +27,7 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(exec_probe(lines,'/stage/ld.so','/stage/qemu'),
                          {'loader_success':1,'loader_failure':0,'qemu_success':0,'qemu_failure':1})
 
+    @unittest.skipUnless(os.name=='posix','bounded loader preflight uses Linux preexec_fn')
     def test_loader_preflight_is_nonboot_and_bounded(self):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmp:
