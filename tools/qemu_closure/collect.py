@@ -21,6 +21,8 @@ INITRD_SHA='21d1a476d2e561c4d6f506b198b401772d3600a6d16ef2398e023612cf3ae38d'
 MARKER=b'SYMBOLS_BOOT_ONLY_SUPERVISOR_READY_v1\r\n'
 MAX_TRACE=16_000_000
 MAX_OUTPUT=65536
+MAX_PREFLIGHT=8192
+SONAME=re.compile(rb'[A-Za-z0-9_+.-]{1,80}\.so(?:\.[0-9]{1,8}){0,4}')
 # This diagnostic treats every non-staged successful file operation as a blocker,
 # not as evidence for promoting a static closure.
 LINE=re.compile(r'^(?:\[pid +\d+\] )?([a-z][a-z0-9_]*)\((.*)\) += +(.+)$')
@@ -60,6 +62,62 @@ def diagnostic(lines, root):
         if not path.startswith(str(root)+'/'):outside.add(path)
     return {'opened':sorted(opened),'probes':sorted(probes),'outside':sorted(outside),
             'unsupported_line_numbers':unsupported[:100],'unsupported_count':len(unsupported)}
+
+
+def bounded_failure(data):
+    """Publish categories and hashes, not arbitrary stderr or guest text."""
+    clipped=data[:MAX_OUTPUT]
+    lower=clipped.lower()
+    labels=[]
+    for label,needle in (
+        ('loader_missing_library',b'error while loading shared libraries:'),
+        ('loader_missing_file',b'cannot open shared object file'),
+        ('loader_version_mismatch',b'version `'),
+        ('loader_bad_elf',b'wrong elf class'),
+        ('exec_permission',b'permission denied'),
+        ('exec_missing',b'no such file or directory'),
+        ('strace_exec_failure',b'strace: exec:'),
+        ('qemu_kvm_failure',b'failed to initialize kvm'),
+    ):
+        if needle in lower:labels.append(label)
+    # Only a loader-formatted missing-library line may supply a soname.
+    sonames=sorted({m.decode('ascii') for m in re.findall(
+        rb'error while loading shared libraries: ('+SONAME.pattern+rb'):',clipped)})[:12]
+    return {'sha256':hashlib.sha256(data).hexdigest(),'size':len(data),
+            'truncated':len(data)>MAX_OUTPUT,'categories':labels or ['unclassified'],
+            'sonames':sonames}
+
+
+def exec_probe(lines, loader, binary):
+    """Classify the exact launch exec transition without printing trace lines."""
+    counts={'loader_success':0,'loader_failure':0,'qemu_success':0,'qemu_failure':0}
+    for line in lines:
+        m=re.fullmatch(r'(?:\[pid +\d+\] )?execve\("([^"\\]+)".*\) += +(0|-1 [A-Z][A-Z0-9_]+ .*|\?)',line)
+        if m and m.group(1) in (str(loader),str(binary)):
+            key=('loader' if m.group(1)==str(loader) else 'qemu')+('_success' if m.group(2)=='0' else '_failure')
+            counts[key]+=1
+    return counts
+
+
+def loader_preflight(loader, library_path, binary, *, env, cwd):
+    """Ask the pinned staged loader to list dependencies; never run QEMU main."""
+    command=[str(loader),'--inhibit-cache','--library-path',library_path,'--list',str(binary)]
+    def limit_output():
+        import resource  # Linux-only bounded preflight output.
+        resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_PREFLIGHT,MAX_PREFLIGHT))
+    out=Path(cwd)/'loader-list.stdout';err=Path(cwd)/'loader-list.stderr'
+    with out.open('wb') as stdout,err.open('wb') as stderr:
+        try:
+            p=subprocess.run(command,cwd=cwd,env=env,stdout=stdout,stderr=stderr,
+                             timeout=5,preexec_fn=limit_output)
+        except subprocess.TimeoutExpired:
+            return {'status':'timeout'}
+    stdout=out.read_bytes();stderr=err.read_bytes()
+    missing=sorted({m.decode('ascii') for m in re.findall(rb'(?m)^\s*('+SONAME.pattern+rb')\s+=>\s+not found\s*$',stdout)})[:12]
+    return {'status':'ok' if p.returncode==0 and len(stdout)<MAX_PREFLIGHT and len(stderr)<MAX_PREFLIGHT and not missing else 'blocked',
+            'exit_status':p.returncode,'stdout_size':len(stdout),'stderr':bounded_failure(stderr),
+            'output_limit':len(stdout)>=MAX_PREFLIGHT or len(stderr)>=MAX_PREFLIGHT,
+            'missing_sonames':missing}
 
 
 def checked_kvm_identity(*, uid, euid, egid, groups, device_gid, device_mode, kvm_gid):
@@ -155,6 +213,10 @@ def main():
         result['argv']=argv
         result['runner_image']=args.runner_image
         result['kernel_sha256']=digest(kernel);result['initramfs_sha256']=digest(initrd);result['qemu_sha256']=digest(qemu)
+        library_path=str(stage/'usr/lib/x86_64-linux-gnu')+':'+str(stage/'lib/x86_64-linux-gnu')
+        child_env={'PATH':'/usr/bin:/bin','LC_ALL':'C','HOME':str(stage),'QEMU_AUDIO_DRV':'none'}
+        result['loader_preflight']=loader_preflight(loader,library_path,qemu,env=child_env,cwd=str(stage))
+        if result['loader_preflight']['status']!='ok':raise Refusal('loader_preflight')
         # Strace version is diagnostic metadata, not an implicit version pin.
         result['strace_version']=subprocess.run([str(args.strace),'-V'],capture_output=True,text=True,timeout=5,check=True).stdout.splitlines()[0][:120]
         def limits():
@@ -163,13 +225,15 @@ def main():
         command=[str(args.strace),'-f','-qq','-s','65535','-e','trace=%file,execve','-o',str(stage/'trace.txt'),'--',*argv]
         started=time.monotonic()
         with (stage/'serial.bin').open('wb') as stdout,(stage/'stderr.bin').open('wb') as stderr:
-            proc=subprocess.Popen(command,cwd=str(stage),env={'PATH':'/usr/bin:/bin','LC_ALL':'C','HOME':str(stage),'QEMU_AUDIO_DRV':'none'},stdout=stdout,stderr=stderr,start_new_session=True,preexec_fn=limits,close_fds=True)
+            proc=subprocess.Popen(command,cwd=str(stage),env=child_env,stdout=stdout,stderr=stderr,start_new_session=True,preexec_fn=limits,close_fds=True)
             try:ret=proc.wait(timeout=60)
             except subprocess.TimeoutExpired:
                 os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=5);raise Refusal('boot_timeout')
         result['elapsed_seconds']=round(time.monotonic()-started,3);result['exit_status']=ret
         if (stage/'trace.txt').stat().st_size>=MAX_TRACE or (stage/'serial.bin').stat().st_size>MAX_OUTPUT or (stage/'stderr.bin').stat().st_size>MAX_OUTPUT:raise Refusal('output_limit')
+        result['process_stderr']=bounded_failure((stage/'stderr.bin').read_bytes())
         trace=(stage/'trace.txt').read_bytes().decode('utf-8','strict').splitlines()
+        result['exec_probe']=exec_probe(trace,loader,qemu)
         result['trace_sha256']=digest(stage/'trace.txt')
         observed=diagnostic(trace,stage)
         result['observed']=observed
