@@ -115,7 +115,7 @@ def main():
                 if len(selected)>300:raise Refusal('selected_count')
                 if name not in src or name not in members:raise Refusal('selected_missing')
                 row=src[name];m=members[name]
-                if not re.fullmatch(r'[A-Za-z0-9._+/-]+',name) or name.startswith('/') or '..' in name.split('/'):raise Refusal('selected_path')
+                if not re.fullmatch(r'[A-Za-z0-9._+,/-]+',name) or name.startswith('/') or '..' in name.split('/'):raise Refusal('selected_path')
                 target=stage/name;target.parent.mkdir(parents=True,exist_ok=True)
                 if 'link' in row:
                     link=row['link']

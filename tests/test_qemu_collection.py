@@ -3,10 +3,18 @@ from pathlib import Path
 import sys
 import unittest
 import ast
+import re
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'))
 from collect import diagnostic,MARKER
 
 class CollectionTests(unittest.TestCase):
+    def test_selected_snapshot_firmware_names(self):
+        rule=r'[A-Za-z0-9._+,/-]+'
+        for name in ('usr/share/qemu/QEMU,VGA.bin','usr/share/qemu/QEMU,cgthree.bin','usr/share/qemu/QEMU,tcx.bin'):
+            self.assertIsNotNone(re.fullmatch(rule,name))
+        for name in ('../etc/passwd','usr/share/qemu/evil\\name','/etc/ld.so.cache'):
+            self.assertTrue(name.startswith('/') or '..' in name.split('/') or not re.fullmatch(rule,name))
+
     def test_resource_is_linux_only_main_path(self):
         source=(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'/'collect.py').read_text()
         tree=ast.parse(source)
