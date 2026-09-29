@@ -1,0 +1,118 @@
+name: Diagnostic runner tracer preflight (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit containing this workflow
+        required: true
+        type: string
+      expected_image_version:
+        description: Optional previously reviewed ImageVersion; empty means measure only
+        required: false
+        type: string
+      expected_strace_sha256:
+        description: Optional previously reviewed strace SHA-256; empty means measure only
+        required: false
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check immutable workflow identity before package install
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$TARGET_SHA"
+      - name: Install diagnostic tracer without boot
+        id: install
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends strace
+      - name: Measure image and tracer, refuse drift from both reviewed expectations
+        if: always()
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.expected_image_version }}
+          EXPECTED_STRACE: ${{ inputs.expected_strace_sha256 }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, subprocess, sys
+          report={
+              'schema':'symbols.qemu-strace-preflight.v1',
+              'classification':'blocked', 'runtime_complete':False,
+              'boot_attempted':False, 'closure_eligible':False,
+              'target_sha':os.environ.get('TARGET_SHA',''),
+              'workflow_sha':os.environ.get('GITHUB_SHA',''),
+              'workflow_ref':os.environ.get('GITHUB_REF',''),
+              'image_version':os.environ.get('ImageVersion',''),
+              'image_os':os.environ.get('ImageOS',''),
+              'install_outcome':os.environ.get('INSTALL_OUTCOME',''),
+              'strace_sha256':None, 'strace_size':None,
+              'strace_package':None, 'strace_version':None,
+              'reason':'unmeasured'
+          }
+          def run(*args):
+              return subprocess.run(args,check=True,capture_output=True,text=True,timeout=8).stdout.strip()
+          try:
+              sha=report['target_sha']; image=report['image_version']
+              expect_image=os.environ['EXPECTED_IMAGE']; expect_sha=os.environ['EXPECTED_STRACE']
+              if (not re.fullmatch('[0-9a-f]{40}',sha) or sha!=report['workflow_sha'] or
+                  report['workflow_ref']!='refs/heads/master'):
+                  raise ValueError('workflow_identity')
+              if not image or len(image)>120 or not re.fullmatch('[A-Za-z0-9._-]+',image):
+                  raise ValueError('image_version')
+              if bool(expect_image)!=bool(expect_sha):
+                  raise ValueError('expected_pair_required')
+              if expect_image and (not re.fullmatch('[A-Za-z0-9._-]+',expect_image) or
+                  not re.fullmatch('[0-9a-f]{64}',expect_sha)):
+                  raise ValueError('expected_format')
+              if report['install_outcome']!='success':
+                  raise ValueError('install_failed')
+              tracer=pathlib.Path('/usr/bin/strace')
+              if tracer.is_symlink() or not tracer.is_file():
+                  raise ValueError('strace_file')
+              h=hashlib.sha256();size=0
+              with tracer.open('rb') as f:
+                  while chunk:=f.read(1024*1024):
+                      size+=len(chunk)
+                      if size>20_000_000:raise ValueError('strace_size')
+                      h.update(chunk)
+              report['strace_sha256']=h.hexdigest()
+              report['strace_size']=size
+              report['strace_package']=run('dpkg-query','-W','-f=${Package} ${Version} ${Architecture}','strace')
+              if run('dpkg-query','-S','/usr/bin/strace')!='strace: /usr/bin/strace':
+                  raise ValueError('package_ownership')
+              report['strace_version']=run('/usr/bin/strace','-V').splitlines()[0][:120]
+              if expect_image and (image!=expect_image or report['strace_sha256']!=expect_sha):
+                  raise ValueError('expected_drift')
+              report['classification']='expectations_match' if expect_image else 'measured_only'
+              report['reason']='no_boot_no_runtime_pin'
+          except Exception as exc:
+              report['reason']=str(exc)[:120] if isinstance(exc,ValueError) else 'measurement_error'
+          finally:
+              path=pathlib.Path(os.environ['RUNNER_TEMP'])/'qemu-strace-preflight.json'
+              path.write_text(json.dumps(report,sort_keys=True,separators=(',',':'))+'\n')
+              print(json.dumps(report,sort_keys=True))
+          if report['classification']=='blocked':sys.exit(2)
+          PY
+      - name: Upload one-day bounded diagnostic JSON (no boot, no checkout)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-strace-preflight
+          path: ${{ runner.temp }}/qemu-strace-preflight.json
+          if-no-files-found: ignore
+          retention-days: 1
