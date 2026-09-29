@@ -287,6 +287,30 @@ class CollectionTests(unittest.TestCase):
         for name in ('../etc/passwd','usr/share/qemu/evil\\name','/etc/ld.so.cache'):
             self.assertTrue(name.startswith('/') or '..' in name.split('/') or not re.fullmatch(rule,name))
 
+    def test_policy_shape_measurement_never_accepts_or_echoes_path(self):
+        from collect import policy_shape_measurement
+        raw=['123  openat(AT_FDCWD, ".", O_PATH|O_DIRECTORY|O_CLOEXEC) = 3',
+             '123  access("sensitive-file", F_OK) = -1 ENOENT (No such file or directory)',
+             '123  access("../secret", F_OK) = -1 ENOENT (No such file or directory)',
+             '123  --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=42, si_uid=1001, si_status=0} ---',
+             '123  --- SIGUSR1 {secret=/private/secret} ---']
+        r=policy_shape_measurement(raw,[1,2,3,4,5])
+        self.assertFalse(r['acceptance'])
+        self.assertFalse(policy_shape_measurement(raw,[1,2,3,4,5],6)['all_unsupported_represented'])
+        self.assertFalse(r['open_time_identity_verified'])
+        self.assertEqual(len(r['entries']),5)
+        self.assertEqual(r['entries'][0]['kind'],'literal_dot')
+        self.assertTrue(r['entries'][0]['grammar'])
+        self.assertEqual(r['entries'][1]['errno_class'],'ENOENT')
+        self.assertFalse(r['entries'][2]['grammar'])
+        self.assertEqual(r['entries'][3]['type'],'SIGCHLD')
+        self.assertEqual(r['entries'][4]['type'],'other')
+        self.assertNotIn('sensitive-file',repr(r))
+        self.assertNotIn('private/secret',repr(r))
+        self.assertNotIn('42',repr(r))
+        variant=policy_shape_measurement(['12  openat(AT_FDCWD, "./secret", O_PATH) = 4'],[1])
+        self.assertEqual(variant['entries'][0]['kind'],'other')
+
     def test_resource_is_linux_only_main_path(self):
         source=(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'/'collect.py').read_text()
         tree=ast.parse(source)

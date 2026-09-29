@@ -202,6 +202,78 @@ def structured_trace_details(lines, indices):
             'host_attempts_truncated':host_attempt_count>100}
 
 
+# Measurement only. No change to diagnostic() acceptance or runtime_complete.
+# Never hash arbitrary path operands in the public artifact: short names can be
+# recovered from an unkeyed digest. Fingerprints below cover closed vocabulary.
+MEASURE_FLAGS=frozenset(('O_RDONLY','O_WRONLY','O_RDWR','O_PATH','O_CLOEXEC',
+                         'O_DIRECTORY','O_NONBLOCK','O_NOFOLLOW','O_LARGEFILE'))
+MEASURE_ACCESS=frozenset(('F_OK','R_OK','W_OK','X_OK'))
+MEASURE_SIGNALS=frozenset(('SIGHUP','SIGINT','SIGQUIT','SIGILL','SIGTRAP','SIGABRT',
+    'SIGBUS','SIGFPE','SIGKILL','SIGUSR1','SIGSEGV','SIGUSR2','SIGPIPE',
+    'SIGALRM','SIGTERM','SIGCHLD','SIGCONT','SIGSTOP','SIGTSTP','SIGTTIN',
+    'SIGTTOU','SIGURG','SIGXCPU','SIGXFSZ','SIGVTALRM','SIGPROF',
+    'SIGWINCH','SIGIO','SIGPWR','SIGSYS'))
+MEASURE_SIGNAL_KEYS=frozenset(('si_signo','si_code','si_pid','si_uid','si_status',
+                               'si_addr','si_value','si_int','si_ptr'))
+
+
+def policy_shape_measurement(lines, unsupported_indices, unsupported_count=None):
+    """Closed classes only; never an acceptance decision or an arbitrary name."""
+    entries=[]
+    for n in unsupported_indices[:100]:
+        if not isinstance(n,int) or n<1 or n>len(lines):continue
+        line=lines[n-1];m=LINE.fullmatch(line)
+        if m:
+            call,args,status=m.groups()
+            if call=='openat':
+                # Full first operand and comma boundary; no ./secret or escape.
+                dot=re.fullmatch(r'AT_FDCWD, "\.", ([A-Z0-9_|]+)',args)
+                if dot:
+                    bits=dot.group(1).split('|')
+                    valid=(len(bits)==len(set(bits)) and all(x in MEASURE_FLAGS for x in bits) and
+                           trace_status(status)[0]=='integer_or_fd')
+                    entries.append({'line':n,'kind':'literal_dot','grammar':valid,
+                                    'flag_classes':sorted(bits) if valid else [],
+                                    'flag_fingerprint':hashlib.sha256('|'.join(sorted(bits)).encode()).hexdigest() if valid else None,
+                                    'return_class':trace_status(status)[0]})
+                    continue
+            if call=='access':
+                token=re.fullmatch(r'"([^"\\]{1,256})", ([A-Z_|]+)',args)
+                if token:
+                    name=token.group(1);parts=name.split('/')
+                    bits=token.group(2).split('|')
+                    valid=(len(bits)==len(set(bits)) and all(x in MEASURE_ACCESS for x in bits))
+                    entries.append({'line':n,'kind':'relative_access',
+                                    'path_class':'relative' if not name.startswith('/') else 'absolute',
+                                    'length_bucket':'1-16' if len(name)<=16 else '17-64' if len(name)<=64 else '65-256',
+                                    'components_bucket':'1' if len(parts)==1 else '2-4' if len(parts)<=4 else '5-8' if len(parts)<=8 else '9+',
+                                    'dot':'.' in parts,'dotdot':'..' in parts,
+                                    'empty_component':'' in parts,
+                                    'flag_classes':sorted(bits) if valid else [],
+                                    'grammar':valid and not name.startswith('/') and not any(x in ('','..') for x in parts) and
+                                              trace_status(status)==('negative_errno','ENOENT'),
+                                    'return_class':trace_status(status)[0],
+                                    'errno_class':trace_status(status)[1]})
+                    continue
+        stripped=re.sub(r'^'+PID_PREFIX,'',line)
+        signal_match=re.fullmatch(r'--- (SIG[A-Z0-9]+) (\{.{0,512}\}) ---',stripped)
+        if signal_match:
+            sig,payload=signal_match.groups()
+            keys=re.findall(r'(?:^|[, {])([a-z_]+)=',payload)
+            recognized=(sig in MEASURE_SIGNALS and bool(keys) and
+                        len(keys)==len(set(keys)) and all(x in MEASURE_SIGNAL_KEYS for x in keys)
+                        and '\\' not in payload and '"' not in payload)
+            entries.append({'line':n,'kind':'signal','type':sig if recognized else 'other',
+                            'payload_keys':sorted(keys) if recognized else [],
+                            'grammar':recognized})
+            continue
+        entries.append({'line':n,'kind':'other','grammar':False})
+    return {'entries':entries,'all_unsupported_represented':len(entries)==len(unsupported_indices) and (
+                unsupported_count is None or unsupported_count==len(unsupported_indices)),
+            'acceptance':False,'open_time_identity_verified':False,
+            'limitation':'shape_measurement_only_no_arbitrary_path_or_signal_payload'}
+
+
 def relative_path_components(name):
     parts=name.split('/')
     flags={'leading_dot_slash':name.startswith('./'),
@@ -603,6 +675,8 @@ def main():
         result['structured_trace_details']=structured_trace_details(trace,observed['unsupported_line_numbers'])
         result['relative_open_diagnostic']=relative_open_diagnostic(trace,observed['unsupported_line_numbers'],stage,src)
         result['literal_dot_diagnostic']=literal_dot_diagnostic(trace,observed['unsupported_line_numbers'],stage)
+        result['policy_shape_measurement']=policy_shape_measurement(
+            trace,observed['unsupported_line_numbers'],observed['unsupported_count'])
         serial=(stage/'serial.bin').read_bytes()
         result['serial_marker_once']=(serial.count(MARKER)==1 or serial.count(MARKER[:-2]+b'\n')==1)
         result['serial_sha256']=hashlib.sha256(serial).hexdigest()
