@@ -26,7 +26,7 @@ MAX_PREFLIGHT=8192
 SONAME=re.compile(rb'[A-Za-z0-9_+.-]{1,80}\.so(?:\.[0-9]{1,8}){0,4}')
 # This diagnostic treats every non-staged successful file operation as a blocker,
 # not as evidence for promoting a static closure.
-PID_PREFIX=r'(?:[0-9]{1,12} |\[pid +[0-9]{1,12}\] )?'
+PID_PREFIX=r'(?:[0-9]{1,12} {1,2}|\[pid +[0-9]{1,12}\] )?'
 LINE=re.compile(r'^'+PID_PREFIX+r'([a-z][a-z0-9_]*)\((.*)\) += +(.+)$')
 QUOTED=re.compile(r'"(/[^"\\]*)"')
 FD=re.compile(r'^[0-9]+(?:<[^>]*>)?$')
@@ -151,6 +151,9 @@ def bounded_failure(data):
         ('qemu_accel_unsupported',b'accelerator kvm not found'),
         ('qemu_argument_invalid',b'invalid option'),
         ('qemu_file_open',b'could not open'),
+        # Fixed basename is present in the signed snapshot inventory. This
+        # identifies a referenced candidate, not an observed open or cause.
+        ('bios_qboot_named',b'qboot.rom'),
         ('strace_prefix',b'strace:'),
         ('qemu_prefix',b'qemu-system-x86_64:'),
         ('error_failed',b'failed'),

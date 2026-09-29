@@ -27,6 +27,9 @@ class CollectionTests(unittest.TestCase):
                          ['kvm','[unknown]','[value]','[value]'])
         self.assertEqual(redacted_stderr(b'\x00secret')['status'],'suppressed')
         self.assertEqual(bounded_failure(b'guest says secret.so.2')['sonames'],[])
+        self.assertIn('bios_qboot_named',bounded_failure(b'qemu: could not load microvm bios qboot.rom')['categories'])
+        self.assertNotIn('bios_qboot_named',bounded_failure(b'qemu: could not load microvm bios other.rom')['categories'])
+
         self.assertEqual(bounded_failure(b'qemu: could not open kernel image /private/secret-kernel: No such file or directory')['categories'],
                          ['exec_missing','qemu_kernel_open','qemu_file_open','error_kernel'])
         self.assertEqual(bounded_failure(b'qemu: -initrd could not load initrd /private/guest')['categories'],
@@ -55,6 +58,19 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual([(x['gap_length'],x['gap_class'],x['after_gap_call']) for x in weird['samples']],
                          [(2,'space','openat'),(1,'tab_or_mixed','openat')])
         self.assertNotIn('/secret',repr(weird))
+        accepted=diagnostic(['1234  execve("/stage/qemu", ["qemu"], 0x0) = 0',
+                             '1234  openat(AT_FDCWD, "/stage/usr/share/qemu/qboot.rom", O_RDONLY) = 3',
+                             '1234  access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)',
+                             '1234  +++ exited with 1 +++'],'/stage')
+        self.assertEqual(accepted['unsupported_count'],0)
+        self.assertIn('/stage/usr/share/qemu/qboot.rom',accepted['opened'])
+        self.assertIn('/etc/ld.so.preload',accepted['outside'])
+        self.assertEqual(exec_probe(['1234  execve("/stage/ld.so", [], 0x0) = 0'],'/stage/ld.so','/stage/qemu')['loader_success'],1)
+        refused=diagnostic(['1234   openat(AT_FDCWD, "/stage/qboot.rom", O_RDONLY) = 3',
+                            '1234\topenat(AT_FDCWD, "/stage/qboot.rom", O_RDONLY) = 4'],'/stage')
+        self.assertEqual(refused['unsupported_count'],2)
+        self.assertEqual(refused['opened'],[])
+
 
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
