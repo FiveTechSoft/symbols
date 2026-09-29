@@ -6,7 +6,7 @@ import ast
 import re
 import os
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'))
-from collect import diagnostic,MARKER,checked_kvm_identity,Refusal,bounded_failure,exec_probe,loader_preflight
+from collect import diagnostic,MARKER,checked_kvm_identity,Refusal,bounded_failure,exec_probe,loader_preflight,needed_aliases
 
 class CollectionTests(unittest.TestCase):
     def test_bounded_preboot_categories_never_echo_arbitrary_data(self):
@@ -39,6 +39,23 @@ class CollectionTests(unittest.TestCase):
             self.assertEqual(r['exit_status'],127)
             self.assertEqual(r['missing_sonames'],['libfoo.so.1'])
             self.assertNotIn(tmp,repr(r))
+
+    def test_signed_soname_alias_selected_from_needed(self):
+        from test_qemu_closure import elf
+        from closure import BINARY,LIB,Refusal
+        binary=elf(['libfdt.so.1'])
+        actual=elf([])
+        source={BINARY:{'sha256':'a'},LIB+'libfdt.so.1':{'link':'libfdt-1.7.0.so'},
+                LIB+'libfdt-1.7.0.so':{'sha256':'b'}}
+        files={BINARY,LIB+'libfdt-1.7.0.so'}
+        raw={BINARY:binary,LIB+'libfdt-1.7.0.so':actual}
+        self.assertEqual(needed_aliases(files,source,raw.__getitem__),{LIB+'libfdt.so.1'})
+        source[LIB+'libfdt.so.1']={'sha256':'c'}
+        with self.assertRaisesRegex(Refusal,'dependency_alias'):
+            needed_aliases(files,source,raw.__getitem__)
+        del source[LIB+'libfdt.so.1']
+        with self.assertRaisesRegex(Refusal,'dependency_resolution'):
+            needed_aliases(files,source,raw.__getitem__)
 
     def test_kvm_identity_requires_active_nonroot_group(self):
         data=dict(uid=1001,euid=1001,egid=1001,groups=[1001,994],device_gid=994,device_mode=0o660,kvm_gid=994)

@@ -13,7 +13,8 @@ import subprocess
 import tarfile
 import time
 
-from closure import BINARY, LOADER, records, Refusal
+from closure import BINARY, LOADER, LIB, records, Refusal
+from elf import dependencies
 
 KERNEL='boot/vmlinuz-6.8.0-142-generic'
 BUSYBOX='usr/bin/busybox'
@@ -120,6 +121,21 @@ def loader_preflight(loader, library_path, binary, *, env, cwd):
             'missing_sonames':missing}
 
 
+def needed_aliases(files, source, read):
+    """Stage signed SONAME aliases, not merely their resolved ELF bytes."""
+    aliases=set()
+    for path in files:
+        _,needed=dependencies(read(path))
+        for name in needed:
+            options=[prefix+name for prefix in (LIB,'lib/x86_64-linux-gnu/') if prefix+name in source]
+            if len(options)!=1:raise Refusal('dependency_resolution')
+            alias=options[0]
+            if alias not in files:
+                if 'link' not in source[alias]:raise Refusal('dependency_alias')
+                aliases.add(alias)
+    return aliases
+
+
 def checked_kvm_identity(*, uid, euid, egid, groups, device_gid, device_mode, kvm_gid):
     active=sorted(set(groups) | {egid})
     if (uid==0 or euid==0 or kvm_gid!=device_gid or kvm_gid not in active or
@@ -172,6 +188,7 @@ def main():
                 return archive.extractfile(m).read(40_000_001)
             static=records(inv,read,packages)
             selected=set(static['files']) | {BINARY,LOADER,KERNEL,BUSYBOX}
+            selected.update(needed_aliases(static['files'],src,read))
             selected.update(k for k in src if k.startswith(('usr/share/qemu/','usr/lib/x86_64-linux-gnu/qemu/')) and isinstance(src[k],dict) and ('sha256' in src[k] or 'link' in src[k]))
             if len(selected)>250:raise Refusal('selected_count')
             # Include relative symlink chain of selected files; all paths and
