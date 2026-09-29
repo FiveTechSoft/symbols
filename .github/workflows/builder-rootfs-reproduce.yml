@@ -1,0 +1,92 @@
+name: Candidate builder rootfs byte reproduction
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit containing the builder, source manifest, and this workflow
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [a, b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Require full immutable commit
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - name: Check out reviewed bytes without credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Confirm checked-out commit and test builder
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_builder_rootfs_build.py
+          python3 tests/test_builder_rootfs_policy.py
+      - name: Independently verify snapshot and build candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/builder_rootfs/build.py --out "$RUNNER_TEMP/candidate"
+          cd "$RUNNER_TEMP/candidate"
+          gzip -n -9 -c rootfs.tar > rootfs.tar.gz
+          test "$(stat -c '%s' rootfs.tar.gz)" -le 180000000
+          sha256sum rootfs.tar rootfs.tar.gz inventory.json > SHA256SUMS
+          rm rootfs.tar
+      - name: Upload short-lived run-local candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ matrix.replica }}
+          path: |
+            ${{ runner.temp }}/candidate/rootfs.tar.gz
+            ${{ runner.temp }}/candidate/inventory.json
+            ${{ runner.temp }}/candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  compare:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Download both run-local candidates
+        uses: actions/download-artifact@v4
+        with:
+          pattern: candidate-*
+          path: candidates
+      - name: Verify each candidate and compare raw bytes and provenance inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find candidates -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 2
+          for replica in a b; do
+            dir="candidates/candidate-$replica"
+            test -f "$dir/rootfs.tar.gz" && test -f "$dir/inventory.json" && test -f "$dir/SHA256SUMS"
+            test "$(stat -c '%s' "$dir/rootfs.tar.gz")" -le 180000000
+            ( cd "$dir" && sha256sum --check SHA256SUMS --ignore-missing )
+            gzip -t "$dir/rootfs.tar.gz"
+            ( ulimit -f 500000; gzip -dc "$dir/rootfs.tar.gz" > "$dir/rootfs.tar" )
+            test "$(stat -c '%s' "$dir/rootfs.tar")" -le 500000000
+            ( cd "$dir" && sha256sum --check SHA256SUMS )
+          done
+          cmp candidates/candidate-a/rootfs.tar candidates/candidate-b/rootfs.tar
+          cmp candidates/candidate-a/inventory.json candidates/candidate-b/inventory.json
+          echo 'Two clean jobs produced byte-identical raw tar and canonical inventory.'
