@@ -7,9 +7,11 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools'/'minimal_initramfs'))
+import pack
 from pack import HERE, BUSYBOX_SHA, BUSYBOX_SIZE, Refusal, assemble, checked_sources, entry, sha
 
 MANIFEST=json.loads((HERE/'manifest.json').read_bytes())
@@ -53,6 +55,23 @@ class NewcTests(unittest.TestCase):
                              (0,0,0,len(data),0,0,0,0,0))
             self.assertEqual(data,source[m['source']] if m['kind']=='file' else b'')
         self.assertTrue(set(x[0] for x in rows).isdisjoint({'dev/console','etc','usr','root'}))
+
+    def test_windows_crlf_checkout_canonicalized_only_under_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            here=Path(directory)
+            for name in ('init','supervisor'):
+                (here/name).write_bytes((HERE/name).read_bytes().replace(b'\n',b'\r\n'))
+            busybox=here/'busybox'
+            busybox.write_bytes(b'\x7fELF'+b'B'*(BUSYBOX_SIZE-4))
+            with mock.patch.object(pack,'HERE',here):
+                with self.assertRaisesRegex(Refusal,'busybox_digest'):
+                    checked_sources(MANIFEST,busybox)
+                (here/'init').write_bytes((HERE/'init').read_bytes().replace(b'\n',b'\r\n')+b'\r')
+                with self.assertRaisesRegex(Refusal,'script_line_endings'):
+                    checked_sources(MANIFEST,busybox)
+                (here/'init').write_bytes((HERE/'init').read_bytes().replace(b'\n',b'\r\n')+b'X')
+                with self.assertRaisesRegex(Refusal,'script_digest'):
+                    checked_sources(MANIFEST,busybox)
 
     def test_input_and_manifest_refusals(self):
         with tempfile.TemporaryDirectory() as directory:

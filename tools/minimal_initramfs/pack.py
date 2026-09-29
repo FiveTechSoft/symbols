@@ -45,6 +45,11 @@ def checked_sources(manifest: dict, busybox: Path) -> dict[str, bytes]:
         p=HERE/name
         if p.is_symlink() or not p.is_file() or p.stat().st_size>4096: raise Refusal('script_input')
         raw=p.read_bytes()
+        # Windows checkouts can CRLF-convert these fixed text files. Restore
+        # canonical LF bytes only if the complete pinned digest still matches.
+        if b'\r' in raw:
+            raw=raw.replace(b'\r\n',b'\n')
+            if b'\r' in raw: raise Refusal('script_line_endings')
         row=next(x for x in rows if x['path']==name)
         if len(raw)!=row['size'] or not raw.startswith(b'#!/bin/busybox sh\n') or sha(raw)!=row['sha256']:
             raise Refusal('script_digest')
