@@ -11,6 +11,7 @@ import platform
 from pathlib import Path
 import re
 import resource
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -44,16 +45,32 @@ def fetch(url: str, size: int, sha: str) -> bytes:
     if not url.startswith(BASE) or not 0 < size <= 200_000_000 or not re.fullmatch('[0-9a-f]{64}', sha):
         raise Refusal('fetch_input')
     opener = urllib.request.build_opener(NoRedirect())
-    for attempt in range(2):
+    # Up to two retries (three total attempts), with fixed backoff only for
+    # explicit transient HTTP statuses and socket transport interruptions.
+    for attempt in range(3):
         try:
-            with opener.open(url, timeout=40) as response:
+            with opener.open(url, timeout=120) as response:
                 if response.url != url or response.status != 200:
                     raise Refusal('fetch_location')
                 raw = response.read(size + 1)
         except urllib.error.HTTPError as exc:
-            if exc.code not in (502, 503, 504) or attempt == 1:
+            if exc.code not in (502, 503, 504) or attempt == 2:
                 raise Refusal(f'fetch_http_{exc.code}') from exc
-            print(f'transient_http_{exc.code} attempt_1 {url}', flush=True)
+            print(f'transient_http_{exc.code} attempt_{attempt+1} {url}', flush=True)
+            time.sleep(5)
+            continue
+        except (TimeoutError, socket.timeout, ConnectionResetError) as exc:
+            if attempt == 2:
+                raise Refusal(f'fetch_transport_{type(exc).__name__}') from exc
+            print(f'transient_transport_{type(exc).__name__} attempt_{attempt+1} {url}', flush=True)
+            time.sleep(5)
+            continue
+        except urllib.error.URLError as exc:
+            # urllib may wrap a socket failure in URLError.reason. Other errors
+            # (DNS, TLS verification, and refused connections) stay terminal.
+            if not isinstance(exc.reason, (TimeoutError, socket.timeout, ConnectionResetError)) or attempt == 2:
+                raise Refusal('fetch_url_error') from exc
+            print(f'transient_transport_{type(exc.reason).__name__} attempt_{attempt+1} {url}', flush=True)
             time.sleep(5)
             continue
         if len(raw) != size or digest(raw) != sha:

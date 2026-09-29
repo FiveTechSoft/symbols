@@ -1,6 +1,7 @@
 """Offline test vectors for the signed metadata and deterministic candidate archive."""
 import copy
 import json
+import socket
 import io
 import urllib.error
 from pathlib import Path
@@ -85,11 +86,11 @@ class SourceTests(unittest.TestCase):
             delay.assert_called_once_with(5)
         with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
             op=open_builder.return_value
-            op.open.side_effect=[error(503),error(503)]
+            op.open.side_effect=[error(503),error(503),error(503)]
             with self.assertRaisesRegex(Refusal,'fetch_http_503'):
                 fetch(url,3,digest(b'abc'))
-            self.assertEqual(op.open.call_count,2)
-            delay.assert_called_once_with(5)
+            self.assertEqual(op.open.call_count,3)
+            self.assertEqual(delay.call_args_list,[mock.call(5),mock.call(5)])
         with mock.patch('urllib.request.build_opener') as open_builder, mock.patch('time.sleep') as delay:
             op=open_builder.return_value
             op.open.side_effect=error(404)
@@ -101,6 +102,52 @@ class SourceTests(unittest.TestCase):
             op=open_builder.return_value
             op.open.side_effect=Refusal('redirect')
             with self.assertRaisesRegex(Refusal,'redirect'):
+                fetch(url,3,digest(b'abc'))
+            op.open.assert_called_once()
+            delay.assert_not_called()
+
+    def test_transport_retry_at_open_and_read(self):
+        url='https://snapshot.ubuntu.com/ubuntu/20260927T000000Z/test'
+        class Response:
+            status=200
+            def __init__(self, outcome):self.outcome=outcome;self.url=url
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,n):
+                if isinstance(self.outcome,BaseException):raise self.outcome
+                return self.outcome[:n]
+        cases=(TimeoutError('timeout'),socket.timeout('timeout'),ConnectionResetError('reset'))
+        for exc in cases:
+            with self.subTest(kind=type(exc).__name__, stage='open'), mock.patch('urllib.request.build_opener') as builder, mock.patch('time.sleep') as delay:
+                op=builder.return_value
+                op.open.side_effect=[exc,Response(b'abc')]
+                self.assertEqual(fetch(url,3,digest(b'abc')),b'abc')
+                self.assertEqual(op.open.call_count,2)
+                self.assertEqual(op.open.call_args_list[0].kwargs['timeout'],120)
+                delay.assert_called_once_with(5)
+            with self.subTest(kind=type(exc).__name__, stage='read'), mock.patch('urllib.request.build_opener') as builder, mock.patch('time.sleep') as delay:
+                op=builder.return_value
+                op.open.side_effect=[Response(exc),Response(b'abc')]
+                self.assertEqual(fetch(url,3,digest(b'abc')),b'abc')
+                self.assertEqual(op.open.call_count,2)
+                delay.assert_called_once_with(5)
+            with self.subTest(kind=type(exc).__name__, stage='exhausted'), mock.patch('urllib.request.build_opener') as builder, mock.patch('time.sleep') as delay:
+                op=builder.return_value
+                op.open.side_effect=[exc,exc,exc]
+                with self.assertRaisesRegex(Refusal,'fetch_transport_'):
+                    fetch(url,3,digest(b'abc'))
+                self.assertEqual(op.open.call_count,3)
+                self.assertEqual(delay.call_args_list,[mock.call(5),mock.call(5)])
+        with mock.patch('urllib.request.build_opener') as builder, mock.patch('time.sleep') as delay:
+            op=builder.return_value
+            op.open.side_effect=[urllib.error.URLError(socket.timeout('wrapped')),Response(b'abc')]
+            self.assertEqual(fetch(url,3,digest(b'abc')),b'abc')
+            self.assertEqual(op.open.call_count,2)
+            delay.assert_called_once_with(5)
+        with mock.patch('urllib.request.build_opener') as builder, mock.patch('time.sleep') as delay:
+            op=builder.return_value
+            op.open.side_effect=urllib.error.URLError('tls-failure')
+            with self.assertRaisesRegex(Refusal,'fetch_url_error'):
                 fetch(url,3,digest(b'abc'))
             op.open.assert_called_once()
             delay.assert_not_called()
