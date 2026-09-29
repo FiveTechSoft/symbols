@@ -16,15 +16,38 @@ class CollectionTests(unittest.TestCase):
         self.assertIn('loader_missing_file',r['categories'])
         self.assertEqual(r['sonames'],['libfoo.so.1'])
         self.assertNotIn('secret',repr(r))
+        self.assertEqual(r['redacted']['status'],'redacted')
+        self.assertNotIn('TOKEN',repr(r))
+        from collect import redacted_stderr
+        self.assertEqual(redacted_stderr(b'qemu-system-x86_64: /private/token: No such file or directory')['words'][-5:],
+                         ['no','such','file','or','directory'])
+        self.assertEqual(redacted_stderr(b'kvm: secretword 123 /tmp/secret')['words'],
+                         ['kvm','[unknown]','[value]','[value]'])
+        self.assertEqual(redacted_stderr(b'\x00secret')['status'],'suppressed')
         self.assertEqual(bounded_failure(b'guest says secret.so.2')['sonames'],[])
         self.assertEqual(bounded_failure(b'qemu: could not open kernel image /private/secret-kernel: No such file or directory')['categories'],
-                         ['exec_missing','qemu_kernel_open','qemu_file_open'])
+                         ['exec_missing','qemu_kernel_open','qemu_file_open','error_kernel'])
         self.assertEqual(bounded_failure(b'qemu: -initrd could not load initrd /private/guest')['categories'],
-                         ['qemu_initrd_load'])
+                         ['qemu_initrd_load','error_initrd'])
         self.assertNotIn('/private/',repr(bounded_failure(b'qemu: could not open /private/token')))
 
         self.assertEqual(bounded_failure(b'strace: exec: No such file or directory')['categories'],
-                         ['exec_missing','strace_exec_failure'])
+                         ['exec_missing','strace_exec_failure','strace_prefix'])
+
+    def test_redacted_trace_shapes_no_paths_or_arbitrary_names(self):
+        from collect import trace_shapes
+        raw=['1234 openat(AT_FDCWD, "/home/private/token", O_RDONLY) = 3',
+             '[pid 1234] newfstatat(AT_FDCWD, "/etc/secret", ...) = 0',
+             '1234 strange_agent_instruction("do something") = 0',
+             '1234 +++ exited with 1 +++']
+        shapes=trace_shapes(raw,[1,2,3])
+        self.assertEqual(sum(x['count'] for x in shapes['counts']),len(raw))
+        self.assertIn({'prefix':'decimal_pid','kind':'syscall','call':'openat','count':1},shapes['counts'])
+        self.assertIn({'prefix':'bracket_pid','kind':'syscall','call':'newfstatat','count':1},shapes['counts'])
+        self.assertNotIn('private',repr(shapes))
+        self.assertNotIn('instruction',repr(shapes))
+        self.assertEqual(len(shapes['samples']),3)
+        self.assertEqual([x['line'] for x in shapes['samples']],[1,2,3])
 
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',

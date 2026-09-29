@@ -66,6 +66,54 @@ def diagnostic(lines, root):
             'unsupported_line_numbers':unsupported[:100],'unsupported_count':len(unsupported)}
 
 
+SAFE_WORDS=frozenset(('qemu strace kvm kernel initrd rom firmware memory machine cpu device accelerator accel '
+    'failed failure error invalid unsupported unable cannot could not open load initialize access permission denied '
+    'no such file or directory operation allowed available requested specified argument option bus pci microvm '
+    'network block serial address space size out of for with to from on at in the a an is was').split())
+
+
+def redacted_stderr(data):
+    """Diagnostic words from a fixed lexicon only; paths, numbers and unknown words are hidden."""
+    if len(data)>256 or not data.isascii():return {'status':'suppressed'}
+    text=data.decode('ascii','strict')
+    # Reject control characters except conventional line endings; never emit text verbatim.
+    if any(ord(c)<32 and c not in '\r\n\t' for c in text):return {'status':'suppressed'}
+    tokens=re.findall(r'[^\s:]+',text)
+    out=[]
+    for token in tokens[:40]:
+        if '/' in token or '\\' in token or any(c.isdigit() for c in token):
+            out.append('[value]');continue
+        word=token.strip('.,;:!?()[]').lower()
+        out.append(word if word in SAFE_WORDS else '[unknown]')
+    return {'status':'redacted','words':out,'truncated':len(tokens)>40}
+
+
+def trace_shapes(lines, unsupported_line_numbers):
+    """Summarize parser misses using only bounded, fixed-vocabulary shapes."""
+    shapes={};samples=[];unsupported=set(unsupported_line_numbers)
+    for index,line in enumerate(lines,1):
+        prefix='none'
+        if re.match(r'^[0-9]{1,12} ',line):prefix='decimal_pid'
+        elif re.match(r'^\[pid +[0-9]{1,12}\] ',line):prefix='bracket_pid'
+        elif re.match(r'^[0-9]',line):prefix='other_numeric'
+        stripped=re.sub(r'^'+PID_PREFIX,'',line)
+        syscall=re.match(r'^([a-z][a-z0-9_]{0,31})\(',stripped)
+        kind='syscall' if syscall else ('exit' if stripped.startswith('+++ ') else 'other')
+        name=syscall.group(1) if syscall and syscall.group(1) in (
+            'execve','open','openat','openat2','access','faccessat','faccessat2',
+            'newfstatat','stat','lstat','statx','readlink','readlinkat',
+            'getcwd','chdir','mkdir','unlink','rename') else 'other'
+        key=(prefix,kind,name)
+        shapes[key]=shapes.get(key,0)+1
+        # Only first few parser misses; never a raw line, path, quoted value or arbitrary name.
+        if len(samples)<8 and index in unsupported:
+            samples.append({'line':index,'prefix':prefix,'kind':kind,'call':name,
+                'starts_parenthesis':bool(syscall),
+                'has_return_delimiter':' = ' in line,'contains_quoted_value':'"' in line})
+    return {'counts':[{'prefix':a,'kind':b,'call':c,'count':n}
+            for (a,b,c),n in sorted(shapes.items())][:60],'samples':samples}
+
+
 def bounded_failure(data):
     """Publish categories and hashes, not arbitrary stderr or guest text."""
     clipped=data[:MAX_OUTPUT]
@@ -90,6 +138,26 @@ def bounded_failure(data):
         ('qemu_accel_unsupported',b'accelerator kvm not found'),
         ('qemu_argument_invalid',b'invalid option'),
         ('qemu_file_open',b'could not open'),
+        ('strace_prefix',b'strace:'),
+        ('qemu_prefix',b'qemu-system-x86_64:'),
+        ('error_failed',b'failed'),
+        ('error_error',b'error'),
+        ('error_denied',b'denied'),
+        ('error_invalid',b'invalid'),
+        ('error_unsupported',b'unsupported'),
+        ('error_not_found',b'not found'),
+        ('error_mmap',b'mmap'),
+        ('error_memory',b'memory'),
+        ('error_kvm',b'kvm'),
+        ('error_microvm',b'microvm'),
+        ('error_kernel',b'kernel'),
+        ('error_initrd',b'initrd'),
+        ('error_rom',b'rom'),
+        ('error_virtio',b'virtio'),
+        ('error_accel',b'accel'),
+        ('error_device',b'device'),
+        ('error_machine',b'machine'),
+        ('error_cpu',b'cpu'),
     ):
         if needle in lower:labels.append(label)
     # Only a loader-formatted missing-library line may supply a soname.
@@ -97,7 +165,7 @@ def bounded_failure(data):
         rb'error while loading shared libraries: ('+SONAME.pattern+rb'):',clipped)})[:12]
     return {'sha256':hashlib.sha256(data).hexdigest(),'size':len(data),
             'truncated':len(data)>MAX_OUTPUT,'categories':labels or ['unclassified'],
-            'sonames':sonames}
+            'sonames':sonames,'redacted':redacted_stderr(data)}
 
 
 def exec_probe(lines, loader, binary):
@@ -265,6 +333,7 @@ def main():
         result['trace_sha256']=digest(stage/'trace.txt')
         observed=diagnostic(trace,stage)
         result['observed']=observed
+        result['trace_shapes']=trace_shapes(trace,observed['unsupported_line_numbers'])
         serial=(stage/'serial.bin').read_bytes()
         result['serial_marker_once']=(serial.count(MARKER)==1 or serial.count(MARKER[:-2]+b'\n')==1)
         result['serial_sha256']=hashlib.sha256(serial).hexdigest()
