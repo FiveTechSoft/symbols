@@ -110,6 +110,36 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaisesRegex(Refusal,'dependency_resolution'):
             needed_aliases(files,source,raw.__getitem__)
 
+    def test_microvm_bios_mapped_only_from_exact_inventory_bytes(self):
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        import hashlib
+        import collect
+        data=b'signed snapshot fixture'
+        checksum=hashlib.sha256(data).hexdigest()
+        src_name=collect.MICROVM_BIOS_SOURCE
+        dest_name=collect.MICROVM_BIOS_DATA
+        with patch.object(collect,'MICROVM_BIOS_SHA',checksum),patch.object(collect,'MICROVM_BIOS_SIZE',len(data)):
+            with TemporaryDirectory() as tmp:
+                stage=Path(tmp)
+                source=stage/src_name;source.parent.mkdir(parents=True)
+                source.write_bytes(data)
+                row={'sha256':checksum,'size':len(data)}
+                collect.stage_microvm_bios({src_name:row},stage)
+                self.assertEqual((stage/dest_name).read_bytes(),data)
+                self.assertEqual((stage/dest_name).stat().st_mode & 0o777,0o644)
+                with self.assertRaisesRegex(Refusal,'bios_source_or_destination'):
+                    collect.stage_microvm_bios({src_name:row},stage)
+                (stage/dest_name).unlink()
+                source.write_bytes(b'other snapshot fixture')
+                with self.assertRaisesRegex(Refusal,'bios_source_or_destination'):
+                    collect.stage_microvm_bios({src_name:row},stage)
+                self.assertFalse((stage/dest_name).exists())
+                with self.assertRaisesRegex(Refusal,'bios_inventory'):
+                    collect.stage_microvm_bios({src_name:row,dest_name:row},stage)
+                with self.assertRaisesRegex(Refusal,'bios_inventory'):
+                    collect.stage_microvm_bios({src_name:{**row,'size':12}},stage)
+
     def test_kvm_identity_requires_active_nonroot_group(self):
         data=dict(uid=1001,euid=1001,egid=1001,groups=[1001,994],device_gid=994,device_mode=0o660,kvm_gid=994)
         self.assertEqual(checked_kvm_identity(**data)['active_gids'],[994,1001])

@@ -19,6 +19,10 @@ from elf import dependencies
 KERNEL='boot/vmlinuz-6.8.0-142-generic'
 BUSYBOX='usr/bin/busybox'
 INITRD_SHA='21d1a476d2e561c4d6f506b198b401772d3600a6d16ef2398e023612cf3ae38d'
+MICROVM_BIOS_SOURCE='usr/share/seabios/bios-microvm.bin'
+MICROVM_BIOS_DATA='usr/share/qemu/bios-microvm.bin'
+MICROVM_BIOS_SHA='3dc79b28380ae79a014060ac23052f32293bc80cdbb39e347811965807cfee1f'
+MICROVM_BIOS_SIZE=131072
 MARKER=b'SYMBOLS_BOOT_ONLY_SUPERVISOR_READY_v1\r\n'
 MAX_TRACE=16_000_000
 MAX_OUTPUT=65536
@@ -38,6 +42,26 @@ def digest(path):
     with path.open('rb') as f:
         for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
     return h.hexdigest()
+
+
+def stage_microvm_bios(src, stage):
+    """Map one verified snapshot BIOS into QEMU's fixed -L data directory."""
+    row=src.get(MICROVM_BIOS_SOURCE)
+    if (not isinstance(row,dict) or row.get('sha256')!=MICROVM_BIOS_SHA or
+        row.get('size')!=MICROVM_BIOS_SIZE or MICROVM_BIOS_DATA in src):
+        raise Refusal('bios_inventory')
+    source=stage/MICROVM_BIOS_SOURCE
+    target=stage/MICROVM_BIOS_DATA
+    if (not source.is_file() or source.is_symlink() or source.stat().st_size!=MICROVM_BIOS_SIZE or
+        digest(source)!=MICROVM_BIOS_SHA or target.exists() or target.is_symlink()):
+        raise Refusal('bios_source_or_destination')
+    target.parent.mkdir(parents=True,exist_ok=True)
+    # The source was read from a digest-checked archive member in the stage loop.
+    with target.open('xb') as out:
+        out.write(source.read_bytes())
+    target.chmod(0o644)
+    if target.stat().st_size!=MICROVM_BIOS_SIZE or digest(target)!=MICROVM_BIOS_SHA:
+        raise Refusal('bios_stage_digest')
 
 
 def diagnostic(lines, root):
@@ -284,6 +308,7 @@ def main():
             static=records(inv,read,packages)
             selected=set(static['files']) | {BINARY,LOADER,KERNEL,BUSYBOX}
             selected.update(needed_aliases(static['files'],src,read))
+            selected.add(MICROVM_BIOS_SOURCE)
             selected.update(k for k in src if k.startswith(('usr/share/qemu/','usr/lib/x86_64-linux-gnu/qemu/')) and isinstance(src[k],dict) and ('sha256' in src[k] or 'link' in src[k]))
             if len(selected)>250:raise Refusal('selected_count')
             # Include relative symlink chain of selected files; all paths and
@@ -308,6 +333,7 @@ def main():
                     if len(raw)!=row['size'] or hashlib.sha256(raw).hexdigest()!=row['sha256']:raise Refusal('selected_digest')
                     target.write_bytes(raw)
                     target.chmod(0o755 if name in (BINARY,LOADER,BUSYBOX) else 0o644)
+        stage_microvm_bios(src,stage)
         busybox=stage/BUSYBOX
         subprocess.run(['python3',str(Path(__file__).parents[1]/'minimal_initramfs/pack.py'),'--busybox',str(busybox),'--out',str(stage/'initramfs.cpio')],check=True,timeout=15)
         if digest(stage/'initramfs.cpio')!=INITRD_SHA:raise Refusal('initrd_drift')
@@ -367,14 +393,14 @@ def main():
                     result['staged_opened'][rel]=digest(initrd)
                     if result['staged_opened'][rel]!=INITRD_SHA:result['reason']='opened_byte_drift'
                     continue
-                row=src.get(rel)
+                row=src.get(MICROVM_BIOS_SOURCE if rel==MICROVM_BIOS_DATA else rel)
                 if row is None:result['reason']='opened_not_in_inventory';continue
                 target=stage/rel
                 if not target.is_file() or not target.resolve().is_relative_to(stage) or target.stat().st_size>40_000_000:
                     result['reason']='opened_unmeasurable';continue
                 measured=digest(target);result['staged_opened'][rel]=measured
                 resolved=target.resolve().relative_to(stage).as_posix()
-                expected=src.get(resolved)
+                expected=src.get(MICROVM_BIOS_SOURCE if rel==MICROVM_BIOS_DATA and resolved==MICROVM_BIOS_DATA else resolved)
                 if not isinstance(expected,dict) or expected.get('sha256')!=measured or expected.get('size')!=target.stat().st_size:
                     result['reason']='opened_byte_drift'
         result['static_files_not_observed']=sorted(set(static['files'])-set(result['staged_opened']))
