@@ -209,14 +209,14 @@ def relative_path_components(name):
            'dotdot_component':'..' in parts,
            'empty_component':'' in parts,
            'absolute':name.startswith('/')}
-    # Only one literal leading ./ may be stripped. The remaining path must be
-    # nonempty, bounded, relative and free of empty/dot/dotdot components.
-    normalized=name[2:] if flags['leading_dot_slash'] else name
-    normal_parts=normalized.split('/')
-    allowed=(not flags['absolute'] and 0<len(normalized)<=256 and
-             all(part not in ('','.','..') for part in normal_parts) and
-             (not flags['dot_component'] or flags['leading_dot_slash'] and parts.count('.')==1))
-    return flags,normalized if allowed else None
+    # Diagnostic-only normalization: remove dot segments, never resolve
+    # traversal, empty segments, absolute paths or an all-dot pathname.
+    remaining=[part for part in parts if part!='.']
+    allowed=(not flags['absolute'] and len(name)<=256 and
+             not flags['dotdot_component'] and not flags['empty_component'] and
+             bool(remaining))
+    normalized='/'.join(remaining) if allowed else None
+    return flags,normalized
 
 
 def relative_open_diagnostic(lines, indices, stage, source):
