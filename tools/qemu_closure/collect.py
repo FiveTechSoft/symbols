@@ -115,7 +115,7 @@ def redacted_stderr(data):
 
 
 TRACE_CALLS=frozenset(('execve open openat openat2 access faccessat faccessat2 newfstatat '
-    'stat lstat statx readlink readlinkat getcwd chdir mkdir unlink rename').split())
+    'stat lstat statx statfs statfs64 readlink readlinkat getcwd chdir mkdir unlink rename').split())
 PROBE_PATHS=frozenset(('/dev/sgx_vepc','/etc/ld.so.preload','/etc/libnl/classid',
     '/etc/selinux/config','/proc/self/exe','/selinux','/sys/fs/selinux'))
 AMBIENT_PATHS=frozenset(('/dev/kvm','/dev/urandom','/etc/gnutls/config',
@@ -133,6 +133,32 @@ def trace_status(status):
     return ('other','none')
 
 
+def missed_path_shape(call, args):
+    # The first quoted operand is the pathname for these exact syscall forms;
+    # escaping prevents accepting a broken quoted token as a path.
+    supported=frozenset(('open','openat','openat2','access','faccessat','faccessat2',
+        'newfstatat','stat','lstat','statx','statfs','statfs64',
+        'readlink','readlinkat','execve'))
+    if call not in supported:return ('not_applicable','not_parsed','unknown',False)
+    dirfd='not_applicable'
+    if call in ('openat','openat2','faccessat','faccessat2','newfstatat','statx','readlinkat'):
+        first=args.split(',',1)[0].strip()
+        if first=='AT_FDCWD':dirfd='AT_FDCWD'
+        elif re.fullmatch(r'[0-9]+(?:<[^>]*>)?',first):dirfd='descriptor'
+        else:dirfd='other'
+    if dirfd!='not_applicable' and ',' not in args:return (dirfd,'not_parsed','unknown',False)
+    operand=args.split(',',1)[1] if dirfd!='not_applicable' else args
+    token=re.match(r'^\s*"((?:[^"\\]|\\.)*)"',operand)
+    if not token:return (dirfd,'not_parsed','unknown',False)
+    value=token.group(1)
+    escaped='\\' in value
+    path_class=('empty' if not value else 'absolute' if value.startswith('/') else
+                'relative' if not value.startswith('\\') else 'other')
+    length=('0' if not value else '1-16' if len(value)<=16 else '17-64' if len(value)<=64
+            else '65-256' if len(value)<=256 else 'over_256')
+    return (dirfd,path_class,length,escaped)
+
+
 def structured_trace_details(lines, indices):
     """Bounded parser misses and allowlisted host path attempts only; never raw text."""
     unsupported=[];host_attempts=[];host_attempt_count=0;unsupported_set=set(indices)
@@ -142,10 +168,12 @@ def structured_trace_details(lines, indices):
         call_match=re.match(r'^([a-z][a-z0-9_]{0,31})\(',stripped)
         call=call_match.group(1) if call_match and call_match.group(1) in TRACE_CALLS else 'other'
         reason='grammar';ret='absent';errno='none';paths=[]
+        dirfd='not_applicable';path_class='not_parsed';path_length='unknown';has_escape=False;event='none'
         if m:
             raw_call,args,status=m.groups()
             paths=QUOTED.findall(args)
             ret,errno=trace_status(status)
+            dirfd,path_class,path_length,has_escape=missed_path_shape(raw_call,args)
             if '<unfinished ...>' in args or '<... ' in args:reason='unfinished'
             elif '\\' in args:reason='escape'
             elif not paths:reason='no_absolute_quoted_path'
@@ -158,15 +186,18 @@ def structured_trace_details(lines, indices):
                     host_attempts.append({'line':n,'path':path,'call':raw_call if raw_call in TRACE_CALLS else 'other',
                                           'return_class':ret,'errno_class':errno,
                                           'parser_supported':n not in unsupported_set})
-        elif stripped.startswith('+++ exited with '):reason='exit_other'
-        elif stripped.startswith('+++ killed by '):reason='killed'
-        elif stripped.startswith('--- '):reason='signal'
+        elif stripped.startswith('+++ exited with '):reason='exit_other';event='exit'
+        elif stripped.startswith('+++ killed by '):reason='killed';event='killed'
+        elif stripped.startswith('--- '):
+            reason='signal';event='signal_delimited' if stripped.endswith(' ---') else 'signal_unterminated'
         elif stripped.startswith('<... '):reason='resumed'
         elif '<unfinished ...>' in stripped:reason='unfinished'
         elif re.match(r'^[a-z][a-z0-9_]{0,31}\(',stripped):reason='grammar_call'
         if n in unsupported_set and len(unsupported)<100:
             unsupported.append({'line':n,'call':call,'rejection':reason,'return_class':ret,
-                                'errno_class':errno,'known_probe_paths':sorted(set(paths)&PROBE_PATHS)})
+                                'errno_class':errno,'known_probe_paths':sorted(set(paths)&PROBE_PATHS),
+                                'dirfd_class':dirfd,'path_class':path_class,'path_length':path_length,
+                                'has_escape':has_escape,'event_shape':event})
     return {'unsupported':unsupported,'host_attempts':host_attempts,
             'host_attempts_truncated':host_attempt_count>100}
 

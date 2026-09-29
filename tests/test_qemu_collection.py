@@ -96,6 +96,31 @@ class CollectionTests(unittest.TestCase):
             self.assertNotIn(forbidden,repr(r))
         self.assertLessEqual(len(structured_trace_details(raw*20,list(range(1,161)))['host_attempts']),100)
 
+    def test_missed_path_shapes_and_signal_boundaries_are_bounded(self):
+        from collect import structured_trace_details
+        raw=['52  openat(AT_FDCWD, "relative-name", O_RDONLY) = 3',
+             '52  access("relative-name", F_OK) = -1 ENOENT (No such file or directory)',
+             '52  openat(3</private/dir>, "rel", O_RDONLY) = 4',
+             '52  openat(AT_FDCWD, "", O_RDONLY) = -1 ENOENT (No such file or directory)',
+             '52  openat(AT_FDCWD, "\\x41private", O_RDONLY) = 5',
+             '52  statfs("/sys/fs/selinux", {f_type=1}) = -1 ENOENT (No such file or directory)',
+             '52  statfs64("/selinux", 88, {}) = -1 ENOENT (No such file or directory)',
+             '52  --- SIGUSR1 {secret=/private/dir} ---',
+             '52  --- SIGUSR1 {secret=/private/dir}',
+             '52  +++ killed by SIGKILL +++',
+             '52  +++ exited with 1 +++']
+        r=structured_trace_details(raw,list(range(1,len(raw)+1)))
+        x=r['unsupported']
+        self.assertEqual([(v['dirfd_class'],v['path_class'],v['path_length'],v['has_escape']) for v in x[:5]],
+                         [('AT_FDCWD','relative','1-16',False),('not_applicable','relative','1-16',False),
+                          ('descriptor','relative','1-16',False),('AT_FDCWD','empty','0',False),
+                          ('AT_FDCWD','other','1-16',True)])
+        self.assertEqual([v['call'] for v in x[5:7]],['statfs','statfs64'])
+        self.assertEqual([v['event_shape'] for v in x[7:]],
+                         ['signal_delimited','signal_unterminated','killed','exit'])
+        for forbidden in ('private','relative-name','SIGUSR1','SIGKILL','secret','52'):
+            self.assertNotIn(forbidden,repr(r))
+
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',
