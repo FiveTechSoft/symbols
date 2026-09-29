@@ -241,6 +241,40 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaisesRegex(Refusal,'dependency_resolution'):
             needed_aliases(files,source,raw.__getitem__)
 
+    def test_static_alias_shape_is_diagnostic_and_fails_closed(self):
+        from collect import static_alias_shape_match
+        from closure import BINARY,LIB
+        from tempfile import TemporaryDirectory
+        import copy,hashlib
+        blob=b'ELF bytes in signed snapshot'
+        checksum=hashlib.sha256(blob).hexdigest()
+        alias=LIB+'libfdt.so.1';target=LIB+'libfdt-1.7.0.so'
+        row={'sha256':checksum,'size':len(blob),'origin_package':'fdt',
+             'payload_sha256':'a'*64}
+        source={BINARY:{'sha256':'b'*64,'size':42},target:row,alias:{'link':'libfdt-1.7.0.so','origin_package':'fdt',
+                                  'payload_sha256':'a'*64}}
+        static={BINARY:{'sha256':'b'*64,'size':42,'needed':['libfdt.so.1']},
+                target:{'sha256':checksum,'size':len(blob),'needed':[]}}
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp);path=root/target;path.parent.mkdir(parents=True)
+            path.write_bytes(blob);(root/alias).symlink_to('libfdt-1.7.0.so')
+            opened={BINARY:'b'*64,alias:checksum}
+            got=static_alias_shape_match(static,source,root,opened)
+            self.assertEqual((got['match'],got['direct'],len(got['alias_pairs'])),(True,1,1))
+            self.assertNotIn('runtime_complete',got)
+            changed=copy.deepcopy(source);changed[alias]['origin_package']='other'
+            self.assertEqual(static_alias_shape_match(static,changed,root,opened)['reason'],'alias_provenance')
+            changed=copy.deepcopy(static);changed[BINARY]['needed']=[]
+            self.assertEqual(static_alias_shape_match(changed,source,root,opened)['reason'],'alias_ambiguous_or_missing')
+            changed=copy.deepcopy(source);changed[LIB+'duplicate.so.1']={**source[alias]}
+            changed[LIB+'duplicate.so.1']['link']='libfdt-1.7.0.so'
+            changed_static=copy.deepcopy(static);changed_static[BINARY]['needed'].append('duplicate.so.1')
+            self.assertEqual(static_alias_shape_match(changed_static,changed,root,opened)['reason'],'alias_ambiguous_or_missing')
+            self.assertEqual(static_alias_shape_match(static,source,root,{BINARY:'b'*64})['reason'],'alias_staged_byte_drift')
+            self.assertEqual(static_alias_shape_match(static,source,root,{BINARY:'0'*64,alias:checksum})['reason'],'direct_digest')
+            path.write_bytes(blob+b'X')
+            self.assertEqual(static_alias_shape_match(static,source,root,opened)['reason'],'alias_staged_byte_drift')
+
     def test_microvm_bios_mapped_only_from_exact_inventory_bytes(self):
         from tempfile import TemporaryDirectory
         from unittest.mock import patch

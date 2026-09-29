@@ -685,6 +685,63 @@ def needed_aliases(files, source, read):
     return aliases
 
 
+
+def static_alias_shape_match(static_files, source, stage, staged_opened):
+    """Post-run, snapshot-bound ELF/SONAME name reconciliation only.
+
+    This is not evidence that an open used this inode, loaded the ELF, or
+    retained its bytes between observation and measurement.
+    """
+    failures=[];pairs=[];direct=0
+    if not isinstance(static_files,dict) or not isinstance(source,dict) or not isinstance(staged_opened,dict):
+        return {'match':False,'reason':'input_schema','direct':0,'alias_pairs':[]}
+    for target, record in sorted(static_files.items()):
+        row=source.get(target)
+        if (not isinstance(record,dict) or not isinstance(row,dict) or
+            record.get('sha256')!=row.get('sha256') or record.get('size')!=row.get('size')):
+            failures.append('static_inventory');continue
+        if target in staged_opened:
+            if staged_opened[target]!=record['sha256']:failures.append('direct_digest')
+            else:direct+=1
+            continue
+        # Require a SONAME specifically referenced by the signed static ELF
+        # graph. Merely finding a like-named symlink in the inventory is not
+        # enough. Reject ambiguous aliases and mismatched package provenance.
+        candidates=[]
+        for parent, parent_record in static_files.items():
+            if not isinstance(parent_record,dict) or not isinstance(parent_record.get('needed'),list):
+                failures.append('needed_schema');continue
+            for name in parent_record['needed']:
+                if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z0-9_+.-]{1,80}\.so(?:\.[A-Za-z0-9]{1,8}){0,4}',name):
+                    failures.append('needed_name');continue
+                for prefix in (LIB,'lib/x86_64-linux-gnu/'):
+                    alias=prefix+name;link=source.get(alias)
+                    if (isinstance(link,dict) and link.get('link')==target.rsplit('/',1)[-1] and
+                        alias.rsplit('/',1)[0]==target.rsplit('/',1)[0]):
+                        candidates.append(alias)
+        candidates=sorted(set(candidates))
+        if len(candidates)!=1:
+            failures.append('alias_ambiguous_or_missing');continue
+        alias=candidates[0];link=source[alias]
+        if (set(link)!={'link','origin_package','payload_sha256'} or
+            link['origin_package']!=row.get('origin_package') or
+            link['payload_sha256']!=row.get('payload_sha256')):
+            failures.append('alias_provenance');continue
+        path=stage/alias;resolved=stage/target
+        if (not path.is_symlink() or os.readlink(path)!=link['link'] or
+            not resolved.is_file() or resolved.is_symlink() or
+            resolved.stat().st_size!=record['size'] or
+            digest(resolved)!=record['sha256'] or
+            staged_opened.get(alias)!=record['sha256']):
+            failures.append('alias_staged_byte_drift');continue
+        pairs.append({'target':target,'observed_alias':alias,'sha256':record['sha256']})
+    return {'match':not failures and direct+len(pairs)==len(static_files),
+            'reason':'matched' if not failures and direct+len(pairs)==len(static_files) else
+                     sorted(set(failures))[0] if failures else 'unaccounted',
+            'direct':direct,'alias_pairs':pairs,
+            'limitation':'post-run pathname and byte reconciliation only; not open-time FD identity, ELF loading, later loads, or host isolation'}
+
+
 def checked_kvm_identity(*, uid, euid, egid, groups, device_gid, device_mode, kvm_gid):
     active=sorted(set(groups) | {egid})
     if (uid==0 or euid==0 or kvm_gid!=device_gid or kvm_gid not in active or
@@ -843,6 +900,8 @@ def main():
                 if not isinstance(expected,dict) or expected.get('sha256')!=measured or expected.get('size')!=target.stat().st_size:
                     result['reason']='opened_byte_drift'
         result['static_files_not_observed']=sorted(set(static['files'])-set(result['staged_opened']))
+        result['static_alias_shape_match']=static_alias_shape_match(
+            static['files'],src,stage,result['staged_opened'])
         if result['static_files_not_observed'] and result['reason']=='coverage_and_host_race_unproven':result['reason']='unseen_static_files'
         save()
         raise SystemExit(2)

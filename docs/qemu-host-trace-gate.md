@@ -101,3 +101,21 @@ A separate runner host shape screen compares each of the eight successful host p
 ## Clean exit evidence with `strace -qq` after collection #18
 
 Run #18 had a successful measured process exit and one serial marker, but the shape screen returned `clean_exit:false` solely because `strace -qq` suppressed the normal `+++ exited with 0 +++` line. The screen now takes the collector's actual child `wait()` status; it allows an absent terminal trace line only with status zero, while refusing any explicit contradictory exit/killed record or multiple exit records. This changes only the diagnostic shape screen, not `diagnostic()` acceptance, guest boot, host-file identity or `runtime_complete:false`. A matching shape still has `relative_names_unreviewed` and `host_identity_and_semantics_unproven` blockers.
+
+## Static SONAME alias screen after collection #19
+
+The static ELF manifest names 49 resolved file targets. In #19, six target
+paths appear directly among staged opens, while 43 resolved library targets
+are absent by exact pathname. Every one of those 43 has one SONAME alias
+referenced by the signed static ELF `DT_NEEDED` graph. That alias was staged
+as a same-package symlink to the resolved target and was observed in #19;
+the recorded post-run alias digest matched the snapshot target bytes. The
+`static_alias_shape_match` measurement repeats the graph, symlink, package
+provenance, staged bytes and digest checks in each diagnostic collection,
+refusing missing or ambiguous aliases, mismatched byte records or direct
+opens. It reports the six direct and 43 alias pairs without changing the
+`static_files_not_observed` list or the underlying trace parser. A match
+explains a name-accounting discrepancy, not open-time FD identity, proof of
+ELF loading, absence of late loads, or host-file semantics and isolation.
+`runtime_complete:false` and both relative-name and host-identity blockers
+remain. Runner `.18` evidence cannot stand in for server `.16` or TCG.
