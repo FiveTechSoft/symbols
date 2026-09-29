@@ -1,0 +1,98 @@
+name: Diagnostic QEMU hosted runtime collection
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit containing this workflow and collector
+        required: true
+        type: string
+      strace_sha256:
+        description: Pre-reviewed SHA-256 of host /usr/bin/strace for this runner image
+        required: true
+        type: string
+      runner_image:
+        description: Exact pre-reviewed hosted ImageVersion (no implicit latest)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Validate immutable dispatch
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          STRACE_SHA: ${{ inputs.strace_sha256 }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$STRACE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Verify checkout and offline gate tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_trace.py
+          python3 tests/test_qemu_collection.py
+          python3 tests/test_qemu_closure.py
+          python3 tests/test_minimal_initramfs.py
+      - name: Install diagnostic tracer and verify exact binary before boot
+        shell: bash
+        env:
+          STRACE_SHA: ${{ inputs.strace_sha256 }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends strace
+          printf '%s  /usr/bin/strace\n' "$STRACE_SHA" | sha256sum --check
+      - name: Reproduce snapshot rootfs in this job
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/builder_rootfs/build.py --out "$RUNNER_TEMP/rootfs"
+          python3 tools/qemu_closure/closure.py --tar "$RUNNER_TEMP/rootfs/rootfs.tar" --inventory "$RUNNER_TEMP/rootfs/inventory.json" --out "$RUNNER_TEMP/qemu-static.json"
+          test "$(sha256sum "$RUNNER_TEMP/qemu-static.json" | cut -d ' ' -f 1)" = '7659770a9649b3907a8715188e550e368d4c3ef889e4b467ff9c2bcba7329b57'
+      - name: Collect one fixed boot (diagnostic, fail-closed)
+        shell: bash
+        env:
+          STRACE_SHA: ${{ inputs.strace_sha256 }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+          timeout --signal=TERM --kill-after=5s 90s python3 tools/qemu_closure/collect.py \
+            --tar "$RUNNER_TEMP/rootfs/rootfs.tar" \
+            --inventory "$RUNNER_TEMP/rootfs/inventory.json" \
+            --stage "$RUNNER_TEMP/qemu-collection" \
+            --strace /usr/bin/strace \
+            --strace-sha256 "$STRACE_SHA" \
+            --runner-image "$EXPECTED_IMAGE"
+          # The collector never promotes runtime_complete. Unexpected ambient,
+          # unsupported lines, host races or coverage gaps are blockers.
+          python3 - "$RUNNER_TEMP/qemu-collection/report.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert r['runtime_complete'] is False and r['classification']=='blocked'
+          print('diagnostic_only:',r['reason'])
+          PY
+      - name: Publish bounded report, not raw guest output or trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runtime-diagnostic
+          path: ${{ runner.temp }}/qemu-collection/report.json
+          if-no-files-found: ignore
+          retention-days: 1
