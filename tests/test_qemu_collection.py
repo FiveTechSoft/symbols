@@ -17,15 +17,22 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(r['sonames'],['libfoo.so.1'])
         self.assertNotIn('secret',repr(r))
         self.assertEqual(bounded_failure(b'guest says secret.so.2')['sonames'],[])
+        self.assertEqual(bounded_failure(b'qemu: could not open kernel image /private/secret-kernel: No such file or directory')['categories'],
+                         ['exec_missing','qemu_kernel_open','qemu_file_open'])
+        self.assertEqual(bounded_failure(b'qemu: -initrd could not load initrd /private/guest')['categories'],
+                         ['qemu_initrd_load'])
+        self.assertNotIn('/private/',repr(bounded_failure(b'qemu: could not open /private/token')))
+
         self.assertEqual(bounded_failure(b'strace: exec: No such file or directory')['categories'],
                          ['exec_missing','strace_exec_failure'])
 
     def test_exec_probe_only_exact_loader_binary(self):
         lines=['execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                '[pid 12] execve("/stage/qemu", ["/stage/qemu"], 0x0) = -1 ENOENT (No such file or directory)',
+               '12345 execve("/stage/ld.so", ["/stage/ld.so"], 0x0) = 0',
                'execve("/some/other", [], 0x0) = 0','not an exec line']
         self.assertEqual(exec_probe(lines,'/stage/ld.so','/stage/qemu'),
-                         {'loader_success':1,'loader_failure':0,'qemu_success':0,'qemu_failure':1})
+                         {'loader_success':2,'loader_failure':0,'qemu_success':0,'qemu_failure':1})
 
     @unittest.skipUnless(os.name=='posix','bounded loader preflight uses Linux preexec_fn')
     def test_loader_preflight_is_nonboot_and_bounded(self):
@@ -94,5 +101,13 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(MARKER,b'SYMBOLS_BOOT_ONLY_SUPERVISOR_READY_v1\r\n')
         self.assertIn('/stage/usr/bin/qemu-system-x86_64',result['opened'])
         self.assertNotIn('/stage/usr/bin/qemu-system-x86_64',result['outside'])
+        numbered=diagnostic(['4123 execve("/stage/usr/bin/qemu-system-x86_64", ["qemu"], 0x0) = 0',
+                             '4123 openat(AT_FDCWD, "/stage/usr/lib/libfdt.so.1", O_RDONLY) = 3',
+                             '4123 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)',
+                             '4123 +++ exited with 0 +++'], '/stage')
+        self.assertEqual(numbered['unsupported_count'],0)
+        self.assertIn('/stage/usr/lib/libfdt.so.1',numbered['opened'])
+        self.assertIn('/etc/ld.so.preload',numbered['outside'])
+        self.assertEqual(diagnostic(['1234567890123 openat(AT_FDCWD, "/stage/x", O_RDONLY) = 3'],'/stage')['unsupported_count'],1)
 
 if __name__=='__main__':unittest.main()

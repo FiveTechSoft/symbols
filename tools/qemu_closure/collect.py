@@ -26,7 +26,8 @@ MAX_PREFLIGHT=8192
 SONAME=re.compile(rb'[A-Za-z0-9_+.-]{1,80}\.so(?:\.[0-9]{1,8}){0,4}')
 # This diagnostic treats every non-staged successful file operation as a blocker,
 # not as evidence for promoting a static closure.
-LINE=re.compile(r'^(?:\[pid +\d+\] )?([a-z][a-z0-9_]*)\((.*)\) += +(.+)$')
+PID_PREFIX=r'(?:[0-9]{1,12} |\[pid +[0-9]{1,12}\] )?'
+LINE=re.compile(r'^'+PID_PREFIX+r'([a-z][a-z0-9_]*)\((.*)\) += +(.+)$')
 QUOTED=re.compile(r'"(/[^"\\]*)"')
 FD=re.compile(r'^[0-9]+(?:<[^>]*>)?$')
 ERROR=re.compile(r'^-1 [A-Z][A-Z0-9_]+ ')
@@ -42,7 +43,7 @@ def digest(path):
 def diagnostic(lines, root):
     opened=set(); probes=set(); unsupported=[]; outside=set()
     for index,line in enumerate(lines,1):
-        if re.fullmatch(r'(?:\[pid +\d+\] )?\+\+\+ exited with [0-9]+ \+\+\+',line):
+        if re.fullmatch(PID_PREFIX+r'\+\+\+ exited with [0-9]+ \+\+\+',line):
             continue
         m=LINE.fullmatch(line)
         if not m:
@@ -79,6 +80,16 @@ def bounded_failure(data):
         ('exec_missing',b'no such file or directory'),
         ('strace_exec_failure',b'strace: exec:'),
         ('qemu_kvm_failure',b'failed to initialize kvm'),
+        ('qemu_kernel_open',b'could not open kernel image'),
+        ('qemu_kernel_load',b'could not load kernel'),
+        ('qemu_initrd_open',b'could not open initrd'),
+        ('qemu_initrd_load',b'could not load initrd'),
+        ('qemu_firmware_open',b'failed to load rom'),
+        ('qemu_machine_unsupported',b'unsupported machine type'),
+        ('qemu_kvm_device',b'could not access kvm kernel module'),
+        ('qemu_accel_unsupported',b'accelerator kvm not found'),
+        ('qemu_argument_invalid',b'invalid option'),
+        ('qemu_file_open',b'could not open'),
     ):
         if needle in lower:labels.append(label)
     # Only a loader-formatted missing-library line may supply a soname.
@@ -93,7 +104,7 @@ def exec_probe(lines, loader, binary):
     """Classify the exact launch exec transition without printing trace lines."""
     counts={'loader_success':0,'loader_failure':0,'qemu_success':0,'qemu_failure':0}
     for line in lines:
-        m=re.fullmatch(r'(?:\[pid +\d+\] )?execve\("([^"\\]+)".*\) += +(0|-1 [A-Z][A-Z0-9_]+ .*|\?)',line)
+        m=re.fullmatch(PID_PREFIX+r'execve\("([^"\\]+)".*\) += +(0|-1 [A-Z][A-Z0-9_]+ .*|\?)',line)
         if m and m.group(1) in (str(loader),str(binary)):
             key=('loader' if m.group(1)==str(loader) else 'qemu')+('_success' if m.group(2)=='0' else '_failure')
             counts[key]+=1
