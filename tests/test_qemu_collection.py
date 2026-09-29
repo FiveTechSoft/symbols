@@ -20,7 +20,7 @@ class CollectionTests(unittest.TestCase):
                            'openat(AT_FDCWD, "/stage/usr/share/qemu/kvmvapic.bin", O_RDONLY) = 4',
                            'newfstatat(AT_FDCWD, "/etc/nsswitch.conf", 0, 0) = 0',
                            '+++ exited with 0 +++',
-                           'strace: Process 99 attached'],Path('/stage'))
+                           'strace: Process 99 attached'],'/stage')
         self.assertIn('/etc/ld.so.cache',result['outside'])
         self.assertIn('/etc/nsswitch.conf',result['outside'])
         self.assertEqual(result['unsupported_count'],1)
