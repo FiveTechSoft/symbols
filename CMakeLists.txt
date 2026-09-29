@@ -296,6 +296,9 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME test_typed_c_schema
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_schema.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_test(NAME test_qemu_trace
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_qemu_trace.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_test(NAME test_qemu_closure
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_qemu_closure.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
