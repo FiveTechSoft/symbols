@@ -1,0 +1,7 @@
+#!/bin/busybox sh
+# Fixed boot-only image. No target source, toolchain, disk or network.
+set -eu
+/bin/busybox mount -t devtmpfs devtmpfs /dev
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+exec /bin/busybox sh /supervisor

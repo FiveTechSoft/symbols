@@ -1,0 +1,26 @@
+{
+  "schema": "symbols.minimal-initramfs.v1",
+  "source_snapshot": "20260927T000000Z",
+  "busybox": {
+    "source_package": "busybox-static",
+    "deb_sha256": "944b2728f53ceb3916cec2c962873c9951e612408099601751db2a0a5d81e0ed",
+    "source_path": "usr/bin/busybox",
+    "size": 2124608,
+    "sha256": "dbac288c29ba568459550a2da9e7ae0ded6b1fc728ee9fad3044c44e62d6ac14"
+  },
+  "files": [
+    {"path": "bin", "kind": "dir", "mode": 493},
+    {"path": "bin/busybox", "kind": "file", "mode": 493, "source": "busybox"},
+    {"path": "dev", "kind": "dir", "mode": 493},
+    {"path": "init", "kind": "file", "mode": 493, "source": "init", "size": 252, "sha256": "04eee4673e8bca88748bdab1853651dd7dda1de0cc0c8eba15eda0face2b13f4"},
+    {"path": "proc", "kind": "dir", "mode": 493},
+    {"path": "run", "kind": "dir", "mode": 493},
+    {"path": "supervisor", "kind": "file", "mode": 420, "source": "supervisor", "size": 214, "sha256": "fb572e6ab60c3ee8f98565bab8650cb03153b1b35ad3206e86e2c93bc39ce082"},
+    {"path": "sys", "kind": "dir", "mode": 493},
+    {"path": "tmp", "kind": "dir", "mode": 1023}
+  ],
+  "archive_format": "newc-070701",
+  "archive_uid": 0,
+  "archive_gid": 0,
+  "archive_mtime": 0
+}

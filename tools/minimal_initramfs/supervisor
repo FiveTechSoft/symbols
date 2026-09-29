@@ -1,0 +1,6 @@
+#!/bin/busybox sh
+# One boot marker, emitted only by this fixed supervisor. No target workload.
+set -eu
+printf 'SYMBOLS_BOOT_ONLY_SUPERVISOR_READY_v1\n' > /dev/ttyS0
+/bin/busybox sync
+exec /bin/busybox poweroff -f
