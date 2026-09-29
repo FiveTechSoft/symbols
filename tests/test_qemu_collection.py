@@ -311,6 +311,75 @@ class CollectionTests(unittest.TestCase):
         variant=policy_shape_measurement(['12  openat(AT_FDCWD, "./secret", O_PATH) = 4'],[1])
         self.assertEqual(variant['entries'][0]['kind'],'other')
 
+    def test_exact_shape_screen_fail_closed_and_no_names(self):
+        from collect import trace_shape_match,ambient_shape_match
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        host=[
+          '13  access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)',
+          '13  newfstatat(AT_FDCWD, "/etc/libnl/classid", 0, 0) = -1 ENOENT (No such file or directory)',
+          '13  openat(AT_FDCWD, "/etc/libnl/classid", O_RDONLY) = -1 ENOENT (No such file or directory)',
+          '13  statfs("/sys/fs/selinux", {}) = -1 ENOENT (No such file or directory)',
+          '13  statfs("/selinux", {}) = -1 ENOENT (No such file or directory)',
+          '13  openat(AT_FDCWD, "/proc/filesystems", O_RDONLY) = 3',
+          '13  access("/etc/selinux/config", R_OK) = -1 ENOENT (No such file or directory)',
+          '13  openat(AT_FDCWD, "/proc/self/status", O_RDONLY) = 3',
+          '13  openat(AT_FDCWD, "/sys/devices/system/node", O_RDONLY) = 3',
+          '13  openat(AT_FDCWD, "/sys/devices/system/cpu/possible", O_RDONLY) = 3',
+          '13  openat(AT_FDCWD, "/proc/self/status", O_RDONLY) = 3',
+          '13  newfstatat(AT_FDCWD, "/sys/bus/nd/devices", 0, 0) = 0',
+          '13  newfstatat(AT_FDCWD, "/sys/bus/nd/devices", 0, 0) = 0',
+          '13  openat(AT_FDCWD, "/sys/bus/nd/devices", O_RDONLY) = 3',
+          '13  newfstatat(AT_FDCWD, "/etc/gnutls/config", 0, 0) = 0',
+          '13  openat(AT_FDCWD, "/etc/gnutls/config", O_RDONLY) = 3',
+          '13  readlink("/proc/self/exe", "hidden", 40) = 12',
+          '13  openat(AT_FDCWD, "/dev/sgx_vepc", O_RDONLY) = -1 ENOENT (No such file or directory)',
+          '13  openat(AT_FDCWD, "/dev/kvm", O_RDWR) = 3',
+          '13  openat(AT_FDCWD, "/dev/urandom", O_RDONLY) = 3']
+        sig='13  --- SIGUSR1 {si_signo=SIGUSR1, si_code=SI_USER, si_pid=13, si_uid=1001} ---'
+        extra=['13  openat(AT_FDCWD, ".", O_RDONLY) = 3',
+               '13  access("private-plugin-name", R_OK) = -1 ENOENT (No such file or directory)',
+               '13  access("name-two", R_OK) = -1 ENOENT (No such file or directory)',
+               '13  access("name-three", R_OK) = -1 ENOENT (No such file or directory)']+[sig]*10
+        lines=host+extra+['13  +++ exited with 0 +++']
+        obs={'unsupported_line_numbers':list(range(len(host)+1,len(host)+15)),
+             'unsupported_count':14}
+        with TemporaryDirectory() as td:
+            stage=Path(td)
+            a=ambient_shape_match(lines,stage,obs['unsupported_line_numbers'])
+            t=trace_shape_match(lines,obs,stage,True)
+            self.assertTrue(a['match'],a)
+            self.assertTrue(t['match'],t)
+            self.assertEqual(t['directory_events'],1)
+            self.assertIn('relative_names_unreviewed',t['blockers'])
+            self.assertNotIn('private-plugin-name',repr(t))
+            def drift(index,old,new,which='trace'):
+                changed=lines.copy();changed[index]=changed[index].replace(old,new)
+                self.assertFalse((trace_shape_match(changed,obs,stage,True) if which=='trace' else
+                                  ambient_shape_match(changed,stage,obs['unsupported_line_numbers']))['match'],(index,new))
+            dot=len(host)
+            drift(dot,'O_RDONLY','O_PATH')
+            drift(dot,'"."','"./secret"')
+            drift(dot,'= 3','= -1 ENOENT (No such file or directory)')
+            drift(dot+1,'R_OK','F_OK')
+            drift(dot+1,'private-plugin-name','../secret')
+            drift(dot+1,'ENOENT','EACCES')
+            drift(dot+1,'private-plugin-name','secret/next')
+            drift(dot+4,'SIGUSR1','SIGTERM')
+            drift(dot+4,'si_uid=1001','si_uid=1001, evil=secret')
+            drift(dot+4,'si_code=SI_USER','si_code=EVIL')
+            drift(dot+4,'si_pid=13','si_pid=-1')
+            drift(dot+4,'si_uid=1001','si_uid=999999999999')
+            self.assertFalse(ambient_shape_match(lines,stage,obs['unsupported_line_numbers'],
+                                                  ['/dev/kvm','/etc/extra'])['match'])
+            drift(0,'ENOENT','EACCES','ambient')
+            drift(18,'= 3','= -1 ENOENT (No such file or directory)','ambient')
+            drift(17,'/dev/sgx_vepc','/dev/newdevice','ambient')
+            short=lines[:-2]+['13  +++ exited with 1 +++']
+            self.assertFalse(trace_shape_match(short,obs,stage,True)['match'])
+            self.assertFalse(trace_shape_match(lines,obs,stage,False)['match'])
+            self.assertFalse(trace_shape_match(lines,{**obs,'unsupported_count':15},stage,True)['match'])
+
     def test_resource_is_linux_only_main_path(self):
         source=(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'/'collect.py').read_text()
         tree=ast.parse(source)

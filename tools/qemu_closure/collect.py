@@ -274,6 +274,134 @@ def policy_shape_measurement(lines, unsupported_indices, unsupported_count=None)
             'limitation':'shape_measurement_only_no_arbitrary_path_or_signal_payload'}
 
 
+# Shape screen only: this does not certify file identity, contents, isolation,
+# relative probe names or a complete static closure. Counts are fixed to #17.
+RUNNER_HOST_SHAPE={
+    '/dev/kvm':(('openat','fd'),),
+    '/dev/urandom':(('openat','fd'),),
+    '/etc/gnutls/config':(('newfstatat','nonnegative'),('openat','fd')),
+    '/proc/filesystems':(('openat','fd'),),
+    '/proc/self/status':(('openat','fd'),('openat','fd')),
+    '/sys/bus/nd/devices':(('newfstatat','nonnegative'),('newfstatat','nonnegative'),('openat','fd')),
+    '/sys/devices/system/cpu/possible':(('openat','fd'),),
+    '/sys/devices/system/node':(('openat','fd'),),
+    '/dev/sgx_vepc':(('openat','ENOENT'),),
+    '/etc/ld.so.preload':(('access','ENOENT'),),
+    '/etc/libnl/classid':(('newfstatat','ENOENT'),('openat','ENOENT')),
+    '/etc/selinux/config':(('access','ENOENT'),),
+    '/proc/self/exe':(('readlink','nonnegative'),),
+    '/selinux':(('statfs','ENOENT'),),
+    '/sys/fs/selinux':(('statfs','ENOENT'),),
+}
+HOST_DIRFD_CALLS=frozenset(('openat','newfstatat'))
+HOST_FIRST_PATH_CALLS=frozenset(('access','statfs','readlink'))
+HOST_TOKEN=re.compile(r'^"(/[^"\\]{1,4096})"(?=,|$)')
+HOST_NEGATIVE=re.compile(r'^-1 ENOENT \(No such file or directory\)$')
+
+
+def ambient_shape_match(lines, stage, unsupported_indices=(), observed_outside=None):
+    """Per-call/result screen. Unknown host path or malformed line is drift."""
+    seen={name:[] for name in RUNNER_HOST_SHAPE}
+    unknown=[]
+    unsupported=set(unsupported_indices)
+    for n,line in enumerate(lines,1):
+        if n in unsupported:continue  # The separate trace-shape screen owns these lines.
+        m=LINE.fullmatch(line)
+        if not m:continue  # Other-line coverage is a separate blocker.
+        call,args,status=m.groups()
+        if call in HOST_DIRFD_CALLS:
+            first,sep,rest=args.partition(', ')
+            if not sep or first!='AT_FDCWD':
+                # A descriptor path operation cannot be credited to this gate.
+                unknown.append(n);continue
+            operand=rest
+        elif call in HOST_FIRST_PATH_CALLS:operand=args
+        else:
+            if call not in ('execve','open','openat2'):
+                unknown.append(n)
+            continue  # Exec/staged opens are separately checked; unknown call blocks.
+        token=HOST_TOKEN.match(operand)
+        if not token:
+            # Unknown pathname operands cannot be considered accepted coverage.
+            unknown.append(n);continue
+        name=token.group(1)
+        if name.startswith(str(stage)+'/'):continue
+        if name=='.' and call=='openat':continue  # Owned by the dot screen.
+        if name not in RUNNER_HOST_SHAPE:
+            unknown.append(n);continue
+        outcome=('ENOENT' if HOST_NEGATIVE.fullmatch(status) else
+                 'fd' if call=='openat' and FD.fullmatch(status) else
+                 'nonnegative' if call in ('newfstatat','readlink','statfs','access') and
+                                  re.fullmatch(r'[0-9]+',status) else 'other')
+        seen[name].append((call,outcome))
+    drift=sorted(name for name,expected in RUNNER_HOST_SHAPE.items()
+                 if sorted(seen[name])!=sorted(expected))
+    outside_set_match=(observed_outside is None or
+                       set(observed_outside)==set(RUNNER_HOST_SHAPE))
+    return {'match':not drift and not unknown and outside_set_match,'drift_paths':drift,
+            'unaccounted_count':len(unknown),
+            'unaccounted_lines':[x for x in unknown[:100] if isinstance(x,int)],
+            'outside_set_match':outside_set_match,
+            'identity_and_semantics_verified':False,
+            'limitation':'path_call_result_shape_only_not_dependency_acceptance'}
+
+
+# Only an entire, bounded siginfo record can match. Never publish values.
+SIGNAL_SHAPE=re.compile(
+    r'^--- (SIG[A-Z0-9]+) \{si_signo=(SIG[A-Z0-9]+), si_code=([A-Z_]+), '
+    r'si_pid=([0-9]{1,10}), si_uid=([0-9]{1,10})\} ---$')
+SIGNAL_CODES=frozenset(('SI_USER','SI_TKILL','SI_QUEUE'))
+DOT_FLAGS_FINGERPRINT='d3be21c00eac6af3696207e9b04fbccf41de1f31a5421be681ae6b4db3f43659'
+ACCESS_PATTERN=re.compile(r'^"([^"\\/]{1,64})", R_OK$')
+DOT_PATTERN=re.compile(r'^AT_FDCWD, "\.", O_RDONLY$')
+
+
+def trace_shape_match(lines, observed, stage, serial_marker_once):
+    """Separate positive shape screen. diagnostic() remains unchanged/blocked."""
+    indices=observed['unsupported_line_numbers']
+    cwd_changed=any(re.match(r'^'+PID_PREFIX+r'(?:chdir|fchdir)\(',line) for line in lines)
+    stage_dir=False
+    if not cwd_changed:
+        fd=os.open(stage,os.O_PATH|os.O_DIRECTORY|os.O_CLOEXEC)
+        try:stage_dir=stat.S_ISDIR(os.fstat(fd).st_mode)
+        finally:os.close(fd)
+    counts={'dot':0,'relative_access_ENOENT':0,'SIGUSR1':0}
+    bad=[]
+    for n in indices[:100]:
+        if not isinstance(n,int) or n<1 or n>len(lines):bad.append(n);continue
+        line=lines[n-1];m=LINE.fullmatch(line)
+        if m:
+            call,args,status=m.groups()
+            if call=='openat' and DOT_PATTERN.fullmatch(args) and FD.fullmatch(status) and stage_dir:
+                counts['dot']+=1;continue
+            if (call=='access' and ACCESS_PATTERN.fullmatch(args) and
+                    HOST_NEGATIVE.fullmatch(status)):
+                # Name stays private and is never hashed into a public report.
+                counts['relative_access_ENOENT']+=1;continue
+        else:
+            stripped=re.sub(r'^'+PID_PREFIX,'',line)
+            sig=SIGNAL_SHAPE.fullmatch(stripped)
+            if (sig and sig.group(1)==sig.group(2)=='SIGUSR1' and
+                    sig.group(3) in SIGNAL_CODES and
+                    0<int(sig.group(4))<=4294967295 and
+                    0<=int(sig.group(5))<=4294967295):
+                counts['SIGUSR1']+=1;continue
+        bad.append(n)
+    clean_exit=sum(bool(re.fullmatch(PID_PREFIX+r'\+\+\+ exited with 0 \+\+\+',x)) for x in lines)==1
+    expected={'dot':1,'relative_access_ENOENT':3,'SIGUSR1':10}
+    complete=(len(indices)==observed['unsupported_count'] and
+              len(indices)==14 and all(isinstance(n,int) for n in indices))
+    return {'match':complete and counts==expected and not bad and
+            not cwd_changed and stage_dir and clean_exit and serial_marker_once,
+            'counts':counts,'mismatch_lines':bad[:100],
+            'all_unsupported_represented':complete,'cwd_changed':cwd_changed,
+            'stage_cwd_directory':stage_dir,'clean_exit':clean_exit,
+            'dot_flag_fingerprint':DOT_FLAGS_FINGERPRINT if counts['dot']==1 else None,
+            'directory_events':counts['dot'],
+            'blockers':['relative_names_unreviewed','host_identity_and_semantics_unproven'],
+            'limitation':'form_only_not_dependency_acceptance'}
+
+
 def relative_path_components(name):
     parts=name.split('/')
     flags={'leading_dot_slash':name.startswith('./'),
@@ -685,6 +813,9 @@ def main():
         elif observed['outside']:result['reason']='ambient_files'
         elif observed['unsupported_count']:result['reason']='unsupported_trace'
         else:result['reason']='coverage_and_host_race_unproven'
+        result['trace_shape_match']=trace_shape_match(trace,observed,stage,result['serial_marker_once'])
+        result['ambient_shape_match']=ambient_shape_match(
+            trace,stage,observed['unsupported_line_numbers'],observed['outside'])
         # Stage comparison shows candidate files, not a race-free immutable host pin.
         result['staged_opened']={}
         for path in observed['opened']:
