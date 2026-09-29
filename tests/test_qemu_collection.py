@@ -2,10 +2,18 @@
 from pathlib import Path
 import sys
 import unittest
+import ast
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'))
 from collect import diagnostic,MARKER
 
 class CollectionTests(unittest.TestCase):
+    def test_resource_is_linux_only_main_path(self):
+        source=(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'/'collect.py').read_text()
+        tree=ast.parse(source)
+        top_imports=[n for n in tree.body if isinstance(n,(ast.Import,ast.ImportFrom))]
+        self.assertNotIn('resource',[a.name for n in top_imports for a in getattr(n,'names',[])])
+        self.assertIn('import resource  # Linux-only',source)
+
     def test_ambient_and_unknown_are_visible(self):
         result=diagnostic(['execve("/stage/usr/bin/qemu-system-x86_64", ["qemu"], 0x0) = 0',
                            'openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY) = 3',

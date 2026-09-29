@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-import resource
 import signal
 import subprocess
 import tarfile
@@ -143,7 +142,9 @@ def main():
         result['kernel_sha256']=digest(kernel);result['initramfs_sha256']=digest(initrd);result['qemu_sha256']=digest(qemu)
         # Strace version is diagnostic metadata, not an implicit version pin.
         result['strace_version']=subprocess.run([str(args.strace),'-V'],capture_output=True,text=True,timeout=5,check=True).stdout.splitlines()[0][:120]
-        def limits():resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_TRACE,MAX_TRACE))
+        def limits():
+            import resource  # Linux-only; pure diagnostic() remains importable on Windows.
+            resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_TRACE,MAX_TRACE))
         command=[str(args.strace),'-f','-qq','-s','65535','-e','trace=%file,execve','-o',str(stage/'trace.txt'),'--',*argv]
         started=time.monotonic()
         with (stage/'serial.bin').open('wb') as stdout,(stage/'stderr.bin').open('wb') as stderr:
