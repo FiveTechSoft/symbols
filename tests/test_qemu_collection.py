@@ -349,7 +349,7 @@ class CollectionTests(unittest.TestCase):
         with TemporaryDirectory() as td:
             stage=Path(td)
             a=ambient_shape_match(lines,stage,obs['unsupported_line_numbers'])
-            t=trace_shape_match(lines,obs,stage,True)
+            t=trace_shape_match(lines,obs,stage,True,0)
             self.assertTrue(a['match'],a)
             self.assertTrue(t['match'],t)
             self.assertEqual(t['directory_events'],1)
@@ -357,7 +357,7 @@ class CollectionTests(unittest.TestCase):
             self.assertNotIn('private-plugin-name',repr(t))
             def drift(index,old,new,which='trace'):
                 changed=lines.copy();changed[index]=changed[index].replace(old,new)
-                self.assertFalse((trace_shape_match(changed,obs,stage,True) if which=='trace' else
+                self.assertFalse((trace_shape_match(changed,obs,stage,True,0) if which=='trace' else
                                   ambient_shape_match(changed,stage,obs['unsupported_line_numbers']))['match'],(index,new))
             dot=len(host)
             drift(dot,'O_RDONLY','O_PATH')
@@ -378,9 +378,14 @@ class CollectionTests(unittest.TestCase):
             drift(18,'= 3','= -1 ENOENT (No such file or directory)','ambient')
             drift(17,'/dev/sgx_vepc','/dev/newdevice','ambient')
             short=lines[:-2]+['13  +++ exited with 1 +++']
-            self.assertFalse(trace_shape_match(short,obs,stage,True)['match'])
-            self.assertFalse(trace_shape_match(lines,obs,stage,False)['match'])
-            self.assertFalse(trace_shape_match(lines,{**obs,'unsupported_count':15},stage,True)['match'])
+            self.assertFalse(trace_shape_match(short,obs,stage,True,0)['match'])
+            self.assertFalse(trace_shape_match(lines,obs,stage,False,0)['match'])
+            self.assertFalse(trace_shape_match(lines,obs,stage,True,1)['match'])
+            no_exit=lines[:-1]
+            self.assertTrue(trace_shape_match(no_exit,obs,stage,True,0)['match'])
+            killed=no_exit+['13  +++ killed by SIGKILL +++']
+            self.assertFalse(trace_shape_match(killed,obs,stage,True,0)['match'])
+            self.assertFalse(trace_shape_match(lines,{**obs,'unsupported_count':15},stage,True,0)['match'])
 
     def test_resource_is_linux_only_main_path(self):
         source=(Path(__file__).resolve().parents[1]/'tools'/'qemu_closure'/'collect.py').read_text()

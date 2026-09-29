@@ -356,7 +356,7 @@ ACCESS_PATTERN=re.compile(r'^"([^"\\/]{1,64})", R_OK$')
 DOT_PATTERN=re.compile(r'^AT_FDCWD, "\.", O_RDONLY$')
 
 
-def trace_shape_match(lines, observed, stage, serial_marker_once):
+def trace_shape_match(lines, observed, stage, serial_marker_once, process_exit_status):
     """Separate positive shape screen. diagnostic() remains unchanged/blocked."""
     indices=observed['unsupported_line_numbers']
     cwd_changed=any(re.match(r'^'+PID_PREFIX+r'(?:chdir|fchdir)\(',line) for line in lines)
@@ -387,7 +387,13 @@ def trace_shape_match(lines, observed, stage, serial_marker_once):
                     0<=int(sig.group(5))<=4294967295):
                 counts['SIGUSR1']+=1;continue
         bad.append(n)
-    clean_exit=sum(bool(re.fullmatch(PID_PREFIX+r'\+\+\+ exited with 0 \+\+\+',x)) for x in lines)==1
+    # strace -qq suppresses normal exit lines. The observed wait status is
+    # authoritative for the traced process, but any contradictory exit or
+    # killed record still fails the shape screen.
+    exit_lines=[re.sub(r'^'+PID_PREFIX,'',x) for x in lines
+                if re.match(r'^'+PID_PREFIX+r'(?:\+\+\+ exited with |\+\+\+ killed by )',x)]
+    clean_exit=(process_exit_status==0 and len(exit_lines)<=1 and
+                all(x=='+++ exited with 0 +++' for x in exit_lines))
     expected={'dot':1,'relative_access_ENOENT':3,'SIGUSR1':10}
     complete=(len(indices)==observed['unsupported_count'] and
               len(indices)==14 and all(isinstance(n,int) for n in indices))
@@ -813,7 +819,8 @@ def main():
         elif observed['outside']:result['reason']='ambient_files'
         elif observed['unsupported_count']:result['reason']='unsupported_trace'
         else:result['reason']='coverage_and_host_race_unproven'
-        result['trace_shape_match']=trace_shape_match(trace,observed,stage,result['serial_marker_once'])
+        result['trace_shape_match']=trace_shape_match(
+            trace,observed,stage,result['serial_marker_once'],ret)
         result['ambient_shape_match']=ambient_shape_match(
             trace,stage,observed['unsupported_line_numbers'],observed['outside'])
         # Stage comparison shows candidate files, not a race-free immutable host pin.
