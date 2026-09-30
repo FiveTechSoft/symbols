@@ -1,5 +1,10 @@
 # Runner B namespace diagnostic, no boot
 
+> Historical namespace contract. The runner direction is superseded by
+> [the disposable-VM contract](qemu-runner-vm-contract.md). This diagnostic
+> remains no-boot and does not accredit that revised boundary. Server `.16`
+> remains paused.
+
 This manual, non-root, no-boot diagnostic localizes the `namespace_setup`
 refusal from runner B #1. It runs only on `ubuntu-24.04` with exact reviewed
 master SHA and ImageVersion; both are checked before checkout and again by the
@@ -35,8 +40,9 @@ This external job boundary does not synthesize restricted `/proc`, `/sys`,
 job context; QEMU's own security model calls for least privilege and host
 confinement: https://www.qemu.org/docs/master/system/security.html .
 The VM boundary could be a separate accepted risk posture for a disposable,
-secret-free job, but is not the currently specified runner B namespace
-criterion or server `.16` goal. Any switch must be an explicit revision with
-independent host-FD/content, egress, process, resource and cleanup tests.
+secret-free job, but did not meet the original runner B namespace
+criterion or the separate server `.16` goal. The runner-only revision now lives
+in `qemu-runner-vm-contract.md`; it requires independent host-FD/content,
+egress, process, resource and cleanup tests before any workload.
 Do not disable global AppArmor/userns restrictions, use sudo for QEMU, or
 call a successful diagnostic an isolation proof.

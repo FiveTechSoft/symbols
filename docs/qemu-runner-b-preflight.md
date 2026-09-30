@@ -1,5 +1,10 @@
 # Hosted-runner B namespace capability preflight, no QEMU boot
 
+> Historical namespace contract. The runner direction is superseded by
+> [the disposable-VM contract](qemu-runner-vm-contract.md). This diagnostic
+> remains no-boot and does not accredit that revised boundary. Server `.16`
+> remains paused.
+
 This manual no-boot diagnostic uses the existing `ubuntu-24.04` hosted runner.
 It does **not** touch Antonio's shared server `.16`, install QEMU, start a
 microVM, compile candidate C, read credentials, or enable the v2 probe.

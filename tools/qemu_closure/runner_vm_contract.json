@@ -1,0 +1,25 @@
+{
+  "schema": "symbols.runner-vm-contract.v1",
+  "boundary": "github_hosted_disposable_vm",
+  "runner_label": "ubuntu-24.04",
+  "payload_secrets": "none",
+  "workflow_permissions": "none",
+  "persist_credentials": false,
+  "qemu_privilege": "nonroot",
+  "mode": "unselected",
+  "server_16": "paused",
+  "in_job_guest_escape_defense": false,
+  "synthetic_qemu_fs_views": false,
+  "provider_lifecycle": "provider_assertion_not_local_measurement",
+  "required_gates": [
+    "runner_identity",
+    "payload_credentials",
+    "host_content",
+    "host_fds",
+    "egress",
+    "resources",
+    "process_cleanup",
+    "workspace_cleanup",
+    "provider_lifecycle"
+  ]
+}
