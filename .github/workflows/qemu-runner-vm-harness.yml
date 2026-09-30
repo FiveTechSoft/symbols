@@ -1,0 +1,90 @@
+name: Diagnostic disposable runner VM confined helper capabilities (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit of this workflow and script
+        required: true
+        type: string
+      runner_image:
+        description: Exact freshly measured Ubuntu 24.04 ImageVersion
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate identity before checkout
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          # Closed refusal tokens only; never print the value that failed.
+          refuse() { printf '%s\n' "$1"; exit 2; }
+          [[ "${TARGET_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || refuse target_sha_format
+          [[ "${EXPECTED_IMAGE:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image_format
+          test "${GITHUB_REF:-}" = refs/heads/master || refuse workflow_ref
+          test "${GITHUB_SHA:-}" = "$TARGET_SHA" || refuse workflow_sha
+          test "${RUNNER_ENVIRONMENT:-}" = github-hosted || refuse runner_environment
+          test "${RUNNER_OS:-}" = Linux || refuse runner_os
+          test "${RUNNER_ARCH:-}" = X64 || refuse runner_arch
+          test "${ImageVersion:-}" = "$EXPECTED_IMAGE" || refuse runner_image
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Verify checkout and run offline tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_runner_vm_contract.py
+          python3 tests/test_qemu_runner_vm_harness.py
+      - name: Compile reviewed trusted helper, never workload
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cc -std=c11 -O2 -Wall -Wextra -Werror tools/qemu_closure/runner_vm_harness.c -o "$RUNNER_TEMP/symbols-vm-harness"
+      - name: Observe trusted confined helper only, always blocked
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(id -u)" -ne 0
+          # Supervisor owns a direct trusted child; outer 20s exceeds inner 3s + reap 2s.
+          set +e
+          timeout --signal=TERM --kill-after=5s 20s python3 tools/qemu_closure/runner_vm_harness.py \
+            "$TARGET_SHA" "$EXPECTED_IMAGE" > "$RUNNER_TEMP/qemu-runner-vm-harness.json"
+          status=$?
+          set -e
+          if [ "$status" -ne 2 ]; then
+            rm -f "$RUNNER_TEMP/qemu-runner-vm-harness.json"
+            exit 2
+          fi
+          # Keep the blocked exit code. A red run is an observation, never approval.
+          exit 2
+      - name: Remove only fixed compiled trusted helper
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/symbols-vm-harness"
+      - name: Upload fixed observer report, never host contents
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-harness
+          path: ${{ runner.temp }}/qemu-runner-vm-harness.json
+          if-no-files-found: ignore
+          retention-days: 1
