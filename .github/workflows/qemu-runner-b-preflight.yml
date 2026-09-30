@@ -1,0 +1,70 @@
+name: Diagnostic hosted runner B namespace preflight (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit of this workflow and script
+        required: true
+        type: string
+      runner_image:
+        description: Exact reviewed Ubuntu 24.04 ImageVersion
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Validate workflow identity before installation
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_SHA" = "$TARGET_SHA"
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Verify byte identity and offline policy tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_runner_b_preflight.py
+      - name: Measure non-root namespace capability, never isolation
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+          timeout --signal=TERM --kill-after=5s 35s python3 tools/qemu_closure/runner_b_preflight.py \
+            --expected-target-sha "$TARGET_SHA" --expected-runner-image "$EXPECTED_IMAGE" \
+            | tee "$RUNNER_TEMP/qemu-runner-b-preflight.json"
+          python3 - "$RUNNER_TEMP/qemu-runner-b-preflight.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert r['runtime_complete'] is False and r['isolation_accredited'] is False
+          assert r['classification']=='measured_only'
+          PY
+      - name: Upload bounded report (no guest output)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-b-preflight
+          path: ${{ runner.temp }}/qemu-runner-b-preflight.json
+          if-no-files-found: ignore
+          retention-days: 1
