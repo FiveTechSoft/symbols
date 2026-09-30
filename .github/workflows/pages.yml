@@ -52,7 +52,7 @@ jobs:
             src/tokenizer.c src/parser.c src/stem.c src/i18n.c src/text_lex.c \
             src/ingest.c src/chat.c src/chat_clarify.c src/dialog.c src/context.c \
             src/nlg.c src/deep_nlg.c src/stochastic_nlg.c src/passage_nlg.c src/generator.c \
-            src/vsa.c src/ccg_realizer.c src/commonsense.c src/persona.c src/episodic_memory.c \
+            src/vsa.c src/ccg_realizer.c src/commonsense.c src/persona.c src/episodic_memory.c src/atomic_store.c \
             src/embedding.c src/dict.c src/qa_layer.c src/export.c src/numeric.c \
             src/prune.c src/stats.c src/server_proto.c src/tool_config.c src/tool_executor.c \
             docs/symbolic_wasm.c \
