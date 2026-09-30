@@ -1,0 +1,64 @@
+name: Diagnostic hosted runner B namespace failure localization (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit of this workflow and script
+        required: true
+        type: string
+      runner_image:
+        description: Exact reviewed Ubuntu 24.04 ImageVersion
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Validate identity before checkout
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_SHA" = "$TARGET_SHA"
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Run offline parser tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_runner_b_namespace_diag.py
+      - name: Diagnose namespace failure phases without boot
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -uo pipefail
+          test "$(id -u)" -ne 0 || exit 2
+          timeout --signal=TERM --kill-after=5s 180s python3 tools/qemu_closure/runner_b_namespace_diag.py \
+            "$TARGET_SHA" "$EXPECTED_IMAGE" | tee "$RUNNER_TEMP/qemu-runner-b-namespace-diag.json"
+          status=${PIPESTATUS[0]}
+          exit "$status"
+      - name: Upload bounded report (no guest output)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-b-namespace-diag
+          path: ${{ runner.temp }}/qemu-runner-b-namespace-diag.json
+          if-no-files-found: ignore
+          retention-days: 1
