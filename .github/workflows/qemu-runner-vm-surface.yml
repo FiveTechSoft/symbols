@@ -1,0 +1,80 @@
+name: Diagnostic disposable runner VM metadata surfaces (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit of this workflow and script
+        required: true
+        type: string
+      runner_image:
+        description: Exact freshly measured Ubuntu 24.04 ImageVersion
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate identity before checkout
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_IMAGE" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]]
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_SHA" = "$TARGET_SHA"
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          test "$RUNNER_ARCH" = X64
+          test "$ImageVersion" = "$EXPECTED_IMAGE"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Verify checkout and run offline tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_runner_vm_contract.py
+          python3 tests/test_qemu_runner_vm_surface.py
+      - name: Observe bounded metadata only, always blocked
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+          # Only the boolean expression reaches the script, never the token value.
+          SYMBOLS_AUTOMATIC_TOKEN_PRESENT: ${{ github.token != '' }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(id -u)" -ne 0
+          # No subprocesses or mounts in the observer; timeout does not orphan a child.
+          set +e
+          timeout --signal=TERM --kill-after=5s 20s python3 tools/qemu_closure/runner_vm_surface.py \
+            "$TARGET_SHA" "$EXPECTED_IMAGE" > "$RUNNER_TEMP/qemu-runner-vm-surface.json"
+          status=$?
+          set -e
+          if [ "$status" -ne 2 ]; then
+            rm -f "$RUNNER_TEMP/qemu-runner-vm-surface.json"
+            exit 2
+          fi
+          # Keep the blocked exit code. A red run is an observation, never approval.
+          exit 2
+      - name: Upload fixed observer report, never host contents
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-surface
+          path: ${{ runner.temp }}/qemu-runner-vm-surface.json
+          if-no-files-found: ignore
+          retention-days: 1
