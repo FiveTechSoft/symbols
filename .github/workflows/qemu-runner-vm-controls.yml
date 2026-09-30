@@ -26,14 +26,16 @@ jobs:
           EXPECTED_IMAGE: ${{ inputs.runner_image }}
         run: |
           set -euo pipefail
-          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$EXPECTED_IMAGE" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]]
-          test "$GITHUB_REF" = refs/heads/master
-          test "$GITHUB_SHA" = "$TARGET_SHA"
-          test "$RUNNER_ENVIRONMENT" = github-hosted
-          test "$RUNNER_OS" = Linux
-          test "$RUNNER_ARCH" = X64
-          test "$ImageVersion" = "$EXPECTED_IMAGE"
+          # Closed refusal tokens only; never print the value that failed.
+          refuse() { printf '%s\n' "$1"; exit 2; }
+          [[ "${TARGET_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || refuse target_sha_format
+          [[ "${EXPECTED_IMAGE:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image_format
+          test "${GITHUB_REF:-}" = refs/heads/master || refuse workflow_ref
+          test "${GITHUB_SHA:-}" = "$TARGET_SHA" || refuse workflow_sha
+          test "${RUNNER_ENVIRONMENT:-}" = github-hosted || refuse runner_environment
+          test "${RUNNER_OS:-}" = Linux || refuse runner_os
+          test "${RUNNER_ARCH:-}" = X64 || refuse runner_arch
+          test "${ImageVersion:-}" = "$EXPECTED_IMAGE" || refuse runner_image
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_sha }}
