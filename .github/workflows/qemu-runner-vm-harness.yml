@@ -26,8 +26,14 @@ jobs:
           EXPECTED_IMAGE: ${{ inputs.runner_image }}
         run: |
           set -euo pipefail
-          # Closed refusal tokens only; never print the value that failed.
-          refuse() { printf '%s\n' "$1"; exit 2; }
+          # Fixed token file only: no values, environment or context dumps.
+          umask 077
+          printf '%s\n' guard_incomplete > "$RUNNER_TEMP/qemu-runner-vm-harness-guard.txt"
+          refuse() {
+            printf '%s\n' "$1" > "$RUNNER_TEMP/qemu-runner-vm-harness-guard.txt"
+            printf '%s\n' "$1"
+            exit 2
+          }
           [[ "${TARGET_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || refuse target_sha_format
           [[ "${EXPECTED_IMAGE:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image_format
           test "${GITHUB_REF:-}" = refs/heads/master || refuse workflow_ref
@@ -36,6 +42,7 @@ jobs:
           test "${RUNNER_OS:-}" = Linux || refuse runner_os
           test "${RUNNER_ARCH:-}" = X64 || refuse runner_arch
           test "${ImageVersion:-}" = "$EXPECTED_IMAGE" || refuse runner_image
+          printf '%s\n' guard_passed > "$RUNNER_TEMP/qemu-runner-vm-harness-guard.txt"
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_sha }}
@@ -87,4 +94,12 @@ jobs:
           name: qemu-runner-vm-harness
           path: ${{ runner.temp }}/qemu-runner-vm-harness.json
           if-no-files-found: ignore
+          retention-days: 1
+      - name: Upload fixed guard token, never rejected values
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-harness-guard
+          path: ${{ runner.temp }}/qemu-runner-vm-harness-guard.txt
+          if-no-files-found: error
           retention-days: 1
