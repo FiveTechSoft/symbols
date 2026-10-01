@@ -7,8 +7,8 @@ on:
         description: Exact reviewed commit of this workflow and script
         required: true
         type: string
-      runner_image:
-        description: Exact freshly measured Ubuntu 24.04 ImageVersion
+      runner_images:
+        description: Canonical comma-separated set of 1-3 freshly measured ImageVersions
         required: true
         type: string
 
@@ -23,19 +23,31 @@ jobs:
         shell: bash
         env:
           TARGET_SHA: ${{ inputs.target_sha }}
-          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+          MEASURED_IMAGES: ${{ inputs.runner_images }}
         run: |
           set -euo pipefail
           # Closed refusal tokens only; never print the value that failed.
           refuse() { printf '%s\n' "$1"; exit 2; }
           [[ "${TARGET_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || refuse target_sha_format
-          [[ "${EXPECTED_IMAGE:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image_format
+          # Strict canonical set: 1-3 distinct tokens, no whitespace or wildcard.
+          [[ "${MEASURED_IMAGES:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+(,[0-9]{8}\.[0-9]+\.[0-9]+){0,2}$ ]] || refuse runner_image_format
+          test "${#MEASURED_IMAGES}" -le 128 || refuse runner_image_format
+          IFS=, read -r -a images <<< "$MEASURED_IMAGES"
+          for ((i=0;i<${#images[@]};i++)); do
+            for ((j=0;j<i;j++)); do
+              test "${images[i]}" != "${images[j]}" || refuse runner_image_format
+            done
+          done
           test "${GITHUB_REF:-}" = refs/heads/master || refuse workflow_ref
           test "${GITHUB_SHA:-}" = "$TARGET_SHA" || refuse workflow_sha
           test "${RUNNER_ENVIRONMENT:-}" = github-hosted || refuse runner_environment
           test "${RUNNER_OS:-}" = Linux || refuse runner_os
           test "${RUNNER_ARCH:-}" = X64 || refuse runner_arch
-          test "${ImageVersion:-}" = "$EXPECTED_IMAGE" || refuse runner_image
+          [[ "${ImageVersion:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image
+          case ",$MEASURED_IMAGES," in
+            *",$ImageVersion,"*) ;;
+            *) refuse runner_image ;;
+          esac
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_sha }}
@@ -53,11 +65,20 @@ jobs:
         shell: bash
         env:
           TARGET_SHA: ${{ inputs.target_sha }}
-          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+          MEASURED_IMAGES: ${{ inputs.runner_images }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test "$(id -u)" -ne 0
+          # Revalidate membership here; keep the Python scalar identity check exact.
+          [[ "${MEASURED_IMAGES:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+(,[0-9]{8}\.[0-9]+\.[0-9]+){0,2}$ ]] || exit 2
+          test "${#MEASURED_IMAGES}" -le 128 || exit 2
+          [[ "${ImageVersion:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || exit 2
+          case ",$MEASURED_IMAGES," in
+            *",$ImageVersion,"*) ;;
+            *) exit 2 ;;
+          esac
+          EXPECTED_IMAGE="$ImageVersion"
           # No subprocesses or mounts in the observer; timeout does not orphan a child.
           set +e
           timeout --signal=TERM --kill-after=5s 20s python3 tools/qemu_closure/runner_vm_controls.py \
