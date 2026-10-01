@@ -1,0 +1,157 @@
+name: Shell stress repeat (Windows)
+
+# Phase 0, Windows side: repeating the shell concurrency and timeout set
+# produces no hang, orphan or nondeterministic status.
+#
+# What this measures: the existing test_agent_shell.exe (MSVC Release), run N
+# times from the source root, exactly as CTest runs it. Per iteration:
+#   - exit status of the binary (a run over 180 s is killed and counts as a hang)
+#   - the "TEST RESULTS: P passed, F failed" line it prints
+#   - powershell.exe and ping.exe processes beyond the baseline taken before the
+#     loop (the timeout tests start sleepers of those kinds)
+#   - agent_shell_* files left in the source root afterwards
+# Pass: every iteration exits 0, F is 0, P is identical in all iterations, no
+# process beyond baseline, no leftover file, and the baseline is clean.
+# Fail: any iteration breaks one of those. Failures do not stop the loop, so
+# the report shows how many failed.
+#
+# Cost: one iteration took about 44 s in CI (PowerShell startup and the
+# timeout tests). 100 iterations is roughly 75 minutes of Windows runner time,
+# so run a small count first and choose the full count from the measured
+# per-iteration time.
+#
+# What it does not claim: Linux, ASan and macOS are not covered. It repeats
+# one test binary; it is not a load test and it adds no new assertions. cmd.exe
+# is not counted because the runner's own shells make a baseline noisy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA to test (empty means the dispatched ref)
+        required: false
+        type: string
+      iterations:
+        description: Repetitions, 1 to 200 (about 44 s each)
+        required: false
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  stress-windows:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
+      - name: Build test_agent_shell (MSVC Release)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --target test_agent_shell -j4
+      - name: Repeat and measure
+        shell: pwsh
+        env:
+          ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          if ($env:ITERATIONS -notmatch '^[0-9]+$') { Write-Host 'iterations must be a number'; exit 2 }
+          $n = [int]$env:ITERATIONS
+          if ($n -lt 1 -or $n -gt 200) { Write-Host 'iterations out of range'; exit 2 }
+          $exe = Join-Path (Get-Location) 'build\Release\test_agent_shell.exe'
+          if (-not (Test-Path $exe)) { Write-Host "missing $exe"; exit 2 }
+          Write-Host "commit: $(git rev-parse HEAD)"
+          Write-Host "runner: $([System.Environment]::OSVersion.VersionString) $([System.Environment]::ProcessorCount) cpu"
+
+          function Get-Sleepers {
+            @(Get-Process -Name powershell, ping -ErrorAction SilentlyContinue).Count
+          }
+          function Get-Leftovers {
+            @(Get-ChildItem -Path . -Filter 'agent_shell_*' -Force -ErrorAction SilentlyContinue).Count
+          }
+          function Wait-Settled($baseline) {
+            # Job Object termination is asynchronous; allow up to 5 s to settle.
+            for ($k = 0; $k -lt 50; $k++) {
+              if ((Get-Sleepers) -le $baseline) { break }
+              Start-Sleep -Milliseconds 100
+            }
+          }
+
+          $baseSleep = Get-Sleepers
+          $baseFiles = Get-Leftovers
+          Write-Host "baseline sleepers=$baseSleep files=$baseFiles"
+          $fails = 0
+          if ($baseFiles -ne 0) { Write-Host 'dirty baseline: leftover files'; $fails++ }
+          $rows = @('iter,exit,passed,failed,ms,sleepers_above_baseline,files')
+          $times = @()
+          $passedSet = @{}
+          $firstPassed = $null
+
+          for ($i = 1; $i -le $n; $i++) {
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $p = Start-Process -FilePath $exe -WorkingDirectory (Get-Location).Path `
+                   -NoNewWindow -PassThru `
+                   -RedirectStandardOutput 'stress-out.txt' -RedirectStandardError 'stress-err.txt'
+            $null = $p.Handle
+            $done = $p.WaitForExit(180000)
+            if (-not $done) {
+              & taskkill /PID $p.Id /T /F | Out-Null
+              $p.WaitForExit(10000) | Out-Null
+            }
+            $sw.Stop()
+            $rc = if ($done) { $p.ExitCode } else { 'TIMEOUT' }
+            $out = ''
+            if (Test-Path 'stress-out.txt') { $out = Get-Content -Raw 'stress-out.txt' }
+            $m = [regex]::Match($out, 'TEST RESULTS: (\d+) passed, (\d+) failed')
+            if ($m.Success) { $pp = $m.Groups[1].Value; $ff = $m.Groups[2].Value } else { $pp = 'NA'; $ff = 'NA' }
+            Wait-Settled $baseSleep
+            $above = (Get-Sleepers) - $baseSleep
+            $fl = Get-Leftovers
+            $ms = [int]$sw.ElapsedMilliseconds
+            $times += $ms
+            $rows += "$i,$rc,$pp,$ff,$ms,$above,$fl"
+            $passedSet[$pp] = $true
+            $bad = ''
+            if ("$rc" -ne '0') { $bad += " exit=$rc" }
+            if ($ff -ne '0') { $bad += " failed=$ff" }
+            if ($null -eq $firstPassed) { $firstPassed = $pp }
+            if ($pp -ne $firstPassed) { $bad += " passed=$pp(first=$firstPassed)" }
+            if ($above -gt 0) { $bad += " sleepers_above_baseline=$above" }
+            if ($fl -ne 0) { $bad += " files=$fl" }
+            if ($bad -ne '') {
+              $fails++
+              Write-Host "iteration $i FAIL:$bad"
+              ($out -split "`n" | Select-Object -Last 40) -join "`n" | Write-Host
+              if (Test-Path 'stress-err.txt') { Get-Content 'stress-err.txt' -Tail 20 | Write-Host }
+              Get-Process -Name powershell, ping -ErrorAction SilentlyContinue |
+                Select-Object -Skip $baseSleep | Stop-Process -Force -ErrorAction SilentlyContinue
+              Get-ChildItem -Path . -Filter 'agent_shell_*' -Force -ErrorAction SilentlyContinue |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          $rows | Set-Content -Encoding ascii stress.csv
+          $sorted = $times | Sort-Object
+          $min = $sorted[0]; $max = $sorted[-1]
+          $med = $sorted[[int][math]::Floor(($sorted.Count - 1) / 2)]
+          $distinct = ($passedSet.Keys | Sort-Object) -join ' '
+          $summary = @(
+            '### Shell stress repeat (Windows)',
+            "- commit: $(git rev-parse HEAD)",
+            "- iterations run: $($times.Count) of $n",
+            "- failing iterations or baseline failures: $fails",
+            "- distinct passed-assertion counts: $distinct",
+            "- iteration ms: min $min, median $med, max $max",
+            '- scope: Windows MSVC Release only, one test binary repeated; Linux and ASan not covered'
+          )
+          $summary | ForEach-Object { Write-Host $_; Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $_ }
+          if ($fails -ne 0) { exit 1 }
+      - name: Upload per-iteration table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-stress-windows
+          path: stress.csv
