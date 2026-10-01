@@ -26,11 +26,17 @@ jobs:
           MEASURED_IMAGES: ${{ inputs.runner_images }}
         run: |
           set -euo pipefail
-          # Fixed token file only: no values, environment or context dumps.
+          # Closed token only, except a bounded public ImageVersion on image refusal.
           umask 077
           printf '%s\n' guard_incomplete > "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
           refuse() {
             printf '%s\n' "$1" > "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
+            # Never disclose malformed data or other rejected fields.
+            if [ "$1" = runner_image ] &&
+               [[ "${ImageVersion:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] &&
+               [ "${#ImageVersion}" -le 64 ]; then
+              printf '%s\n' "$ImageVersion" >> "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
+            fi
             printf '%s\n' "$1"
             exit 2
           }
