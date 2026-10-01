@@ -2,6 +2,62 @@
 
 This roadmap turns the current native C11 engine into a dependable engineering agent through measured capability gates. It is ordered by dependency, not by calendar date. A phase exits only when its evidence is reproducible in CI on the final commit.
 
+## Where we are
+
+Snapshot: master at `3ab774506024ded0a9cf097b304565489d79d218`. This section is the entry point for anyone (Antonio, Mimo, OpenCode) who needs to know where the project stands and where it goes next. The phase sections below remain the detailed contract. Sizes are S, M, L and dependencies are stated; there are no dates.
+
+How to read status words: **landed** means code or docs are on `master` with the cited evidence. **Exit not declared** means a phase has landed pieces but nobody has recorded that every one of its exit criteria below holds on a final SHA. A phase closes only when all of its own exit criteria are shown on the final commit. Absence of a recorded check is reported here as "not shown", never as "met".
+
+### The core, and the core-first rule
+
+The core is the deterministic verifier and its engineering operators: bounded shell execution, structured filesystem and Git, build/test understanding, and the verified repair loop (perceive, test, correct, consolidate verified experience, abstain). It follows the operating principles above, in particular principle 8 (memory + verification) and the domain orientation (shell, git and C first). The rule is: **the core comes before any new front.** A new front is only opened when it unblocks a core milestone or Antonio decides it.
+
+### Milestones
+
+| # | Milestone (phase) | Status | Evidence on `master` | Closes when | Remaining size and dependencies |
+|---|---|---|---|---|---|
+| M0 | Safe shell execution (Phase 0) | Foundation landed, exit not declared | Commit `ba90e1d4ba648e844c3e975ad8e870df38877c89` (70/70 `test_agent_shell`, bounded capture, process-tree timeout); command safety policy with 82 labeled commands and fuzzing, see [docs/core_triage.md](docs/core_triage.md); Windows flake hardening is source-based only, see [docs/windows-test-flakes.md](docs/windows-test-flakes.md) | All Phase 0 exit criteria hold on one final SHA, including the 100x stress repeat and the Linux/MSVC/ASan matrix | S. No dependency. The Windows flake fix is unproven until a later Windows run shows it |
+| M1 | Structured filesystem (Phase 1) | Largely landed, exit not declared | `fs_*` modules and tests on `master`: read-only manifest and journal planning, POSIX create/replace/move/copy/remove with recovery, adversarial path and race tests, Windows NTFS handle-relative create with a process-crash journal (for example `0458caa`) | All Phase 1 exit criteria hold, including path fuzzing with no out-of-workspace write and unified-diff behavior reimplemented on the filesystem API (neither is shown as met here) | M. Depends on M0. Power-loss durability stays explicitly deferred |
+| M2 | Safe Git (Phase 2) | Partial, exit not declared | `git_ops` and `agent_git` modules with tests; the guarded apply-patch workflow gives a reproducible delivery boundary | All Phase 2 exit criteria hold; in particular apply-patch must use the Git contracts rather than open-coded assumptions (not shown as met) | M. Depends on M1 |
+| M3 | Build and test intelligence (Phase 3) | Partial | `build_ops` repair rules verified by a real out-of-tree build; bank `build_ci` went 0/7 to 7/7 but those task texts were read before the rules were written, so that is development evidence | CMake File API and CTest metadata ingestion, affected-test selection with 100% recall and full-suite fallback, versioned benchmark runner (none of these found in the repository) | L. Depends on M2 |
+| M4 | Clang AST and `compile_commands.json` (Phase 4) | Design closed, phase open | [docs/ast-design-spike.md](docs/ast-design-spike.md), [docs/ast-inspect.md](docs/ast-inspect.md): opt-in read-only libclang inspector, native Windows Ninja evidence; no edit authority | Phase 4 exit criteria; first consumer proposed is read-only impact reporting next to `CodeGraphComputeBlastRadius` | L. Depends on M3 metadata |
+| M5 | Persistent workflows (Phase 5) | Not started | No dedicated deliverable on `master` | Phase 5 exit criteria | L. Depends on M2 and M3 |
+| M6 | Verified episodic memory (Phase 6) | Slice landed, phase open | Atomic fact store at `1c9dd550241b8cd0aaebac118d8bdaa04bde6615`; opt-in shadow episode audit and offline replay gate ([docs/engineering-episodes.md](docs/engineering-episodes.md), [docs/episode-replay.md](docs/episode-replay.md)); the solver does not read the episode store | Phase 6 exit criteria (verified-only write, forgetting, invalidation, measured benefit) | L. Depends on M3 and a trustworthy verifier |
+| M7 | Verified Reflexion-style loop (Phase 7) | Minimal slice landed, phase open | Commit `06cc3ba`: analogue tasks 0/3 reflection-off versus 2/3 on; Mimo's counts-only blind rerun on `27a3b21` found no gain in solved tasks (2/24, zero wrong edits); see [COORDINATION.md](COORDINATION.md) | Phase 7 exit criteria, not the slice | L. Depends on M6 |
+
+### What is measured and what it says
+
+- The engineering bank (59 tasks, 9 categories) was last recorded at 49/59 for both the CLI and OpenCode, with 0 wrong edits and the bank self-test at 59/59 (COORDINATION.md, September 25 entries). CTest was 113/113 locally in the same entries. The bank is partly development-visible.
+- Mimo's blind batch, counts only, was 2/24 on `27a3b21` with zero wrong edits. The gap between the visible bank and the blind batch is the honest headline: **the verifier never makes a wrong edit, but its recall on unseen tasks is low.** Closing that gap, without weakening abstention, is the main core problem.
+- The metrics block in `README.md` is a snapshot from commit `d6a0aad` (September 24). It is older than the numbers above. Read the status log in COORDINATION.md for newer counts until the block is regenerated.
+- Final-SHA CI exists: the apply workflow calls `ci.yml` for the exact commit it pushes (see "Closed: final-SHA CI gap"). Pages and bank workflows are separate and do not always run on a given SHA, so one SHA's green apply-plus-CI does not imply them.
+
+### Landed side lines
+
+- **Typed C contract line.** A strict, read-only data contract and static previews: [v1](docs/typed-c-contract-v1.md), [v2 Slice A verify without target execution](docs/typed-c-contract-v2-slice-a.md), [binary-safe preview](docs/typed-c-binary-preview-v1.md), and a CLI-only abstain-and-ask pilot ([docs/abstain-and-ask.md](docs/abstain-and-ask.md)). Free-form stdout parsing was rejected after independent gates, see [docs/c-stdout-contract-boundary.md](docs/c-stdout-contract-boundary.md). The conservative `shell_contract` guard stays held. **Target-code execution is not enabled:** an eligible v2 candidate still returns `probe_unavailable`.
+
+### Parked: the QEMU and containment line
+
+- **Why it exists.** Running a candidate's compiled program is the one step that needs a real isolation boundary ([docs/typed-c-slice-b-isolation-design.md](docs/typed-c-slice-b-isolation-design.md)). The line studied a disposable hosted runner VM as that boundary ([docs/qemu-runner-vm-contract.md](docs/qemu-runner-vm-contract.md), evidence in [docs/qemu-runner-vm-evidence-ledger.md](docs/qemu-runner-vm-evidence-ledger.md)).
+- **Where it stops.** Documented up to `3ab774506024ded0a9cf097b304565489d79d218` ([docs/qemu-runner-vm-benign-scope-setup-design.md](docs/qemu-runner-vm-benign-scope-setup-design.md)). Everything on this line is no-boot metadata observation or documentation. All nine isolation gates are `not_proven`. No isolation, resource-limit or cleanup claim is made, and no candidate code has been run under it.
+- **Why it is parked.** Its next step needs a verified, dedicated cgroup parent grant that does not exist, and the choice below is a product decision, not an engineering one.
+- **Open fork, Antonio's decision, no urgency** (details in the design doc): A) GitHub-hosted runner under the current no-privilege rules, where a private cgroup path stays blocked without verified delegation; B) self-hosted hardware under Antonio's house rules, with persistent runner, network, storage and secret risk; C) the nine gates without a private cgroup, with the narrower claims that allows.
+- **Unparking** happens only on Antonio's choice of A, B or C. Until then no work on this line is scheduled, and nothing on the core waits for it.
+
+### What is missing for core v1
+
+Proposed definition of v1, for Antonio to accept or change: **Phases 0 to 3 meet their exit criteria on a final SHA, the Phase 0-1 and Phase 2-3 columns of the measurable targets table hold, harmful edits stay at 0, and the blind batch shows a measured gain over its current 2/24.** Phases 4 to 7 and the Oracle vision stay beyond v1 except for the slices already landed.
+
+In dependency order, with sizes:
+
+1. Declare M0 and M1: run and record the remaining exit checks (stress repeat, path fuzzing, diff on the filesystem API). S to M. No dependency.
+2. M2: move apply-patch onto the Git contracts and close the remote-advance, stale-HEAD and interrupted-retry fixtures. M. After step 1.
+3. M3: CMake File API and CTest ingestion, then conservative affected-test selection with full-suite fallback. L. After step 2.
+4. Generalization of the repair operators on unseen tasks, without hand-tuning on the blind or held-out sets and without any wrong edit. L. Runs alongside steps 2 and 3, scored by Mimo's counts-only batch.
+5. Regenerate the README metrics block so one source states current numbers. S.
+
+Not on this list on purpose: new fronts, new languages, QEMU or any execution-isolation work, and the Oracle.
+
 ## Operating principles
 
 This roadmap does not encode one behavior per situation. It builds mechanisms: **perceive** the repository and its context, **test** candidate changes against the world, **correct** without hiding failure, **consolidate** only verified experience, and **abstain** when evidence is insufficient. Each phase below strengthens specific mechanisms; each gate exists to prove them.
@@ -381,3 +437,7 @@ Final-SHA CI is in place (see "Closed: final-SHA CI gap"). The current work, in 
 2. **AST design spike - writeup complete, Phase 4 open.** [Design-spike comparison and first-consumer recommendation](docs/ast-design-spike.md) records the optional libclang pilot, native Windows Ninja evidence, tree-sitter's unmeasured status and the two rejected semantic vetoes. The first proposed consumer is read-only impact reporting adjacent to `CodeGraphComputeBlastRadius`; no edit path or phase status changes.
 
 The phase gates above are unchanged: no phase exits before its dependencies and exit criteria are met, and new work does not weaken the shell invariants.
+
+### Update: core-first reset
+
+The QEMU and containment line is parked (see "Where we are"). The proposed next gate, pending Antonio's acceptance of the v1 definition, is the first item under "What is missing for core v1", then the rest in that order. The two items above stay as history and are not reopened by this update.
