@@ -1,0 +1,116 @@
+name: Shell stress repeat (Linux)
+
+# Phase 0 exit criterion: repeating the shell concurrency and timeout set
+# produces no hang, orphan or nondeterministic status.
+#
+# What this measures: the existing test_agent_shell binary, run N times
+# (default 100) from the source root, exactly as CTest runs it. Per iteration:
+#   - exit status of the binary (a hang is cut off at 120 s and counts as fail)
+#   - the "TEST RESULTS: P passed, F failed" line it prints
+#   - live non-zombie processes left from its "sleep 30" children afterwards
+#   - agent_shell_* files left in the source root afterwards
+# Pass: every iteration exits 0, F is 0, P is identical in all iterations, no
+# leftover process, no leftover file, and the baseline before the loop is clean.
+# Fail: any iteration breaks one of those. Failures do not stop the loop, so
+# the report shows how many failed.
+#
+# What it does not claim: Windows, ASan and macOS are not covered. It repeats
+# one test binary; it is not a load test and it adds no new assertions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit SHA to test (empty means the dispatched ref)
+        required: false
+        type: string
+      iterations:
+        description: Repetitions, 1 to 200
+        required: false
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  stress-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.sha }}
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+      - name: Build test_agent_shell
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target test_agent_shell -j4
+      - name: Repeat and measure
+        shell: bash
+        env:
+          ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          set -uo pipefail
+          case "$ITERATIONS" in ''|*[!0-9]*) echo "iterations must be a number"; exit 2;; esac
+          if [ "$ITERATIONS" -lt 1 ] || [ "$ITERATIONS" -gt 200 ]; then echo "iterations out of range"; exit 2; fi
+          echo "commit: $(git rev-parse HEAD)"
+          echo "runner: $(uname -sr) $(nproc) cpu"
+          live_sleepers() {
+            ps -eo stat=,args= | awk '$1 !~ /^Z/ && $2 == "sleep" && $3 == "30" {n++} END {print n+0}'
+          }
+          leftovers() { find . -maxdepth 1 -name 'agent_shell_*' | wc -l; }
+          base_sleep=$(live_sleepers); base_files=$(leftovers)
+          echo "baseline sleepers=$base_sleep files=$base_files"
+          fails=0
+          [ "$base_sleep" -eq 0 ] && [ "$base_files" -eq 0 ] || { echo "dirty baseline"; fails=$((fails+1)); }
+          echo "iter,exit,passed,failed,ms,sleepers,files" > stress.csv
+          first_passed=""
+          for i in $(seq 1 "$ITERATIONS"); do
+            s=$(date +%s%N)
+            out=$(timeout 120 build/test_agent_shell 2>&1); rc=$?
+            e=$(date +%s%N); ms=$(( (e - s) / 1000000 ))
+            line=$(printf '%s\n' "$out" | grep -E 'TEST RESULTS: [0-9]+ passed, [0-9]+ failed' | tail -1)
+            p=$(printf '%s' "$line" | sed -E 's/.*RESULTS: ([0-9]+) passed.*/\1/')
+            f=$(printf '%s' "$line" | sed -E 's/.*passed, ([0-9]+) failed.*/\1/')
+            [ -n "$line" ] || { p=NA; f=NA; }
+            sl=$(live_sleepers); fl=$(leftovers)
+            echo "$i,$rc,$p,$f,$ms,$sl,$fl" >> stress.csv
+            bad=""
+            [ "$rc" -eq 0 ] || bad="$bad exit=$rc"
+            [ "$f" = "0" ] || bad="$bad failed=$f"
+            if [ -z "$first_passed" ]; then first_passed="$p"; fi
+            [ "$p" = "$first_passed" ] || bad="$bad passed=$p(first=$first_passed)"
+            [ "$sl" -eq 0 ] || bad="$bad sleepers=$sl"
+            [ "$fl" -eq 0 ] || bad="$bad files=$fl"
+            if [ -n "$bad" ]; then
+              fails=$((fails+1)); echo "iteration $i FAIL:$bad"
+              printf '%s\n' "$out" | tail -40
+              pkill -x sleep 2>/dev/null || true
+              rm -f agent_shell_* 2>/dev/null || true
+            fi
+          done
+          total=$(( $(wc -l < stress.csv) - 1 ))
+          med=$(tail -n +2 stress.csv | cut -d, -f5 | sort -n | awk '{a[NR]=$1} END {print a[int((NR+1)/2)]}')
+          min=$(tail -n +2 stress.csv | cut -d, -f5 | sort -n | head -1)
+          max=$(tail -n +2 stress.csv | cut -d, -f5 | sort -n | tail -1)
+          distinct=$(tail -n +2 stress.csv | cut -d, -f3 | sort -u | tr '\n' ' ')
+          {
+            echo "### Shell stress repeat (Linux)"
+            echo "- commit: $(git rev-parse HEAD)"
+            echo "- iterations run: $total of $ITERATIONS"
+            echo "- failing iterations or baseline failures: $fails"
+            echo "- distinct passed-assertion counts: $distinct"
+            echo "- iteration ms: min $min, median $med, max $max"
+            echo "- scope: Linux only, one test binary repeated; Windows and ASan not covered"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$fails" -eq 0 ] || exit 1
+      - name: Upload per-iteration table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-stress-linux
+          path: stress.csv
