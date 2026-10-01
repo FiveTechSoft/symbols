@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/resource.h>
+#else
+#include <windows.h>
 #endif
 #include "agent_shell.h"
 #include "agent_diagnose.h"
@@ -641,6 +643,115 @@ static void test_timeout_terminates_grandchild(void)
 }
 #endif
 
+#ifdef _WIN32
+/* Windows ports of POSIX Tests 9-11. Test 8 (spawn failure) has no
+   reasonable Windows equivalent: handle/pipe exhaustion and a missing
+   cmd.exe cannot be forced reliably. Writers here are interleaved from one
+   PowerShell loop, not truly concurrent: real concurrency (Parallel.Invoke,
+   start /b) would be racy against the drain. */
+static long shell_test_read_pid_win(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    long pid = -1;
+    if (f)
+    {
+        if (fscanf(f, "%ld", &pid) != 1) pid = -1;
+        fclose(f);
+    }
+    return pid;
+}
+
+/* 1 when the process is gone (cannot be opened, or exits within 5 s). */
+static int shell_test_process_gone_win(long pid)
+{
+    HANDLE h;
+    DWORD w;
+    if (pid <= 0) return 0;
+    h = OpenProcess(SYNCHRONIZE, FALSE, (DWORD)pid);
+    if (!h) return GetLastError() == ERROR_INVALID_PARAMETER;
+    w = WaitForSingleObject(h, 5000);
+    CloseHandle(h);
+    return w == WAIT_OBJECT_0;
+}
+
+static void test_interleaved_dual_stream_output_win(void)
+{
+    SHELL_EXEC_RESULT res;
+    int ok;
+    size_t i;
+    int pure_out = 1, pure_err = 1;
+    const char *cmd =
+        "powershell.exe -NoProfile -Command \"1..25 | ForEach-Object { [Console]::Out.Write('O'*4000); [Console]::Error.Write('E'*4000) }\"";
+
+    printf("\n=== Test 9: Interleaved 100 KB Writers on Both Streams (Windows) ===\n");
+    ok = AgentShellExec(cmd, ".", 60000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out && !res.execution_failed,
+                "Interleaved dual-stream output completes without deadlock or false timeout");
+    TEST_ASSERT(res.stdout_total_len == 100000 && res.stderr_total_len == 100000,
+                "Interleaved output reports exact totals on both streams");
+    TEST_ASSERT(res.stdout_truncated && res.stderr_truncated &&
+                res.stdout_len == SHELL_BUFFER_MAX - 1 && res.stderr_len == SHELL_BUFFER_MAX - 1,
+                "Interleaved output fills both bounded buffers and flags truncation");
+    for (i = 0; i < res.stdout_len; i++) if (res.stdout_buf[i] != 'O') { pure_out = 0; break; }
+    for (i = 0; i < res.stderr_len; i++) if (res.stderr_buf[i] != 'E') { pure_err = 0; break; }
+    TEST_ASSERT(pure_out && pure_err, "Interleaved output stays separated by stream");
+}
+
+static void test_truncation_with_failure_and_timeout_win(void)
+{
+    SHELL_EXEC_RESULT res;
+    int ok;
+
+    printf("\n=== Test 10: Truncation Combined With Failure and Timeout (Windows) ===\n");
+    ok = AgentShellExec(
+        "powershell.exe -NoProfile -Command \"[Console]::Out.Write('O'*100000); [Console]::Error.Write('E'*100000); exit 3\"",
+        ".", 60000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 3 && !res.timed_out && !res.execution_failed,
+                "Truncated output with failing command keeps its own exit status");
+    TEST_ASSERT(res.stdout_truncated && res.stderr_truncated &&
+                res.stdout_total_len == 100000 && res.stderr_total_len == 100000,
+                "Truncation flags and totals survive a non-zero exit");
+
+    /* Generous deadline: PowerShell startup must finish writing first. */
+    ok = AgentShellExec(
+        "powershell.exe -NoProfile -Command \"[Console]::Out.Write('O'*100000); Start-Sleep -Seconds 60\"",
+        ".", 20000, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124 && !res.execution_failed,
+                "Timeout after large output reports timed_out and 124");
+    TEST_ASSERT(res.stdout_truncated && res.stdout_total_len == 100000,
+                "Truncation is still reported when the command later times out");
+}
+
+static void test_timeout_terminates_grandchild_win(void)
+{
+    SHELL_EXEC_RESULT res;
+    const char *child_file = "agent_shell_child_win.pid";
+    const char *grand_file = "agent_shell_grandchild_win.pid";
+    long child_pid, grand_pid;
+    int ok;
+
+    printf("\n=== Test 11: Timeout Terminates Grandchild (Windows) ===\n");
+    remove(child_file);
+    remove(grand_file);
+    ok = AgentShellExec(
+        "powershell.exe -NoProfile -Command \"$c = Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 60' -PassThru -WindowStyle Hidden; "
+        "Set-Content -Encoding ascii -Path agent_shell_child_win.pid -Value $PID; "
+        "Set-Content -Encoding ascii -Path agent_shell_grandchild_win.pid -Value $c.Id; "
+        "Start-Sleep -Seconds 60\"",
+        ".", 20000, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124,
+                "Nested process tree timeout is reported");
+    child_pid = shell_test_read_pid_win(child_file);
+    grand_pid = shell_test_read_pid_win(grand_file);
+    TEST_ASSERT(child_pid > 0 && grand_pid > 0 && child_pid != grand_pid,
+                "Child and grandchild PIDs were recorded before timeout");
+    TEST_ASSERT(shell_test_process_gone_win(child_pid), "Child does not survive timeout");
+    TEST_ASSERT(shell_test_process_gone_win(grand_pid), "Grandchild does not survive timeout");
+    remove(child_file);
+    remove(grand_file);
+}
+#endif
+
 int main(void)
 {
     /* Preserve the exact last completed assertion in CTest failure output. */
@@ -664,6 +775,10 @@ int main(void)
     test_concurrent_dual_stream_output();
     test_truncation_with_failure_and_timeout();
     test_timeout_terminates_grandchild();
+#else
+    test_interleaved_dual_stream_output_win();
+    test_truncation_with_failure_and_timeout_win();
+    test_timeout_terminates_grandchild_win();
 #endif
 
     printf("\n======================================================================\n");
