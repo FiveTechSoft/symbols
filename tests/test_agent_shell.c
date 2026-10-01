@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/resource.h>
 #endif
 #include "agent_shell.h"
 #include "agent_diagnose.h"
@@ -444,6 +446,201 @@ static void test_timeout_terminates_process_tree(void)
 #endif
 }
 
+#ifndef _WIN32
+/* True once pid is gone or a zombie. A changed Linux start time is PID reuse,
+   not a surviving copy of this process. Bounded wait of about 490 ms. */
+static int shell_test_process_gone(long pid)
+{
+    int tries;
+    unsigned long long first_start = 0;
+    if (pid <= 0) return 0;
+    for (tries = 0; tries < 50; tries++)
+    {
+#if defined(__linux__)
+        char path[64], line[512];
+        FILE *proc;
+        snprintf(path, sizeof(path), "/proc/%ld/stat", pid);
+        proc = fopen(path, "rb");
+        if (!proc && errno == ENOENT) return 1;
+        if (proc)
+        {
+            if (fgets(line, sizeof(line), proc))
+            {
+                char *after = strrchr(line, ')');
+                if (after && after[1] == ' ')
+                {
+                    char *field = after + 2;
+                    char state = *field;
+                    unsigned long long start;
+                    int n;
+                    field += 2;
+                    for (n = 4; n < 22 && field && *field; n++)
+                    {
+                        field = strchr(field, ' ');
+                        if (field) field++;
+                    }
+                    start = field && *field ? strtoull(field, NULL, 10) : 0;
+                    if (!first_start && start) first_start = start;
+                    if (state == 'Z' || (first_start && start && start != first_start))
+                    {
+                        fclose(proc);
+                        return 1;
+                    }
+                }
+            }
+            fclose(proc);
+        }
+#else
+        (void)first_start;
+        if (kill((pid_t)pid, 0) != 0 && errno == ESRCH) return 1;
+#endif
+        usleep(10000);
+    }
+    return 0;
+}
+
+static long shell_test_read_pid(const char *path)
+{
+    long pid = -1;
+    FILE *f = fopen(path, "rb");
+    if (f)
+    {
+        if (fscanf(f, "%ld", &pid) != 1) pid = -1;
+        fclose(f);
+    }
+    return pid;
+}
+
+/* Launch failure must run nothing. Exhaust descriptors so pipe() fails, then
+   point PATH at nothing so the shell cannot be executed. */
+static void test_spawn_failure_fails_closed(void)
+{
+    SHELL_EXEC_RESULT res;
+    const char *effect = "agent_shell_spawn_effect.tmp";
+    const char *cmd = "printf SHOULD_NOT_RUN > agent_shell_spawn_effect.tmp";
+    struct rlimit old_lim, low_lim;
+    int probe, ok, next_fd;
+    char *old_path = getenv("PATH");
+    char *saved_path = old_path ? strdup(old_path) : NULL;
+
+    printf("\n=== Test 8: Spawn Failure Fails Closed (POSIX) ===\n");
+    remove(effect);
+
+    probe = dup(0);
+    close(probe);
+    TEST_ASSERT(probe >= 0 && getrlimit(RLIMIT_NOFILE, &old_lim) == 0,
+                "Descriptor limit fixture is readable");
+    low_lim = old_lim;
+    low_lim.rlim_cur = (rlim_t)probe + 1; /* one free descriptor, pipe() needs two */
+    if (probe >= 0 && setrlimit(RLIMIT_NOFILE, &low_lim) == 0)
+    {
+        ok = AgentShellExec(cmd, ".", 2000, &res);
+        setrlimit(RLIMIT_NOFILE, &old_lim);
+        TEST_ASSERT(ok == 0 && res.execution_failed,
+                    "Pipe creation failure reports execution_failed");
+        TEST_ASSERT(fopen(effect, "rb") == NULL,
+                    "Pipe creation failure produced no side effect");
+        next_fd = dup(0);
+        close(next_fd);
+        TEST_ASSERT(next_fd == probe, "Pipe creation failure leaks no descriptor");
+    }
+    else
+    {
+        TEST_ASSERT(0, "Could not lower the descriptor limit for the fixture");
+    }
+    remove(effect);
+
+    setenv("PATH", "/agent_shell_no_such_directory", 1);
+    ok = AgentShellExec(cmd, ".", 2000, &res);
+    if (saved_path) setenv("PATH", saved_path, 1); else unsetenv("PATH");
+    free(saved_path);
+    /* Current contract: an unexecutable shell surfaces as exit 127 from the
+       forked child, not as execution_failed. The test pins that and the key
+       safety property, that the command never ran. */
+    TEST_ASSERT(ok == 1 && res.exit_code == 127 && !res.timed_out,
+                "Unexecutable shell reports exit 127");
+    TEST_ASSERT(fopen(effect, "rb") == NULL,
+                "Unexecutable shell produced no side effect");
+    remove(effect);
+}
+
+/* Both streams written at the same time by two concurrent writers. */
+static void test_concurrent_dual_stream_output(void)
+{
+    SHELL_EXEC_RESULT res;
+    int ok;
+    size_t i;
+    int pure_out = 1, pure_err = 1;
+    const char *cmd =
+        "(head -c 100000 /dev/zero | tr '\\0' O) & "
+        "(head -c 100000 /dev/zero | tr '\\0' E >&2) & wait";
+
+    printf("\n=== Test 9: Concurrent 100 KB Writers on Both Streams (POSIX) ===\n");
+    ok = AgentShellExec(cmd, ".", 60000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 0 && !res.timed_out && !res.execution_failed,
+                "Concurrent dual-stream output completes without deadlock or false timeout");
+    TEST_ASSERT(res.stdout_total_len == 100000 && res.stderr_total_len == 100000,
+                "Concurrent output reports exact totals on both streams");
+    TEST_ASSERT(res.stdout_truncated && res.stderr_truncated &&
+                res.stdout_len == SHELL_BUFFER_MAX - 1 && res.stderr_len == SHELL_BUFFER_MAX - 1,
+                "Concurrent output fills both bounded buffers and flags truncation");
+    for (i = 0; i < res.stdout_len; i++) if (res.stdout_buf[i] != 'O') { pure_out = 0; break; }
+    for (i = 0; i < res.stderr_len; i++) if (res.stderr_buf[i] != 'E') { pure_err = 0; break; }
+    TEST_ASSERT(pure_out && pure_err, "Concurrent output stays separated by stream");
+}
+
+/* Truncation is a separate fact from failure and from timeout. */
+static void test_truncation_with_failure_and_timeout(void)
+{
+    SHELL_EXEC_RESULT res;
+    int ok;
+
+    printf("\n=== Test 10: Truncation Combined With Failure and Timeout (POSIX) ===\n");
+    ok = AgentShellExec(
+        "head -c 100000 /dev/zero | tr '\\0' O; head -c 100000 /dev/zero | tr '\\0' E >&2; exit 3",
+        ".", 60000, &res);
+    TEST_ASSERT(ok == 1 && res.exit_code == 3 && !res.timed_out && !res.execution_failed,
+                "Truncated output with failing command keeps its own exit status");
+    TEST_ASSERT(res.stdout_truncated && res.stderr_truncated &&
+                res.stdout_total_len == 100000 && res.stderr_total_len == 100000,
+                "Truncation flags and totals survive a non-zero exit");
+
+    ok = AgentShellExec("head -c 100000 /dev/zero | tr '\\0' O; sleep 30", ".", 1500, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124 && !res.execution_failed,
+                "Timeout after large output reports timed_out and 124");
+    TEST_ASSERT(res.stdout_truncated && res.stdout_total_len == 100000,
+                "Truncation is still reported when the command later times out");
+}
+
+/* A grandchild started by a child must die with the process group. */
+static void test_timeout_terminates_grandchild(void)
+{
+    SHELL_EXEC_RESULT res;
+    const char *child_file = "agent_shell_child2.pid";
+    const char *grand_file = "agent_shell_grandchild.pid";
+    long child_pid, grand_pid;
+    int ok;
+
+    printf("\n=== Test 11: Timeout Terminates Grandchild (POSIX) ===\n");
+    remove(child_file);
+    remove(grand_file);
+    ok = AgentShellExec(
+        "sh -c 'sleep 30 & echo $! > agent_shell_grandchild.pid; wait' & "
+        "echo $! > agent_shell_child2.pid; wait",
+        ".", 1000, &res);
+    TEST_ASSERT(ok == 1 && res.timed_out && res.exit_code == 124,
+                "Nested process tree timeout is reported");
+    child_pid = shell_test_read_pid(child_file);
+    grand_pid = shell_test_read_pid(grand_file);
+    TEST_ASSERT(child_pid > 0 && grand_pid > 0 && child_pid != grand_pid,
+                "Child and grandchild PIDs were recorded before timeout");
+    TEST_ASSERT(shell_test_process_gone(child_pid), "Child does not survive timeout");
+    TEST_ASSERT(shell_test_process_gone(grand_pid), "Grandchild does not survive timeout");
+    remove(child_file);
+    remove(grand_file);
+}
+#endif
+
 int main(void)
 {
     /* Preserve the exact last completed assertion in CTest failure output. */
@@ -462,6 +659,12 @@ int main(void)
     test_timeout_terminates_process_tree();
     test_abductive_diagnostic_integration();
     test_swe_bench_shell_integration();
+#ifndef _WIN32
+    test_spawn_failure_fails_closed();
+    test_concurrent_dual_stream_output();
+    test_truncation_with_failure_and_timeout();
+    test_timeout_terminates_grandchild();
+#endif
 
     printf("\n======================================================================\n");
     printf("  TEST RESULTS: %d passed, %d failed\n", g_tests_passed, g_tests_run - g_tests_passed);
