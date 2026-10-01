@@ -1,0 +1,175 @@
+name: Diagnostic trusted local egress samples (no boot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed commit of this workflow and script
+        required: true
+        type: string
+      runner_image:
+        description: Exact freshly measured Ubuntu 24.04 ImageVersion
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate identity before checkout
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          # Fixed token file only: no values, environment or context dumps.
+          umask 077
+          printf '%s\n' guard_incomplete > "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
+          refuse() {
+            printf '%s\n' "$1" > "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
+            printf '%s\n' "$1"
+            exit 2
+          }
+          [[ "${TARGET_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || refuse target_sha_format
+          [[ "${EXPECTED_IMAGE:-}" =~ ^[0-9]{8}\.[0-9]+\.[0-9]+$ ]] || refuse runner_image_format
+          test "${GITHUB_REF:-}" = refs/heads/master || refuse workflow_ref
+          test "${GITHUB_SHA:-}" = "$TARGET_SHA" || refuse workflow_sha
+          test "${RUNNER_ENVIRONMENT:-}" = github-hosted || refuse runner_environment
+          test "${RUNNER_OS:-}" = Linux || refuse runner_os
+          test "${RUNNER_ARCH:-}" = X64 || refuse runner_arch
+          test "${ImageVersion:-}" = "$EXPECTED_IMAGE" || refuse runner_image
+          printf '%s\n' guard_passed > "$RUNNER_TEMP/qemu-runner-vm-egress-guard.txt"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - name: Verify checkout and run offline tests
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          python3 tests/test_qemu_runner_vm_contract.py
+          python3 tests/test_qemu_runner_vm_harness.py
+          python3 tests/test_qemu_runner_vm_egress.py
+      - name: Compile reviewed fixed control and confined helper, never workload
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cc -std=c11 -O2 -Wall -Wextra -Werror tools/qemu_closure/runner_vm_egress_control.c -o "$RUNNER_TEMP/symbols-vm-egress-control"
+          cc -std=c11 -O2 -Wall -Wextra -Werror tools/qemu_closure/runner_vm_egress_child.c -o "$RUNNER_TEMP/symbols-vm-egress-child"
+      - name: Observe trusted confined helper only, always blocked
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_IMAGE: ${{ inputs.runner_image }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(id -u)" -ne 0
+          # Only numeric-loopback fixtures; no resolver or public targets.
+          # Whole observer15s; each direct child3s + reap2s. Outer30s + kill5s.
+          set +e
+          timeout --signal=TERM --kill-after=5s 30s python3 tools/qemu_closure/runner_vm_egress.py \
+            "$TARGET_SHA" "$EXPECTED_IMAGE" > "$RUNNER_TEMP/qemu-runner-vm-egress.json"
+          status=$?
+          set -e
+          if [ "$status" -ne 2 ]; then
+            rm -f "$RUNNER_TEMP/qemu-runner-vm-egress.json"
+            exit 2
+          fi
+          # Keep the blocked exit code. A red run is an observation, never approval.
+          exit 2
+      - name: Check owned cleanup without relying on checkout or logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import json,os,stat
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])
+          names=('symbols-vm-egress-control','symbols-vm-egress-child')
+          scratch='symbols-vm-egress-owned'
+          result={'schema':'symbols.runner-vm-egress-cleanup.v1','direct_children':'not_proven',
+                  'fixture_descriptors':'not_proven','owned_paths':'not_proven','outcome':'measured_only',
+                  'aggregate_process_cleanup':'not_proven','aggregate_workspace_cleanup':'not_proven'}
+          ok=False
+          try:
+              if not root.is_absolute() or any(not stat.S_ISDIR(p.lstat().st_mode) for p in (root,*root.parents)):
+                  raise ValueError()
+              proof=root/'qemu-runner-vm-egress-supervisor-cleanup.json'
+              try:
+                  info=proof.lstat()
+                  if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_size>8192:
+                      raise ValueError()
+                  def unique(pairs):
+                      d={}
+                      for k,v in pairs:
+                          if k in d:raise ValueError()
+                          d[k]=v
+                      return d
+                  value=json.loads(proof.read_bytes(),object_pairs_hook=unique)
+                  if type(value) is not dict or set(value)!=set(result):raise ValueError()
+                  for k,v in value.items():
+                      allowed=(result[k],)
+                      if k in ('direct_children','fixture_descriptors','owned_paths'):
+                          allowed=('confirmed_owned_direct','not_proven')
+                      if k=='outcome':allowed=('measured_only','refusal')
+                      if type(v) is not str or v not in allowed:raise ValueError()
+                  result=value
+              except (OSError,ValueError):pass
+              owned=root/scratch
+              try:info=owned.lstat()
+              except FileNotFoundError:info=None
+              if info is not None:
+                  if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid() or list(owned.iterdir()):raise ValueError()
+                  owned.rmdir()
+              for name in names:
+                  p=root/name
+                  try:info=p.lstat()
+                  except FileNotFoundError:continue
+                  if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid():raise ValueError()
+                  p.unlink()
+              ok=all(not (root/n).exists() and not (root/n).is_symlink() for n in (*names,scratch))
+          except (OSError,ValueError):pass
+          result['owned_paths']='confirmed_owned_direct' if ok else 'not_proven'
+          if not ok:result['outcome']='refusal'
+          raw=json.dumps(result,sort_keys=True,separators=(',',':')).encode()+b'\n'
+          fd=os.open(root/'qemu-runner-vm-egress-cleanup.json',os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600)
+          try:
+              if os.write(fd,raw)!=len(raw):raise ValueError()
+          finally:os.close(fd)
+          raise SystemExit(0 if ok else 2)
+          PY
+      - name: Upload fixed observer report, never host contents
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-egress
+          path: ${{ runner.temp }}/qemu-runner-vm-egress.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload fixed guard token, never rejected values
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-egress-guard
+          path: ${{ runner.temp }}/qemu-runner-vm-egress-guard.txt
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload fixed owned cleanup results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-runner-vm-egress-cleanup
+          path: ${{ runner.temp }}/qemu-runner-vm-egress-cleanup.json
+          if-no-files-found: error
+          retention-days: 1
