@@ -11,18 +11,22 @@ import sys
 import time
 from runner_vm_surface import identity
 
-EXPECTED = {'schema':'symbols.runner-vm-harness-child.v1','classification':'measured_only',
-            'limits_readback':True,'hard_raise_denied':True,'allow_getpid':True,'deny_classes':True}
+EXPECTED = {'schema':'symbols.runner-vm-harness-child.v2','classification':'measured_only',
+            'limits_readback':True,'all_five_ceiling_raises_denied':True,'allow_getpid':True,'deny_classes':True}
 REASONS = ('identity','binary','child_failure','timeout','output_bounds','child_schema',
            'supervisor_error','capabilities_only_not_enforcement')
 
 
 def report(reason):
-    return {'schema':'symbols.runner-vm-harness.v1','classification':'blocked',
+    return {'schema':'symbols.runner-vm-harness.v2','classification':'blocked',
             'reason':reason if reason in REASONS else 'supervisor_error',
             'boot_attempted':False,'runtime_complete':False,'isolation_accredited':False,
             'gates':[{'gate':g,'status':'not_proven'} for g in ('egress','resources','process_cleanup','workspace_cleanup')],
-            'child_checks':'measured_only' if reason=='capabilities_only_not_enforcement' else 'not_proven'}
+            'child_checks':'measured_only' if reason=='capabilities_only_not_enforcement' else 'not_proven',
+            'ceiling_raise_denials':[{'limit':k,'status':
+                'measured_only' if reason=='capabilities_only_not_enforcement' else 'not_proven'}
+                for k in ('as','cpu','fsize','nofile','core')],
+            'consumption_violations':'not_tested'}
 
 
 def validate(raw):

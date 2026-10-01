@@ -17,7 +17,8 @@ seccomp installation must succeed, or it refuses without a positive report.
 
 Numerical test budgets: virtual AS 64 MiB, CPU 1 second, per-file FSIZE 1024
 bytes, NOFILE 16, CORE zero, applied to helper only. All five hard/soft values
-are read back after filtering; raising NOFILE hard limit to17 must fail EPERM.
+are read back after filtering; raising both soft and hard limits by one for each of AS, CPU, FSIZE, NOFILE
+and CORE must fail EPERM, followed by unchanged hard/soft readback.
 These are trusted-helper budgets, not chosen QEMU budgets. No memory/CPU/file
 stress or aggregate resource bound is proved by this patch.
 
@@ -31,7 +32,7 @@ more restrictive values within hard ceilings. No return to libc exit handlers
 is needed: raw exit_group finishes after one fixed JSON write.
 
 Checks: allowed getpid succeeds; nine denied syscall classes return EPERM;
-all hard/soft limits read back; hard raise denied. This does not make nine
+all hard/soft limits read back; all five ceiling raises denied. This does not make nine
 negative samples an exhaustive egress test. Inherited FDs are closed except
 reviewed stdio; stdout remains a parent pipe and the child can still write to
 it. No local baseline listener, successful socket, QEMU exec, file-output
@@ -81,3 +82,28 @@ Sources: https://www.man7.org/linux/man-pages/man2/seccomp.2.html ;
 https://www.man7.org/linux/man-pages/man2/PR_SET_NO_NEW_PRIVS.2const.html ;
 https://www.man7.org/linux/man-pages/man2/setrlimit.2.html ;
 https://www.man7.org/linux/man-pages/man2/pidfd_open.2.html .
+
+
+## Ceiling-raise tranche, not resource stress
+
+The child v2 schema requires `all_five_ceiling_raises_denied:true` instead of
+v1's single NOFILE `hard_raise_denied`. Parent v2 emits five closed
+`ceiling_raise_denials` rows and `consumption_violations:not_tested`. An old
+schema, duplicate/extra key or wrong type refuses. Only exact child exit0 and
+schema validation can set these rows to measured_only. Aggregate gates and
+boot/runtime/isolation flags remain unchanged and blocked.
+
+Each attempted pair is the reviewed ceiling plus one: AS 67108865 bytes,
+CPU 2 seconds, FSIZE 1025 bytes, NOFILE 17 descriptors and CORE 1 byte. The
+original ceilings remain AS 67108864, CPU 1, FSIZE 1024, NOFILE 16, CORE 0.
+The same five limits are read back after each EPERM. This tests inability to
+raise hard ceilings, not memory allocation failure, CPU exhaustion/signals,
+file-size overrun, FD exhaustion or core-dump output. No mapping, file open,
+process multiplication, stress loop or relaxed syscall policy is introduced.
+
+The existing native x86-64 seccomp block is byte-compared against the reviewed
+egress child by an offline test. All limits, supervisor deadlines, output
+bounds and launch mechanics are unchanged. This policy still denies exec and
+all clones and is not QEMU-compatible. Real consumption tests need a separate
+helper/policy review. A passing ceiling test never promotes resources or
+cleanup to aggregate proof.

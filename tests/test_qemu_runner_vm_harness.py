@@ -11,6 +11,29 @@ import runner_vm_harness as m
 
 
 class HarnessTests(unittest.TestCase):
+    def test_ceiling_loop_and_filter_unchanged(self):
+        root=Path(__file__).resolve().parents[1]/'tools/qemu_closure'
+        c=(root/'runner_vm_harness.c').read_text()
+        e=(root/'runner_vm_egress_child.c').read_text()
+        start='    struct sock_filter code[] = {'
+        end='    if (syscall(SYS_getpid) <= 0) fail();'
+        self.assertEqual(c[c.index(start):c.index(end)],e[e.index(start):e.index(end)])
+        self.assertIn('struct rlimit raise = {values[i]+1,values[i]+1}',c)
+        self.assertIn('SYS_setrlimit,kinds[i],&raise',c)
+        self.assertIn('errno != EPERM',c)
+        self.assertIn('observed.rlim_cur!=values[i] || observed.rlim_max!=values[i]',c)
+    def test_ceiling_claims_require_exact_success(self):
+        for reason in m.REASONS:
+            r=m.report(reason)
+            self.assertEqual(r['consumption_violations'],'not_tested')
+            self.assertEqual([x['limit'] for x in r['ceiling_raise_denials']],
+                             ['as','cpu','fsize','nofile','core'])
+            for row in r['ceiling_raise_denials']:
+                self.assertEqual(row['status'],'measured_only' if
+                                 reason=='capabilities_only_not_enforcement' else 'not_proven')
+    def test_old_schema_not_accepted(self):
+        value=dict(m.EXPECTED);value['schema']='symbols.runner-vm-harness-child.v1'
+        self.assertFalse(m.validate(json.dumps(value).encode()))
     def test_exact_child_schema(self):
         self.assertTrue(m.validate(json.dumps(m.EXPECTED).encode()))
         for key in m.EXPECTED:

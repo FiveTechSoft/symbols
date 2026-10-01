@@ -70,9 +70,14 @@ int main(void) {
     for (unsigned int i=0;i<sizeof(kinds)/sizeof(kinds[0]);++i)
         if (syscall(SYS_getrlimit,kinds[i],&observed) ||
             observed.rlim_cur!=values[i] || observed.rlim_max!=values[i]) fail();
-    struct rlimit raise = {17,17}; errno=0;
-    if (syscall(SYS_setrlimit,RLIMIT_NOFILE,&raise) != -1 || errno != EPERM) fail();
-    static const char output[] = "{\"schema\":\"symbols.runner-vm-harness-child.v1\",\"classification\":\"measured_only\",\"limits_readback\":true,\"hard_raise_denied\":true,\"allow_getpid\":true,\"deny_classes\":true}\n";
+    /* Ceiling raises, not resource-consumption stress. Keep the filter unchanged. */
+    for (unsigned int i=0;i<sizeof(kinds)/sizeof(kinds[0]);++i) {
+        struct rlimit raise = {values[i]+1,values[i]+1}; errno=0;
+        if (syscall(SYS_setrlimit,kinds[i],&raise) != -1 || errno != EPERM) fail();
+        if (syscall(SYS_getrlimit,kinds[i],&observed) ||
+            observed.rlim_cur!=values[i] || observed.rlim_max!=values[i]) fail();
+    }
+    static const char output[] = "{\"schema\":\"symbols.runner-vm-harness-child.v2\",\"classification\":\"measured_only\",\"limits_readback\":true,\"all_five_ceiling_raises_denied\":true,\"allow_getpid\":true,\"deny_classes\":true}\n";
     if (syscall(SYS_write,1,output,sizeof(output)-1) != (long)(sizeof(output)-1)) fail();
     syscall(SYS_exit_group,0);
 #endif
