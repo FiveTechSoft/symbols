@@ -73,33 +73,51 @@ int AgentShellWrapCommand(SHELL_BACKEND backend,
                           char *out_cmd,
                           size_t out_cmd_size)
 {
+    int n;
+
     if (!cmd || !out_cmd || out_cmd_size == 0)
         return 0;
+    out_cmd[0] = '\0';
 
     switch (backend)
     {
     case SHELL_BACKEND_POWERSHELL:
-        return snprintf(out_cmd, out_cmd_size,
-                        "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"%s\"",
-                        cmd);
+        n = snprintf(out_cmd, out_cmd_size,
+                     "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"%s\"",
+                     cmd);
+        break;
 
     case SHELL_BACKEND_CMD:
-        return snprintf(out_cmd, out_cmd_size, "cmd.exe /c \"%s\"", cmd);
+        n = snprintf(out_cmd, out_cmd_size, "cmd.exe /c \"%s\"", cmd);
+        break;
 
     case SHELL_BACKEND_BASH:
-        return snprintf(out_cmd, out_cmd_size, "/bin/bash -c \"%s\"", cmd);
+        n = snprintf(out_cmd, out_cmd_size, "/bin/bash -c \"%s\"", cmd);
+        break;
 
     case SHELL_BACKEND_ZSH:
-        return snprintf(out_cmd, out_cmd_size, "/bin/zsh -c \"%s\"", cmd);
+        n = snprintf(out_cmd, out_cmd_size, "/bin/zsh -c \"%s\"", cmd);
+        break;
 
     case SHELL_BACKEND_SH:
     default:
 #ifdef _WIN32
-        return snprintf(out_cmd, out_cmd_size, "cmd.exe /c \"%s\"", cmd);
+        n = snprintf(out_cmd, out_cmd_size, "cmd.exe /c \"%s\"", cmd);
 #else
-        return snprintf(out_cmd, out_cmd_size, "/bin/sh -c \"%s\"", cmd);
+        n = snprintf(out_cmd, out_cmd_size, "/bin/sh -c \"%s\"", cmd);
 #endif
+        break;
     }
+
+    /* snprintf returns the length it WOULD have written. A result that does
+       not fit was truncated, and a truncated command line must never run:
+       reject it, leaving an empty string and no partial command behind. */
+    if (n < 0 || (size_t)n >= out_cmd_size)
+    {
+        out_cmd[0] = '\0';
+        return 0;
+    }
+    return n;
 }
 
 /* ============================================================

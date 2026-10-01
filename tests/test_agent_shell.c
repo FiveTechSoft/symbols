@@ -752,6 +752,87 @@ static void test_timeout_terminates_grandchild_win(void)
 }
 #endif
 
+/* An over-long command is REJECTED, never truncated. "Rejected cleanly":
+   the wrapper returns 0, leaves out_cmd as an empty string (no partial
+   command line), and AgentShellExec on a wrapping platform returns 0 with
+   execution_failed set, exit_code -1, empty output buffers, and starts no
+   process. */
+static void test_overlong_command_rejected_cleanly(void)
+{
+    static const SHELL_BACKEND backends[] = {
+        SHELL_BACKEND_CMD, SHELL_BACKEND_POWERSHELL, SHELL_BACKEND_BASH,
+        SHELL_BACKEND_ZSH, SHELL_BACKEND_SH
+    };
+    static char cmd[5001];
+    char buf[4096];
+    char exact[64];
+    size_t i;
+    int all_rejected = 1, all_empty = 1;
+    int n;
+
+    printf("\n=== Test 12: Over-Long Command Is Rejected, Not Truncated ===\n");
+    memset(cmd, 'a', sizeof(cmd) - 1);
+    cmd[sizeof(cmd) - 1] = '\0';
+    for (i = 0; i < sizeof(backends) / sizeof(backends[0]); i++)
+    {
+        memset(buf, 'X', sizeof(buf));
+        if (AgentShellWrapCommand(backends[i], cmd, buf, sizeof(buf)) != 0)
+            all_rejected = 0;
+        if (buf[0] != '\0')
+            all_empty = 0;
+    }
+    TEST_ASSERT(all_rejected, "Over-long command is rejected by every backend wrapper");
+    TEST_ASSERT(all_empty, "Rejected wrap leaves an empty out_cmd, no truncated command");
+
+    /* Exact boundary: size == length + 1 fits, size == length does not. */
+    n = AgentShellWrapCommand(SHELL_BACKEND_BASH, "echo", exact, sizeof(exact));
+    TEST_ASSERT(n > 0 && (size_t)n < sizeof(exact), "Short command wraps and reports its real length");
+    {
+        char fit[64], nofit[64];
+        int a = AgentShellWrapCommand(SHELL_BACKEND_BASH, "echo", fit, (size_t)n + 1);
+        int b = AgentShellWrapCommand(SHELL_BACKEND_BASH, "echo", nofit, (size_t)n);
+        TEST_ASSERT(a == n && strlen(fit) == (size_t)n, "Wrap into an exactly sized buffer succeeds");
+        TEST_ASSERT(b == 0 && nofit[0] == '\0', "Wrap into a buffer one byte too small is rejected");
+    }
+
+#ifdef _WIN32
+    {
+        /* Without the fix the truncated wrapper would still run the front
+           of this line and create the side-effect file. */
+        static char line[5200];
+        SHELL_EXEC_RESULT res;
+        int ok;
+        const char *effect = "agent_shell_overlong_effect.txt";
+        remove(effect);
+        size_t plen = (size_t)snprintf(line, sizeof(line), "echo x> %s & rem ", effect);
+        memset(line + plen, 'a', 4500);
+        line[plen + 4500] = '\0';
+        ok = AgentShellExec(line, ".", 10000, &res);
+        TEST_ASSERT(ok == 0 && res.execution_failed && res.exit_code == -1 && !res.timed_out,
+                    "Windows rejects an over-long command with execution_failed");
+        TEST_ASSERT(res.stdout_len == 0 && res.stderr_len == 0,
+                    "Rejected command leaves both output buffers empty");
+        TEST_ASSERT(fopen(effect, "rb") == NULL,
+                    "Rejected command produced no side effect");
+        remove(effect);
+    }
+#else
+    {
+        /* POSIX passes the command to exec directly: no wrapper buffer, no
+           length gap. A long command still runs in full. */
+        SHELL_EXEC_RESULT res;
+        static char longline[6000];
+        size_t plen = (size_t)snprintf(longline, sizeof(longline), "echo done # ");
+        int ok;
+        memset(longline + plen, 'a', 5000);
+        longline[plen + 5000] = '\0';
+        ok = AgentShellExec(longline, ".", 10000, &res);
+        TEST_ASSERT(ok == 1 && res.exit_code == 0 && strstr(res.stdout_buf, "done") != NULL,
+                    "POSIX still runs a 5000-character command in full");
+    }
+#endif
+}
+
 int main(void)
 {
     /* Preserve the exact last completed assertion in CTest failure output. */
@@ -770,6 +851,7 @@ int main(void)
     test_timeout_terminates_process_tree();
     test_abductive_diagnostic_integration();
     test_swe_bench_shell_integration();
+    test_overlong_command_rejected_cleanly();
 #ifndef _WIN32
     test_spawn_failure_fails_closed();
     test_concurrent_dual_stream_output();
