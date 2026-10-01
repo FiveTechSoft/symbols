@@ -12,6 +12,43 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools/qemu_closure'))
 import runner_vm_egress as m
 
 class Tests(unittest.TestCase):
+    def test_inherited_endpoints_restore_blocking(self):
+        f=object.__new__(m.Fixtures);f.ports=[30001,30002,30003,30004]
+        listener=MagicMock();peer=MagicMock();listener.accept.return_value=(peer,('127.0.0.1',30005))
+        f.owned=[listener];f.poll=MagicMock()
+        tcp=MagicMock();tcp.fileno.return_value=8
+        udp=MagicMock();udp.fileno.return_value=10;udp.getsockname.return_value=('127.0.0.1',30006)
+        with patch.object(m.socket,'socket',side_effect=[tcp,udp]):
+            self.assertEqual(f.prepare_inherited(),[tcp,udp])
+        for endpoint,port in ((tcp,30001),(udp,30003)):
+            self.assertEqual(endpoint.method_calls[:3],[unittest.mock.call.settimeout(1),
+                             unittest.mock.call.connect(('127.0.0.1',port)),
+                             unittest.mock.call.settimeout(None)])
+    def test_diagnostic_closed_values(self):
+        for phase in (*m.PHASES,'PRIVATE'):
+            for exc in (BrokenPipeError(m.errno.EPIPE,'PRIVATE'),ValueError('PRIVATE'),
+                        m.subprocess.TimeoutExpired('PRIVATE',2),OSError(9999,'PRIVATE')):
+                d=m.diagnostic(phase,exc)
+                self.assertEqual(set(d),{'phase','category','errno'})
+                self.assertIn(d['phase'],(*m.PHASES,'unknown'))
+                self.assertIn(d['category'],(*m.CATEGORIES,'unknown'))
+                self.assertIn(d['errno'],(*m.ERRNOS,'unknown'))
+                self.assertNotIn('PRIVATE',json.dumps(d))
+        self.assertEqual(m.diagnostic('fixture_service',BrokenPipeError(m.errno.EPIPE,'PRIVATE')),
+                         {'phase':'fixture_service','category':'os_error','errno':'EPIPE'})
+    def test_experiment_captures_diagnostic_without_message(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            for name in m.BINARIES:(root/name).write_text('trusted')
+            f=MagicMock();f.phase='baseline';f.last_reaped=True;f.close.return_value=True
+            def fail(*args):
+                f.phase='fixture_service';raise BrokenPipeError(m.errno.EPIPE,'PRIVATE')
+            with patch.object(m,'Fixtures',return_value=f),patch.object(m,'run_child',side_effect=fail):
+                r=m.experiment(root)
+            self.assertEqual(r['reason'],'supervisor_error')
+            self.assertEqual(r['diagnostic'],{'phase':'fixture_service','category':'os_error','errno':'EPIPE'})
+            self.assertNotIn('PRIVATE',json.dumps(r))
+            self.assertTrue(all(g['status']=='not_proven' for g in r['gates']))
     def test_exact_schemas(self):
         for expected in (m.CHILD,m.CONTROL):
             self.assertTrue(m.exact(json.dumps(expected).encode(),expected))

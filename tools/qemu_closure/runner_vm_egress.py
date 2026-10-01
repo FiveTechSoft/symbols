@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fixed trusted numeric-loopback experiment. Not an adversarial egress proof."""
+import errno
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,24 @@ CHILD={'schema':'symbols.runner-vm-egress-child.v1','classification':'measured_o
 REASONS=('identity','fixture_setup','baseline','fd_identity','negative_result','fixture_protocol',
          'timeout','output_bounds','child_schema','supervisor_error','cleanup_refusal',
          'capabilities_only_not_enforcement')
+PHASES=('report_setup','binary_check','scratch_setup','fixture_setup','baseline',
+        'negative','prepare_inherited','spawn','poll_register','poll_select',
+        'output_read','fixture_service','child_wait','child_schema','fixture_drain')
+CATEGORIES=('os_error','value_error','subprocess_error')
+ERRNOS=('EAGAIN','EBADF','EPIPE','ECONNRESET','EMFILE','ENFILE','ENOMEM','EACCES','EPERM','EINVAL')
+
+
+def diagnostic(phase,exc):
+    # Closed enums only, never exception strings, tracebacks, paths or environment.
+    category=('os_error' if isinstance(exc,OSError) else
+              'subprocess_error' if isinstance(exc,subprocess.SubprocessError) else
+              'value_error' if isinstance(exc,ValueError) else 'unknown')
+    number=getattr(exc,'errno',None) if category=='os_error' else None
+    name=next((n for n in ERRNOS if type(number) is int and number==getattr(errno,n)), 'unknown')
+    return {'phase':phase if phase in PHASES else 'unknown',
+            'category':category,'errno':name}
+
+
 BINARIES=('symbols-vm-egress-control','symbols-vm-egress-child')
 SCRATCH='symbols-vm-egress-owned'
 REPORT='qemu-runner-vm-egress.json'
@@ -105,6 +124,8 @@ class Fixtures:
                 s=socket.socket(socket.AF_INET,socket.SOCK_STREAM if stream else socket.SOCK_DGRAM)
                 endpoints.append(s);s.settimeout(1)
                 s.connect(('127.0.0.1',port))
+                # C helpers use synchronous read/write; Python timeout implies O_NONBLOCK.
+                s.settimeout(None)
                 if stream:
                     peer,_=self.owned[0].accept();peer.setblocking(False);self.owned.append(peer)
                     self.poll.register(peer,selectors.EVENT_READ,('stream','inherited_tcp',b''))
@@ -172,8 +193,10 @@ class Fixtures:
 def run_child(binary,fixtures,expected,negative,deadline):
     child=None;handle=None;passed=[];raw=bytearray();reaped=False
     try:
+        fixtures.phase='prepare_inherited'
         passed=fixtures.prepare_inherited();fds=tuple(s.fileno() for s in passed)
         args=[str(binary),*(str(p) for p in fixtures.ports),*(str(fd) for fd in fds)]
+        fixtures.phase='spawn'
         child=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL,env={},close_fds=True,pass_fds=fds)
         for s in passed:s.close()
@@ -181,25 +204,33 @@ def run_child(binary,fixtures,expected,negative,deadline):
         if hasattr(os,'pidfd_open'):
             try:handle=os.pidfd_open(child.pid)
             except OSError:pass
+        fixtures.phase='poll_register'
         fixtures.poll.register(child.stdout,selectors.EVENT_READ,('output','',b''))
         end=min(deadline,time.monotonic()+3)
         eof=False
         while not eof:
             left=end-time.monotonic()
             if left<=0:raise Refusal('timeout')
+            fixtures.phase='poll_select'
             events=fixtures.poll.select(left)
             if not events:raise Refusal('timeout')
             for key,_ in events:
                 if key.data[0]=='output':
+                    fixtures.phase='output_read'
                     data=os.read(child.stdout.fileno(),4096)
                     if not data:eof=True;continue
                     raw.extend(data)
                     if len(raw)>1024:raise Refusal('output_bounds')
-                else:fixtures.service(key.fileobj,key.data)
+                else:
+                    fixtures.phase='fixture_service'
+                    fixtures.service(key.fileobj,key.data)
+        fixtures.phase='child_wait'
         if child.wait(timeout=max(0.01,end-time.monotonic()))!=0:raise Refusal('negative_result' if negative else 'baseline')
         reaped=True
+        fixtures.phase='child_schema'
         if not exact(raw,expected):raise Refusal('child_schema')
         # Drain queued owned events once, including EOF; no new traffic is sent.
+        fixtures.phase='fixture_drain'
         for key,_ in fixtures.poll.select(0):
             if key.data[0]!='output':fixtures.service(key.fileobj,key.data)
         if not negative and not fixtures.baseline_complete():raise Refusal('baseline')
@@ -249,23 +280,31 @@ def experiment(root):
     def terminate(signum,frame):raise Refusal('supervisor_error')
     previous={s:signal.signal(s,terminate) for s in (signal.SIGTERM,signal.SIGINT)}
     fixtures=None;reason='supervisor_error';reaped=False;closed=False
+    phase='report_setup';detail=None
     deadline=time.monotonic()+15
     try:
         write_report(root/SUPERVISOR,clean_report())
+        phase='binary_check'
         for name in BINARIES:
             p=root/name;info=p.lstat()
             if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o022:
                 raise Refusal('fd_identity')
+        phase='scratch_setup'
         (root/SCRATCH).mkdir(mode=0o700)
+        phase='fixture_setup'
         fixtures=Fixtures()
+        fixtures.phase='baseline'
         run_child(root/BINARIES[0],fixtures,CONTROL,False,deadline)
         reaped=fixtures.last_reaped
         fixtures.negative=True
+        fixtures.phase='negative'
         run_child(root/BINARIES[1],fixtures,CHILD,True,deadline)
         reaped=reaped and fixtures.last_reaped
         reason='capabilities_only_not_enforcement'
     except Refusal as exc:reason=exc.reason
-    except (OSError,ValueError,subprocess.SubprocessError):reason='supervisor_error'
+    except (OSError,ValueError,subprocess.SubprocessError) as exc:
+        reason='supervisor_error'
+        detail=diagnostic(getattr(fixtures,'phase',phase),exc)
     finally:
         if fixtures is not None:
             reaped=getattr(fixtures,'last_reaped',False) and (reaped or reason!='capabilities_only_not_enforcement')
@@ -275,7 +314,9 @@ def experiment(root):
         try:write_report(root/SUPERVISOR,clean_report(reaped,closed,paths,not (reaped and closed and paths)))
         finally:
             for sig,handler in previous.items():signal.signal(sig,handler)
-    return report(reason)
+    result=report(reason)
+    if detail is not None:result['diagnostic']=detail
+    return result
 
 
 def finalizer(root):
