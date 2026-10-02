@@ -102,7 +102,14 @@ static void test_harness_run_evaluation(void)
 #else
     TEST_ASSERT(summary->memory_footprint_mb < 50.0, "Memory footprint is under 50 MB RAM");
 #endif
-    TEST_ASSERT(summary->avg_latency_ms < 50.0, "Average task latency is < 50 ms (orders of magnitude faster than neural LLMs)");
+    /* Since M1-3 the harness creates and removes its benchmark file through
+       Fs*, which fsyncs. Measured on Linux: about 10 ms per task idle (30 runs,
+       max 11.9), median 25 ms and max 31.7 ms with four concurrent fsync
+       writers, p90 57 ms and max 343 ms with twelve. The old 50 ms bound was
+       a wall-clock gate on a fast filesystem and flapped (apply run
+       36987869534). 500 ms keeps the claim an order of magnitude below
+       neural-LLM task latency; it no longer bounds engine time alone. */
+    TEST_ASSERT(summary->avg_latency_ms < 500.0, "Average task latency is < 500 ms (an order of magnitude faster than neural LLMs, fs fsync included)");
 
     /* Verify leaderboard markdown report */
     TEST_ASSERT(strlen(summary->leaderboard_report) > 0, "Leaderboard report formatted");
