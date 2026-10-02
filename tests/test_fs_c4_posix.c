@@ -100,12 +100,20 @@ static void ro_snapshot_ok(void)
     ck(namesis(SCRATCH "/ro","f,g"),"ro dir names unchanged");
     ck(same("ro/f","FFF",3)&&same("ro/g","GGG",3),"ro dir bytes unchanged");
 }
-static void ro_case(const char *label,int status)
+/* needs_rec=0: the writer rolls back in process, so the root is clean at once
+   and no recovery call is needed. needs_rec=1: still pins the older contract
+   (pending state until the explicit recovery call). */
+static void ro_case(const char *label,int status,int needs_rec)
 {
     g_what=label;
     ck(status!=FS_READ_OK,"op in read-only dir must fail");
     (void)chmod(SCRATCH "/ro",0500);
     ro_snapshot_ok();
+    if(!needs_rec){
+        ck(namesis(SCRATCH,"a,ro"),"root clean with no recovery call");
+        ck(FsCreateFile(R,"next","N",1,0644)==FS_READ_OK,"next writer not blocked");
+        ck(FsRemoveFile(R,"next","N",1)==FS_READ_OK,"next remove not blocked");
+    }
     rec();
     /* After explicit recovery the workspace root holds nothing but its own files. */
     ck(namesis(SCRATCH,"a,ro"),"root clean after recovery");
@@ -123,14 +131,14 @@ static void t_perms(void)
     ck(mkdir(SCRATCH "/ro",0700)==0,"mkdir ro");
     ck(mk("ro/f","FFF",3,0644)&&mk("ro/g","GGG",3,0644),"ro fixtures");
     ck(chmod(SCRATCH "/ro",0500)==0,"ro chmod");
-    ro_case("ro create",FsCreateFile(R,"ro/n","N",1,0644));
-    ro_case("ro replace",FsReplaceFile(R,"ro/f","FFF",3,"XXX",3));
-    ro_case("ro remove",FsRemoveFile(R,"ro/f","FFF",3));
-    ro_case("ro move out",FsMoveFile(R,"ro/f","mv","FFF",3));
-    ro_case("move into ro",FsMoveFile(R,"a","ro/mv","AAA",3));
-    ro_case("copy into ro",FsCopyFile(R,"a","ro/cp","AAA",3));
-    ro_case("batch create in ro",FsBatchCreate(R,bc,2));
-    ro_case("batch replace in ro",FsBatchReplace(R,br,2));
+    ro_case("ro create",FsCreateFile(R,"ro/n","N",1,0644),0);
+    ro_case("ro replace",FsReplaceFile(R,"ro/f","FFF",3,"XXX",3),1);
+    ro_case("ro remove",FsRemoveFile(R,"ro/f","FFF",3),0);
+    ro_case("ro move out",FsMoveFile(R,"ro/f","mv","FFF",3),0);
+    ro_case("move into ro",FsMoveFile(R,"a","ro/mv","AAA",3),0);
+    ro_case("copy into ro",FsCopyFile(R,"a","ro/cp","AAA",3),0);
+    ro_case("batch create in ro",FsBatchCreate(R,bc,2),1);
+    ro_case("batch replace in ro",FsBatchReplace(R,br,2),1);
     ck(same("a","AAA",3),"a untouched");
     /* The block is the mode, not a stuck state: with write access back, work resumes. */
     g_what="ro resume";

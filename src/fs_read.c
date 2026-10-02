@@ -535,7 +535,7 @@ static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
 {
     char parent[FS_INTENT_MAX_PATH],*slash,*leaf,temp_name[48]={0};
     char intent_tmp[48]={0};int dir=-1,temp=-1,record=-1,random_fd=-1,record_owned=0;
-    unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;int published=0,pending=0;
+    unsigned char nonce[16];FS_READ_STATUS s=FS_READ_IO;int published=0,pending=0,own_intent=0;
     struct stat st;FS_CREATE_INTENT intent={0};
     FS_MANIFEST plan={0};FS_OP_REQUEST request={FS_OP_CREATE,NULL,rel};
     if(!r||!valid_relative(rel,0)||strlen(rel)>=sizeof(parent)||
@@ -603,7 +603,7 @@ static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
     if(linkat(r->fd,intent_tmp,r->fd,FS_INTENT_NAME,0)<0){
         s=error_status();goto done;
     }
-    pending=1;
+    pending=1;own_intent=1;
     if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
     crash_point(2); /* durable intent, no target */
     if(linkat(r->fd,temp_name,dir,leaf,0)<0){
@@ -622,6 +622,31 @@ done:
     if(record_owned){(void)unlinkat(r->fd,intent_tmp,0);(void)fsync(r->fd);}
     if(temp>=0)close(temp);
     if(!pending&&temp_name[0]){(void)unlinkat(r->fd,temp_name,0);(void)fsync(r->fd);}
+    if(own_intent&&!published){
+        /* In-process failure after our intent and before the target name was
+           linked: we know nothing was published, so undo exactly what this call
+           wrote instead of leaving a pending intent that blocks the next
+           writer. Only our own record (byte-identical) and our own stage are
+           removed; anything else stays and the call reports IO. */
+        FS_CREATE_INTENT cur;int rfd=openat(r->fd,FS_INTENT_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+        int ok=0;
+        if(rfd>=0){
+            struct stat rs;
+            ok=fstat(rfd,&rs)==0&&S_ISREG(rs.st_mode)&&rs.st_size==(off_t)sizeof(cur)&&
+               read(rfd,&cur,sizeof(cur))==(ssize_t)sizeof(cur)&&!memcmp(&cur,&intent,sizeof(cur));
+            close(rfd);
+        }
+        if(ok){
+            struct stat ss;
+            ok=durable_remove(r->fd,FS_INTENT_NAME);
+            if(ok&&fstatat(r->fd,temp_name,&ss,AT_SYMLINK_NOFOLLOW)==0){
+                if(S_ISREG(ss.st_mode)&&ss.st_dev==(dev_t)intent.dev&&ss.st_ino==(ino_t)intent.ino)
+                    ok=durable_remove(r->fd,temp_name);
+                else ok=0;
+            }
+        }
+        if(!ok)s=FS_READ_IO;
+    }
     if(dir>=0)close(dir);
     if(random_fd>=0)close(random_fd);
     /* A successful link must never be reported as failure and invite retry. */
@@ -1369,6 +1394,11 @@ done:
     if(random_fd>=0)close(random_fd);
     free(bytes);FsManifestFree(&plan);
     if(!journaled&&stage_owned){(void)durable_remove(r->fd,i.stage);}
+    if(journaled&&!unlinked&&!marked){
+        /* Failure after the journal, target still present: roll back now
+           (same contract as FsBatchReplace) instead of leaving it pending. */
+        if(remove_recover_locked(r)!=FS_READ_OK)s=FS_READ_IO;
+    }
     unlock_workspace(lock);
     return marked?FS_READ_OK:(unlinked?FS_READ_IO:s);
 }
@@ -1584,6 +1614,12 @@ done:
     if(random_fd>=0)close(random_fd);
     free(bytes);FsManifestFree(&plan);
     if(!journaled&&stage_owned)(void)durable_remove(r->fd,i.stage);
+    if(journaled&&!marked&&!source_removed){
+        /* The source name is still intact. Roll back now, with the same code a
+           crash replay uses: it removes the target link if this call made it. */
+        if(move_recover_locked(r)==FS_READ_OK)target_visible=0;
+        else s=FS_READ_IO;
+    }
     unlock_workspace(lock);
     return marked?FS_READ_OK:((target_visible||source_removed)?FS_READ_IO:s);
 }
