@@ -224,3 +224,5 @@ Facts the wiring has to respect: `AgentGitPatchState` refuses absolute paths, an
 Measured locally: 50/50, including the built executable returning exit 3 and exit 64. Mutants killed: rename without the `D`, duplicates allowed, "already applied" returning 0, `verify-head` using the index, preflight not requiring a clean tree, unsafe paths accepted, "applies neither way" returning 0, new files read as `M`, mismatch returned as match. ASan/UBSan x5: 50/50 clean.
 
 Not shown: behaviour on the Actions checkout (whether it has an upstream is not measured; that needs a dry run), Windows (the test prints a skip; the library file compiles on every platform), file content (as before, only paths and kinds are compared), and any use by `apply-patch`.
+
+Test line used on 2026-10-02 to exercise the apply-patch Git gate (dry run, then a real run and a retry).
