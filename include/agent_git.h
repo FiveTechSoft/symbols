@@ -27,6 +27,9 @@ typedef struct
     unsigned untracked_paths;
     unsigned ignored_paths;
     unsigned conflicted_paths;
+    /* Filled only by a remote check (require_remote_in_sync). */
+    char upstream[GIT_BRANCH_MAX];  /* e.g. origin/main */
+    char remote_head[GIT_HEAD_MAX]; /* tip of that branch on the remote */
 } GIT_REPOSITORY_STATE;
 
 typedef struct
@@ -35,6 +38,11 @@ typedef struct
     const char *expected_branch;
     bool require_clean;
     bool allow_detached_head;
+    /* Opt-in, read-only: ask the upstream remote for its branch tip (git
+       ls-remote, no fetch, no ref or tree change) and refuse unless that tip
+       is HEAD or an ancestor of HEAD. A remote that moved, diverged, is
+       unreachable or whose tip is unknown locally fails closed. */
+    bool require_remote_in_sync;
 } GIT_PRECONDITIONS;
 
 typedef enum
@@ -46,7 +54,9 @@ typedef enum
     GIT_PREFLIGHT_WRONG_BRANCH,
     GIT_PREFLIGHT_DETACHED_HEAD,
     GIT_PREFLIGHT_CONFLICTS,
-    GIT_PREFLIGHT_DIRTY_TREE
+    GIT_PREFLIGHT_DIRTY_TREE,
+    GIT_PREFLIGHT_NO_UPSTREAM,
+    GIT_PREFLIGHT_REMOTE_ADVANCED
 } GIT_PREFLIGHT_STATUS;
 
 /* Inspect repository facts through fixed, read-only Git commands. No caller

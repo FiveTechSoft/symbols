@@ -4626,6 +4626,17 @@ void ServerComposeGitPreflightAnswer(GIT_PREFLIGHT_STATUS status,
                  observed->staged_paths, observed->unstaged_paths,
                  observed->untracked_paths);
         break;
+    case GIT_PREFLIGHT_NO_UPSTREAM:
+        snprintf(out, size,
+                 "Me abstengo: la rama no tiene upstream, no puedo comprobar"
+                 " si el remoto ha avanzado.");
+        break;
+    case GIT_PREFLIGHT_REMOTE_ADVANCED:
+        snprintf(out, size,
+                 "Me abstengo: el remoto %s ha avanzado o ha divergido de"
+                 " HEAD. No he hecho fetch ni cambiado nada.",
+                 observed->upstream[0] ? observed->upstream : "(upstream)");
+        break;
     default:
         snprintf(out, size,
                  "Me abstengo: estado del repositorio desconocido.");

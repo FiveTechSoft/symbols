@@ -98,3 +98,39 @@ Criterion by platform (shown / partial / not shown):
 | Locked file | partial: workspace lock order and unsafe lock mode shown; per-file foreign locks are not honoured by design | partial: `test_fs_create_windows` opens the file with sharing denied; replace and remove are not covered |
 
 Criterion 4 therefore reads: shown on Linux for the six aspects within the limits above (one aspect, locked file, only for the workspace lock); partial on Windows; not shown on any other filesystem.
+
+## Update: Phase 2 step 1, remote-advance preflight (`tests/test_agent_git_remote.c`, POSIX)
+
+`AgentGitPreflight` has a new opt-in precondition, `require_remote_in_sync`, run last (after dirty, stale and conflict checks). It finds the upstream of the current branch, asks the remote for the branch tip with `git ls-remote --exit-code` (no fetch, no ref, index or tree change) and compares it with HEAD:
+
+| Remote tip | Status |
+|---|---|
+| equals HEAD, or is an ancestor of HEAD (local ahead) | `ready` |
+| not an ancestor of HEAD (remote advanced, diverged, or unknown object) | `remote_advanced` |
+| branch has no upstream, or HEAD is detached with detached allowed | `no_upstream` |
+| remote unreachable, name not a plain Git name, malformed answer | `inspection_failed` (fails closed) |
+
+The default stays off, so callers that do not set the field behave as before (the test pins this). Local tracking refs are not trusted for this, since they are only as fresh as the last fetch.
+
+The test uses a bare local remote and two clones. Every case also checks that HEAD, `refs/remotes`, index and working tree are identical before and after the check.
+
+Phase 2 status after this step (shown / partial / not shown / not met):
+
+| Criterion | Status |
+|---|---|
+| dirty, stale, detached, conflict | shown (`test_agent_git`) |
+| remote advance | shown on a local file remote only; no network remote, no authentication failure case |
+| submodule | not shown |
+| commit equals manifest | not shown |
+| idempotent retry ("already applied") | not shown |
+| apply-patch on the Git contracts | not met |
+
+### Bounded finding: `src/git_ops.c` (conflict solver)
+
+Not changed by this step. The solver is reached from `task_ops.c:3972` and `server_taskops.c:216`, which is the conflict-solving path and not the patch delivery path. It runs three history or tree rewriting commands:
+
+- line 389: `git checkout HEAD~1 -- <file>` overwrites the working copy of one file with its parent version.
+- line 346: `git checkout -m -- <file>` re-creates the conflicted merge state of one file while a merge is in progress (`MERGE_HEAD` present).
+- line 477: `git reset -q --hard <head>` on the failure branch of a revert, resetting the whole tree and index to the saved head.
+
+Line 477 is the broad one: it discards uncommitted work in the repository. It is outside the delivery contracts and is registered here as a known exception for criterion 4 of Phase 2, to be reviewed on its own.

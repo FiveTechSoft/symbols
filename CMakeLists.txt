@@ -392,6 +392,7 @@ target_link_libraries(c_contract_static symbolic)
 sllm_test(test_reflect tests/test_reflect.c)
 sllm_test(test_git_ops tests/test_git_ops.c)
 sllm_test(test_agent_git tests/test_agent_git.c)
+sllm_test(test_agent_git_remote tests/test_agent_git_remote.c)
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)
 
