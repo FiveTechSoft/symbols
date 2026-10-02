@@ -23,6 +23,11 @@ on:
         description: Lowercase SHA-256 of URL payload; required with patch_url
         required: false
         type: string
+      dry_run:
+        description: Run every check, build, test and a local commit, then stop before updating master
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -37,12 +42,24 @@ jobs:
     timeout-minutes: 30
     outputs:
       committed_sha: ${{ steps.commit.outputs.sha }}
+      already_applied: ${{ steps.state.outputs.already_applied }}
     steps:
       - name: Check out master
         uses: actions/checkout@v4
         with:
           ref: master
           fetch-depth: 0
+
+      - name: Build the Git gate from the current master
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Built before the patch is applied, outside the workspace, so the patch
+          # being checked cannot change the gate that checks it.
+          cmake -S . -B "$RUNNER_TEMP/gate-build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/gate-build" --target symbols_git_gate --parallel 2
+          cp "$RUNNER_TEMP/gate-build/symbols_git_gate" "$RUNNER_TEMP/symbols_git_gate"
+          test -x "$RUNNER_TEMP/symbols_git_gate"
 
       - name: Validate request and patch
         env:
@@ -98,7 +115,32 @@ jobs:
           done < "$RUNNER_TEMP/numstat"
           git apply --check "$RUNNER_TEMP/change.patch"
 
+      - name: Git preflight and already-applied check
+        id: state
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GATE="$RUNNER_TEMP/symbols_git_gate"
+          "$GATE" preflight --expected-head "$EXPECTED_HEAD" --branch master
+          # Explicit remote check: master on origin must be exactly this HEAD.
+          remote="$(git ls-remote --exit-code origin refs/heads/master | cut -f1)"
+          test "$remote" = "$(git rev-parse HEAD)" || { echo "origin/master is $remote, not $(git rev-parse HEAD)"; exit 1; }
+          # The patch goes to a relative path under .git: not tracked, not shown by
+          # git status, not picked up by git add, and a relative path as the gate requires.
+          cp "$RUNNER_TEMP/change.patch" .git/change.patch
+          rc=0
+          "$GATE" patch-state .git/change.patch || rc=$?
+          case "$rc" in
+            0) echo 'already_applied=false' >> "$GITHUB_OUTPUT" ;;
+            3) echo 'already applied: the changes of this patch are already present; nothing to commit'
+               echo 'already_applied=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo "patch-state failed with exit $rc"; exit 1 ;;
+          esac
+
       - name: Apply patch
+        if: steps.state.outputs.already_applied != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -107,18 +149,23 @@ jobs:
           test -n "$(git status --porcelain)" || { echo 'Patch produced no changes'; exit 1; }
 
       - name: Configure and build
+        if: steps.state.outputs.already_applied != 'true'
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2
 
       - name: Test
+        if: steps.state.outputs.already_applied != 'true'
         run: ctest --test-dir build --output-on-failure
 
       - name: Commit and update master
         id: commit
+        if: steps.state.outputs.already_applied != 'true'
         env:
           COMMIT_MESSAGE: ${{ inputs.message }}
+          DRY_RUN: ${{ inputs.dry_run }}
         shell: bash
         run: |
           set -euo pipefail
+          GATE="$RUNNER_TEMP/symbols_git_gate"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- src include tests tools CMakeLists.txt README.md ROADMAP.md COORDINATION.md AGENTS.md CHANGELOG.md .gitignore
@@ -126,12 +173,22 @@ jobs:
             git add -- docs
           fi
           git diff --cached --quiet && { echo 'Nothing to commit'; exit 1; }
+          # The index must hold exactly the files of the reviewed patch.
+          "$GATE" verify-staged .git/change.patch
           git commit -m "$COMMIT_MESSAGE"
+          # The commit must change exactly the files of the reviewed patch.
+          "$GATE" verify-head .git/change.patch
+          if [ "$DRY_RUN" = 'true' ]; then
+            echo 'dry run: all checks passed; master is not updated'
+            git push --dry-run origin HEAD:master
+            exit 0
+          fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git push origin HEAD:master
 
   ci:
     needs: apply
+    if: needs.apply.outputs.committed_sha != ''
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
