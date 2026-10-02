@@ -89,10 +89,10 @@ jobs:
           grep -q '^diff --git a/.* b/.*$' "$RUNNER_TEMP/change.patch" || { echo 'Not a unified git diff'; exit 1; }
           git apply --numstat "$RUNNER_TEMP/change.patch" > "$RUNNER_TEMP/numstat"
           test -s "$RUNNER_TEMP/numstat" || { echo 'Patch changes no files'; exit 1; }
-          test "$(wc -l < "$RUNNER_TEMP/numstat")" -le 20 || { echo 'Patch changes more than 20 files'; exit 1; }
+          test "$(wc -l < "$RUNNER_TEMP/numstat")" -le 40 || { echo 'Patch changes more than 40 files'; exit 1; }
           while IFS=$'\t' read -r added deleted path; do
             case "$path" in
-              src/*|include/*|tests/*|tools/*|CMakeLists.txt|README.md|ROADMAP.md|COORDINATION.md|AGENTS.md|CHANGELOG.md|docs/*) ;;
+              src/*|include/*|tests/*|tools/*|CMakeLists.txt|README.md|ROADMAP.md|COORDINATION.md|AGENTS.md|CHANGELOG.md|.gitignore|docs/*) ;;
               *) echo "Disallowed path: $path"; exit 1 ;;
             esac
           done < "$RUNNER_TEMP/numstat"
@@ -121,7 +121,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- src include tests tools CMakeLists.txt README.md ROADMAP.md COORDINATION.md AGENTS.md CHANGELOG.md
+          git add -- src include tests tools CMakeLists.txt README.md ROADMAP.md COORDINATION.md AGENTS.md CHANGELOG.md .gitignore
           if [ -d docs ]; then
             git add -- docs
           fi
