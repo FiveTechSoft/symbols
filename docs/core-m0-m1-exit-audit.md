@@ -160,3 +160,16 @@ No production change: `AgentGitInspect` already reads submodule state from `git 
 | uninitialised (plain clone without `--recurse-submodules`) | `ready`: there is nothing to compare, so a caller that needs the submodule content must check initialisation itself |
 
 Not covered: network submodules and credentials, nested submodules, a submodule whose remote advanced (the remote-advance check looks at the super repo only), Windows.
+
+## Update: M1 criterion 5 fuzz, Windows slice (`tests/test_fs_fuzz_ops.c`, `#else` branch)
+
+The Windows branch of `test_fs_fuzz_ops` was an empty skip. It now runs the confinement fuzz on NTFS: seeded malformed paths against replace, remove, create, move and copy, the manifest and transaction-plan tables, and the random manifests. A rejected operation must leave the workspace tree, a directory outside it and a file outside it unchanged (names, kind, read-only attribute, size, bytes) and leave no journal, stage or marker behind. Reproduce with `FS_FUZZ_SEED` and `FS_FUZZ_ITERS`.
+
+Differences from the POSIX branch:
+
+- Modes are only the read-only attribute. There is no symlink fixture; the directory link is a junction made with `mklink /J`.
+- The path pool adds the Windows control names (`.fstxn.intent`, `.fstxn.remove`, `.fstxn.move`, `.fstxn.rcommit`, `.fstxn.mcommit`, `.fst-stage`, `.fsrm-stage`, `.fsmv-stage`) and Win32 aliases (`NUL`, `con.txt`, a trailing dot, a trailing space), which the writers are expected to refuse.
+- `FsBatchCreate`, `FsBatchReplace` and `FsBatchRecover` are unsupported stubs on Windows. The test asserts the stub status, so it fails when batch support arrives. It makes no claim about batch behaviour on Windows.
+- Default iterations are 150 and 100 (POSIX: 400 and 300) until the CI cost is measured.
+
+Status: written without a Windows toolchain (syntax-checked only against stubs). The Windows cell of criterion 5 stays "not shown" until the CI jobs that build and run it are green; the measured CI cost is recorded in the commit closeout, not here.
