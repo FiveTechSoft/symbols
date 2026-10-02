@@ -73,3 +73,28 @@ Not covered, by design: Windows for these operations (the test prints SKIP there
 
 Observations, not bugs: control names such as `.fstxn.commit` and `.fsrp-*` are reserved at the workspace root only; inside a subdirectory they are ordinary file names. Mutation check: dropping the reserved-name check or the manifest's target validation makes the test fail; dropping only the manifest's colon or leading-slash check does not, because `FsReadStat` rejects those paths again later (redundant defense).
 Criterion 5 therefore reads: shown on POSIX for these operations with a recorded seed; not shown on Windows for replace, batch and the rest.
+
+## Update: M1 criterion 4 on POSIX (`tests/test_fs_c4_posix.c`)
+
+The new test pins behaviour measured on Linux. It is not a claim about other filesystems (macOS and Windows are usually case-insensitive) and it adds no Windows coverage.
+
+- **Case.** `Safe.txt`, `safe.txt` and `SAFE.TXT` are three objects; an exact duplicate is refused; replacing one leaves the others; a manifest with `New.txt` and `new.txt` plans both creates.
+- **Permissions** (skipped when euid is 0). In a `0500` directory, create, replace, remove, move out, move in, copy in, batch create and batch replace all fail and leave the directory byte-for-byte as it was; recovery then leaves the workspace root clean, and after `chmod 0700` the work resumes. A `0444` file is protected by its directory, not by its own bits: replace (mode stays `0444`), copy, move and remove succeed. A `0000` file cannot be read, so read, replace, copy and remove are all DENIED and nothing changes. A directory without `x` denies stat and create.
+- **Path length.** A 254 or 255 byte component works for create, replace and remove; 256 and 257 are refused with no leftover. A path of 1022 or 1023 bytes works for create, replace and remove; 1024 and 1025 are INVALID.
+- **Newline.** CRLF, LF, mixed, no trailing newline and a NUL-bearing payload survive create, copy, replace, move, remove and batch replace byte for byte; the reported newline kind and the binary flag match. A near-miss expected image (LF where the file has CRLF) is refused.
+- **Locks.** A child holding `flock` on `.fstxn.lock` makes create and replace wait; both complete after the release and land exactly once. Only the order is asserted (the holder's release is observed before the call returns), never a duration. A lock file with mode `0644` makes create and replace DENIED. A `flock` on a target file is not honoured: replace does not wait for it. That is declared out of scope in the Fs* comments (cooperative workspace lock only).
+
+Observation found while writing this test, pinned as measured and not changed: a refused operation in a read-only directory returns DENIED (or IO for some paths) but leaves its journal and stage files in the workspace root, and a pending intent blocks later writers until the explicit recovery call runs. Recovery restores a clean root and no target is ever changed. This matches the documented "pending intent blocks writes until explicit recovery", but a caller that treats DENIED as "nothing happened" will find later writes refused until it recovers.
+
+Criterion by platform (shown / partial / not shown):
+
+| Aspect | Linux | Windows |
+|---|---|---|
+| Separator | partial: `test_fs_adversarial`, `test_fs_fuzz_ops` (backslash, `C:`) | partial: the `test_fs_adversarial` Windows port exists; not read by this audit beyond a green job |
+| Case | shown: `test_fs_c4_posix` (case-sensitive, pinned) | partial: `test_fs_create_windows` has case alias checks; not read beyond a green job |
+| Permission | shown: `test_fs_c4_posix` (0444, 0500 dir, 0000, no-x dir, lock mode) | partial: `test_fs_create_windows` read-only attribute only |
+| Long path | shown: `test_fs_c4_posix` (255 component, 1023 path, edges refused) | partial: `test_fs_create_windows`, 240 byte component only; no total-path limit test |
+| Newline | shown: `test_fs_c4_posix`, `test_fs_read` | partial: `test_fs_read` CRLF read; no write-op byte test |
+| Locked file | partial: workspace lock order and unsafe lock mode shown; per-file foreign locks are not honoured by design | partial: `test_fs_create_windows` opens the file with sharing denied; replace and remove are not covered |
+
+Criterion 4 therefore reads: shown on Linux for the six aspects within the limits above (one aspect, locked file, only for the workspace lock); partial on Windows; not shown on any other filesystem.
