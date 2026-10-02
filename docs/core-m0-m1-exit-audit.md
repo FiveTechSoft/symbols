@@ -56,3 +56,20 @@ Summary: no M1 criterion is shown. Criteria 1, 2, 4 and 5 are partial and criter
 3. Medium: Windows survivor check (M0-3), Windows adversarial and wider fuzz (M1-1, M1-5), case and permission fixtures (M1-4).
 4. Product decisions, not started: mixed-operation executor or a narrower criterion (M1-2), `AgentPatch` on the `Fs*` API (M1-3).
 5. Dedicated run: the 100-repetition stress (M0-6).
+
+## Update: M1 criterion 5 fuzz (`tests/test_fs_fuzz_ops.c`, POSIX)
+
+Corrections to the table above, read from `master` after the audited commit:
+- `test_fs_adversarial` has a Windows port (the `#else` branch: the 20 malformed strings across create, copy, move, remove and manifest, the 400 generated strings and the outside check). Criteria 1 and 5 are no longer "POSIX only" for create, copy, move and remove. Replace, batch and the other operations below are still not covered on Windows.
+- `FsBatchReplace` (multi-file replace, POSIX) exists next to `FsBatchCreate`; see `docs/agent-patch-fs.md`.
+
+What the new test covers, with a recorded seed (`0x20d1854`, override with `FS_FUZZ_SEED` and `FS_FUZZ_ITERS`; a failure prints seed, iteration, operation and path):
+- Generated paths of one to three segments from a pool of `..`, `.`, empty, `safe`, `sub`, backslash, `C:`, a root symlink to a directory outside the workspace, a root symlink to a file outside, control-file names, a control byte, a leading slash. For each: replace (four expected images, including the outside file's bytes so a followed symlink would succeed), remove, create, move (both directions), copy (both directions), batch create and batch replace with the bad path as second entry, `FsTxnPlan`, then `FsBatchRecover`.
+- After every operation the test requires: the operation was rejected; the workspace tree (names, kinds, modes, bytes, link targets), a directory outside the workspace and a file outside are identical to the baseline; no journal, stage or marker remains. A positive control first shows that the detector sees a real replace and a real batch replace.
+- Manifests: a table of malformed requests (count 0 and 65, null arguments, bad kinds, wrong source or target arity, empty, absolute, control byte, backslash, colon, `..`, duplicate, prefix overlap, move onto itself, missing parent, file as parent, symlink component and leaf, over 1024 bytes, `FsTxnPlan` without and with a wrong expected image) and 300 random manifests where any accepted plan must name only safe paths and change nothing.
+- Measured locally on Linux: 5808 rejected operations per default run, about 0.2 s (0.45 s under ASan and UBSan); 100 seeds of 600 iterations and one 20,000-iteration ASan run found no violation.
+
+Not covered, by design: Windows for these operations (the test prints SKIP there, which is not coverage), concurrent races (`test_fs_race`), journal byte fuzzing (fixed malformed-journal cases exist in `test_fs_batch` and `test_fs_batch_replace`), content fuzzing.
+
+Observations, not bugs: control names such as `.fstxn.commit` and `.fsrp-*` are reserved at the workspace root only; inside a subdirectory they are ordinary file names. Mutation check: dropping the reserved-name check or the manifest's target validation makes the test fail; dropping only the manifest's colon or leading-slash check does not, because `FsReadStat` rejects those paths again later (redundant defense).
+Criterion 5 therefore reads: shown on POSIX for these operations with a recorded seed; not shown on Windows for replace, batch and the rest.
