@@ -199,7 +199,7 @@ These decisions change the order of work, not the dependency chain above. No pul
 ### Exit criteria
 
 - Traversal through `..`, absolute-path escape, symlink escape, and rename races fail closed in adversarial fixtures.
-- Interrupted multi-file mutations either commit fully or restore the original byte-for-byte state.
+- Interrupted multi-file create and replace batches either commit fully or restore the original byte-for-byte state. Mixed-operation batches (create, replace, move, remove in one transaction) are not part of this criterion; see the 2026-10-02 decision in [docs/core-m0-m1-exit-audit.md](docs/core-m0-m1-exit-audit.md).
 - Existing unified-diff behavior is reimplemented on the structured filesystem API with no regression in patch fixtures.
 - Linux and Windows fixtures cover separator, case, permission, long-path, newline, and locked-file behavior.
 - Fuzzing malformed paths and operation manifests yields no out-of-workspace write.

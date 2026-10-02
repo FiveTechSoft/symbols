@@ -54,7 +54,7 @@ Summary: no M1 criterion is shown. Criteria 1, 2, 4 and 5 are partial and criter
 1. Read-only: record per-test PASS lines for the audited SHA (M0-5), and fill the criterion by platform table (M1-4).
 2. Small tests, no new run beyond ordinary CI: the four POSIX tests above are in this change. Windows equivalents remain.
 3. Medium: Windows survivor check (M0-3), Windows adversarial and wider fuzz (M1-1, M1-5), case and permission fixtures (M1-4).
-4. Product decisions, not started: mixed-operation executor or a narrower criterion (M1-2), `AgentPatch` on the `Fs*` API (M1-3).
+4. Product decisions: M1-2 decided on 2026-10-02 (narrower criterion, see the decision section below); not started: `AgentPatch` on the `Fs*` API (M1-3).
 5. Dedicated run: the 100-repetition stress (M0-6).
 
 ## Update: M1 criterion 5 fuzz (`tests/test_fs_fuzz_ops.c`, POSIX)
@@ -134,3 +134,11 @@ Not changed by this step. The solver is reached from `task_ops.c:3972` and `serv
 - line 477: `git reset -q --hard <head>` on the failure branch of a revert, resetting the whole tree and index to the saved head.
 
 Line 477 is the broad one: it discards uncommitted work in the repository. It is outside the delivery contracts and is registered here as a known exception for criterion 4 of Phase 2, to be reviewed on its own.
+
+## Decision: M1 criterion 2 narrowed (2026-10-02)
+
+Criterion 2 now reads: interrupted multi-file **create and replace** batches either commit fully or restore the original bytes byte-for-byte. The planned mixed-operation executor (M1-2b) is dropped as planned work.
+
+Reason: no consumer needs a mixed batch today, and a mixed executor would add a recovery surface (journal formats, crash points, foreign-state handling) that nothing justifies yet. If a real consumer appears, it is built then, with its own crash tests.
+
+What the narrowed criterion rests on, unchanged by this decision: `test_fs_batch` and `test_fs_fuzz_ops` (POSIX) and the in-process rollback tests for batch create and batch replace. Windows batch create and replace remain not shown (`FsBatch*` returns unsupported there). The earlier criterion-2 row in the table above records the state before this decision.
