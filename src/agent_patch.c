@@ -160,33 +160,38 @@ static bool make_abs(const char *p, char *out, size_t out_size)
     return n > 0 && (size_t)n < out_size;
 }
 
-/* Derive the workspace-relative path of plan->target_file. A relative target
-   keeps its historical meaning (relative to the current directory). Either way
-   the target must lie beneath the workspace; anything else is rejected. */
-static bool resolve_target(const PATCH_PLAN *plan, char *rel, size_t rel_size)
+/* Derive the workspace-relative path of `target`. A relative target keeps its
+   historical meaning (relative to the current directory). Either way the
+   target must lie beneath the workspace; anything else is rejected. */
+int PatchResolveTarget(const char *workspace, const char *target, char *rel, size_t rel_size)
 {
-    const char *ws = plan->workspace[0] ? plan->workspace : ".";
+    const char *ws = (workspace && workspace[0]) ? workspace : ".";
     char abs_ws[MAX_PATCH_PATH * 4], abs_t[MAX_PATCH_PATH * 4];
-    if (!plan->target_file[0] || !make_abs(ws, abs_ws, sizeof(abs_ws)) ||
-        !make_abs(plan->target_file, abs_t, sizeof(abs_t)))
-        return false;
+    if (!target || !target[0] || !rel || !make_abs(ws, abs_ws, sizeof(abs_ws)) ||
+        !make_abs(target, abs_t, sizeof(abs_t)))
+        return 0;
     size_t n = strlen(abs_ws);
     while (n > 1 && (abs_ws[n - 1] == '/' || abs_ws[n - 1] == '\\'))
         n--;
     for (size_t i = 0; i < n; i++)
         if (norm_ch(abs_ws[i]) != norm_ch(abs_t[i]))
-            return false;
+            return 0;
     if (abs_t[n] != '/' && abs_t[n] != '\\')
-        return false;
+        return 0;
     const char *t = abs_t + n + 1;
     while (t[0] == '.' && (t[1] == '/' || t[1] == '\\'))
         t += 2;
     if (!t[0] || strlen(t) >= rel_size)
-        return false;
+        return 0;
     snprintf(rel, rel_size, "%s", t);
     for (char *q = rel; *q; q++)
         if (*q == '\\') *q = '/'; /* Fs* accepts '/' only */
-    return true;
+    return 1;
+}
+
+static bool resolve_target(const PATCH_PLAN *plan, char *rel, size_t rel_size)
+{
+    return PatchResolveTarget(plan->workspace, plan->target_file, rel, rel_size) != 0;
 }
 
 static FS_READ_ROOT *open_root(const PATCH_PLAN *plan)

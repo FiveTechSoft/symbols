@@ -9,6 +9,10 @@
 #include <string.h>
 #include <time.h>
 #include "swe_bench_harness.h"
+#include "agent_patch.h"
+#include "fs_read.h"
+#include "fs_write.h"
+#include "fs_remove.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -39,6 +43,7 @@ static double get_process_memory_mb(void)
 }
 #else
 #include <sys/resource.h>
+#include <sys/stat.h>
 static double get_time_ms(void)
 {
     struct timespec ts;
@@ -235,6 +240,66 @@ static void make_parent_dirs(const char *path)
     }
 }
 
+/* Create the benchmark file with FsCreateFile. Returns 1 when this run created
+   it. Fails closed (returns 0) when the target is outside the workspace, when
+   the name already exists, or on any Fs* error. */
+static int seed_target(const SWE_BENCH_HARNESS *harness, const SWE_BENCH_TASK *t,
+                       const char *code, int *created)
+{
+    char rel[MAX_PATCH_PATH];
+    FS_READ_ROOT *root = NULL;
+    FS_READ_STATUS st;
+    *created = 0;
+    if (!PatchResolveTarget(harness->workspace_dir, t->target_file, rel, sizeof(rel)))
+    {
+        fprintf(stderr, "swe-bench: target '%s' is outside the workspace; task skipped\n", t->target_file);
+        return 0;
+    }
+    make_parent_dirs(t->target_file);
+    if (FsReadOpen(harness->workspace_dir, &root) != FS_READ_OK)
+        return 0;
+    st = FsCreateFile(root, rel, code, strlen(code), 0644);
+    if (st == FS_READ_PENDING)
+    {
+        unsigned char *b = NULL;
+        size_t n = 0;
+        FS_READ_META meta;
+        if (FsCreateRecover(root) == FS_READ_OK &&
+            FsReadFile(root, rel, &b, &n, &meta) == FS_READ_OK &&
+            n == strlen(code) && (n == 0 || memcmp(b, code, n) == 0))
+            st = FS_READ_OK;
+        free(b);
+    }
+    FsReadClose(root);
+    if (st != FS_READ_OK)
+    {
+        fprintf(stderr, "swe-bench: cannot create '%s' (Fs status %d; an existing file is never overwritten); task skipped\n",
+                t->target_file, (int)st);
+        return 0;
+    }
+    *created = 1;
+    return 1;
+}
+
+/* Remove the seeded file with the exact bytes it holds now (FsRemoveFile is a
+   compare-and-remove, so drift between the read and the remove is refused). */
+static void unseed_target(const SWE_BENCH_HARNESS *harness, const SWE_BENCH_TASK *t)
+{
+    char rel[MAX_PATCH_PATH];
+    FS_READ_ROOT *root = NULL;
+    unsigned char *b = NULL;
+    size_t n = 0;
+    FS_READ_META meta;
+    if (!PatchResolveTarget(harness->workspace_dir, t->target_file, rel, sizeof(rel)) ||
+        FsReadOpen(harness->workspace_dir, &root) != FS_READ_OK)
+        return;
+    if (FsReadFile(root, rel, &b, &n, &meta) == FS_READ_OK &&
+        FsRemoveFile(root, rel, b, n) != FS_READ_OK)
+        fprintf(stderr, "swe-bench: could not remove benchmark file '%s'\n", t->target_file);
+    free(b);
+    FsReadClose(root);
+}
+
 /* ============================================================
    Evaluation & Benchmarking API
    ============================================================ */
@@ -263,12 +328,14 @@ int SweBenchHarnessRun(SWE_BENCH_HARNESS *harness, SWE_BENCH_EVAL_SUMMARY *summa
                  "%s%s%s",
                  t->context_before, t->buggy_snippet, t->context_after);
 
-        make_parent_dirs(t->target_file);
-        FILE *f = fopen(t->target_file, "wb");
-        if (f)
+        /* Seed the benchmark file through Fs*: create-only, inside the
+           workspace. An existing file is never overwritten (it may be the
+           user's own code), and only a file this run created is removed. */
+        int created = 0;
+        if (!seed_target(harness, t, sample_code, &created))
         {
-            fwrite(sample_code, 1, strlen(sample_code), f);
-            fclose(f);
+            summary->failed_tasks++;
+            continue;
         }
 
         CodeGraphIngestSource(harness->runner->code_graph, t->target_file, sample_code);
@@ -285,8 +352,9 @@ int SweBenchHarnessRun(SWE_BENCH_HARNESS *harness, SWE_BENCH_EVAL_SUMMARY *summa
             summary->failed_tasks++;
         }
 
-        /* Clean up temporary benchmark file */
-        remove(t->target_file);
+        /* Clean up the temporary benchmark file, only if this run created it */
+        if (created)
+            unseed_target(harness, t);
 
         summary->total_tool_calls += res->total_tool_calls;
         summary->total_replans    += res->replans_triggered;

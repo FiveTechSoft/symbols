@@ -43,3 +43,16 @@ Incident and rule (6a5ad6c)
   runner tests now remove `.fstxn.lock` from each versioned fixture directory
   before and after every case, and the 33 tracked locks are deleted. Tests
   must leave no control file in versioned fixtures.
+
+SWE-bench harness (M1-3, patch 2 of 2)
+- `SweBenchHarnessRun` seeds its benchmark file with `FsCreateFile` (create-only)
+  and removes it with `FsRemoveFile` (compare-and-remove with the bytes read just
+  before). Root is the harness workspace; the target must lie beneath it
+  (`PatchResolveTarget`), otherwise the task is skipped and counted as failed.
+- Behavior change: an existing file at the target path is never overwritten or
+  removed (before, `fopen "wb"` truncated it and `remove` deleted it, which
+  could destroy user code). Such a task is counted as failed and a line is
+  written to stderr. Only a file this run created is removed.
+- Parent directories are still created with `mkdir` (Fs* has no directory
+  creation); directories are left in place, as before.
+- Symlink targets are refused; Windows needs NTFS and otherwise fails closed.

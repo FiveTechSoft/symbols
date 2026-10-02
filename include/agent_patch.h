@@ -89,6 +89,11 @@ int  PatchPlanInit(PATCH_PLAN *plan, const char *target_file);
    .fstxn-*, .fsrp-*) appear in this root and are internal artifacts. */
 int  PatchPlanSetWorkspace(PATCH_PLAN *plan, const char *workspace_dir);
 
+/* Workspace-relative form of `target` (cwd-relative or absolute) beneath
+   `workspace` (NULL or empty means "."). Returns 1 and fills `rel` with a '/'
+   separated path, or 0 when the target is outside the workspace. */
+int  PatchResolveTarget(const char *workspace, const char *target, char *rel, size_t rel_size);
+
 /* Recover a pending Fs* replace transaction left by a crash in the workspace.
    Returns 1 when recovery completed. */
 int  PatchRecover(const PATCH_PLAN *plan);
