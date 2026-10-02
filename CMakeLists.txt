@@ -400,6 +400,7 @@ sllm_test(test_agent_git tests/test_agent_git.c)
 sllm_test(test_agent_git_remote tests/test_agent_git_remote.c)
 sllm_test(test_agent_git_contract tests/test_agent_git_contract.c)
 sllm_test(test_agent_git_submodule tests/test_agent_git_submodule.c)
+sllm_test(test_git_destructive_audit tests/test_git_destructive_audit.c)
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)
 

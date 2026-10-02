@@ -197,3 +197,13 @@ Three new read-only checks in `src/agent_git.c`. Nothing calls them yet; wiring 
 - `AgentGitPatchState`: for a retry. `git apply --check` forward means `not_applied`; if that fails and `git apply --check --reverse` succeeds the patch is `already_applied` (the retry can say "this patch is already in the tree" instead of only refusing); neither direction is `no_match`; an unreadable, corrupt or unsafe patch path is `check_failed`. Forward wins when both directions apply. The path is interpolated into a command line, so only `[A-Za-z0-9._/-]` is accepted (relative, no leading `-`, no `..`).
 
 Measured: 44/44 locally with real repositories; the checks leave HEAD, index and tree identical. Not covered: file content (a manifest path with the wrong bytes still matches), renames (reported as `D` plus `A`), a patch whose direction is ambiguous, Windows, and `already_applied` for a patch that was applied and then partly edited (that is `no_match`).
+
+## Update: Phase 2 criterion 4, destructive git inventory (`tests/test_git_destructive_audit.c`, POSIX)
+
+A text scan over every `.c`, `.h` and `.inc` under `src/` and `include/` for destructive git commands (`reset`, `clean`, `checkout`, `restore`, `push`, `--force`, `--hard`, `stash`, `rebase`, `switch`, `filter`, `rm`, `branch -D`, `revert`, `gc`, `prune`, `update-ref`, `worktree`, `reflog`). Every matching line must match a whitelist entry in the test, each with its reason. A new use fails until it is reviewed and added. A whitelist entry that no longer matches also fails. The test also requires that every `git apply` built in `src/agent_git.c` is a `--check` dry run.
+
+Measured: 14/14 locally. Mutants all killed: a new `git clean` in `agent_git.c`, a new `git push --force` in another file, a new use in a subdirectory, `reset --hard` edited so its entry goes stale, and `git apply --check` changed to `git apply`.
+
+Current whitelist: the detector in `src/command_policy.c` (strings that refuse these commands), the phrase list in `src/server_proto.c` (never executed), path-scoped `checkout`, `rm --cached` and `revert` in `src/git_ops.c` and `src/server_taskops.c`, and the known exception `git reset -q --hard` at `src/git_ops.c:477` (see above). `src/agent_git.c` has no entry: the delivery contracts name no destructive command.
+
+Not shown: commands assembled from pieces at run time, shell scripts, workflows, and anything outside `src/` and `include/`. The test does not prove the whitelisted uses are safe, only that the set of uses is the reviewed one. POSIX only; Windows prints a skip. Criterion 4 of Phase 2 is therefore: delivery path **shown clean by inventory**, with one registered exception outside it.
