@@ -121,8 +121,8 @@ Phase 2 status after this step (shown / partial / not shown / not met):
 | dirty, stale, detached, conflict | shown (`test_agent_git`) |
 | remote advance | shown on a local file remote only; no network remote, no authentication failure case |
 | submodule | shown on POSIX with a `file://` submodule (`test_agent_git_submodule`, see below); no network submodule, no nested submodule, no Windows |
-| commit equals manifest | not shown |
-| idempotent retry ("already applied") | not shown |
+| commit equals manifest | shown on POSIX for the set of paths and their kind (A, M, D) of the index and of the HEAD commit (`test_agent_git_contract`); file content is not compared |
+| idempotent retry ("already applied") | detection shown on POSIX (`AgentGitPatchState`, `test_agent_git_contract`); not wired into any retry path |
 | apply-patch on the Git contracts | not met |
 
 ### Bounded finding: `src/git_ops.c` (conflict solver)
@@ -187,3 +187,13 @@ Not covered: `CONIN$`, `CONOUT$` and the superscript digit forms of COM and LPT.
 Run 37037694490 (commit `a154d40`) is green on all four jobs, including `build-test-msvc` and `asan-msvc`, which run the Windows branch of `test_fs_fuzz_ops` and `test_fs_win_device_names`. The earlier red (run 37036245164) was the device-name gap fixed in that commit.
 
 Criterion 5 on Windows: **partial**. Shown by CI with a recorded default seed (150 iterations, 100 random manifests): replace, remove, create, move and copy with malformed paths, the manifest and transaction-plan tables, and random manifests. Not shown: batch (the Windows batch functions are unsupported stubs, asserted as such), the iteration count of the POSIX run (400 and 300), other seeds, and `CONIN$`, `CONOUT$` and superscript COM and LPT names. The per-test pass counts and run time were not read from the CI logs; the job status is what was read.
+
+## Update: Phase 2 commit contract and "already applied" (`tests/test_agent_git_contract.c`, POSIX)
+
+Three new read-only checks in `src/agent_git.c`. Nothing calls them yet; wiring them into `apply-patch` is step 5.
+
+- `AgentGitStagedMatches`: the index differs from HEAD in exactly the expected paths, with the expected kind (`A`, `M`, `D`) where one is given. A missing or extra path, a wrong kind, a repeated manifest path, a path git would quote, or an unknown kind letter all fail, and the message names the first difference. Unstaged and untracked files are not in the index and do not matter here; `AgentGitPreflight` owns them.
+- `AgentGitHeadCommitMatches`: the same for the HEAD commit against its parent (or the empty tree for a root commit). A merge commit never matches. An empty commit matches an empty manifest.
+- `AgentGitPatchState`: for a retry. `git apply --check` forward means `not_applied`; if that fails and `git apply --check --reverse` succeeds the patch is `already_applied` (the retry can say "this patch is already in the tree" instead of only refusing); neither direction is `no_match`; an unreadable, corrupt or unsafe patch path is `check_failed`. Forward wins when both directions apply. The path is interpolated into a command line, so only `[A-Za-z0-9._/-]` is accepted (relative, no leading `-`, no `..`).
+
+Measured: 44/44 locally with real repositories; the checks leave HEAD, index and tree identical. Not covered: file content (a manifest path with the wrong bytes still matches), renames (reported as `D` plus `A`), a patch whose direction is ambiguous, Windows, and `already_applied` for a patch that was applied and then partly edited (that is `no_match`).

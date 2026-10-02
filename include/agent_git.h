@@ -74,6 +74,62 @@ GIT_PREFLIGHT_STATUS AgentGitPreflight(const char *working_dir,
                                        char *error,
                                        size_t error_size);
 
+/* Phase 2: commit contract and "already applied" detection. Read-only. */
+
+/* One path a reviewed mutation manifest says will change. status is 'A'
+   (added), 'M' (modified), 'D' (deleted), or 0 when only the path matters.
+   Renames are not detected (git runs with --no-renames), so a rename is a
+   'D' plus an 'A'. */
+typedef struct
+{
+    const char *path;
+    char status;
+} GIT_EXPECTED_CHANGE;
+
+typedef enum
+{
+    GIT_CHANGES_MATCH = 0,
+    GIT_CHANGES_MISMATCH,
+    GIT_CHANGES_INSPECTION_FAILED
+} GIT_CHANGES_STATUS;
+
+/* The index differs from HEAD in exactly the expected paths (and statuses
+   where given): nothing extra, nothing missing. Unstaged and untracked files
+   are not part of the index and are ignored here; AgentGitPreflight owns
+   them. error names the first difference. Paths git would quote (quote,
+   newline, tab) fail closed as INSPECTION_FAILED. */
+GIT_CHANGES_STATUS AgentGitStagedMatches(const char *working_dir,
+                                         const GIT_EXPECTED_CHANGE *expected,
+                                         size_t count,
+                                         char *error,
+                                         size_t error_size);
+
+/* The HEAD commit differs from its parent (or from the empty tree for a root
+   commit) in exactly the expected paths. A merge commit never matches. */
+GIT_CHANGES_STATUS AgentGitHeadCommitMatches(const char *working_dir,
+                                             const GIT_EXPECTED_CHANGE *expected,
+                                             size_t count,
+                                             char *error,
+                                             size_t error_size);
+
+typedef enum
+{
+    GIT_PATCH_NOT_APPLIED = 0,   /* applies forward to the working tree */
+    GIT_PATCH_ALREADY_APPLIED,   /* applies in reverse: its changes are present */
+    GIT_PATCH_NO_MATCH,          /* applies neither way (diverged or partial) */
+    GIT_PATCH_CHECK_FAILED       /* unreadable, corrupt or unsafe patch path */
+} GIT_PATCH_STATE;
+
+/* Tell a retry whether a patch is already present. Uses git apply --check,
+   which writes nothing. Forward application wins when both directions apply.
+   The patch path is interpolated into a command line, so only
+   [A-Za-z0-9._/-] is accepted: relative, no leading '-' or '/', no "..". The check is against the
+   working tree, so run it after a clean preflight. */
+GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
+                                   const char *patch_path,
+                                   char *error,
+                                   size_t error_size);
+
 const char *AgentGitPreflightStatusName(GIT_PREFLIGHT_STATUS status);
 
 #endif
