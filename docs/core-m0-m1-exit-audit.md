@@ -173,3 +173,11 @@ Differences from the POSIX branch:
 - Default iterations are 150 and 100 (POSIX: 400 and 300) until the CI cost is measured.
 
 Status: written without a Windows toolchain (syntax-checked only against stubs). The Windows cell of criterion 5 stays "not shown" until the CI jobs that build and run it are green; the measured CI cost is recorded in the commit closeout, not here.
+
+## Finding: Windows writers accepted Win32 device names (fixed here)
+
+The Windows fuzz slice (commit `a89cbd8`, run 37036245164) failed on `build-test-msvc` and `asan-msvc` with `FAIL operation with a generated path was accepted (seed=34412628 iter=7 op=create path=[NUL])`: `FsCreateFile(root, "NUL", ...)` returned OK. `wc_target_status` in `src/fs_create_win.inc` rejected a trailing dot or space, `:`, `\`, control characters and over-long segments, but not device names. The manifest layer already refused them (`valid_component` in `src/fs_manifest.c`), so only the direct writers had the gap.
+
+Fix: `wc_device_name` refuses CON, PRN, AUX, NUL, COM1-9 and LPT1-9 in every path component, in any case, with any extension and with trailing spaces before the extension (`NUL .txt`). It sits in `wc_target_status`, which every writer entry point calls (create, copy, remove, move, replace), so one check covers all of them. The result is `FS_READ_INVALID`, like the other malformed-name cases. It is slightly wider than the manifest rule on one point: the manifest does not trim spaces before the extension.
+
+Not covered: `CONIN$`, `CONOUT$` and the superscript digit forms of COM and LPT. `tests/test_fs_win_device_names.c` (Windows only, runs only in CI) tries every writer entry point with each device name as source, destination and directory component, checks the listing is unchanged, and checks that near-miss names (`NULL`, `COM0`, `COM10`, `LPT0`, `CONSOLE`, `nul1`, `xNUL`) still work. The logic of `wc_device_name` alone was also run on Linux against the same name lists. The fuzz test is unchanged and keeps exercising the aliases.

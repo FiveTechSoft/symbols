@@ -174,6 +174,11 @@ if(WIN32)
     target_compile_definitions(test_fs_win_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_replace COMMAND test_fs_win_replace
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_device_names PRIVATE include)
+    add_test(NAME test_fs_win_device_names COMMAND test_fs_win_device_names
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 else()
     sllm_test(test_fs_create_windows tests/test_fs_create_windows.c)
 endif()

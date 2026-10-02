@@ -71,6 +71,22 @@ static int wc_reserved(const WCHAR *s)
        !_wcsnicmp(leaf,L".fsrp-",6)||!_wcsnicmp(leaf,L".fsrb-",6)||
        !_wcsnicmp(leaf,L".fsrm-",6)||!_wcsnicmp(leaf,L".fsmv-",6);
 }
+/* Win32 device names (CON PRN AUX NUL COM1-9 LPT1-9), with any extension and
+   any trailing spaces before the extension, are aliases of devices in the Win32
+   namespace. They are refused for every component, as the manifest already
+   does (valid_component in fs_manifest.c). */
+static int wc_device_name(const WCHAR *s)
+{
+    WCHAR b[6];size_t n=0,i;
+    while(s[n]&&s[n]!=L'.')n++;
+    while(n&&s[n-1]==L' ')n--;
+    if(n!=3&&n!=4)return 0;
+    for(i=0;i<n;i++)b[i]=(s[i]>=L'a'&&s[i]<=L'z')?(WCHAR)(s[i]-32):s[i];
+    b[n]=0;
+    if(n==3)return !wcscmp(b,L"CON")||!wcscmp(b,L"PRN")||
+                   !wcscmp(b,L"AUX")||!wcscmp(b,L"NUL");
+    return (!wcsncmp(b,L"COM",3)||!wcsncmp(b,L"LPT",3))&&b[3]>=L'1'&&b[3]<=L'9';
+}
 /* Validate the whole path before classifying reserved control leaves. A malformed
    suffix must stay INVALID even if an earlier component is reserved. */
 static FS_READ_STATUS wc_target_status(const WCHAR *s)
@@ -83,6 +99,7 @@ static FS_READ_STATUS wc_target_status(const WCHAR *s)
             segment[n]=0;
             if(segment[n-1]==L'.'||segment[n-1]==L' '||
                !wcscmp(segment,L".")||!wcscmp(segment,L".."))return FS_READ_INVALID;
+            if(wc_device_name(segment))return FS_READ_INVALID;
             if(wc_reserved(segment))reserved=1;
             n=0;if(!*p)break;
         }else{
