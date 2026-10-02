@@ -113,8 +113,7 @@ jobs:
               *) echo "Disallowed path: $path"; exit 1 ;;
             esac
           done < "$RUNNER_TEMP/numstat"
-          git apply --check "$RUNNER_TEMP/change.patch"
-
+          
       - name: Git preflight and already-applied check
         id: state
         env:
