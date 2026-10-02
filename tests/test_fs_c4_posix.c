@@ -132,13 +132,18 @@ static void t_perms(void)
     ck(mk("ro/f","FFF",3,0644)&&mk("ro/g","GGG",3,0644),"ro fixtures");
     ck(chmod(SCRATCH "/ro",0500)==0,"ro chmod");
     ro_case("ro create",FsCreateFile(R,"ro/n","N",1,0644),0);
-    ro_case("ro replace",FsReplaceFile(R,"ro/f","FFF",3,"XXX",3),1);
+    ro_case("ro replace",FsReplaceFile(R,"ro/f","FFF",3,"XXX",3),0);
     ro_case("ro remove",FsRemoveFile(R,"ro/f","FFF",3),0);
     ro_case("ro move out",FsMoveFile(R,"ro/f","mv","FFF",3),0);
     ro_case("move into ro",FsMoveFile(R,"a","ro/mv","AAA",3),0);
     ro_case("copy into ro",FsCopyFile(R,"a","ro/cp","AAA",3),0);
-    ro_case("batch create in ro",FsBatchCreate(R,bc,2),1);
-    ro_case("batch replace in ro",FsBatchReplace(R,br,2),1);
+    ro_case("batch create in ro",FsBatchCreate(R,bc,2),0);
+    {   /* Partial publication: the first name lands in the writable root, the second
+           fails in the read-only dir. The first must be taken back. */
+        FS_BATCH_CREATE bp[2]={{"first","1",1,0644},{"ro/second","2",1,0644}};
+        ro_case("batch create partial",FsBatchCreate(R,bp,2),0);
+    }
+    ro_case("batch replace in ro",FsBatchReplace(R,br,2),0);
     ck(same("a","AAA",3),"a untouched");
     /* The block is the mode, not a stuck state: with write access back, work resumes. */
     g_what="ro resume";

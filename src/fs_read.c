@@ -1033,6 +1033,17 @@ done:
         (void)fsync(r->fd);
     }
     if(random_fd>=0)close(random_fd);
+    if(journaled&&!committed_here){
+        /* In-process failure after the journal and before the commit marker:
+           roll back now with the crash-replay code (same contract as
+           FsBatchReplace). Success keeps the original error; a failed
+           rollback leaves the journal and reports IO. */
+        int pj=0,pc=0;FS_READ_STATUS rs=batch_state(r,&pj,&pc);
+        if(rs==FS_READ_OK&&pj&&!pc){
+            if(batch_recover_locked(r)==FS_READ_OK)visible=0;
+            else{s=FS_READ_IO;visible=1;}
+        }else if(rs!=FS_READ_OK||pj){s=FS_READ_IO;visible=1;}
+    }
     unlock_workspace(lock);
     /* If any name became visible, report an interrupted transaction as IO,
        never invite blind retry. Caller must recover explicitly. */
@@ -1887,6 +1898,11 @@ done:
     if(!journal){
         if(oldstage)(void)durable_remove(r->fd,i.oldstage);
         if(newstage)(void)durable_remove(r->fd,i.newstage);
+    }else if(!published&&!committed){
+        /* Failure after the journal, target still the old inode: roll back
+           now instead of leaving a pending intent. A failed rollback leaves
+           the journal and reports IO. */
+        if(replace_recover_locked(r)!=FS_READ_OK)s=FS_READ_IO;
     }
     unlock_workspace(lock);
     return committed?FS_READ_OK:(published?FS_READ_PENDING:s);

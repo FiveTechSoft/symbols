@@ -76,6 +76,15 @@ Multi-file replace (M1-2, `FsBatchReplace`)
   the original error; a crash needs `FsBatchRecover`.
 - It reuses the create batch journal name, so a pending batch of either kind
   blocks every other writer until `FsBatchRecover`.
+- In-process rollback for every writer (patches P1 and P2): create, copy, remove,
+  move, replace and batch create also undo their own journal when a step fails
+  before the commit, using the same code as crash replay (create removes only its
+  own byte-identical intent and stage). The original error is returned and no
+  recovery call is needed. If the rollback itself fails the journal stays, the
+  call returns `FS_READ_IO` and later writers are refused until recovery. A
+  failure after a name became visible and the source was removed (move, remove)
+  or after the new target was published (replace) still reports IO or PENDING and
+  needs the explicit recovery call.
 - Recovery validates every target, stage and rollback name before changing any;
   a target holding neither the old nor the new inode (foreign bytes) makes
   recovery fail closed with nothing changed.
