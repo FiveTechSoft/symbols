@@ -26,6 +26,17 @@ static int copy_file(const char *from, const char *to)
     fclose(in); return fclose(out) == 0;
 }
 
+/* AgentPatch (Fs*) leaves a .fstxn.lock in the workspace root. Fixture
+   directories are versioned, so drop it before and after each case: a stale
+   checked-out copy (mode 0644) would be refused, and a fresh one must not be
+   left in the tree. */
+static void drop_lock(const char *workspace)
+{
+    char p[1100];
+    snprintf(p, sizeof(p), "%s/.fstxn.lock", workspace);
+    remove(p);
+}
+
 static int same_file(const char *a, const char *b)
 {
     FILE *fa = fopen(a, "rb"), *fb = fopen(b, "rb"); int ca, cb;
@@ -41,8 +52,9 @@ static int run_case(const char *dir, const char *replacement, int expected,
     if (!getcwd(cwd, sizeof(cwd))) return 0;
     snprintf(initial, sizeof(initial), "%s/%s/%s/main.initial.c", cwd, ROOT, dir);
     snprintf(target, sizeof(target), "%s/%s/%s/main.c", cwd, ROOT, dir);
-    if (!copy_file(initial, target)) return 0;
     char workspace[1024]; snprintf(workspace, sizeof(workspace), "%s/%s/%s", cwd, ROOT, dir);
+    drop_lock(workspace);
+    if (!copy_file(initial, target)) return 0;
     AGENT_RUNNER *r = AgentRunnerCreate(workspace, 1);
     SWE_BENCH_TASK t; SWE_BENCH_RESULT result;
     memset(&t, 0, sizeof(t));
@@ -51,7 +63,7 @@ static int run_case(const char *dir, const char *replacement, int expected,
     strncpy(t.target_file, target, sizeof(t.target_file)-1);
     t.target_line = 1;
     FILE *f = fopen(initial, "rb");
-    if (!f || !fgets(t.buggy_snippet, sizeof(t.buggy_snippet), f)) { if (f) fclose(f); AgentRunnerDestroy(r); remove(target); return 0; }
+    if (!f || !fgets(t.buggy_snippet, sizeof(t.buggy_snippet), f)) { if (f) fclose(f); AgentRunnerDestroy(r); (remove(target), drop_lock(workspace)); return 0; }
     fclose(f);
     strncpy(t.fixed_snippet, replacement, sizeof(t.fixed_snippet)-1);
     snprintf(cmd, sizeof(cmd), "gcc -std=c11 -Werror=implicit-function-declaration -fsyntax-only %s", target);
@@ -70,7 +82,7 @@ static int run_case(const char *dir, const char *replacement, int expected,
            dir, rc, expected, result.attempts_executed, result.replans_triggered,
            result.last_repair_operator[0] ? result.last_repair_operator : "none",
            ok ? "OK" : "FAIL");
-    AgentRunnerDestroy(r); remove(target); return ok;
+    AgentRunnerDestroy(r); (remove(target), drop_lock(workspace)); return ok;
 }
 
 int main(void)

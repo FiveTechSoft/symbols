@@ -37,3 +37,9 @@ Incident and rule (6a5ad6c)
 - Known limitation: `FS_READ_DENIED` covers drift, links, a pending transaction
   and an unsafe lock; `io_diag` cannot tell them apart. Fixing that needs Fs* to
   expose the reason and is out of scope here.
+- Correction (follow-up): `.gitignore` does not protect files that are already
+  tracked, and the apply workflow runs ctest before committing, so a test that
+  recreates a tracked lock cancels its deletion. The held-out and external
+  runner tests now remove `.fstxn.lock` from each versioned fixture directory
+  before and after every case, and the 33 tracked locks are deleted. Tests
+  must leave no control file in versioned fixtures.
