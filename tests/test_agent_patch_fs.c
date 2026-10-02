@@ -189,6 +189,17 @@ int main(void)
     ck(PatchRollback(&p) == 0 && is(WS "/a.c", "user edit\n") && p.is_applied, "rollback refused, user edit kept");
     PatchPlanFree(&p);
 
+    puts("T9 pre-existing .fstxn.lock with unsafe mode fails closed");
+    reset();
+    put(WS "/.fstxn.lock", "");
+    chmod(WS "/.fstxn.lock", 0644);
+    plan_for(&p, WS "/a.c");
+    ck(PatchApplyAtomic(&p) == 0 && is(WS "/a.c", OLDC), "0644 lock: apply refused, file untouched");
+    ck(p.io_diag[0] != 0 && !p.is_applied, "diagnostic set, not applied");
+    chmod(WS "/.fstxn.lock", 0600);
+    ck(PatchApplyAtomic(&p) == 1 && is(WS "/a.c", NEWC), "same lock at 0600: apply works");
+    PatchPlanFree(&p);
+
     if (system("rm -rf " WS " " OUT) != 0) return 2;
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
     return fails ? 1 : 0;

@@ -75,3 +75,8 @@ bank_report.jsonl
 /sympy/
 /trap/
 /src/_pytest/
+
+# Fs* control file created in every workspace root that AgentPatch edits. Never commit it:
+# a checked-out copy has mode 0644 and Fs* refuses it (fail closed).
+.fstxn.lock
+**/.fstxn.lock

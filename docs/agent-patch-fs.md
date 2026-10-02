@@ -24,3 +24,16 @@ Behavior
   `.fsrm-*`, `.fs*-stage`) appear in the workspace root. They are internal.
   `AgentGitInspect` excludes them from untracked/ignored counts. The user's
   `.gitignore` and `.git/info/exclude` are never edited.
+
+Incident and rule (6a5ad6c)
+- The apply workflow ran the tests and committed the 33 `.fstxn.lock` files they
+  created in fixture workspaces. A checkout gives them mode 0644, and Fs* refuses
+  a lock with group/other bits (fail closed), so every patch in those workspaces
+  was DENIED and `test_agent_runner_heldout` / `_external` failed on Linux CI.
+- Control files are never committed. `.fstxn.lock` is in `.gitignore`.
+  The `AgentGitInspect` exclusion only keeps them out of the clean-tree check;
+  it is not permission to track them.
+- A lock with an unsafe mode makes apply fail closed (`test_agent_patch_fs` T9).
+- Known limitation: `FS_READ_DENIED` covers drift, links, a pending transaction
+  and an unsafe lock; `io_diag` cannot tell them apart. Fixing that needs Fs* to
+  expose the reason and is out of scope here.
