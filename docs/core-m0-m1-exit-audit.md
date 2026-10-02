@@ -72,7 +72,7 @@ What the new test covers, with a recorded seed (`0x20d1854`, override with `FS_F
 Not covered, by design: Windows for these operations (the test prints SKIP there, which is not coverage), concurrent races (`test_fs_race`), journal byte fuzzing (fixed malformed-journal cases exist in `test_fs_batch` and `test_fs_batch_replace`), content fuzzing.
 
 Observations, not bugs: control names such as `.fstxn.commit` and `.fsrp-*` are reserved at the workspace root only; inside a subdirectory they are ordinary file names. Mutation check: dropping the reserved-name check or the manifest's target validation makes the test fail; dropping only the manifest's colon or leading-slash check does not, because `FsReadStat` rejects those paths again later (redundant defense).
-Criterion 5 therefore reads: shown on POSIX for these operations with a recorded seed; not shown on Windows for replace, batch and the rest.
+Criterion 5 therefore reads: shown on POSIX for these operations with a recorded seed; not shown on Windows for replace, batch and the rest. Superseded for Windows by the 2026-10-02 update at the end of this document.
 
 ## Update: M1 criterion 4 on POSIX (`tests/test_fs_c4_posix.c`)
 
@@ -181,3 +181,9 @@ The Windows fuzz slice (commit `a89cbd8`, run 37036245164) failed on `build-test
 Fix: `wc_device_name` refuses CON, PRN, AUX, NUL, COM1-9 and LPT1-9 in every path component, in any case, with any extension and with trailing spaces before the extension (`NUL .txt`). It sits in `wc_target_status`, which every writer entry point calls (create, copy, remove, move, replace), so one check covers all of them. The result is `FS_READ_INVALID`, like the other malformed-name cases. It is slightly wider than the manifest rule on one point: the manifest does not trim spaces before the extension.
 
 Not covered: `CONIN$`, `CONOUT$` and the superscript digit forms of COM and LPT. `tests/test_fs_win_device_names.c` (Windows only, runs only in CI) tries every writer entry point with each device name as source, destination and directory component, checks the listing is unchanged, and checks that near-miss names (`NULL`, `COM0`, `COM10`, `LPT0`, `CONSOLE`, `nul1`, `xNUL`) still work. The logic of `wc_device_name` alone was also run on Linux against the same name lists. The fuzz test is unchanged and keeps exercising the aliases.
+
+## Update: criterion 5 Windows cell after CI (2026-10-02)
+
+Run 37037694490 (commit `a154d40`) is green on all four jobs, including `build-test-msvc` and `asan-msvc`, which run the Windows branch of `test_fs_fuzz_ops` and `test_fs_win_device_names`. The earlier red (run 37036245164) was the device-name gap fixed in that commit.
+
+Criterion 5 on Windows: **partial**. Shown by CI with a recorded default seed (150 iterations, 100 random manifests): replace, remove, create, move and copy with malformed paths, the manifest and transaction-plan tables, and random manifests. Not shown: batch (the Windows batch functions are unsupported stubs, asserted as such), the iteration count of the POSIX run (400 and 300), other seeds, and `CONIN$`, `CONOUT$` and superscript COM and LPT names. The per-test pass counts and run time were not read from the CI logs; the job status is what was read.
