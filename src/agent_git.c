@@ -21,6 +21,28 @@ static void TrimLine(char *text)
         text[--n] = '\0';
 }
 
+/* Fs* control artifacts (lock, intents, stage/pin files) live in the workspace
+   root while AgentPatch edits files. They are internal, not user changes. */
+static int IsFsControlEntry(const char *line)
+{
+    const char *path = line + 2; /* after "? " or "! " */
+    const char *base = path, *p;
+    size_t n;
+    if (*base == '"')
+        base++;
+    for (p = base; *p; p++)
+        if (*p == '/' || *p == '\\')
+            base = p + 1;
+    if (!strncmp(base, ".fstxn", 6) || !strncmp(base, ".fsrp-", 6) ||
+        !strncmp(base, ".fsrb-", 6) || !strncmp(base, ".fsrm-", 6) ||
+        !strncmp(base, ".fsmv-", 6))
+        return 1;
+    n = strlen(base);
+    if (n > 0 && base[n - 1] == '"')
+        n--;
+    return !strncmp(base, ".fs", 3) && n > 9 && !strncmp(base + n - 6, "-stage", 6);
+}
+
 static GIT_INSPECT_STATUS RunReadOnly(const char *command,
                                       const char *working_dir,
                                       SHELL_EXEC_RESULT *result,
@@ -143,9 +165,15 @@ GIT_INSPECT_STATUS AgentGitInspect(const char *working_dir,
         else if (line[0] == 'u' && line[1] == ' ')
             out->conflicted_paths++;
         else if (line[0] == '?' && line[1] == ' ')
-            out->untracked_paths++;
+        {
+            if (!IsFsControlEntry(line))
+                out->untracked_paths++;
+        }
         else if (line[0] == '!' && line[1] == ' ')
-            out->ignored_paths++;
+        {
+            if (!IsFsControlEntry(line))
+                out->ignored_paths++;
+        }
         else if (line[0] != '\0')
         {
             SetError(error, error_size, "Unknown Git status entry");

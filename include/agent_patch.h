@@ -70,6 +70,10 @@ typedef struct
     bool        is_applied;
     char       *backup_content;     /* Snapshot of original file content for rollback */
     size_t      backup_size;
+    char        workspace[MAX_PATCH_PATH]; /* Fs* root; empty means "." */
+    char       *applied_content;    /* Exact bytes this plan wrote (rollback precondition) */
+    size_t      applied_size;
+    char        io_diag[MAX_PATCH_DIAG]; /* Why the last apply/rollback failed */
 } PATCH_PLAN;
 
 /* ============================================================
@@ -78,6 +82,16 @@ typedef struct
 
 /* Initialize a new patch plan targeting target_file */
 int  PatchPlanInit(PATCH_PLAN *plan, const char *target_file);
+
+/* Set the workspace root. Reads and writes go through the Fs* API held at this
+   root; target_file keeps its meaning (cwd-relative or absolute) and must lie
+   beneath it; anything else is rejected. Default root is ".". Fs* control files (.fstxn.lock,
+   .fstxn-*, .fsrp-*) appear in this root and are internal artifacts. */
+int  PatchPlanSetWorkspace(PATCH_PLAN *plan, const char *workspace_dir);
+
+/* Recover a pending Fs* replace transaction left by a crash in the workspace.
+   Returns 1 when recovery completed. */
+int  PatchRecover(const PATCH_PLAN *plan);
 
 /* Release internal backup buffers and clean up plan */
 void PatchPlanFree(PATCH_PLAN *plan);

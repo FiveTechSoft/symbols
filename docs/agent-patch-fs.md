@@ -1,0 +1,26 @@
+# AgentPatch on the Fs* API (M1-3, patch 1 of 2)
+
+Scope: the write paths of `src/agent_patch.c` that mutate the user's working
+tree. Patch 2 covers `src/swe_bench_harness.c`. Runner reads, internal stores
+(`atomic_store.c`, `reflect.c`) and data/model/log files are out of scope by the
+write-path criterion.
+
+Behavior
+- Reads use `FsReadFile`; apply and rollback use `FsReplaceFile` with the exact
+  expected bytes. There is no `fopen` fallback.
+- Root is the plan workspace (`PatchPlanSetWorkspace`, default `.`; the runner
+  passes `workspace_dir`). A target keeps its historical meaning (relative to the
+  current directory, or absolute) and must lie beneath the workspace; anything
+  else, including `..` escapes, is rejected.
+- Drift: if the file changed between the read and the replace, apply is DENIED
+  and the file is not touched. Rollback restores only if the file still holds
+  exactly what the plan wrote; otherwise it refuses and keeps the user's bytes.
+- `FS_READ_PENDING` is never success: recovery runs and the on-disk bytes decide.
+  `PatchRecover` clears a pending transaction left by a crash.
+- Limits: 1 MiB per file (`FS_READ_MAX`), refused explicitly. Symlink and
+  hard-linked targets are DENIED. Windows requires NTFS; other volumes fail
+  closed. The inode changes on replace; the permission bits are kept.
+- Control files `.fstxn.lock`, `.fstxn-*`, `.fsrp-*` (and `.fsrb-*`, `.fsmv-*`,
+  `.fsrm-*`, `.fs*-stage`) appear in the workspace root. They are internal.
+  `AgentGitInspect` excludes them from untracked/ignored counts. The user's
+  `.gitignore` and `.git/info/exclude` are never edited.

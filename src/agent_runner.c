@@ -447,6 +447,7 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
     /* 4. Pre-Flight Surgical Patch Verification */
     PATCH_PLAN patch;
     PatchPlanInit(&patch, task->target_file);
+    PatchPlanSetWorkspace(&patch, runner->workspace_dir);
     PatchPlanAddHunk(&patch,
                      task->target_line,
                      task->context_before,
@@ -586,6 +587,7 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
             PATCH_PLAN candidate;
             PATCH_VERIFY_REPORT candidate_rep;
             PatchPlanInit(&candidate, task->target_file);
+            PatchPlanSetWorkspace(&candidate, runner->workspace_dir);
             bool added = PatchPlanAddHunk(&candidate, task->target_line,
                                           task->context_before, task->buggy_snippet,
                                           repaired_replacement, task->context_after);
@@ -616,6 +618,7 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
             PATCH_PLAN candidate;
             PATCH_VERIFY_REPORT candidate_rep;
             PatchPlanInit(&candidate, task->target_file);
+            PatchPlanSetWorkspace(&candidate, runner->workspace_dir);
             /* Header insertion comes first so applying it preserves the task
                hunk's original target for the following sequential hunk. */
             if (add_missing_header_hunk(runner, task, &diag, &candidate) &&

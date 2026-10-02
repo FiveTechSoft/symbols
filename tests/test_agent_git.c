@@ -94,6 +94,22 @@ int main(void)
     CHECK(Run(repo, "git reset --quiet", 0), "fixture staging reset explicitly");
     remove("test_agent_git_repo/untracked.txt");
 
+    CHECK(WriteFile("test_agent_git_repo/.fstxn.lock", "") &&
+          WriteFile("test_agent_git_repo/.fsrp-0123abcd", "x") &&
+          WriteFile("test_agent_git_repo/.fstxn-0123abcd", "x"),
+          "Fs* control artifacts created");
+    CHECK(AgentGitInspect(repo, &state, error, sizeof(error)) == GIT_INSPECT_OK &&
+          state.untracked_paths == 0 &&
+          AgentGitPreflight(repo, &required, &state, error, sizeof(error)) == GIT_PREFLIGHT_READY,
+          "Fs* control artifacts are not user changes");
+    CHECK(WriteFile("test_agent_git_repo/.fsrpx", "x") &&
+          AgentGitInspect(repo, &state, error, sizeof(error)) == GIT_INSPECT_OK &&
+          state.untracked_paths == 1, "similar non-control name still counts as untracked");
+    remove("test_agent_git_repo/.fsrpx");
+    remove("test_agent_git_repo/.fstxn.lock");
+    remove("test_agent_git_repo/.fsrp-0123abcd");
+    remove("test_agent_git_repo/.fstxn-0123abcd");
+
     CHECK(WriteFile("test_agent_git_repo/tracked.txt", "modified\n"), "tracked file modified");
     CHECK(AgentGitInspect(repo, &state, error, sizeof(error)) == GIT_INSPECT_OK &&
           state.unstaged_paths == 1, "unstaged tracked path is reported");

@@ -7,7 +7,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include "agent_patch.h"
+#include "fs_read.h"
+#include "fs_replace.h"
 
 /* Helper to count newline-separated lines in a string */
 static uint32_t count_lines(const char *text)
@@ -84,66 +91,209 @@ static char *restore_crlf_if_needed(const char *src, bool original_had_crlf, siz
     return dst;
 }
 
-/* Helper to read entire file content into an allocated string */
-static char *read_file_to_string(const char *file_path, size_t *out_size)
+/* ============================================================
+   Workspace-confined I/O on the Fs* API (M1-3).
+   Every read and write of a target goes through a held workspace root:
+   FsReadFile for reads, FsReplaceFile (exact expected bytes) for writes.
+   Absolute targets are accepted only when they lie under the workspace.
+   ".." escapes, symlinked or hard-linked targets, files over the Fs* 1 MiB
+   limit and non-NTFS Windows volumes fail closed. There is no fopen fallback.
+   ============================================================ */
+
+#ifdef AGENT_PATCH_TEST_HOOK
+void (*g_patch_test_before_replace)(void) = NULL;
+#endif
+
+#define PATCH_IO_MAX (1024u * 1024u) /* FS_READ_MAX */
+
+static void set_diag(char *dst, const char *msg)
 {
-    if (!file_path)
-        return NULL;
+    if (dst)
+        snprintf(dst, MAX_PATCH_DIAG, "%s", msg);
+}
 
-    FILE *f = fopen(file_path, "rb");
-    if (!f)
-        return NULL;
-
-    if (fseek(f, 0, SEEK_END) != 0)
+static const char *fs_status_text(FS_READ_STATUS s)
+{
+    switch (s)
     {
-        fclose(f);
+    case FS_READ_OK:          return "ok";
+    case FS_READ_INVALID:     return "invalid path, outside workspace, or over the 1 MiB limit";
+    case FS_READ_MISSING:     return "file missing";
+    case FS_READ_DENIED:      return "denied: file changed, is a link, or an Fs transaction is pending";
+    case FS_READ_UNSUPPORTED: return "unsupported on this filesystem (NTFS required on Windows)";
+    case FS_READ_PENDING:     return "replace pending recovery";
+    default:                  return "I/O error";
+    }
+}
+
+static bool path_is_abs(const char *t)
+{
+    return t[0] == '/' || t[0] == '\\' ||
+           (((t[0] >= 'A' && t[0] <= 'Z') || (t[0] >= 'a' && t[0] <= 'z')) && t[1] == ':');
+}
+
+static char norm_ch(char c)
+{
+#ifdef _WIN32
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+#endif
+    return c == '\\' ? '/' : c;
+}
+
+/* Make `p` absolute: keep absolute paths, otherwise prefix the current directory. */
+static bool make_abs(const char *p, char *out, size_t out_size)
+{
+    if (path_is_abs(p))
+    {
+        if (strlen(p) >= out_size) return false;
+        strcpy(out, p);
+        return true;
+    }
+    char cwd[MAX_PATCH_PATH * 2];
+#ifdef _WIN32
+    if (!_getcwd(cwd, (int)sizeof(cwd))) return false;
+#else
+    if (!getcwd(cwd, sizeof(cwd))) return false;
+#endif
+    int n = strcmp(p, ".") == 0 ? snprintf(out, out_size, "%s", cwd)
+                                : snprintf(out, out_size, "%s/%s", cwd, p);
+    return n > 0 && (size_t)n < out_size;
+}
+
+/* Derive the workspace-relative path of plan->target_file. A relative target
+   keeps its historical meaning (relative to the current directory). Either way
+   the target must lie beneath the workspace; anything else is rejected. */
+static bool resolve_target(const PATCH_PLAN *plan, char *rel, size_t rel_size)
+{
+    const char *ws = plan->workspace[0] ? plan->workspace : ".";
+    char abs_ws[MAX_PATCH_PATH * 4], abs_t[MAX_PATCH_PATH * 4];
+    if (!plan->target_file[0] || !make_abs(ws, abs_ws, sizeof(abs_ws)) ||
+        !make_abs(plan->target_file, abs_t, sizeof(abs_t)))
+        return false;
+    size_t n = strlen(abs_ws);
+    while (n > 1 && (abs_ws[n - 1] == '/' || abs_ws[n - 1] == '\\'))
+        n--;
+    for (size_t i = 0; i < n; i++)
+        if (norm_ch(abs_ws[i]) != norm_ch(abs_t[i]))
+            return false;
+    if (abs_t[n] != '/' && abs_t[n] != '\\')
+        return false;
+    const char *t = abs_t + n + 1;
+    while (t[0] == '.' && (t[1] == '/' || t[1] == '\\'))
+        t += 2;
+    if (!t[0] || strlen(t) >= rel_size)
+        return false;
+    snprintf(rel, rel_size, "%s", t);
+    for (char *q = rel; *q; q++)
+        if (*q == '\\') *q = '/'; /* Fs* accepts '/' only */
+    return true;
+}
+
+static FS_READ_ROOT *open_root(const PATCH_PLAN *plan)
+{
+    FS_READ_ROOT *r = NULL;
+    if (FsReadOpen(plan->workspace[0] ? plan->workspace : ".", &r) != FS_READ_OK)
+        return NULL;
+    return r;
+}
+
+/* Read the target as a NUL-terminated buffer. */
+static char *read_target(const PATCH_PLAN *plan, size_t *out_size, char *diag)
+{
+    char rel[MAX_PATCH_PATH];
+    FS_READ_ROOT *r;
+    unsigned char *bytes = NULL;
+    size_t n = 0;
+    FS_READ_META meta;
+    FS_READ_STATUS s;
+
+    if (!resolve_target(plan, rel, sizeof(rel)))
+    {
+        set_diag(diag, "target is outside the workspace");
         return NULL;
     }
-
-    long sz = ftell(f);
-    if (sz < 0 || sz > 20 * 1024 * 1024) /* 20 MB safety limit */
+    r = open_root(plan);
+    if (!r)
     {
-        fclose(f);
+        set_diag(diag, "cannot open workspace root");
         return NULL;
     }
-
-    if (fseek(f, 0, SEEK_SET) != 0)
+    s = FsReadFile(r, rel, &bytes, &n, &meta);
+    FsReadClose(r);
+    if (s != FS_READ_OK)
     {
-        fclose(f);
+        set_diag(diag, fs_status_text(s));
         return NULL;
     }
-
-    char *buf = (char *)malloc((size_t)sz + 1);
+    char *buf = (char *)malloc(n + 1);
     if (!buf)
     {
-        fclose(f);
+        free(bytes);
+        set_diag(diag, "out of memory");
         return NULL;
     }
-
-    size_t read_bytes = fread(buf, 1, (size_t)sz, f);
-    buf[read_bytes] = '\0';
-    fclose(f);
-
+    if (n)
+        memcpy(buf, bytes, n);
+    buf[n] = '\0';
+    free(bytes);
     if (out_size)
-        *out_size = read_bytes;
-
+        *out_size = n;
     return buf;
 }
 
-/* Helper to write string content to disk */
-static bool write_string_to_file(const char *file_path, const char *content, size_t size)
+/* Replace the target's exact `expected` bytes with `repl`. Returns true only
+   when the target verifiably holds `repl` afterwards. FS_READ_PENDING is never
+   treated as success: recovery runs, then the on-disk bytes decide. */
+static bool replace_target(const PATCH_PLAN *plan, const char *expected, size_t elen,
+                           const char *repl, size_t rlen, char *diag)
 {
-    if (!file_path || !content)
+    char rel[MAX_PATCH_PATH];
+    FS_READ_ROOT *r;
+    FS_READ_STATUS s;
+    bool ok = false;
+
+    if (elen > PATCH_IO_MAX || rlen > PATCH_IO_MAX)
+    {
+        set_diag(diag, "file exceeds the 1 MiB Fs* limit");
         return false;
-
-    FILE *f = fopen(file_path, "wb");
-    if (!f)
+    }
+    if (!resolve_target(plan, rel, sizeof(rel)))
+    {
+        set_diag(diag, "target is outside the workspace");
         return false;
-
-    size_t written = fwrite(content, 1, size, f);
-    fclose(f);
-
-    return (written == size);
+    }
+    r = open_root(plan);
+    if (!r)
+    {
+        set_diag(diag, "cannot open workspace root");
+        return false;
+    }
+#ifdef AGENT_PATCH_TEST_HOOK
+    if (g_patch_test_before_replace)
+        g_patch_test_before_replace();
+#endif
+    s = FsReplaceFile(r, rel, expected, elen, repl, rlen);
+    if (s == FS_READ_OK)
+        ok = true;
+    else if (s == FS_READ_PENDING)
+    {
+        FS_READ_STATUS rs = FsReplaceRecover(r);
+        unsigned char *now = NULL;
+        size_t nn = 0;
+        FS_READ_META meta;
+        if (rs == FS_READ_OK && FsReadFile(r, rel, &now, &nn, &meta) == FS_READ_OK &&
+            nn == rlen && (rlen == 0 || memcmp(now, repl, rlen) == 0))
+            ok = true;
+        else
+            set_diag(diag, rs == FS_READ_OK
+                     ? "replace was rolled back by recovery"
+                     : "replace pending and recovery failed");
+        free(now);
+    }
+    else
+        set_diag(diag, fs_status_text(s));
+    FsReadClose(r);
+    return ok;
 }
 
 /* ============================================================
@@ -160,6 +310,27 @@ int PatchPlanInit(PATCH_PLAN *plan, const char *target_file)
     return 1;
 }
 
+int PatchPlanSetWorkspace(PATCH_PLAN *plan, const char *workspace_dir)
+{
+    if (!plan || !workspace_dir || !workspace_dir[0] ||
+        strlen(workspace_dir) >= MAX_PATCH_PATH)
+        return 0;
+    strcpy(plan->workspace, workspace_dir);
+    return 1;
+}
+
+int PatchRecover(const PATCH_PLAN *plan)
+{
+    if (!plan)
+        return 0;
+    FS_READ_ROOT *r = open_root(plan);
+    if (!r)
+        return 0;
+    FS_READ_STATUS s = FsReplaceRecover(r);
+    FsReadClose(r);
+    return s == FS_READ_OK;
+}
+
 void PatchPlanFree(PATCH_PLAN *plan)
 {
     if (!plan)
@@ -171,6 +342,12 @@ void PatchPlanFree(PATCH_PLAN *plan)
         plan->backup_content = NULL;
     }
     plan->backup_size = 0;
+    if (plan->applied_content)
+    {
+        free(plan->applied_content);
+        plan->applied_content = NULL;
+    }
+    plan->applied_size = 0;
     plan->is_applied = false;
     plan->hunk_count = 0;
 }
@@ -356,14 +533,15 @@ int PatchVerifyPlan(const PATCH_PLAN *plan, PATCH_VERIFY_REPORT *report)
         return 0;
 
     size_t sz = 0;
-    char *content = read_file_to_string(plan->target_file, &sz);
+    char why[MAX_PATCH_DIAG] = {0};
+    char *content = read_target(plan, &sz, why);
     if (!content)
     {
         memset(report, 0, sizeof(*report));
         report->status = PATCH_CHECK_IO_ERROR;
         report->is_applicable = false;
         snprintf(report->diagnostic, sizeof(report->diagnostic),
-                 "Failed to read file '%s'.", plan->target_file);
+                 "Failed to read file '%.200s': %.200s.", plan->target_file, why);
         return 0;
     }
 
@@ -381,14 +559,19 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     if (!plan || plan->hunk_count == 0)
         return 0;
 
+    plan->io_diag[0] = '\0';
+
     /* 1. Pre-flight verification of all hunks */
     PATCH_VERIFY_REPORT report;
     if (!PatchVerifyPlan(plan, &report) || !report.is_applicable)
+    {
+        set_diag(plan->io_diag, report.diagnostic);
         return 0;
+    }
 
     /* 2. Read full original content for backup */
     size_t orig_sz = 0;
-    char *orig_content = read_file_to_string(plan->target_file, &orig_sz);
+    char *orig_content = read_target(plan, &orig_sz, plan->io_diag);
     if (!orig_content)
         return 0;
 
@@ -473,14 +656,18 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     if (!final_content)
         return 0;
 
-    /* 5. Atomic write to disk */
-    if (!write_string_to_file(plan->target_file, final_content, final_sz))
+    /* 5. Conditional replace: succeeds only if the file still holds exactly
+       the bytes read in step 2 (drift since then is DENIED, not overwritten). */
+    if (!replace_target(plan, plan->backup_content, plan->backup_size,
+                        final_content, final_sz, plan->io_diag))
     {
         free(final_content);
         return 0;
     }
 
-    free(final_content);
+    free(plan->applied_content);
+    plan->applied_content = final_content;
+    plan->applied_size = final_sz;
     plan->is_applied = true;
     return 1;
 }
@@ -490,7 +677,13 @@ int PatchRollback(PATCH_PLAN *plan)
     if (!plan || !plan->is_applied || !plan->backup_content)
         return 0;
 
-    if (!write_string_to_file(plan->target_file, plan->backup_content, plan->backup_size))
+    plan->io_diag[0] = '\0';
+    if (!plan->applied_content)
+        return 0;
+
+    /* Restore only if the file still holds exactly what this plan wrote. */
+    if (!replace_target(plan, plan->applied_content, plan->applied_size,
+                        plan->backup_content, plan->backup_size, plan->io_diag))
         return 0;
 
     plan->is_applied = false;
