@@ -120,7 +120,7 @@ Phase 2 status after this step (shown / partial / not shown / not met):
 |---|---|
 | dirty, stale, detached, conflict | shown (`test_agent_git`) |
 | remote advance | shown on a local file remote only; no network remote, no authentication failure case |
-| submodule | not shown |
+| submodule | shown on POSIX with a `file://` submodule (`test_agent_git_submodule`, see below); no network submodule, no nested submodule, no Windows |
 | commit equals manifest | not shown |
 | idempotent retry ("already applied") | not shown |
 | apply-patch on the Git contracts | not met |
@@ -142,3 +142,21 @@ Criterion 2 now reads: interrupted multi-file **create and replace** batches eit
 Reason: no consumer needs a mixed batch today, and a mixed executor would add a recovery surface (journal formats, crash points, foreign-state handling) that nothing justifies yet. If a real consumer appears, it is built then, with its own crash tests.
 
 What the narrowed criterion rests on, unchanged by this decision: `test_fs_batch` and `test_fs_fuzz_ops` (POSIX) and the in-process rollback tests for batch create and batch replace. Windows batch create and replace remain not shown (`FsBatch*` returns unsupported there). The earlier criterion-2 row in the table above records the state before this decision.
+
+## Update: Phase 2 submodule states (`tests/test_agent_git_submodule.c`, POSIX)
+
+No production change: `AgentGitInspect` already reads submodule state from `git status --porcelain=v2`, where a submodule is an ordinary entry with a `160000` mode. The test pins that behaviour with real repositories (a library repo used as a `file://` submodule of a super repo; the fixture allows the file protocol with `-c protocol.file.allow=always` on that one command only).
+
+| State of the submodule | Preflight |
+|---|---|
+| just added (`.gitmodules` and pointer staged) | `dirty_tree`, 2 staged |
+| at the recorded commit | `ready` |
+| tracked file edited inside it | `dirty_tree`, 1 unstaged |
+| untracked file inside it | `dirty_tree`, 1 unstaged |
+| moved past the recorded commit, pointer not staged | `dirty_tree`, 1 unstaged |
+| pointer staged | `dirty_tree`, 1 staged |
+| pointer committed | `ready` |
+| checked out behind the recorded commit | `dirty_tree`, 1 unstaged |
+| uninitialised (plain clone without `--recurse-submodules`) | `ready`: there is nothing to compare, so a caller that needs the submodule content must check initialisation itself |
+
+Not covered: network submodules and credentials, nested submodules, a submodule whose remote advanced (the remote-advance check looks at the super repo only), Windows.
