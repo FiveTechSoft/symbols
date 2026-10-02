@@ -56,3 +56,37 @@ SWE-bench harness (M1-3, patch 2 of 2)
 - Parent directories are still created with `mkdir` (Fs* has no directory
   creation); directories are left in place, as before.
 - Symlink targets are refused; Windows needs NTFS and otherwise fails closed.
+
+Multi-file replace (M1-2, `FsBatchReplace`)
+- Scope of the M1 criterion "interrupted multi-file mutations either commit fully
+  or restore the original byte-for-byte state", as delivered: multi-file create
+  (`FsBatchCreate`, earlier) and multi-file replace (`FsBatchReplace`). Mixed
+  operations (move, remove, copy together with create or replace) are NOT covered
+  and stay open as M1-2b. `AgentPatch` does not call `FsBatchReplace` yet; one
+  plan is still one file.
+- API: 2..8 distinct existing regular files, each with its byte-exact expected
+  image and its replacement. Each target must have exactly one hard link.
+- Protocol under the workspace lock: verify every expected image, pin every old
+  inode with a hard link (`.fsrp-<nonce>`), stage every new image durably, write a
+  durable journal (`.fstxn.batch`, record version 2), publish one rename per
+  target, sync, write the commit marker (`.fstxn.commit`), then clean up.
+- Crash or in-process failure before the marker: every target is restored from its
+  pinned old inode (original bytes, original inode). After the marker: every
+  target keeps the new bytes. In-process failures roll back immediately and report
+  the original error; a crash needs `FsBatchRecover`.
+- It reuses the create batch journal name, so a pending batch of either kind
+  blocks every other writer until `FsBatchRecover`.
+- Recovery validates every target, stage and rollback name before changing any;
+  a target holding neither the old nor the new inode (foreign bytes) makes
+  recovery fail closed with nothing changed.
+- Limits and non-claims: POSIX only. Windows fails closed (`FS_READ_UNSUPPORTED`);
+  there is no Windows multi-file replace. Cooperating writers only. Not atomic
+  visibility to readers and not a power-loss guarantee. A crash between journal
+  retirement and marker retirement leaves a marker-only state that fails closed
+  for manual inspection (same as create). 1 MiB per file. Inodes change.
+- Test: `tests/test_fs_batch_replace.c` (fork+kill at steps 60 journal, 61
+  partial publish, 62 all published without marker, 63 committed with cleanup
+  pending; recovery interrupted at 65 and 66; foreign target; malformed journal;
+  hard-linked and drifted targets; in-process publish failure) with byte and mode
+  comparison after every case. The re-check of the target identity just before
+  each rename is defensive and not exercised by a test.

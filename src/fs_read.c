@@ -345,6 +345,8 @@ FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
 { return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+FS_READ_STATUS FsBatchReplace(const FS_READ_ROOT *r,const FS_BATCH_REPLACE *e,size_t n)
+{ (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else
 /* The lock is an inode under the held root, not a path reopened by name.
    External processes that unlink or ignore it are outside cooperative isolation. */
@@ -680,6 +682,133 @@ static FS_READ_STATUS batch_state(const FS_READ_ROOT *r,int *batch,int *commit)
     else if(errno!=ENOENT)return FS_READ_DENIED;
     return FS_READ_OK;
 }
+/* Multi-file replace journal (record version 2 under FS_BATCH_NAME). Same
+   journal and commit names as the create batch, so every other writer already
+   refuses to run while one is pending. Recovery is dispatched by record size. */
+#define FS_BREPL_MAGIC 0x46534252u
+typedef struct {
+    char target[FS_INTENT_MAX_PATH];
+    char oldstage[48],newstage[48];
+    uint64_t olddev,oldino,newdev,newino;
+} FS_BREPL_ITEM;
+typedef struct {
+    uint32_t magic,version,count,reserved;
+    FS_BREPL_ITEM items[FS_BATCH_LIMIT];
+} FS_BREPL_RECORD;
+typedef char fs_brepl_size_differs[sizeof(FS_BREPL_RECORD)!=sizeof(FS_BATCH_RECORD)?1:-1];
+static int brepl_stage_ok(const char *s)
+{
+    return strlen(s)==38 && !strncmp(s,".fsrp-",6) &&
+           strspn(s+6,"0123456789abcdef")==32;
+}
+static int brepl_valid(const FS_BREPL_RECORD *b)
+{
+    if(b->magic!=FS_BREPL_MAGIC||b->version!=1||b->count<2||
+       b->count>FS_BATCH_LIMIT||b->reserved)return 0;
+    for(unsigned k=0;k<b->count;k++){
+        const FS_BREPL_ITEM *i=&b->items[k];
+        if(!memchr(i->target,0,sizeof(i->target))||
+           !memchr(i->oldstage,0,sizeof(i->oldstage))||
+           !memchr(i->newstage,0,sizeof(i->newstage))||
+           !batch_name_ok(i->target)||!brepl_stage_ok(i->oldstage)||
+           !brepl_stage_ok(i->newstage)||!strcmp(i->oldstage,i->newstage)||
+           (i->olddev==i->newdev&&i->oldino==i->newino))return 0;
+        for(unsigned j=0;j<k;j++){
+            const FS_BREPL_ITEM *o=&b->items[j];
+            if(!strcmp(i->target,o->target)||!strcmp(i->oldstage,o->oldstage)||
+               !strcmp(i->oldstage,o->newstage)||!strcmp(i->newstage,o->oldstage)||
+               !strcmp(i->newstage,o->newstage))return 0;
+        }
+    }
+    for(unsigned k=b->count;k<FS_BATCH_LIMIT;k++){
+        const unsigned char *p=(const unsigned char*)&b->items[k];
+        for(size_t j=0;j<sizeof(b->items[k]);j++)if(p[j])return 0;
+    }
+    return 1;
+}
+static void brepl_rb_name(const FS_BREPL_ITEM *i,char *out)
+{ snprintf(out,48,".fsrb-%.32s",i->newstage+6); }
+static int brepl_is(const struct stat *st,uint64_t dev,uint64_t ino)
+{ return S_ISREG(st->st_mode)&&st->st_dev==(dev_t)dev&&st->st_ino==(ino_t)ino; }
+/* Caller holds the workspace lock. Without a commit marker every target that
+   holds the new inode is restored from its pinned old inode; with a marker
+   every target must already hold the new inode. Nothing is changed until every
+   target, stage and rollback name has been validated. */
+static FS_READ_STATUS brepl_recover_locked(const FS_READ_ROOT *r,int commit)
+{
+    FS_BREPL_RECORD b;struct stat journal,mark,t;
+    int dirs[FS_BATCH_LIMIT],tnew[FS_BATCH_LIMIT],oldp[FS_BATCH_LIMIT];
+    int newp[FS_BATCH_LIMIT],rbp[FS_BATCH_LIMIT];
+    char rb[FS_BATCH_LIMIT][48],parent[FS_INTENT_MAX_PATH],*slash;
+    const char *leaf;int fd;FS_READ_STATUS s=FS_READ_DENIED;
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=-1;
+    fd=openat(r->fd,FS_BATCH_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+    if(fd<0)return FS_READ_DENIED;
+    if(fstat(fd,&journal)<0||!S_ISREG(journal.st_mode)||
+       (journal.st_mode&077)!=0||journal.st_nlink!=1||
+       journal.st_size!=(off_t)sizeof(b)||
+       read(fd,&b,sizeof(b))!=(ssize_t)sizeof(b)||!brepl_valid(&b)){
+        close(fd);return FS_READ_DENIED;
+    }
+    close(fd);
+    if(commit){
+        uint64_t identity=0;
+        int mk=openat(r->fd,FS_BATCH_COMMIT,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
+        if(mk<0)return FS_READ_DENIED;
+        if(fstat(mk,&mark)<0||!S_ISREG(mark.st_mode)||mark.st_nlink!=1||
+           mark.st_size!=(off_t)sizeof(identity)||
+           read(mk,&identity,sizeof(identity))!=(ssize_t)sizeof(identity)||
+           identity!=(uint64_t)journal.st_ino){close(mk);return FS_READ_DENIED;}
+        close(mk);
+    }
+    for(unsigned k=0;k<b.count;k++){
+        FS_BREPL_ITEM *i=&b.items[k];
+        strcpy(parent,i->target);slash=strrchr(parent,'/');
+        if(slash)*slash=0;else *parent=0;
+        leaf=slash?slash+1:i->target;
+        s=posix_open(r,parent,&dirs[k]);if(s!=FS_READ_OK)goto done;
+        s=FS_READ_DENIED;
+        brepl_rb_name(i,rb[k]);
+        oldp[k]=fstatat(r->fd,i->oldstage,&t,AT_SYMLINK_NOFOLLOW)==0;
+        if(oldp[k]?!brepl_is(&t,i->olddev,i->oldino):errno!=ENOENT)goto done;
+        newp[k]=fstatat(r->fd,i->newstage,&t,AT_SYMLINK_NOFOLLOW)==0;
+        if(newp[k]?!brepl_is(&t,i->newdev,i->newino):errno!=ENOENT)goto done;
+        rbp[k]=fstatat(dirs[k],rb[k],&t,AT_SYMLINK_NOFOLLOW)==0;
+        if(rbp[k]?!brepl_is(&t,i->olddev,i->oldino):errno!=ENOENT)goto done;
+        if(fstatat(dirs[k],leaf,&t,AT_SYMLINK_NOFOLLOW)<0||!S_ISREG(t.st_mode))goto done;
+        if(brepl_is(&t,i->newdev,i->newino))tnew[k]=1;
+        else if(brepl_is(&t,i->olddev,i->oldino))tnew[k]=0;
+        else goto done;
+        if(commit&&!tnew[k])goto done;
+        if(!commit&&tnew[k]&&!oldp[k]&&!rbp[k])goto done;
+    }
+    for(unsigned k=0;k<b.count;k++){
+        FS_BREPL_ITEM *i=&b.items[k];
+        strcpy(parent,i->target);slash=strrchr(parent,'/');
+        leaf=slash?slash+1:i->target;
+        if(!commit&&tnew[k]){
+            if(!rbp[k]){
+                if(linkat(r->fd,i->oldstage,dirs[k],rb[k],0)<0){s=FS_READ_IO;goto done;}
+                crash_point(65); /* rollback link exists, target still new */
+            }
+            if(renameat(dirs[k],rb[k],dirs[k],leaf)<0){s=FS_READ_IO;goto done;}
+        }else if(rbp[k]&&unlinkat(dirs[k],rb[k],0)<0){s=FS_READ_IO;goto done;}
+        if(fsync(dirs[k])<0){s=FS_READ_IO;goto done;}
+    }
+    if(commit){
+        if(!durable_remove(r->fd,FS_BATCH_NAME)){s=FS_READ_IO;goto done;}
+        crash_point(66); /* journal retired, marker remains */
+        if(!durable_remove(r->fd,FS_BATCH_COMMIT)){s=FS_READ_IO;goto done;}
+    }else if(!durable_remove(r->fd,FS_BATCH_NAME)){s=FS_READ_IO;goto done;}
+    for(unsigned k=0;k<b.count;k++){
+        if(oldp[k])(void)durable_remove(r->fd,b.items[k].oldstage);
+        if(newp[k])(void)durable_remove(r->fd,b.items[k].newstage);
+    }
+    s=FS_READ_OK;
+done:
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)if(dirs[k]>=0)close(dirs[k]);
+    return s;
+}
 static FS_READ_STATUS batch_recover_locked(const FS_READ_ROOT *r)
 {
     FS_BATCH_RECORD b;struct stat journal,mark,stage[FS_BATCH_LIMIT],target[FS_BATCH_LIMIT];
@@ -692,6 +821,10 @@ static FS_READ_STATUS batch_recover_locked(const FS_READ_ROOT *r)
            the caller must inspect it manually, never infer safe cleanup. */
         return commit?FS_READ_DENIED:FS_READ_OK;
     }
+    {struct stat js;
+     if(fstatat(r->fd,FS_BATCH_NAME,&js,AT_SYMLINK_NOFOLLOW)==0&&
+        js.st_size==(off_t)sizeof(FS_BREPL_RECORD))
+         return brepl_recover_locked(r,commit);}
     for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=-1;
     fd=openat(r->fd,FS_BATCH_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     if(fd<0)return FS_READ_DENIED;
@@ -879,6 +1012,139 @@ done:
     /* If any name became visible, report an interrupted transaction as IO,
        never invite blind retry. Caller must recover explicitly. */
     return committed_here?FS_READ_OK:(visible?FS_READ_IO:s);
+}
+FS_READ_STATUS FsBatchReplace(const FS_READ_ROOT *r,const FS_BATCH_REPLACE *entries,size_t count)
+{
+    FS_BREPL_RECORD b={0};unsigned char nonce[16];struct stat st,old,nw;
+    int lock=-1,random_fd=-1,record=-1,dirs[FS_BATCH_LIMIT];
+    char parent[FS_INTENT_MAX_PATH],*slash;const char *leaf;
+    int journaled=0,visible=0,committed_here=0,p=0,o=0,c=0;
+    FS_READ_STATUS s=FS_READ_IO;
+    if(!r||!entries||count<2||count>FS_BATCH_LIMIT)return FS_READ_INVALID;
+    for(size_t k=0;k<count;k++){
+        if(!entries[k].target||strlen(entries[k].target)>=FS_INTENT_MAX_PATH||
+           !batch_name_ok(entries[k].target)||!entries[k].expected||
+           (!entries[k].replacement&&entries[k].replacement_len)||
+           entries[k].expected_len>FS_READ_MAX||
+           entries[k].replacement_len>FS_READ_MAX)return FS_READ_INVALID;
+        for(size_t j=0;j<k;j++)
+            if(!strcmp(entries[k].target,entries[j].target))return FS_READ_INVALID;
+    }
+    for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=-1;
+    s=lock_workspace(r,&lock);if(s!=FS_READ_OK)return s;
+    s=pending_intent(r,&p);if(s!=FS_READ_OK)goto done;
+    s=batch_state(r,&o,&c);if(s!=FS_READ_OK)goto done;
+    if(p||o||c){s=FS_READ_DENIED;goto done;}
+    {int a=0,bb=0;
+     s=remove_state(r,&a,&bb);
+     if(s!=FS_READ_OK||a||bb){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+     s=move_state(r,&a,&bb);
+     if(s!=FS_READ_OK||a||bb){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+     s=replace_state(r,&a,&bb);
+     if(s!=FS_READ_OK||a||bb){s=s==FS_READ_OK?FS_READ_DENIED:s;goto done;}
+    }
+    random_fd=open("/dev/urandom",O_RDONLY|O_CLOEXEC);
+    if(random_fd<0){s=FS_READ_IO;goto done;}
+    b.magic=FS_BREPL_MAGIC;b.version=1;b.count=(uint32_t)count;
+    /* Phase 1: verify every expected image, pin every old inode, stage every
+       new image. Nothing is visible under a target name yet. */
+    for(size_t k=0;k<count;k++){
+        FS_BREPL_ITEM *i=&b.items[k];FS_READ_META meta;unsigned char *bytes=NULL;
+        size_t len=0;int nf,of;
+        s=FsReadFile(r,entries[k].target,&bytes,&len,&meta);if(s!=FS_READ_OK)goto done;
+        if(len!=entries[k].expected_len||
+           (len&&memcmp(bytes,entries[k].expected,len))){free(bytes);s=FS_READ_DENIED;goto done;}
+        free(bytes);
+        strcpy(i->target,entries[k].target);
+        strcpy(parent,i->target);slash=strrchr(parent,'/');
+        if(slash)*slash=0;else *parent=0;
+        leaf=slash?slash+1:i->target;
+        s=posix_open(r,parent,&dirs[k]);if(s!=FS_READ_OK)goto done;
+        if(fstatat(dirs[k],leaf,&old,AT_SYMLINK_NOFOLLOW)<0||
+           !S_ISREG(old.st_mode)||old.st_nlink!=1){s=FS_READ_DENIED;goto done;}
+        for(int w=0;w<2;w++){
+            char *dst=w?i->newstage:i->oldstage;
+            if(read(random_fd,nonce,sizeof(nonce))!=(ssize_t)sizeof(nonce)){
+                s=FS_READ_IO;goto done;}
+            memcpy(dst,".fsrp-",6);
+            for(size_t j=0;j<sizeof(nonce);j++)sprintf(dst+6+j*2,"%02x",nonce[j]);
+            dst[38]=0;
+        }
+        if(linkat(dirs[k],leaf,r->fd,i->oldstage,0)<0){s=error_status();goto done;}
+        of=openat(r->fd,i->oldstage,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
+        if(of<0){s=FS_READ_IO;goto done;}
+        if(fstat(of,&st)<0||!brepl_is(&st,(uint64_t)old.st_dev,(uint64_t)old.st_ino)||
+           fsync(of)<0){close(of);s=FS_READ_DENIED;goto done;}
+        close(of);
+        i->olddev=(uint64_t)old.st_dev;i->oldino=(uint64_t)old.st_ino;
+        nf=openat(r->fd,i->newstage,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+        if(nf<0){s=error_status();goto done;}
+        if(!write_all(nf,entries[k].replacement,entries[k].replacement_len)||
+           fchmod(nf,old.st_mode&0777)<0||fsync(nf)<0||fstat(nf,&nw)<0){
+            close(nf);s=FS_READ_IO;goto done;}
+        close(nf);
+        i->newdev=(uint64_t)nw.st_dev;i->newino=(uint64_t)nw.st_ino;
+    }
+    if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    record=openat(r->fd,FS_BATCH_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+    if(record<0){s=error_status();goto done;}
+    if(!write_all(record,(const unsigned char*)&b,sizeof(b))||
+       fsync(record)<0||fstat(record,&st)<0||fsync(r->fd)<0){
+        close(record);record=-1;
+        if(!durable_remove(r->fd,FS_BATCH_NAME))journaled=1;
+        s=FS_READ_IO;goto done;
+    }
+    journaled=1;
+    crash_point(60); /* durable journal, every target still old */
+    /* Phase 2: publish by rename onto the target name, one file at a time. */
+    for(size_t k=0;k<count;k++){
+        struct stat cur;
+        strcpy(parent,b.items[k].target);slash=strrchr(parent,'/');
+        leaf=slash?slash+1:b.items[k].target;
+        if(fstatat(dirs[k],leaf,&cur,AT_SYMLINK_NOFOLLOW)<0||
+           !brepl_is(&cur,b.items[k].olddev,b.items[k].oldino)){
+            s=FS_READ_DENIED;goto done;}
+        if(renameat(r->fd,b.items[k].newstage,dirs[k],leaf)<0){
+            s=error_status();goto done;}
+        visible=1;
+        if(fsync(dirs[k])<0){s=FS_READ_IO;goto done;}
+        if(k==0)crash_point(61); /* partial: first target new, rest old */
+    }
+    crash_point(62); /* every target new, no commit marker */
+    {uint64_t id=(uint64_t)st.st_ino;
+     int mark=openat(r->fd,FS_BATCH_COMMIT,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
+     if(mark<0){s=error_status();goto done;}
+     if(!write_all(mark,(const unsigned char*)&id,sizeof(id))||fsync(mark)<0){
+         close(mark);s=FS_READ_IO;goto done;}
+     close(mark);
+    }
+    if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
+    committed_here=1;
+    crash_point(63); /* committed, cleanup pending */
+    (void)brepl_recover_locked(r,1);
+    s=FS_READ_OK;
+done:
+    if(record>=0)close(record);
+    for(size_t k=0;k<FS_BATCH_LIMIT;k++)if(dirs[k]>=0)close(dirs[k]);
+    if(random_fd>=0)close(random_fd);
+    if(!journaled){
+        for(size_t k=0;k<count;k++){
+            if(b.items[k].oldstage[0])(void)unlinkat(r->fd,b.items[k].oldstage,0);
+            if(b.items[k].newstage[0])(void)unlinkat(r->fd,b.items[k].newstage,0);
+        }
+        (void)fsync(r->fd);
+    }else if(!committed_here){
+        /* In-process failure after the journal: restore the original bytes
+           now instead of leaving a pending transaction. */
+        int pj=0,pc=0;FS_READ_STATUS rs=batch_state(r,&pj,&pc);
+        if(rs==FS_READ_OK&&pj){
+            rs=brepl_recover_locked(r,pc);
+            if(rs==FS_READ_OK){if(pc){committed_here=1;s=FS_READ_OK;}}
+            else {s=FS_READ_IO;visible=1;}
+        }else if(rs!=FS_READ_OK){s=FS_READ_IO;visible=1;}
+    }
+    unlock_workspace(lock);
+    return committed_here?FS_READ_OK:(visible&&s==FS_READ_IO?FS_READ_IO:s);
 }
 FS_READ_STATUS FsCreateFile(const FS_READ_ROOT *r,const char *rel,
                             const void *bytes,size_t len,unsigned mode)
