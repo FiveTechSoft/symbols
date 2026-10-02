@@ -32,6 +32,7 @@ add_library(symbolic STATIC
     src/agent_shell.c
     src/task_ops.c
     src/agent_git.c
+    src/git_gate.c
     src/swe_bench_harness.c
     src/numeric.c
     src/prune.c
@@ -109,6 +110,9 @@ endif()
 
 add_executable(sllm_cli src/main_cli.c)
 target_link_libraries(sllm_cli symbolic)
+
+add_executable(symbols_git_gate tools/symbols_git_gate.c)
+target_link_libraries(symbols_git_gate symbolic)
 
 add_executable(train_shard src/train_shard.c)
 target_link_libraries(train_shard symbolic)
@@ -401,6 +405,9 @@ sllm_test(test_agent_git_remote tests/test_agent_git_remote.c)
 sllm_test(test_agent_git_contract tests/test_agent_git_contract.c)
 sllm_test(test_agent_git_submodule tests/test_agent_git_submodule.c)
 sllm_test(test_git_destructive_audit tests/test_git_destructive_audit.c)
+sllm_test(test_git_gate tests/test_git_gate.c)
+add_dependencies(test_git_gate symbols_git_gate)
+target_compile_definitions(test_git_gate PRIVATE GATE_EXE="$<TARGET_FILE:symbols_git_gate>")
 sllm_test(test_server_git_inquiry tests/test_server_git_inquiry.c)
 sllm_test(test_c_synthesis tests/test_c_synthesis.c)
 

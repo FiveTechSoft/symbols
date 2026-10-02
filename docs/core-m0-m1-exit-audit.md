@@ -207,3 +207,20 @@ Measured: 14/14 locally. Mutants all killed: a new `git clean` in `agent_git.c`,
 Current whitelist: the detector in `src/command_policy.c` (strings that refuse these commands), the phrase list in `src/server_proto.c` (never executed), path-scoped `checkout`, `rm --cached` and `revert` in `src/git_ops.c` and `src/server_taskops.c`, and the known exception `git reset -q --hard` at `src/git_ops.c:477` (see above). `src/agent_git.c` has no entry: the delivery contracts name no destructive command.
 
 Not shown: commands assembled from pieces at run time, shell scripts, workflows, and anything outside `src/` and `include/`. The test does not prove the whitelisted uses are safe, only that the set of uses is the reviewed one. POSIX only; Windows prints a skip. Criterion 4 of Phase 2 is therefore: delivery path **shown clean by inventory**, with one registered exception outside it.
+
+## Update: Phase 2 step 5a, `symbols_git_gate` (`tests/test_git_gate.c`, POSIX)
+
+A command line front end over the Phase 2 Git contracts, so a workflow can call them instead of reimplementing them in shell. New files: `include/git_gate.h`, `src/git_gate.c` (in the library), `tools/symbols_git_gate.c` (a `main` that only calls `GitGateRun`). Nothing in `.github/` calls it yet; the workflow wiring is step 5b and is not part of this change.
+
+- `preflight --expected-head SHA [--branch NAME] [--remote-sync] [--dir D]`: exit 0 ready, otherwise 10 plus the preflight status (13 stale head, 14 wrong branch, 17 dirty tree, 18 no upstream, 19 remote advanced).
+- `patch-state PATCH [--dir D]`: exit 0 not applied, 3 already applied, 4 applies neither way, 5 check failed. The caller decides what "already applied" means; the tool only reports it.
+- `verify-staged PATCH` and `verify-head PATCH`: exit 0 match, 1 mismatch, 2 inspection failed, 6 the manifest could not be derived from the patch (fail closed).
+- 64 is a usage error. Every command is read-only.
+
+The expected-change manifest is derived from the diff headers of the patch: `A` for a new file, `D` for a deleted one, `M` otherwise (a mode-only change is `M`), a rename is `D` for the old path plus `A` for the new one, a copy is `A` for the destination. Quoted paths, characters outside `[A-Za-z0-9._/-]`, `..`, a leading `-`, a repeated path, more than 256 paths and an empty patch are refused with exit 6.
+
+Facts the wiring has to respect: `AgentGitPatchState` refuses absolute paths, and the workflow keeps the patch in `$RUNNER_TEMP`. The test uses `.git/change.patch` inside the repository (relative, not tracked, not seen by `git status`, not picked up by `git add`). A patch copied into the work tree proper would show as an untracked file and fail `preflight`; under `.git` it does not.
+
+Measured locally: 50/50, including the built executable returning exit 3 and exit 64. Mutants killed: rename without the `D`, duplicates allowed, "already applied" returning 0, `verify-head` using the index, preflight not requiring a clean tree, unsafe paths accepted, "applies neither way" returning 0, new files read as `M`, mismatch returned as match. ASan/UBSan x5: 50/50 clean.
+
+Not shown: behaviour on the Actions checkout (whether it has an upstream is not measured; that needs a dry run), Windows (the test prints a skip; the library file compiles on every platform), file content (as before, only paths and kinds are compared), and any use by `apply-patch`.
