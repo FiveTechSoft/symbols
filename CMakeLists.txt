@@ -178,6 +178,12 @@ if(WIN32)
     target_compile_definitions(test_fs_win_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_replace COMMAND test_fs_win_replace
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_agent_patch_fs_win tests/test_agent_patch_fs_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_fs_win PRIVATE include)
+    target_compile_definitions(test_agent_patch_fs_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
+    add_test(NAME test_agent_patch_fs_win COMMAND test_agent_patch_fs_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_device_names PRIVATE include)
