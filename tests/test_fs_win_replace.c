@@ -128,6 +128,28 @@ int main(int argc,char **argv)
      "write mismatched full marker");}
  ck(FsReplaceRecover(r)==FS_READ_DENIED,"valid mismatched records denied");
  read_eq(r,"new");FsReadClose(r);cleanup();
+ /* READONLY target: the rename-over is refused, so the replace is PENDING.
+    Recovery must remove every pin (a pin of a read-only file needs READONLY
+    cleared for the delete), leave no orphan, keep the target 1-link with its
+    READONLY attribute, and leave the root usable once the attribute is gone. */
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open readonly");
+ ck(SetFileAttributesA(ROOT "\\inside\\target",FILE_ATTRIBUTE_READONLY),"set readonly");
+ ck(FsReplaceFile(r,"inside/target","old",3,"new",3)==FS_READ_PENDING,"read-only target: replace is PENDING");
+ ck(FsReplaceRecover(r)==FS_READ_OK,"read-only target: recovery completes");
+ ck(FsReplaceRecover(r)==FS_READ_OK,"read-only target: recovery twice");
+ {WIN32_FIND_DATAA d;HANDLE f=FindFirstFileA(ROOT "\\.fsrp-*",&d);
+  ck(f==INVALID_HANDLE_VALUE,"no orphan pin in the root");
+  f=FindFirstFileA(ROOT "\\inside\\.fsrb-*",&d);
+  ck(f==INVALID_HANDLE_VALUE,"no rollback leftover beside the target");}
+ {FILE_STANDARD_INFO st;HANDLE h=CreateFileA(ROOT "\\inside\\target",GENERIC_READ,
+     FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+  ck(h!=INVALID_HANDLE_VALUE&&GetFileInformationByHandleEx(h,FileStandardInfo,&st,sizeof(st))&&
+     st.NumberOfLinks==1,"read-only target is 1-link again");CloseHandle(h);}
+ ck((GetFileAttributesA(ROOT "\\inside\\target")&FILE_ATTRIBUTE_READONLY)!=0,"READONLY attribute restored");
+ read_eq(r,"old");
+ ck(SetFileAttributesA(ROOT "\\inside\\target",FILE_ATTRIBUTE_NORMAL),"clear readonly");
+ ck(FsReplaceFile(r,"inside/target","old",3,"new",3)==FS_READ_OK,"same replace applies once READONLY is gone");
+ read_eq(r,"new");FsReadClose(r);cleanup();
  fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open simple");
  ck(FsReplaceFile(r,"inside/target","bad",3,"new",3)==FS_READ_DENIED,"stale");
  ck(FsReplaceFile(r,"../escape","old",3,"new",3)==FS_READ_INVALID,"traversal");

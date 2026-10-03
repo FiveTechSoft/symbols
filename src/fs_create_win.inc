@@ -251,6 +251,40 @@ static FS_READ_STATUS wc_remove(HANDLE dir,const WCHAR *name,const FILE_ID_INFO 
     else s=FS_READ_OK;
     CloseHandle(h);return s;
 }
+/* Remove a replace pin. A pin is a hard link to the original file, and the
+   READONLY attribute lives on the file, not on the link, so a pin of a
+   read-only target cannot be deleted (access denied) and would stay
+   behind as an orphan that makes the target 2-link. Clear READONLY only for
+   the delete, then restore the original attributes on the same handle so the
+   target keeps its attribute. Used for replace pins only, never for user files. */
+static FS_READ_STATUS wr_remove_pin(HANDLE dir,const WCHAR *name,const FILE_ID_INFO *id)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FILE_ID_INFO found;FS_READ_META m;
+    FILE_BASIC_INFO basic,orig;int cleared=0;
+    FS_READ_STATUS s=wc_open(dir,name,DELETE|FILE_WRITE_ATTRIBUTES,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING)return FS_READ_OK;
+    if(s!=FS_READ_OK)return s;
+    s=win_meta(h,&m);
+    if(s!=FS_READ_OK||m.kind!=FS_KIND_FILE||!wc_id(h,&found)||!wc_same(&found,id)){
+        s=FS_READ_DENIED;goto done;}
+    if(wc_delete(h)){s=FS_READ_OK;goto done;}
+    if(!GetFileInformationByHandleEx(h,FileBasicInfo,&orig,sizeof(orig))||
+       !(orig.FileAttributes&FILE_ATTRIBUTE_READONLY)){s=FS_READ_PENDING;goto done;}
+    basic=orig;
+    basic.FileAttributes=orig.FileAttributes&~(DWORD)FILE_ATTRIBUTE_READONLY;
+    if(!basic.FileAttributes)basic.FileAttributes=FILE_ATTRIBUTE_NORMAL;
+    cleared=SetFileInformationByHandle(h,FileBasicInfo,&basic,sizeof(basic))!=FALSE;
+    WC_TRACE("wr_remove_pin clear READONLY ok=%d\n",cleared);
+    if(!cleared){s=FS_READ_PENDING;goto done;}
+    if(wc_delete(h))s=FS_READ_OK;else s=FS_READ_PENDING;
+    /* The attribute belongs to the file other names still reach: put it back. */
+    if(!SetFileInformationByHandle(h,FileBasicInfo,&orig,sizeof(orig))){
+        WC_TRACE("wr_remove_pin restore READONLY failed error=%lu\n",(unsigned long)GetLastError());
+        if(s==FS_READ_OK)s=FS_READ_IO;
+    }
+done:
+    CloseHandle(h);return s;
+}
 static int wc_random(WCHAR out[48],const WCHAR *prefix)
 {
     unsigned char b[16];size_t n=wcslen(prefix);
@@ -677,8 +711,8 @@ static FS_READ_STATUS wr_recover_locked(const FS_READ_ROOT *r)
     }
     /* Both pins survive as long as a checked record exists. An interruption
        after record retirement can leave old bytes in a manual-cleanup pin. */
-    s=wc_remove(r->handle,i.old_pin,&i.old_id);if(s!=FS_READ_OK)goto done;
-    s=wc_remove(r->handle,i.new_pin,&i.new_id);
+    s=wr_remove_pin(r->handle,i.old_pin,&i.old_id);if(s!=FS_READ_OK)goto done;
+    s=wr_remove_pin(r->handle,i.new_pin,&i.new_id);
     wc_probe_dir(r->handle);
 done:
     if(old_h!=INVALID_HANDLE_VALUE)CloseHandle(old_h);
