@@ -186,6 +186,9 @@ static FS_READ_STATUS wc_open(HANDLE dir,const WCHAR *leaf,ACCESS_MASK access,UL
     *out=INVALID_HANDLE_VALUE;
     if(nt==(NTSTATUS)0xC0000034L||nt==(NTSTATUS)0xC000003AL)return FS_READ_MISSING;
     if(nt==(NTSTATUS)0xC0000035L)return FS_READ_DENIED;
+    /* STATUS_DELETE_PENDING: the name was deleted but a holder still has it
+       open. Nothing is wrong with the tree; retry after the holder closes. */
+    if(nt==(NTSTATUS)0xC0000056L)return FS_READ_PENDING;
     return FS_READ_DENIED;
 }
 /* No path-based renames or deletion. The object is always accessed through

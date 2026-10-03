@@ -167,6 +167,13 @@ static void wb_crash(int point)
     const char *v=getenv("FS_WIN_BATCH_CRASH");
     if(v&&atoi(v)==point)ExitProcess((UINT)(80+point));
 }
+/* Test only: deliberate protocol breaks. The test runs each one and requires
+   its own checks to fail; a mutant that passes means a missing check. */
+static int wb_mutant(int n)
+{
+    const char *v=getenv("FS_WIN_BATCH_MUTANT");
+    return v&&atoi(v)==n;
+}
 /* Test only: make the publish of item k fail as if its rename was refused. */
 static int wb_inject_publish_failure(unsigned k)
 {
@@ -175,6 +182,7 @@ static int wb_inject_publish_failure(unsigned k)
 }
 #else
 #define wb_crash(n) ((void)0)
+#define wb_mutant(n) 0
 #define wb_inject_publish_failure(k) 0
 #endif
 static FS_READ_STATUS wb_publish(HANDLE root,const WCHAR *final,const void *rec,size_t size)
@@ -256,9 +264,16 @@ static FS_READ_STATUS wb_recover_locked(const FS_READ_ROOT *r)
     s=wb_read(r->handle,WB_JOURNAL,j,&jid,&journal);if(s!=FS_READ_OK)goto done;
     s=wb_read(r->handle,WB_MARKER,m,&mid,&marker);if(s!=FS_READ_OK)goto done;
     if(!journal&&!marker){s=FS_READ_OK;goto done;}
+    if(wb_mutant(1)&&journal&&!marker){marker=1;mid=jid;} /* mutant 1: roll forward without a marker */
     if(journal&&marker&&memcmp(j,m,sizeof(*j))){s=FS_READ_DENIED;goto done;}
     rec=journal?j:m;count=rec->count;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&rec->root)||!wc_ntfs(r->handle)){s=FS_READ_DENIED;goto done;}
+    if(wb_mutant(2)){ /* mutant 2: delete stage names before any identity check */
+        for(k=0;k<count;k++){
+            HANDLE h=INVALID_HANDLE_VALUE;
+            if(wc_open(r->handle,rec->items[k].stage,DELETE,FILE_OPEN,&h)==FS_READ_OK){wc_delete(h);CloseHandle(h);}
+        }
+    }
     for(k=0;k<count;k++){
         const WB_ITEM *i=&rec->items[k];
         s=wc_parent(r,i->target,&parent[k],&leaf[k]);if(s!=FS_READ_OK)goto done;
@@ -298,6 +313,10 @@ static FS_READ_STATUS wb_recover_locked(const FS_READ_ROOT *r)
             if(!(rec->items[k].mode&0222)){s=wb_make_readonly(parent[k],leaf[k],&rec->items[k].file);if(s!=FS_READ_OK)goto done;}
         }
         wb_crash(12);wc_probe_dir(r->handle);
+        if(wb_mutant(3)){ /* mutant 3: retire the marker before the journal */
+            s=wc_remove(r->handle,WB_MARKER,&mid);if(s!=FS_READ_OK)goto done;
+            marker=0;wb_crash(13);
+        }
         if(journal){s=wc_remove(r->handle,WB_JOURNAL,&jid);if(s!=FS_READ_OK)goto done;}
         wb_crash(13);
         /* The marker owns the recovery record until its very last deletion. */
@@ -306,7 +325,7 @@ static FS_READ_STATUS wb_recover_locked(const FS_READ_ROOT *r)
             s=wc_lookup(parent[k],leaf[k],&rec->items[k].file,&still);
             if(s!=FS_READ_OK||!still){s=FS_READ_DENIED;goto done;}
         }
-        s=wc_remove(r->handle,WB_MARKER,&mid);if(s!=FS_READ_OK)goto done;
+        if(marker){s=wc_remove(r->handle,WB_MARKER,&mid);if(s!=FS_READ_OK)goto done;}
     }
     wc_probe_dir(r->handle);s=FS_READ_OK;
 done:
@@ -413,7 +432,8 @@ static FS_READ_STATUS wb_batch_create(const FS_READ_ROOT *r,const FS_BATCH_CREAT
     s=wb_publish(r->handle,WB_MARKER,rec,sizeof(*rec));
     if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
     committed=1;wb_crash(6); /* F: marker and journal */
-    for(k=0;k<n;k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+    /* mutant 4: keep the stage handles open through recovery */
+    for(k=0;k<n&&!wb_mutant(4);k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
     s=wb_recover_locked(r);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
     wb_crash(7); /* G: committed cleanup complete */
     s=FS_READ_OK;goto end;
@@ -436,6 +456,16 @@ end:
 /* Test hooks: the record layouts stay private to this file. */
 FS_READ_STATUS FsWinBatchTestValidateCreate(const FS_BATCH_CREATE *e,size_t n){return wb_validate_create(e,n);}
 FS_READ_STATUS FsWinBatchTestValidateReplace(const FS_BATCH_REPLACE *e,size_t n){return wb_validate_replace(e,n);}
+/* Test only: the status wc_open reports for a leaf of the root (used to
+   measure the STATUS_DELETE_PENDING mapping). */
+FS_READ_STATUS FsWinBatchTestOpenStatus(const FS_READ_ROOT *r,const char *leaf)
+{
+    WCHAR *w=win_wide(leaf);HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s;
+    if(!w||!r)return FS_READ_INVALID;
+    s=wc_open(r->handle,w,FILE_READ_ATTRIBUTES,FILE_OPEN,&h);
+    if(s==FS_READ_OK)CloseHandle(h);
+    free(w);return s;
+}
 static void wb_hexname(WCHAR out[48],const WCHAR *prefix,unsigned tag,unsigned k)
 {
     size_t p=wcslen(prefix);

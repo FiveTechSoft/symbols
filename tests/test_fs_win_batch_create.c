@@ -7,8 +7,12 @@
 #include <string.h>
 #include <direct.h>
 #define ROOT "test_fs_winbatch_scratch"
-/* W2: FsBatchCreate and FsBatchRecover on NTFS. Crash points 5-7 are a smoke
-   check; the full crash matrix, mutants and recovery-crash cases are W3. */
+/* W2/W3: FsBatchCreate and FsBatchRecover on NTFS. Writer crash points 1-7,
+   recovery crash points 8-13 (rollback 8-11, roll-forward 12-13), a foreign
+   stage under a journaled name, the STATUS_DELETE_PENDING mapping, and four
+   mutants that the same scenarios must kill. Crashes are real process exits
+   (ExitProcess 80+point) in child processes. */
+FS_READ_STATUS FsWinBatchTestOpenStatus(const FS_READ_ROOT *r,const char *leaf);
 static void ck(int ok,const char *label)
 {if(!ok){fprintf(stderr,"FAIL %s (%lu)\n",label,GetLastError());exit(1);}}
 static void put(const char *p,const char *v)
@@ -17,12 +21,14 @@ static void fixture(void)
 {ck(_mkdir(ROOT)==0&&_mkdir(ROOT "\\sub")==0,"mkdir");}
 /* Count the names directly in dir, excluding . and .. and the persistent
    .fstxn.lock that the writers leave in the root. */
-static int count(const char *pattern)
+static int count_skip(const char *pattern,const char *skip)
 {WIN32_FIND_DATAA d;HANDLE f=FindFirstFileA(pattern,&d);int n=0;
  if(f==INVALID_HANDLE_VALUE)return 0;
  do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,"..")&&
-       strcmp(d.cFileName,".fstxn.lock"))n++;}while(FindNextFileA(f,&d));
+       strcmp(d.cFileName,".fstxn.lock")&&
+       !(skip&&!strncmp(d.cFileName,skip,strlen(skip))))n++;}while(FindNextFileA(f,&d));
  FindClose(f);return n;}
+static int count(const char *pattern){return count_skip(pattern,NULL);}
 static void is_file(const char *p,const char *v,int readonly)
 {char b[64]={0};FILE *in=fopen(p,"rb");DWORD a;size_t n=strlen(v);
  ck(in!=NULL,"open created file");ck(fread(b,1,sizeof(b)-1,in)==n,"created size");
@@ -45,21 +51,23 @@ static void cleanup(void)
     snprintf(p,sizeof(p),ROOT "\\sub\\%s",d.cFileName);rm(p);
  }while(FindNextFileA(f,&d));FindClose(f);}
  ck(_rmdir(ROOT "\\sub")==0&&_rmdir(ROOT)==0,"remove root");}
-static int run_child(const char *exe,int point)
+static int run_proc(const char *exe,const char *args)
 {char cmd[1024];STARTUPINFOA si={0};PROCESS_INFORMATION pi={0};DWORD code=0;
- si.cb=sizeof(si);sprintf(cmd,"\"%s\" child %d",exe,point);
+ si.cb=sizeof(si);sprintf(cmd,"\"%s\" %s",exe,args);
  ck(CreateProcessA(NULL,cmd,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi),"spawn");
  ck(WaitForSingleObject(pi.hProcess,30000)==WAIT_OBJECT_0,"wait");
  ck(GetExitCodeProcess(pi.hProcess,&code),"exit");
  CloseHandle(pi.hThread);CloseHandle(pi.hProcess);return (int)code;}
+static int run_child(const char *exe,int point,int recovery)
+{char a[64];sprintf(a,"child %d %d",point,recovery);return run_proc(exe,a);}
 static const FS_BATCH_CREATE three[3]={
  {"a.txt","AAA",3,0444},{"sub/b.txt","BBBB",4,0644},{"c.txt","C",1,0444}};
-static void child(int point)
+static void child(int point,int recovery)
 {FS_READ_ROOT *r;char v[20];FS_READ_STATUS s;
  ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"child open");
  sprintf(v,"%d",point);_putenv_s("FS_WIN_BATCH_CRASH",v);
- s=FsBatchCreate(r,three,3);
- fprintf(stderr,"batch child point=%d status=%d\n",point,(int)s);
+ s=recovery?FsBatchRecover(r):FsBatchCreate(r,three,3);
+ fprintf(stderr,"batch child point=%d recovery=%d status=%d\n",point,recovery,(int)s);
  FsReadClose(r);ExitProcess(200);}
 static void created_all(void)
 {is_file(ROOT "\\a.txt","AAA",1);is_file(ROOT "\\sub\\b.txt","BBBB",0);
@@ -68,9 +76,94 @@ static void created_all(void)
  ck(count(ROOT "\\sub\\*")==1,"sub holds only b.txt");}
 static void nothing(void)
 {ck(count(ROOT "\\*")==1,"root holds only sub");ck(count(ROOT "\\sub\\*")==0,"sub empty");}
+/* After a crash before the journal exists, orphan .fst-/.fsp- names may
+   remain (declared non-claim); no target and no batch file may. */
+static void nothing_but_orphans(void)
+{ck(count_skip(ROOT "\\*",".fs")==1,"root holds only sub and orphans");
+ ck(count(ROOT "\\sub\\*")==0,"sub empty");
+ ck(GetFileAttributesA(ROOT "\\a.txt")==INVALID_FILE_ATTRIBUTES,"a.txt absent");
+ ck(GetFileAttributesA(ROOT "\\c.txt")==INVALID_FILE_ATTRIBUTES,"c.txt absent");
+ ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"no journal");
+ ck(GetFileAttributesA(ROOT "\\.fstxn.commit")==INVALID_FILE_ATTRIBUTES,"no marker");}
+static void nuke(void)
+{WIN32_FIND_DATAA d;HANDLE f;char p[512];
+ f=FindFirstFileA(ROOT "\\sub\\*",&d);
+ if(f!=INVALID_HANDLE_VALUE){do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,"..")){
+   snprintf(p,sizeof(p),ROOT "\\sub\\%s",d.cFileName);SetFileAttributesA(p,FILE_ATTRIBUTE_NORMAL);DeleteFileA(p);}}while(FindNextFileA(f,&d));FindClose(f);}
+ f=FindFirstFileA(ROOT "\\*",&d);
+ if(f!=INVALID_HANDLE_VALUE){do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,"..")){
+   snprintf(p,sizeof(p),ROOT "\\%s",d.cFileName);SetFileAttributesA(p,FILE_ATTRIBUTE_NORMAL);DeleteFileA(p);}}while(FindNextFileA(f,&d));FindClose(f);}
+ _rmdir(ROOT "\\sub");_rmdir(ROOT);}
+/* Scenarios. Each runs on a fresh fixture, uses ck for every check, and is
+   also the body a mutant must fail. */
+static void sc_matrix(const char *exe,int pt)
+{FS_READ_ROOT *r;int forward=pt>=6;
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open matrix");
+ ck(run_child(exe,pt,0)==80+pt,"writer killed at point");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
+ if(forward)created_all();else if(pt<3)nothing_but_orphans();else nothing();
+ ck(FsCreateRecover(r)==FS_READ_OK,"single create recovery sees nothing");
+ FsReadClose(r);cleanup();}
+/* Writer killed at setup_pt, then the recovery itself killed at rec_pt, then
+   a full recovery. Pins may be orphaned once the journal is gone (11). */
+static void sc_reccrash(const char *exe,int setup_pt,int rec_pt)
+{FS_READ_ROOT *r;
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open recovery crash");
+ ck(run_child(exe,setup_pt,0)==80+setup_pt,"setup writer killed");
+ ck(run_child(exe,rec_pt,1)==80+rec_pt,"recovery killed at point");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover after recovery crash");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
+ if(setup_pt>=6)created_all();else if(rec_pt==11)nothing_but_orphans();else nothing();
+ FsReadClose(r);cleanup();}
+/* A foreign file under a journaled stage name must stop recovery, untouched. */
+static void sc_foreign_stage(const char *exe)
+{FS_READ_ROOT *r;WIN32_FIND_DATAA d;HANDLE f;char p[512]="";
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open foreign stage");
+ ck(run_child(exe,3,0)==83,"writer killed at 3");
+ f=FindFirstFileA(ROOT "\\.fst-*",&d);ck(f!=INVALID_HANDLE_VALUE,"find stage");
+ snprintf(p,sizeof(p),ROOT "\\%s",d.cFileName);FindClose(f);
+ SetFileAttributesA(p,FILE_ATTRIBUTE_NORMAL);ck(DeleteFileA(p),"remove stage name");
+ put(p,"foreign");
+ ck(FsBatchRecover(r)==FS_READ_DENIED,"foreign stage denied");
+ {char b[16]={0};FILE *in=fopen(p,"rb");ck(in&&fread(b,1,7,in)==7&&!memcmp(b,"foreign",7),"foreign file intact");fclose(in);}
+ ck(GetFileAttributesA(ROOT "\\.fstxn.batch")!=INVALID_FILE_ATTRIBUTES,"journal kept");
+ ck(GetFileAttributesA(ROOT "\\a.txt")==INVALID_FILE_ATTRIBUTES,"nothing published");
+ FsReadClose(r);cleanup();}
+static void sc_success(void)
+{FS_READ_ROOT *r;
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open success");
+ ck(FsBatchCreate(r,three,3)==FS_READ_OK,"batch create");created_all();
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover clean");created_all();
+ FsReadClose(r);cleanup();}
+/* Mutants are enabled by FS_WIN_BATCH_MUTANT in a child; the child fails
+   (exit 1 through ck) when its checks catch the break, and exits 0 when they
+   do not. The parent requires the failure. */
+static void mutant_child(const char *exe,int m)
+{char v[8];sprintf(v,"%d",m);_putenv_s("FS_WIN_BATCH_MUTANT",v);
+ if(m==1)sc_matrix(exe,5);          /* journal only treated as committed */
+ else if(m==2)sc_foreign_stage(exe);/* stage deleted before identity check */
+ else if(m==3)sc_reccrash(exe,6,13);/* marker retired before journal */
+ else sc_success();                 /* stage handles kept open */
+ ExitProcess(0);}
+static void delete_pending(void)
+{FS_READ_ROOT *r;HANDLE h;FILE_DISPOSITION_INFO di;
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open delete pending");
+ put(ROOT "\\dp","x");
+ ck(FsWinBatchTestOpenStatus(r,"dp")==FS_READ_OK,"existing name opens");
+ ck(FsWinBatchTestOpenStatus(r,"nope")==FS_READ_MISSING,"missing name is MISSING");
+ h=CreateFileA(ROOT "\\dp",GENERIC_READ|DELETE,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+               NULL,OPEN_EXISTING,0,NULL);
+ ck(h!=INVALID_HANDLE_VALUE,"holder");
+ di.DeleteFile=TRUE;ck(SetFileInformationByHandle(h,FileDispositionInfo,&di,sizeof(di)),"delete by handle");
+ ck(FsWinBatchTestOpenStatus(r,"dp")==FS_READ_PENDING,"delete-pending name is PENDING");
+ CloseHandle(h);
+ ck(FsWinBatchTestOpenStatus(r,"dp")==FS_READ_MISSING,"gone once the holder closes");
+ FsReadClose(r);cleanup();}
 int main(int argc,char **argv)
 {char exe[768];DWORD got;FS_READ_ROOT *r;
- if(argc==3&&!strcmp(argv[1],"child")){child(atoi(argv[2]));return 200;}
+ if(argc==4&&!strcmp(argv[1],"child")){child(atoi(argv[2]),atoi(argv[3]));return 200;}
+ if(argc==3&&!strcmp(argv[1],"mutant")){got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");mutant_child(exe,atoi(argv[2]));return 0;}
  got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");
  /* Success across directories, read-only mode honoured, nothing left over. */
  fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open");
@@ -115,18 +208,26 @@ int main(int argc,char **argv)
  ck(FsBatchRecover(r)==FS_READ_OK,"recover after rollback");nothing();
  ck(FsBatchCreate(r,three,3)==FS_READ_OK,"batch works after rollback");created_all();
  FsReadClose(r);cleanup();
- /* Crash smoke. 3: journal complete, nothing published. 5: all published,
-    no marker (rolls back). 6: marker (rolls forward). 7: all done. */
- for(int k=0;k<4;k++){
-   int pt=k==0?3:k==1?5:k==2?6:7;int forward=pt>=6;
-   fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open crash");
-   ck(run_child(exe,pt)==80+pt,"writer killed at point");
-   if(pt<7)ck(FsBatchCreate(r,three,3)==FS_READ_DENIED,"pending batch blocks a new one");
-   ck(FsBatchRecover(r)==FS_READ_OK,"recover");
-   ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
-   if(forward)created_all();else nothing();
-   ck(FsCreateRecover(r)==FS_READ_OK,"single create recovery sees nothing");
-   FsReadClose(r);cleanup();
+ /* Writer crash matrix, points 1-7. */
+ for(int pt=1;pt<=7;pt++)sc_matrix(exe,pt);
+ /* A pending batch blocks a new one until recovery. */
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open blocked");
+ ck(run_child(exe,5,0)==85,"writer killed at 5");
+ ck(FsBatchCreate(r,three,3)==FS_READ_DENIED,"pending batch blocks a new one");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover blocked");nothing();
+ ck(FsBatchCreate(r,three,3)==FS_READ_OK,"create after recovery");created_all();
+ FsReadClose(r);cleanup();
+ /* Recovery crash matrix: rollback 8-11 from a writer killed at 5, roll-forward
+    12-13 from a writer killed at 6. */
+ for(int rp=8;rp<=11;rp++)sc_reccrash(exe,5,rp);
+ for(int rp=12;rp<=13;rp++)sc_reccrash(exe,6,rp);
+ sc_foreign_stage(exe);
+ delete_pending();
+ /* Mutants: each must fail the scenario that targets it. */
+ for(int m=1;m<=4;m++){
+   char a[32];int code;sprintf(a,"mutant %d",m);
+   code=run_proc(exe,a);nuke();
+   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}
  }
  printf("test_fs_win_batch_create ok\n");
  return 0;
