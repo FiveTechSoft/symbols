@@ -177,8 +177,13 @@ int main(void)
  /* a file that denies delete */
  rmtree(WS);fixture(&r);
  sys("icacls \"%s\" /deny *S-1-1-0:(D) >NUL 2>&1",WS "\\Dir\\Ro");
+ {FILE *f=fopen(WS "\\Dir\\Ro","rb");
+  if(!f)fprintf(stderr,"diag: BEFORE the remove, fopen Ro failed, errno %d, GetLastError %lu\n",errno,(unsigned long)GetLastError());
+  else{fprintf(stderr,"diag: BEFORE the remove, Ro is readable\n");fclose(f);}}
+ fprintf(stderr,"diag: ACL before the remove:\n");sys("icacls \"%s\" >&2",WS "\\Dir\\Ro");
  REFUSED(FsRemoveFile(r,"Dir/Ro","RO!!",4),"remove file that denies delete");
  rec("remove recovery",(int)FsRemoveRecover(r));
+ fprintf(stderr,"diag: ACL after the recovery:\n");sys("icacls \"%s\" >&2",WS "\\Dir\\Ro");
  {FILE *f=fopen(WS "\\Dir\\Ro","rb");char b[16]={0};size_t n=0;
   if(!f)fprintf(stderr,"diag: fopen Ro failed, errno %d, GetLastError %lu\n",errno,(unsigned long)GetLastError());
   else{n=fread(b,1,sizeof(b)-1,f);fclose(f);fprintf(stderr,"diag: read %lu bytes from Ro: \"%s\"\n",(unsigned long)n,b);}
