@@ -230,6 +230,11 @@ if(WIN32)
     target_include_directories(test_fs_win_race PRIVATE include)
     add_test(NAME test_fs_win_race COMMAND test_fs_win_race
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_case tests/test_fs_win_case.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_case PRIVATE include)
+    add_test(NAME test_fs_win_case COMMAND test_fs_win_case
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_device_names PRIVATE include)
