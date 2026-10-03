@@ -182,9 +182,28 @@ static int wb_inject_publish_failure(unsigned k)
 /* Test only: called before the publish of item k of a replace batch, so a test
    can change a target between the final check and the rename. */
 static void (*wb_before_publish)(unsigned k)=NULL;
+/* Test only, cross-process: after our handle on target k is closed and before
+   its rename-over (FS_WIN_BATCH_HOLD=k)
+   the writer creates <FS_WIN_BATCH_SYNC>.ready and waits up to 20 s for
+   <FS_WIN_BATCH_SYNC>.go, so another process can open the target meanwhile. */
+#ifndef WB_HARNESS
+static void wb_hold(unsigned k)
+{
+    const char *v=getenv("FS_WIN_BATCH_HOLD"),*d=getenv("FS_WIN_BATCH_SYNC");
+    char path[600];HANDLE h;int i;
+    if(!v||!d||(unsigned)atoi(v)!=k||strlen(d)>400)return;
+    snprintf(path,sizeof(path),"%s.ready",d);
+    h=CreateFileA(path,GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);
+    snprintf(path,sizeof(path),"%s.go",d);
+    for(i=0;i<1000&&GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES;i++)Sleep(20);
+}
+#endif
 #define WB_BEFORE_PUBLISH(k) do{if(wb_before_publish)wb_before_publish(k);}while(0)
+#define WB_BEFORE_RENAME(k) wb_hold(k)
 #else
 #define WB_BEFORE_PUBLISH(k) ((void)0)
+#define WB_BEFORE_RENAME(k) ((void)0)
 #define wb_crash(n) ((void)0)
 #define wb_mutant(n) 0
 #define wb_inject_publish_failure(k) 0
@@ -528,6 +547,33 @@ out:CloseHandle(h);return s;
 /* Recovery for a replace batch. Journal only: restore every old inode. Marker
    present: keep every new inode. All identities, pin bytes and link counts are
    verified before the first change. */
+/* Mutant 9 (test only) takes a name for the pin without its FileId: presence
+   and bytes only. Production compares identity everywhere. */
+static FS_READ_STATUS wbr_named(HANDLE dir,const WCHAR *leaf,const FILE_ID_INFO *id,int *present)
+{
+    if(wb_mutant(9)){
+        HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+        if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+        if(s!=FS_READ_OK)return s;
+        *present=1;CloseHandle(h);return FS_READ_OK;
+    }
+    return wr_named(dir,leaf,id,present);
+}
+static FS_READ_STATUS wbr_verify(HANDLE dir,const WCHAR *leaf,const FILE_ID_INFO *id,size_t len,unsigned long long digest)
+{
+    if(wb_mutant(9)){
+        HANDLE h=INVALID_HANDLE_VALUE;FILE_ID_INFO own;FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+        if(s!=FS_READ_OK)return s;
+        if(!wc_id(h,&own)){CloseHandle(h);return FS_READ_DENIED;}
+        s=wo_bytes(h,&own,len,digest);CloseHandle(h);return s;
+    }
+    return wr_verify(dir,leaf,id,len,digest);
+}
+static FS_READ_STATUS wbr_pin(HANDLE root,const WCHAR *name,const FILE_ID_INFO *id,unsigned long long size,unsigned long long digest)
+{
+    if(wb_mutant(9))return wbr_verify(root,name,id,(size_t)size,digest);
+    return wb_pin_bytes(root,name,id,size,digest);
+}
 static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
 {
     WBR_RECORD *j=(WBR_RECORD*)calloc(1,sizeof(WBR_RECORD)),*m=(WBR_RECORD*)calloc(1,sizeof(WBR_RECORD));
@@ -542,6 +588,7 @@ static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
     s=wbr_read(r->handle,WB_MARKER,m,&mid,&marker);if(s!=FS_READ_OK)goto done;
     if(!journal&&!marker){s=FS_READ_OK;goto done;}
     if(journal&&marker&&memcmp(j,m,sizeof(*j))){s=FS_READ_DENIED;goto done;}
+    if(wb_mutant(7)&&journal&&!marker){marker=1;mid=jid;} /* mutant 7: replace roll-forward without a marker */
     rec=journal?j:m;count=rec->count;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&rec->root)||!wc_ntfs(r->handle)){s=FS_READ_DENIED;goto done;}
     for(k=0;k<count;k++){
@@ -550,16 +597,16 @@ static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
         s=wc_parent(r,i->target,&parent[k],&leaf[k]);if(s!=FS_READ_OK)goto done;
         if(!wc_id(parent[k],&pid)||!wc_same(&pid,&i->parent)||
            pid.VolumeSerialNumber!=rec->root.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
-        s=wr_named(r->handle,i->old_pin,&i->old_id,&oldpin[k]);if(s!=FS_READ_OK)goto done;
-        s=wr_named(r->handle,i->new_pin,&i->new_id,&newpin[k]);if(s!=FS_READ_OK)goto done;
-        s=wr_named(r->handle,i->new_stage,&i->new_id,&stage[k]);if(s!=FS_READ_OK)goto done;
-        s=wr_named(parent[k],i->rollback,&i->old_id,&rb[k]);if(s!=FS_READ_OK)goto done;
+        s=wbr_named(r->handle,i->old_pin,&i->old_id,&oldpin[k]);if(s!=FS_READ_OK)goto done;
+        s=wbr_named(r->handle,i->new_pin,&i->new_id,&newpin[k]);if(s!=FS_READ_OK)goto done;
+        s=wbr_named(r->handle,i->new_stage,&i->new_id,&stage[k]);if(s!=FS_READ_OK)goto done;
+        s=wbr_named(parent[k],i->rollback,&i->old_id,&rb[k]);if(s!=FS_READ_OK)goto done;
         /* Before the marker the pins are the only proof of both images. */
         if(!marker&&(!oldpin[k]||!newpin[k])){s=FS_READ_DENIED;goto done;}
-        if(oldpin[k]){s=wb_pin_bytes(r->handle,i->old_pin,&i->old_id,i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
-        if(newpin[k]){s=wb_pin_bytes(r->handle,i->new_pin,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
-        if(stage[k]){s=wb_pin_bytes(r->handle,i->new_stage,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
-        if(rb[k]){s=wr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
+        if(oldpin[k]){s=wbr_pin(r->handle,i->old_pin,&i->old_id,i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
+        if(newpin[k]){s=wbr_pin(r->handle,i->new_pin,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
+        if(stage[k]){s=wbr_pin(r->handle,i->new_stage,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
+        if(rb[k]){s=wbr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
         s=wc_open(parent[k],leaf[k],GENERIC_READ,FILE_OPEN,&t);
         if(s==FS_READ_MISSING)s=FS_READ_DENIED;
         if(s!=FS_READ_OK)goto done;
@@ -577,12 +624,14 @@ static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
         }
         if(marker){
             if(!tnew[k]||rb[k]){s=FS_READ_DENIED;goto done;}
-            s=wr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
+            s=wbr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
         }
     }
     if(!marker){
         wb_crash(29);
-        for(k=count;k-->0;){
+        {int restored=0;
+        for(unsigned q=0;q<count;q++){
+            const unsigned k=wb_mutant(8)?q:count-1-q; /* mutant 8: ascending order */
             const WBR_ITEM *i=&rec->items[k];
             if(tnew[k]){
                 HANDLE h=INVALID_HANDLE_VALUE;
@@ -590,17 +639,17 @@ static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
                     s=wc_open(r->handle,i->old_pin,GENERIC_READ,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
                     if(!wc_set_name(h,parent[k],i->rollback,WC_NT_LINK)){CloseHandle(h);s=FS_READ_PENDING;goto done;}
                     CloseHandle(h);
-                    s=wr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
+                    s=wbr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
                 }
-                s=wr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
+                s=wbr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
                 s=wc_open(parent[k],i->rollback,DELETE,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
                 if(!wr_replace_name(h,parent[k],leaf[k])){CloseHandle(h);s=FS_READ_PENDING;goto done;}
                 CloseHandle(h);
-                if(k==count-1)wb_crash(30);
+                if(!restored){restored=1;wb_crash(30);} /* first restored item */
             }
-            s=wr_verify(parent[k],leaf[k],&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
+            s=wbr_verify(parent[k],leaf[k],&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
             wc_probe_dir(parent[k]);
-        }
+        }}
         wb_crash(31);
         for(k=count;k-->0;)if(stage[k]){s=wc_remove(r->handle,rec->items[k].new_stage,&rec->items[k].new_id);if(s!=FS_READ_OK)goto done;}
         wb_crash(32);
@@ -623,7 +672,7 @@ static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
         wb_crash(36);
         /* The marker owns the recovery record until its very last deletion. */
         for(k=0;k<count;k++){
-            s=wr_verify(parent[k],leaf[k],&rec->items[k].new_id,(size_t)rec->items[k].new_size,rec->items[k].new_digest);
+            s=wbr_verify(parent[k],leaf[k],&rec->items[k].new_id,(size_t)rec->items[k].new_size,rec->items[k].new_digest);
             if(s!=FS_READ_OK)goto done;
         }
         s=wc_remove(r->handle,WB_MARKER,&mid);if(s!=FS_READ_OK)goto done;
@@ -730,6 +779,7 @@ static FS_READ_STATUS wb_batch_replace(const FS_READ_ROOT *r,const FS_BATCH_REPL
         if(s!=FS_READ_OK){s=FS_READ_DENIED;rollback=1;goto end;}
         /* Close-then-rename: our own old handle must not be what blocks it. */
         CloseHandle(old[k]);old[k]=INVALID_HANDLE_VALUE;
+        WB_BEFORE_RENAME(k);
         if(wb_inject_publish_failure(k)||!wr_replace_name(stage[k],parent[k],leaf[k])){
             s=FS_READ_PENDING;rollback=1;goto end;}
         if(k==0)wb_crash(25); /* first target replaced */

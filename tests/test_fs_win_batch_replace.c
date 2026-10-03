@@ -7,10 +7,11 @@
 #include <string.h>
 #include <direct.h>
 #define ROOT "test_fs_winbatch_scratch"
-/* W4: FsBatchReplace on NTFS. Success, refusals, a target changed between the
-   final check and the publish, a pending replace journal, crash smoke at
-   writer points 24-28, and one mutant. The full crash matrix and the foreign
-   open handle are W5. Crashes are real process exits (ExitProcess 80+point). */
+/* W4/W5: FsBatchReplace on NTFS. Success, refusals, a swapped target, the full
+   crash matrix (writer 21-28, recovery 29-36), a foreign process holding a
+   handle on a target (0xc0000022 on the rename-over => PENDING with rollback),
+   a foreign file under a pin name, and mutants 6-9 that the same scenarios
+   must kill. Crashes are real process exits (ExitProcess 80+point). */
 void FsWinBatchTestSetBeforePublish(void (*f)(unsigned k));
 FS_READ_STATUS FsWinBatchTestOpenStatus(const FS_READ_ROOT *r,const char *leaf);
 static void ck(int ok,const char *label)
@@ -81,6 +82,11 @@ static void child(int point,int recovery)
  s=recovery?FsBatchRecover(r):FsBatchReplace(r,trio,3);
  fprintf(stderr,"replace child point=%d recovery=%d status=%d\n",point,recovery,(int)s);
  FsReadClose(r);ExitProcess(200);}
+static void hchild(int k,const char *sync)
+{FS_READ_ROOT *r;char v[16];FS_READ_STATUS s;
+ ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"holder child open");
+ sprintf(v,"%d",k);_putenv_s("FS_WIN_BATCH_HOLD",v);_putenv_s("FS_WIN_BATCH_SYNC",sync);
+ s=FsBatchReplace(r,trio,3);FsReadClose(r);ExitProcess((UINT)(100+(int)s));}
 static void put_old(void)
 {put(ROOT "\\r1","one-old");put(ROOT "\\sub\\r2","two-old!");put(ROOT "\\r3","three");}
 static void is_old(void)
@@ -104,6 +110,88 @@ static void sc_crash(const char *exe,int pt)
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
  if(pt>=27)is_new();else is_old();
  FsReadClose(r);cleanup();}
+static void is_old_orph(void)
+{is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
+ ck(count_skip(ROOT "\\*",".fs")==3,"root holds r1 r3 sub and orphans only");
+ ck(count_skip(ROOT "\\sub\\*",".fs")==1,"sub holds r2");
+ ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"no journal");
+ ck(GetFileAttributesA(ROOT "\\.fstxn.commit")==INVALID_FILE_ATTRIBUTES,"no marker");}
+/* Writer killed at 21-23 (before any journal): orphan names only. A leftover
+   old pin makes r1 a two-link file, so the next batch on it is refused. */
+static void sc_early(const char *exe,int pt)
+{FS_READ_ROOT *r;
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open early");
+ ck(run_child(exe,pt,0)==80+pt,"early writer killed");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover");ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
+ is_old_orph();
+ ck(FsBatchReplace(r,trio,3)==FS_READ_DENIED,"orphan old pin makes the target two-link");
+ is_old_orph();
+ FsReadClose(r);nuke();}
+/* Writer killed at spt, recovery killed at rpt, then full recovery. */
+static void sc_reccrash(const char *exe,int spt,int rpt)
+{FS_READ_ROOT *r;
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open recovery crash");
+ ck(run_child(exe,spt,0)==80+spt,"setup writer killed");
+ ck(run_child(exe,rpt,1)==80+rpt,"recovery killed at point");
+ if(spt==26&&rpt==30){ /* reverse order: the last item is restored first */
+  is_file(ROOT "\\r3","three",0);is_file(ROOT "\\r1","ONE-NEW-LONGER",0);is_file(ROOT "\\sub\\r2","",0);}
+ if(spt==25&&rpt==30){is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\r3","three",0);}
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover after recovery crash");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
+ if(spt>=27)is_new();else if(rpt==33)is_old_orph();else is_old();
+ FsReadClose(r);cleanup();}
+/* Another process holds the target open without delete sharing, opened after
+   our handle on it was closed: the rename-over is refused. */
+static void sc_foreign_handle(const char *exe,int k)
+{FS_READ_ROOT *r;char sync[64]="test_fs_winbatch_sync",f1[96],f2[96],args[160],cmd[1024],*tg[3]={ROOT "\\r1",ROOT "\\sub\\r2",ROOT "\\r3"};
+ STARTUPINFOA si={0};PROCESS_INFORMATION pi={0};DWORD code=0;HANDLE foreign,g;int i;
+ snprintf(f1,sizeof(f1),"%s.ready",sync);snprintf(f2,sizeof(f2),"%s.go",sync);
+ DeleteFileA(f1);DeleteFileA(f2);
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open foreign handle");
+ sprintf(args,"hchild %d %s",k,sync);sprintf(cmd,"\"%s\" %s",exe,args);si.cb=sizeof(si);
+ ck(CreateProcessA(NULL,cmd,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi),"spawn holder child");
+ for(i=0;i<1000&&GetFileAttributesA(f1)==INVALID_FILE_ATTRIBUTES;i++)Sleep(20);
+ ck(GetFileAttributesA(f1)!=INVALID_FILE_ATTRIBUTES,"writer reached the hold point");
+ foreign=CreateFileA(tg[k],GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+ ck(foreign!=INVALID_HANDLE_VALUE,"foreign open of the target");
+ g=CreateFileA(f2,GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);ck(g!=INVALID_HANDLE_VALUE,"go file");CloseHandle(g);
+ ck(WaitForSingleObject(pi.hProcess,30000)==WAIT_OBJECT_0,"writer finished");
+ ck(GetExitCodeProcess(pi.hProcess,&code),"writer exit");CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
+ ck(code==(DWORD)(100+(int)FS_READ_PENDING),"foreign handle on the rename-over is PENDING");
+ is_old(); /* items before k were rolled back, journal and pins gone */
+ ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"journal gone");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover is a no-op");is_old();
+ CloseHandle(foreign);
+ ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"same batch accepted once the foreign handle is closed");is_new();
+ DeleteFileA(f1);DeleteFileA(f2);
+ FsReadClose(r);cleanup();}
+/* A foreign handle opened BEFORE the batch (no delete sharing) is refused by
+   the up-front check: nothing was linked or created. */
+static void sc_foreign_early(void)
+{FS_READ_ROOT *r;HANDLE foreign;
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open foreign early");
+ foreign=CreateFileA(ROOT "\\r3",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+ ck(foreign!=INVALID_HANDLE_VALUE,"foreign open");
+ ck(FsBatchReplace(r,trio,3)==FS_READ_DENIED,"foreign handle held before the batch is DENIED");
+ is_old();CloseHandle(foreign);
+ FsReadClose(r);cleanup();}
+/* A foreign file with the right bytes under the old pin name must not be
+   accepted: recovery compares the FileId, refuses, and changes nothing. */
+static void sc_foreign_pin(const char *exe)
+{FS_READ_ROOT *r;WIN32_FIND_DATAA d;HANDLE f;char pin[512]="",b[16]={0};FILE *in;
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open foreign pin");
+ ck(run_child(exe,26,0)==106,"writer killed at 26");
+ f=FindFirstFileA(ROOT "\\.fsrp-*",&d);
+ if(f!=INVALID_HANDLE_VALUE){do{char p[512];snprintf(p,sizeof(p),ROOT "\\%s",d.cFileName);
+   in=fopen(p,"rb");memset(b,0,sizeof(b));if(in){size_t n=fread(b,1,15,in);fclose(in);if(n==7&&!memcmp(b,"one-old",7))strcpy(pin,p);}
+  }while(FindNextFileA(f,&d));FindClose(f);}
+ ck(pin[0],"found the old pin of r1");
+ put(ROOT "\\foreign.tmp","one-old");
+ ck(MoveFileExA(ROOT "\\foreign.tmp",pin,MOVEFILE_REPLACE_EXISTING),"swap in a foreign pin");
+ ck(FsBatchRecover(r)==FS_READ_DENIED,"foreign pin denied");
+ is_file(ROOT "\\r1","ONE-NEW-LONGER",0);is_file(pin,"one-old",0);
+ ck(count_skip(ROOT "\\*",".fsrb-")==count(ROOT "\\*"),"no rollback name left behind");
+ FsReadClose(r);nuke();}
 /* The same scenarios a mutant must fail: a hard-linked target is refused. */
 static void sc_hardlink(void)
 {FS_READ_ROOT *r;
@@ -114,13 +202,18 @@ static void sc_hardlink(void)
  is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);
  ck(count(ROOT "\\*")==4,"hard link left no residue");
  FsReadClose(r);cleanup();}
-static void mutant_child(int m)
+static void mutant_child(const char *exe,int m)
 {char v[8];sprintf(v,"%d",m);_putenv_s("FS_WIN_BATCH_MUTANT",v);
- sc_hardlink();ExitProcess(0);}
+ if(m==6)sc_hardlink();            /* single-link check removed */
+ else if(m==7)sc_crash(exe,26);    /* replace roll-forward without a marker */
+ else if(m==8)sc_reccrash(exe,26,30);/* rollback in ascending order */
+ else sc_foreign_pin(exe);         /* pin accepted by name, no FileId */
+ ExitProcess(0);}
 int main(int argc,char **argv)
 {char exe[768];DWORD got;FS_READ_ROOT *r;
  if(argc==4&&!strcmp(argv[1],"rchild")){child(atoi(argv[2]),atoi(argv[3]));return 200;}
- if(argc==3&&!strcmp(argv[1],"rmutant")){mutant_child(atoi(argv[2]));return 0;}
+ if(argc==4&&!strcmp(argv[1],"hchild")){hchild(atoi(argv[2]),argv[3]);return 200;}
+ if(argc==3&&!strcmp(argv[1],"rmutant")){got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");mutant_child(exe,atoi(argv[2]));return 0;}
  got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");
  /* Success, three files in two directories, one replaced by an empty file. */
  fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open");
@@ -165,12 +258,21 @@ int main(int argc,char **argv)
  ck(FsBatchRecover(r)==FS_READ_DENIED,"recovery refuses a foreign inode");
  is_file(ROOT "\\sub\\r2","two-NEW!",0);
  FsReadClose(r);nuke();
- /* Crash smoke: journal complete, first target replaced, all replaced without
-    marker, marker, committed cleanup done. */
- for(int i=0;i<5;i++){int pts[5]={24,25,26,27,28};sc_crash(exe,pts[i]);}
- /* Mutant: the single-link check removed must be caught. */
- {char a[32];int code;sprintf(a,"rmutant 6");code=run_proc(exe,a);nuke();
-  if(code!=1){fprintf(stderr,"mutant 6 SURVIVED (exit %d)\n",code);exit(1);}}
+ /* Writer crash matrix 21-28. */
+ for(int pt=21;pt<=23;pt++)sc_early(exe,pt);
+ for(int pt=24;pt<=28;pt++)sc_crash(exe,pt);
+ /* Recovery crashes: rollback 29-33 from writer points 25 and 26, roll-forward
+    34-36 from 27. */
+ for(int sp=25;sp<=26;sp++)for(int rp=29;rp<=33;rp++)sc_reccrash(exe,sp,rp);
+ for(int rp=34;rp<=36;rp++)sc_reccrash(exe,27,rp);
+ /* Foreign process: handle opened before the batch, and after our own handle
+    on target k was closed (items before k must be rolled back). */
+ sc_foreign_early();
+ for(int k=0;k<3;k++)sc_foreign_handle(exe,k);
+ sc_foreign_pin(exe);
+ /* Mutants: each must fail the scenario that targets it. */
+ for(int m=6;m<=9;m++){char a[32];int code;sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
+  if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
  printf("test_fs_win_batch_replace ok\n");
  return 0;
 }
