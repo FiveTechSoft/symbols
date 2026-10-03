@@ -454,7 +454,8 @@ static FS_READ_STATUS wo_clear_other(HANDLE root,unsigned self)
     for(unsigned k=0;k<sizeof(names)/sizeof(names[0]);k++){
         HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s;
         if((self==0&&k<2)||(self==1&&k>=2&&k<4)||
-           (self==2&&k>=4&&k<6)||(self==3&&k>=8&&k<10))continue;
+           (self==2&&k>=4&&k<6)||(self==3&&k>=8&&k<10)||
+           (self==4&&k>=6&&k<8))continue;
         s=wc_open(root,names[k],FILE_READ_ATTRIBUTES,FILE_OPEN,&h);
         if(s==FS_READ_OK){CloseHandle(h);return FS_READ_DENIED;}
         if(s!=FS_READ_MISSING)return FS_READ_DENIED;

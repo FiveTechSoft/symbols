@@ -342,9 +342,9 @@ done:FsReadFreeList(list,n);closedir(dir);return s;
 #ifdef _WIN32
 #include "fs_create_win.inc"
 FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *e,size_t n)
-{ (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+{ return wb_batch_create(r,e,n); }
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *r)
-{ return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
+{ return wb_batch_recover(r); }
 FS_READ_STATUS FsBatchReplace(const FS_READ_ROOT *r,const FS_BATCH_REPLACE *e,size_t n)
 { (void)e;(void)n;return r?FS_READ_UNSUPPORTED:FS_READ_INVALID; }
 #else

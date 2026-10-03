@@ -304,10 +304,11 @@ int main(void)
    - Modes are the read-only attribute only (0444 or 0644).
    - The directory link fixture is a junction made with `mklink /J`; there
      is no symlink fixture and no "linkfile".
-   - FsBatchCreate, FsBatchReplace and FsBatchRecover are UNSUPPORTED stubs
-     on Windows. They are asserted as such, so this test fails loudly when
-     batch support arrives and needs a real port; "rejected" for them is
-     therefore not evidence about batch behaviour.
+   - FsBatchCreate and FsBatchRecover are real on Windows (W2); a generated
+     bad path must be rejected with the tree unchanged. FsBatchReplace is
+     still an UNSUPPORTED stub and is asserted as such, so this test fails
+     loudly when it becomes real; "rejected" for it is therefore not evidence
+     about batch replace behaviour.
    - Default iterations are lower (150 and 100) until the CI cost is known;
      the elapsed time is printed. FS_FUZZ_ITERS raises the first. */
 #include "fs_write.h"
@@ -475,8 +476,7 @@ static void path_ops(FS_READ_ROOT *root,const char *p,const char *base)
     rejected(FsCopyFile(root,p,"copied","SAFE",4),base,"copy-from");
     rejected(FsCopyFile(root,"safe",p,"SAFE",4),base,"copy-to");
     {FS_BATCH_CREATE b[2]={{"fresh-a","x",1,0600},{p,"x",1,0600}};
-     ck(FsBatchCreate(root,b,2)==FS_READ_UNSUPPORTED,"batch create is no longer an unsupported stub on Windows");
-     same(base,"batch create stub changed the tree");}
+     rejected(FsBatchCreate(root,b,2),base,"batch-create");}
     {FS_BATCH_REPLACE b[2]={{"safe","SAFE",4,"NEW",3},{p,"outside",7,"NEW",3}};
      ck(FsBatchReplace(root,b,2)==FS_READ_UNSUPPORTED,"batch replace is no longer an unsupported stub on Windows");
      same(base,"batch replace stub changed the tree");}
@@ -486,7 +486,7 @@ static void path_ops(FS_READ_ROOT *root,const char *p,const char *base)
      ck(!plan.before&&!plan.effects.items,"failed txn plan left allocations");
      same(base,"txn plan changed the tree");}
     g_what="recover";
-    ck(FsBatchRecover(root)==FS_READ_UNSUPPORTED,"batch recover is no longer an unsupported stub on Windows");
+    ck(FsBatchRecover(root)==FS_READ_OK,"batch recover on a clean tree");
     same(base,"recover changed the tree");
 }
 static int path_ok(const char *p)
