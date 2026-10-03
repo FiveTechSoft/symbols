@@ -43,7 +43,7 @@ Present in the repository: typed `stat`, `list`, `read`, `create`, `replace`, `m
 |---|---|---|---|---|
 | 1 | `..`, absolute path, symlink escape and rename races fail closed in adversarial fixtures | Partial, POSIX only | `test_fs_adversarial` and `test_fs_race` are wrapped in `#ifndef _WIN32` and do nothing on Windows. POSIX covers traversal, `C:`, backslash, `.` and empty segments across create, copy, move, remove and batch, symlink leaf and directory, renamed root, and fork races on create, copy and move | Port the adversarial set to Windows (`..`, drive paths, `\\?\`, junctions) or declare Windows outside this criterion |
 | 2 | Interrupted multi-file mutations commit fully or restore the original bytes | Partial | Only multi-file create has a batch executor (`test_fs_batch`, POSIX only, crash at each of eight steps, foreign and malformed fixtures). `test_fs_txn_plan` is read-only planning. No mixed-operation executor. Windows batch: not shown when this row was written, partial on NTFS since 2026-10-03 (see the Windows batch update) | Product decision: narrow the criterion to batch create, or build and test a mixed executor (medium size) |
-| 3 | Unified-diff behavior reimplemented on the structured filesystem API with no patch regression | Historical, superseded (see the 2026-10-03 criterion 3 update): at the time of this table `src/agent_patch.c` opened files with `fopen` and was **not met**; the migration landed in `6a5ad6c` and `ee87088` | The row's original finding no longer holds: `agent_patch.c` has no `fopen`, `fwrite` or `rename` and reads and writes through `FsReadFile` and `FsReplaceFile`. Current state: shown on POSIX, partial on Windows | Superseded; open points are listed in the criterion 3 update |
+| 3 | Unified-diff behavior reimplemented on the structured filesystem API with no patch regression | Historical, superseded (see the 2026-10-03 criterion 3 update): at the time of this table `src/agent_patch.c` opened files with `fopen` and was **not met**; the migration landed in `6a5ad6c` and `ee87088` | The row's original finding no longer holds: `agent_patch.c` has no `fopen`, `fwrite` or `rename` and reads and writes through `FsReadFile` and `FsReplaceFile`. Current state: shown on POSIX; on Windows shown for the cases listed in the 2026-10-03 Windows update, partial against full POSIX parity | Superseded; open points are listed in the criterion 3 updates |
 | 4 | Linux and Windows fixtures cover separator, case, permission, long path, newline and locked-file behavior | Partial | Newline: `test_fs_read` (CRLF and LF). Long path and locked file: only `test_fs_create_windows`. Separator: backslash and `C:` in the POSIX adversarial test. No case-sensitivity test and no permission test on either platform. `test_fs_copy`, replace, move and remove are POSIX-only in CMake | A criterion by platform table with one test per empty cell. Case and permission have no test on any platform |
 | 5 | Fuzzing malformed paths and operation manifests yields no out-of-workspace write | Partial | `test_fs_adversarial` runs 400 seeded iterations over six segments for create, copy and move, with an outside-file check. POSIX only. No replace or remove, no malformed manifest | Extend to replace, remove and manifests with a recorded seed and the same outside check, then run on Windows |
 
@@ -218,6 +218,44 @@ Checked in CI (run 329, `https://github.com/FiveTechSoft/symbols/actions/runs/37
 Status of criterion 3: **shown on POSIX**; **partial on Windows** (generic apply and rollback pass on NTFS, the drift, outside-workspace, hard-link, crash and recovery cases have no Windows test). It is not met in the sense of the original row for no platform.
 
 Not claimed: creating a new file or appending from a unified diff (`AgentPatch` edits existing files only; a missing target fails in `FsReadFile`; this is new functionality and a product decision, not part of this criterion); other writers that still use `fopen` (internal stores such as `atomic_store.c` and `reflect.c`, exports, logs, `task_ops.c`, `server_*`, and `write_all` in `git_ops.c`, which was not read for this update); durability against power loss; filesystems other than NTFS on Windows; behaviour with a non-cooperating writer; the numbers inside each test, because ctest hides the output of passing tests.
+
+## Update: criterion 3 on Windows after E1, E2 and the read-only fix (2026-10-03)
+
+This supersedes the "partial on Windows" line of the update above for the cases listed here. Everything below was measured by CI on the single `windows-latest` runner (NTFS), in runs 331, 332 and 333 (`https://github.com/FiveTechSoft/symbols/actions/runs/37105533806`, `.../37106267719`, `.../37107013381`).
+
+What was added:
+- E1, `tests/test_agent_patch_fs_win.c` (run 331, green): the POSIX `test_agent_patch_fs` cases T1 to T8 on NTFS.
+- E2, `tests/test_agent_patch_ntfs_win.c` (run 332, red, then run 333, green): CRLF, BOM, multi-hunk, read-only target, and a handle held by another process.
+- E3-fix, `src/fs_create_win.inc` and `tests/test_fs_win_replace.c` (run 333, green): see the finding below.
+
+Shown on Windows through `AgentPatch` (msvc and asan-msvc, 156 of 156 tests passed in run 333):
+- T1: drift between read and replace is DENIED and the external bytes are kept.
+- T2: after a success only `.fstxn.lock` is left as a control artifact.
+- T3: rollback restores the bytes.
+- T4: paths outside the workspace (dotdot, absolute, relative) are rejected; an absolute path inside works.
+- T5: a file over 1 MiB is refused.
+- T6: a writer process killed at crash point 4 leaves a pending transaction that blocks further apply, recovery completes and the file is old or new, never mixed; a handle held without delete sharing gives a result whose return code matches the bytes on disk.
+- T7: a hard-linked target and a target below a junction are refused with the files untouched.
+- T8: rollback refuses to overwrite a user edit.
+- N1: a CRLF file keeps its CRLF through apply and rollback, byte exact.
+- N2: a UTF-8 BOM is kept through apply and rollback.
+- N3: multi-hunk is all or nothing. `AgentPatch` verifies every hunk first and writes one buffer with one `FsReplaceFile`, so a failing second hunk means nothing is written; there is no partial rollback on disk and none is claimed.
+- N4: a read-only target never gives a mixed result and does not wedge the workspace (after clearing the attribute the same plan applies).
+- N5 and N6: a handle held by another process, taken before or after our read, makes the apply fail closed, the old bytes stay, and the same plan applies once the holder is gone.
+
+Finding, fixed: with a read-only target the replace was refused (rename over a read-only file gives `0xc0000022`), recovery rolled back, but the final delete of the old-file pin failed with error 5, because the read-only attribute belongs to the file and all its hard links. The pin stayed behind, the target became 2-link, and every later replace was DENIED even after the attribute was cleared. Run 332 measured this as the only red (`test_agent_patch_ntfs_win`, case N4). `wr_remove_pin` now clears the attribute only to delete a replace pin and restores it on the same handle; `wc_remove`, and with it `FsMove` and the other user-file paths, is unchanged. Run 333 passes both `test_agent_patch_ntfs_win` N4 and a dedicated case in `test_fs_win_replace` (PENDING, recovery twice, no `.fsrp-` or `.fsrb-` left, target 1-link, READONLY restored, same replace applies). The new `test_fs_win_replace` case was not run against the old code; the witness for the old behaviour is the red of run 332. This does not change the existing non-claim about orphan pins left by crash points 21 to 23 and 33.
+
+Not shown, declared:
+- Symlink leaf on Windows: the case runs only if the runner can create symlinks and the log of a passing ctest does not say whether it ran. Not shown.
+- T9 (a `.fstxn.lock` with an unsafe mode) is a POSIX permission case and is not ported.
+- E3, the Windows port of `test_swe_bench_harness_fs`, is not ported by decision. That test drives `FsCreateFile` and `FsRemoveFile` through the benchmark harness, which already have direct Windows coverage in `test_fs_win_*`; the harness is auxiliary benchmark tooling and not the `AgentPatch` path.
+- File attributes after a successful apply (the new file does not inherit READONLY) are not claimed.
+- Mixed line endings: if a file has any CRLF, `AgentPatch` rewrites every line ending to CRLF. This is earlier behavior, platform independent, and not tested here.
+- The single-replace crash matrix through `AgentPatch`: only crash point 4 is exercised; the other points are inherited from `FsReplaceFile` and are covered by `test_fs_win_replace`, not through `AgentPatch`.
+- The values printed by the tests (the return code of the pending case, the file contents after the crash, whether the symlink case ran) were not read, because ctest hides the output of a passing test.
+- Power-loss durability, filesystems other than NTFS, a non-cooperating writer, antivirus and indexer interference, and any runner other than `windows-latest`.
+
+Status of criterion 3: **shown on POSIX**. On Windows it is **shown for the cases listed above** and **partial against full POSIX parity** because of the declared exceptions. It is not claimed as met for any case that is not listed.
 
 ## Update: Phase 2 commit contract and "already applied" (`tests/test_agent_git_contract.c`, POSIX)
 
