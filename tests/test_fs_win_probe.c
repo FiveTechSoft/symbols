@@ -24,7 +24,7 @@ static void del(const WCHAR *leaf)
 {WCHAR p[300];path(p,leaf);SetFileAttributesW(p,FILE_ATTRIBUTE_NORMAL);DeleteFileW(p);}
 static HANDLE mk(const WCHAR *leaf,const char *bytes,DWORD access,DWORD share)
 {WCHAR p[300];HANDLE h;DWORD w;path(p,leaf);
- h=CreateFileW(p,access,share,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+ h=CreateFileW(p,access|GENERIC_WRITE,share,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
  ck(h!=INVALID_HANDLE_VALUE,"mk");
  if(bytes&&*bytes)ck(WriteFile(h,bytes,(DWORD)strlen(bytes),&w,NULL),"write");
  return h;}
