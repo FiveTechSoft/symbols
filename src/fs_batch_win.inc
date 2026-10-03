@@ -432,15 +432,16 @@ static FS_READ_STATUS wb_batch_create(const FS_READ_ROOT *r,const FS_BATCH_CREAT
     s=wb_publish(r->handle,WB_MARKER,rec,sizeof(*rec));
     if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
     committed=1;wb_crash(6); /* F: marker and journal */
-    /* mutant 4: keep the stage handles open through recovery */
-    for(k=0;k<n&&!wb_mutant(4);k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+    for(k=0;k<n;k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
     s=wb_recover_locked(r);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
     wb_crash(7); /* G: committed cleanup complete */
     s=FS_READ_OK;goto end;
 unjournaled:
     wb_discard_unjournaled(r,rec,stage,(unsigned)n);
 end:
-    for(k=0;k<WB_LIMIT;k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+    /* mutant 4: the in-process rollback runs with the stage handles still open
+       (and they are never closed). */
+    for(k=0;k<WB_LIMIT&&!wb_mutant(4);k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
     /* Journal published but no marker: restore the tree now (our handles are
        closed, so no stage name is held open). A failed rollback leaves the
        journal for FsBatchRecover and reports PENDING. */

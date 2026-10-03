@@ -130,11 +130,21 @@ static void sc_foreign_stage(const char *exe)
  ck(GetFileAttributesA(ROOT "\\.fstxn.batch")!=INVALID_FILE_ATTRIBUTES,"journal kept");
  ck(GetFileAttributesA(ROOT "\\a.txt")==INVALID_FILE_ATTRIBUTES,"nothing published");
  FsReadClose(r);cleanup();}
-static void sc_success(void)
+/* Publish of item 1 fails after item 0 was published: the in-process rollback
+   must leave a tree that accepts the same batch again immediately. With a
+   stage handle still open on the published inode (mutant 4) the rollback can
+   only mark a.txt delete-pending, and the retry finds that name still taken
+   (0xc0000056, PENDING) instead of free. */
+static void sc_inject_retry(void)
 {FS_READ_ROOT *r;
- fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open success");
- ck(FsBatchCreate(r,three,3)==FS_READ_OK,"batch create");created_all();
- ck(FsBatchRecover(r)==FS_READ_OK,"recover clean");created_all();
+ fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open inject retry");
+ ck(_putenv_s("FS_WIN_BATCH_FAIL_PUBLISH","1")==0,"set injection");
+ ck(FsBatchCreate(r,three,3)==FS_READ_DENIED,"publish failure reported");
+ ck(_putenv_s("FS_WIN_BATCH_FAIL_PUBLISH","99")==0,"clear injection");
+ nothing();
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover after rollback");nothing();
+ ck(FsBatchCreate(r,three,3)==FS_READ_OK,"same batch accepted right after the rollback");
+ created_all();
  FsReadClose(r);cleanup();}
 /* Mutants are enabled by FS_WIN_BATCH_MUTANT in a child; the child fails
    (exit 1 through ck) when its checks catch the break, and exits 0 when they
@@ -144,7 +154,7 @@ static void mutant_child(const char *exe,int m)
  if(m==1)sc_matrix(exe,5);          /* journal only treated as committed */
  else if(m==2)sc_foreign_stage(exe);/* stage deleted before identity check */
  else if(m==3)sc_reccrash(exe,6,13);/* marker retired before journal */
- else sc_success();                 /* stage handles kept open */
+ else sc_inject_retry();            /* rollback with stage handles open */
  ExitProcess(0);}
 static void delete_pending(void)
 {FS_READ_ROOT *r;HANDLE h;FILE_DISPOSITION_INFO di;
@@ -200,14 +210,7 @@ int main(int argc,char **argv)
  FsReadClose(r);cleanup();
  /* Publish of the second item refused after the first was published: the
     in-process rollback restores the tree. Needs a missing-until-then target. */
- fixture();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open injected");
- ck(_putenv_s("FS_WIN_BATCH_FAIL_PUBLISH","1")==0,"set injection");
- ck(FsBatchCreate(r,three,3)==FS_READ_DENIED,"publish failure reported");
- ck(_putenv_s("FS_WIN_BATCH_FAIL_PUBLISH","99")==0,"clear injection");
- nothing();
- ck(FsBatchRecover(r)==FS_READ_OK,"recover after rollback");nothing();
- ck(FsBatchCreate(r,three,3)==FS_READ_OK,"batch works after rollback");created_all();
- FsReadClose(r);cleanup();
+ sc_inject_retry();
  /* Writer crash matrix, points 1-7. */
  for(int pt=1;pt<=7;pt++)sc_matrix(exe,pt);
  /* A pending batch blocks a new one until recovery. */
