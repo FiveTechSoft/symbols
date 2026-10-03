@@ -311,6 +311,36 @@ Read from `tests/` on `master` at `737508b7f55085b4198db9e2572dbeebb1893c4e`, by
 
 Status of criterion 4 on Windows after this reading: **partial**, with five of the six aspects each carrying a stated gap and the separator aspect shown for refusal. The gaps above are the work left. They are not scheduled by this update beyond the order agreed for the sequence: case, permission, long path and locked file as separate test patches, each stating its expected result before it is measured.
 
+## Update: criterion 4 on Windows, permission aspect measured (2026-10-03)
+
+Measured by CI on the single `windows-latest` runner (NTFS), `build-test-msvc` and `asan-msvc`. The last run with every job read is run 37136586954 on `master` at `16e1cfe7b53f12c0c90a6a49885dfacfb7808c27`: msvc and asan-msvc each 167 of 167 passed (log lines read: `test_fs_win_perm`, `test_fs_win_perm_mc4` and `test_fs_win_perm_acl` Passed in both, `test_fs_win_aliases_short` Skipped as before); linux and ast-inspect green. Expected results were stated before each measurement; two predictions were wrong and are listed.
+
+What was added: `tests/test_fs_win_perm.c`, built as three ctest targets from one source: `test_fs_win_perm` (READONLY attribute, 8 cells), `test_fs_win_perm_mc4` (the same cells compiled with `FS_PIN_MUTANT=1`, exit 0 means killed, exit 1 means survived) and `test_fs_win_perm_acl` (`ACL_ONLY=1`, explicit deny entries set with `icacls`, `SKIP_RETURN_CODE 77` so a no-effect deny shows as Skipped). Through ctest only the Passed or Failed line is observable, not the printed cell count nor the mutant's kill message.
+
+Shown, per cell:
+- Remove of a READONLY file: refused, `FsRemoveRecover` returns OK, no `.fsrm-` pin or journal is left, the file keeps its bytes and its READONLY attribute, the next writer works.
+- Move with a READONLY source: refused, `FsMoveRecover` returns OK, the target link and the pin are gone, the source is unchanged and still READONLY.
+- Copy of a READONLY source: OK, the source is untouched, the copy is an ordinary new file.
+- Create inside a directory that carries the READONLY attribute: OK (NTFS does not enforce the attribute on directories).
+- Explicit deny of write-data and append on a directory: create, copy target, move target and batch create into it are refused, nothing appears, the root holds only `Dir` and the lock file.
+- Explicit deny of delete on a file: remove refused, recovery OK, no pin or journal left, the file kept. Its bytes were checked after removing the deny entry (see the expectation note below).
+- Explicit deny of write-data and append on a file: a replace leaves a state that agrees with its status (OK means the new bytes, otherwise the old bytes, no stray names). Whether the replace was OK or refused is not observable through ctest and not claimed.
+
+Finding, fixed: remove and move recovery could not delete a READONLY file's links.
+- Run 37118524047 (`test_fs_win_perm`, v1 with diagnostics): the READONLY remove was refused as predicted, but `FsRemoveRecover` returned `FS_READ_PENDING` (6) and a `.fsrm-` pin (READONLY, 4 bytes, a hard link to the file) stayed in the root. The prediction "recovery clean" was wrong.
+- Cause, from the code and the listing: the remove and move recovery (`wo_recover_locked` in `src/fs_create_win.inc`) deleted the pin with the plain `wc_remove`. The READONLY attribute lives on the file, so deleting a link to it is refused. `wr_remove_pin` already handles this for replace pins.
+- Fix, runs 37131910189 and 37132605822: the pin deletes go through `wr_remove_pin`. Run 37131910189 showed the remove cell passing and the move cell failing with `PENDING`, because the rollback of a move also deletes the target link with the plain delete (the listing showed `Moved` READONLY, the journal and a `.fsmv-` pin left). Run 37132605822 routed that third delete through the helper too and the move cell passed. The macro `wo_remove_pin` selects the helper, or `wc_remove` under `FS_PIN_MUTANT` (mutant MC4: both sites revert).
+- Mutant MC4: killed (the target exits 0 and ctest shows Passed). Which of the two sites killed it is not observed. MC4 here is a different mutant from MC4 of the parent-swap race in criterion 1.
+- Accepted risk: the helper opens the link with DELETE and FILE_WRITE_ATTRIBUTES, where the plain delete asked for DELETE only, so a link whose ACL denies write-attributes would now fail to open. Not covered by a test.
+- `wr_remove_pin` is now used for replace pins and for the remove and move recovery links. It is never used on a user's file.
+
+Test-fixture faults found on the way (not production):
+- Runs 37132605822 and 37133270380: the workspace survived the helper `rmtree` of the test, which removed it with a `cmd` chain. The command exited 2 with "The system cannot find the file specified." for both the plain path and the `\\?\` path. The cause inside `cmd` was not identified. Run 37133880455 replaced it with Win32 calls (a recursive walk with `DeleteFileA` and `RemoveDirectoryA`), and the failure is gone. The parked ACL target of run 37118524047 failed with the same symptom: it was this helper, not the ACL cells.
+- Runs 37134646822, 37135262099 and 37135936309: with `icacls /deny *S-1-1-0:(D)` on a file, the test process could not open that file for reading with the CRT, before the remove as well as after the recovery, and the ACL printout was identical before and after (`Everyone:(DENY)(D)` plus the inherited Administrators, SYSTEM and Users entries). So it is a test expectation error, not a production effect. Why a delete-only deny blocks the read is not determined. Run 37136586954 removes the deny entry before reading the bytes, in this cell and in the deny-write replace cell.
+- The prediction made for the ACL target, that recovery of the deny-delete remove would stay `PENDING` because the pin shares the file's ACL, was wrong: recovery returned OK and left no pin.
+
+Status of the permission aspect on Windows after these runs: **shown for the cells above** on one runner and one account. Not shown: a file owned by another account, inherited ACLs, a directory the process cannot list, the denial of write-attributes on a link (accepted risk above), and any runner other than `windows-latest`. POSIX mode bits have no NTFS equivalent and are not claimed. Criterion 4 on Windows stays **partial** while long path and locked file are open.
+
 ## Update: Phase 2 commit contract and "already applied" (`tests/test_agent_git_contract.c`, POSIX)
 
 Three new read-only checks in `src/agent_git.c`. Nothing calls them yet; wiring them into `apply-patch` is step 5.

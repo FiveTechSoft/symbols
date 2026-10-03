@@ -263,7 +263,9 @@ static FS_READ_STATUS wc_remove(HANDLE dir,const WCHAR *name,const FILE_ID_INFO 
    read-only target cannot be deleted (access denied) and would stay
    behind as an orphan that makes the target 2-link. Clear READONLY only for
    the delete, then restore the original attributes on the same handle so the
-   target keeps its attribute. Used for replace pins only, never for user files. */
+   target keeps its attribute. Used for replace pins and for the remove and
+   move recovery links (the journal pin and the target link of a rolled back
+   move); never for user files. */
 static FS_READ_STATUS wr_remove_pin(HANDLE dir,const WCHAR *name,const FILE_ID_INFO *id)
 {
     HANDLE h=INVALID_HANDLE_VALUE;FILE_ID_INFO found;FS_READ_META m;
