@@ -184,6 +184,11 @@ int main(void)
  REFUSED(FsRemoveFile(r,"Dir/Ro","RO!!",4),"remove file that denies delete");
  rec("remove recovery",(int)FsRemoveRecover(r));
  fprintf(stderr,"diag: ACL after the recovery:\n");sys("icacls \"%s\" >&2",WS "\\Dir\\Ro");
+ /* Measured (run 37135936309): with this deny-delete entry in place Ro cannot
+    be opened for reading, before the remove as well as after the recovery, and
+    the ACL is identical before and after. So the entry is removed before the
+    content check, which then reads the file the operation left behind. */
+ sys("icacls \"%s\" /remove:d *S-1-1-0 >NUL 2>&1",WS "\\Dir\\Ro");
  {FILE *f=fopen(WS "\\Dir\\Ro","rb");char b[16]={0};size_t n=0;
   if(!f)fprintf(stderr,"diag: fopen Ro failed, errno %d, GetLastError %lu\n",errno,(unsigned long)GetLastError());
   else{n=fread(b,1,sizeof(b)-1,f);fclose(f);fprintf(stderr,"diag: read %lu bytes from Ro: \"%s\"\n",(unsigned long)n,b);}
@@ -195,6 +200,11 @@ int main(void)
  sys("icacls \"%s\" /deny *S-1-1-0:(WD,AD) >NUL 2>&1",WS "\\Dir\\Ro");
  {FS_READ_STATUS s=FsReplaceFile(r,"Dir/Ro","RO!!",4,"NEW!",4);
   rec("replace recovery",(int)FsReplaceRecover(r));
+  /* The deny entry is removed before the bytes are read, as in the cell above
+     (run 37135936309: a deny entry made Ro unreadable for the CRT). The cell
+     measures that the replace is consistent, not that the CRT can read under
+     the entry. */
+  sys("icacls \"%s\" /remove:d *S-1-1-0 >NUL 2>&1",WS "\\Dir\\Ro");
   ck(s==FS_READ_OK?bytes_are(WS "\\Dir\\Ro","NEW!"):bytes_are(WS "\\Dir\\Ro","RO!!"),"replace over deny-write file: state agrees with status");
   ck(entries(WS "\\Dir\\*")==2,"replace over deny-write file: Dir entries");root_clean("replace deny-write");cells++;}
  FsReadClose(r);
