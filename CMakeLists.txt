@@ -190,6 +190,11 @@ if(WIN32)
     target_compile_definitions(test_agent_patch_ntfs_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
     add_test(NAME test_agent_patch_ntfs_win COMMAND test_agent_patch_ntfs_win
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_reparse tests/test_fs_win_reparse.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_reparse PRIVATE include)
+    add_test(NAME test_fs_win_reparse COMMAND test_fs_win_reparse
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_device_names PRIVATE include)
