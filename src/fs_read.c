@@ -102,7 +102,9 @@ static FS_READ_STATUS win_meta(HANDLE h,FS_READ_META *m)
     FILE_STANDARD_INFO std;
     if(!GetFileInformationByHandle(h,&i))return win_error(GetLastError());
     if(!GetFileInformationByHandleEx(h,FileStandardInfo,&std,sizeof(std)))return FS_READ_IO;
+#ifndef FS_REPARSE_MUTANT
     if(i.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)return FS_READ_DENIED;
+#endif /* FS_REPARSE_MUTANT: test-only build MC1 drops this check; never defined in production targets */
     if(!!(i.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=!!std.Directory)return FS_READ_DENIED;
     if(i.dwFileAttributes & FILE_ATTRIBUTE_DEVICE)return FS_READ_UNSUPPORTED;
     m->kind=std.Directory?FS_KIND_DIR:FS_KIND_FILE;

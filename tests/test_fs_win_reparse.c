@@ -31,10 +31,35 @@
      so the refusals above are not a harness that rejects everything.
    If any cell is accepted or writes outside, this test fails and the finding
    is reported before any change to src. */
+#ifdef FS_REPARSE_MUTANT
+/* MC1 build: the same test, linked against an fs_read.c whose win_meta no
+   longer rejects a reparse point (see src/fs_read.c). It passes (exit 0) only
+   if the matrix catches the mutant: a failed check after the controls counts
+   as a kill, a failed control is a real failure, and reaching the end means
+   the mutant survived (exit 1). Separate fixture names so ctest may run both
+   builds in parallel. */
+#define WS "test_fs_winreparse_mc1_ws"
+#define OUTD "test_fs_winreparse_mc1_out"
+#define RL "test_fs_winreparse_mc1_rootlink"
+#else
 #define WS "test_fs_winreparse_ws"
-#define OUT "test_fs_winreparse_out"
+#define OUTD "test_fs_winreparse_out"
 #define RL "test_fs_winreparse_rootlink"
-static void ck(int ok,const char *what){if(!ok){fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());exit(1);}}
+#endif
+static int matrix_started;
+/* Junctions are removed as links first so the recursive delete never follows
+   them; no ck() in here, it runs from the failure path too. */
+static void cleanup(void)
+{system("cmd /D /C if exist " RL " rmdir " RL " >NUL 2>&1");
+ system("cmd /D /C if exist " WS "\\jl rmdir " WS "\\jl >NUL 2>&1");
+ system("cmd /D /C if exist " WS " rmdir /S /Q " WS " >NUL 2>&1");
+ system("cmd /D /C if exist " OUTD " rmdir /S /Q " OUTD " >NUL 2>&1");}
+static void ck(int ok,const char *what)
+{if(ok)return;
+#ifdef FS_REPARSE_MUTANT
+ if(matrix_started){printf("MC1 killed by: %s\n",what);cleanup();exit(0);}
+#endif
+ fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());exit(1);}
 static void put(const char *path,const char *v)
 {FILE *f=fopen(path,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
 static void same_bytes(const char *path,const char *v)
@@ -56,8 +81,8 @@ static void unlink_dir(const char *p)
 /* Everything that must not move when a refused operation ends. */
 static void untouched(const char *what)
 {char m[160];
- snprintf(m,sizeof(m),"%s: victim bytes",what);same_bytes(OUT "\\victim","VICTIM");
- snprintf(m,sizeof(m),"%s: outside entries",what);ck(count(OUT "\\*")==1,m);
+ snprintf(m,sizeof(m),"%s: victim bytes",what);same_bytes(OUTD "\\victim","VICTIM");
+ snprintf(m,sizeof(m),"%s: outside entries",what);ck(count(OUTD "\\*")==1,m);
  snprintf(m,sizeof(m),"%s: real file bytes",what);same_bytes(WS "\\inside\\f","REAL");
  snprintf(m,sizeof(m),"%s: real dir entries",what);ck(count(WS "\\inside\\*")==1,m);
  snprintf(m,sizeof(m),"%s: workspace entries",what);ck(count(WS "\\*")==2,m);
@@ -69,13 +94,10 @@ static int refused;
 int main(void)
 {
  FS_READ_ROOT *r,*rl=NULL;FS_READ_STATUS s;
- system("cmd /D /C if exist " RL " rmdir " RL " >NUL 2>&1");
- system("cmd /D /C if exist " WS "\\jl rmdir " WS "\\jl >NUL 2>&1");
- system("cmd /D /C if exist " WS " rmdir /S /Q " WS " >NUL 2>&1");
- system("cmd /D /C if exist " OUT " rmdir /S /Q " OUT " >NUL 2>&1");
- ck(_mkdir(WS)==0&&_mkdir(WS "\\inside")==0&&_mkdir(OUT)==0,"mkdir");
- put(OUT "\\victim","VICTIM");put(WS "\\inside\\f","REAL");
- junction(WS "\\jl",OUT);junction(RL,WS);
+ cleanup();
+ ck(_mkdir(WS)==0&&_mkdir(WS "\\inside")==0&&_mkdir(OUTD)==0,"mkdir");
+ put(OUTD "\\victim","VICTIM");put(WS "\\inside\\f","REAL");
+ junction(WS "\\jl",OUTD);junction(RL,WS);
  ck(FsReadOpen(WS,&r)==FS_READ_OK,"open workspace");
  /* Controls on the real directory: the writers work in this fixture. */
  ck(FsCreateFile(r,"inside/c1","c1",2,0666)==FS_READ_OK,"control create");
@@ -91,6 +113,7 @@ int main(void)
  ck(FsRemoveFile(r,"inside/b1","B1",2)==FS_READ_OK&&FsRemoveFile(r,"inside/b2","B2",2)==FS_READ_OK,"control cleanup");
  ck(FsBatchRecover(r)==FS_READ_OK,"control recover");
  untouched("after controls");
+ matrix_started=1;
  /* Junction as a parent: expected DENIED in every writer. */
  DENIED(FsReplaceFile(r,"jl/victim","VICTIM",6,"HACKED",6),"replace via junction parent");
  DENIED(FsRemoveFile(r,"jl/victim","VICTIM",6),"remove via junction parent");
@@ -117,10 +140,14 @@ int main(void)
  if(rl)FsReadClose(rl);
  ck(count(WS "\\*")==2,"junction root: workspace entries");
  unlink_dir(RL);unlink_dir(WS "\\jl");
- system("cmd /D /C rmdir /S /Q " WS " >NUL 2>&1");system("cmd /D /C rmdir /S /Q " OUT " >NUL 2>&1");
+ cleanup();
  ck(refused==16,"cell count");
+#ifdef FS_REPARSE_MUTANT
+ printf("MC1 SURVIVED: the matrix did not notice win_meta accepting reparse points\n");return 1;
+#else
  printf("fs win reparse ok: %d refused cells\n",refused);
  return 0;
+#endif
 }
 #else
 int main(void){return 0;}
