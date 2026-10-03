@@ -37,7 +37,13 @@
      succeed (guard against writers that always fail). This is an invariant held
      over K iterations in a time budget, never a proof that no interleaving
      exists; K and the swap count are printed. If it turns flaky in CI the
-     budget is cut and the cut is declared. A write outside is a finding. */
+     budget is cut and the cut is declared. A write outside is a finding.
+   v2 note: v1 (run 342) failed the guard "at least one writer call succeeded"
+   with 0 OK. That was a test-design fault, not a production finding: the real
+   directory phase lasted microseconds because the swapper looped straight back
+   to RemoveDirectory, so writers always met the junction or no directory, and
+   nothing was written outside. The real phase is now held REAL_HOLD_MS (30 ms)
+   so writers have a genuine window. Both guards are unchanged. */
 #define ROOT "test_fs_winrace_ws"
 #define OUTD "test_fs_winrace_out"
 #define ROUNDS 8
@@ -100,6 +106,7 @@ static void reset(void)
 {DeleteFileA(ROOT "\\t");DeleteFileA(ROOT "\\u");DeleteFileA(ROOT "\\n");DeleteFileA(ROOT "\\b0");
  put(ROOT "\\t","ORIG");}
 /* ---- E: parent swap ---- */
+#define REAL_HOLD_MS 30
 static volatile LONG g_stop,g_swaps,g_junctions,g_ok,g_calls;
 static void flip_to_junction(void)
 {char abs[MAX_PATH],cmd[2*MAX_PATH+128];DWORD n=GetFullPathNameA(OUTD,MAX_PATH,abs,NULL);
@@ -128,6 +135,7 @@ static DWORD WINAPI swapper(LPVOID p)
    Sleep(15);
    /* junction -> real directory */
    if(RemoveDirectoryA(ROOT "\\D"))_mkdir(ROOT "\\D");
+   Sleep(REAL_HOLD_MS); /* hold the real phase so writers get a window */
    InterlockedIncrement(&g_swaps);
   }else Sleep(5);
  }
