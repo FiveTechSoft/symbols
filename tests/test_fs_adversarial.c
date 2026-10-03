@@ -87,9 +87,9 @@ int main(void)
    Ported: the 20 malformed strings across create/copy/move/remove/manifest,
    the 400 deterministic generated strings, and "outside untouched".
    Not ported, by design:
-   - batch: FsBatchCreate is an UNSUPPORTED stub on Windows, so "no partial
-     batch" has no behavior to test. The stub is asserted instead, so this
-     test fails loudly when batch support arrives and needs a real port.
+   - batch: FsBatchCreate is real on Windows (W2); its tests are
+     test_fs_win_batch_create and the fuzz test. Only the one-entry
+     rejection is asserted here.
    - cross-operation recovery and writer races (separate tests). */
 #include "fs_write.h"
 #include "fs_remove.h"
@@ -153,11 +153,11 @@ int main(void)
  free(bytes);
  ck(FsCopyFile(root,"source","valid-copy","source",6)==FS_READ_OK,
     "guard: valid copy succeeds in this scratch");
- /* Documented stub: Windows has no batch writer. */
+ /* FsBatchCreate is real on Windows (W2): a single entry is invalid. */
  {FS_BATCH_CREATE one[1]={{"batch-new","x",1,0600}};
-  ck(FsBatchCreate(root,one,1)==FS_READ_UNSUPPORTED,
-     "batch is an UNSUPPORTED stub on Windows");
-  ck(FsReadStat(root,"batch-new",&m)==FS_READ_MISSING,"stub wrote nothing");}
+  ck(FsBatchCreate(root,one,1)==FS_READ_INVALID,
+     "batch of one entry is rejected on Windows");
+  ck(FsReadStat(root,"batch-new",&m)==FS_READ_MISSING,"rejected batch wrote nothing");}
  for(size_t k=0;k<sizeof(invalid)/sizeof(*invalid);k++){
    FS_OP_REQUEST req={FS_OP_CREATE,NULL,invalid[k]};FS_MANIFEST plan={0};
    ck(FsCreateFile(root,invalid[k],"x",1,0600)!=FS_READ_OK,"create rejected");

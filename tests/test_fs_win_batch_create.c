@@ -15,11 +15,13 @@ static void put(const char *p,const char *v)
 {FILE *f=fopen(p,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"fixture");}
 static void fixture(void)
 {ck(_mkdir(ROOT)==0&&_mkdir(ROOT "\\sub")==0,"mkdir");}
-/* Count the names directly in dir (excluding . and ..). */
+/* Count the names directly in dir, excluding . and .. and the persistent
+   .fstxn.lock that the writers leave in the root. */
 static int count(const char *pattern)
 {WIN32_FIND_DATAA d;HANDLE f=FindFirstFileA(pattern,&d);int n=0;
  if(f==INVALID_HANDLE_VALUE)return 0;
- do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,".."))n++;}while(FindNextFileA(f,&d));
+ do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,"..")&&
+       strcmp(d.cFileName,".fstxn.lock"))n++;}while(FindNextFileA(f,&d));
  FindClose(f);return n;}
 static void is_file(const char *p,const char *v,int readonly)
 {char b[64]={0};FILE *in=fopen(p,"rb");DWORD a;size_t n=strlen(v);
@@ -62,7 +64,7 @@ static void child(int point)
 static void created_all(void)
 {is_file(ROOT "\\a.txt","AAA",1);is_file(ROOT "\\sub\\b.txt","BBBB",0);
  is_file(ROOT "\\c.txt","C",1);
- ck(count(ROOT "\\*")==4,"root holds only a.txt c.txt sub and nothing else");
+ ck(count(ROOT "\\*")==3,"root holds only a.txt c.txt sub and nothing else");
  ck(count(ROOT "\\sub\\*")==1,"sub holds only b.txt");}
 static void nothing(void)
 {ck(count(ROOT "\\*")==1,"root holds only sub");ck(count(ROOT "\\sub\\*")==0,"sub empty");}
