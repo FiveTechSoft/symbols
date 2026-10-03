@@ -183,6 +183,9 @@ if(WIN32)
     target_include_directories(test_fs_win_device_names PRIVATE include)
     add_test(NAME test_fs_win_device_names COMMAND test_fs_win_device_names
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_probe tests/test_fs_win_probe.c)
+    add_test(NAME test_fs_win_probe COMMAND test_fs_win_probe
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 else()
     sllm_test(test_fs_create_windows tests/test_fs_create_windows.c)
 endif()
