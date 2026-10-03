@@ -179,6 +179,10 @@ int main(void)
  sys("icacls \"%s\" /deny *S-1-1-0:(D) >NUL 2>&1",WS "\\Dir\\Ro");
  REFUSED(FsRemoveFile(r,"Dir/Ro","RO!!",4),"remove file that denies delete");
  rec("remove recovery",(int)FsRemoveRecover(r));
+ {FILE *f=fopen(WS "\\Dir\\Ro","rb");char b[16]={0};size_t n=0;
+  if(!f)fprintf(stderr,"diag: fopen Ro failed, errno %d, GetLastError %lu\n",errno,(unsigned long)GetLastError());
+  else{n=fread(b,1,sizeof(b)-1,f);fclose(f);fprintf(stderr,"diag: read %lu bytes from Ro: \"%s\"\n",(unsigned long)n,b);}
+  fprintf(stderr,"diag: Dir entries %d\n",entries(WS "\\Dir\\*"));}
  ck(bytes_are(WS "\\Dir\\Ro","RO!!")&&entries(WS "\\Dir\\*")==2,"remove denied file: unchanged");root_clean("remove denied file");
  FsReadClose(r);
  /* a file that denies write-data: consistency only */
