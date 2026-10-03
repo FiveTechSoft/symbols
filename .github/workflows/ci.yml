@@ -33,6 +33,8 @@ jobs:
         run: cmake --build build --config Release -j4
       - name: Tests
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: NTFS measurement probe (output only)
+        run: .\build\Release\test_fs_win_probe.exe
       - name: Corpus lint (gate)
         run: python tools/lint_corpus.py --check
 
