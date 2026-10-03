@@ -1141,3 +1141,4 @@ done:
     if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
     free(name);return s;
 }
+#include "fs_batch_win.inc"
