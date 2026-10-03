@@ -306,7 +306,8 @@ int main(void)
      is no symlink fixture and no "linkfile".
    - FsBatchCreate and FsBatchRecover are real on Windows (W2), and so is
      FsBatchReplace (W4); a generated bad path must be rejected with the
-     tree unchanged.
+     tree unchanged, and a positive batch replace round trip (control) shows
+     the detector sees a batch.
    - Default iterations are lower (150 and 100) until the CI cost is known;
      the elapsed time is printed. FS_FUZZ_ITERS raises the first. */
 #include "fs_write.h"
@@ -593,6 +594,14 @@ int main(void)
     ck(FsReplaceFile(root,"safe","SAFE",4,"SAFF",4)==FS_READ_OK,"control replace");
     changed=snap();ck(strcmp(base,changed),"detector missed a replace");free(changed);
     ck(FsReplaceFile(root,"safe","SAFF",4,"SAFE",4)==FS_READ_OK,"control restore");
+    /* The batch rejections below are only meaningful if a legal batch works
+       and the detector sees it: replace two files, then put them back. */
+    {FS_BATCH_REPLACE b[2]={{"safe","SAFE",4,"SAFF",4},{"sub/inner","INNER",5,"INNEX",5}};
+     ck(FsBatchReplace(root,b,2)==FS_READ_OK,"control batch");
+     changed=snap();ck(strcmp(base,changed),"detector missed a batch");free(changed);
+     {FS_BATCH_REPLACE r[2]={{"safe","SAFF",4,"SAFE",4},{"sub/inner","INNEX",5,"INNER",5}};
+      ck(FsBatchReplace(root,r,2)==FS_READ_OK,"control batch restore");}}
+    ck(FsBatchRecover(root)==FS_READ_OK,"control recover on a clean tree");
     free(base);base=snap();
     {char *check=snap();ck(!strcmp(base,check),"control restore not exact");free(check);}
     for(unsigned k=0;k<iters;k++){

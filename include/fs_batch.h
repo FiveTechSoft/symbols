@@ -10,7 +10,8 @@
    guarantee. An orphan stage before journal publication may remain. A crash
    between journal and marker retirement leaves a marker-only state that blocks
    writes pending manual inspection; automatic recovery cannot verify targets
-   without the journal. Windows writes fail closed. */
+   without the journal. On Windows (NTFS only; other volumes fail closed) the
+   same API runs the hard-link pin protocol of src/fs_batch_win.inc. */
 typedef struct { const char *target; const void *bytes; size_t len; unsigned mode; } FS_BATCH_CREATE;
 FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *root,const FS_BATCH_CREATE *entries,size_t count);
 FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *root);

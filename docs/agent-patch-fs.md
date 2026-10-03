@@ -88,8 +88,13 @@ Multi-file replace (M1-2, `FsBatchReplace`)
 - Recovery validates every target, stage and rollback name before changing any;
   a target holding neither the old nor the new inode (foreign bytes) makes
   recovery fail closed with nothing changed.
-- Limits and non-claims: POSIX only. Windows fails closed (`FS_READ_UNSUPPORTED`);
-  there is no Windows multi-file replace. Cooperating writers only. Not atomic
+- Limits and non-claims: the protocol above is the POSIX one. Windows (NTFS only)
+  has its own implementation of batch create, replace and recover in
+  `src/fs_batch_win.inc` (hard-link pins, rename-over, marker, recovery); a
+  foreign open handle on a target makes the rename fail and the call returns
+  `FS_READ_PENDING` after rolling back what it published. Its evidence and
+  non-claims are in `docs/core-m0-m1-exit-audit.md` (2026-10-03 update); other
+  volumes fail closed. Cooperating writers only. Not atomic
   visibility to readers and not a power-loss guarantee. A crash between journal
   retirement and marker retirement leaves a marker-only state that fails closed
   for manual inspection (same as create). 1 MiB per file. Inodes change.
