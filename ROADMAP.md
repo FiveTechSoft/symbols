@@ -50,7 +50,7 @@ Proposed definition of v1, for Antonio to accept or change: **Phases 0 to 3 meet
 
 In dependency order, with sizes:
 
-1. Declare M0 and M1: run and record the remaining exit checks (stress repeat, path fuzzing, diff on the filesystem API). S to M. No dependency.
+1. Declare M0 and M1: run and record the remaining exit checks (path fuzzing, diff on the filesystem API). S to M. No dependency. The M0 stress repeat is no longer on this list: 100 of 100 iterations passed on Windows (run `36937340017`, commit `50ee995`) and on Linux (run `37115541002`, commit `f1c43cb`), within the limits stated in the M0 update of [docs/core-m0-m1-exit-audit.md](docs/core-m0-m1-exit-audit.md); ASan and macOS are not covered, and M0 is not declared by that update.
 2. M2: move apply-patch onto the Git contracts and close the remote-advance, stale-HEAD and interrupted-retry fixtures. M. After step 1.
 3. M3: CMake File API and CTest ingestion, then conservative affected-test selection with full-suite fallback. L. After step 2.
 4. Generalization of the repair operators on unseen tasks, without hand-tuning on the blind or held-out sets and without any wrong edit. L. Runs alongside steps 2 and 3, scored by Mimo's counts-only batch.
