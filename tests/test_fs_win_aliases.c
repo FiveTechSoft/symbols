@@ -39,23 +39,51 @@
    an accepted one would still be a defect. In the 8.3 cell the file does exist
    (the lock, empty) and the expected bytes are the empty string, so a writer
    that follows the alias would succeed and be caught.
+   MC2 and MC3 build this same file with a mutant in src (valid_relative lets
+   a colon through; wc_target_status stops rejecting a trailing dot or space),
+   exit 0 only if the matrix catches it. Predictions, before measuring: MC3 is
+   killed by the creating cells on "f.", "f ", "...", " " and "inside/...", which
+   would create a file. MC2 is killed only by the two read cells on
+   "inside/f::$DATA" (an existing file's default stream, which would resolve to
+   the file); the writers have a second colon check in wc_target_status, so the
+   writer cells cannot tell the layers apart and are not expected to kill it.
    Controls on legal paths succeed, so these refusals are not a harness that
    rejects everything. ALIAS_SHORT builds run only the 8.3 cell: the short
    name of the persistent .fstxn.lock control file, if the volume generates
    one; when it does not, the test exits 77 (ctest "Skipped"), so "not shown"
    is visible in the run. */
-#ifdef ALIAS_SHORT
+#if defined(ALIAS_SHORT)
 #define WS "test_fs_winshort_ws"
 #define OUTD "test_fs_winshort_out"
+#elif defined(FS_ALIAS_MUTANT) && FS_ALIAS_MUTANT==2
+#define WS "test_fs_winalias_mc2_ws"
+#define OUTD "test_fs_winalias_mc2_out"
+#elif defined(FS_ALIAS_MUTANT) && FS_ALIAS_MUTANT==3
+#define WS "test_fs_winalias_mc3_ws"
+#define OUTD "test_fs_winalias_mc3_out"
 #else
 #define WS "test_fs_winalias_ws"
 #define OUTD "test_fs_winalias_out"
 #endif
-static void cleanup(void)
-{system("cmd /D /C if exist " WS " rmdir /S /Q " WS " >NUL 2>&1");
- system("cmd /D /C if exist " OUTD " rmdir /S /Q " OUTD " >NUL 2>&1");}
-static void ck(int ok,const char *what)
-{if(ok)return;fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());exit(1);}
+static int matrix_started;
+/* Names such as "..." and "f." can be created through the NT API by a mutant
+   and cannot be deleted by a plain path, so the delete uses the extended
+   prefix. No ck() in here: it also runs from the failure path. */
+static void rmtree(const char *rel)
+{char full[MAX_PATH],cmd[2*MAX_PATH+64];DWORD n=GetFullPathNameA(rel,MAX_PATH,full,NULL);
+ if(!n||n>=MAX_PATH)return;
+ snprintf(cmd,sizeof(cmd),"cmd /D /C if exist \"%s\" rmdir /S /Q \"\\\\?\\%s\" >NUL 2>&1",full,full);
+ system(cmd);}
+static void cleanup(void){rmtree(WS);rmtree(OUTD);}
+/* In a mutant build a failed check after the controls is a kill (exit 0); a
+   failed control stays a real failure; reaching the end is SURVIVED. */
+static void fail(const char *what)
+{
+#if defined(FS_ALIAS_MUTANT)
+ if(matrix_started){printf("MC%d killed by: %s\n",(int)FS_ALIAS_MUTANT,what);cleanup();exit(0);}
+#endif
+ fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());exit(1);}
+static void ck(int ok,const char *what){if(!ok)fail(what);}
 static void put(const char *path,const char *v)
 {FILE *f=fopen(path,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
 static void same_bytes(const char *path,const char *v)
@@ -77,9 +105,18 @@ static void untouched(void)
  snprintf(m,sizeof(m),"%s: workspace entries",label);ck(count(WS "\\*")==1,m);}
 static int cells;
 #define REFUSE(expr,op) do{FS_READ_STATUS s_;snprintf(label,sizeof(label),"%s [%s]",op,name);\
- s_=(expr);if(s_==FS_READ_OK){fprintf(stderr,"ACCEPTED %s\n",label);exit(1);}untouched();cells++;}while(0)
+ s_=(expr);if(s_==FS_READ_OK){char w_[360];snprintf(w_,sizeof(w_),"ACCEPTED %s",label);fail(w_);}untouched();cells++;}while(0)
 static void nine(FS_READ_ROOT *r,const char *name,const char *exp,size_t el)
 {
+#ifndef ALIAS_SHORT
+ /* Readers go only through win_open and valid_relative, with no second
+    validator behind them, so these two cells are where a loosened
+    valid_relative shows. Not run for the 8.3 lock cell: the lock may be read
+    through its own name too. */
+ {FS_READ_META m;unsigned char *b=NULL;size_t bn=0;
+  REFUSE(FsReadStat(r,name,&m),"read stat");
+  REFUSE(FsReadFile(r,name,&b,&bn,&m),"read file");free(b);}
+#endif
  REFUSE(FsCreateFile(r,name,"x",1,0666),"create");
  REFUSE(FsCopyFile(r,"inside/f",name,"REAL",4),"copy target");
  REFUSE(FsCopyFile(r,name,"inside/c",exp,el),"copy source");
@@ -108,7 +145,7 @@ static void fixture(FS_READ_ROOT **r)
   ck(FsBatchReplace(*r,b,2)==FS_READ_OK,"control batch replace");}
  ck(FsRemoveFile(*r,"inside/b1","B1",2)==FS_READ_OK&&FsRemoveFile(*r,"inside/b2","B2",2)==FS_READ_OK,"control cleanup");
  ck(FsBatchRecover(*r)==FS_READ_OK,"control recover");
- label[0]=0;snprintf(label,sizeof(label),"after controls");untouched();}
+ label[0]=0;snprintf(label,sizeof(label),"after controls");untouched();matrix_started=1;}
 int main(void)
 {
  FS_READ_ROOT *r;
@@ -133,7 +170,7 @@ int main(void)
 #else
  char absv[MAX_PATH],plain[MAX_PATH+16],ext[MAX_PATH+16],dev[MAX_PATH+16];DWORD n;
  static const char *fixed[]={
-  "C:rel","C:","inside\\f","inside/f:ads","f:ads","f::$DATA","inside/f:ads:$DATA",
+  "C:rel","C:","inside\\f","inside/f:ads","f:ads","f::$DATA","inside/f:ads:$DATA","inside/f::$DATA","inside/f:ads",
   "\\\\?\\C:\\x","\\\\?\\UNC\\localhost\\C$\\x","\\\\.\\C:\\x","\\\\.\\PhysicalDrive0","\\\\localhost\\C$\\x",
   "a*b","a?b","a<b","a>b","a|b","a\"b","*","?","<",">","|","\"","*.*","inside/*","inside/?","inside/a<b","inside/a|b",
   "...","f.","f "," ",".","inside/..."};
@@ -145,10 +182,14 @@ int main(void)
  snprintf(dev,sizeof(dev),"\\\\.\\%s",absv);
  for(i=0;i<sizeof(fixed)/sizeof(fixed[0]);i++)nine(r,fixed[i],"REAL",4);
  nine(r,plain,"REAL",4);nine(r,ext,"REAL",4);nine(r,dev,"REAL",4);
- ck(cells==9*(int)(sizeof(fixed)/sizeof(fixed[0])+3),"cell count");
+ ck(cells==11*(int)(sizeof(fixed)/sizeof(fixed[0])+3),"cell count");
  FsReadClose(r);cleanup();
+#ifdef FS_ALIAS_MUTANT
+ printf("MC%d SURVIVED: the alias matrix did not notice the mutant\n",(int)FS_ALIAS_MUTANT);return 1;
+#else
  printf("fs win aliases ok: %d refused cells\n",cells);
  return 0;
+#endif
 #endif
 }
 #else

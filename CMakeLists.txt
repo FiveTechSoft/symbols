@@ -213,6 +213,18 @@ if(WIN32)
     add_test(NAME test_fs_win_aliases_short COMMAND test_fs_win_aliases_short
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_aliases_short PROPERTIES SKIP_RETURN_CODE 77)
+    add_executable(test_fs_win_aliases_mc2 tests/test_fs_win_aliases.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_aliases_mc2 PRIVATE include)
+    target_compile_definitions(test_fs_win_aliases_mc2 PRIVATE FS_ALIAS_MUTANT=2)
+    add_test(NAME test_fs_win_aliases_mc2 COMMAND test_fs_win_aliases_mc2
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_aliases_mc3 tests/test_fs_win_aliases.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_aliases_mc3 PRIVATE include)
+    target_compile_definitions(test_fs_win_aliases_mc3 PRIVATE FS_ALIAS_MUTANT=3)
+    add_test(NAME test_fs_win_aliases_mc3 COMMAND test_fs_win_aliases_mc3
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_device_names PRIVATE include)

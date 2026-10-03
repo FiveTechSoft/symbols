@@ -19,13 +19,20 @@ static FS_READ_STATUS error_status(void)
     if (errno == EACCES || errno == EPERM || errno == ELOOP) return FS_READ_DENIED;
     return FS_READ_IO;
 }
+/* Test-only mutants (never defined in production targets): MC2 lets a colon
+   through this validator. See tests/test_fs_win_aliases.c. */
+#if defined(FS_ALIAS_MUTANT) && FS_ALIAS_MUTANT==2
+#define VR_COLON 0
+#else
+#define VR_COLON (*p == ':')
+#endif
 static int valid_relative(const char *p, int allow_empty)
 {
     const char *start;
     if (!p || (!*p && !allow_empty) || *p == '/' || *p == '\\') return 0;
     if (!*p) return 1;
     for (start=p; *p; p++) {
-        if (*p == '\\' || *p == ':' || (unsigned char)*p < 32) return 0;
+        if (*p == '\\' || VR_COLON || (unsigned char)*p < 32) return 0;
         if (*p == '/') {
             size_t n=(size_t)(p-start);
             if (!n || (n==1 && *start=='.') ||

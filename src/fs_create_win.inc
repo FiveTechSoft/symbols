@@ -89,6 +89,13 @@ static int wc_device_name(const WCHAR *s)
 }
 /* Validate the whole path before classifying reserved control leaves. A malformed
    suffix must stay INVALID even if an earlier component is reserved. */
+/* Test-only mutant (never defined in production targets): MC3 drops the
+   trailing dot and space rejection. See tests/test_fs_win_aliases.c. */
+#if defined(FS_ALIAS_MUTANT) && FS_ALIAS_MUTANT==3
+#define WC_TRAIL 0
+#else
+#define WC_TRAIL (segment[n-1]==L'.'||segment[n-1]==L' ')
+#endif
 static FS_READ_STATUS wc_target_status(const WCHAR *s)
 {
     WCHAR segment[241];size_t n=0;int reserved=0;
@@ -97,7 +104,7 @@ static FS_READ_STATUS wc_target_status(const WCHAR *s)
         if(*p==L'/'||!*p){
             if(!n||n>240)return FS_READ_INVALID;
             segment[n]=0;
-            if(segment[n-1]==L'.'||segment[n-1]==L' '||
+            if(WC_TRAIL||
                !wcscmp(segment,L".")||!wcscmp(segment,L".."))return FS_READ_INVALID;
             if(wc_device_name(segment))return FS_READ_INVALID;
             if(wc_reserved(segment))reserved=1;
