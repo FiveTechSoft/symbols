@@ -27,8 +27,9 @@ FS_READ_STATUS FsBatchRecover(const FS_READ_ROOT *root);
    for manual inspection, as for create. Cooperating writers only (workspace
    lock); not atomic visibility to readers, not a power-loss guarantee, not a
    protection against an outside process that ignores the lock. Inodes change
-   on replace; permission bits are kept. Windows fails closed
-   (FS_READ_UNSUPPORTED); there is no Windows multi-file replace. */
+   on replace; permission bits are kept. Windows (NTFS) uses the
+   journaled hard-link pin protocol of src/fs_batch_win.inc: same outcome
+   classes, cooperating writers only, no power-loss claim. */
 typedef struct { const char *target; const void *expected; size_t expected_len;
                  const void *replacement; size_t replacement_len; } FS_BATCH_REPLACE;
 FS_READ_STATUS FsBatchReplace(const FS_READ_ROOT *root,const FS_BATCH_REPLACE *entries,size_t count);

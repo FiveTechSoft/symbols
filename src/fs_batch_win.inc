@@ -1,6 +1,5 @@
-/* Windows batch: journal record formats, batch-level validation (W1) and
-   FsBatchCreate / FsBatchRecover (W2). FsBatchReplace is still an
-   UNSUPPORTED stub. Included at the end of fs_create_win.inc, after the wc_
+/* Windows batch: journal record formats, batch-level validation (W1),
+   FsBatchCreate / FsBatchRecover (W2) and FsBatchReplace (W4). Included at the end of fs_create_win.inc, after the wc_
    helpers it uses. */
 #define WB_MAGIC 0x57425431u
 #define WBR_MAGIC 0x57425231u
@@ -180,7 +179,12 @@ static int wb_inject_publish_failure(unsigned k)
     const char *v=getenv("FS_WIN_BATCH_FAIL_PUBLISH");
     return v&&(unsigned)atoi(v)==k;
 }
+/* Test only: called before the publish of item k of a replace batch, so a test
+   can change a target between the final check and the rename. */
+static void (*wb_before_publish)(unsigned k)=NULL;
+#define WB_BEFORE_PUBLISH(k) do{if(wb_before_publish)wb_before_publish(k);}while(0)
 #else
+#define WB_BEFORE_PUBLISH(k) ((void)0)
 #define wb_crash(n) ((void)0)
 #define wb_mutant(n) 0
 #define wb_inject_publish_failure(k) 0
@@ -252,13 +256,41 @@ static FS_READ_STATUS wb_make_readonly(HANDLE parent,const WCHAR *leaf,const FIL
    Every stage, pin and target identity is verified before the first delete,
    so a foreign file under a journaled name stops recovery with nothing removed.
    Idempotent: each step tolerates an already finished earlier step. */
+static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r);
+/* Which record, if any, a batch file holds: 1 create, 2 replace. A batch file
+   of any other shape is DENIED (the caller sees present=1). */
+static FS_READ_STATUS wb_kind(HANDLE root,const WCHAR *name,int *kind,int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_META m;DWORD got=0;unsigned magic=0;FS_READ_STATUS s;
+    *kind=0;*present=0;
+    s=wc_open(root,name,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING)return FS_READ_OK;
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    if(win_meta(h,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||
+       !ReadFile(h,&magic,sizeof(magic),&got,NULL)||got!=sizeof(magic)){CloseHandle(h);return FS_READ_DENIED;}
+    CloseHandle(h);
+    if(magic==WB_MAGIC&&m.size==sizeof(WB_RECORD))*kind=1;
+    else if(magic==WBR_MAGIC&&m.size==sizeof(WBR_RECORD))*kind=2;
+    else return FS_READ_DENIED;
+    return FS_READ_OK;
+}
 static FS_READ_STATUS wb_recover_locked(const FS_READ_ROOT *r)
 {
-    WB_RECORD *j=(WB_RECORD*)calloc(1,sizeof(WB_RECORD)),*m=(WB_RECORD*)calloc(1,sizeof(WB_RECORD));
+    WB_RECORD *j=NULL,*m=NULL;
     const WB_RECORD *rec;FILE_ID_INFO jid,mid,rid,pid;
     HANDLE parent[WB_LIMIT];const WCHAR *leaf[WB_LIMIT];
     int stage[WB_LIMIT]={0},pin[WB_LIMIT]={0},target[WB_LIMIT]={0};
     int journal=0,marker=0;unsigned count=0,k;FS_READ_STATUS s;
+    int jk=0,mk=0,jp=0,mp=0;
+    s=wb_kind(r->handle,WB_JOURNAL,&jk,&jp);if(s!=FS_READ_OK)return s;
+    s=wb_kind(r->handle,WB_MARKER,&mk,&mp);if(s!=FS_READ_OK)return s;
+    if((jp&&jk==2)||(mp&&mk==2)){
+        /* A replace batch: journal and marker must both be replace records. */
+        if((jp&&jk!=2)||(mp&&mk!=2))return FS_READ_DENIED;
+        return wbr_recover_locked(r);
+    }
+    j=(WB_RECORD*)calloc(1,sizeof(WB_RECORD));m=(WB_RECORD*)calloc(1,sizeof(WB_RECORD));
     for(k=0;k<WB_LIMIT;k++){parent[k]=INVALID_HANDLE_VALUE;leaf[k]=NULL;}
     if(!j||!m){s=FS_READ_IO;goto done;}
     s=wb_read(r->handle,WB_JOURNAL,j,&jid,&journal);if(s!=FS_READ_OK)goto done;
@@ -453,12 +485,294 @@ end:
     if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
     free(rec);free(other);return s;
 }
+/* ---- FsBatchReplace (W4) -------------------------------------------------
+   Same journal and marker names as the create batch; the record is a WBR_RECORD
+   (own magic and size), so recovery tells them apart. Per item, in the root:
+   old_pin .fsrp- (hard link to the old inode), new_stage .fst-, new_pin .fsp-
+   (hard link to the staged inode); in the target's directory a rollback name
+   .fsrb- is linked to the old inode only while recovery restores it. The
+   single-file replace uses its own names and checks; none are reused.
+   Order: validate every target (identity, single link, not read-only, exact
+   expected bytes) -> pin every old inode -> stage and pin every new image ->
+   complete journal -> per item: close the old handle, rename the stage over the
+   target (ReplaceIfExists) -> verify -> marker -> recovery rolls forward.
+   Before the marker, recovery restores the old inode of every published item
+   in reverse order by linking the old pin to the rollback name and renaming
+   that over the target. A foreign open handle makes the rename fail with
+   0xc0000022: that is PENDING, with what was published rolled back. */
+#ifndef WB_HARNESS
+static int wb_links(HANDLE h,DWORD *n)
+{FILE_STANDARD_INFO s;if(!GetFileInformationByHandleEx(h,FileStandardInfo,&s,sizeof(s)))return 0;*n=s.NumberOfLinks;return 1;}
+#endif
+static FS_READ_STATUS wb_named_links(HANDLE dir,const WCHAR *leaf,DWORD *n)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s=wc_open(dir,leaf,GENERIC_READ,FILE_OPEN,&h);
+    if(s!=FS_READ_OK)return s;
+    s=wb_links(h,n)?FS_READ_OK:FS_READ_IO;CloseHandle(h);return s;
+}
+static FS_READ_STATUS wbr_read(HANDLE root,const WCHAR *name,WBR_RECORD *r,FILE_ID_INFO *id,int *present)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;FS_READ_META m;FS_READ_STATUS s;size_t done=0;DWORD got=0;
+    s=wc_open(root,name,GENERIC_READ,FILE_OPEN,&h);
+    if(s==FS_READ_MISSING){*present=0;return FS_READ_OK;}
+    if(s!=FS_READ_OK)return s;
+    *present=1;
+    if(win_meta(h,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=sizeof(*r)||!wc_id(h,id)){s=FS_READ_DENIED;goto out;}
+    while(done<sizeof(*r)){
+        if(!ReadFile(h,(unsigned char*)r+done,(DWORD)(sizeof(*r)-done),&got,NULL)||!got){s=FS_READ_DENIED;goto out;}
+        done+=got;
+    }
+    s=wb_replace_record_valid(r)?FS_READ_OK:FS_READ_DENIED;
+out:CloseHandle(h);return s;
+}
+/* Recovery for a replace batch. Journal only: restore every old inode. Marker
+   present: keep every new inode. All identities, pin bytes and link counts are
+   verified before the first change. */
+static FS_READ_STATUS wbr_recover_locked(const FS_READ_ROOT *r)
+{
+    WBR_RECORD *j=(WBR_RECORD*)calloc(1,sizeof(WBR_RECORD)),*m=(WBR_RECORD*)calloc(1,sizeof(WBR_RECORD));
+    const WBR_RECORD *rec;FILE_ID_INFO jid,mid,rid,pid;
+    HANDLE parent[WB_LIMIT];const WCHAR *leaf[WB_LIMIT];
+    int oldpin[WB_LIMIT]={0},newpin[WB_LIMIT]={0},stage[WB_LIMIT]={0},rb[WB_LIMIT]={0};
+    int told[WB_LIMIT]={0},tnew[WB_LIMIT]={0};
+    int journal=0,marker=0;unsigned count=0,k;FS_READ_STATUS s;
+    for(k=0;k<WB_LIMIT;k++){parent[k]=INVALID_HANDLE_VALUE;leaf[k]=NULL;}
+    if(!j||!m){s=FS_READ_IO;goto done;}
+    s=wbr_read(r->handle,WB_JOURNAL,j,&jid,&journal);if(s!=FS_READ_OK)goto done;
+    s=wbr_read(r->handle,WB_MARKER,m,&mid,&marker);if(s!=FS_READ_OK)goto done;
+    if(!journal&&!marker){s=FS_READ_OK;goto done;}
+    if(journal&&marker&&memcmp(j,m,sizeof(*j))){s=FS_READ_DENIED;goto done;}
+    rec=journal?j:m;count=rec->count;
+    if(!wc_id(r->handle,&rid)||!wc_same(&rid,&rec->root)||!wc_ntfs(r->handle)){s=FS_READ_DENIED;goto done;}
+    for(k=0;k<count;k++){
+        const WBR_ITEM *i=&rec->items[k];HANDLE t=INVALID_HANDLE_VALUE;FILE_ID_INFO found;FS_READ_META tm;
+        DWORD links=0;
+        s=wc_parent(r,i->target,&parent[k],&leaf[k]);if(s!=FS_READ_OK)goto done;
+        if(!wc_id(parent[k],&pid)||!wc_same(&pid,&i->parent)||
+           pid.VolumeSerialNumber!=rec->root.VolumeSerialNumber){s=FS_READ_DENIED;goto done;}
+        s=wr_named(r->handle,i->old_pin,&i->old_id,&oldpin[k]);if(s!=FS_READ_OK)goto done;
+        s=wr_named(r->handle,i->new_pin,&i->new_id,&newpin[k]);if(s!=FS_READ_OK)goto done;
+        s=wr_named(r->handle,i->new_stage,&i->new_id,&stage[k]);if(s!=FS_READ_OK)goto done;
+        s=wr_named(parent[k],i->rollback,&i->old_id,&rb[k]);if(s!=FS_READ_OK)goto done;
+        /* Before the marker the pins are the only proof of both images. */
+        if(!marker&&(!oldpin[k]||!newpin[k])){s=FS_READ_DENIED;goto done;}
+        if(oldpin[k]){s=wb_pin_bytes(r->handle,i->old_pin,&i->old_id,i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
+        if(newpin[k]){s=wb_pin_bytes(r->handle,i->new_pin,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
+        if(stage[k]){s=wb_pin_bytes(r->handle,i->new_stage,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;}
+        if(rb[k]){s=wr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;}
+        s=wc_open(parent[k],leaf[k],GENERIC_READ,FILE_OPEN,&t);
+        if(s==FS_READ_MISSING)s=FS_READ_DENIED;
+        if(s!=FS_READ_OK)goto done;
+        if(win_meta(t,&tm)!=FS_READ_OK||tm.kind!=FS_KIND_FILE||!wc_id(t,&found)){CloseHandle(t);s=FS_READ_DENIED;goto done;}
+        told[k]=wc_same(&found,&i->old_id);tnew[k]=wc_same(&found,&i->new_id);CloseHandle(t);
+        if(!told[k]&&!tnew[k]){s=FS_READ_DENIED;goto done;}
+        if(told[k]&&rb[k]){s=FS_READ_DENIED;goto done;} /* an alias nobody explains */
+        if(oldpin[k]){
+            s=wb_named_links(r->handle,i->old_pin,&links);if(s!=FS_READ_OK)goto done;
+            if(links!=(DWORD)(1+told[k]+rb[k])){s=FS_READ_DENIED;goto done;}
+        }
+        if(newpin[k]){
+            s=wb_named_links(r->handle,i->new_pin,&links);if(s!=FS_READ_OK)goto done;
+            if(links!=(DWORD)(1+stage[k]+tnew[k])){s=FS_READ_DENIED;goto done;}
+        }
+        if(marker){
+            if(!tnew[k]||rb[k]){s=FS_READ_DENIED;goto done;}
+            s=wr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
+        }
+    }
+    if(!marker){
+        wb_crash(29);
+        for(k=count;k-->0;){
+            const WBR_ITEM *i=&rec->items[k];
+            if(tnew[k]){
+                HANDLE h=INVALID_HANDLE_VALUE;
+                if(!rb[k]){
+                    s=wc_open(r->handle,i->old_pin,GENERIC_READ,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
+                    if(!wc_set_name(h,parent[k],i->rollback,WC_NT_LINK)){CloseHandle(h);s=FS_READ_PENDING;goto done;}
+                    CloseHandle(h);
+                    s=wr_verify(parent[k],i->rollback,&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
+                }
+                s=wr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);if(s!=FS_READ_OK)goto done;
+                s=wc_open(parent[k],i->rollback,DELETE,FILE_OPEN,&h);if(s!=FS_READ_OK)goto done;
+                if(!wr_replace_name(h,parent[k],leaf[k])){CloseHandle(h);s=FS_READ_PENDING;goto done;}
+                CloseHandle(h);
+                if(k==count-1)wb_crash(30);
+            }
+            s=wr_verify(parent[k],leaf[k],&i->old_id,(size_t)i->old_size,i->old_digest);if(s!=FS_READ_OK)goto done;
+            wc_probe_dir(parent[k]);
+        }
+        wb_crash(31);
+        for(k=count;k-->0;)if(stage[k]){s=wc_remove(r->handle,rec->items[k].new_stage,&rec->items[k].new_id);if(s!=FS_READ_OK)goto done;}
+        wb_crash(32);
+        /* Pins stay until the journal is gone, as for create. */
+        s=wc_remove(r->handle,WB_JOURNAL,&jid);if(s!=FS_READ_OK)goto done;
+        wb_crash(33);
+        for(k=0;k<count;k++){
+            if(newpin[k]){s=wc_remove(r->handle,rec->items[k].new_pin,&rec->items[k].new_id);if(s!=FS_READ_OK)goto done;}
+            if(oldpin[k]){s=wc_remove(r->handle,rec->items[k].old_pin,&rec->items[k].old_id);if(s!=FS_READ_OK)goto done;}
+        }
+    }else{
+        for(k=0;k<count;k++)if(stage[k]){s=wc_remove(r->handle,rec->items[k].new_stage,&rec->items[k].new_id);if(s!=FS_READ_OK)goto done;}
+        wb_crash(34);
+        for(k=0;k<count;k++){
+            if(newpin[k]){s=wc_remove(r->handle,rec->items[k].new_pin,&rec->items[k].new_id);if(s!=FS_READ_OK)goto done;}
+            if(oldpin[k]){s=wc_remove(r->handle,rec->items[k].old_pin,&rec->items[k].old_id);if(s!=FS_READ_OK)goto done;}
+        }
+        wb_crash(35);wc_probe_dir(r->handle);
+        if(journal){s=wc_remove(r->handle,WB_JOURNAL,&jid);if(s!=FS_READ_OK)goto done;}
+        wb_crash(36);
+        /* The marker owns the recovery record until its very last deletion. */
+        for(k=0;k<count;k++){
+            s=wr_verify(parent[k],leaf[k],&rec->items[k].new_id,(size_t)rec->items[k].new_size,rec->items[k].new_digest);
+            if(s!=FS_READ_OK)goto done;
+        }
+        s=wc_remove(r->handle,WB_MARKER,&mid);if(s!=FS_READ_OK)goto done;
+    }
+    wc_probe_dir(r->handle);s=FS_READ_OK;
+done:
+    for(k=0;k<WB_LIMIT;k++)if(parent[k]!=INVALID_HANDLE_VALUE)CloseHandle(parent[k]);
+    free(j);free(m);return s;
+}
+/* Before a journal exists nothing else refers to these names. */
+static void wbr_discard_unjournaled(const FS_READ_ROOT *r,WBR_RECORD *rec,HANDLE *stage,unsigned count)
+{
+    for(unsigned k=0;k<count;k++){
+        WBR_ITEM *i=&rec->items[k];
+        if(stage[k]!=INVALID_HANDLE_VALUE){wc_delete(stage[k]);CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+        if(i->new_id.VolumeSerialNumber&&i->new_pin[0])(void)wc_remove(r->handle,i->new_pin,&i->new_id);
+        if(i->old_id.VolumeSerialNumber&&i->old_pin[0])(void)wc_remove(r->handle,i->old_pin,&i->old_id);
+    }
+}
+static FS_READ_STATUS wb_batch_replace(const FS_READ_ROOT *r,const FS_BATCH_REPLACE *e,size_t n)
+{
+    HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED overlap;WBR_RECORD *rec=NULL;
+    HANDLE parent[WB_LIMIT],old[WB_LIMIT],stage[WB_LIMIT];WCHAR *wide[WB_LIMIT];const WCHAR *leaf[WB_LIMIT];
+    int journaled=0,committed=0,rollback=0;unsigned k;FS_READ_STATUS s;
+    for(k=0;k<WB_LIMIT;k++){parent[k]=old[k]=stage[k]=INVALID_HANDLE_VALUE;wide[k]=NULL;leaf[k]=NULL;}
+    if(!r)return FS_READ_INVALID;
+    s=wb_validate_replace(e,n);if(s!=FS_READ_OK)return s;
+    if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
+    rec=(WBR_RECORD*)calloc(1,sizeof(*rec));
+    if(!rec)return FS_READ_IO;
+    s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK){free(rec);return s;}
+    s=wo_clear_other(r->handle,4);if(s!=FS_READ_OK)goto end;
+    {int kind=0,present=0;
+     /* Any pending batch, create or replace, blocks a new one until recovery. */
+     s=wb_kind(r->handle,WB_JOURNAL,&kind,&present);if(present){s=FS_READ_DENIED;goto end;}if(s!=FS_READ_OK)goto end;
+     s=wb_kind(r->handle,WB_MARKER,&kind,&present);if(present){s=FS_READ_DENIED;goto end;}if(s!=FS_READ_OK)goto end;}
+    rec->magic=WBR_MAGIC;rec->version=1;rec->count=(unsigned)n;
+    if(!wc_id(r->handle,&rec->root)){s=FS_READ_UNSUPPORTED;goto end;}
+    /* Validate every target before anything is linked or created. The link
+       count is read before the pin exists, because the pin makes it 2. */
+    for(k=0;k<n;k++){
+        WBR_ITEM *i=&rec->items[k];FS_READ_META meta;DWORD links=0;
+        wide[k]=win_wide(e[k].target);if(!wide[k]){s=FS_READ_INVALID;goto end;}
+        s=wc_parent(r,wide[k],&parent[k],&leaf[k]);if(s!=FS_READ_OK)goto end;
+        if(!wc_id(parent[k],&i->parent)||i->parent.VolumeSerialNumber!=rec->root.VolumeSerialNumber){
+            s=FS_READ_UNSUPPORTED;goto end;}
+        s=wc_open(parent[k],leaf[k],GENERIC_READ|DELETE,FILE_OPEN,&old[k]);if(s!=FS_READ_OK)goto end;
+        if(win_meta(old[k],&meta)!=FS_READ_OK||meta.kind!=FS_KIND_FILE||
+           meta.size!=e[k].expected_len||!wc_id(old[k],&i->old_id)||
+           i->old_id.VolumeSerialNumber!=rec->root.VolumeSerialNumber){s=FS_READ_DENIED;goto end;}
+        /* A read-only target cannot be renamed over (0xc0000022): refuse now. */
+        if(!(meta.mode&0222)){s=FS_READ_DENIED;goto end;}
+        if(!wb_mutant(6)&&(!wb_links(old[k],&links)||links!=1)){s=FS_READ_DENIED;goto end;}
+        i->old_size=e[k].expected_len;i->old_digest=wc_hash((const unsigned char*)e[k].expected,e[k].expected_len);
+        i->new_size=e[k].replacement_len;i->new_digest=wc_hash((const unsigned char*)e[k].replacement,e[k].replacement_len);
+        s=wo_bytes(old[k],&i->old_id,e[k].expected_len,i->old_digest);if(s!=FS_READ_OK)goto end;
+        wcscpy(i->target,wide[k]);
+        if(!wc_random(i->old_pin,L".fsrp-")||!wc_random(i->new_stage,L".fst-")||
+           !wc_random(i->new_pin,L".fsp-")||!wc_random(i->rollback,L".fsrb-")){s=FS_READ_IO;goto end;}
+    }
+    /* Pin every old inode, then stage and pin every new image. No journal
+       exists yet: a failure discards our own names and leaves the tree as it was. */
+    for(k=0;k<n;k++){
+        if(!wc_set_name(old[k],r->handle,rec->items[k].old_pin,WC_NT_LINK)){s=FS_READ_UNSUPPORTED;goto unjournaled;}
+        if(k==0)wb_crash(21); /* first old pin */
+    }
+    for(k=0;k<n;k++){
+        WBR_ITEM *i=&rec->items[k];size_t used=0;DWORD wrote=0;int exists=0;
+        s=wc_open(r->handle,i->new_stage,GENERIC_WRITE|GENERIC_READ|DELETE,FILE_CREATE,&stage[k]);
+        if(s!=FS_READ_OK)goto unjournaled;
+        if(k==0)wb_crash(22); /* first stage */
+        while(used<e[k].replacement_len){
+            if(!WriteFile(stage[k],(const unsigned char*)e[k].replacement+used,(DWORD)(e[k].replacement_len-used),&wrote,NULL)||!wrote){
+                s=FS_READ_IO;goto unjournaled;}
+            used+=wrote;
+        }
+        if(!FlushFileBuffers(stage[k])||!wc_id(stage[k],&i->new_id)||
+           i->new_id.VolumeSerialNumber!=rec->root.VolumeSerialNumber||wc_same(&i->old_id,&i->new_id)){
+            s=FS_READ_IO;goto unjournaled;}
+        if(!wc_set_name(stage[k],r->handle,i->new_pin,WC_NT_LINK)){s=FS_READ_UNSUPPORTED;goto unjournaled;}
+        s=wr_named(r->handle,i->old_pin,&i->old_id,&exists);if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto unjournaled;}
+        s=wr_named(r->handle,i->new_pin,&i->new_id,&exists);if(s!=FS_READ_OK||!exists){s=FS_READ_PENDING;goto unjournaled;}
+        s=wb_pin_bytes(r->handle,i->old_pin,&i->old_id,i->old_size,i->old_digest);if(s!=FS_READ_OK)goto unjournaled;
+        s=wb_pin_bytes(r->handle,i->new_pin,&i->new_id,i->new_size,i->new_digest);if(s!=FS_READ_OK)goto unjournaled;
+    }
+    wb_crash(23); /* every pin and stage, no journal */
+    rec->checksum=wbr_checksum(rec);
+    if(!wb_replace_record_valid(rec)){s=FS_READ_INVALID;goto unjournaled;}
+    wc_probe_dir(r->handle);
+    s=wb_publish(r->handle,WB_JOURNAL,rec,sizeof(*rec));
+    if(s!=FS_READ_OK){
+        /* The rename may or may not have happened: if a journal now exists it
+           owns the pins, so leave everything for recovery. */
+        int kind=0,now=0;
+        if(wb_kind(r->handle,WB_JOURNAL,&kind,&now)==FS_READ_OK&&!now)goto unjournaled;
+        s=FS_READ_PENDING;journaled=1;goto end;
+    }
+    journaled=1;wb_crash(24); /* complete journal */
+    for(k=0;k<n;k++){
+        const WBR_ITEM *i=&rec->items[k];
+        WB_BEFORE_PUBLISH(k);
+        /* Final gate: the target is still the pinned inode with the expected bytes. */
+        s=wr_verify(parent[k],leaf[k],&i->old_id,(size_t)i->old_size,i->old_digest);
+        if(s!=FS_READ_OK){s=FS_READ_DENIED;rollback=1;goto end;}
+        /* Close-then-rename: our own old handle must not be what blocks it. */
+        CloseHandle(old[k]);old[k]=INVALID_HANDLE_VALUE;
+        if(wb_inject_publish_failure(k)||!wr_replace_name(stage[k],parent[k],leaf[k])){
+            s=FS_READ_PENDING;rollback=1;goto end;}
+        if(k==0)wb_crash(25); /* first target replaced */
+    }
+    wb_crash(26); /* every target replaced, no marker */
+    for(k=0;k<n;k++){
+        const WBR_ITEM *i=&rec->items[k];
+        s=wr_verify(parent[k],leaf[k],&i->new_id,(size_t)i->new_size,i->new_digest);
+        if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
+        wc_probe_dir(parent[k]);
+    }
+    s=wb_publish(r->handle,WB_MARKER,rec,sizeof(*rec));
+    if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
+    committed=1;wb_crash(27); /* marker and journal */
+    for(k=0;k<n;k++)if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+    s=wb_recover_locked(r);if(s!=FS_READ_OK){s=FS_READ_PENDING;goto end;}
+    wb_crash(28); /* committed cleanup complete */
+    s=FS_READ_OK;goto end;
+unjournaled:
+    wbr_discard_unjournaled(r,rec,stage,(unsigned)n);
+end:
+    for(k=0;k<WB_LIMIT;k++){
+        if(stage[k]!=INVALID_HANDLE_VALUE){CloseHandle(stage[k]);stage[k]=INVALID_HANDLE_VALUE;}
+        if(old[k]!=INVALID_HANDLE_VALUE){CloseHandle(old[k]);old[k]=INVALID_HANDLE_VALUE;}
+    }
+    /* Journal published, no marker, and the failure is one we can undo now
+       (changed target or refused rename): restore the tree. A failed rollback
+       leaves the journal for FsBatchRecover and reports PENDING. */
+    if(journaled&&!committed&&rollback){
+        FS_READ_STATUS rs=wb_recover_locked(r);
+        if(rs!=FS_READ_OK)s=FS_READ_PENDING;
+    }
+    for(k=0;k<WB_LIMIT;k++){if(parent[k]!=INVALID_HANDLE_VALUE)CloseHandle(parent[k]);free(wide[k]);}
+    if(lock!=INVALID_HANDLE_VALUE)wc_unlock(lock,&overlap);
+    free(rec);return s;
+}
 #ifdef FS_CREATE_TEST_CRASH
 /* Test hooks: the record layouts stay private to this file. */
 FS_READ_STATUS FsWinBatchTestValidateCreate(const FS_BATCH_CREATE *e,size_t n){return wb_validate_create(e,n);}
 FS_READ_STATUS FsWinBatchTestValidateReplace(const FS_BATCH_REPLACE *e,size_t n){return wb_validate_replace(e,n);}
 /* Test only: the status wc_open reports for a leaf of the root (used to
    measure the STATUS_DELETE_PENDING mapping). */
+void FsWinBatchTestSetBeforePublish(void (*f)(unsigned k)){wb_before_publish=f;}
 FS_READ_STATUS FsWinBatchTestOpenStatus(const FS_READ_ROOT *r,const char *leaf)
 {
     WCHAR *w=win_wide(leaf);HANDLE h=INVALID_HANDLE_VALUE;FS_READ_STATUS s;

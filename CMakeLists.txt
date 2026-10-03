@@ -195,6 +195,12 @@ if(WIN32)
     target_compile_definitions(test_fs_win_batch_create PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_batch_create COMMAND test_fs_win_batch_create
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_batch_replace tests/test_fs_win_batch_replace.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_batch_replace PRIVATE include)
+    target_compile_definitions(test_fs_win_batch_replace PRIVATE FS_CREATE_TEST_CRASH=1)
+    add_test(NAME test_fs_win_batch_replace COMMAND test_fs_win_batch_replace
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_probe tests/test_fs_win_probe.c)
     add_test(NAME test_fs_win_probe COMMAND test_fs_win_probe
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
