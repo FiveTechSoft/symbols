@@ -235,6 +235,18 @@ if(WIN32)
     target_include_directories(test_fs_win_case PRIVATE include)
     add_test(NAME test_fs_win_case COMMAND test_fs_win_case
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_perm tests/test_fs_win_perm.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_perm PRIVATE include)
+    add_test(NAME test_fs_win_perm COMMAND test_fs_win_perm
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_perm_acl tests/test_fs_win_perm.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_perm_acl PRIVATE include)
+    target_compile_definitions(test_fs_win_perm_acl PRIVATE ACL_ONLY=1)
+    add_test(NAME test_fs_win_perm_acl COMMAND test_fs_win_perm_acl
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_perm_acl PROPERTIES SKIP_RETURN_CODE 77)
     add_executable(test_fs_win_device_names tests/test_fs_win_device_names.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_device_names PRIVATE include)
