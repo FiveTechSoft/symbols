@@ -48,11 +48,29 @@
 #else
 #define WS "test_fs_winperm_ws"
 #endif
+static void rmtree_log(const char *log)
+{FILE *f=fopen(log,"rb");char b[256];size_t n;
+ if(!f){fprintf(stderr,"  (no cmd output file)\n");return;}
+ while((n=fread(b,1,sizeof(b)-1,f))>0){b[n]=0;fputs(b,stderr);}
+ fclose(f);}
+/* Remove the workspace tree: clear deny entries and READONLY, then rmdir. The
+   command output goes to a file next to the tree; when the tree is still there
+   the exit code and that output are printed and a second try with the
+   extended-length prefix is made and reported. */
 static void rmtree(const char *rel)
-{char full[MAX_PATH],cmd[2*MAX_PATH+160];DWORD n=GetFullPathNameA(rel,MAX_PATH,full,NULL);
- if(!n||n>=MAX_PATH)return;
- snprintf(cmd,sizeof(cmd),"cmd /D /C if exist \"%s\" (icacls \"%s\" /T /Q /remove:d *S-1-1-0 >NUL 2>&1 & attrib -R \"%s\\*\" /S /D >NUL 2>&1 & rmdir /S /Q \"\\\\?\\%s\") >NUL 2>&1",full,full,full,full);
- system(cmd);}
+{char full[MAX_PATH],cmd[2*MAX_PATH+320],log[MAX_PATH+16];DWORD n=GetFullPathNameA(rel,MAX_PATH,full,NULL);int rc;
+ if(!n||n>=MAX_PATH||GetFileAttributesA(full)==INVALID_FILE_ATTRIBUTES)return;
+ snprintf(log,sizeof(log),"%s.rmlog",full);
+ snprintf(cmd,sizeof(cmd),"cmd /D /C (icacls \"%s\" /T /Q /remove:d *S-1-1-0 & attrib -R \"%s\" /S /D & attrib -R \"%s\\*\" /S /D & rmdir /S /Q \"%s\") >\"%s\" 2>&1",full,full,full,full,log);
+ rc=system(cmd);
+ if(GetFileAttributesA(full)!=INVALID_FILE_ATTRIBUTES){
+  int rc2;
+  fprintf(stderr,"rmtree: %s still exists after cmd (exit %d); cmd output:\n",rel,rc);rmtree_log(log);
+  snprintf(cmd,sizeof(cmd),"cmd /D /C (attrib -R \"%s\\*\" /S /D & rmdir /S /Q \"\\\\?\\%s\") >\"%s\" 2>&1",full,full,log);
+  rc2=system(cmd);
+  fprintf(stderr,"rmtree: second try with the extended-length prefix: exit %d, %s\n",rc2,GetFileAttributesA(full)!=INVALID_FILE_ATTRIBUTES?"still exists":"removed");
+  if(GetFileAttributesA(full)!=INVALID_FILE_ATTRIBUTES)rmtree_log(log);}
+ DeleteFileA(log);}
 static void dump(const char *dir)
 {char pat[MAX_PATH];WIN32_FIND_DATAA d;HANDLE f;snprintf(pat,sizeof(pat),"%s\\*",dir);
  f=FindFirstFileA(pat,&d);
