@@ -59,7 +59,11 @@ static void dump(const char *dir)
  if(f==INVALID_HANDLE_VALUE){fprintf(stderr,"  [%s] not listable (%lu)\n",dir,GetLastError());return;}
  do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,".."))fprintf(stderr,"  [%s] %s attr=0x%lx size=%lu\n",dir,d.cFileName,(unsigned long)d.dwFileAttributes,(unsigned long)d.nFileSizeLow);}while(FindNextFileA(f,&d));
  FindClose(f);}
-static void fail(const char *what){DWORD e=GetLastError();fprintf(stderr,"FAIL %s (GetLastError %lu)\n",what,(unsigned long)e);dump(WS);dump(WS "\\Dir");rmtree(WS);exit(1);}
+static void fail(const char *what){DWORD e=GetLastError();
+#ifdef FS_PIN_MUTANT
+ printf("MC4 killed by: %s\n",what);rmtree(WS);exit(0);
+#endif
+fprintf(stderr,"FAIL %s (GetLastError %lu)\n",what,(unsigned long)e);dump(WS);dump(WS "\\Dir");rmtree(WS);exit(1);}
 static void ck(int ok,const char *what){if(!ok)fail(what);}
 static void rec(const char *what,int status)
 {if(status!=FS_READ_OK){char m[160];snprintf(m,sizeof(m),"%s returned status %d",what,status);fail(m);}}
@@ -123,6 +127,9 @@ int main(void)
  ck(cells==8,"cell count");
  rmtree(WS);
  printf("fs win perm ok: %d cells\n",cells);
+#ifdef FS_PIN_MUTANT
+ printf("MC4 SURVIVED: the READONLY remove cells did not notice the mutant\n");return 1;
+#endif
  return 0;
 #else
  fixture(&r);

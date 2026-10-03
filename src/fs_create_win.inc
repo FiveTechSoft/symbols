@@ -543,6 +543,14 @@ static void wo_crash(unsigned kind,int phase)
 #else
 #define wo_crash(k,p) ((void)0)
 #endif
+/* Remove/move recovery deletes its pin (a hard link to the user's file) with
+   the READONLY-aware helper, as the replace path does. FS_PIN_MUTANT switches
+   it back to the plain delete, which a READONLY file refuses (mutant MC4). */
+#ifdef FS_PIN_MUTANT
+#define wo_remove_pin wc_remove
+#else
+#define wo_remove_pin wr_remove_pin
+#endif
 static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
 {
     const WCHAR *intent_name=kind==1?WO_REMOVE:WO_MOVE;
@@ -596,7 +604,7 @@ static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
         s=wc_remove(r->handle,mark_name,&cid);if(s!=FS_READ_OK)goto done;
         wo_crash(kind,5);
         CloseHandle(pin_h);pin_h=INVALID_HANDLE_VALUE;
-        s=wc_remove(r->handle,i.pin,&i.file);
+        s=wo_remove_pin(r->handle,i.pin,&i.file);
     }else{
         if(!source){
             if(!wc_set_name(pin_h,source_dir,source_leaf,WC_NT_LINK)){s=FS_READ_PENDING;goto done;}
@@ -616,7 +624,7 @@ static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
         s=wc_remove(r->handle,intent_name,&iid);if(s!=FS_READ_OK)goto done;
         wo_crash(kind,8);
         CloseHandle(pin_h);pin_h=INVALID_HANDLE_VALUE;
-        s=wc_remove(r->handle,i.pin,&i.file);
+        s=wo_remove_pin(r->handle,i.pin,&i.file);
     }
     wc_probe_dir(r->handle);
 done:
