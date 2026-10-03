@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <direct.h>
+#include <errno.h>
 /* Criterion 4, Windows: permission and attribute cases against the writers
    (NTFS, one runner). POSIX mode bits have no NTFS equivalent and are not
    claimed. Built twice: the default target covers the READONLY attribute, the
@@ -52,8 +53,16 @@ static void rmtree(const char *rel)
  if(!n||n>=MAX_PATH)return;
  snprintf(cmd,sizeof(cmd),"cmd /D /C if exist \"%s\" (icacls \"%s\" /T /Q /remove:d *S-1-1-0 >NUL 2>&1 & attrib -R \"%s\\*\" /S /D >NUL 2>&1 & rmdir /S /Q \"\\\\?\\%s\") >NUL 2>&1",full,full,full,full);
  system(cmd);}
-static void fail(const char *what){fprintf(stderr,"FAIL %s (%lu)\n",what,GetLastError());rmtree(WS);exit(1);}
+static void dump(const char *dir)
+{char pat[MAX_PATH];WIN32_FIND_DATAA d;HANDLE f;snprintf(pat,sizeof(pat),"%s\\*",dir);
+ f=FindFirstFileA(pat,&d);
+ if(f==INVALID_HANDLE_VALUE){fprintf(stderr,"  [%s] not listable (%lu)\n",dir,GetLastError());return;}
+ do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,".."))fprintf(stderr,"  [%s] %s attr=0x%lx size=%lu\n",dir,d.cFileName,(unsigned long)d.dwFileAttributes,(unsigned long)d.nFileSizeLow);}while(FindNextFileA(f,&d));
+ FindClose(f);}
+static void fail(const char *what){DWORD e=GetLastError();fprintf(stderr,"FAIL %s (GetLastError %lu)\n",what,(unsigned long)e);dump(WS);dump(WS "\\Dir");rmtree(WS);exit(1);}
 static void ck(int ok,const char *what){if(!ok)fail(what);}
+static void rec(const char *what,int status)
+{if(status!=FS_READ_OK){char m[160];snprintf(m,sizeof(m),"%s returned status %d",what,status);fail(m);}}
 static void put(const char *path,const char *v)
 {FILE *f=fopen(path,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
 static int bytes_are(const char *path,const char *v)
@@ -75,7 +84,10 @@ static int cells;
 static void root_clean(const char *what)
 {char m[128];snprintf(m,sizeof(m),"%s: workspace root has only Dir",what);ck(entries(WS "\\*")==1,m);}
 static void fixture(FS_READ_ROOT **r)
-{rmtree(WS);ck(_mkdir(WS)==0&&_mkdir(WS "\\Dir")==0,"mkdir");
+{int a,b;rmtree(WS);
+ if(exists(WS))fprintf(stderr,"fixture: %s still exists after rmtree\n",WS);
+ a=_mkdir(WS);if(a!=0){char m[96];snprintf(m,sizeof(m),"mkdir root (errno %d)",errno);fail(m);}
+ b=_mkdir(WS "\\Dir");if(b!=0){char m[96];snprintf(m,sizeof(m),"mkdir Dir (errno %d)",errno);fail(m);}
  put(WS "\\Dir\\Ro","RO!!");put(WS "\\Dir\\Src","SRC");
  ck(FsReadOpen(WS,r)==FS_READ_OK,"open workspace");}
 int main(void)
@@ -88,13 +100,13 @@ int main(void)
  ck(SetFileAttributesA(WS "\\Dir\\Ro",FILE_ATTRIBUTE_READONLY),"make Ro read-only");
  /* remove */
  REFUSED(FsRemoveFile(r,"Dir/Ro","RO!!",4),"remove read-only");
- ck(FsRemoveRecover(r)==FS_READ_OK,"remove recovery");
+ rec("remove recovery",(int)FsRemoveRecover(r));
  ck(bytes_are(WS "\\Dir\\Ro","RO!!")&&(GetFileAttributesA(WS "\\Dir\\Ro")&FILE_ATTRIBUTE_READONLY),"remove read-only: bytes and attribute kept");
  ck(entries(WS "\\Dir\\*")==2,"remove read-only: Dir entries");root_clean("remove read-only");
  OKC(FsCreateFile(r,"Dir/After1","a",1,0666),"next writer after read-only remove");
  /* move source */
  REFUSED(FsMoveFile(r,"Dir/Ro","Dir/Moved","RO!!",4),"move read-only source");
- ck(FsMoveRecover(r)==FS_READ_OK,"move recovery");
+ rec("move recovery",(int)FsMoveRecover(r));
  ck(bytes_are(WS "\\Dir\\Ro","RO!!")&&!exists(WS "\\Dir\\Moved")&&(GetFileAttributesA(WS "\\Dir\\Ro")&FILE_ATTRIBUTE_READONLY),"move read-only source: unchanged");
  ck(entries(WS "\\Dir\\*")==3,"move read-only source: Dir entries");root_clean("move read-only source");
  OKC(FsCreateFile(r,"Dir/After2","b",1,0666),"next writer after read-only move");
@@ -135,14 +147,14 @@ int main(void)
  rmtree(WS);fixture(&r);
  sys("icacls \"%s\" /deny *S-1-1-0:(D) >NUL 2>&1",WS "\\Dir\\Ro");
  REFUSED(FsRemoveFile(r,"Dir/Ro","RO!!",4),"remove file that denies delete");
- ck(FsRemoveRecover(r)==FS_READ_OK,"remove recovery");
+ rec("remove recovery",(int)FsRemoveRecover(r));
  ck(bytes_are(WS "\\Dir\\Ro","RO!!")&&entries(WS "\\Dir\\*")==2,"remove denied file: unchanged");root_clean("remove denied file");
  FsReadClose(r);
  /* a file that denies write-data: consistency only */
  rmtree(WS);fixture(&r);
  sys("icacls \"%s\" /deny *S-1-1-0:(WD,AD) >NUL 2>&1",WS "\\Dir\\Ro");
  {FS_READ_STATUS s=FsReplaceFile(r,"Dir/Ro","RO!!",4,"NEW!",4);
-  ck(FsReplaceRecover(r)==FS_READ_OK,"replace recovery");
+  rec("replace recovery",(int)FsReplaceRecover(r));
   ck(s==FS_READ_OK?bytes_are(WS "\\Dir\\Ro","NEW!"):bytes_are(WS "\\Dir\\Ro","RO!!"),"replace over deny-write file: state agrees with status");
   ck(entries(WS "\\Dir\\*")==2,"replace over deny-write file: Dir entries");root_clean("replace deny-write");cells++;}
  FsReadClose(r);
