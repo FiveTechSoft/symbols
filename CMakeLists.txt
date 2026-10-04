@@ -200,6 +200,18 @@ if(WIN32)
     target_compile_definitions(test_fs_win_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_replace COMMAND test_fs_win_replace
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # Windows replace journal byte fuzz (m171): one kind, phases 3 to 6, two seeds. Every cell asserts the
+    # outcome predicted before the first run; a miss names phase, class, iteration and seed.
+    add_executable(test_fs_win_journal_fuzz tests/test_fs_win_journal_fuzz.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_journal_fuzz PRIVATE include)
+    target_compile_definitions(test_fs_win_journal_fuzz PRIVATE FS_CREATE_TEST_CRASH=1)
+    foreach(wjf_seed 1786707969 12648430)
+        add_test(NAME test_fs_win_journal_fuzz_seed_${wjf_seed} COMMAND test_fs_win_journal_fuzz
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(test_fs_win_journal_fuzz_seed_${wjf_seed} PROPERTIES
+            ENVIRONMENT "FS_WJFUZZ_SEED=${wjf_seed}" TIMEOUT 900)
+    endforeach()
     add_executable(test_agent_patch_fs_win tests/test_agent_patch_fs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_fs_win PRIVATE include)
