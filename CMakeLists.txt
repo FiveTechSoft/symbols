@@ -214,6 +214,11 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     # PASS_REGULAR_EXPRESSION replaces the exit code check; the line is printed only at zero failures.
     set_tests_properties(test_agent_patch_crash_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch crash phases ran: 7")
+    # Mutant: FS_WIN_BATCH_MUTANT=10 skips the sweep; the same test must then fail.
+    add_test(NAME test_agent_patch_crash_win_mc10 COMMAND test_agent_patch_crash_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_agent_patch_crash_win_mc10 PROPERTIES
+        ENVIRONMENT "FS_WIN_BATCH_MUTANT=10" PASS_REGULAR_EXPRESSION "agentpatch crash phases ran: 7" WILL_FAIL TRUE)
     add_executable(test_agent_patch_ntfs_win tests/test_agent_patch_ntfs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_ntfs_win PRIVATE include)

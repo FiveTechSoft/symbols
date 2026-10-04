@@ -648,6 +648,11 @@ done:
     if(source_dir!=INVALID_HANDLE_VALUE)CloseHandle(source_dir);
     return s;
 }
+/* Defined in fs_batch_win.inc. With no replace intent and no marker, a writer
+   killed before its intent was written (phases 0-2) can have left .fsrp- names;
+   the same exact-shape sweep as the batch calls removes them (shared names only,
+   under the workspace lock, no journal of any protocol). */
+static void wb_sweep_orphans(const FS_READ_ROOT *r);
 static FS_READ_STATUS wr_recover_locked(const FS_READ_ROOT *r)
 {
     WR_RECORD i,c;FILE_ID_INFO iid,cid,rid,pid;
@@ -657,7 +662,7 @@ static FS_READ_STATUS wr_recover_locked(const FS_READ_ROOT *r)
     if(s!=FS_READ_OK)return s;
     s=wr_read(r->handle,WR_INTENT,&i,&iid,&intent);if(s!=FS_READ_OK)return s;
     s=wr_read(r->handle,WR_COMMIT,&c,&cid,&mark);if(s!=FS_READ_OK)return s;
-    if(!intent&&!mark)return FS_READ_OK;
+    if(!intent&&!mark){wb_sweep_orphans(r);return FS_READ_OK;}
     if(intent&&mark&&memcmp(&i,&c,sizeof(i)))return FS_READ_DENIED;
     if(!intent)i=c;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||!wc_ntfs(r->handle))return FS_READ_DENIED;
