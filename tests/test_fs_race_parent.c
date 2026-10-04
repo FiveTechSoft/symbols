@@ -49,6 +49,11 @@
 #define MUTANT_CAP_MS 30000
 #endif
 #define CNTF "test_fs_race_parent_count"
+/* Non-mutant floor on successful calls per writer in the 4 s window: local minimum 224 over 27 runs, floor about a
+   fifth of it. Not yet measured on the CI runner; if CI shows fewer, report before changing it. */
+#ifndef RP_OK_FLOOR
+#define RP_OK_FLOOR 50
+#endif
 
 static int mism;
 static void ck(int x, const char *m)
@@ -105,12 +110,15 @@ static long loadcount(int k)
     (void)unlink(p);
     return n;
 }
-#ifdef FS_PARENT_FOLLOW_MUTANT
-/* Mutant build only. A replace cut off by the directory swap leaves its journal and pins in
-   ROOT, and recovery refuses to restore over the swapped directory, so every later writer
-   call is DENIED for the rest of the run and no call ever meets a symlink window (measured
-   in m150: DENIED on 99.9 percent of the calls, journal files left in ROOT). The swapper,
-   which owns the fixture, clears those files so the writers keep making real calls. */
+/* Both builds. A replace, remove or batch cut off by the directory swap leaves its journal, commit marker and
+   pins in ROOT, and recovery refuses to restore over the swapped directory, so every later writer call is
+   DENIED for the rest of the run and no call ever meets a symlink window. Measured (local gcc sandbox, not
+   the CI runner): mutant build, DENIED on 99.9 percent of the calls (m150); non-mutant build without this
+   clearing, 0 to 4 OK calls per operation per writer in 4 s; with the clearing of every .fstxn.* file except
+   the lock plus the .fsrp-, .fsrs-, .fst- and .fsp- files, 224 to 308 OK calls per writer in total (15 runs,
+   unloaded) and 253 to 354 (12 runs, 6 busy loops on 2 cores). The narrower m150 set (replace journal, its
+   commit marker, .fsrp- and .fsrs-) gave only 2 to 53 OK calls per writer in 12 runs. The swapper, which owns
+   the fixture, clears those files so the writers keep making real calls. The lock file is left alone. */
 static void unwedge(void)
 {
     DIR *d = opendir(ROOT);
@@ -119,8 +127,9 @@ static void unwedge(void)
     if (!d) return;
     while ((e = readdir(d)))
     {
-        if (!strcmp(e->d_name, ".fstxn.replace") || !strcmp(e->d_name, ".fstxn.pcommit") ||
-            !strncmp(e->d_name, ".fsrp-", 6) || !strncmp(e->d_name, ".fsrs-", 6))
+        if ((!strncmp(e->d_name, ".fstxn.", 7) && strcmp(e->d_name, ".fstxn.lock")) ||
+            !strncmp(e->d_name, ".fsrp-", 6) || !strncmp(e->d_name, ".fsrs-", 6) ||
+            !strncmp(e->d_name, ".fst-", 5) || !strncmp(e->d_name, ".fsp-", 5))
         {
             snprintf(p, sizeof p, ROOT "/%s", e->d_name);
             (void)unlink(p);
@@ -128,16 +137,13 @@ static void unwedge(void)
     }
     closedir(d);
 }
-#endif
 static int swapper(void)
 {
     int verified = 0;
     while (!exists(STOPF))
     {
         clear_dir(ROOT "/D");
-#ifdef FS_PARENT_FOLLOW_MUTANT
         unwedge();
-#endif
         if (rmdir(ROOT "/D") == 0)
         {
             struct stat st;
@@ -253,7 +259,11 @@ int main(void)
 #else
     ck(st[0] == 0, "swapper verified the symlink state at least 5 times");
     ck(st[1] == 0 || st[2] == 0, "at least one writer had a successful call");
-    (void)loadcount(0); (void)loadcount(1); (void)loadcount(2);
+    {
+        long sw = loadcount(0), w1 = loadcount(1), w2 = loadcount(2);
+        printf("  swaps %ld, writer calls OK %ld %ld (floor %d each)\n", sw, w1, w2, RP_OK_FLOOR);
+        ck(w1 >= RP_OK_FLOOR && w2 >= RP_OK_FLOOR, "each writer made at least RP_OK_FLOOR successful calls");
+    }
     printf("%s (%d outside mismatches)\n", mism ? "FAILED" : "ALL PASS", mism);
     return mism ? 1 : 0;
 #endif
