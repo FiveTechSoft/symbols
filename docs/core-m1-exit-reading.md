@@ -84,7 +84,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
 - **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
-  replace), with measured limits. Not shown for Windows.**
+  replace), with measured limits. Shown for one Windows journal (replace) only, m171 to m175.**
   `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
   appended bytes, path-field rewrites, deleted journal files and stage or temp-name decoys, at every crash point
   of each kind, 350 iterations per kind, seeds 0, 1, 7, 12648430 and the test default 1786707969. A run passes
@@ -128,9 +128,10 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** every Windows journal, the POSIX 8 byte commit markers, damage to two journal files at once.
+  - **Not shown:** the Windows create, remove, move and batch journals, the POSIX 8 byte commit markers, damage to
+    two journal files at once except the Windows replace pair-mismatch cell.
     Criterion 5 stays partial.
-  - **Windows journals: read, not run, not fuzzed (source reading at a3e89a2, nothing executed for this note).**
+  - **Windows journals: read (source reading at a3e89a2), and the replace journal fuzzed (m171 to m175).**
     The five Windows records already carry a 32 bit FNV-1a checksum over the whole struct except the checksum
     field, checked on read: create, remove/move and replace in `src/fs_create_win.inc` (structs lines 30 to 56,
     `wc_checksum`, `wo_checksum`, `wr_checksum` lines 119 to 148, checks at lines 344, 376, 408); batch create and
@@ -138,11 +139,30 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     and 91). Records are also checked for magic, version, size, name shape and file ids. The Windows batch commit
     marker `.fstxn.commit` is a byte copy of the journal, compared with `memcmp` (`src/fs_batch_win.inc` lines
     154 to 156 and 319). FNV-1a, like the POSIX CRC, detects accidental damage only, not a writer that recomputes
-    it. The only Windows record mutation test is `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to
-    989): 18 fixed mutations of batch records, one with a stale checksum and the rest resealed so only the
-    semantic checks can refuse them. It is a fixed list, not random byte fuzz. There is no Windows port of
-    `test_fs_journal_fuzz.c`. Whether a resealed damaged name field is followed on Windows (the F2 and F4 shape)
-    is not measured.
+    it. `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to 989) is a fixed list of 18 mutations of batch
+    records, not random byte fuzz; the batch, create, remove and move journals on Windows are not fuzzed.
+  - **Windows replace journal fuzz (`tests/test_fs_win_journal_fuzz.c`, m171 to m175): measured, one runner
+    (`windows-latest`), replace only, real process kills at crash phases 3 to 6.** 9 damage classes (bit flip,
+    set byte, truncate, append, sealed name fields, sealed scalar fields, sealed shape, deleted journal files,
+    intent and marker that disagree), 20 iterations per phase and class, seeds 1786707969 and 12648430, 660
+    cells each. "Sealed" means the checksum is recomputed, so only the semantic checks can refuse the record.
+    Measured in the m174 run (job `build-test-msvc`): **a sealed damaged name field
+    is NOT followed on Windows replace.** The target, old pin and new pin fields were refused, a renamed stage
+    was refused where the stage link exists and harmless where it does not, a renamed rollback name was harmless,
+    and every scalar, shape and pair cell was refused: no miss in 2 x 660 cells outside the deleted-journal
+    class. So the POSIX shapes F2, F4, F6 and F7 did not appear on Windows replace. This says nothing about the
+    Windows create, remove, move and batch journals, which are not fuzzed. Their record checks differ and were
+    only read.
+  - **Windows replace, journal deleted after the publish: limit, outside the crash model, measured.** With the
+    intent deleted at crash phases 4 and 5, or both the intent and the marker deleted at phase 6, recovery
+    returns OK, the new bytes are in place, and exactly one `.fsrp-` pin is left in the root (46 of 660 cells,
+    the same count on both seeds, m174). It is the old pin: `wb_sweep_orphans` keeps an unshared `.fsrp-`
+    on purpose, because it may be the last link to bytes someone still needs (comment above `wb_sweep_orphans` in
+    `src/fs_batch_win.inc`; `include/fs_replace.h` says a pin left after record removal "is never deleted
+    automatically"). Same class as the POSIX limit F5 (a record deleted after the publish leaves nothing to
+    check). Data is not lost, names are not clean. Since m175 the test pins these cells: OK, new state, exactly
+    one leftover name, a `.fsrp-` pin whose bytes are the old bytes. That the pin holds the old bytes was an
+    inference from the code until the m175 run; the m175 CI result is reported separately.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

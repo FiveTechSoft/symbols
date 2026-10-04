@@ -228,6 +228,14 @@ static int collect(const char *dir,const char *pat)
  do{size_t k=strlen(g_ex);n++;
     if(k+strlen(dir)+strlen(d.cFileName)+4<sizeof(g_ex))snprintf(g_ex+k,sizeof(g_ex)-k,"%s\\%s ",dir,d.cFileName);
  }while(FindNextFileA(f,&d));FindClose(f);return n;}
+/* Known limit (measured in m174, 2 seeds x 660 cells, same on both): with no journal record left after the
+   publish, recovery returns OK, the new bytes are in place, and the OLD pin (.fsrp-) stays untracked. The sweep
+   (wb_sweep_orphans) keeps an unshared .fsrp- on purpose: it may be the last link to bytes someone still needs
+   (src/fs_batch_win.inc, comment above wb_sweep_orphans; include/fs_replace.h). Cells: delete class, intent
+   deleted at phases 4 and 5, both journal files deleted at phase 6. Same class as the POSIX limit F5; outside
+   the crash model. Pinned: exactly one leftover name, a .fsrp- pin, holding the old bytes; the state is new. */
+static int limit_cell(int phase,int cls,int sub)
+{return cls==C_DELETE&&(((phase==4||phase==5)&&sub==0)||(phase==6&&sub==2));}
 static int leftover_names(void)
 {static const char *J[]={".fstxn.intent",".fstxn.ccommit",".fstxn.remove",".fstxn.rcommit",".fstxn.move",
    ".fstxn.mcommit",".fstxn.replace",".fstxn.pcommit",".fstxn.batch",".fstxn.commit"};
@@ -241,7 +249,7 @@ static void remove_stale(void)
 int main(int argc,char **argv)
 {char exe[768];DWORD got;int phase,cls,it,iters=20;unsigned long long seed=1786707969ULL;
  static char before[65536],after[65536],again[65536];
- long cells=0,refused=0,ok_old=0,ok_new=0;
+ long cells=0,refused=0,ok_old=0,ok_new=0,limit_hits=0;
  if(argc==3&&!strcmp(argv[1],"child")){child(atoi(argv[2]));return 200;}
  remove_stale();
  if(getenv("FS_WJFUZZ_SEED"))seed=strtoull(getenv("FS_WJFUZZ_SEED"),NULL,10);
@@ -273,7 +281,15 @@ int main(int argc,char **argv)
      if(want==2&&is_new!=state_new)FAIL("OK with the other state than predicted");
      if(links_of(INS "\\target")!=1)FAIL("OK but the target is not a single link");
      if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
-     if(leftover_names())FAIL("OK but a pin, stage, rollback or journal name is left");
+     if(limit_cell(phase,cls,sub)){
+       int n=leftover_names();char path[600];size_t pl;
+       if(!is_new)FAIL("limit cell: the state is not new");
+       if(n!=1)FAIL("limit cell: not exactly one leftover name");
+       if(strncmp(g_ex,ROOT "\\.fsrp-",strlen(ROOT "\\.fsrp-")))FAIL("limit cell: the leftover is not a .fsrp- pin");
+       snprintf(path,sizeof(path),"%s",g_ex);pl=strlen(path);while(pl&&path[pl-1]==' ')path[--pl]=0;
+       if(!file_is(path,"old"))FAIL("limit cell: the leftover pin does not hold the old bytes");
+       limit_hits++;
+     }else if(leftover_names())FAIL("OK but a pin, stage, rollback or journal name is left");
      if(is_old)ok_old++;else ok_new++;
      snap(after,sizeof(after));
      if(FsReplaceRecover(r)!=FS_READ_OK)FAIL("second recovery not OK");
@@ -290,8 +306,8 @@ int main(int argc,char **argv)
         miss[m].sub,miss[m].n,miss[m].it,miss[m].what,miss[m].ex[0]?" | names: ":"",miss[m].ex);
    fprintf(stderr,"FAIL %d cells missed their prediction or the oracle in %d distinct groups (seed %llu), of %ld cells\n",
         total_miss,nmiss,(unsigned long long)seed,cells);exit(1);}
- printf("windows replace journal fuzz: %ld cells, seed %llu, %d per phase and class: refused %ld, ok old %ld, ok new %ld\n",
-        cells,seed,iters,refused,ok_old,ok_new);
+ printf("windows replace journal fuzz: %ld cells, seed %llu, %d per phase and class: refused %ld, ok old %ld, ok new %ld, known-limit hits %ld\n",
+        cells,seed,iters,refused,ok_old,ok_new,limit_hits);
  (void)CLS;return 0;}
 #else
 int main(void){return 0;}
