@@ -105,12 +105,39 @@ static long loadcount(int k)
     (void)unlink(p);
     return n;
 }
+#ifdef FS_PARENT_FOLLOW_MUTANT
+/* Mutant build only. A replace cut off by the directory swap leaves its journal and pins in
+   ROOT, and recovery refuses to restore over the swapped directory, so every later writer
+   call is DENIED for the rest of the run and no call ever meets a symlink window (measured
+   in m150: DENIED on 99.9 percent of the calls, journal files left in ROOT). The swapper,
+   which owns the fixture, clears those files so the writers keep making real calls. */
+static void unwedge(void)
+{
+    DIR *d = opendir(ROOT);
+    struct dirent *e;
+    char p[512];
+    if (!d) return;
+    while ((e = readdir(d)))
+    {
+        if (!strcmp(e->d_name, ".fstxn.replace") || !strcmp(e->d_name, ".fstxn.pcommit") ||
+            !strncmp(e->d_name, ".fsrp-", 6) || !strncmp(e->d_name, ".fsrs-", 6))
+        {
+            snprintf(p, sizeof p, ROOT "/%s", e->d_name);
+            (void)unlink(p);
+        }
+    }
+    closedir(d);
+}
+#endif
 static int swapper(void)
 {
     int verified = 0;
     while (!exists(STOPF))
     {
         clear_dir(ROOT "/D");
+#ifdef FS_PARENT_FOLLOW_MUTANT
+        unwedge();
+#endif
         if (rmdir(ROOT "/D") == 0)
         {
             struct stat st;
