@@ -206,6 +206,14 @@ if(WIN32)
     target_compile_definitions(test_agent_patch_fs_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
     add_test(NAME test_agent_patch_fs_win COMMAND test_agent_patch_fs_win
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # Mutant 12: the drift guard of replace_target is dropped. The same test must fail exactly four cells.
+    add_executable(test_agent_patch_fs_win_mc tests/test_agent_patch_fs_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_fs_win_mc PRIVATE include)
+    target_compile_definitions(test_agent_patch_fs_win_mc PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1 AGENT_PATCH_APPLY_MUTANT=1)
+    add_test(NAME test_agent_patch_fs_win_mc COMMAND test_agent_patch_fs_win_mc
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_agent_patch_fs_win_mc PROPERTIES PASS_REGULAR_EXPRESSION "mutant killed by 4 cell")
     add_executable(test_agent_patch_crash_win tests/test_agent_patch_crash_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_crash_win PRIVATE include)

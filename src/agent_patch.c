@@ -301,7 +301,24 @@ static bool replace_target(const PATCH_PLAN *plan, const char *expected, size_t 
     if (g_patch_test_before_replace)
         g_patch_test_before_replace();
 #endif
+#ifdef AGENT_PATCH_APPLY_MUTANT
+    /* Test only: the drift guard is dropped. Whatever the target holds right now is
+       passed as the expected bytes, so a change since the read is overwritten. */
+    {
+        unsigned char *cur = NULL;
+        size_t cn = 0;
+        FS_READ_META cm;
+        if (FsReadFile(r, rel, &cur, &cn, &cm) == FS_READ_OK)
+        {
+            s = FsReplaceFile(r, rel, (const char *)cur, cn, repl, rlen);
+            free(cur);
+        }
+        else
+            s = FsReplaceFile(r, rel, expected, elen, repl, rlen);
+    }
+#else
     s = FsReplaceFile(r, rel, expected, elen, repl, rlen);
+#endif
     if (s == FS_READ_OK)
         ok = true;
     else if (s == FS_READ_PENDING)

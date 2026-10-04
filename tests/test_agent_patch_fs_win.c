@@ -18,10 +18,28 @@ extern void (*g_patch_test_before_replace)(void);
 #define NEWC "int x = 9;\n"
 
 static int fails;
+#ifdef AGENT_PATCH_APPLY_MUTANT
+/* Mutant build (target test_agent_patch_fs_win_mc): replace_target drops its drift
+   guard. Predicted kill set, written before the first run: exactly four cells,
+   T1 "apply refuses", T1 "external bytes kept", T1 "diagnostic set, not applied"
+   and T8 "rollback refused, user edit kept". Every other cell must still pass.
+   Bits: 1, 2, 4, 8 in that order; anything else failing counts as "other". */
+static int fail_mask, fail_other;
+#endif
 static void ck(int x, const char *m)
 {
     printf("  [%s] %s\n", x ? "PASS" : "FAIL", m);
-    if (!x) fails++;
+    if (!x)
+    {
+        fails++;
+#ifdef AGENT_PATCH_APPLY_MUTANT
+        if (!strcmp(m, "apply refuses")) fail_mask |= 1;
+        else if (!strcmp(m, "external bytes kept")) fail_mask |= 2;
+        else if (!strcmp(m, "diagnostic set, not applied")) fail_mask |= 4;
+        else if (!strcmp(m, "rollback refused, user edit kept")) fail_mask |= 8;
+        else fail_other++;
+#endif
+    }
 }
 static void put(const char *p, const char *v)
 {
@@ -255,6 +273,16 @@ int main(int argc, char **argv)
     puts("T9 not ported: .fstxn.lock mode 0644 is a POSIX permission case");
 
     wipe();
+#ifdef AGENT_PATCH_APPLY_MUTANT
+    /* Exit 0 only when the failing cells are exactly the predicted four. */
+    if (fail_mask == 0xF && fail_other == 0 && fails == 4)
+    {
+        printf("mutant killed by %d cell(s)\n", fails);
+        return 0;
+    }
+    printf("mutant SURVIVED or failed elsewhere: mask %x, other %d, fails %d\n", fail_mask, fail_other, fails);
+    return 1;
+#endif
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
     return fails ? 1 : 0;
 }
