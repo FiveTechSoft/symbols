@@ -340,15 +340,6 @@ if(NOT WIN32)
     target_include_directories(test_agent_patch_fs PRIVATE include)
     target_compile_definitions(test_agent_patch_fs PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
     add_test(NAME test_agent_patch_fs COMMAND test_agent_patch_fs WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    add_executable(test_agent_patch_eol tests/test_agent_patch_eol.c src/agent_patch.c
-        src/fs_read.c src/fs_manifest.c)
-    target_include_directories(test_agent_patch_eol PRIVATE include)
-    add_test(NAME test_agent_patch_eol COMMAND test_agent_patch_eol WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    add_executable(test_agent_patch_eol_mc tests/test_agent_patch_eol.c src/agent_patch.c
-        src/fs_read.c src/fs_manifest.c)
-    target_include_directories(test_agent_patch_eol_mc PRIVATE include)
-    target_compile_definitions(test_agent_patch_eol_mc PRIVATE AGENT_PATCH_EOL_MUTANT=1)
-    add_test(NAME test_agent_patch_eol_mc COMMAND test_agent_patch_eol_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_move tests/test_fs_move.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_move PRIVATE include)
     target_compile_definitions(test_fs_move PRIVATE FS_CREATE_TEST_CRASH=1)
@@ -761,3 +752,13 @@ add_executable(test_attempt_capture tests/test_attempt_capture.c src/attempt_cap
 target_compile_definitions(test_attempt_capture PRIVATE ATTEMPT_CAPTURE_TEST_CRASH=1)
 target_include_directories(test_attempt_capture PRIVATE include)
 add_test(NAME test_attempt_capture COMMAND test_attempt_capture WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_agent_patch_eol tests/test_agent_patch_eol.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_eol PRIVATE include)
+add_test(NAME test_agent_patch_eol COMMAND test_agent_patch_eol WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_executable(test_agent_patch_eol_mc tests/test_agent_patch_eol.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_eol_mc PRIVATE include)
+target_compile_definitions(test_agent_patch_eol_mc PRIVATE AGENT_PATCH_EOL_MUTANT=1)
+add_test(NAME test_agent_patch_eol_mc COMMAND test_agent_patch_eol_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
