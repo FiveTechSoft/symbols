@@ -145,9 +145,162 @@ static void test_repos(void)
 }
 #endif
 
+#ifdef _WIN32
+/* Windows port of the cells that need no compiler (m127). Fixtures are built with C file writes
+   and one git command per call, because the POSIX scripts use bash syntax. The scratch directory is
+   under %TEMP%, outside any repository, so the "not a repository" cell cannot find an outer .git.
+   The revert cells (they compile with gcc) are NOT ported. */
+#include <direct.h>
+#include <process.h>
+
+static char base_dir[300];
+
+static int shw(const char *dir, const char *script)
+{
+    char cmd[4096];
+    snprintf(cmd, sizeof(cmd), "cd /d \"%s\" && (%s) >nul 2>&1", dir, script);
+    return system(cmd);
+}
+
+static int shw_out(const char *dir, const char *script)
+{
+    char cmd[4096];
+    snprintf(cmd, sizeof(cmd), "cd /d \"%s\" && (%s) > .git\\o.txt 2>&1", dir, script);
+    return system(cmd);
+}
+
+static int put(const char *dir, const char *rel, const char *text)
+{
+    char p[800];
+    snprintf(p, sizeof(p), "%s\\%s", dir, rel);
+    FILE *f = fopen(p, "wb");
+    if (!f)
+        return 0;
+    fputs(text, f);
+    fclose(f);
+    return 1;
+}
+
+static char *slurp(const char *dir, const char *rel)
+{
+    char p[800];
+    snprintf(p, sizeof(p), "%s\\%s", dir, rel);
+    FILE *f = fopen(p, "rb");
+    if (!f)
+        return NULL;
+    static char b[4096];
+    size_t n = fread(b, 1, sizeof(b) - 1, f);
+    fclose(f);
+    b[n] = '\0';
+    return b;
+}
+
+static const char *repo(const char *name)
+{
+    static char d[512];
+    snprintf(d, sizeof(d), "%s\\%s", base_dir, name);
+    if (_mkdir(d) != 0 || shw(d, "git init -q -b main && git config core.autocrlf false") != 0)
+        printf("setup failed for %s\n", name);
+    return d;
+}
+
+static const char *merge_repo(const char *name)
+{
+    const char *d = repo(name);
+    int ok = put(d, "c.txt", "base\n") && shw(d, "git add . && git commit -qm base") == 0 &&
+             shw(d, "git checkout -qb fa") == 0 && put(d, "c.txt", "alpha\n") &&
+             shw(d, "git commit -qam a") == 0 && shw(d, "git checkout -q main") == 0 &&
+             shw(d, "git checkout -qb fb") == 0 && put(d, "c.txt", "beta\n") &&
+             shw(d, "git commit -qam b") == 0 && shw(d, "git checkout -q main") == 0 &&
+             shw(d, "git merge -q fa -m ma") == 0 && shw(d, "git merge -q fb") != 0;
+    if (!ok)
+        printf("setup failed for %s\n", name);
+    return d;
+}
+
+static const char *deleted_repo(const char *name, const char *text)
+{
+    const char *d = repo(name);
+    int ok = put(d, "notes.txt", text) && put(d, "keep.txt", "k\n") &&
+             shw(d, "git add . && git commit -qm add") == 0 &&
+             shw(d, "git rm -q notes.txt && git commit -qm drop") == 0;
+    if (!ok)
+        printf("setup failed for %s\n", name);
+    return d;
+}
+
+static void test_repos_win(void)
+{
+    GIT_OPS_RESULT r;
+    const char *d;
+    char *s;
+
+    /* merge, keep both: resolved and committed as a two-parent merge */
+    d = merge_repo("m1");
+    CHECK(GitOpsSolve(d, "Resolve the conflict in c.txt keeping both lines and finish the merge.", &r) == 1);
+    CHECK(!strcmp(r.op, "resolve_merge") && r.verified);
+    s = slurp(d, "c.txt");
+    CHECK(s && !strcmp(s, "alpha\nbeta\n"));
+    CHECK(shw(d, "git rev-parse -q --verify MERGE_HEAD") != 0);
+    CHECK(shw_out(d, "git log -1 --format=%p") == 0 && (s = slurp(d, ".git\\o.txt")) && strchr(s, ' '));
+    CHECK(shw_out(d, "git status --porcelain") == 0 && (s = slurp(d, ".git\\o.txt")) && s[0] == '\0');
+
+    /* merge without "both": no guess, conflict left exactly as it was */
+    d = merge_repo("m2");
+    CHECK(GitOpsSolve(d, "Fix the merge in c.txt.", &r) == 0);
+    CHECK(!r.verified && strstr(r.reason, "both"));
+    CHECK(shw(d, "git rev-parse -q --verify MERGE_HEAD") == 0);
+    s = slurp(d, "c.txt");
+    CHECK(s && strstr(s, "<<<<<<<"));
+
+    /* restore a file HEAD deleted and the task names */
+    d = deleted_repo("r1", "x\ny\n");
+    CHECK(GitOpsSolve(d, "The last commit deleted notes.txt by mistake. Restore it.", &r) == 1);
+    s = slurp(d, "notes.txt");
+    CHECK(s && !strcmp(s, "x\ny\n"));
+    CHECK(shw(d, "git ls-files --error-unmatch notes.txt") == 0);
+
+    /* a deleted file the task does not name is not touched */
+    d = deleted_repo("r2", "x\n");
+    CHECK(GitOpsSolve(d, "Restore readme.md from the previous release.", &r) == -1);
+    CHECK(slurp(d, "notes.txt") == NULL);
+
+    /* named but not asked to restore */
+    d = deleted_repo("r3", "x\n");
+    CHECK(GitOpsSolve(d, "Explain why notes.txt was removed.", &r) == 0);
+    CHECK(slurp(d, "notes.txt") == NULL);
+
+    /* not a repository: no git operator */
+    d = repo("plain");
+    CHECK(shw(d, "rmdir /s /q .git") == 0 && put(d, "a.txt", "x\n"));
+    CHECK(GitOpsSolve(d, "Restore a.txt and undo the last commit.", &r) == -1);
+}
+#endif
+
 int main(void)
 {
     test_union();
+#ifdef _WIN32
+    if (system("git --version >nul 2>&1") == 0) {
+        const char *tmp = getenv("TEMP");
+        snprintf(base_dir, sizeof(base_dir), "%s\\test_git_ops_%d", tmp ? tmp : ".", (int)_getpid());
+        char c[400];
+        snprintf(c, sizeof(c), "if exist \"%s\" rmdir /s /q \"%s\"", base_dir, base_dir);
+        (void)system(c);
+        _putenv_s("GIT_AUTHOR_NAME", "t");
+        _putenv_s("GIT_AUTHOR_EMAIL", "t@t");
+        _putenv_s("GIT_COMMITTER_NAME", "t");
+        _putenv_s("GIT_COMMITTER_EMAIL", "t@t");
+        _putenv_s("GIT_CONFIG_NOSYSTEM", "1");
+        if (_mkdir(base_dir) == 0)
+            test_repos_win();
+        else
+            printf("FAIL cannot create %s\n", base_dir), fails++;
+        snprintf(c, sizeof(c), "rmdir /s /q \"%s\"", base_dir);
+        (void)system(c);
+    } else
+        printf("git not found: repository tests skipped\n");
+#else
 #ifndef _WIN32
     if (system("git --version >/dev/null 2>&1") == 0) {
         snprintf(base_dir, sizeof(base_dir), "/tmp/test_git_ops_%d", (int)getpid());
@@ -168,6 +321,7 @@ int main(void)
         (void)system(c);
     } else
         printf("git not found: repository tests skipped\n");
+#endif
 #endif
     printf(fails ? "test_git_ops: %d failure(s)\n" : "test_git_ops: ok\n", fails);
     return fails ? 1 : 0;
