@@ -99,6 +99,17 @@ static int leftovers(void)
     FindClose(h);
     return n;
 }
+static unsigned long links(void)
+{
+    BY_HANDLE_FILE_INFORMATION bi;
+    HANDLE h = CreateFileA(WS "\\a.c", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    unsigned long n = 0;
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    if (GetFileInformationByHandle(h, &bi)) n = bi.nNumberOfLinks;
+    CloseHandle(h);
+    return n;
+}
 static const char *what(void)
 {
     return is(WS "\\a.c", OLDC) ? "OLD" : is(WS "\\a.c", NEWC) ? "NEW" : "OTHER";
@@ -125,13 +136,17 @@ int main(int argc, char **argv)
         rec2 = PatchRecover(&p);
         printf("  (measured: PatchRecover %d then %d, file %s)\n", rec1, rec2, what());
         ck(is(WS "\\a.c", phase == 6 ? NEWC : OLDC), "bytes after recovery match the phase");
+        printf("  (measured: links of a.c after recovery %lu)\n", links());
         left = leftovers();
         ck(left == 0, "no leftover names after recovery");
         PatchPlanFree(&p);
         if (is(WS "\\a.c", OLDC))
         {
+            int arc;
             plan_for(&p);
-            ck(PatchApplyAtomic(&p) == 1 && is(WS "\\a.c", NEWC), "the same plan applies afterwards");
+            arc = PatchApplyAtomic(&p);
+            printf("  (measured: re-apply rc %d, links of a.c %lu, io_diag [%s])\n", arc, links(), p.io_diag);
+            ck(arc == 1 && is(WS "\\a.c", NEWC), "the same plan applies afterwards");
             PatchPlanFree(&p);
         }
         ran++;
