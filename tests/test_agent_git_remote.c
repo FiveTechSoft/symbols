@@ -1,15 +1,24 @@
-#ifndef _WIN32
 #include "agent_git.h"
 #include "agent_shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#define RMTREE(p) "if exist " p " rmdir /s /q " p
+#define MOVE(a, b) "move " a " " b
+#else
 #include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#define RMTREE(p) "rm -rf " p
+#define MOVE(a, b) "mv " a " " b
+#endif
 /* Phase 2: remote-advance detection in AgentGitPreflight (opt-in
    require_remote_in_sync). Real repositories: a bare local remote and two
    clones. The check is read only: every case also proves HEAD, the working
-   tree, the remote-tracking ref and the index did not change. POSIX only
-   (fixtures use sh); the Windows build prints a skip. */
+   tree, the remote-tracking ref and the index did not change. Runs on POSIX and, since m112,
+   on Windows (the fixture helpers differ only in rmdir, mkdir and move). */
 #define S "test_agent_git_remote_scratch"
 static int run_n,pass_n;
 #define CHECK(x,m) do{run_n++;if(x){pass_n++;printf("  [PASS] %s\n",m);}else printf("  [FAIL] %s (line %d)\n",m,__LINE__);}while(0)
@@ -57,8 +66,8 @@ int main(void)
 {
     const char *a=S "/a";char head_b[128];
     printf("=== Remote-advance preflight ===\n");
-    (void)system("rm -rf " S);
-    CHECK(mkdir(S,0755)==0,"scratch");
+    (void)system(RMTREE(S));
+    CHECK(MKDIR(S)==0,"scratch");
     CHECK(Run(S,"git init --bare -b main remote.git",0),"bare remote");
     CHECK(Run(S,"git clone -q remote.git a",0)&&Run(a,"git checkout -q -b main",0),"clone a");
     CHECK(Run(S,"git clone -q remote.git b",0)&&Run(S "/b","git checkout -q -b main",0),"clone b");
@@ -104,20 +113,16 @@ int main(void)
     CHECK(Run(a,"git checkout -q main",0),"back to main again");
 
     /* Unreachable remote fails closed, never ready. */
-    CHECK(Run(S,"mv remote.git remote.gone",0),"remote moved away");
+    CHECK(Run(S,MOVE("remote.git","remote.gone"),0),"remote moved away");
     expect(a,1,GIT_PREFLIGHT_INSPECTION_FAILED,"unreachable remote: refused");
-    CHECK(Run(S,"mv remote.gone remote.git",0),"remote back");
+    CHECK(Run(S,MOVE("remote.gone","remote.git"),0),"remote back");
     expect(a,1,GIT_PREFLIGHT_READY,"reachable again: ready");
 
     /* Dirty tree is still refused first. */
     {FILE *f=fopen(S "/a/new.txt","wb");CHECK(f&&fputs("x\n",f)>=0&&fclose(f)==0,"untracked file");}
     expect(a,1,GIT_PREFLIGHT_DIRTY_TREE,"dirty tree wins over remote state");
 
-    (void)system("rm -rf " S);
+    (void)system(RMTREE(S));
     printf("\n=== %d/%d passed ===\n",pass_n,run_n);
     return pass_n==run_n?0:1;
 }
-#else
-#include <stdio.h>
-int main(void){printf("test_agent_git_remote: skipped on Windows\n");return 0;}
-#endif
