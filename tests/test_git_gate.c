@@ -1,13 +1,27 @@
-#ifndef _WIN32
 #include "git_gate.h"
 #include "agent_shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#define RMTREE(p) "if exist " p " rmdir /s /q " p
+#define DELCMD "del "
+#define COPYPATCH "copy p.patch r\\.git\\change.patch >nul"
+/* Windows has no chmod: the index mode bit is set with git itself, which makes the same mode-only change in the patch. */
+#define MODEPLUS "git update-index --chmod=+x x.sh"
+#else
 #include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#define RMTREE(p) "rm -rf " p
+#define DELCMD "rm "
+#define COPYPATCH "cp p.patch r/.git/change.patch"
+#define MODEPLUS "chmod +x x.sh"
+#endif
 /* Phase 2 step 5a: the command line front end (symbols_git_gate) over the Git
-   contracts, and the manifest derived from a patch. Real repositories, POSIX
-   only. Nothing in the workflow uses it yet. */
+   contracts, and the manifest derived from a patch. Real repositories. Runs on
+   POSIX and, since m122, on Windows. Nothing in the workflow uses it yet. */
 #define S "test_git_gate_scratch"
 #define R S "/r"
 #define P S "/p"
@@ -16,12 +30,22 @@ static int run_n,pass_n;
 static int Run(const char *cwd,const char *cmd,int want)
 {
     SHELL_EXEC_RESULT r;
-    if(!AgentShellExec(cmd,cwd,20000,&r))return 0;
+    if(!AgentShellExec(cmd,cwd,20000,&r)){printf("    command not run: %s (cwd %s)\n",cmd,cwd);return 0;}
+    if(r.execution_failed||r.timed_out||r.exit_code!=want)
+        /* Diagnostic only: a failed fixture command prints what it did, so a hidden ctest log shows the cause. */
+        printf("    command: %s (cwd %s)\n    exit %d, want %d, failed %d, timed out %d\n    stdout: %.300s\n    stderr: %.300s\n",cmd,cwd,
+               r.exit_code,want,r.execution_failed,r.timed_out,r.stdout_buf,r.stderr_buf);
     return !r.execution_failed&&!r.timed_out&&r.exit_code==want;
 }
 static int Put(const char *path,const char *text)
 {
     FILE *f=fopen(path,"wb");int ok=f&&fputs(text,f)>=0;
+    if(f&&fclose(f)!=0)ok=0;
+    return ok;
+}
+static int PutBin(const char *path,const char *data,size_t n)
+{
+    FILE *f=fopen(path,"wb");int ok=f&&fwrite(data,1,n,f)==n;
     if(f&&fclose(f)!=0)ok=0;
     return ok;
 }
@@ -33,12 +57,22 @@ static int Gate(const char *a1,const char *a2,const char *a3,const char *a4,cons
     argv[argc++]="gate";
     if(a1)argv[argc++]=(char*)a1;if(a2)argv[argc++]=(char*)a2;if(a3)argv[argc++]=(char*)a3;
     if(a4)argv[argc++]=(char*)a4;if(a5)argv[argc++]=(char*)a5;if(a6)argv[argc++]=(char*)a6;if(a7)argv[argc++]=(char*)a7;
+#ifdef _WIN32
+    /* tmpfile() writes to the drive root on Windows and can be refused. */
+    o=fopen("test_git_gate_out.tmp","w+b");e=fopen("test_git_gate_err.tmp","w+b");
+    if(o==NULL||e==NULL)return 99;
+#else
     o=tmpfile();e=tmpfile();
+#endif
     rc=GitGateRun(argc,argv,o,e);
     rewind(o);rewind(e);
     n=fread(gout,1,sizeof gout-1,o);gout[n]=0;
     n=fread(gerr,1,sizeof gerr-1,e);gerr[n]=0;
-    fclose(o);fclose(e);return rc;
+    fclose(o);fclose(e);
+#ifdef _WIN32
+    (void)remove("test_git_gate_out.tmp");(void)remove("test_git_gate_err.tmp");
+#endif
+    return rc;
 }
 static int Derive(const char *text,GIT_GATE_MANIFEST *m,char *err)
 {
@@ -55,17 +89,17 @@ int main(void)
     char err[GIT_ERROR_MAX]="",head[80];
     SHELL_EXEC_RESULT r;
     printf("=== symbols_git_gate: manifest from the patch and the four commands ===\n");
-    (void)system("rm -rf " S);
-    CHECK(mkdir(S,0755)==0&&Run(S,"git init -q -b main r",0),"repo");
-    CHECK(Run(R,"git config user.name F",0)&&Run(R,"git config user.email f@example.invalid",0),"identity");
+    (void)system(RMTREE(S));
+    CHECK(MKDIR(S)==0&&Run(S,"git init -q -b main r",0),"repo");
+    CHECK(Run(R,"git config user.name F",0)&&Run(R,"git config user.email f@example.invalid",0)&&Run(R,"git config core.autocrlf false",0),"identity");
     CHECK(Put(R "/a.txt","one\ntwo\nthree\nfour\nfive\nsix\n")&&Put(R "/b.txt","bee\n")&&Put(R "/old.txt","line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\n")&&Put(R "/x.sh","echo\n"),"files");
     CHECK(Run(R,"git add -A && git commit -q -m base",0),"base commit");
     CHECK(Run(R,"git rev-parse HEAD",0)&&AgentShellExec("git rev-parse HEAD",R,20000,&r),"head");
     snprintf(head,sizeof head,"%.40s",r.stdout_buf);
 
     /* A real patch: modify, delete, add, binary add, rename with edit, mode change. */
-    CHECK(Put(R "/a.txt","one\nTWO\nthree\nfour\nfive\nsix\n")&&Run(R,"git rm -q b.txt",0)&&Put(R "/new.txt","n\n")&&Run(R,"printf '\\000\\001\\002bin' > blob.bin",0)
-          &&Run(R,"git mv old.txt moved.txt",0)&&Put(R "/moved.txt","line1\nline2\nline3\nline4\nline5\nline6\nline7\nEIGHT\n")&&Run(R,"chmod +x x.sh",0)
+    CHECK(Put(R "/a.txt","one\nTWO\nthree\nfour\nfive\nsix\n")&&Run(R,"git rm -q b.txt",0)&&Put(R "/new.txt","n\n")&&PutBin(R "/blob.bin","\000\001\002bin",6)
+          &&Run(R,"git mv old.txt moved.txt",0)&&Put(R "/moved.txt","line1\nline2\nline3\nline4\nline5\nline6\nline7\nEIGHT\n")&&Run(R,MODEPLUS,0)
           &&Run(R,"git add -A",0),"stage the change");
     CHECK(Run(R,"git diff --cached --binary -M > ../p.patch",0),"patch with rename detection");
     CHECK(GitGateDeriveManifest(S "/p.patch",&m,err,sizeof err),"derive from a real patch");
@@ -97,12 +131,12 @@ int main(void)
 
     /* The front end. Patch in the repository at a relative path. */
     CHECK(Run(R,"git reset -q --hard HEAD && git clean -fdq",0),"back to the base commit");
-    CHECK(Run(S,"cp p.patch r/.git/change.patch",0),"patch copied to .git/change.patch");
+    CHECK(Run(S,COPYPATCH,0),"patch copied to .git/change.patch");
     CHECK(Gate("preflight","--expected-head",head,"--dir",R,NULL,NULL)==0&&strstr(gout,"ready"),"preflight: ready");
     CHECK(Gate("preflight","--expected-head","0000000000000000000000000000000000000000","--dir",R,NULL,NULL)==10+3&&strstr(gout,"stale_head")&&gerr[0],"preflight: stale head, exit 13, explanation on stderr");
     CHECK(Gate("preflight","--expected-head",head,"--branch","other","--dir",R)==10+4&&strstr(gout,"wrong_branch"),"preflight: wrong branch, exit 14");
     CHECK(Put(R "/dirty.txt","d\n")&&Gate("preflight","--expected-head",head,"--dir",R,NULL,NULL)==10+7&&strstr(gout,"dirty_tree"),"preflight: untracked file is dirty, exit 17");
-    CHECK(Run(R,"rm dirty.txt",0)&&Gate("preflight","--expected-head",head,"--dir",R,NULL,NULL)==0,"preflight: ready again");
+    CHECK(Run(R,DELCMD "dirty.txt",0)&&Gate("preflight","--expected-head",head,"--dir",R,NULL,NULL)==0,"preflight: ready again");
     CHECK(Gate("preflight","--dir",R,NULL,NULL,NULL,NULL)==GIT_GATE_USAGE,"preflight without --expected-head: usage");
     CHECK(Gate("preflight","--expected-head",head,"--remote-sync","--dir",R,NULL)==10+8&&strstr(gout,"no_upstream"),"preflight --remote-sync without an upstream: exit 18");
 
@@ -126,7 +160,7 @@ int main(void)
 #endif
     CHECK(Run(R,"git add -A",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0&&strstr(gout,"match (7 paths)"),"verify-staged: match");
     CHECK(Put(R "/extra.c","e\n")&&Run(R,"git add extra.c",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==1&&strstr(gerr,"extra.c"),"an extra staged file: mismatch names it");
-    CHECK(Run(R,"git rm -q --cached extra.c && rm extra.c",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0,"unstaged: match");
+    CHECK(Run(R,"git rm -q --cached extra.c && " DELCMD "extra.c",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0,"unstaged: match");
     CHECK(Run(R,"git commit -q -m change",0)&&Gate("verify-head",".git/change.patch","--dir",R,NULL,NULL,NULL)==0,"verify-head: match");
     CHECK(Run(R,"git commit -q --allow-empty -m empty",0)&&Gate("verify-head",".git/change.patch","--dir",R,NULL,NULL,NULL)==1,"verify-head on a different HEAD: mismatch");
     CHECK(Put(R "/a.txt","one\nQQ\nthree\nfour\nfive\nsix\n")&&Run(R,"git commit -q -am diverge",0)&&Gate("patch-state",".git/change.patch","--dir",R,NULL,NULL,NULL)==4&&strstr(gout,"neither")&&gerr[0],"patch-state: diverged tree, applies neither way, exit 4");
@@ -135,10 +169,6 @@ int main(void)
     CHECK(Gate(NULL,NULL,NULL,NULL,NULL,NULL,NULL)==GIT_GATE_USAGE&&Gate("bogus",NULL,NULL,NULL,NULL,NULL,NULL)==GIT_GATE_USAGE,"no command, unknown command: usage");
 
     printf("\n%d/%d passed\n",pass_n,run_n);
-    (void)system("rm -rf " S);
+    (void)system(RMTREE(S));
     return pass_n==run_n?0:1;
 }
-#else
-#include <stdio.h>
-int main(void){printf("SKIP: test_git_gate is POSIX only\n");return 0;}
-#endif
