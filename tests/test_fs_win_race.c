@@ -108,11 +108,26 @@ static void reset(void)
 /* ---- E: parent swap ---- */
 #define REAL_HOLD_MS 30
 static volatile LONG g_stop,g_swaps,g_junctions,g_ok,g_calls;
+/* Diagnostic counters (m172, not a gate): where the writer calls land relative to the real-directory phase,
+   how long a call and a junction flip take, and the OK count per operation. They exist to measure the
+   cause of the cell E flake ("at least one writer call succeeded (0)"); no guard below depends on them. */
+static volatile LONG g_real;                       /* 1 while D is a real directory (set by the swapper) */
+static volatile LONG g_rcalls,g_rok;               /* calls that started and ended inside one real phase */
+static volatile LONG g_rseq;                       /* counts real-phase starts so a call can tell it spanned two */
+static volatile LONG g_opok[6],g_opn[6],g_opms[6],g_opmax[6]; /* g_opms: microseconds */
+static volatile LONG g_flipn,g_flipms,g_flipmax; /* microseconds */
+static LARGE_INTEGER g_qbase,g_qfreq;
+/* microseconds since the start of cell E; GetTickCount would tick only every 15.6 ms */
+static LONG now_us(void)
+{LARGE_INTEGER q;QueryPerformanceCounter(&q);
+ return (LONG)(((q.QuadPart-g_qbase.QuadPart)*1000000LL)/g_qfreq.QuadPart);}
 static void flip_to_junction(void)
-{char abs[MAX_PATH],cmd[2*MAX_PATH+128];DWORD n=GetFullPathNameA(OUTD,MAX_PATH,abs,NULL);
+{char abs[MAX_PATH],cmd[2*MAX_PATH+128];DWORD n=GetFullPathNameA(OUTD,MAX_PATH,abs,NULL);LONG t0,d;
  if(!n||n>=MAX_PATH)return;
  snprintf(cmd,sizeof(cmd),"cmd /D /C mklink /J \"" ROOT "\\D\" \"%s\" >NUL 2>&1",abs);
- system(cmd);}
+ t0=now_us();system(cmd);d=now_us()-t0;
+ InterlockedIncrement(&g_flipn);InterlockedExchangeAdd(&g_flipms,d);
+ if(d>g_flipmax)InterlockedExchange(&g_flipmax,d);}
 static void clear_dir(const char *dir)
 {WIN32_FIND_DATAA d;char pat[MAX_PATH],p[MAX_PATH];HANDLE h;
  /* Never delete through a junction: only the swapper changes D, so this
@@ -128,13 +143,14 @@ static DWORD WINAPI swapper(LPVOID p)
  while(!g_stop){
   /* real directory -> junction */
   clear_dir(ROOT "\\D");
+  InterlockedExchange(&g_real,0);
   if(RemoveDirectoryA(ROOT "\\D")){
    flip_to_junction();
    {DWORD a=GetFileAttributesA(ROOT "\\D");
     if(a!=INVALID_FILE_ATTRIBUTES&&(a&FILE_ATTRIBUTE_REPARSE_POINT))InterlockedIncrement(&g_junctions);}
    Sleep(15);
    /* junction -> real directory */
-   if(RemoveDirectoryA(ROOT "\\D"))_mkdir(ROOT "\\D");
+   if(RemoveDirectoryA(ROOT "\\D")){_mkdir(ROOT "\\D");InterlockedIncrement(&g_rseq);InterlockedExchange(&g_real,1);}
    Sleep(REAL_HOLD_MS); /* hold the real phase so writers get a window */
    InterlockedIncrement(&g_swaps);
   }else Sleep(5);
@@ -147,13 +163,28 @@ static DWORD WINAPI writer(LPVOID p)
  while(!g_stop){
   FS_READ_STATUS s[6];
   FS_BATCH_CREATE b[2]={{"D/b1","x",1,0666},{"D/b2","y",1,0666}};
+  LONG t[7],seq0[6],real0[6];
+  t[0]=now_us();seq0[0]=g_rseq;real0[0]=g_real;
   s[0]=FsCreateFile(r,"D/w","v1",2,0666);
+  t[1]=now_us();seq0[1]=g_rseq;real0[1]=g_real;
   s[1]=FsReplaceFile(r,"D/w","v1",2,"v2",2);
+  t[2]=now_us();seq0[2]=g_rseq;real0[2]=g_real;
   s[2]=FsRemoveFile(r,"D/w","v2",2);
+  t[3]=now_us();seq0[3]=g_rseq;real0[3]=g_real;
   s[3]=FsBatchCreate(r,b,2);
+  t[4]=now_us();seq0[4]=g_rseq;real0[4]=g_real;
   s[4]=FsRemoveFile(r,"D/b1","x",1);
+  t[5]=now_us();seq0[5]=g_rseq;real0[5]=g_real;
   s[5]=FsRemoveFile(r,"D/b2","y",1);
-  for(int i=0;i<6;i++){InterlockedIncrement(&g_calls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_ok);}
+  t[6]=now_us();
+  for(int i=0;i<6;i++){LONG d=t[i+1]-t[i];
+   InterlockedIncrement(&g_calls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_ok);
+   InterlockedIncrement(&g_opn[i]);InterlockedExchangeAdd(&g_opms[i],d);
+   if(d>g_opmax[i])InterlockedExchange(&g_opmax[i],d);
+   if(s[i]==FS_READ_OK)InterlockedIncrement(&g_opok[i]);
+   /* a call counts as inside a real phase when D was real at its start and no new real phase began since;
+      the junction phase in between is not observed, so this is an upper bound on calls with a real parent */
+   if(real0[i]&&g_real&&g_rseq==seq0[i]){InterlockedIncrement(&g_rcalls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_rok);}}
   Sleep(1);
  }
  return 0;}
@@ -210,6 +241,7 @@ int main(int argc,char **argv)
  }
  /* E */
  {HANDLE th[3];DWORD t0=GetTickCount();
+  QueryPerformanceFrequency(&g_qfreq);QueryPerformanceCounter(&g_qbase);
   ck(_mkdir(ROOT "\\D")==0,"mkdir D");
   th[0]=CreateThread(NULL,0,swapper,NULL,0,NULL);
   th[1]=CreateThread(NULL,0,writer,r,0,NULL);
@@ -220,6 +252,14 @@ int main(int argc,char **argv)
   WaitForMultipleObjects(3,th,TRUE,60000);
   for(int i=0;i<3;i++)CloseHandle(th[i]);
   outside_intact("after swap");
+  /* printed BEFORE the guards, so a failing run still carries the numbers */
+  printf("E diag: calls %ld ok %ld; inside-one-real-phase calls %ld ok %ld; swaps %ld junctions %ld; flip us n %ld avg %ld max %ld\n",
+         (long)g_calls,(long)g_ok,(long)g_rcalls,(long)g_rok,(long)g_swaps,(long)g_junctions,
+         (long)g_flipn,(long)(g_flipn?g_flipms/g_flipn:0),(long)g_flipmax);
+  {static const char *opn[6]={"create","replace","remove","batch","rm_b1","rm_b2"};
+   for(int i=0;i<6;i++)printf("E diag op %s: calls %ld ok %ld us avg %ld max %ld\n",opn[i],(long)g_opn[i],(long)g_opok[i],
+        (long)(g_opn[i]?g_opms[i]/g_opn[i]:0),(long)g_opmax[i]);}
+  fflush(stdout);
   ck(g_junctions>=5,"E: junction state verified at least 5 times");
   ck(g_ok>0,"E: at least one writer call succeeded");
   printf("fs win race ok: parent swap invariant held over %ld writer calls (%ld OK), %ld swaps, %ld verified junction phases\n",
