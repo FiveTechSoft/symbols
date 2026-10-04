@@ -218,7 +218,12 @@ if(WIN32)
     add_test(NAME test_agent_patch_crash_win_mc10 COMMAND test_agent_patch_crash_win
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_agent_patch_crash_win_mc10 PROPERTIES
-        ENVIRONMENT "FS_WIN_BATCH_MUTANT=10" PASS_REGULAR_EXPRESSION "agentpatch crash phases ran: 7" WILL_FAIL TRUE)
+        ENVIRONMENT "FS_WIN_BATCH_MUTANT=10" PASS_REGULAR_EXPRESSION "mutant killed by 6 cell")
+    # Mutant 11: the sweep keeps an unshared .fsrs- stage; only the phase 1 leftover cell may fail.
+    add_test(NAME test_agent_patch_crash_win_mc11 COMMAND test_agent_patch_crash_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_agent_patch_crash_win_mc11 PROPERTIES
+        ENVIRONMENT "FS_WIN_BATCH_MUTANT=11" PASS_REGULAR_EXPRESSION "mutant killed by 1 cell")
     add_executable(test_agent_patch_ntfs_win tests/test_agent_patch_ntfs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_ntfs_win PRIVATE include)

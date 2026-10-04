@@ -18,10 +18,18 @@
 #define OLDC "int x = 1;\n"
 #define NEWC "int x = 9;\n"
 static int fails;
+/* Which cells failed, for the mutant mode: bit k of a mask is phase k. */
+static int cur_phase = -1, fail_leftover, fail_apply, fail_other;
 static void ck(int x, const char *m)
 {
     printf("  [%s] %s\n", x ? "PASS" : "FAIL", m);
-    if (!x) fails++;
+    if (!x)
+    {
+        fails++;
+        if (cur_phase >= 0 && strstr(m, "leftover")) fail_leftover |= 1 << cur_phase;
+        else if (cur_phase >= 0 && strstr(m, "applies afterwards")) fail_apply |= 1 << cur_phase;
+        else fail_other++;
+    }
 }
 static void put(const char *p, const char *v)
 {
@@ -150,6 +158,7 @@ int main(int argc, char **argv)
         PATCH_PLAN p;
         int rec1, rec2, left;
         printf("phase %d\n", phase);
+        cur_phase = phase;
         reset();
         ck(run_child(exe, phase) == 140 + phase, "writer killed at the phase");
         printf("  (measured: before recovery %s)\n", what());
@@ -175,6 +184,31 @@ int main(int argc, char **argv)
         ran++;
     }
     wipe();
+    cur_phase = -1;
+    {
+        /* Mutant mode (FS_WIN_BATCH_MUTANT set): exit 0 only when the failing cells
+           are exactly the expected ones, so a survivor or a failure elsewhere is
+           not counted as a kill. Mutant 10 (sweep skipped): leftover and re-apply
+           cells at phases 0, 1, 2 (the six cells measured in m137). Mutant 11
+           (unshared .fsrs- kept): the leftover cell at phase 1 only. */
+        const char *mv = getenv("FS_WIN_BATCH_MUTANT");
+        if (mv && *mv)
+        {
+            int m = atoi(mv), el = 0, ea = 0, n;
+            if (m == 10) { el = 0x7; ea = 0x7; }
+            else if (m == 11) { el = 0x2; ea = 0; }
+            else { printf("mutant %d not handled here\n", m); return 1; }
+            n = fails;
+            if (fail_leftover == el && fail_apply == ea && fail_other == 0 && n > 0)
+            {
+                printf("mutant killed by %d cell(s)\n", n);
+                return 0;
+            }
+            printf("mutant %d SURVIVED or failed elsewhere: leftover mask %x, apply mask %x, other %d\n",
+                   m, fail_leftover, fail_apply, fail_other);
+            return 1;
+        }
+    }
     if (!fails) printf("agentpatch crash phases ran: %d\n", ran);
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL PASS", fails);
     return fails ? 1 : 0;

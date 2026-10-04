@@ -21,7 +21,8 @@ Behavior
   hard-linked targets are DENIED. Windows requires NTFS; other volumes fail
   closed. The inode changes on replace; the permission bits are kept.
 - Control files `.fstxn.lock`, `.fstxn-*`, `.fsrp-*` (and `.fsrb-*`, `.fsmv-*`,
-  `.fsrm-*`, `.fs*-stage`) appear in the workspace root. They are internal.
+  `.fsrm-*`, `.fs*-stage`, and on Windows `.fsrs-*`, the new-content stage of a
+  single-file replace) appear in the workspace root. They are internal.
   `AgentGitInspect` excludes them from untracked/ignored counts. The user's
   `.gitignore` and `.git/info/exclude` are never edited.
 

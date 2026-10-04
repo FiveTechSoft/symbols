@@ -401,7 +401,7 @@ done:
    shared, because an unshared one may be the last link to bytes someone still
    needs (the target is gone), and then it stays. Best
    effort: a name that cannot be deleted stays, as before. At most 128 names per
-   call. Mutant 10 (test only) skips the sweep. */
+   call. Mutant 10 (test only) skips the sweep; mutant 11 keeps an unshared .fsrs-. */
 #define WB_SWEEP_MAX 128
 static void wb_sweep_orphans(const FS_READ_ROOT *r)
 {
@@ -446,7 +446,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
         if(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&wc_id(h,&ids[k])&&
            GetFileInformationByHandleEx(h,FileStandardInfo,&si,sizeof(si))){
             links[k]=si.NumberOfLinks;
-            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5)||!wcsncmp(names[k],L".fsrs-",6);
+            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5)||(!wb_mutant(11)&&!wcsncmp(names[k],L".fsrs-",6));
         }
         CloseHandle(h);
     }
