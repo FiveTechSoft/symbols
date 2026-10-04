@@ -262,6 +262,12 @@ if(WIN32)
     target_include_directories(test_fs_win_fileparent PRIVATE include)
     add_test(NAME test_fs_win_fileparent COMMAND test_fs_win_fileparent
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_fileparent_mc tests/test_fs_win_fileparent.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_fileparent_mc PRIVATE include)
+    target_compile_definitions(test_fs_win_fileparent_mc PRIVATE FS_PARENT_MUTANT=1)
+    add_test(NAME test_fs_win_fileparent_mc COMMAND test_fs_win_fileparent_mc
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_perm tests/test_fs_win_perm.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_perm PRIVATE include)

@@ -488,7 +488,18 @@ static FS_READ_STATUS wc_parent(const FS_READ_ROOT *r,const WCHAR *target,HANDLE
     if(!**leaf||wcslen(*leaf)>240)return FS_READ_DENIED;
     n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path,-1,utf8,sizeof(utf8),NULL,NULL);
     if(!n||!valid_relative(utf8,1))return FS_READ_DENIED;
-    return win_open(r,utf8,dir);
+    {FS_READ_STATUS s=win_open(r,utf8,dir);
+#ifndef FS_PARENT_MUTANT
+     /* win_open opens the last component without FILE_DIRECTORY_FILE, so a
+        regular file would come back as the "parent". Refuse it here, before
+        any stage, pin or intent exists. Test-only build FS_PARENT_MUTANT drops
+        this check (tests/test_fs_win_fileparent.c); never defined in
+        production targets. */
+     if(s==FS_READ_OK){FS_READ_META m;
+        if(win_meta(*dir,&m)!=FS_READ_OK||m.kind!=FS_KIND_DIR){
+            CloseHandle(*dir);*dir=INVALID_HANDLE_VALUE;return FS_READ_DENIED;}}
+#endif
+     return s;}
 }
 /* All operation families share one workspace lock. An unknown control name
    blocks rather than having its content interpreted by an unrelated writer. */
