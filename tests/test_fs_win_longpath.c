@@ -11,33 +11,54 @@
 #include <wchar.h>
 /* Criterion 4, Windows: long paths against the writers (NTFS, one runner).
 
-   What the source says before measuring (read, not measured): on Windows the
-   writers do not use MAX_PATH. Every component is opened by handle with
-   NtCreateFile (one component per call), and the only length limits are
-   wcslen(path) >= WC_MAX_PATH (4096 wide characters) -> INVALID, checked in
-   create, copy, move, replace and batch validation, and the NTFS limit of 255
-   UTF-16 units per component. FS_INTENT_MAX_PATH (1024) lives in the POSIX
-   code and is not part of the Windows branch.
+   What the source says (read, not measured): on Windows the writers do not use
+   MAX_PATH. Every component is opened by handle with NtCreateFile (one
+   component per call). The limits are in src/fs_create_win.inc:
+   - wc_target_status (lines 100-115, called by every writer): every path
+     segment, directories included, must be 1..240 wide characters, else
+     INVALID. wc_open (line 184) and the leaf split at line 488 repeat the
+     240 cap for the leaf. No source comment gives the reason for 240; the
+     rejection of over-long segments is listed as intended in
+     docs/core-m0-m1-exit-audit.md (the device-name section).
+   - wcslen(path) >= WC_MAX_PATH (#define at line 17, 4096) -> INVALID in
+     create, copy, move, replace and batch validation (lines 117, 857, 938,
+     954, 987 and src/fs_batch_win.inc line 117). WC_MAX_PATH is also the size
+     of the path field of the journal records. No comment gives a reason
+     either; the code is the only statement of the limit.
+   FS_INTENT_MAX_PATH (1024) is in the POSIX code and is not part of the
+   Windows branch.
 
-   Predictions, stated before the first measurement:
+   RETRACTION. The first version of this test (run 37165509182, red on
+   build-test-msvc and asan-msvc at "leaf 255 create") predicted that a leaf of
+   254 and 255 characters works and that 250-character directories work. That
+   prediction was wrong: it used the NTFS limit (255) and I had not read the
+   240 cap in wc_target_status. It was a fault of the test expectation, not of
+   the production code. The 823-character block of that version passed (7
+   cells) and is kept unchanged.
+
+   Predictions for this version, stated before the first measurement:
    - A relative path of 823 characters (3 directories of 240, leaf of 100),
      whose absolute path is far above 260, works for create, replace, copy,
      move, remove, batch create and batch replace: OK, with the bytes read back
-     through wide "\\?\" APIs.
-   - A leaf of 255 characters is created (OK), and so is one of 254. A leaf of
-     256 is refused (status other than OK) and nothing is created.
-   - A relative path of exactly 4095 characters (16 directories of 250, leaf of
-     79) works for create, replace, move and remove: OK.
-   - A relative path of 4096 characters is refused (status other than OK, a
+     through wide "\\?\" APIs. (Measured OK in run 37165509182.)
+   - A leaf of 240 characters is created (OK). A leaf of 241 is refused (status
+     other than OK) and nothing is created. A directory component of 241
+     characters, made by the test, is refused as a parent (status other than
+     OK) and nothing is created in it.
+   - A relative path of exactly 4095 characters (16 directories of 240, leaf of
+     239) works for create, replace, move and remove: OK.
+   - A relative path of exactly 4096 characters (the same directories, leaf of
+     240, which is itself a legal leaf) is refused (status other than OK, a
      predicted INVALID but only "not OK" is asserted) by create, copy target,
      move target and batch create, and nothing is created. Against an existing
      file at that length, replace, remove, move source and copy source are
      refused and the file keeps its bytes.
-   Not claimed: the status code of the refusals, which layer refuses, paths
-   above 32767, long names through the 8.3 alias, other volumes, other runners.
-   The directories of the fixture are created by the test itself with wide
-   "\\?\" calls; the narrow helpers of the other tests cannot reach them. No
-   mutant: the limit is spread over several checks, not one macro in src. */
+   The lengths are asserted in the test. Not claimed: the status code of the
+   refusals, which layer refuses, paths above 32767, long names through the
+   8.3 alias, other volumes, other runners. The directories of the fixture are
+   created by the test itself with wide "\\?\" calls; the narrow helpers of
+   the other tests cannot reach them. No mutant: the limits are several
+   comparisons spread over the file, not one macro in src. */
 #define WS "test_fs_winlp_ws"
 static WCHAR g_root[700];
 static WCHAR *wpath(const char *rel)
@@ -94,7 +115,7 @@ static void make_rel(char *out,int dirs,int dirlen,int leaflen,char ch)
 static void mkchain(const char *dir)
 {char pre[5200];size_t i,n=strlen(dir);WCHAR *w;
  for(i=0;i<=n;i++)if(dir[i]=='/'||dir[i]==0){memcpy(pre,dir,i);pre[i]=0;w=wpath(pre);
-     ck(CreateDirectoryW(w,NULL)!=0,"mkchain");free(w);}}
+     ck(CreateDirectoryW(w,NULL)!=0||GetLastError()==ERROR_ALREADY_EXISTS,"mkchain");free(w);}}
 static int cells;
 #define STAY_OK(expr,what) do{ck((expr)==FS_READ_OK,what);cells++;}while(0)
 #define STAY_REFUSED(expr,what) do{ck((expr)!=FS_READ_OK,what);cells++;}while(0)
@@ -130,23 +151,26 @@ int main(void)
   STAY_OK(FsBatchReplace(r,b,2),"823 batch replace");}
  ck(bytes_w(rel,"C1")&&bytes_w(relm,"C2")&&count_w(dir)==2,"823 batch replace: state");
  ck(FsRemoveFile(r,rel,"C1",2)==FS_READ_OK&&FsRemoveFile(r,relm,"C2",2)==FS_READ_OK&&count_w(dir)==0,"823 batch cleanup");
- /* leaf of 255, 254 and 256 characters */
-{char leaf[400];
+ /* leaf of 240 and 241 characters, directory of 241 characters */
+ {char leaf[400],bd[400];
   {WCHAR *w=wpath("D");ck(CreateDirectoryW(w,NULL)!=0,"mkdir D");free(w);}
-  strcpy(leaf,"D/");memset(leaf+2,'x',255);leaf[257]=0;
-  STAY_OK(FsCreateFile(r,leaf,"L",1,0666),"leaf 255 create");
-  ck(bytes_w(leaf,"L")&&count_w("D")==1,"leaf 255: state");
-  ck(FsRemoveFile(r,leaf,"L",1)==FS_READ_OK&&count_w("D")==0,"leaf 255 cleanup");
-  leaf[256]=0;
-  STAY_OK(FsCreateFile(r,leaf,"L",1,0666),"leaf 254 create");
-  ck(bytes_w(leaf,"L")&&count_w("D")==1,"leaf 254: state");
-  ck(FsRemoveFile(r,leaf,"L",1)==FS_READ_OK&&count_w("D")==0,"leaf 254 cleanup");
-  strcpy(leaf,"D/");memset(leaf+2,'x',256);leaf[258]=0;
-  STAY_REFUSED(FsCreateFile(r,leaf,"L",1,0666),"leaf 256 create");
-  ck(count_w("D")==0&&count_w("")==2,"leaf 256: nothing created");}
- /* 4095 characters: 16 directories of 250 and a leaf of 79 */
- make_dir(dir,16,250);mkchain(dir);
- make_rel(rel4095,16,250,79,'p');make_rel(relm,16,250,79,'q');make_rel(rel4096,16,250,80,'p');
+  strcpy(leaf,"D/");memset(leaf+2,'x',240);leaf[242]=0;
+  ck(strlen(leaf)==242,"leaf 240 length");
+  STAY_OK(FsCreateFile(r,leaf,"L",1,0666),"leaf 240 create");
+  ck(bytes_w(leaf,"L")&&count_w("D")==1,"leaf 240: state");
+  ck(FsRemoveFile(r,leaf,"L",1)==FS_READ_OK&&count_w("D")==0,"leaf 240 cleanup");
+  strcpy(leaf,"D/");memset(leaf+2,'x',241);leaf[243]=0;
+  ck(strlen(leaf)==243,"leaf 241 length");
+  STAY_REFUSED(FsCreateFile(r,leaf,"L",1,0666),"leaf 241 create");
+  ck(!exists_w(leaf)&&count_w("D")==0&&count_w("")==2,"leaf 241: nothing created");
+  memset(bd,'y',241);bd[241]=0;
+  {WCHAR *w=wpath(bd);ck(CreateDirectoryW(w,NULL)!=0,"mkdir 241");free(w);}
+  strcpy(leaf,bd);strcat(leaf,"/f");
+  STAY_REFUSED(FsCreateFile(r,leaf,"L",1,0666),"directory 241 create under it");
+  ck(count_w(bd)==0&&count_w("")==3,"directory 241: nothing created");}
+ /* 4095 characters: 16 directories of 240 and a leaf of 239 */
+ make_dir(dir,16,240);mkchain(dir);
+ make_rel(rel4095,16,240,239,'p');make_rel(relm,16,240,239,'q');make_rel(rel4096,16,240,240,'p');
  ck(strlen(rel4095)==4095&&strlen(rel4096)==4096,"4095 and 4096 lengths");
  STAY_OK(FsCreateFile(r,rel4095,"ONE",3,0666),"4095 create");
  ck(bytes_w(rel4095,"ONE")&&count_w(dir)==1,"4095 create: state");
