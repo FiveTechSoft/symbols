@@ -149,7 +149,7 @@ static void test_repos(void)
 /* Windows port of the cells that need no compiler (m127). Fixtures are built with C file writes
    and one git command per call, because the POSIX scripts use bash syntax. The scratch directory is
    under %TEMP%, outside any repository, so the "not a repository" cell cannot find an outer .git.
-   The revert cells (they compile with gcc) are NOT ported. */
+   The revert cells (they compile with gcc) run only when gcc is found. */
 #include <direct.h>
 #include <process.h>
 
@@ -229,6 +229,26 @@ static const char *deleted_repo(const char *name, const char *text)
     return d;
 }
 
+/* Diagnostic for the gcc cells: what the operator said, so a red cell shows why. */
+static void say(const char *cell, int rc, const char *op, int verified, const char *detail, const char *reason)
+{
+    printf("  [%s] rc=%d op=[%s] verified=%d detail=[%s] reason=[%s]\n", cell, rc, op, verified, detail, reason);
+}
+
+static const char *calc_repo(const char *name, int broken)
+{
+    const char *good = "#include <stdio.h>\nint main(void) { printf(\"ok\\n\"); return 0; }\n";
+    const char *bad = "#include <stdio.h>\nint main(void) { printf(\"ok\\n\"); return 0 }\n";
+    const char *more = "#include <stdio.h>\nint main(void) { printf(\"ok\\n\"); return 0; }\n/* c */\n";
+    const char *d = repo(name);
+    int ok = put(d, "calc.c", good) && shw(d, "git add . && git commit -qm good") == 0 &&
+             put(d, "calc.c", broken ? bad : more) &&
+             shw(d, broken ? "git commit -qam wip" : "git commit -qam more") == 0;
+    if (!ok)
+        printf("setup failed for %s\n", name);
+    return d;
+}
+
 static void test_repos_win(void)
 {
     GIT_OPS_RESULT r;
@@ -269,6 +289,35 @@ static void test_repos_win(void)
     d = deleted_repo("r3", "x\n");
     CHECK(GitOpsSolve(d, "Explain why notes.txt was removed.", &r) == 0);
     CHECK(slurp(d, "notes.txt") == NULL);
+
+    if (system("gcc --version >nul 2>&1") == 0) {
+        int rc;
+        TASK_OPS_REPORT rep;
+
+        /* revert a commit that broke the build: history kept, tree back */
+        d = calc_repo("v1", 1);
+        rc = GitOpsSolve(d, "The last commit left calc.c uncompilable. Undo that commit with git.", &r);
+        say("v1", rc, r.op, r.verified, r.detail, r.reason);
+        CHECK(rc == 1);
+        CHECK(!strcmp(r.op, "revert_head"));
+        CHECK(shw_out(d, "git rev-list --count HEAD") == 0 && (s = slurp(d, ".git\\o.txt")) && s[0] == '3');
+        CHECK(shw(d, "git diff --quiet HEAD HEAD~2") == 0);
+
+        /* HEAD builds fine: no evidence, nothing reverted */
+        d = calc_repo("v2", 0);
+        rc = GitOpsSolve(d, "Undo the last commit.", &r);
+        say("v2", rc, r.op, r.verified, r.detail, r.reason);
+        CHECK(rc == 0);
+        CHECK(shw_out(d, "git rev-list --count HEAD") == 0 && (s = slurp(d, ".git\\o.txt")) && s[0] == '2');
+
+        /* routed through TaskOpsSolve before any file operator */
+        d = calc_repo("v3", 1);
+        rc = TaskOpsSolve(d, "The last commit broke calc.c. Revert that commit.", &rep);
+        say("v3", rc, rep.op, rep.verified, rep.detail, rep.reason);
+        CHECK(rc == 1);
+        CHECK(!strcmp(rep.op, "revert_head") && rep.verified);
+    } else
+        printf("gcc not found: revert cells skipped\n");
 
     /* not a repository: no git operator */
     d = repo("plain");
