@@ -25,6 +25,12 @@
 #define O S "/o"
 static int run_n, pass_n;
 #define CHECK(x,m) do{run_n++;if(x){pass_n++;printf("  [PASS] %s\n",m);}else printf("  [FAIL] %s (line %d)\n",m,__LINE__);}while(0)
+/* Cells tagged R are the retry cells. In the mutant build (AGENT_GIT_PATCH_STATE_MUTANT,
+   patch-state never recognises an applied patch) the run is a kill when every non-R
+   cell passes and at least one R cell fails: exit 0. A mutant that passes all R cells
+   survives: exit 1. */
+static int retry_fail_n;
+#define CHECKR(x,m) do{run_n++;if(x){pass_n++;printf("  [PASS] %s\n",m);}else{retry_fail_n++;printf("  [FAIL] %s (line %d)\n",m,__LINE__);}}while(0)
 static int Run(const char *cwd, const char *cmd, int want)
 {
     SHELL_EXEC_RESULT r;
@@ -139,9 +145,47 @@ int main(void)
     CHECK(Out(L, "git rev-parse HEAD", local_commit, sizeof local_commit) && Out(S "/b.git", "git rev-parse main", tip_after, sizeof tip_after) &&
           !strcmp(local_commit, tip_after) && strcmp(tip_after, tip_other) != 0, "7: control remote tip equals the local commit");
 
+    /* Interrupted run: the sequence is applied, staged, verified and committed, and the process
+       dies before the push. Retrying must report the completed work and finish once.
+       Predictions, written before the first run:
+         R1 patch-state on the committed tree: already applied, exit 3
+         R2 verify-head still passes on the committed tree (exit 0)
+         R3 a naive second `git apply` of the patch is refused (git exit 1), HEAD and tree unchanged
+         R4 the push then succeeds once: the remote tip equals the local commit and the remote
+            has exactly one more commit than before
+         R5 a second push is a no-op (exit 0): tip unchanged, commit count unchanged
+         R6 patch-state after the push still reports already applied, exit 3 */
+    {
+        char before[80] = "", count0[32] = "", count1[32] = "", count2[32] = "", c3[80] = "", tip3[80] = "", head3[80] = "";
+        CHECK(Out(L, "git rev-parse HEAD", before, sizeof before) && Out(S "/b.git", "git rev-list --count main", count0, sizeof count0) &&
+              Put(L "/third.txt", "t\n") && Run(L, "git add -A -N && git diff --binary > .git/change3.patch && git reset -q && rm third.txt", 0) &&
+              Run(L, "git apply .git/change3.patch && git add -A", 0) &&
+              Gate("verify-staged", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0 &&
+              Run(L, "git commit -q -m change3", 0) && Out(L, "git rev-parse HEAD", c3, sizeof c3) && strcmp(c3, before) != 0,
+              "interrupted run: apply, stage, verify, commit done, no push");
+        rc = Gate("patch-state", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        if (rc != 3) printf("    got exit %d out=%s err=%s\n", rc, gout, gerr);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R1: patch-state on the committed tree reports already applied, exit 3");
+        CHECK(Gate("verify-head", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0, "R2: verify-head passes on the committed tree");
+        CHECK(Run(L, "git apply .git/change3.patch 2>/dev/null", 1) && Out(L, "git rev-parse HEAD", head3, sizeof head3) && !strcmp(head3, c3) &&
+              Out(L, "git status --porcelain", porcelain, sizeof porcelain) && porcelain[0] == 0, "R3: a naive second git apply is refused and changes nothing");
+        CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
+              Out(S "/b.git", "git rev-list --count main", count1, sizeof count1) && atoi(count1) == atoi(count0) + 1, "R4: the push finishes once, remote has exactly one more commit");
+        CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
+              Out(S "/b.git", "git rev-list --count main", count2, sizeof count2) && !strcmp(count1, count2), "R5: a second push is a no-op, tip and commit count unchanged");
+        rc = Gate("patch-state", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R6: patch-state after the push still reports already applied, exit 3");
+    }
+
     printf("\n%d/%d passed\n", pass_n, run_n);
     (void)system("rm -rf " S);
+#ifdef AGENT_GIT_PATCH_STATE_MUTANT
+    if (retry_fail_n > 0 && pass_n + retry_fail_n == run_n) { printf("mutant killed by %d retry cell(s)\n", retry_fail_n); return 0; }
+    printf("MUTANT SURVIVED or a non-retry cell failed\n");
+    return 1;
+#else
     return pass_n == run_n ? 0 : 1;
+#endif
 }
 #else
 #include <stdio.h>

@@ -520,7 +520,12 @@ GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
         SetError(error, error_size, "Git could not parse the patch");
         return GIT_PATCH_CHECK_FAILED;
     }
+#ifdef AGENT_GIT_PATCH_STATE_MUTANT
+    /* Test only: forget the reverse check, so an applied patch is never recognised. */
+    snprintf(command, sizeof(command), "git apply --check %s", patch_path);
+#else
     snprintf(command, sizeof(command), "git apply --check --reverse %s", patch_path);
+#endif
     if (RunReadOnly(command, working_dir, &result, error, error_size) != GIT_INSPECT_OK)
         return GIT_PATCH_CHECK_FAILED;
     if (result.exit_code == 0)
