@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <assert.h>
 #include "agent_runner.h"
 
@@ -278,8 +279,37 @@ static void test_did_you_mean_repair(void)
     snprintf(task.build_command, sizeof(task.build_command),
              "gcc -fsyntax-only %s", target_file);
 
+    /* Warm the compiler first. The runner gives every build a fixed 10 s limit
+       (agent_runner.c, AgentShellExecGuarded 10000). On the windows-latest runner
+       the first gcc start was measured at exit=124 once (CI run 37174365271,
+       build-test-msvc: first_build timeout=1, attempts=3, solved=1), which makes
+       the attempt count 3 instead of 2 although the repair itself worked. The
+       warm-up uses its own 60 s limit and is reported; the assertions below are
+       unchanged. Prediction: warm-up removes that failure mode; NOT measured on
+       Windows yet, one occurrence only. */
+    {
+        const char *warm_file = "test_swe_warm.c";
+        FILE *wf = fopen(warm_file, "wb");
+        if (wf)
+        {
+            fputs("int Warm(void) { return 0; }\n", wf);
+            fclose(wf);
+            SHELL_EXEC_RESULT warm;
+            AgentShellResultInit(&warm);
+            time_t t0 = time(NULL);
+            AgentShellExecGuarded("gcc -fsyntax-only test_swe_warm.c", ".", 60000, &warm);
+            fprintf(stderr, "Test 6 warm-up: exit=%d timed_out=%d seconds=%ld\n",
+                    warm.exit_code, warm.timed_out, (long)(time(NULL) - t0));
+            remove(warm_file);
+        }
+    }
+
     SWE_BENCH_RESULT result;
     int rc = AgentRunnerSolveTask(runner, &task, &result);
+    if (result.first_failed_build.timed_out)
+        fprintf(stderr, "Test 6 ENVIRONMENT TIMEOUT: first build hit the 10 s limit "
+                "(exit=%d); an attempt-count failure below is a timing fault, not a repair-logic fault\n",
+                result.first_failed_build.build_exit);
     if (!(rc == 1 && result.is_solved && result.attempts_executed == 2 &&
           result.repairs_applied == 1 &&
           strcmp(result.last_repair_operator, "compiler-did-you-mean") == 0 &&
