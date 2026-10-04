@@ -323,8 +323,14 @@ int main(void)
    stage or marker behind. Reproduce with FS_FUZZ_SEED / FS_FUZZ_ITERS.
    Differences from the POSIX branch, all deliberate:
    - Modes are the read-only attribute only (0444 or 0644).
-   - The directory link fixture is a junction made with `mklink /J`; there
-     is no symlink fixture and no "linkfile".
+   - The directory link fixture is a junction made with `mklink /J`. The
+     file symlink "linkfile" is made with CreateSymbolicLinkA when the runner
+     allows it, and is NOT in the random pool (so the seeded sequence of the
+     earlier runs is unchanged); it gets its own fixed pass through path_ops
+     and a manifest case. If the runner cannot create it the run prints
+     "symlink leaf: SKIPPED" and goes on, unless FS_FUZZ_REQUIRE_SYMLINK=1 is
+     set (the CMake registration sets it), in which case that is a failure,
+     so a Passed ctest state means the symlink cases ran.
    - FsBatchCreate and FsBatchRecover are real on Windows (W2), and so is
      FsBatchReplace (W4); a generated bad path must be rejected with the
      tree unchanged, and a positive batch replace round trip (control) shows
@@ -351,6 +357,7 @@ static uint32_t g_seed=0x20d1854u;
 static unsigned g_iter=0;
 static const char *g_what="setup";
 static const char *g_path="";
+static int g_have_link=0;
 static void ck(int x,const char *m)
 {
     if(!x){
@@ -462,6 +469,13 @@ static void fixtures(void)
     put(SCRATCH "/sub/inner","INNER",0);
     put(OUTFILE,"outside",0);
     ck(system("mklink /J " SCRATCH "\\linkdir " OUTDIR " >nul")==0,"junction fixture");
+    g_have_link=CreateSymbolicLinkA(SCRATCH "\\linkfile","..\\" OUTDIR "\\target",
+                                   0x2 /* ALLOW_UNPRIVILEGED_CREATE */)!=0;
+    if(!g_have_link){
+        const char *req=getenv("FS_FUZZ_REQUIRE_SYMLINK");
+        printf("symlink leaf: SKIPPED, CreateSymbolicLinkA error %lu\n",GetLastError());
+        ck(!(req&&*req=='1'),"symlink fixture required but not created");
+    }
 }
 static const char *POOL[]={"..",".","","safe","sub","\\","C:","linkdir",
     "target",".fsrp-0123456789abcdef0123456789abcdef",
@@ -576,6 +590,7 @@ static void manifest_table(FS_READ_ROOT *root,const char *base)
     {FS_OP_REQUEST q[1]={{FS_OP_CREATE,NULL,"nodir/x"}};BAD(q,1,"missing parent");}
     {FS_OP_REQUEST q[1]={{FS_OP_CREATE,NULL,"safe/x"}};BAD(q,1,"file as parent");}
     {FS_OP_REQUEST q[1]={{FS_OP_CREATE,NULL,"linkdir/x"}};BAD(q,1,"junction dir component");}
+    if(g_have_link){FS_OP_REQUEST q[1]={{FS_OP_REPLACE,NULL,"linkfile"}};BAD(q,1,"symlink leaf");}
     {FS_OP_REQUEST q[1]={{FS_OP_CREATE,NULL,longp}};BAD(q,1,"path over 1024");}
     {FS_TXN_REQUEST t[1]={{{FS_OP_REPLACE,NULL,"safe"},NULL,0,"x",1}};FS_TXN_PLAN plan={0};
      g_what="txn no expected";
@@ -651,6 +666,12 @@ int main(void)
         g_iter=k;gen_path(p,sizeof(p),&skip);
         if(skip)continue;
         path_ops(root,p,base);
+    }
+    if(g_have_link){
+        /* Fixed pass: every operation on the symlink leaf is rejected and
+           leaves the tree and the outside file as they were. */
+        path_ops(root,"linkfile",base);
+        printf("symlink leaf: RAN\n");
     }
     manifest_table(root,base);
     manifest_random(root,base,100);

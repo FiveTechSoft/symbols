@@ -324,6 +324,15 @@ endif()
 sllm_test(test_fs_copy tests/test_fs_copy.c)
 sllm_test(test_fs_adversarial tests/test_fs_adversarial.c)
 sllm_test(test_fs_fuzz_ops tests/test_fs_fuzz_ops.c)
+# On Windows the fuzz has symlink-leaf cases that need CreateSymbolicLinkA.
+# With this variable a runner that cannot create the symlink makes the test
+# fail instead of silently skipping those cases, so Passed means they ran.
+set(fz_req "")
+if(WIN32)
+    set(fz_req ";FS_FUZZ_REQUIRE_SYMLINK=1")
+    set_tests_properties(test_fs_fuzz_ops PROPERTIES
+        ENVIRONMENT "FS_FUZZ_REQUIRE_SYMLINK=1")
+endif()
 # More fixed seeds of the same confinement fuzz (M1 criterion 5). The seed and
 # the iteration count are in the test name, so a CI log names what ran. The
 # test is sequential in CI (no ctest -j); every run uses the same scratch
@@ -332,7 +341,7 @@ foreach(fz_seed 1 7 12648430)
     add_test(NAME test_fs_fuzz_ops_seed_${fz_seed}_i400 COMMAND test_fs_fuzz_ops
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_fuzz_ops_seed_${fz_seed}_i400 PROPERTIES
-        ENVIRONMENT "FS_FUZZ_SEED=${fz_seed};FS_FUZZ_ITERS=400" TIMEOUT 300)
+        ENVIRONMENT "FS_FUZZ_SEED=${fz_seed};FS_FUZZ_ITERS=400${fz_req}" TIMEOUT 300)
 endforeach()
 sllm_test(test_fs_c4_posix tests/test_fs_c4_posix.c)
 sllm_test(test_fs_race tests/test_fs_race.c)
