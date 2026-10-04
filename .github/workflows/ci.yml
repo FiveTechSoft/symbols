@@ -54,6 +54,12 @@ jobs:
         run: cmake --build build -j4
       - name: Tests
         run: ctest --test-dir build --output-on-failure
+      - name: race_parent writer OK counts (output only, not a gate)
+        continue-on-error: true
+        run: |
+          for i in 1 2 3; do
+            ctest --test-dir build -R '^test_fs_race_parent$' -V | grep -E 'swaps [0-9]+, writer calls OK|ALL PASS|Test +#'
+          done
       - name: Corpus lint (gate)
         run: python3 tools/lint_corpus.py --check
 
