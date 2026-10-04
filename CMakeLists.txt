@@ -423,6 +423,12 @@ if(NOT WIN32)
     # Seed 1786707969 is the test default (no FS_JFUZZ_SEED): iteration 7, kind move, bitflip at phase 22 first
     # showed the damaged-name limit F4; seeds 0, 1, 7 and 12648430 did not hit it, so the default is run as well.
     # Known limits F2 (remove) and F4 (move) are pinned cells in the test.
+    # Integrity trailer (record + 8 bytes: magic, CRC-32). Plain damage is now refused; the pinned cells for F2, F4, F6 and
+    # F7 run twice (plain: refused; CRC recomputed: the old outcome, a CRC is not authentication). The stage decoy classes
+    # recompute the CRC on purpose, otherwise every stage mutant would be killed by the CRC instead of by the identity
+    # check it drops. Legacy cells cut the trailer of every journal and require recovery OK. The tmp mutant now fails
+    # replace legacy cells (bit 0); class setbyte (bit 1) is ignored because it only fails when a random setbyte writes
+    # the value that is already there (the record is then intact), which is seed dependent.
     # Batch kinds (batch_create, batch_replace): no mutant, none was both cheap and killable. Known limits counted as
     # known-limit-hits and pinned as asserted cells: F5 (journal deleted while half published, delete class at create
     # crash 6 and replace crash 61 only), F6 (damaged create batch item name: half applied, recovery OK), F7 (damaged
@@ -454,10 +460,10 @@ if(NOT WIN32)
         PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 80")
     add_executable(test_fs_journal_fuzz_mc_tmp tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz_mc_tmp PRIVATE include)
-    target_compile_definitions(test_fs_journal_fuzz_mc_tmp PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_TMP=1 FS_JFUZZ_MUTANT_MASK=0x3)
+    target_compile_definitions(test_fs_journal_fuzz_mc_tmp PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_TMP=1 FS_JFUZZ_MUTANT_MASK=0x1 FS_JFUZZ_MUTANT_IGNORE=0x2)
     add_test(NAME test_fs_journal_fuzz_mc_tmp COMMAND test_fs_journal_fuzz_mc_tmp WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_journal_fuzz_mc_tmp PROPERTIES TIMEOUT 300
-        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 3")
+        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 1")
     # remove and move: dropping the stage identity check (FS_JREC_MUTANT_RSTAGE, FS_JREC_MUTANT_MSTAGE) must
     # fail exactly the stage_decoy class of that kind (the other classes of the kind are ignored: seed dependent).
     add_executable(test_fs_journal_fuzz_mc_rstage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)

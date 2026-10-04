@@ -21,7 +21,7 @@
    (signal or hang = failure). Claim checked: a refusal leaves every workspace byte unchanged; an OK leaves
    the files in one of the two states the operation allows (before or after), no journal or stage name,
    every other file unchanged; nothing outside the workspace changes; a second recovery is OK and changes
-   nothing. Known limits F2, F4, F5, F6, F7 are counted and pinned (see CMakeLists.txt). Reproduce with FS_JFUZZ_SEED=<n> FS_JFUZZ_ITERS=<n> (iterations per kind). Not covered here:
+   nothing. Known limits F2, F4, F5, F6, F7 are pinned (see CMakeLists.txt). Reproduce with FS_JFUZZ_SEED=<n> FS_JFUZZ_ITERS=<n> (iterations per kind). Not covered here:
    Windows, power loss, damage to two journal files at once. */
 #define WS "test_fs_journal_fuzz_scratch"
 #define OUT "test_fs_journal_fuzz_outside"
@@ -221,6 +221,55 @@ static void field(const char *journal, int off, const char *val, size_t vlen)
     (void)!pwrite(fd, buf, vlen + 1, off);
     close(fd);
 }
+/* The records carry an 8 byte trailer {0x4653434b, CRC-32 of the record bytes} (src/fs_read.c, rec_crc). This
+   copy lets the test play a writer that rewrites a field and recomputes the CRC: such a forged but consistent
+   record is the case the identity checks in recovery still have to catch (stage and temp mutants) and the case
+   a CRC cannot detect (cells F2, F4, F6, F7 with recompute). Plain damage does not recompute. */
+static uint32_t crc32_buf(const unsigned char *b, size_t n)
+{
+    uint32_t c = 0xffffffffu;
+    for (size_t k = 0; k < n; k++) { c ^= b[k]; for (int j = 0; j < 8; j++) c = (c >> 1) ^ (0xedb88320u & (0u - (c & 1u))); }
+    return ~c;
+}
+static void refresh_crc(const char *journal)
+{
+    char p[512];
+    unsigned char buf[16384];
+    uint32_t tr[2];
+    ssize_t n;
+    int fd;
+    snprintf(p, sizeof(p), "%s/%s", WS, journal);
+    fd = open(p, O_RDWR | O_NOFOLLOW);
+    if (fd < 0) return;
+    n = pread(fd, buf, sizeof(buf), 0);
+    if (n > 8)
+    {
+        memcpy(tr, buf + n - 8, 8);
+        if (tr[0] == 0x4653434bu) { tr[1] = crc32_buf(buf, (size_t)n - 8); (void)!pwrite(fd, tr, 8, n - 8); }
+    }
+    close(fd);
+}
+/* Legacy cell: cut the 8 byte trailer, giving a record as the previous build wrote it. */
+static void strip_trailers(void)
+{
+    const KIND *k = &K[g_kind];
+    int cut = 0;
+    char p[512];
+    for (int i = 0; i < k->njf; i++)
+    {
+        int fd;
+        uint32_t tr[2];
+        off_t size;
+        snprintf(p, sizeof(p), "%s/%s", WS, k->jf[i].name);
+        fd = open(p, O_RDWR | O_NOFOLLOW);
+        if (fd < 0) continue;
+        size = lseek(fd, 0, SEEK_END);
+        if (size > 8 && pread(fd, tr, 8, size - 8) == 8 && tr[0] == 0x4653434bu) { if (ftruncate(fd, size - 8) == 0) cut++; }
+        close(fd);
+    }
+    snprintf(g_what, sizeof(g_what), "legacy: %d trailer(s) cut", cut);
+}
+static int g_legacy;
 static void damage(int cls)
 {
     const KIND *k = &K[g_kind];
@@ -243,7 +292,8 @@ static void damage(int cls)
             if (cls == 6) field(present[i]->name, present[i]->off_stage, k->decoy, strlen(k->decoy));
             else field(present[i]->name, present[i]->off_stage2 >= 0 ? present[i]->off_stage2 : present[i]->off_stage, k->stage2, strlen(k->stage2));
         }
-        snprintf(g_what, sizeof(g_what), "%d record(s) rewritten", n);
+        for (int i = 0; i < np; i++) if (present[i]->off_stage >= 0) refresh_crc(present[i]->name);
+        snprintf(g_what, sizeof(g_what), "%d record(s) rewritten, trailer recomputed", n);
         return;
     }
     j = present[rnd() % np];
@@ -346,13 +396,14 @@ static void one(int kind, int cls, int phase)
     fixture();
     if (FsReadOpen(WS, &r) != FS_READ_OK) die("open");
     if (run_child(phase, 0, r) != 90 + phase) die("crash point not reached");
-    damage(cls);
+    if (g_legacy) strip_trailers(); else damage(cls);
     before = snap(WS); out_b = snap(OUT);
     rc = run_child(0, 1, r);
     after = snap(WS); out_a = snap(OUT);
     cls_runs[kind][cls]++;
     if (rc < 0) fail("recovery died by signal or hang");
     else if (strcmp(out_b, out_a)) fail("a file outside the workspace changed");
+    else if (g_legacy && rc != 40 + FS_READ_OK) fail("a legacy record (no trailer) was refused");
     else if (rc != 40 + FS_READ_OK)
     {
         n_refused++;
@@ -370,9 +421,6 @@ static void one(int kind, int cls, int phase)
                class at those two crash points only; the contract "all targets or none" is NOT met there. */
             if (cls == 5 && ((kind == K_BCREATE && phase == 6 && is_content("target", "payload") && !has("t2")) ||
                              (kind == K_BREPLACE && phase == 61 && is_content("target", "new") && is_content("t2", "old")))) n_f5_limit++;
-            /* Known limit F6: a damaged item name of the create batch that is still a valid absent name; recovery rolls
-               back nothing for that item, removes its stage and returns OK with the first target still published. */
-            else if (kind == K_BCREATE && g_name_damage && phase == 6 && is_content("target", "payload") && !has("t2")) n_f6_limit++;
             else fail("OK but the files are in neither allowed state");
         }
         if (!is_content("keep", "keep")) fail("OK but keep changed");
@@ -385,12 +433,6 @@ static void one(int kind, int cls, int phase)
             if (cls == 5 && !strncmp(e->d_name, K[kind].stage_pref, strlen(K[kind].stage_pref))) continue;
             if (cls == 5 && (kind == K_REPLACE || kind == K_BREPLACE) && !strncmp(e->d_name, ".fsrb-", 6)) continue;
             if (cls == 5 && !strncmp(e->d_name, ".fstxn-", 7)) continue;
-            /* Known limits F2 (remove) and F4 (move): a damaged record name that is still a valid in-workspace name is
-               trusted; the file (content "old") shows up under that name. Counted, not failed. */
-            if ((kind == K_REMOVE || kind == K_MOVE) && g_name_damage && is_content(e->d_name, "old")) { n_f2_limit++; continue; }
-            /* Known limit F7: a damaged stage name of the replace batch that is still a valid stage name; the real stage
-               link is left as an orphan. No data lost; counted, not failed. */
-            if (kind == K_BREPLACE && g_stage_damage && !strncmp(e->d_name, ".fsrp-", 6)) { n_f7_limit++; continue; }
             { snprintf(g_what + strlen(g_what), 40, " left=%.30s", e->d_name); fail("OK but an unexpected name is left"); }
             break;
         }
@@ -401,64 +443,16 @@ static void one(int kind, int cls, int phase)
     FsReadClose(r);
 }
 
-/* Pinned cell (measured limit, not a claim of correctness): the remove record is not integrity protected.
-   Crash at point 12 (target absent, not committed), the record's target field rewritten to another valid
-   in-workspace name: recovery returns OK and restores the file under THAT name. Nothing is lost and nothing
-   outside the workspace changes, but the claim "fail closed or old/new state" is NOT met for this shape.
-   If a future fix changes this outcome, this cell must flip deliberately. */
-static void pinned_remove_rename(void)
-{
-    FS_READ_ROOT *r;
-    char *out_b, *out_a;
-    int rc, good = 1;
-    g_kind = K_REMOVE; g_cls = 4; g_phase = 12;
-    snprintf(g_what, sizeof(g_what), "pinned remove rename");
-    fixture();
-    if (FsReadOpen(WS, &r) != FS_READ_OK) die("open");
-    if (run_child(12, 0, r) != 90 + 12) die("crash point not reached");
-    field(".fstxn.remove", 24, "renamed", 7);
-    out_b = snap(OUT);
-    rc = run_child(0, 1, r);
-    out_a = snap(OUT);
-    good &= rc == 40 + FS_READ_OK;
-    good &= is_content("renamed", "old") && !has("target") && is_content("keep", "keep");
-    good &= !strcmp(out_b, out_a);
-    good &= !has(".fstxn.remove") && !has(".fstxn.rcommit");
-    free(out_b); free(out_a);
-    FsReadClose(r);
-    if (!good) { g_cls = 7; fail("pinned remove rename: the outcome changed (restored under the recorded name, recovery OK)"); }
-    else printf("pinned: damaged remove record restored the file under another name, recovery OK (known limit)\n");
-}
-
-/* Pinned cell F4 (measured limit): move, crash at point 22 (src and dst are links of one inode, journal
-   present), the record's source field rewritten to another valid in-workspace name. Recovery returns OK,
-   removes dst and leaves the new name and src as links of the same inode. Nothing lost, nothing outside the
-   workspace, but "fail closed or old/new state" is NOT met. A future fix must flip this cell deliberately. */
-static void pinned_move_rename(void)
-{
-    FS_READ_ROOT *r;
-    int rc, good = 1;
-    g_kind = K_MOVE; g_cls = 4; g_phase = 22;
-    snprintf(g_what, sizeof(g_what), "pinned move rename");
-    fixture();
-    if (FsReadOpen(WS, &r) != FS_READ_OK) die("open");
-    if (run_child(22, 0, r) != 90 + 22) die("crash point not reached");
-    field(".fstxn.move", 24, "rrc", 3);
-    rc = run_child(0, 1, r);
-    good &= rc == 40 + FS_READ_OK;
-    good &= is_content("rrc", "old") && is_content("src", "old") && !has("dst") && is_content("keep", "keep");
-    good &= !has(".fstxn.move") && !has(".fstxn.mcommit");
-    FsReadClose(r);
-    if (!good) { g_cls = 7; fail("pinned move rename: the outcome changed (recovery OK, new name and src both present, dst gone)"); }
-    else printf("pinned: damaged move record left the new name next to src, recovery OK (known limit)\n");
-}
-
-/* Pinned cells for the batch journals (measured limits, not claims of correctness). A future fix flips them deliberately.
-   F5: journal deleted while half published (create crash 6): recovery OK, half applied state stays.
-   F6: create crash 6, item 0 target field rewritten to another valid absent name: recovery OK, stage removed,
-       the first target stays published (half applied), no journal left.
-   F7: replace crash 61, one hex digit of item 1's newstage changed: recovery OK, old state, the real new stage
-       stays as an orphan .fsrp- link. */
+/* Pinned cells for damaged name fields (findings F2 remove, F4 move, F6 batch create, F7 batch replace) and the
+   journal deleted while half published (F5). Each cell runs twice:
+   - plain damage (the field is rewritten, the record CRC is NOT recomputed): recovery must REFUSE (DENIED), the
+     workspace must stay byte for byte unchanged and the journal must stay. Before the integrity trailer these four
+     shapes returned OK with a wrong state; the trailer turns them into refusals.
+   - recomputed CRC (a writer that rewrites the field and recomputes the CRC): the old outcome remains, because a CRC
+     is not authentication: F2 restored under another name, F4 two links of one inode, F6 first target stays
+     published (half applied), F7 an orphan stage. These cells document the cooperating-writer limit and flip only if
+     the record gets real authentication or the recovery gets an independent check.
+   F5 (journal deleted) has no record left to check; the CRC does not change it. */
 static int pin_prepare(int kind, int phase, FS_READ_ROOT **r)
 {
     g_kind = kind; g_cls = 4; g_phase = phase;
@@ -476,46 +470,110 @@ static int count_prefix(const char *pre)
     if (d) closedir(d);
     return n;
 }
-static void pinned_batch_cells(void)
+/* Runs recovery; returns 1 when the plain-damage expectation holds (DENIED, workspace unchanged, journal present). */
+static int plain_refused(FS_READ_ROOT *r, const char *journal, int *rc_out)
+{
+    char *b = snap(WS), *a;
+    int rc = run_child(0, 1, r), ok;
+    a = snap(WS);
+    ok = rc == 40 + FS_READ_DENIED && !strcmp(a, b) && has(journal);
+    free(a); free(b);
+    *rc_out = rc;
+    return ok;
+}
+static void pin_report(const char *name, int good, const char *limit_text)
+{
+    snprintf(g_what, sizeof(g_what), "%s", name);
+    if (!good) { g_cls = 7; fail("a pinned cell changed its outcome (flip it deliberately if a fix is intended)"); }
+    else printf("pinned: %s\n", limit_text);
+}
+static void pinned_cells(void)
 {
     FS_READ_ROOT *r;
     int rc, good;
     char name[64], p[512];
     int fd;
-    /* F5 */
+    for (int recompute = 0; recompute < 2; recompute++)
+    {
+        /* F2: remove, crash 12 (target absent, not committed), target field rewritten to "renamed". */
+        pin_prepare(K_REMOVE, 12, &r);
+        field(".fstxn.remove", 24, "renamed", 7);
+        if (recompute) refresh_crc(".fstxn.remove");
+        if (!recompute) good = plain_refused(r, ".fstxn.remove", &rc);
+        else
+        {
+            char *ob = snap(OUT), *oa;
+            rc = run_child(0, 1, r);
+            oa = snap(OUT);
+            good = rc == 40 + FS_READ_OK && is_content("renamed", "old") && !has("target") && is_content("keep", "keep") &&
+                   !strcmp(ob, oa) && !has(".fstxn.remove") && !has(".fstxn.rcommit");
+            free(ob); free(oa);
+        }
+        FsReadClose(r);
+        pin_report(recompute ? "F2 recomputed" : "F2 plain", good, recompute ? "F2 remove, CRC recomputed: restored under another name, recovery OK (cooperating-writer limit)" : "F2 remove, plain damage: refused, workspace unchanged");
+        /* F4: move, crash 22 (src and dst links of one inode), source field rewritten to "rrc". */
+        pin_prepare(K_MOVE, 22, &r);
+        field(".fstxn.move", 24, "rrc", 3);
+        if (recompute) refresh_crc(".fstxn.move");
+        if (!recompute) good = plain_refused(r, ".fstxn.move", &rc);
+        else
+        {
+            rc = run_child(0, 1, r);
+            good = rc == 40 + FS_READ_OK && is_content("rrc", "old") && is_content("src", "old") && !has("dst") && is_content("keep", "keep") &&
+                   !has(".fstxn.move") && !has(".fstxn.mcommit");
+        }
+        FsReadClose(r);
+        pin_report(recompute ? "F4 recomputed" : "F4 plain", good, recompute ? "F4 move, CRC recomputed: new name and src are one inode, dst gone, recovery OK (cooperating-writer limit)" : "F4 move, plain damage: refused, workspace unchanged");
+        /* F6: batch create, crash 6 (first target published), item 0 target rewritten to "tarqet". */
+        pin_prepare(K_BCREATE, 6, &r);
+        field(".fstxn.batch", 16, "tarqet", 6);
+        if (recompute) refresh_crc(".fstxn.batch");
+        if (!recompute) good = plain_refused(r, ".fstxn.batch", &rc);
+        else
+        {
+            rc = run_child(0, 1, r);
+            good = rc == 40 + FS_READ_OK && is_content("target", "payload") && !has("t2") && !has("tarqet") && !has(".fstxn.batch") && count_prefix(".fst-") == 2;
+        }
+        FsReadClose(r);
+        pin_report(recompute ? "F6 recomputed" : "F6 plain", good, recompute ? "F6 batch create, CRC recomputed: first target stays published, half applied, recovery OK (cooperating-writer limit)" : "F6 batch create, plain damage: refused, workspace unchanged");
+        /* F7: batch replace, crash 61, one hex digit of item 1's newstage changed. */
+        pin_prepare(K_BREPLACE, 61, &r);
+        snprintf(p, sizeof(p), "%s/.fstxn.batch", WS);
+        fd = open(p, O_RDWR | O_NOFOLLOW);
+        if (fd < 0 || pread(fd, name, 38, 2240) != 38) die("read newstage");
+        name[37] = name[37] == 'a' ? 'b' : 'a';
+        (void)!pwrite(fd, name, 38, 2240);
+        close(fd);
+        name[0] = 0;
+        if (recompute) refresh_crc(".fstxn.batch");
+        if (!recompute) good = plain_refused(r, ".fstxn.batch", &rc);
+        else
+        {
+            rc = run_child(0, 1, r);
+            good = rc == 40 + FS_READ_OK && is_content("target", "old") && is_content("t2", "old") && !has(".fstxn.batch") && count_prefix(".fsrp-") == 2;
+        }
+        FsReadClose(r);
+        pin_report(recompute ? "F7 recomputed" : "F7 plain", good, recompute ? "F7 batch replace, CRC recomputed: orphan stage left, old state, recovery OK (cooperating-writer limit)" : "F7 batch replace, plain damage: refused, workspace unchanged");
+    }
+    /* F5: journal deleted while half published (create crash 6). No record is left to check. */
     pin_prepare(K_BCREATE, 6, &r);
     unlink(WS "/.fstxn.batch");
     rc = run_child(0, 1, r);
     good = rc == 40 + FS_READ_OK && is_content("target", "payload") && !has("t2") && !has(".fstxn.batch");
     FsReadClose(r);
-    snprintf(g_what, sizeof(g_what), "pinned F5");
-    if (!good) { g_cls = 7; fail("pinned F5: the outcome changed (journal deleted at create crash 6: recovery OK, half applied)"); }
-    else printf("pinned: batch journal deleted while half published, recovery OK, half applied (known limit F5)\n");
-    /* F6 */
-    pin_prepare(K_BCREATE, 6, &r);
-    field(".fstxn.batch", 16, "tarqet", 6);
-    rc = run_child(0, 1, r);
-    good = rc == 40 + FS_READ_OK && is_content("target", "payload") && !has("t2") && !has("tarqet") && !has(".fstxn.batch") && count_prefix(".fst-") == 2;
-    FsReadClose(r);
-    snprintf(g_what, sizeof(g_what), "pinned F6");
-    if (!good) { g_cls = 7; fail("pinned F6: the outcome changed (damaged item name: recovery OK, first target stays published)"); }
-    else printf("pinned: damaged batch item name left the first target published, recovery OK, half applied (known limit F6)\n");
-    /* F7 */
-    pin_prepare(K_BREPLACE, 61, &r);
-    snprintf(p, sizeof(p), "%s/.fstxn.batch", WS);
-    fd = open(p, O_RDWR | O_NOFOLLOW);
-    if (fd < 0 || pread(fd, name, 38, 2240) != 38) die("read newstage");
-    name[38] = 0;
-    name[37] = name[37] == 'a' ? 'b' : 'a';
-    (void)!pwrite(fd, name, 38, 2240);
-    close(fd);
-    rc = run_child(0, 1, r);
-    good = rc == 40 + FS_READ_OK && is_content("target", "old") && is_content("t2", "old") && !has(".fstxn.batch") && count_prefix(".fsrp-") == 2 + 0;
-    FsReadClose(r);
-    snprintf(g_what, sizeof(g_what), "pinned F7");
-    if (!good) { g_cls = 7; fail("pinned F7: the outcome changed (damaged stage name: recovery OK, old state, orphan .fsrp- left)"); }
-    else printf("pinned: damaged batch stage name left an orphan stage, recovery OK, old state (known limit F7)\n");
+    pin_report("F5", good, "F5 batch journal deleted while half published, recovery OK, half applied (known limit, outside the crash model)");
 }
+/* Legacy cells: a journal as the previous build wrote it (no trailer) must still be recovered, at every crash point of
+   every kind. Deterministic, no random numbers. */
+static void legacy_cells(void)
+{
+    g_legacy = 1;
+    for (int kind = 0; kind < NKIND; kind++)
+        for (int i = 0; i < K[kind].nph; i++)
+            one(kind, 0, K[kind].phases[i]);
+    g_legacy = 0;
+}
+
 int main(void)
 {
     const char *e;
@@ -523,9 +581,8 @@ int main(void)
     if ((e = getenv("FS_JFUZZ_SEED"))) g_seed = (uint32_t)strtoul(e, NULL, 0);
     if ((e = getenv("FS_JFUZZ_ITERS"))) iters = (unsigned)strtoul(e, NULL, 0);
     rs = g_seed;
-    pinned_remove_rename();
-    pinned_move_rename();
-    pinned_batch_cells();
+    pinned_cells();
+    legacy_cells();
     for (int kind = 0; kind < NKIND; kind++)
         for (g_iter = 0; g_iter < iters; g_iter++)
             one(kind, (int)(g_iter % K[kind].ncls), K[kind].phases[(g_iter / K[kind].ncls) % K[kind].nph]);

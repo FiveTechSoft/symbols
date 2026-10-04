@@ -403,6 +403,28 @@ typedef struct {
     char target[FS_INTENT_MAX_PATH];
     char stage[48];
 } FS_CREATE_INTENT;
+/* Journal record integrity. Every journal and marker record file is the fixed-size record followed by an 8 byte
+   trailer {magic, CRC-32 of the record bytes}. A trailer that does not match refuses the record (fail closed). A file
+   that is exactly the record size, with no trailer, is a record written by a build that predates the trailer and is
+   still accepted unchecked, so an interrupted operation of the previous build can still be recovered; this build
+   always writes the trailer. A CRC detects accidental damage only. A writer that recomputes it is not detected, which
+   is the cooperating-writer model of this file; it is not authentication. */
+#define FS_REC_TRAILER_MAGIC 0x4653434bu
+static uint32_t rec_crc(const void *p,size_t n)
+{
+    const unsigned char *b=(const unsigned char*)p;uint32_t c=0xffffffffu;
+    for(size_t k=0;k<n;k++){c^=b[k];for(int j=0;j<8;j++)c=(c>>1)^(0xedb88320u&(0u-(c&1u)));}
+    return ~c;
+}
+/* Reads a record of exactly n bytes (legacy) or n+8 bytes with a matching trailer. st is the fstat of fd. */
+static int rec_load(int fd,const struct stat *st,void *out,size_t n)
+{
+    uint32_t tr[2];
+    if(st->st_size==(off_t)n)return read(fd,out,n)==(ssize_t)n;
+    if(st->st_size!=(off_t)(n+sizeof(tr)))return 0;
+    if(read(fd,out,n)!=(ssize_t)n||read(fd,tr,sizeof(tr))!=(ssize_t)sizeof(tr))return 0;
+    return tr[0]==FS_REC_TRAILER_MAGIC&&tr[1]==rec_crc(out,n);
+}
 static void crash_point(int step)
 {
 #ifdef FS_CREATE_TEST_CRASH
@@ -463,7 +485,7 @@ static FS_READ_STATUS recover_locked(const FS_READ_ROOT *r)
     fd=openat(r->fd,FS_INTENT_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     if(fd<0)return FS_READ_DENIED;
     if(fstat(fd,&st)<0||!S_ISREG(st.st_mode)||(st.st_nlink<1||st.st_nlink>2)||
-       (st.st_mode&077)!=0||st.st_size!=(off_t)sizeof(i)||read(fd,&i,sizeof(i))!=(ssize_t)sizeof(i)||
+       (st.st_mode&077)!=0||!rec_load(fd,&st,&i,sizeof(i))||
        !intent_valid(&i)){close(fd);return FS_READ_DENIED;}
     close(fd);
     {char record_tmp[48];struct stat temp_record;
@@ -547,6 +569,12 @@ static int write_all(int fd,const unsigned char *bytes,size_t len)
         used+=(size_t)n;}
     return 1;
 }
+static int rec_write(int fd,const void *rec,size_t n)
+{
+    uint32_t tr[2];
+    tr[0]=FS_REC_TRAILER_MAGIC;tr[1]=rec_crc(rec,n);
+    return write_all(fd,(const unsigned char*)rec,n)&&write_all(fd,(const unsigned char*)tr,sizeof(tr));
+}
 static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
                             const void *bytes,size_t len,unsigned mode)
 {
@@ -614,7 +642,7 @@ static FS_READ_STATUS create_locked(const FS_READ_ROOT *r,const char *rel,
     record=openat(r->fd,intent_tmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
     record_owned=1;
-    if(!write_all(record,(const unsigned char*)&intent,sizeof(intent))||
+    if(!rec_write(record,&intent,sizeof(intent))||
        fsync(record)<0){s=FS_READ_IO;goto done;}
     close(record);record=-1;
     if(linkat(r->fd,intent_tmp,r->fd,FS_INTENT_NAME,0)<0){
@@ -649,8 +677,7 @@ done:
         int ok=0;
         if(rfd>=0){
             struct stat rs;
-            ok=fstat(rfd,&rs)==0&&S_ISREG(rs.st_mode)&&rs.st_size==(off_t)sizeof(cur)&&
-               read(rfd,&cur,sizeof(cur))==(ssize_t)sizeof(cur)&&!memcmp(&cur,&intent,sizeof(cur));
+            ok=fstat(rfd,&rs)==0&&S_ISREG(rs.st_mode)&&rec_load(rfd,&rs,&cur,sizeof(cur))&&!memcmp(&cur,&intent,sizeof(cur));
             close(rfd);
         }
         if(ok){
@@ -788,8 +815,7 @@ static FS_READ_STATUS brepl_recover_locked(const FS_READ_ROOT *r,int commit)
     if(fd<0)return FS_READ_DENIED;
     if(fstat(fd,&journal)<0||!S_ISREG(journal.st_mode)||
        (journal.st_mode&077)!=0||journal.st_nlink!=1||
-       journal.st_size!=(off_t)sizeof(b)||
-       read(fd,&b,sizeof(b))!=(ssize_t)sizeof(b)||!brepl_valid(&b)){
+       !rec_load(fd,&journal,&b,sizeof(b))||!brepl_valid(&b)){
         close(fd);return FS_READ_DENIED;
     }
     close(fd);
@@ -865,14 +891,14 @@ static FS_READ_STATUS batch_recover_locked(const FS_READ_ROOT *r)
     }
     {struct stat js;
      if(fstatat(r->fd,FS_BATCH_NAME,&js,AT_SYMLINK_NOFOLLOW)==0&&
-        js.st_size==(off_t)sizeof(FS_BREPL_RECORD))
+        (js.st_size==(off_t)sizeof(FS_BREPL_RECORD)||js.st_size==(off_t)(sizeof(FS_BREPL_RECORD)+8)))
          return brepl_recover_locked(r,commit);}
     for(unsigned k=0;k<FS_BATCH_LIMIT;k++)dirs[k]=-1;
     fd=openat(r->fd,FS_BATCH_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     if(fd<0)return FS_READ_DENIED;
     if(fstat(fd,&journal)<0||!S_ISREG(journal.st_mode)||
        (journal.st_mode&077)!=0||journal.st_nlink!=1||
-       journal.st_size!=(off_t)sizeof(b)||read(fd,&b,sizeof(b))!=(ssize_t)sizeof(b)||
+       !rec_load(fd,&journal,&b,sizeof(b))||
        !batch_valid(&b)){close(fd);return FS_READ_DENIED;}
     close(fd);
     if(commit){int markfd=openat(r->fd,FS_BATCH_COMMIT,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
@@ -1009,7 +1035,7 @@ FS_READ_STATUS FsBatchCreate(const FS_READ_ROOT *r,const FS_BATCH_CREATE *entrie
     record=openat(r->fd,FS_BATCH_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
     journaled=1;
-    if(!write_all(record,(const unsigned char*)&b,sizeof(b))||
+    if(!rec_write(record,&b,sizeof(b))||
        fsync(record)<0||fstat(record,&st)<0||fsync(r->fd)<0){s=FS_READ_IO;goto done;}
     crash_point(5); /* durable journal; no target */
     for(size_t k=0;k<count;k++){
@@ -1141,7 +1167,7 @@ FS_READ_STATUS FsBatchReplace(const FS_READ_ROOT *r,const FS_BATCH_REPLACE *entr
     if(fsync(r->fd)<0){s=FS_READ_IO;goto done;}
     record=openat(r->fd,FS_BATCH_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
-    if(!write_all(record,(const unsigned char*)&b,sizeof(b))||
+    if(!rec_write(record,&b,sizeof(b))||
        fsync(record)<0||fstat(record,&st)<0||fsync(r->fd)<0){
         close(record);record=-1;
         if(!durable_remove(r->fd,FS_BATCH_NAME))journaled=1;
@@ -1277,8 +1303,7 @@ static FS_READ_STATUS remove_recover_locked(const FS_READ_ROOT *r)
     record=openat(r->fd,FS_REMOVE_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     if(record<0)return FS_READ_DENIED;
     if(fstat(record,&rec)<0||!S_ISREG(rec.st_mode)||rec.st_nlink!=1||
-       (rec.st_mode&077)!=0||rec.st_size!=(off_t)sizeof(i)||
-       read(record,&i,sizeof(i))!=(ssize_t)sizeof(i)||!remove_valid(&i)){
+       (rec.st_mode&077)!=0||!rec_load(record,&rec,&i,sizeof(i))||!remove_valid(&i)){
         close(record);return FS_READ_DENIED;
     }
     close(record);
@@ -1397,7 +1422,7 @@ FS_READ_STATUS FsRemoveFile(const FS_READ_ROOT *r,const char *path,
     record=openat(r->fd,FS_REMOVE_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
     journaled=1;
-    if(!write_all(record,(const unsigned char*)&i,sizeof(i))||
+    if(!rec_write(record,&i,sizeof(i))||
        fsync(record)<0||fstat(record,&record_stat)<0||fsync(r->fd)<0){
         s=FS_READ_IO;goto done;
     }
@@ -1489,8 +1514,7 @@ static FS_READ_STATUS move_recover_locked(const FS_READ_ROOT *r)
     record=openat(r->fd,FS_MOVE_NAME,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     if(record<0)return FS_READ_DENIED;
     if(fstat(record,&rec)<0||!S_ISREG(rec.st_mode)||rec.st_nlink!=1||
-       (rec.st_mode&077)!=0||rec.st_size!=(off_t)sizeof(i)||
-       read(record,&i,sizeof(i))!=(ssize_t)sizeof(i)||!move_valid(&i)){
+       (rec.st_mode&077)!=0||!rec_load(record,&rec,&i,sizeof(i))||!move_valid(&i)){
         close(record);return FS_READ_DENIED;
     }
     close(record);
@@ -1614,7 +1638,7 @@ FS_READ_STATUS FsMoveFile(const FS_READ_ROOT *r,const char *src,const char *dst,
     record=openat(r->fd,FS_MOVE_NAME,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
     journaled=1;
-    if(!write_all(record,(const unsigned char*)&i,sizeof(i))||
+    if(!rec_write(record,&i,sizeof(i))||
        fsync(record)<0||fstat(record,&record_stat)<0||fsync(r->fd)<0){
        s=FS_READ_IO;goto done;
     }
@@ -1699,8 +1723,8 @@ static int replace_read(int root,const char *name,void *out,size_t size,
 {
     int fd=openat(root,name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK);
     int ok=fd>=0&&fstat(fd,st)==0&&S_ISREG(st->st_mode)&&
-       st->st_nlink>=1&&st->st_nlink<=2&&(st->st_mode&077)==0&&st->st_size==(off_t)size&&
-       read(fd,out,size)==(ssize_t)size;
+       st->st_nlink>=1&&st->st_nlink<=2&&(st->st_mode&077)==0&&
+       rec_load(fd,st,out,size);
     if(fd>=0)close(fd);
     return ok;
 }
@@ -1917,7 +1941,7 @@ FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
     crash_point(40); /* two pinned images, no journal */
     record=openat(r->fd,inttmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(record<0){s=error_status();goto done;}
-    if(!write_all(record,(const unsigned char*)&i,sizeof(i))||
+    if(!rec_write(record,&i,sizeof(i))||
        fsync(record)<0||fstat(record,&record_st)<0){s=FS_READ_IO;goto done;}
     if(linkat(r->fd,inttmp,r->fd,FS_REPLACE_NAME,0)<0){s=error_status();goto done;}
     journal=1;
@@ -1940,7 +1964,7 @@ FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
     marker.image=i;
     mark=openat(r->fd,marktmp,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);
     if(mark<0){s=FS_READ_PENDING;goto done;}
-    if(!write_all(mark,(const unsigned char*)&marker,sizeof(marker))||fsync(mark)<0){
+    if(!rec_write(mark,&marker,sizeof(marker))||fsync(mark)<0){
         s=FS_READ_PENDING;goto done;
     }
     crash_point(52); /* complete marker temp, no commit name */
