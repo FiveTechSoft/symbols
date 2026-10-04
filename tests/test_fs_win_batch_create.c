@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <direct.h>
-#define ROOT "test_fs_winbatch_scratch"
+#define ROOT "test_fs_winbatch_create_scratch"
 /* W2/W3: FsBatchCreate and FsBatchRecover on NTFS. Writer crash points 1-7,
    recovery crash points 8-13 (rollback 8-11, roll-forward 12-13), a foreign
    stage under a journaled name, the STATUS_DELETE_PENDING mapping, and four
@@ -17,8 +17,11 @@ static void ck(int ok,const char *label)
 {if(!ok){fprintf(stderr,"FAIL %s (%lu)\n",label,GetLastError());exit(1);}}
 static void put(const char *p,const char *v)
 {FILE *f=fopen(p,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"fixture");}
+/* A failed cell exits without cleanup: start every fixture from nothing so a
+   leftover scratch directory cannot fail the next cell with "mkdir". */
+static void nuke(void);
 static void fixture(void)
-{ck(_mkdir(ROOT)==0&&_mkdir(ROOT "\\sub")==0,"mkdir");}
+{nuke();ck(_mkdir(ROOT)==0&&_mkdir(ROOT "\\sub")==0,"mkdir");}
 /* Count the names directly in dir, excluding . and .. and the persistent
    .fstxn.lock that the writers leave in the root. */
 static int count_skip(const char *pattern,const char *skip)

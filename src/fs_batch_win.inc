@@ -392,9 +392,12 @@ done:
    and touches only root names of the exact shape prefix + 32 lowercase hex that
    are regular files (directories and reparse points are skipped). Whether a name
    is shared (two or more links) is decided for every candidate before the first
-   delete: a shared name is deleted, an unshared .fst- stage is deleted (staged
-   bytes that were never published), and an unshared .fsp- or .fsrp- is left
-   alone because it may be the last link to bytes someone still needs. Best
+   delete. .fst- stages and .fsp- pins are deleted whatever their link count:
+   in the batch protocols they only ever name NEW staged inodes (after recovery
+   removed the stage name, the .fsp- pin is the sole link to an unpublished
+   inode). A .fsrp- name is the pin of an OLD inode: it is deleted only when
+   shared, because an unshared one may be the last link to bytes someone still
+   needs (the target is gone), and then it stays. Best
    effort: a name that cannot be deleted stays, as before. At most 128 names per
    call. Mutant 10 (test only) skips the sweep. */
 #define WB_SWEEP_MAX 128
@@ -441,7 +444,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
         if(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&wc_id(h,&ids[k])&&
            GetFileInformationByHandleEx(h,FileStandardInfo,&si,sizeof(si))){
             links[k]=si.NumberOfLinks;
-            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5);
+            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5);
         }
         CloseHandle(h);
     }
