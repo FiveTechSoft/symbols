@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated AST consumer checks; skip only when optional pinned package is absent."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -71,8 +72,10 @@ class AstInspectTest(unittest.TestCase):
         self.source.write_text('#include "helper.h"\nint main(void){return helper();}\n')
         rc,r = self.run_inspect()
         self.assertEqual((rc,r['status']), (0,'complete'))
-        self.assertEqual(r['facts'][-2]['target']['file'], str(self.root/'helper.h'))
-        self.assertEqual([x['file'] for x in r['includes']], [str(self.root/'helper.h')])
+        # libclang reports long Windows names; tempfile can return the 8.3 form (RUNNER~1). realpath both sides.
+        helper = os.path.realpath(self.root/'helper.h')
+        self.assertEqual(os.path.realpath(r['facts'][-2]['target']['file']), helper)
+        self.assertEqual([os.path.realpath(x['file']) for x in r['includes']], [helper])
         (self.root/'helper.h').unlink()
         rc,r = self.run_inspect()
         self.assertEqual((rc,r['reason']), (2,'diagnostics'))
