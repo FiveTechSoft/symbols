@@ -12,7 +12,16 @@
    The outside directory never gains, loses or changes a file.
    Mutant (FS_PARENT_FOLLOW_MUTANT, one macro in src/fs_read.c: the per-component
    O_NOFOLLOW removed): with it defined this target exits 0 only if the outside
-   directory was touched (killed); exit 1 means the mutant SURVIVED.
+   directory was touched (killed). v2 (m100): the kill is a race outcome, and in CI run
+   37181356800 (build-test-linux) the 4 s fixed window ended with zero touches, so the
+   old target printed SURVIVED by luck (local kill rate before the change: 14 of 14; CI:
+   1 survival in about 11 executions). The mutant build now keeps running until the first
+   outside touch (killed, exit 0) or MUTANT_CAP_MS (30 s). No touch within the cap is
+   INCONCLUSIVE, exit 7, with the swapper and writer counts printed; it is never reported
+   as a surviving mutant, and CI treats any non-zero exit as a failure. The non-mutant
+   build is unchanged (4 s window, same guards).
+   Predictions before the v2 runs: kill in 30 of 30 local runs, typically well under the
+   old 4 s; INCONCLUSIVE never locally.
    Guards, so the test cannot pass vacuously: the swapper verifies the symlink
    state with lstat at least 5 times, and at least one writer process has a
    successful call. Measured while writing this: in 1 of 6 local runs one of
@@ -36,6 +45,10 @@
 #define OUTD "test_fs_race_parent_outside"
 #define STOPF "test_fs_race_parent_stop"
 #define BUDGET_MS 4000
+#ifndef MUTANT_CAP_MS
+#define MUTANT_CAP_MS 30000
+#endif
+#define CNTF "test_fs_race_parent_count"
 
 static int mism;
 static void ck(int x, const char *m)
@@ -73,6 +86,25 @@ static void clear_dir(const char *dir)
     }
     closedir(d);
 }
+static void savecount(int k, long n)
+{
+    char p[64];
+    FILE *f;
+    snprintf(p, sizeof p, CNTF "%d", k);
+    f = fopen(p, "wb");
+    if (f) { fprintf(f, "%ld", n); fclose(f); }
+}
+static long loadcount(int k)
+{
+    char p[64];
+    long n = -1;
+    FILE *f;
+    snprintf(p, sizeof p, CNTF "%d", k);
+    f = fopen(p, "rb");
+    if (f) { if (fscanf(f, "%ld", &n) != 1) n = -1; fclose(f); }
+    (void)unlink(p);
+    return n;
+}
 static int swapper(void)
 {
     int verified = 0;
@@ -92,9 +124,10 @@ static int swapper(void)
         else nap(5);
     }
     if (!exists(ROOT "/D")) (void)mkdir(ROOT "/D", 0700);
+    savecount(0, verified);
     return verified >= 5 ? 0 : 3;
 }
-static int writer(void)
+static int writer(int idx)
 {
     FS_READ_ROOT *r;
     long ok = 0;
@@ -113,6 +146,7 @@ static int writer(void)
         nap(1);
     }
     FsReadClose(r);
+    savecount(idx, ok);
     return ok > 0 ? 0 : 4;
 }
 static void outside_intact(const char *when)
@@ -142,6 +176,7 @@ int main(void)
 {
     pid_t pid[3];
     int st[3] = { 0, 0, 0 };
+    long elapsed_ms = 0;
     struct timespec t0, t1;
     rmtree(ROOT); rmtree(OUTD); (void)unlink(STOPF);
     ck(mkdir(ROOT, 0700) == 0 && mkdir(OUTD, 0700) == 0 && mkdir(ROOT "/D", 0700) == 0, "mkdir");
@@ -150,18 +185,27 @@ int main(void)
     {
         pid[k] = fork();
         ck(pid[k] >= 0, "fork");
-        if (pid[k] == 0) _exit(k == 0 ? swapper() : writer());
+        if (pid[k] == 0) _exit(k == 0 ? swapper() : writer(k));
     }
     clock_gettime(CLOCK_MONOTONIC, &t0);
     for (;;)
     {
         long ms;
         outside_intact("during swap");
+#ifdef FS_PARENT_FOLLOW_MUTANT
+        if (mism) break; /* first outside touch: the mutant is killed, no need to wait */
+#endif
         nap(50);
         clock_gettime(CLOCK_MONOTONIC, &t1);
         ms = (t1.tv_sec - t0.tv_sec) * 1000 + (t1.tv_nsec - t0.tv_nsec) / 1000000;
+#ifdef FS_PARENT_FOLLOW_MUTANT
+        if (ms >= MUTANT_CAP_MS) break;
+#else
         if (ms >= BUDGET_MS) break;
+#endif
     }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000 + (t1.tv_nsec - t0.tv_nsec) / 1000000;
     put(STOPF, "stop");
     for (int k = 0; k < 3; k++)
     {
@@ -173,12 +217,16 @@ int main(void)
     printf("  swapper exit %d (0 = symlink state verified >= 5 times), writers exit %d %d (0 = that writer had a call OK)\n", st[0], st[1], st[2]);
     rmtree(ROOT); rmtree(OUTD); (void)unlink(STOPF);
 #ifdef FS_PARENT_FOLLOW_MUTANT
-    if (mism && st[0] == 0) { printf("FS_PARENT_FOLLOW_MUTANT killed: outside touched %d times\n", mism); return 0; }
-    printf("FS_PARENT_FOLLOW_MUTANT SURVIVED (mismatches %d, swapper exit %d)\n", mism, st[0]);
-    return 1;
+    {
+        long sw = loadcount(0), w1 = loadcount(1), w2 = loadcount(2);
+        if (mism) { printf("FS_PARENT_FOLLOW_MUTANT killed after %ld ms: outside touched %d times (swaps %ld, writer calls OK %ld %ld)\n", elapsed_ms, mism, sw, w1, w2); return 0; }
+        printf("FS_PARENT_FOLLOW_MUTANT INCONCLUSIVE, not a surviving mutant: no outside touch in %ld ms (swaps %ld, writer calls OK %ld %ld, swapper exit %d)\n", elapsed_ms, sw, w1, w2, st[0]);
+        return 7;
+    }
 #else
     ck(st[0] == 0, "swapper verified the symlink state at least 5 times");
     ck(st[1] == 0 || st[2] == 0, "at least one writer had a successful call");
+    (void)loadcount(0); (void)loadcount(1); (void)loadcount(2);
     printf("%s (%d outside mismatches)\n", mism ? "FAILED" : "ALL PASS", mism);
     return mism ? 1 : 0;
 #endif
