@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.10)
 project(SymbolicLLM C)
 
+# Measurement only (m130): what a Windows runner gives to `gcc` and to a missing command under cmd.exe.
+# It prints "gcc-probe" lines in the configure log and never fails the configure.
+function(gcc_probe)
+    string(REPLACE ";" " " label "${ARGN}")
+    execute_process(COMMAND cmd /c ${ARGN}
+        RESULT_VARIABLE probe_rc OUTPUT_VARIABLE probe_out ERROR_VARIABLE probe_err TIMEOUT 30)
+    string(REPLACE "\n" " | " probe_out "${probe_out}")
+    string(REPLACE "\n" " | " probe_err "${probe_err}")
+    message(STATUS "gcc-probe: cmd /c ${label}: rc=[${probe_rc}] out=[${probe_out}] err=[${probe_err}]")
+endfunction()
+if(WIN32)
+    gcc_probe(where gcc)
+    gcc_probe(gcc --version)
+    gcc_probe(this_command_does_not_exist_probe)
+endif()
+
 set(CMAKE_C_STANDARD 11)
 
 add_library(symbolic STATIC
