@@ -33,7 +33,7 @@ static int IsFsControlEntry(const char *line)
     for (p = base; *p; p++)
         if (*p == '/' || *p == '\\')
             base = p + 1;
-    if (!strncmp(base, ".fstxn", 6) || !strncmp(base, ".fsrp-", 6) ||
+    if (!strncmp(base, ".fstxn", 6) || !strncmp(base, ".fsrp-", 6) || !strncmp(base, ".fsrs-", 6) ||
         !strncmp(base, ".fsrb-", 6) || !strncmp(base, ".fsrm-", 6) ||
         !strncmp(base, ".fsmv-", 6))
         return 1;

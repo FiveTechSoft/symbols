@@ -395,7 +395,9 @@ done:
    delete. .fst- stages and .fsp- pins are deleted whatever their link count:
    in the batch protocols they only ever name NEW staged inodes (after recovery
    removed the stage name, the .fsp- pin is the sole link to an unpublished
-   inode). A .fsrp- name is the pin of an OLD inode: it is deleted only when
+   inode). A .fsrs- name is the new stage of the single-file replace (m141),
+   only ever a NEW unpublished inode, so it is deleted whatever its link count.
+   A .fsrp- name is the pin of an OLD inode: it is deleted only when
    shared, because an unshared one may be the last link to bytes someone still
    needs (the target is gone), and then it stays. Best
    effort: a name that cannot be deleted stays, as before. At most 128 names per
@@ -428,7 +430,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
             if(wn>=1&&wn<47&&n<WB_SWEEP_MAX&&
                !(item->FileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT))){
                 memcpy(name,item->FileName,wn*sizeof(WCHAR));name[wn]=0;
-                if(wc_random_name(name,L".fst-")||wc_random_name(name,L".fsp-")||wc_random_name(name,L".fsrp-")){
+                if(wc_random_name(name,L".fst-")||wc_random_name(name,L".fsp-")||wc_random_name(name,L".fsrp-")||wc_random_name(name,L".fsrs-")){
                     memcpy(names[n],name,(wn+1)*sizeof(WCHAR));n++;
                 }
             }
@@ -444,7 +446,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
         if(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&wc_id(h,&ids[k])&&
            GetFileInformationByHandleEx(h,FileStandardInfo,&si,sizeof(si))){
             links[k]=si.NumberOfLinks;
-            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5);
+            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5)||!wcsncmp(names[k],L".fsrs-",6);
         }
         CloseHandle(h);
     }

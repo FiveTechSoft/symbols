@@ -68,7 +68,7 @@ static int wc_reserved(const WCHAR *s)
     const WCHAR *leaf=wcsrchr(s,L'/');leaf=leaf?leaf+1:s;
     return !_wcsnicmp(leaf,L".fstxn",6)||!_wcsnicmp(leaf,L".fst-",5)||
        !_wcsnicmp(leaf,L".fsp-",5)||!_wcsnicmp(leaf,L".fsj-",5)||
-       !_wcsnicmp(leaf,L".fsrp-",6)||!_wcsnicmp(leaf,L".fsrb-",6)||
+       !_wcsnicmp(leaf,L".fsrp-",6)||!_wcsnicmp(leaf,L".fsrs-",6)||!_wcsnicmp(leaf,L".fsrb-",6)||
        !_wcsnicmp(leaf,L".fsrm-",6)||!_wcsnicmp(leaf,L".fsmv-",6);
 }
 /* Win32 device names (CON PRN AUX NUL COM1-9 LPT1-9), with any extension and
@@ -411,7 +411,7 @@ static FS_READ_STATUS wr_read(HANDLE root,const WCHAR *name,WR_RECORD *r,
        !wc_terminated(r->new_pin,48)||!wc_terminated(r->rollback,48)||
        wc_target_status(r->target)!=FS_READ_OK||
        !wc_random_name(r->old_pin,L".fsrp-")||
-       !wc_random_name(r->new_stage,L".fsrp-")||
+       !(wc_random_name(r->new_stage,L".fsrs-")||wc_random_name(r->new_stage,L".fsrp-"))||
        !wc_random_name(r->new_pin,L".fsrp-")||
        !wc_random_name(r->rollback,L".fsrb-")||
        !wcscmp(r->old_pin,r->new_pin)||!wcscmp(r->old_pin,r->new_stage)||
@@ -649,7 +649,7 @@ done:
     return s;
 }
 /* Defined in fs_batch_win.inc. With no replace intent and no marker, a writer
-   killed before its intent was written (phases 0-2) can have left .fsrp- names;
+   killed before its intent was written (phases 0-2) can have left .fsrp- pins and a .fsrs- stage;
    the same exact-shape sweep as the batch calls removes them (shared names only,
    under the workspace lock, no journal of any protocol). */
 static void wb_sweep_orphans(const FS_READ_ROOT *r);
@@ -1151,7 +1151,7 @@ FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,
     rec.new_size=replacement_len;
     rec.new_digest=wc_hash((const unsigned char*)replacement,replacement_len);
     s=wo_bytes(old,&rec.old_id,expected_len,rec.old_digest);if(s!=FS_READ_OK)goto done;
-    if(!wc_random(rec.old_pin,L".fsrp-")||!wc_random(rec.new_stage,L".fsrp-")||
+    if(!wc_random(rec.old_pin,L".fsrp-")||!wc_random(rec.new_stage,L".fsrs-")||
        !wc_random(rec.new_pin,L".fsrp-")||!wc_random(rec.rollback,L".fsrb-")){
        s=FS_READ_IO;goto done;}
     if(!wc_set_name(old,r->handle,rec.old_pin,WC_NT_LINK)){s=FS_READ_UNSUPPORTED;goto done;}

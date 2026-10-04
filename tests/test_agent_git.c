@@ -190,6 +190,7 @@ int main(void)
 
     CHECK(WriteFile("test_agent_git_repo/.fstxn.lock", "") &&
           WriteFile("test_agent_git_repo/.fsrp-0123abcd", "x") &&
+          WriteFile("test_agent_git_repo/.fsrs-0123abcd", "x") &&
           WriteFile("test_agent_git_repo/.fstxn-0123abcd", "x"),
           "Fs* control artifacts created");
     CHECK(AgentGitInspect(repo, &state, error, sizeof(error)) == GIT_INSPECT_OK &&
@@ -202,6 +203,7 @@ int main(void)
     remove("test_agent_git_repo/.fsrpx");
     remove("test_agent_git_repo/.fstxn.lock");
     remove("test_agent_git_repo/.fsrp-0123abcd");
+    remove("test_agent_git_repo/.fsrs-0123abcd");
     remove("test_agent_git_repo/.fstxn-0123abcd");
 
     CHECK(WriteFile("test_agent_git_repo/tracked.txt", "modified\n"), "tracked file modified");
