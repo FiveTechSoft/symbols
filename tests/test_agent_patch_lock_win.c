@@ -20,6 +20,7 @@
 #include <string.h>
 #define WS "test_agent_patch_lock_win_scratch"
 #define LK WS "\\.fstxn.lock"
+#define AUX "test_agent_patch_lock_win_aux" /* outside WS, so the leftover check stays strict */
 #define OLDC "int x = 1;\n"
 #define NEWC "int x = 9;\n"
 static int fails;
@@ -49,6 +50,7 @@ static void wipe(void)
 {
     (void)system("if exist " LK "\\NUL rmdir " LK " >NUL 2>NUL");
     (void)system("if exist " WS " rmdir /s /q " WS " >NUL 2>NUL");
+    (void)system("if exist " AUX " rmdir /s /q " AUX " >NUL 2>NUL");
 }
 static void reset(void)
 {
@@ -115,8 +117,9 @@ int main(void)
 
     puts("L2 lock is a file symlink");
     reset();
-    put(WS "\\other", "");
-    if (CreateSymbolicLinkA(LK, "other", 0x2 /* ALLOW_UNPRIVILEGED_CREATE */))
+    if (_mkdir(AUX) != 0) { fprintf(stderr, "mkdir aux\n"); exit(2); }
+    put(AUX "\\other", "");
+    if (CreateSymbolicLinkA(LK, "..\\" AUX "\\other", 0x2 /* ALLOW_UNPRIVILEGED_CREATE */))
     {
         symlink_ran = 1;
         refused("symlink");
@@ -153,8 +156,9 @@ int main(void)
 
     puts("L6 hard-linked empty lock (measured only, no assertion)");
     reset();
-    put(WS "\\other", "");
-    if (CreateHardLinkA(LK, WS "\\other", NULL))
+    if (_mkdir(AUX) != 0) { fprintf(stderr, "mkdir aux\n"); exit(2); }
+    put(AUX "\\other", "");
+    if (CreateHardLinkA(LK, AUX "\\other", NULL))
     {
         PATCH_PLAN p;
         int rc;
