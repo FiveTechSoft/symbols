@@ -206,6 +206,14 @@ if(WIN32)
     target_compile_definitions(test_agent_patch_fs_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
     add_test(NAME test_agent_patch_fs_win COMMAND test_agent_patch_fs_win
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_agent_patch_crash_win tests/test_agent_patch_crash_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_crash_win PRIVATE include)
+    target_compile_definitions(test_agent_patch_crash_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
+    add_test(NAME test_agent_patch_crash_win COMMAND test_agent_patch_crash_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # PASS_REGULAR_EXPRESSION replaces the exit code check; the line is printed only at zero failures.
+    set_tests_properties(test_agent_patch_crash_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch crash phases ran: 7")
     add_executable(test_agent_patch_ntfs_win tests/test_agent_patch_ntfs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_ntfs_win PRIVATE include)
