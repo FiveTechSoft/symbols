@@ -33,9 +33,19 @@
    cells: replace recovery 3; move cells: replace and remove recovery 3), only
    the matching recovery returned OK. The other 16 cells matched (all refusals,
    all copies, the three lock file cells).
-   Predictions for this version, stated before the measurement (OK means
-   FS_READ_OK, "no" a status other than OK that is not PENDING, PENDING is
-   FS_READ_PENDING exactly; the code of a refusal is not asserted):
+   RETRACTION 2. The second version (run 37168089085, base 6b8f774, red on
+   build-test-msvc with 6 mismatches in 23 cells) kept the statuses and
+   predicted that the six PENDING cells end in the FINISHED state after the
+   foreign handle is closed and the matching recovery ran. That was wrong, a
+   guess I had written as a guess: all six end in the OLD state (the listing
+   was exactly "F:4;", F holding "OLD!", no journal or pin left), so recovery
+   rolls the operation back. The other 17 cells matched, including the
+   exact PENDING (6) status of the six cells, the matching recovery returning
+   OK, the other recoveries leaving the listing unchanged, and the three lock
+   file cells.
+   Measured behaviour asserted by this version (OK means FS_READ_OK, "no" a
+   status other than OK that is not PENDING, PENDING is FS_READ_PENDING
+   exactly; the code of a refusal is not asserted):
    - share none:            replace no, remove no, move no, copy no
    - share read:            replace no, remove no, move no, copy OK
    - share read+write:      replace no, remove no, move no, copy OK
@@ -44,15 +54,12 @@
    After the foreign handle is closed:
    - the recoveries of the OTHER two operations are called first, and they must
      leave the workspace listing (names and sizes, journals included) exactly
-     as it was: a DENIED recovery leaves the journal intact (their statuses are
-     not asserted);
+     as it was (their statuses are not asserted);
    - the MATCHING recovery returns OK;
-   - a "no" cell is then in the old state (F "OLD!" and nothing else); a
-     PENDING cell is in the FINISHED state of its operation (replace: F "NEW!";
-     remove: nothing; move: M "OLD!"), because I predict recovery rolls forward
-     once the file is no longer held. This end-state prediction is a guess, not
-     read from the source; a wrong one is named in the output. OK requires the
-     finished state, copy cells end with F and C "OLD!".
+   - a "no" cell is then in the old state (F "OLD!" and nothing else) and a
+     PENDING cell is in the old state too (rolled back, nothing left over);
+     OK requires the finished state of the operation (copy cells end with F
+     and C "OLD!").
    Lock file cells (the foreign handle is opened with the workspace lock file
    as the writer expects it, an empty file named .fstxn.lock):
    - a foreign exclusive LockFileEx on byte 0, held 1500 ms: a create in a
@@ -155,11 +162,8 @@ static void cell(const char *mode,DWORD share,int op,int expect)
  if(op<3){
   mr=recover_op(r,op);
   if(mr!=FS_READ_OK){snprintf(m,sizeof(m),"the matching %s recovery returned %d",OPN[op],(int)mr);note(name,m);}}
- if(expect==2){
-  if(!is_done(op)){snap(after,sizeof(after));
-   snprintf(m,sizeof(m),"PENDING cell: the end state is not the finished state (old state %d), listing [%s]",is_old(),after);note(name,m);}}
- else if(expect==0){
-  if(!is_old()){snap(after,sizeof(after));snprintf(m,sizeof(m),"refused cell: the state is not the old state, listing [%s]",after);note(name,m);}}
+ if(expect==0||expect==2){
+  if(!is_old()){snap(after,sizeof(after));snprintf(m,sizeof(m),"%s cell: the state is not the old state, listing [%s]",expect==2?"PENDING":"refused",after);note(name,m);}}
  else if(!is_done(op)){snap(after,sizeof(after));snprintf(m,sizeof(m),"status OK but the finished state is not there, listing [%s]",after);note(name,m);}
  FsReadClose(r);cells++;}
 typedef struct{FS_READ_ROOT *r;volatile LONG done;FS_READ_STATUS st;}JOB;
