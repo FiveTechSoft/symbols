@@ -235,6 +235,11 @@ if(WIN32)
     target_include_directories(test_fs_win_case PRIVATE include)
     add_test(NAME test_fs_win_case COMMAND test_fs_win_case
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_longpath PRIVATE include)
+    add_test(NAME test_fs_win_longpath COMMAND test_fs_win_longpath
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_perm tests/test_fs_win_perm.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_perm PRIVATE include)
