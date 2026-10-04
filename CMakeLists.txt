@@ -423,6 +423,10 @@ if(NOT WIN32)
     # Seed 1786707969 is the test default (no FS_JFUZZ_SEED): iteration 7, kind move, bitflip at phase 22 first
     # showed the damaged-name limit F4; seeds 0, 1, 7 and 12648430 did not hit it, so the default is run as well.
     # Known limits F2 (remove) and F4 (move) are pinned cells in the test.
+    # Batch kinds (batch_create, batch_replace): no mutant, none was both cheap and killable. Known limits counted as
+    # known-limit-hits and pinned as asserted cells: F5 (journal deleted while half published, delete class at create
+    # crash 6 and replace crash 61 only), F6 (damaged create batch item name: half applied, recovery OK), F7 (damaged
+    # replace batch stage name: orphan stage left). F5 and F6 do NOT meet "all targets or none".
     # No create mutant: the create stage identity check and the record temp link check cover each other for the
     # stage_decoy and temp_decoy classes (a rewritten stage field changes the derived temp link name), so a
     # create-stage and a create-temp mutant both SURVIVED on all 4 seeds; the check is not independently
@@ -434,7 +438,7 @@ if(NOT WIN32)
         add_test(NAME test_fs_journal_fuzz_seed_${jf_seed} COMMAND test_fs_journal_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(test_fs_journal_fuzz_seed_${jf_seed} PROPERTIES
             ENVIRONMENT "FS_JFUZZ_SEED=${jf_seed}" TIMEOUT 300
-            PASS_REGULAR_EXPRESSION "journal fuzz iterations: 350 per kind, 4 kinds, seed ${jf_seed} refused [0-9]+ ok [0-9]+ known-limit-hits [0-9]+ failures 0 class mask 0")
+            PASS_REGULAR_EXPRESSION "journal fuzz iterations: 350 per kind, 6 kinds, seed ${jf_seed} refused [0-9]+ ok [0-9]+ known-limit-hits [0-9]+ failures 0 class mask 0")
     endforeach()
     add_executable(test_fs_journal_fuzz_mc_stage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz_mc_stage PRIVATE include)
