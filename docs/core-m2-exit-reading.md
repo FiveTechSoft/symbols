@@ -10,7 +10,8 @@ cover; M2 is not declared. The declaration is Antonio's.
 | Test | Linux | Windows (one runner, `windows-latest`) |
 |---|---|---|
 | `test_agent_git` | runs | runs (no `#ifndef _WIN32` around the cells; Windows branches only for fixture cleanup). Ctest shows Passed; the assertion count was not read from the log. |
-| `test_agent_git_remote`, `test_agent_git_contract`, `test_agent_git_submodule` | run | `#ifndef _WIN32`: the Windows build is a SKIP stub that returns 0 |
+| `test_agent_git_remote` | runs | runs since m112 (`1662322`, run 37190124619): remote-advance preflight (58 cells in the source, the count was not read from the Windows log), bare remote and two clones; ctest Passed on msvc (10.64 s) and asan-msvc (12.67 s), 181/181 on both |
+| `test_agent_git_contract`, `test_agent_git_submodule` | run | `#ifndef _WIN32`: the Windows build is a SKIP stub that returns 0 |
 | `test_git_gate`, `test_git_gate_e2e` | run | SKIP stub (POSIX only) |
 | `test_git_destructive_audit` | runs | SKIP stub (directory walk) |
 | `test_git_ops` | runs | git-backed part is `#ifndef _WIN32` |
@@ -22,7 +23,7 @@ A Passed on Windows for a SKIP stub is not evidence of the behaviour.
 
 1. **Dirty-tree, stale-HEAD, detached-HEAD, conflict, remote-advance and submodule fixtures fail without losing user changes.**
    Linux: shown for the listed cells (`test_agent_git`: dirty, stale, detached, conflict; `test_agent_git_remote` and the m95b gate e2e: remote advance and the control; `test_agent_git_submodule`: submodule).
-   Windows: PARTIAL. Only the `test_agent_git` cells run. Remote advance, submodule and the gate e2e are NOT SHOWN.
+   Windows: PARTIAL. The `test_agent_git` cells and, since m112, the `test_agent_git_remote` cells (remote advance, diverged, no upstream, detached, unreachable remote, dirty tree) run. Submodule and the gate e2e are NOT SHOWN.
 2. **A produced commit's tree exactly matches the reviewed mutation manifest.**
    Linux: shown for the listed cells (`test_agent_git_contract`, `test_git_gate` verify-staged and verify-head).
    Windows: NOT SHOWN (those tests are SKIP stubs).
