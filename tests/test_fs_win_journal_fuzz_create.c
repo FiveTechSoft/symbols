@@ -14,7 +14,7 @@
    or with exactly the new bytes and a single link, no stage, pin or journal name left, the decoy unchanged,
    and a second recovery is OK and changes nothing. "Sealed" damage recomputes the FNV-1a checksum, so only
    the semantic checks of recovery can refuse it. Every cell also asserts the outcome predicted before the
-   first run (see predicted below). The strict oracle treats any leftover as a miss; misses are grouped.
+   first run (see predicted below). The strict oracle treats any leftover as a miss except the pinned known limits (limit_kind); misses are grouped.
    Reproduce with FS_WJFUZZ_SEED=<n> FS_WJFUZZ_ITERS=<n>. Not covered: crash points 1 and 2 (stage, or stage
    and pin, with no journal: recovery returns OK and leaves them by design), remove, move and batch journals,
    power loss, two journal files damaged differently except the pair-mismatch class. */
@@ -248,12 +248,34 @@ static int leftover_names(void)
  n+=collect(ROOT,".fsp-*");n+=collect(INS,".fsp-*");n+=collect(INS,".fsrp-*");n+=collect(INS,".fsrs-*");n+=collect(INS,".fsrb-*");n+=collect(INS,".fst-*");
  for(i=0;i<sizeof(J)/sizeof(J[0]);i++)n+=collect(ROOT,J[i]);
  return n;}
+/* Known limits (measured in m176, 2 seeds x 660 cells, same table on both seeds, msvc and asan), pinned in
+   m177 with the exact outcome. Kind 1: phase 3, stage name resealed to a missing name: the stage lookup of a
+   missing name is accepted, so the real .fst- stays (one name, 1 link, new bytes), target absent. Kind 2: the
+   pin is left as a second link of a finished target (target new, 2 links, one .fsp- name, new bytes): phase 6
+   with the pin name resealed in both files (sub 3 of name_sealed, a recomputing writer), and the journal
+   deleted after the publish (delete class at phases 4 and 5, and both files at phase 6): nothing is left
+   to recover from, same class as the POSIX limit F5. Kind 3: phase 3 with the intent deleted: stage and
+   pin both stay (2 names, each 2 links, new bytes), target absent. */
+static int limit_kind(int phase,int cls,int sub)
+{if(cls==C_NAME&&phase==3&&sub==2)return 1;
+ if(cls==C_NAME&&phase==6&&sub==3)return 2;
+ if(cls==C_DELETE&&phase==3)return 3;
+ if(cls==C_DELETE&&(phase==4||phase==5)&&sub==0)return 2;
+ if(cls==C_DELETE&&phase==6&&sub==2)return 2;
+ return 0;}
+/* g_ex holds "dir\\name " entries from leftover_names(); copy them into paths[] */
+static int split_names(char paths[4][600])
+{int n=0;char *p=g_ex;
+ while(*p&&n<4){char *e=strchr(p,' ');size_t l=e?(size_t)(e-p):strlen(p);
+   if(l>=600)l=599;memcpy(paths[n],p,l);paths[n][l]=0;n++;
+   if(!e)break;p=e+1;}
+ return n;}
 static void remove_stale(void)
 {sweep_dir(INS);sweep_dir(ROOT);_rmdir(INS);_rmdir(ROOT);ck(!exists(ROOT),"stale scratch removed");}
 int main(int argc,char **argv)
 {char exe[768];DWORD got;int phase,cls,it,iters=20;unsigned long long seed=1786707969ULL;
  static char before[65536],after[65536],again[65536];
- long cells=0,refused=0,ok_old=0,ok_new=0;
+ long cells=0,refused=0,ok_old=0,ok_new=0,limit_hits=0;
  if(argc==3&&!strcmp(argv[1],"child")){child(atoi(argv[2]));return 200;}
  remove_stale();
  if(getenv("FS_WJFUZZ_SEED"))seed=strtoull(getenv("FS_WJFUZZ_SEED"),NULL,10);
@@ -279,13 +301,30 @@ int main(int argc,char **argv)
      if(strcmp(before,after))FAIL("refusal changed the workspace");
      if(want==2)FAIL("predicted OK, recovery refused");
    }else if(s==FS_READ_OK){
-     int is_abs=!exists(INS "\\newfile"),is_new=file_is(INS "\\newfile","newbytes");
+     int lk,is_abs=!exists(INS "\\newfile"),is_new=file_is(INS "\\newfile","newbytes");
      if(want==1)FAIL("predicted refusal, recovery returned OK (damage followed or ignored)");
      if(!is_abs&&!is_new)FAIL("OK but the target is neither absent nor the new bytes");
      if(want==2&&is_new!=state_new)FAIL("OK with the other state than predicted");
-     if(is_new&&links_of(INS "\\newfile")!=1)FAIL("OK but the target is not a single link");
+     if(is_new&&links_of(INS "\\newfile")!=(limit_kind(phase,cls,sub)==2?2:1))FAIL("OK but the target is not a single link");
      if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
-     if(leftover_names())FAIL("OK but a stage, pin or journal name is left");
+     lk=limit_kind(phase,cls,sub);
+     if(lk){
+       int n=leftover_names();char names[4][600];int k;int want_n=(lk==3)?2:1;
+       if(n!=want_n||split_names(names)!=want_n)FAIL("limit cell: unexpected number of leftover names");
+       if(lk==2&&!is_new)FAIL("limit cell: the state is not new");
+       if(lk!=2&&!is_abs)FAIL("limit cell: the target is not absent");
+       for(k=0;k<want_n;k++){
+         if(!file_is(names[k],"newbytes"))FAIL("limit cell: a leftover does not hold the new bytes");
+         if(links_of(names[k])!=((lk==1)?1:2))FAIL("limit cell: unexpected link count of a leftover");
+       }
+       if(lk==1&&strncmp(names[0],ROOT "\\.fst-",strlen(ROOT "\\.fst-")))FAIL("limit cell: the leftover is not a .fst- stage");
+       if(lk==2&&strncmp(names[0],ROOT "\\.fsp-",strlen(ROOT "\\.fsp-")))FAIL("limit cell: the leftover is not a .fsp- pin");
+       if(lk==3){int st=0,pn=0;
+         for(k=0;k<2;k++){if(!strncmp(names[k],ROOT "\\.fst-",strlen(ROOT "\\.fst-")))st++;
+                         if(!strncmp(names[k],ROOT "\\.fsp-",strlen(ROOT "\\.fsp-")))pn++;}
+         if(st!=1||pn!=1)FAIL("limit cell: the leftovers are not one stage and one pin");}
+       limit_hits++;
+     }else if(leftover_names())FAIL("OK but a stage, pin or journal name is left");
      if(is_abs)ok_old++;else ok_new++;
      snap(after,sizeof(after));
      if(FsCreateRecover(r)!=FS_READ_OK)FAIL("second recovery not OK");
@@ -302,8 +341,8 @@ int main(int argc,char **argv)
         miss[m].sub,miss[m].n,miss[m].it,miss[m].what,miss[m].ex[0]?" | names: ":"",miss[m].ex);
    fprintf(stderr,"FAIL %d cells missed their prediction or the oracle in %d distinct groups (seed %llu), of %ld cells\n",
         total_miss,nmiss,(unsigned long long)seed,cells);exit(1);}
- printf("windows create journal fuzz: %ld cells, seed %llu, %d per phase and class: refused %ld, ok absent %ld, ok new %ld\n",
-        cells,seed,iters,refused,ok_old,ok_new);
+ printf("windows create journal fuzz: %ld cells, seed %llu, %d per phase and class: refused %ld, ok absent %ld, ok new %ld, known-limit hits %ld\n",
+        cells,seed,iters,refused,ok_old,ok_new,limit_hits);
  (void)CLS;return 0;}
 #else
 int main(void){return 0;}

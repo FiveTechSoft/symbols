@@ -84,7 +84,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
 - **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
-  replace), with measured limits. Shown for one Windows journal (replace) only, m171 to m175.**
+  replace), with measured limits. Shown for two Windows journals (replace, create) only, m171 to m177.**
   `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
   appended bytes, path-field rewrites, deleted journal files and stage or temp-name decoys, at every crash point
   of each kind, 350 iterations per kind, seeds 0, 1, 7, 12648430 and the test default 1786707969. A run passes
@@ -128,7 +128,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** the Windows create, remove, move and batch journals, the POSIX 8 byte commit markers, damage to
+  - **Not shown:** the Windows remove, move and batch journals, the POSIX 8 byte commit markers, damage to
     two journal files at once except the Windows replace pair-mismatch cell.
     Criterion 5 stays partial.
   - **Windows journals: read (source reading at a3e89a2), and the replace journal fuzzed (m171 to m175).**
@@ -140,7 +140,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     marker `.fstxn.commit` is a byte copy of the journal, compared with `memcmp` (`src/fs_batch_win.inc` lines
     154 to 156 and 319). FNV-1a, like the POSIX CRC, detects accidental damage only, not a writer that recomputes
     it. `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to 989) is a fixed list of 18 mutations of batch
-    records, not random byte fuzz; the batch, create, remove and move journals on Windows are not fuzzed.
+    records, not random byte fuzz; the batch, remove and move journals on Windows are not fuzzed.
   - **Windows replace journal fuzz (`tests/test_fs_win_journal_fuzz.c`, m171 to m175): measured, one runner
     (`windows-latest`), replace only, real process kills at crash phases 3 to 6.** 9 damage classes (bit flip,
     set byte, truncate, append, sealed name fields, sealed scalar fields, sealed shape, deleted journal files,
@@ -151,7 +151,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     was refused where the stage link exists and harmless where it does not, a renamed rollback name was harmless,
     and every scalar, shape and pair cell was refused: no miss in 2 x 660 cells outside the deleted-journal
     class. So the POSIX shapes F2, F4, F6 and F7 did not appear on Windows replace. This says nothing about the
-    Windows create, remove, move and batch journals, which are not fuzzed. Their record checks differ and were
+    Windows remove, move and batch journals, which are not fuzzed (the create journal is in the next bullet). Their record checks differ and were
     only read.
   - **Windows replace, journal deleted after the publish: limit, outside the crash model, measured.** With the
     intent deleted at crash phases 4 and 5, or both the intent and the marker deleted at phase 6, recovery
@@ -163,6 +163,30 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     check). Data is not lost, names are not clean. Since m175 the test pins these cells: OK, new state, exactly
     one leftover name, a `.fsrp-` pin whose bytes are the old bytes. That the pin holds the old bytes was an
     inference from the code until the m175 run; the m175 CI result is reported separately.
+  - **Windows create journal fuzz (`tests/test_fs_win_journal_fuzz_create.c`, m176 and m177): measured, one
+    runner (`windows-latest`, msvc and asan jobs), create only, real process kills at crash points 3 to 6
+    (`FS_WIN_JOURNAL_CRASH`).** Same 9 classes and seeds as the replace fuzz, 660 cells per seed, 584 of them
+    held as predicted in both seeds: every unsealed damage, scalar (except a mode flip, which is followed and
+    only changes the read-only bit), shape and pair-mismatch cell was refused, a record naming the decoy was
+    refused, and the other name cells matched their predictions. The first run (m176, strict oracle) missed in
+    6 table lines, 76 cells per seed, identical on msvc and asan and on both seeds; they are the cells below.
+    **Resealed name fields ARE followed in two places, by a writer that recomputes the checksum in both journal
+    files (outside the cooperating-writer model, the same stance as the POSIX CRC: it detects accidental
+    damage, not forgery):** (1) at crash point 3, a stage name resealed to a missing name is accepted (the
+    lookup of a missing name returns OK, `wc_lookup`, `src/fs_create_win.inc` lines 237 to 247), so recovery
+    rolls back, returns OK and the real `.fst-` stage is left (5 cells per seed); (2) at crash point 6, a pin
+    name resealed to a missing name in both files makes recovery return OK with the right bytes, but the real
+    `.fsp-` pin stays as a second hard link of the finished file (5 cells per seed). Both are untracked leftovers
+    with the right bytes, not lost data. **Journal deleted: limit, outside the crash model, measured.** With the
+    intent deleted at crash point 3, recovery returns OK and leaves the stage and the pin (2 names, 20 cells per
+    seed); with the intent deleted at points 4 and 5, or both files deleted at point 6, it returns OK and the
+    finished file keeps a second link, the pin (46 cells per seed). With nothing to recover from the code does
+    nothing, the same class as POSIX F5 and as the Windows replace limit above. Since m177 the test pins all
+    these cells: state, exact number and kind of leftover names, their bytes and their link counts. Why the pin
+    existence is not required by the code is a reading, not a measurement: after the commit marker a missing
+    pin can be a legitimate state (a crash between the commit and the pin removal), so "the pin must exist"
+    is not a safe rule without a deeper change. Crash points 1 and 2 (stage, or stage and pin, with no journal)
+    are not covered: recovery returns OK without cleanup there by reading of the code (line 763), not by test.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.
