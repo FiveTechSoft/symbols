@@ -163,7 +163,7 @@ int main(void)
     CHECK(rc == 10 + 9 && strstr(gout, "remote_advanced"), "6: preflight --remote-sync on the diverged state reports remote_advanced");
 
     /* Control: sync L to the remote tip (explicit fixture reset), then run the same steps with no advance. */
-    CHECK(Run(L, "git fetch -q origin 2>/dev/null && git reset -q --hard origin/main", 0) &&
+    CHECK(Run(L, "git fetch -q origin " NOERR " && git reset -q --hard origin/main", 0) &&
           Out(L, "git rev-parse HEAD", head, sizeof head) && !strcmp(head, tip_other), "control: local reset to the remote tip");
     CHECK(Put(L "/other.txt", "o2\n") && Run(L, "git diff --binary > .git/change2.patch", 0) && Run(L, "git checkout -q -- other.txt", 0),
           "control: second patch made, tree clean");
