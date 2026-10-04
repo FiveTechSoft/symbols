@@ -84,7 +84,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
 - **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
-  replace), with measured limits. Shown for two Windows journals (replace, create) only, m171 to m177.**
+  replace), with measured limits. Shown for four Windows journals (replace, create, remove, move), not for batch, m171 to m179.**
   `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
   appended bytes, path-field rewrites, deleted journal files and stage or temp-name decoys, at every crash point
   of each kind, 350 iterations per kind, seeds 0, 1, 7, 12648430 and the test default 1786707969. A run passes
@@ -128,7 +128,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** the Windows remove, move and batch journals, the POSIX 8 byte commit markers, damage to
+  - **Not shown:** the Windows batch journals, the POSIX 8 byte commit markers, damage to
     two journal files at once except the Windows replace pair-mismatch cell.
     Criterion 5 stays partial.
   - **Windows journals: read (source reading at a3e89a2), and the replace journal fuzzed (m171 to m175).**
@@ -140,7 +140,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     marker `.fstxn.commit` is a byte copy of the journal, compared with `memcmp` (`src/fs_batch_win.inc` lines
     154 to 156 and 319). FNV-1a, like the POSIX CRC, detects accidental damage only, not a writer that recomputes
     it. `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to 989) is a fixed list of 18 mutations of batch
-    records, not random byte fuzz; the batch, remove and move journals on Windows are not fuzzed.
+    records, not random byte fuzz; the batch journals on Windows are not fuzzed by bytes.
   - **Windows replace journal fuzz (`tests/test_fs_win_journal_fuzz.c`, m171 to m175): measured, one runner
     (`windows-latest`), replace only, real process kills at crash phases 3 to 6.** 9 damage classes (bit flip,
     set byte, truncate, append, sealed name fields, sealed scalar fields, sealed shape, deleted journal files,
@@ -151,7 +151,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     was refused where the stage link exists and harmless where it does not, a renamed rollback name was harmless,
     and every scalar, shape and pair cell was refused: no miss in 2 x 660 cells outside the deleted-journal
     class. So the POSIX shapes F2, F4, F6 and F7 did not appear on Windows replace. This says nothing about the
-    Windows remove, move and batch journals, which are not fuzzed (the create journal is in the next bullet). Their record checks differ and were
+    Windows batch journals, which are not fuzzed by bytes (create, remove and move are in the next bullets). Their record checks differ and were
     only read.
   - **Windows replace, journal deleted after the publish: limit, outside the crash model, measured.** With the
     intent deleted at crash phases 4 and 5, or both the intent and the marker deleted at phase 6, recovery
@@ -187,6 +187,29 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     pin can be a legitimate state (a crash between the commit and the pin removal), so "the pin must exist"
     is not a safe rule without a deeper change. Crash points 1 and 2 (stage, or stage and pin, with no journal)
     are not covered: recovery returns OK without cleanup there by reading of the code (line 763), not by test.
+  - **Windows remove and move journal fuzz (`tests/test_fs_win_journal_fuzz_ops.c`, m178 and m179): measured, one
+    runner (`windows-latest`, msvc and asan jobs), real process kills at the points that leave a journal
+    (`FS_WIN_OP_CRASH`: remove 1, 3, 4; move 1, 2, 3, 4).** Same 9 classes and seeds, 1160 cells per seed (500
+    remove, 660 move). This recovery is stricter than the create one: it requires the pin, checks the pin's
+    link count against the source and target actually present, and looks every name up by file id
+    (`wo_recover_locked`, `src/fs_create_win.inc` lines 568 to 650). 1040 cells per seed held as predicted: all
+    unsealed damage, scalar (except `target_parent` on remove, a field remove does not use), shape and
+    pair-mismatch cells were refused, and so were a source or target resealed to the decoy, a target resealed
+    to a missing leaf (except move point 1, where no target exists yet and recovery is correctly OK), and a
+    resealed pin name. The first run (m178, strict oracle) missed in 9 table lines, 120 cells per seed, identical
+    on msvc and asan and on both seeds. **A resealed source name IS followed in two places (remove point 3,
+    move point 3), by a writer that recomputes the checksum in both journal files (outside the cooperating-writer
+    model, same stance as the POSIX CRC: it detects accidental damage, not forgery):** the rollback relinks
+    the pin under the name in the record (`wc_set_name` at `src/fs_create_win.inc` line 626), recovery returns
+    OK, the file is back under the resealed name (the test reads that name from inside/ since m179), the original
+    path stays empty, and for move the target link is removed (4 cells per seed each). **Journal deleted: limit,
+    outside the crash model, measured, the same class as POSIX F5.** With the intent deleted at point 1 the
+    source keeps the pin as a second link (remove and move, 20 cells each); move at point 2 leaves both the
+    source and the target, 3 links each (20); at point 3 remove leaves the file only as the `.fsrm-` pin and move
+    leaves it at the target with the pin as a second link (20 each); with both files deleted at point 4 the pin
+    stays (6 each). Since m179 the test pins all 9 groups with the exact outcome (file set of inside/, bytes,
+    link counts, names of leftovers). Not covered: point 0 (pin only, no journal: recovery returns OK without
+    cleanup, by reading of the code), and the batch journals.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

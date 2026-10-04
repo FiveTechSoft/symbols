@@ -254,6 +254,34 @@ static int leftover_names(void)
  n+=collect(ROOT,".fsrm-*");n+=collect(ROOT,".fsmv-*");n+=collect(INS,".fsrm-*");n+=collect(INS,".fsmv-*");n+=collect(ROOT,".fsp-*");n+=collect(INS,".fsp-*");n+=collect(INS,".fsrp-*");n+=collect(INS,".fsrs-*");n+=collect(INS,".fsrb-*");n+=collect(INS,".fst-*");
  for(i=0;i<sizeof(J)/sizeof(J[0]);i++)n+=collect(ROOT,J[i]);
  return n;}
+/* Known limits (measured in m178, 2 seeds x 1160 cells, same 9 table lines on both seeds, msvc), pinned in m179
+   with the exact outcome. Group names are kind*10+point. A, B: remove point 3 and move point 3, source name
+   resealed to a missing leaf "other" in the journal: rollback relinks the pin under the resealed name, OK, the
+   file is at inside/other (read by name here), the source is empty, nothing at the move target, no leftover.
+   C..I: the journal is gone (same class as the POSIX limit F5): recovery returns OK and does nothing; the
+   expected state is spelled out per group in lim[]. */
+static struct {int kind,phase,cls,sub;int S,T,O,Sl,Tl,left,Ll;} lim[]={
+ /* kind phase class         sub  S T O Sl Tl left Ll */
+ {1,3,C_NAME,1,   0,0,1,0,0,0,0},   /* A remove point 3, source -> other */
+ {2,3,C_NAME,1,   0,0,1,0,0,0,0},   /* B move point 3, source -> other */
+ {1,1,C_DELETE,0, 1,0,0,2,0,1,2},   /* C remove point 1, intent deleted: pin = 2nd link of the source */
+ {2,1,C_DELETE,0, 1,0,0,2,0,1,2},   /* D move point 1, intent deleted */
+ {2,2,C_DELETE,0, 1,1,0,3,3,1,3},   /* E move point 2, intent deleted: source and target, 3 links each */
+ {1,3,C_DELETE,0, 0,0,0,0,0,1,1},   /* F remove point 3, intent deleted: the file lives only as the pin */
+ {2,3,C_DELETE,0, 0,1,0,0,2,1,2},   /* G move point 3, intent deleted: at the target + pin */
+ {1,4,C_DELETE,2, 0,0,0,0,0,1,1},   /* H remove point 4, both files deleted: file only as the pin */
+ {2,4,C_DELETE,2, 0,1,0,0,2,1,2},   /* I move point 4, both files deleted: at the target + pin */
+};
+static int limit_row(int kind,int phase,int cls,int sub)
+{size_t i;for(i=0;i<sizeof(lim)/sizeof(lim[0]);i++)
+ if(lim[i].kind==kind&&lim[i].phase==phase&&lim[i].cls==cls&&lim[i].sub==sub)return (int)i;
+ return -1;}
+static int split_names(char paths[4][600])
+{int n=0;char *p=g_ex;
+ while(*p&&n<4){char *e=strchr(p,' ');size_t l=e?(size_t)(e-p):strlen(p);
+   if(l>=600)l=599;memcpy(paths[n],p,l);paths[n][l]=0;n++;
+   if(!e)break;p=e+1;}
+ return n;}
 static int count_files(const char *dir)
 {WIN32_FIND_DATAA d;char pat[600];HANDLE f;int n=0;
  snprintf(pat,sizeof(pat),"%s\\*",dir);f=FindFirstFileA(pat,&d);
@@ -268,7 +296,7 @@ int main(int argc,char **argv)
 {char exe[768];DWORD got;int kind,pi,phase,cls,it,iters=20;unsigned long long seed=1786707969ULL;
  static const int pts[3][5]={{0},{1,3,4,0,0},{1,2,3,4,0}};
  static char before[65536],after[65536],again[65536];
- long cells=0,refused=0,ok_old=0,ok_new=0;
+ long cells=0,refused=0,ok_old=0,ok_new=0,limit_hits=0;
  if(argc==4&&!strcmp(argv[1],"child")){child(atoi(argv[2]),atoi(argv[3]));return 200;}
  remove_stale();
  if(getenv("FS_WJFUZZ_SEED"))seed=strtoull(getenv("FS_WJFUZZ_SEED"),NULL,10);
@@ -295,18 +323,37 @@ int main(int argc,char **argv)
      if(strcmp(before,after))FAIL("refusal changed the workspace");
      if(want==2)FAIL("predicted OK, recovery refused");
    }else if(s==FS_READ_OK){
-     int S=exists(INS "\\data"),T=(kind==2)&&exists(INS "\\moved"),nf=count_files(INS),st;
+     int S=exists(INS "\\data"),T=(kind==2)&&exists(INS "\\moved"),nf=count_files(INS),st,row=limit_row(kind,phase,cls,sub);
+     if(row>=0){
+       int O=exists(INS "\\other"),n;char names[4][600];
+       if(S!=lim[row].S)FAIL("limit cell: the source presence differs");
+       if(T!=lim[row].T)FAIL("limit cell: the target presence differs");
+       if(O!=lim[row].O)FAIL("limit cell: the file under the resealed name differs");
+       if(nf!=1+S+T+O)FAIL("limit cell: the files in inside/ are not exactly the expected set");
+       if(S&&(!file_is(INS "\\data","old")||links_of(INS "\\data")!=lim[row].Sl))FAIL("limit cell: source bytes or links differ");
+       if(T&&(!file_is(INS "\\moved","old")||links_of(INS "\\moved")!=lim[row].Tl))FAIL("limit cell: target bytes or links differ");
+       if(O&&(!file_is(INS "\\other","old")||links_of(INS "\\other")!=1))FAIL("limit cell: the relinked file bytes or links differ");
+       n=leftover_names();
+       if(n!=lim[row].left||(n&&split_names(names)!=n))FAIL("limit cell: unexpected number of leftover names");
+       if(n){const char *pre=kind==1?ROOT "\\.fsrm-":ROOT "\\.fsmv-";
+         if(strncmp(names[0],pre,strlen(pre)))FAIL("limit cell: the leftover is not the expected pin");
+         if(!file_is(names[0],"old")||links_of(names[0])!=lim[row].Ll)FAIL("limit cell: the leftover pin bytes or links differ");}
+       limit_hits++;
+     }else{
      if(kind==1)st=(S&&nf==2)?0:(!S&&nf==1)?1:3;
      else st=(S&&T)?2:(S&&nf==2)?0:(T&&nf==2)?1:3;
      if(want==1)FAIL("predicted refusal, recovery returned OK (damage followed or ignored)");
      if((S&&!file_is(INS "\\data","old"))||(T&&!file_is(INS "\\moved","old")))FAIL("OK but a file holds other bytes");
      if(want==2&&st!=state)FAIL(st==2?"OK with both the source and the target present":
                                 st==3?"OK but the files in inside/ are not the expected set":"OK with the other state than predicted");
+     }
      if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
+     if(row<0){
      if(S&&links_of(INS "\\data")!=1)FAIL("OK but the file is not a single link");
      if(T&&links_of(INS "\\moved")!=1)FAIL("OK but the file is not a single link");
      if(leftover_names())FAIL("OK but a pin or journal name is left");
-     if(st==0)ok_old++;else ok_new++;
+     }
+     if(row>=0)ok_new++;else if(st==0)ok_old++;else ok_new++;
      snap(after,sizeof(after));
      if(recover(r)!=FS_READ_OK)FAIL("second recovery not OK");
      snap(again,sizeof(again));
@@ -322,8 +369,8 @@ int main(int argc,char **argv)
         miss[m].sub,miss[m].n,miss[m].it,miss[m].what,miss[m].ex[0]?" | names: ":"",miss[m].ex);
    fprintf(stderr,"FAIL %d cells missed their prediction or the oracle in %d distinct groups (seed %llu), of %ld cells\n",
         total_miss,nmiss,(unsigned long long)seed,cells);exit(1);}
- printf("windows remove and move journal fuzz: %ld cells, seed %llu, %d per point and class: refused %ld, ok rolled back %ld, ok completed %ld\n",
-        cells,seed,iters,refused,ok_old,ok_new);
+ printf("windows remove and move journal fuzz: %ld cells, seed %llu, %d per point and class: refused %ld, ok rolled back %ld, ok completed or limit %ld, known-limit hits %ld\n",
+        cells,seed,iters,refused,ok_old,ok_new,limit_hits);
  (void)CLS;return 0;}
 #else
 int main(void){return 0;}
