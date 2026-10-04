@@ -90,9 +90,30 @@ static char *snap(void)
     bput(&o,"O\n",2);walk(&o,OUTDIR,"o");
     return o.b;
 }
+/* On a mismatch, print the first differing snapshot line (before and after,
+   cut to 200 bytes) so the log names the entry that changed. The caller's
+   ck() then prints the seed, iteration, operation and path. */
+static void first_diff(const char *a,const char *b)
+{
+    int ln=1;
+    while(*a&&*b){
+        const char *ae=strchr(a,'\n'),*be=strchr(b,'\n');
+        size_t al=ae?(size_t)(ae-a):strlen(a),bl=be?(size_t)(be-b):strlen(b);
+        if(al!=bl||memcmp(a,b,al))break;
+        a+=al+(ae!=NULL);b+=bl+(be!=NULL);ln++;
+    }
+    {
+        const char *ae=strchr(a,'\n'),*be=strchr(b,'\n');
+        int al=ae?(int)(ae-a):(int)strlen(a),bl=be?(int)(be-b):(int)strlen(b);
+        if(al>200)al=200;
+        if(bl>200)bl=200;
+        fprintf(stderr,"first differing snapshot line %d: before=[%.*s] after=[%.*s]\n",ln,al,a,bl,b);
+    }
+}
 static void same(const char *before,const char *what)
 {
     char *now=snap();
+    if(strcmp(before,now))first_diff(before,now);
     ck(!strcmp(before,now),what);free(now);
 }
 static void fixtures(void)
@@ -399,9 +420,30 @@ static char *snap(void)
     bput(&o,"O\n",2);walk(&o,OUTDIR,"o");
     return o.b;
 }
+/* On a mismatch, print the first differing snapshot line (before and after,
+   cut to 200 bytes) so the log names the entry that changed. The caller's
+   ck() then prints the seed, iteration, operation and path. */
+static void first_diff(const char *a,const char *b)
+{
+    int ln=1;
+    while(*a&&*b){
+        const char *ae=strchr(a,'\n'),*be=strchr(b,'\n');
+        size_t al=ae?(size_t)(ae-a):strlen(a),bl=be?(size_t)(be-b):strlen(b);
+        if(al!=bl||memcmp(a,b,al))break;
+        a+=al+(ae!=NULL);b+=bl+(be!=NULL);ln++;
+    }
+    {
+        const char *ae=strchr(a,'\n'),*be=strchr(b,'\n');
+        int al=ae?(int)(ae-a):(int)strlen(a),bl=be?(int)(be-b):(int)strlen(b);
+        if(al>200)al=200;
+        if(bl>200)bl=200;
+        fprintf(stderr,"first differing snapshot line %d: before=[%.*s] after=[%.*s]\n",ln,al,a,bl,b);
+    }
+}
 static void same(const char *before,const char *what)
 {
     char *now=snap();
+    if(strcmp(before,now))first_diff(before,now);
     ck(!strcmp(before,now),what);free(now);
 }
 static void clean(void)
