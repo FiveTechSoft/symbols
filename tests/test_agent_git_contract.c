@@ -1,13 +1,24 @@
-#ifndef _WIN32
 #include "agent_git.h"
 #include "agent_shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#define RMTREE(p) "if exist " p " rmdir /s /q " p
+#define MKDIR_DIR "if not exist dir mkdir dir"
+#define COPY_HOSTILE "copy p.patch \"p.patch;true\" >nul && copy p.patch \"-p.patch\" >nul"
+#else
 #include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#define RMTREE(p) "rm -rf " p
+#define MKDIR_DIR "mkdir -p dir"
+#define COPY_HOSTILE "cp p.patch 'p.patch;true' && cp p.patch ./-p.patch"
+#endif
 /* Phase 2: commit contract (staged index and HEAD commit equal the reviewed
    manifest) and "already applied" detection for a retry. Real repositories.
-   POSIX only (fixtures use sh); the Windows build prints a skip. */
+   Runs on POSIX and, since m114, on Windows (fixture helpers differ in rmdir, mkdir, copy, quoting). */
 #define S "test_agent_git_contract_scratch"
 #define R S "/r"
 static int run_n,pass_n;
@@ -42,14 +53,14 @@ int main(void)
     GIT_EXPECTED_CHANGE all[3]={{"a.txt",'M'},{"b.txt",'D'},{"dir/c y.txt",'A'}};
     GIT_EXPECTED_CHANGE anyk[3]={{"a.txt",0},{"b.txt",0},{"dir/c y.txt",0}};
     printf("=== Commit contract and already-applied detection ===\n");
-    (void)system("rm -rf " S);
-    CHECK(mkdir(S,0755)==0&&Run(S,"git init -q -b main r",0),"repo");
-    CHECK(Run(R,"git config user.name F",0)&&Run(R,"git config user.email f@example.invalid",0),"identity");
+    (void)system(RMTREE(S));
+    CHECK(MKDIR(S)==0&&Run(S,"git init -q -b main r",0),"repo");
+    CHECK(Run(R,"git config user.name F",0)&&Run(R,"git config user.email f@example.invalid",0)&&Run(R,"git config core.autocrlf false",0),"identity");
     CHECK(Put(R "/a.txt","one\ntwo\nthree\n")&&Put(R "/b.txt","bee\n")&&Run(R,"git add a.txt b.txt",0)&&Run(R,"git commit -q -m base",0),"base commit");
 
     /* Index vs the manifest. */
     CHECK(staged(NULL,0,err)==GIT_CHANGES_MATCH,"empty index, empty manifest: match");
-    CHECK(Put(R "/a.txt","one\nTWO\nthree\n")&&Run(R,"git rm -q b.txt",0)&&Run(R,"mkdir -p dir",0)&&Put(R "/dir/c y.txt","c\n")&&Run(R,"git add a.txt 'dir/c y.txt'",0),"stage modify, delete, add (path with a space)");
+    CHECK(Put(R "/a.txt","one\nTWO\nthree\n")&&Run(R,"git rm -q b.txt",0)&&Run(R,MKDIR_DIR,0)&&Put(R "/dir/c y.txt","c\n")&&Run(R,"git add a.txt \"dir/c y.txt\"",0),"stage modify, delete, add (path with a space)");
     CHECK(staged(all,3,err)==GIT_CHANGES_MATCH,"exact manifest with kinds: match");
     CHECK(staged(anyk,3,err)==GIT_CHANGES_MATCH,"exact manifest, kinds not given: match");
     {GIT_EXPECTED_CHANGE w[3]={{"a.txt",'A'},{"b.txt",'D'},{"dir/c y.txt",'A'}};
@@ -84,8 +95,8 @@ int main(void)
      CHECK(head(m,1,err)==GIT_CHANGES_MISMATCH&&strstr(err,"merge"),"merge commit never matches");}
 
     /* Already applied. */
-    CHECK(Run(S,"rm -rf r2 && git init -q -b main r2",0),"second repo");
-    CHECK(Run(S "/r2","git config user.name F",0)&&Run(S "/r2","git config user.email f@example.invalid",0),"identity 2");
+    CHECK(Run(S,"git init -q -b main r2",0),"second repo");
+    CHECK(Run(S "/r2","git config user.name F",0)&&Run(S "/r2","git config user.email f@example.invalid",0)&&Run(S "/r2","git config core.autocrlf false",0),"identity 2");
     CHECK(Put(S "/r2/f.txt","1\n2\n3\n4\n5\n")&&Run(S "/r2","git add f.txt",0)&&Run(S "/r2","git commit -q -m base",0),"base 2");
     CHECK(Put(S "/r2/f.txt","1\n2\nTHREE\n4\n5\n")&&Run(S "/r2","git diff > p.patch",0)&&Run(S "/r2","git checkout -q -- f.txt",0),"patch made, tree restored");
     {char snap1[4096],snap2[4096];SHELL_EXEC_RESULT r;
@@ -98,16 +109,12 @@ int main(void)
     CHECK(Put(S "/r2/f.txt","1\n2\nELSE\n4\n5\n")&&AgentGitPatchState(S "/r2","p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_NO_MATCH,"same lines changed again: neither direction");
     CHECK(Run(S "/r2","git checkout -q -- f.txt",0)&&AgentGitPatchState(S "/r2","nope.patch",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"missing patch file: check failed");
     CHECK(AgentGitPatchState(S "/r2","p.patch; echo x",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"unsafe patch path: check failed");
-    CHECK(Run(S "/r2","cp p.patch 'p.patch;true' && cp p.patch ./-p.patch",0),"patch copies with hostile names");
+    CHECK(Run(S "/r2",COPY_HOSTILE,0),"patch copies with hostile names");
     CHECK(AgentGitPatchState(S "/r2","p.patch;true",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"existing file with a shell metacharacter name: check failed");
     CHECK(AgentGitPatchState(S "/r2","-p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"leading dash: check failed");
     CHECK(Put(S "/r2/bad.patch","this is not a patch\n")&&AgentGitPatchState(S "/r2","bad.patch",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"garbage file: check failed");
 
-    (void)system("rm -rf " S);
+    (void)system(RMTREE(S));
     printf("\n=== %d/%d passed ===\n",pass_n,run_n);
     return pass_n==run_n?0:1;
 }
-#else
-#include <stdio.h>
-int main(void){printf("test_agent_git_contract: skipped on Windows\n");return 0;}
-#endif
