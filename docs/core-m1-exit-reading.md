@@ -124,3 +124,16 @@ non-mutant build did not raise the OK counts in 8 runs, so the cause there is no
 `D` is refused by design for about a third of each cycle). What its pass shows: no outside mismatch ever appeared, and
 the calls made in the first milliseconds were real. What it does not show: four seconds of racing writes. A further
 diagnostic is next; no claim of strength or weakness beyond these numbers.
+
+Correction (m152) to the m150 mechanism. What was measured for m150: the INCONCLUSIVE rate of the mutant build under artificial
+load in my sandbox (5 of 110 runs before, 0 of 110 after) and the kill times in CI (0.10 s and 0.19 s in the apply gate
+and the CI Linux job, four clean runs since). What was NOT measured, and is not claimed: that deleting the leftover files
+makes the writers make real calls again. Local numbers say it does not restore them in the non-mutant build: total OK
+calls of both writers in 4 s stayed at about 8 to 38 (of about 39000 calls) with the m150 file set deleted each cycle, with
+the writers reopening their root, with both, and with every `.fstxn.*` file except the lock deleted plus the pins
+(9 to 23 OK). A strace of a wedged run shows each call taking the lock, stat-ing `.fstxn.intent`, `.batch`, `.commit`,
+`.remove` and `.rcommit`, and returning DENIED without opening `D`; the leftover set varies between runs (a replace
+journal in some, a remove journal and its commit marker in others). Why deleting them does not cure it is unexplained.
+In the m150 mutant build every local run ended at the first kill (50 to 100 ms, 2 to 3 swaps, 1 to 17 OK calls per
+writer), so its OK counts cannot show whether writers recover. So the m150 effect is an observed drop in INCONCLUSIVE runs
+with an unproven mechanism; it may only narrow the time in which a wedge can land before a symlink window.
