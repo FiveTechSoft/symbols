@@ -83,40 +83,53 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   (`iters=150` in the Windows `main` of `tests/test_fs_fuzz_ops.c`), not 400. Only seeds 1, 7 and 12648430
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
-- **Journal byte fuzzing: shown for four POSIX journals, with two measured limits. Not shown for the batch journals and for Windows.**
-  `tests/test_fs_journal_fuzz.c` (m163, m164, m165) damages the replace, create, remove and move journals
-  with bit flips, set bytes, truncation, appended bytes, path-field rewrites, deleted journal files and
-  stage or temp-name decoys, at every crash point of each kind, 350 iterations per kind, seeds 0, 1, 7,
-  12648430 and the test default 1786707969. A run passes when recovery refuses (and leaves the workspace
-  unchanged) or returns OK with the old or the new state, nothing outside the workspace touched and no
-  journal, stage or `.fstxn-` name left. Design: [core-m1-c5-journal-fuzz-proposal.md](core-m1-c5-journal-fuzz-proposal.md).
+- **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
+  replace), with measured limits. Not shown for Windows.**
+  `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
+  appended bytes, path-field rewrites, deleted journal files and stage or temp-name decoys, at every crash point
+  of each kind, 350 iterations per kind, seeds 0, 1, 7, 12648430 and the test default 1786707969. A run passes
+  when recovery refuses (and leaves the workspace unchanged) or returns OK with the old or the new state (all
+  targets or none for the batches), nothing outside the workspace touched and no journal, stage or `.fstxn-`
+  name left. Design: [core-m1-c5-journal-fuzz-proposal.md](core-m1-c5-journal-fuzz-proposal.md).
+  **Integrity trailer (m168).** Since m168 every POSIX journal and marker record file is the record plus an 8 byte
+  trailer (magic and CRC-32). Plain damage to a record is refused. A record without a trailer (written by a build
+  before m168) is still accepted unchecked, so an interrupted older operation can be recovered; the legacy cells
+  of the fuzz cut the trailer at every crash point of every kind and require recovery OK. The 8 byte commit
+  markers (batch, remove, move) are not covered. **A CRC detects accidental damage only. A writer that rewrites a
+  field and recomputes the CRC is not detected: that is the cooperating-writer model, not authentication.**
   Measured, with the status words that apply:
   - **F1, fixed (m164).** Replace recovery left the `.fstxn-<hex>` and `.fstxn-c<hex>` temporary links. It
     now removes them only when they are provably the journal's own links. The earlier m163 statement that
     no journal or stage name is left after recovery was true only for the names that test checked; it did
-    not look for `.fstxn-` names. The fuzz now does, for all four kinds.
-  - **F2, limit, not met.** A damaged remove record whose target field becomes another valid in-workspace
-    name is restored under that name. Recovery returns OK, nothing is lost, nothing outside the workspace
-    changes. The claim "fail closed or old or new state" is NOT met for this shape. Pinned as an asserted cell.
-  - **F4, limit, not met.** A damaged move record whose source field becomes another valid name (crash
-    point 22) leaves that name and the real source as two links of one inode, destination removed.
-    Recovery returns OK. Same claim not met. Pinned as an asserted cell. It was found by the test-default
-    seed (iteration 7, move, bit flip, crash point 22); seeds 0, 1, 7 and 12648430 did not hit it, so a
-    suite with only those seeds would have hidden it.
+    not look for `.fstxn-` names. The fuzz now does, for all kinds.
+  - **F2, F4, F6, F7: found by the fuzz before m168; now refused for plain damage, still open for a writer that
+    recomputes the CRC.** Before m168 a damaged name field that was still a valid name was followed:
+    F2 (remove, target field) restored the file under that name; F4 (move, source field, crash 22) left the new
+    name and the real source as two links of one inode; F6 (batch create, item name, crash 6) returned OK with
+    the first target still published, so the batch was half applied and the claim "all targets or none" was NOT
+    met; F7 (batch replace, one hex digit of a stage name, crash 61) left the real new stage as an orphan link.
+    F4 was found by the test-default seed (iteration 7, move, bit flip, crash 22), not by seeds 0, 1, 7 and
+    12648430, so a suite with only those seeds would have hidden it. Each shape is a pinned cell run twice: plain
+    damage must be refused with the workspace unchanged (measured since m168); with the CRC recomputed the old
+    outcome is asserted, and it still holds, so these four are limits of the cooperating-writer model.
+  - **F5, limit, not met, outside the crash model.** If the batch journal file is deleted while the batch is half
+    published (create crash 6, replace crash 61), recovery has no record, returns OK and leaves the half applied
+    state with no journal. The contract "all targets or none" is NOT met there. The oracle allows it for the
+    delete class at those two crash points only (26 hits on seed 0, measured locally). The CRC does not change it.
   - **F3, limit, outside the crash model.** Deleting the move journal at crash point 22 leaves src and dst as
     the same inode. The oracle allows this for the delete class only.
-  - A checksum on journal records would turn F2 and F4 into refusals; it is sized, not built, in
-    [core-m1-journal-integrity-sizing.md](core-m1-journal-integrity-sizing.md).
-  - **Mutants.** Exact kills: replace stage and replace temp (m163), replace temp links (m164), remove stage
-    identity and move stage identity (m165). The replace stage and temp mutants are exact over the decoy
-    classes only: the random byte classes of the replace kind are ignored for them (`FS_JFUZZ_MUTANT_IGNORE`),
-    because they can add seed-dependent failures there. The remove and move stage mutants ignore the random
-    classes of their own kind in the same way. There is no create mutant: a create-stage and a create-temp
-    mutant both survived on all four seeds, because a rewritten stage field changes the name the record temp
-    link is derived from, so the record is refused before the stage identity check is reached. The create
-    stage identity check is not independently exercised by the current classes.
-  - **Not shown:** the batch journals (`.fstxn.batch`, `.fstxn.commit`, batch replace) and every Windows
-    journal. Criterion 5 stays partial.
+  - **Mutants.** Exact kills: replace stage and replace temp (m163), replace temp links (m164, now mask 1 with
+    the setbyte class ignored: it only fails when a random set byte writes the value already there), remove stage
+    identity and move stage identity (m165). The stage and temp mutants are exact over the decoy classes only: the
+    random byte classes of the mutated kind are ignored (`FS_JFUZZ_MUTANT_IGNORE`), because they can add
+    seed-dependent failures. The stage decoy classes recompute the CRC on purpose; otherwise the CRC would refuse
+    the record before the identity check the mutant drops, and every stage mutant would survive (measured before
+    the change). There is no create mutant (a create-stage and a create-temp mutant both survived on all four
+    seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
+    before the stage identity check; that check is not independently exercised by the current classes). There is
+    no batch mutant: none was both cheap and killable.
+  - **Not shown:** every Windows journal (not read for this note, no claim), the 8 byte commit markers, damage to
+    two journal files at once. Criterion 5 stays partial.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

@@ -1,7 +1,21 @@
 # Journal record integrity field: sizing (not built)
 
-Status: a sizing note only. Nothing in this file is implemented. Whether to build it is Antonio's decision
-(it changes the on-disk record format and touches M1 criterion 5), taken after reading this.
+Status: sizing note, written before the change. **Built for the POSIX records in m168, with one deviation from
+the design below (see "As built").** Windows records are not sized or changed. The M1 and criterion 5 declarations
+stay Antonio's.
+
+## As built (m168)
+
+- Not a version 2 field. Every journal and marker record file is the record followed by an 8 byte trailer
+  {magic 0x4653434b, CRC-32 of the record bytes}. Struct sizes and the version field are unchanged, the replace
+  marker keeps embedding the record, and a build older than m168 refuses a new file by size (fail closed).
+- Old-format rule as designed: a file of exactly the old record size is accepted unchecked; new files always have
+  the trailer. A test cuts the trailer at every crash point of every kind and requires recovery OK.
+- Not covered: the 8 byte commit markers (batch, remove, move: the journal inode id), and Windows.
+- Measured effect: plain damage to a record is refused; F2, F4, F6, F7 as plain damage are refusals. With the CRC
+  recomputed they behave as before, because a CRC is not authentication (cooperating-writer model).
+- Cost seen: about +44 and -20 lines in `src/fs_read.c`, a test change of about 260 lines, one CI round, no red.
+  The estimates below are the pre-build ones.
 
 ## Why it is being sized
 
@@ -15,7 +29,7 @@ carries anything that proves its bytes are the bytes that were written:
   the real source as two links of one inode, with the destination removed. Recovery returns OK.
 
 Both are pinned as asserted cells. The claim "fails closed or recovers to the old or new state" is NOT met
-for these two shapes. A checksum would turn them into refusals.
+for these two shapes. A checksum turns plain damage into refusals (built, m168); a writer that recomputes it is not caught.
 
 ## What exists today (read from `src/fs_read.c`)
 
