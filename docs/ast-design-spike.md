@@ -15,9 +15,13 @@ Phase 4. The existing read-only pilot and its limits are in
   header closure, unresolved/indirect calls and provenance changes. This is
   one-TU inspection, not a project-wide graph or a C++ test.
 - The native `ast-inspect-windows-ninja` job installed pinned Python 3.11,
-  libclang 18.1.1 and Ninja 1.12.1, generated a compilation database, and
-  passed the corpus on commit `2f1ee43`
-  ([run](https://github.com/FiveTechSoft/symbols/actions/runs/36133603060)).
+  libclang 18.1.1 and Ninja, generated a compilation database, and ran the
+  corpus. Correction: the run on commit `2f1ee43`
+  ([run](https://github.com/FiveTechSoft/symbols/actions/runs/36133603060))
+  skipped all 7 tests (the Ninja pin was not installable), so it was not
+  evidence of a pass; the first run that executed the corpus and passed is
+  commit `530cc26` ([run](https://github.com/FiveTechSoft/symbols/actions/runs/37223661285)),
+  10 tests OK. Details in [docs/ast-inspect.md](ast-inspect.md).
   The job remains in the exact-SHA CI matrix; it does not test an MSVC
   Visual Studio compilation database or native C libclang linkage.
 - Two opt-in semantic vetoes for `c_contract` were rejected by counterexamples:

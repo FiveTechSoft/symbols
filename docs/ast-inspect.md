@@ -20,9 +20,18 @@ cmake -S . -B build-ast -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 On Windows, use the venv's `Scripts/python.exe` and a Ninja generator to
 produce the database. Native Windows execution is measured by the
 `ast-inspect-windows-ninja` CI job on `windows-latest`: Python 3.11 x64,
-`libclang==18.1.1`, `ninja==1.12.1`, and CMake's Ninja generator produce
-`compile_commands.json` and run `tests/test_ast_inspect.py -v`. This corpus
-passed on commit `2f1ee43` ([CI run](https://github.com/FiveTechSoft/symbols/actions/runs/36133603060)).
+`libclang==18.1.1`, `ninja==1.11.1.4`, and CMake's Ninja generator produce
+`compile_commands.json` and run `tests/test_ast_inspect.py -v`. Correction
+(m153 to m156): this corpus was NOT shown to pass on commit `2f1ee43`
+([CI run](https://github.com/FiveTechSoft/symbols/actions/runs/36133603060)).
+In every run of that job read since its first appearance (2026-09-25, 21 runs
+sampled) the pin `ninja==1.12.1` was not on the package index, the install
+failed, libclang was missing, and all tests were skipped (7, later 10), while
+the job still showed green. The job now fails on a failed install or on any
+skipped test (m155). The first run in which the tests actually executed and
+passed is commit `530cc26` ([run](https://github.com/FiveTechSoft/symbols/actions/runs/37223661285)):
+10 tests, OK, one runner (`windows-latest`); it needed a test fix for short
+(8.3) versus long Windows path names (m156).
 The 18.1.1 Windows wheel was inspected: it contains libclang.dll (83,988,992
 bytes) and Python bindings, but not clang-c headers or an import library.
 Existing MSVC/Visual Studio-generator CI does not emit `compile_commands.json`;
@@ -53,8 +62,8 @@ staleness; concurrent writes remain outside the guarantee.
 
 Tests cover nested shadowing, conditional variants, header closure, unresolved
 and indirect calls, and changed source/command provenance. They are skipped
-when the optional package is absent. The optional corpus ran successfully on
-native Windows Ninja CI for commit `2f1ee43`. The official LLVM developer
+when the optional package is absent. The optional corpus first ran, not skipped, on
+native Windows Ninja CI at commit `530cc26` (see the correction above). The official LLVM developer
 archive is much larger than this opt-in adapter; no archive or binary is
 vendored.
 
