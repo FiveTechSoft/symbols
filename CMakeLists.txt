@@ -578,6 +578,12 @@ add_executable(c_contract_static src/c_contract_static_main.c)
 target_link_libraries(c_contract_static symbolic)
 sllm_test(test_reflect tests/test_reflect.c)
 sllm_test(test_git_ops tests/test_git_ops.c)
+if(WIN32)
+    # The Windows revert cells need gcc and skip quietly without it. This turns a skip into a red:
+    # the test prints the line only when nothing failed and all three revert fixtures ran.
+    # PASS_REGULAR_EXPRESSION replaces the exit code check, which is why the line is printed only at zero failures.
+    set_tests_properties(test_git_ops PROPERTIES PASS_REGULAR_EXPRESSION "revert cells ran: 3")
+endif()
 sllm_test(test_agent_git tests/test_agent_git.c)
 sllm_test(test_agent_git_remote tests/test_agent_git_remote.c)
 sllm_test(test_agent_git_contract tests/test_agent_git_contract.c)

@@ -154,6 +154,7 @@ static void test_repos(void)
 #include <process.h>
 
 static char base_dir[300];
+static int revert_ran; /* revert fixtures executed; main prints a marker that CTest requires on Windows */
 
 static int shw(const char *dir, const char *script)
 {
@@ -298,6 +299,7 @@ static void test_repos_win(void)
         d = calc_repo("v1", 1);
         rc = GitOpsSolve(d, "The last commit left calc.c uncompilable. Undo that commit with git.", &r);
         say("v1", rc, r.op, r.verified, r.detail, r.reason);
+        revert_ran++;
         CHECK(rc == 1);
         CHECK(!strcmp(r.op, "revert_head"));
         CHECK(shw_out(d, "git rev-list --count HEAD") == 0 && (s = slurp(d, ".git\\o.txt")) && s[0] == '3');
@@ -307,6 +309,7 @@ static void test_repos_win(void)
         d = calc_repo("v2", 0);
         rc = GitOpsSolve(d, "Undo the last commit.", &r);
         say("v2", rc, r.op, r.verified, r.detail, r.reason);
+        revert_ran++;
         CHECK(rc == 0);
         CHECK(shw_out(d, "git rev-list --count HEAD") == 0 && (s = slurp(d, ".git\\o.txt")) && s[0] == '2');
 
@@ -314,6 +317,7 @@ static void test_repos_win(void)
         d = calc_repo("v3", 1);
         rc = TaskOpsSolve(d, "The last commit broke calc.c. Revert that commit.", &rep);
         say("v3", rc, rep.op, rep.verified, rep.detail, rep.reason);
+        revert_ran++;
         CHECK(rc == 1);
         CHECK(!strcmp(rep.op, "revert_head") && rep.verified);
     } else
@@ -347,6 +351,10 @@ int main(void)
             printf("FAIL cannot create %s\n", base_dir), fails++;
         snprintf(c, sizeof(c), "rmdir /s /q \"%s\"", base_dir);
         (void)system(c);
+        /* CMakeLists.txt makes ctest require this line on Windows (PASS_REGULAR_EXPRESSION replaces the exit code),
+           so it is printed only when nothing failed and all three revert fixtures ran. */
+        if (fails == 0 && revert_ran == 3)
+            printf("revert cells ran: 3\n");
     } else
         printf("git not found: repository tests skipped\n");
 #else
