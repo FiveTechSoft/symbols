@@ -224,6 +224,14 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_agent_patch_crash_win_mc11 PROPERTIES
         ENVIRONMENT "FS_WIN_BATCH_MUTANT=11" PASS_REGULAR_EXPRESSION "mutant killed by 1 cell")
+    add_executable(test_agent_patch_lock_win tests/test_agent_patch_lock_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_lock_win PRIVATE include)
+    target_compile_definitions(test_agent_patch_lock_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
+    add_test(NAME test_agent_patch_lock_win COMMAND test_agent_patch_lock_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # The marker is printed only at zero failures; PASS_REGULAR_EXPRESSION replaces the exit code check.
+    set_tests_properties(test_agent_patch_lock_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch lock cells ran: 6")
     add_executable(test_agent_patch_ntfs_win tests/test_agent_patch_ntfs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_ntfs_win PRIVATE include)
