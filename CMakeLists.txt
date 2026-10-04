@@ -420,6 +420,13 @@ if(NOT WIN32)
     # (shared scratch directories). The two _mc targets drop one identity check in src/fs_read.c
     # (FS_JREC_MUTANT_STAGE and FS_JREC_MUTANT_TEMP) and pass only when exactly the predicted class fails;
     # _mc_tmp drops the removal of the .fstxn- temporary links in FsReplaceRecover (FS_JREC_MUTANT_TMP).
+    # Seed 1786707969 is the test default (no FS_JFUZZ_SEED): iteration 7, kind move, bitflip at phase 22 first
+    # showed the damaged-name limit F4; seeds 0, 1, 7 and 12648430 did not hit it, so the default is run as well.
+    # Known limits F2 (remove) and F4 (move) are pinned cells in the test.
+    # No create mutant: the create stage identity check and the record temp link check cover each other for the
+    # stage_decoy and temp_decoy classes (a rewritten stage field changes the derived temp link name), so a
+    # create-stage and a create-temp mutant both SURVIVED on all 4 seeds; the check is not independently
+    # exercised by the current classes.
     add_executable(test_fs_journal_fuzz tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz PRIVATE include)
     target_compile_definitions(test_fs_journal_fuzz PRIVATE FS_CREATE_TEST_CRASH=1)
