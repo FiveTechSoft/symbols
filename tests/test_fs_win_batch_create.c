@@ -76,15 +76,6 @@ static void created_all(void)
  ck(count(ROOT "\\sub\\*")==1,"sub holds only b.txt");}
 static void nothing(void)
 {ck(count(ROOT "\\*")==1,"root holds only sub");ck(count(ROOT "\\sub\\*")==0,"sub empty");}
-/* After a crash before the journal exists, orphan .fst-/.fsp- names may
-   remain (declared non-claim); no target and no batch file may. */
-static void nothing_but_orphans(void)
-{ck(count_skip(ROOT "\\*",".fs")==1,"root holds only sub and orphans");
- ck(count(ROOT "\\sub\\*")==0,"sub empty");
- ck(GetFileAttributesA(ROOT "\\a.txt")==INVALID_FILE_ATTRIBUTES,"a.txt absent");
- ck(GetFileAttributesA(ROOT "\\c.txt")==INVALID_FILE_ATTRIBUTES,"c.txt absent");
- ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"no journal");
- ck(GetFileAttributesA(ROOT "\\.fstxn.commit")==INVALID_FILE_ATTRIBUTES,"no marker");}
 static void nuke(void)
 {WIN32_FIND_DATAA d;HANDLE f;char p[512];
  f=FindFirstFileA(ROOT "\\sub\\*",&d);
@@ -102,7 +93,7 @@ static void sc_matrix(const char *exe,int pt)
  ck(run_child(exe,pt,0)==80+pt,"writer killed at point");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
- if(forward)created_all();else if(pt<3)nothing_but_orphans();else nothing();
+ if(forward)created_all();else nothing();
  ck(FsCreateRecover(r)==FS_READ_OK,"single create recovery sees nothing");
  FsReadClose(r);cleanup();}
 /* Writer killed at setup_pt, then the recovery itself killed at rec_pt, then
@@ -114,7 +105,7 @@ static void sc_reccrash(const char *exe,int setup_pt,int rec_pt)
  ck(run_child(exe,rec_pt,1)==80+rec_pt,"recovery killed at point");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover after recovery crash");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
- if(setup_pt>=6)created_all();else if(rec_pt==11)nothing_but_orphans();else nothing();
+ if(setup_pt>=6)created_all();else nothing();
  FsReadClose(r);cleanup();}
 /* A foreign file under a journaled stage name must stop recovery, untouched. */
 static void sc_foreign_stage(const char *exe)
@@ -154,6 +145,7 @@ static void mutant_child(const char *exe,int m)
  if(m==1)sc_matrix(exe,5);          /* journal only treated as committed */
  else if(m==2)sc_foreign_stage(exe);/* stage deleted before identity check */
  else if(m==3)sc_reccrash(exe,6,13);/* marker retired before journal */
+ else if(m==10)sc_matrix(exe,1);   /* orphan sweep skipped */
  else sc_inject_retry();            /* rollback with stage handles open */
  ExitProcess(0);}
 static void delete_pending(void)
@@ -227,8 +219,8 @@ int main(int argc,char **argv)
  sc_foreign_stage(exe);
  delete_pending();
  /* Mutants: each must fail the scenario that targets it. */
- for(int m=1;m<=4;m++){
-   char a[32];int code;sprintf(a,"mutant %d",m);
+ for(int mi=0;mi<5;mi++){
+   int m=mi<4?mi+1:10;char a[32];int code;sprintf(a,"mutant %d",m);
    code=run_proc(exe,a);nuke();
    if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}
  }

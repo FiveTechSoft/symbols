@@ -383,6 +383,72 @@ done:
     for(k=0;k<WB_LIMIT;k++)if(parent[k]!=INVALID_HANDLE_VALUE)CloseHandle(parent[k]);
     free(j);free(m);return s;
 }
+/* Orphan sweep. A writer killed before its journal exists (points 1, 2, 21-23),
+   or a recovery killed after it removed the journal and before it removed the
+   pins (11, 33), leaves .fst-, .fsp- or .fsrp- names that nothing refers to.
+   A leftover old pin makes its target a two-link file, so every later replace
+   of it is DENIED. Called only under the workspace lock. It runs only when no
+   journal or marker of any protocol exists (wo_clear_other plus the batch pair),
+   and touches only root names of the exact shape prefix + 32 lowercase hex that
+   are regular files (directories and reparse points are skipped). Whether a name
+   is shared (two or more links) is decided for every candidate before the first
+   delete: a shared name is deleted, an unshared .fst- stage is deleted (staged
+   bytes that were never published), and an unshared .fsp- or .fsrp- is left
+   alone because it may be the last link to bytes someone still needs. Best
+   effort: a name that cannot be deleted stays, as before. At most 128 names per
+   call. Mutant 10 (test only) skips the sweep. */
+#define WB_SWEEP_MAX 128
+static void wb_sweep_orphans(const FS_READ_ROOT *r)
+{
+    union { unsigned long long aligned; unsigned char bytes[65536]; } buffer;
+    WCHAR (*names)[48]=(WCHAR(*)[48])calloc(WB_SWEEP_MAX,sizeof(*names));
+    FILE_ID_INFO *ids=(FILE_ID_INFO*)calloc(WB_SWEEP_MAX,sizeof(*ids));
+    DWORD *links=(DWORD*)calloc(WB_SWEEP_MAX,sizeof(*links));
+    int *drop=(int*)calloc(WB_SWEEP_MAX,sizeof(*drop));
+    unsigned n=0,k;int restart=1,jk=0,jp=0,mk=0,mp=0;
+    if(!names||!ids||!links||!drop)goto out;
+    if(wb_mutant(10))goto out;
+    if(wo_clear_other(r->handle,4)!=FS_READ_OK)goto out;
+    if(wb_kind(r->handle,WB_JOURNAL,&jk,&jp)!=FS_READ_OK||jp)goto out;
+    if(wb_kind(r->handle,WB_MARKER,&mk,&mp)!=FS_READ_OK||mp)goto out;
+    while(n<WB_SWEEP_MAX){
+        FILE_ID_BOTH_DIR_INFO *item;
+        if(!GetFileInformationByHandleEx(r->handle,restart?FileIdBothDirectoryRestartInfo:FileIdBothDirectoryInfo,
+                                         buffer.bytes,sizeof(buffer.bytes)))break;
+        restart=0;item=(FILE_ID_BOTH_DIR_INFO*)buffer.bytes;
+        while(1){
+            size_t offset=(size_t)((unsigned char*)item-buffer.bytes);
+            size_t wn;WCHAR name[48];
+            if(offset>sizeof(buffer.bytes)-sizeof(*item)||
+               item->FileNameLength>sizeof(buffer.bytes)-offset-offsetof(FILE_ID_BOTH_DIR_INFO,FileName))goto out;
+            wn=item->FileNameLength/sizeof(WCHAR);
+            if(wn>=1&&wn<47&&n<WB_SWEEP_MAX&&
+               !(item->FileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT))){
+                memcpy(name,item->FileName,wn*sizeof(WCHAR));name[wn]=0;
+                if(wc_random_name(name,L".fst-")||wc_random_name(name,L".fsp-")||wc_random_name(name,L".fsrp-")){
+                    memcpy(names[n],name,(wn+1)*sizeof(WCHAR));n++;
+                }
+            }
+            if(!item->NextEntryOffset)break;
+            if(item->NextEntryOffset>sizeof(buffer.bytes)-offset||item->NextEntryOffset<sizeof(*item))goto out;
+            item=(FILE_ID_BOTH_DIR_INFO*)((unsigned char*)item+item->NextEntryOffset);
+        }
+    }
+    /* Decide for every candidate first: identity and link count now. */
+    for(k=0;k<n;k++){
+        HANDLE h=INVALID_HANDLE_VALUE;FS_READ_META m;FILE_STANDARD_INFO si;
+        if(wc_open(r->handle,names[k],GENERIC_READ,FILE_OPEN,&h)!=FS_READ_OK)continue;
+        if(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&wc_id(h,&ids[k])&&
+           GetFileInformationByHandleEx(h,FileStandardInfo,&si,sizeof(si))){
+            links[k]=si.NumberOfLinks;
+            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5);
+        }
+        CloseHandle(h);
+    }
+    for(k=0;k<n;k++)if(drop[k])(void)wr_remove_pin(r->handle,names[k],&ids[k]);
+out:
+    free(names);free(ids);free(links);free(drop);
+}
 static FS_READ_STATUS wb_batch_recover(const FS_READ_ROOT *r)
 {
     HANDLE lock=INVALID_HANDLE_VALUE;OVERLAPPED o;FS_READ_STATUS s;
@@ -390,6 +456,7 @@ static FS_READ_STATUS wb_batch_recover(const FS_READ_ROOT *r)
     if(!wc_ntfs(r->handle))return FS_READ_UNSUPPORTED;
     s=wc_lock(r->handle,&lock,&o);if(s!=FS_READ_OK)return s;
     s=wo_clear_other(r->handle,4);if(s==FS_READ_OK)s=wb_recover_locked(r);
+    if(s==FS_READ_OK)wb_sweep_orphans(r);
     wc_unlock(lock,&o);return s;
 }
 /* Best-effort removal of everything staged before a journal exists. Nothing
@@ -422,6 +489,7 @@ static FS_READ_STATUS wb_batch_create(const FS_READ_ROOT *r,const FS_BATCH_CREAT
     if(s==FS_READ_OK)s=wb_read(r->handle,WB_MARKER,other,&ignored,&marker);
     if(s!=FS_READ_OK)goto end;
     if(journal||marker){s=FS_READ_DENIED;goto end;}
+    wb_sweep_orphans(r);
     rec->magic=WB_MAGIC;rec->version=1;rec->count=(unsigned)n;
     if(!wc_id(r->handle,&rec->root)){s=FS_READ_UNSUPPORTED;goto end;}
     /* Resolve and check every target before creating anything. */
@@ -709,6 +777,7 @@ static FS_READ_STATUS wb_batch_replace(const FS_READ_ROOT *r,const FS_BATCH_REPL
      /* Any pending batch, create or replace, blocks a new one until recovery. */
      s=wb_kind(r->handle,WB_JOURNAL,&kind,&present);if(present){s=FS_READ_DENIED;goto end;}if(s!=FS_READ_OK)goto end;
      s=wb_kind(r->handle,WB_MARKER,&kind,&present);if(present){s=FS_READ_DENIED;goto end;}if(s!=FS_READ_OK)goto end;}
+    wb_sweep_orphans(r);
     rec->magic=WBR_MAGIC;rec->version=1;rec->count=(unsigned)n;
     if(!wc_id(r->handle,&rec->root)){s=FS_READ_UNSUPPORTED;goto end;}
     /* Validate every target before anything is linked or created. The link

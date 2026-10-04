@@ -110,23 +110,18 @@ static void sc_crash(const char *exe,int pt)
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
  if(pt>=27)is_new();else is_old();
  FsReadClose(r);cleanup();}
-static void is_old_orph(void)
-{is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
- ck(count_skip(ROOT "\\*",".fs")==3,"root holds r1 r3 sub and orphans only");
- ck(count_skip(ROOT "\\sub\\*",".fs")==1,"sub holds r2");
- ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"no journal");
- ck(GetFileAttributesA(ROOT "\\.fstxn.commit")==INVALID_FILE_ATTRIBUTES,"no marker");}
 /* Writer killed at 21-23 (before any journal): orphan names only. A leftover
-   old pin makes r1 a two-link file, so the next batch on it is refused. */
+   old pin makes r1 a two-link file. Recovery now sweeps those names (mutant 10
+   skips the sweep), so the tree is clean and the next batch on r1 works. */
 static void sc_early(const char *exe,int pt)
 {FS_READ_ROOT *r;
  fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open early");
  ck(run_child(exe,pt,0)==80+pt,"early writer killed");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover");ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
- is_old_orph();
- ck(FsBatchReplace(r,trio,3)==FS_READ_DENIED,"orphan old pin makes the target two-link");
- is_old_orph();
- FsReadClose(r);nuke();}
+ is_old();
+ ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"batch on the target works after the sweep");
+ is_new();
+ FsReadClose(r);cleanup();}
 /* Writer killed at spt, recovery killed at rpt, then full recovery. */
 static void sc_reccrash(const char *exe,int spt,int rpt)
 {FS_READ_ROOT *r;
@@ -138,7 +133,7 @@ static void sc_reccrash(const char *exe,int spt,int rpt)
  if(spt==25&&rpt==30){is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\r3","three",0);}
  ck(FsBatchRecover(r)==FS_READ_OK,"recover after recovery crash");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
- if(spt>=27)is_new();else if(rpt==33)is_old_orph();else is_old();
+ if(spt>=27)is_new();else is_old();
  FsReadClose(r);cleanup();}
 /* Another process holds the target open without delete sharing, opened after
    our handle on it was closed: the rename-over is refused. */
@@ -207,6 +202,7 @@ static void mutant_child(const char *exe,int m)
  if(m==6)sc_hardlink();            /* single-link check removed */
  else if(m==7)sc_crash(exe,26);    /* replace roll-forward without a marker */
  else if(m==8)sc_reccrash(exe,26,30);/* rollback in ascending order */
+ else if(m==10)sc_early(exe,21);   /* orphan sweep skipped */
  else sc_foreign_pin(exe);         /* pin accepted by name, no FileId */
  ExitProcess(0);}
 int main(int argc,char **argv)
@@ -271,7 +267,7 @@ int main(int argc,char **argv)
  for(int k=0;k<3;k++)sc_foreign_handle(exe,k);
  sc_foreign_pin(exe);
  /* Mutants: each must fail the scenario that targets it. */
- for(int m=6;m<=9;m++){char a[32];int code;sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
+ for(int m=6;m<=10;m++){char a[32];int code;sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
  printf("test_fs_win_batch_replace ok\n");
  return 0;
