@@ -341,6 +341,29 @@ Test-fixture faults found on the way (not production):
 
 Status of the permission aspect on Windows after these runs: **shown for the cells above** on one runner and one account. Not shown: a file owned by another account, inherited ACLs, a directory the process cannot list, the denial of write-attributes on a link (accepted risk above), and any runner other than `windows-latest`. POSIX mode bits have no NTFS equivalent and are not claimed. Criterion 4 on Windows stays **partial** while long path and locked file are open.
 
+## Update: criterion 4 on Windows, long path aspect measured (2026-10-04)
+
+Measured by CI on the single `windows-latest` runner (NTFS). Two runs of `tests/test_fs_win_longpath.c` (ctest target `test_fs_win_longpath`, 22 cells), both read in the `build-test-msvc` and `asan-msvc` logs. Expected results were stated in the test header before each measurement. One prediction was wrong and is retracted below.
+
+What the source says (read from `src/fs_create_win.inc` on `master` at `00fb392`, not measured by itself): the Windows writers do not use `MAX_PATH`; each component is opened by handle with `NtCreateFile`. The limits are (a) every path segment, directories included, must be 1 to 240 wide characters (`wc_target_status`, lines 105 and 113, called by every writer; the leaf again at lines 184 and 488), and (b) `wcslen(path) >= WC_MAX_PATH` (4096, line 17) is INVALID for create, copy, move, replace and batch validation (lines 857, 938, 954, 987, the replace entry and `src/fs_batch_win.inc` line 117). `WC_MAX_PATH` is also the size of the path field of the journal records. No source comment states the reason for 240 or for 4096. The audit above lists the rejection of over-long segments in `wc_target_status` as intended (device-name section); the numbers themselves are caps set by the code, not by NTFS (NTFS allows 255 units per component). `FS_INTENT_MAX_PATH` (1024) belongs to the POSIX code and is not in the Windows branch.
+
+Retraction: run 37165509182 (test v1, `master` `b987d30`) predicted that leaves of 254 and 255 characters and directories of 250 characters work. That was wrong: the prediction used the NTFS limit and had not read the 240 cap. The result was `FAIL leaf 255 create` on `build-test-msvc` and on `asan-msvc` (`test_fs_win_longpath` Failed, 99% passed, 1 failed of 168, no other failure in msvc). It was a fault of the test expectation, not of the production code. In that run the 823-character block (7 cells) had passed.
+
+Run 37166084828 (test v2 `master` `00fb392` to `d23520e`, patch read back identical): `build-test-msvc` 168 of 168 passed, `test_fs_win_longpath` Passed; `build-test-linux` and `ast-inspect-windows-ninja` green; `asan-msvc` RED, see the last paragraph. In the asan log `test_fs_win_longpath` is Passed as well. All 22 cells matched their predictions.
+
+Shown, per cell (one runner, one account, NTFS):
+- A relative path of 823 characters (3 directories of 240 and a leaf of 100; the absolute path is above 260, asserted): create, replace, copy, move, remove, batch create and batch replace are OK; the bytes were read back through wide `\\?\` calls and the directory entry counts checked.
+- A leaf of 240 characters: create OK. A leaf of 241: refused, nothing created. A directory of 241 characters made by the test: create under it refused, nothing created.
+- A relative path of exactly 4095 characters (16 directories of 240 and a leaf of 239): create, replace, move and remove are OK.
+- A relative path of exactly 4096 characters (same directories, leaf of 240): create, copy target, move target and batch create are refused and nothing is created, the copy and move sources are unchanged. Against an existing file at that length (made by the test with wide calls): replace, remove, move source and copy source are refused and the file keeps its bytes.
+The lengths are asserted in the test. The status code of the refusals is not asserted (INVALID is the reading of the source, not an observation).
+
+Not shown: which layer refuses; paths above 32767 characters; names through an 8.3 alias; other volumes, runners or account types; long paths combined with a locked file or an ACL-protected directory. No mutant: the limits are several comparisons spread over one file, not one macro in `src`, so the mutant is NOT DONE.
+
+State of `asan-msvc` on run 37166084828 (`master` `d23520e`): FAILED, job 111329464561, 99% passed, 1 of 168 failed. The failing test is `test_agent_runner` (#83), `[FAIL] Repair required exactly two attempts (line 316)`, 39 of 40 inside the test. Its diagnostic lines in the log: the first build `gcc -fsyntax-only` ended with `exit=124 timeout=1` (the runner kills a build command after 10000 ms, `src/agent_runner.c` lines 501 and 508), the task then needed 3 attempts and 2 replans instead of 2 and 1 and still solved with one repair; a `gcc --version` probe right after exited 0. The test took 19.11 s; it took 2.53 s in the asan job of run 37137337315 and 3.71 s in the asan job of run 37165509182. The measured mechanism is a 10 s timeout of the first external compiler call on a loaded runner; why that call was slow is not determined. The change under test does not touch this test or `src/agent_runner.c`. This section therefore does not call `asan-msvc` green for run 37166084828.
+
+Status of the long path aspect on Windows after these runs: **shown for the cells above** on one runner. Criterion 4 on Windows stays **partial** while the locked-file aspect is open. The per-aspect table above is not edited by this update; the final closure rewrites the status paragraph and the whole table.
+
 ## Update: Phase 2 commit contract and "already applied" (`tests/test_agent_git_contract.c`, POSIX)
 
 Three new read-only checks in `src/agent_git.c`. Nothing calls them yet; wiring them into `apply-patch` is step 5.
