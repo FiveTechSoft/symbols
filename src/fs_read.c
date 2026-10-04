@@ -1711,6 +1711,14 @@ static int replace_name_check(int dir,const char *name,uint64_t dev,uint64_t ino
     }
     *present=0;return errno==ENOENT;
 }
+#if defined(FS_JREC_MUTANT_STAGE) || defined(FS_JREC_MUTANT_TEMP)
+static int replace_name_check_noid(int dir,const char *name,int *present)
+{
+    struct stat st;
+    *present=fstatat(dir,name,&st,AT_SYMLINK_NOFOLLOW)==0;
+    return *present||errno==ENOENT;
+}
+#endif
 static void replace_temp_names(const FS_REPLACE_RECORD *i,char *pub,char *rb)
 {
     snprintf(pub,48,".fsrp-p%.31s",i->newstage+6);
@@ -1741,10 +1749,22 @@ static FS_READ_STATUS replace_recover_locked(const FS_READ_ROOT *r)
     }
     replace_temp_names(&i,publish,rollback);
     s=move_parent(r,i.target,&dir,&leaf);if(s!=FS_READ_OK)return s;
-    if(!replace_name_check(r->fd,i.oldstage,i.olddev,i.oldino,&oldstage)||
-       !replace_name_check(r->fd,i.newstage,i.newdev,i.newino,&newstage)||
-       !replace_name_check(dir,publish,i.newdev,i.newino,&pub)||
-       !replace_name_check(dir,rollback,i.olddev,i.oldino,&rb)){
+#if defined(FS_JREC_MUTANT_STAGE)
+    /* Test only (test_fs_journal_fuzz_mc_stage): the identity of the two named stages is not checked. */
+#define FS_NAME_CHECK_STAGE(d,n,dev,ino,p) replace_name_check_noid(d,n,p)
+#else
+#define FS_NAME_CHECK_STAGE(d,n,dev,ino,p) replace_name_check(d,n,dev,ino,p)
+#endif
+#if defined(FS_JREC_MUTANT_TEMP)
+    /* Test only (test_fs_journal_fuzz_mc_temp): the identity of the publish and rollback links is not checked. */
+#define FS_NAME_CHECK_TEMP(d,n,dev,ino,p) replace_name_check_noid(d,n,p)
+#else
+#define FS_NAME_CHECK_TEMP(d,n,dev,ino,p) replace_name_check(d,n,dev,ino,p)
+#endif
+    if(!FS_NAME_CHECK_STAGE(r->fd,i.oldstage,i.olddev,i.oldino,&oldstage)||
+       !FS_NAME_CHECK_STAGE(r->fd,i.newstage,i.newdev,i.newino,&newstage)||
+       !FS_NAME_CHECK_TEMP(dir,publish,i.newdev,i.newino,&pub)||
+       !FS_NAME_CHECK_TEMP(dir,rollback,i.olddev,i.oldino,&rb)){
         s=FS_READ_DENIED;goto done;
     }
     exists=fstatat(dir,leaf,&target,AT_SYMLINK_NOFOLLOW)==0;

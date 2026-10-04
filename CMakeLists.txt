@@ -416,6 +416,30 @@ if(NOT WIN32)
     target_include_directories(test_fs_replace PRIVATE include)
     target_compile_definitions(test_fs_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_replace COMMAND test_fs_replace WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # Journal fuzz of the replace journal (M1 criterion 5, POSIX). Seeds in the test names; sequential
+    # (shared scratch directories). The two _mc targets drop one identity check in src/fs_read.c
+    # (FS_JREC_MUTANT_STAGE and FS_JREC_MUTANT_TEMP) and pass only when exactly the predicted class fails.
+    add_executable(test_fs_journal_fuzz tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz PRIVATE FS_CREATE_TEST_CRASH=1)
+    foreach(jf_seed 0 1 7 12648430)
+        add_test(NAME test_fs_journal_fuzz_seed_${jf_seed} COMMAND test_fs_journal_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(test_fs_journal_fuzz_seed_${jf_seed} PROPERTIES
+            ENVIRONMENT "FS_JFUZZ_SEED=${jf_seed}" TIMEOUT 300
+            PASS_REGULAR_EXPRESSION "journal fuzz iterations: 700 seed ${jf_seed} refused [0-9]+ ok [0-9]+ failures 0 class mask 0")
+    endforeach()
+    add_executable(test_fs_journal_fuzz_mc_stage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz_mc_stage PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz_mc_stage PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_STAGE=1 FS_JFUZZ_MUTANT_MASK=0x40)
+    add_test(NAME test_fs_journal_fuzz_mc_stage COMMAND test_fs_journal_fuzz_mc_stage WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_journal_fuzz_mc_stage PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 40")
+    add_executable(test_fs_journal_fuzz_mc_temp tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz_mc_temp PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz_mc_temp PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_TEMP=1 FS_JFUZZ_MUTANT_MASK=0x80)
+    add_test(NAME test_fs_journal_fuzz_mc_temp COMMAND test_fs_journal_fuzz_mc_temp WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_journal_fuzz_mc_temp PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 80")
     add_executable(test_fs_race_parent tests/test_fs_race_parent.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_race_parent PRIVATE include)
     target_compile_definitions(test_fs_race_parent PRIVATE FS_CREATE_TEST_CRASH=1)
