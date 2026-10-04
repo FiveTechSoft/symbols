@@ -38,9 +38,20 @@ static unsigned long long rnd(void)
 {rs^=rs>>12;rs^=rs<<25;rs^=rs>>27;return rs*2685821657736338717ULL;}
 static void ck(int ok,const char *label)
 {if(!ok){fprintf(stderr,"FAIL %s (%lu)\n",label,GetLastError());exit(1);}}
-static void failcell(int phase,int cls,int it,const char *what)
-{fprintf(stderr,"FAIL cell phase=%d class=%d iter=%d seed=%llu: %s\n",phase,cls,it,
-        (unsigned long long)rs,what);exit(1);}
+/* A failing cell does not stop the run: it is recorded under (phase, class, sub-case) with its first
+   example, the iteration is cleaned up, and the run goes on. At the end every distinct miss is printed and
+   the test fails. One CI round then shows all the misses, not only the first. */
+#define MAXMISS 64
+static char g_ex[512];                 /* names found by the last leftover scan, first example only */
+static struct {int phase,cls,sub,n,it;char what[96],ex[512];} miss[MAXMISS];
+static int nmiss,total_miss;
+#define FAIL(msg) do{note(phase,cls,it,sub,msg);goto done_iter;}while(0)
+static void note(int phase,int cls,int it,int sub,const char *what)
+{int i;total_miss++;
+ for(i=0;i<nmiss;i++)if(miss[i].phase==phase&&miss[i].cls==cls&&miss[i].sub==sub&&!strcmp(miss[i].what,what)){miss[i].n++;return;}
+ if(nmiss<MAXMISS){miss[nmiss].phase=phase;miss[nmiss].cls=cls;miss[nmiss].sub=sub;miss[nmiss].n=1;miss[nmiss].it=it;
+   snprintf(miss[nmiss].what,sizeof(miss[nmiss].what),"%s",what);
+   snprintf(miss[nmiss].ex,sizeof(miss[nmiss].ex),"%s",g_ex);nmiss++;}}
 static void put(const char *p,const char *v)
 {FILE *f=fopen(p,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"fixture");}
 static unsigned char *slurp(const char *p,size_t *n)
@@ -56,6 +67,7 @@ static int spit(const char *p,const void *b,size_t n)
  if(n&&fwrite(b,1,n,f)!=n){fclose(f);return 0;}
  return fclose(f)==0;}
 static int exists(const char *p){return GetFileAttributesA(p)!=INVALID_FILE_ATTRIBUTES;}
+static void cleanup(void);
 static void fixture(void)
 {ck(_mkdir(ROOT)==0&&_mkdir(INS)==0,"mkdir");
  put(INS "\\target","old");put(INS "\\decoy","old");}
@@ -76,8 +88,7 @@ static int count_pat(const char *pat)
  do{n++;}while(FindNextFileA(f,&d));FindClose(f);return n;}
 static unsigned long long fnv64(const unsigned char *p,size_t n)
 {unsigned long long h=14695981039346656037ULL;size_t i;
- for(i=0;i<n;i++)h=(h^p[i])*1099511628211ULL;
- return h;}
+ for(i=0;i<n;i++)h=(h^p[i])*1099511628211ULL;return h;}
 static size_t snap_dir(const char *dir,char *out,size_t cap,size_t at)
 {WIN32_FIND_DATAA d;char pat[600],p[700];HANDLE f;
  snprintf(pat,sizeof(pat),"%s\\*",dir);f=FindFirstFileA(pat,&d);
@@ -207,21 +218,40 @@ static int damage(int phase,int cls,int it)
    return 1;}
  default:return 0;}
  (void)i;}
+/* The workspace lock file .fstxn.lock is a control file that stays by design (WC_LOCK, opened FILE_OPEN_IF in
+   src/fs_create_win.inc), so it is not a leftover. The first version of this scan matched ".fstxn*" and
+   counted it: that was a mistake in this test, not a finding. Journal and marker names are listed exactly. */
+static int collect(const char *dir,const char *pat)
+{WIN32_FIND_DATAA d;char full[700];HANDLE f;int n=0;
+ snprintf(full,sizeof(full),"%s\\%s",dir,pat);f=FindFirstFileA(full,&d);
+ if(f==INVALID_HANDLE_VALUE)return 0;
+ do{size_t k=strlen(g_ex);n++;
+    if(k+strlen(dir)+strlen(d.cFileName)+4<sizeof(g_ex))snprintf(g_ex+k,sizeof(g_ex)-k,"%s\\%s ",dir,d.cFileName);
+ }while(FindNextFileA(f,&d));FindClose(f);return n;}
 static int leftover_names(void)
-{return count_pat(ROOT "\\.fsrp-*")+count_pat(ROOT "\\.fsrs-*")+count_pat(ROOT "\\.fsrb-*")+
-        count_pat(ROOT "\\.fst-*")+count_pat(ROOT "\\.fstxn*")+count_pat(INS "\\.fsrb-*")+
-        count_pat(INS "\\.fsrp-*")+count_pat(INS "\\.fsrs-*")+count_pat(INS "\\.fst*");}
+{static const char *J[]={".fstxn.intent",".fstxn.ccommit",".fstxn.remove",".fstxn.rcommit",".fstxn.move",
+   ".fstxn.mcommit",".fstxn.replace",".fstxn.pcommit",".fstxn.batch",".fstxn.commit"};
+ int n=0;size_t i;g_ex[0]=0;
+ n+=collect(ROOT,".fsrp-*");n+=collect(ROOT,".fsrs-*");n+=collect(ROOT,".fsrb-*");n+=collect(ROOT,".fst-*");
+ n+=collect(INS,".fsrp-*");n+=collect(INS,".fsrs-*");n+=collect(INS,".fsrb-*");n+=collect(INS,".fst-*");
+ for(i=0;i<sizeof(J)/sizeof(J[0]);i++)n+=collect(ROOT,J[i]);
+ return n;}
+static void remove_stale(void)
+{sweep_dir(INS);sweep_dir(ROOT);_rmdir(INS);_rmdir(ROOT);ck(!exists(ROOT),"stale scratch removed");}
 int main(int argc,char **argv)
 {char exe[768];DWORD got;int phase,cls,it,iters=20;unsigned long long seed=1786707969ULL;
  static char before[65536],after[65536],again[65536];
  long cells=0,refused=0,ok_old=0,ok_new=0;
  if(argc==3&&!strcmp(argv[1],"child")){child(atoi(argv[2]));return 200;}
+ remove_stale();
  if(getenv("FS_WJFUZZ_SEED"))seed=strtoull(getenv("FS_WJFUZZ_SEED"),NULL,10);
  if(getenv("FS_WJFUZZ_ITERS"))iters=atoi(getenv("FS_WJFUZZ_ITERS"));
  ck(iters>0&&iters<=1000,"iters");
  got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");
  for(phase=3;phase<=6;phase++)for(cls=0;cls<NCLS;cls++)for(it=0;it<iters;it++){
-   FS_READ_ROOT *r;FS_READ_STATUS s;int want,state_new,took;
+   FS_READ_ROOT *r;FS_READ_STATUS s;int want,state_new,took,sub;
+   sub=cls==C_NAME?it%NNAME:cls==C_SCALAR?it%NSCALAR:cls==C_SHAPE?it%4:cls==C_DELETE?(phase==6?it%3:0):0;
+   g_ex[0]=0;
    rs=seed*1000003ULL+(unsigned long long)(phase*100+cls*10)*7919ULL+(unsigned long long)it*104729ULL+1ULL;
    if(!rs)rs=1;
    if(cls==C_PAIR&&phase!=6)continue;
@@ -234,26 +264,32 @@ int main(int argc,char **argv)
    if(s==FS_READ_DENIED){
      refused++;
      snap(after,sizeof(after));
-     if(strcmp(before,after))failcell(phase,cls,it,"refusal changed the workspace");
-     if(want==2)failcell(phase,cls,it,"predicted OK, recovery refused");
+     if(strcmp(before,after))FAIL("refusal changed the workspace");
+     if(want==2)FAIL("predicted OK, recovery refused");
    }else if(s==FS_READ_OK){
      int is_old=file_is(INS "\\target","old"),is_new=file_is(INS "\\target","new");
-     if(want==1)failcell(phase,cls,it,"predicted refusal, recovery returned OK (damage followed or ignored)");
-     if(!is_old&&!is_new)failcell(phase,cls,it,"OK but the target is neither old nor new");
-     if(want==2&&is_new!=state_new)failcell(phase,cls,it,"OK with the other state than predicted");
-     if(links_of(INS "\\target")!=1)failcell(phase,cls,it,"OK but the target is not a single link");
-     if(!file_is(INS "\\decoy","old"))failcell(phase,cls,it,"OK but the decoy changed");
-     if(leftover_names())failcell(phase,cls,it,"OK but a pin, stage, rollback or journal name is left");
+     if(want==1)FAIL("predicted refusal, recovery returned OK (damage followed or ignored)");
+     if(!is_old&&!is_new)FAIL("OK but the target is neither old nor new");
+     if(want==2&&is_new!=state_new)FAIL("OK with the other state than predicted");
+     if(links_of(INS "\\target")!=1)FAIL("OK but the target is not a single link");
+     if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
+     if(leftover_names())FAIL("OK but a pin, stage, rollback or journal name is left");
      if(is_old)ok_old++;else ok_new++;
      snap(after,sizeof(after));
-     if(FsReplaceRecover(r)!=FS_READ_OK)failcell(phase,cls,it,"second recovery not OK");
+     if(FsReplaceRecover(r)!=FS_READ_OK)FAIL("second recovery not OK");
      snap(again,sizeof(again));
-     if(strcmp(after,again))failcell(phase,cls,it,"second recovery changed the workspace");
+     if(strcmp(after,again))FAIL("second recovery changed the workspace");
    }else{
-     fprintf(stderr,"status=%d\n",(int)s);failcell(phase,cls,it,"recovery returned neither OK nor DENIED");
+     fprintf(stderr,"status=%d\n",(int)s);FAIL("recovery returned neither OK nor DENIED");
    }
+  done_iter:
    FsReadClose(r);cleanup();
  }
+ if(total_miss){int m;
+   for(m=0;m<nmiss;m++)fprintf(stderr,"MISS phase=%d class=%s sub=%d x%d (first iter %d): %s%s%s\n",miss[m].phase,CLS[miss[m].cls],
+        miss[m].sub,miss[m].n,miss[m].it,miss[m].what,miss[m].ex[0]?" | names: ":"",miss[m].ex);
+   fprintf(stderr,"FAIL %d cells missed their prediction or the oracle in %d distinct groups (seed %llu), of %ld cells\n",
+        total_miss,nmiss,(unsigned long long)seed,cells);exit(1);}
  printf("windows replace journal fuzz: %ld cells, seed %llu, %d per phase and class: refused %ld, ok old %ld, ok new %ld\n",
         cells,seed,iters,refused,ok_old,ok_new);
  (void)CLS;return 0;}
