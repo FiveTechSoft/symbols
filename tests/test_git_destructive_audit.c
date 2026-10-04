@@ -7,14 +7,14 @@
    Limits: this is a text scan. It does not see commands built from pieces
    at run time, scripts outside src/ and include/, or workflows. */
 #ifdef _WIN32
-#include <stdio.h>
-int main(void){printf("SKIP: test_git_destructive_audit is POSIX only (directory walk)\n");return 0;}
+#include <windows.h>
 #else
 #include <dirent.h>
+#include <sys/stat.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 static int run_n,pass_n;
 #define CHECK(x,m) do{run_n++;if(x){pass_n++;printf("  [PASS] %s\n",m);}else printf("  [FAIL] %s (line %d)\n",m,__LINE__);}while(0)
 
@@ -76,22 +76,46 @@ static void ScanFile(const char *path)
     }
     fclose(f);
 }
+static void ScanIfSource(const char *path,const char *name)
+{
+    size_t L=strlen(name);
+    if((L>2&&!strcmp(name+L-2,".c"))||(L>2&&!strcmp(name+L-2,".h"))||
+       (L>4&&!strcmp(name+L-4,".inc")))ScanFile(path);
+}
+#ifdef _WIN32
+/* Same walk with FindFirstFile. Paths keep forward slashes, which the Windows API accepts and which match the
+   whitelist keys. */
+static void Walk(const char *dir)
+{
+    char pat[1024];WIN32_FIND_DATAA fd;HANDLE h;
+    snprintf(pat,sizeof pat,"%s/*",dir);
+    h=FindFirstFileA(pat,&fd);
+    if(h==INVALID_HANDLE_VALUE){printf("  cannot open dir %s\n",dir);unlisted++;return;}
+    do{
+        char p[1024];
+        if(fd.cFileName[0]=='.')continue;
+        snprintf(p,sizeof p,"%s/%s",dir,fd.cFileName);
+        if(fd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY){Walk(p);continue;}
+        ScanIfSource(p,fd.cFileName);
+    }while(FindNextFileA(h,&fd));
+    FindClose(h);
+}
+#else
 static void Walk(const char *dir)
 {
     DIR *d=opendir(dir);struct dirent *e;
     if(!d){printf("  cannot open dir %s\n",dir);unlisted++;return;}
     while((e=readdir(d))){
-        char p[1024];struct stat st;size_t L;
+        char p[1024];struct stat st;
         if(e->d_name[0]=='.')continue;
         snprintf(p,sizeof p,"%s/%s",dir,e->d_name);
         if(stat(p,&st)!=0)continue;
         if(S_ISDIR(st.st_mode)){Walk(p);continue;}
-        L=strlen(e->d_name);
-        if((L>2&&!strcmp(e->d_name+L-2,".c"))||(L>2&&!strcmp(e->d_name+L-2,".h"))||
-           (L>4&&!strcmp(e->d_name+L-4,".inc")))ScanFile(p);
+        ScanIfSource(p,e->d_name);
     }
     closedir(d);
 }
+#endif
 /* agent_git.c is the delivery contract: every "git apply" it builds must be
    a dry run, and it must not name any destructive command. */
 static int ApplyOnlyChecks(const char *path)
@@ -134,4 +158,3 @@ int main(void)
     printf("\n%d/%d passed\n",pass_n,run_n);
     return pass_n==run_n?0:1;
 }
-#endif
