@@ -240,6 +240,12 @@ if(WIN32)
     target_include_directories(test_fs_win_longpath PRIVATE include)
     add_test(NAME test_fs_win_longpath COMMAND test_fs_win_longpath
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_locked tests/test_fs_win_locked.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_locked PRIVATE include)
+    add_test(NAME test_fs_win_locked COMMAND test_fs_win_locked
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_locked PROPERTIES TIMEOUT 120)
     add_executable(test_fs_win_perm tests/test_fs_win_perm.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_perm PRIVATE include)
