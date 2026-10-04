@@ -31,7 +31,16 @@ static uint32_t count_lines(const char *text)
     return lines;
 }
 
-/* Helper to strip '\r' from a string, returning a newly allocated LF-only string */
+/* A CR is dropped from the working text only when it is the CR of a CRLF pair; a CR that is
+   not directly before an LF is content and is kept everywhere (file, needle, replacement).
+   AGENT_PATCH_CR_MUTANT (test only) restores the old rule: every CR is dropped. */
+#ifdef AGENT_PATCH_CR_MUTANT
+#define CR_DROP(s, i) ((s)[i] == '\r')
+#else
+#define CR_DROP(s, i) ((s)[i] == '\r' && (s)[(i) + 1] == '\n')
+#endif
+
+/* Helper to strip the CR of each CRLF pair from a string, returning a newly allocated string */
 static char *strip_cr(const char *src)
 {
     if (!src)
@@ -45,7 +54,7 @@ static char *strip_cr(const char *src)
     size_t j = 0;
     for (size_t i = 0; i < len; i++)
     {
-        if (src[i] != '\r')
+        if (!CR_DROP(src, i))
             dst[j++] = src[i];
     }
     dst[j] = '\0';
@@ -54,8 +63,8 @@ static char *strip_cr(const char *src)
 
 /* Per-newline ending flags. work_buf is LF-normalised; flags[i] is 1 when
    work_buf[i] is a '\n' that the file wrote as "\r\n". Untouched lines keep
-   the ending they had on disk (mixed files stay mixed). A lone '\r' that is
-   not followed by '\n' is still dropped, as before (not measured here). */
+   the ending they had on disk (mixed files stay mixed). A '\r' that is not
+   directly before a '\n' is content, kept in work_buf and written back as is. */
 static unsigned char *eol_flags_from(const char *orig, size_t *dflt_out)
 {
     size_t len = strlen(orig);
@@ -66,7 +75,7 @@ static unsigned char *eol_flags_from(const char *orig, size_t *dflt_out)
     *dflt_out = 0;
     for (size_t i = 0; i < len; i++)
     {
-        if (orig[i] == '\r') continue;
+        if (CR_DROP(orig, i)) continue;
         if (orig[i] == '\n')
         {
             fl[j] = (i > 0 && orig[i - 1] == '\r') ? 1 : 0;

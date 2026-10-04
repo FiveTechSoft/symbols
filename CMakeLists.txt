@@ -771,3 +771,8 @@ add_executable(test_agent_patch_eol_mc tests/test_agent_patch_eol.c src/agent_pa
 target_include_directories(test_agent_patch_eol_mc PRIVATE include)
 target_compile_definitions(test_agent_patch_eol_mc PRIVATE AGENT_PATCH_EOL_MUTANT=1)
 add_test(NAME test_agent_patch_eol_mc COMMAND test_agent_patch_eol_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_executable(test_agent_patch_eol_crmc tests/test_agent_patch_eol.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_eol_crmc PRIVATE include)
+target_compile_definitions(test_agent_patch_eol_crmc PRIVATE AGENT_PATCH_CR_MUTANT=1)
+add_test(NAME test_agent_patch_eol_crmc COMMAND test_agent_patch_eol_crmc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
