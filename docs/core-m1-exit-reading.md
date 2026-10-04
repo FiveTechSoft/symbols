@@ -54,7 +54,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
    - L5 plain empty lock: applies (control).
    - L6 lock is a hard link to another empty file: **apply returned 1 and `a.c` became NEW.** This is a measured
      behaviour, not an asserted one: the test prints it and checks nothing. `wc_lock` checks the kind (file) and size
-     (0) but no link count. Whether that is acceptable is a question for Antonio, not a reading of the criterion.
+     (0) but no link count. **Decision (main agent, under the standing mandate, retractable by Antonio): accepted as a documented limit, no source change.** The lock is an empty file whose only function is mutual exclusion among cooperating writers; a hard link to it shares that lock object and exposes no user bytes; whoever can create hard links inside the workspace is outside the cooperating-writer model anyway. The test still asserts nothing for L6.
    Limits: one runner and one account; no `LockFileEx` byte-range contention case (a second process waiting on the
    lock was not tested); the lock cases are sequential in one process; the POSIX mode check has no Windows
    equivalent, so this is parity of intent, not of mechanism. **Shown for L1 to L5, L6 measured only.**
