@@ -52,38 +52,53 @@ static char *strip_cr(const char *src)
     return dst;
 }
 
-/* Helper to convert LF-only text to CRLF if target file originally used CRLF */
-static char *restore_crlf_if_needed(const char *src, bool original_had_crlf, size_t *out_size)
+/* Per-newline ending flags. work_buf is LF-normalised; flags[i] is 1 when
+   work_buf[i] is a '\n' that the file wrote as "\r\n". Untouched lines keep
+   the ending they had on disk (mixed files stay mixed). A lone '\r' that is
+   not followed by '\n' is still dropped, as before (not measured here). */
+static unsigned char *eol_flags_from(const char *orig, size_t *dflt_out)
+{
+    size_t len = strlen(orig);
+    unsigned char *fl = (unsigned char *)calloc(len + 1, 1);
+    if (!fl) return NULL;
+    size_t j = 0;
+    int have_dflt = 0;
+    *dflt_out = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (orig[i] == '\r') continue;
+        if (orig[i] == '\n')
+        {
+            fl[j] = (i > 0 && orig[i - 1] == '\r') ? 1 : 0;
+            if (!have_dflt) { *dflt_out = fl[j]; have_dflt = 1; }
+        }
+        j++;
+    }
+    return fl;
+}
+
+#ifdef AGENT_PATCH_EOL_MUTANT /* test-only: the old "any CRLF means all CRLF" rule */
+#define EOL_SET(fl, i, len) (memchr((fl), 1, (len) + 1) != NULL)
+#else
+#define EOL_SET(fl, i, len) ((fl)[(i)])
+#endif
+
+/* Write src with CR inserted before every '\n' whose flag is set. */
+static char *restore_eol(const char *src, const unsigned char *fl, size_t *out_size)
 {
     if (!src)
         return NULL;
-
-    if (!original_had_crlf)
+    size_t len = strlen(src), extra = 0;
+    for (size_t i = 0; i < len; i++)
     {
-        size_t len = strlen(src);
-        char *dst = (char *)malloc(len + 1);
-        if (!dst) return NULL;
-        memcpy(dst, src, len + 1);
-        if (out_size) *out_size = len;
-        return dst;
+        if (src[i] == '\n' && fl && EOL_SET(fl, i, len)) extra++;
     }
-
-    /* Count LFs that need CR */
-    size_t extra = 0;
-    for (const char *p = src; *p; p++)
-    {
-        if (*p == '\n') extra++;
-    }
-
-    size_t len = strlen(src);
     char *dst = (char *)malloc(len + extra + 1);
     if (!dst) return NULL;
-
     size_t j = 0;
     for (size_t i = 0; i < len; i++)
     {
-        if (src[i] == '\n')
-            dst[j++] = '\r';
+        if (src[i] == '\n' && fl && EOL_SET(fl, i, len)) dst[j++] = '\r';
         dst[j++] = src[i];
     }
     dst[j] = '\0';
@@ -580,7 +595,6 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     if (!orig_content)
         return 0;
 
-    bool had_crlf = (strstr(orig_content, "\r\n") != NULL);
 
     if (plan->backup_content)
         free(plan->backup_content);
@@ -592,6 +606,13 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
     char *work_buf = strip_cr(plan->backup_content);
     if (!work_buf)
         return 0;
+    size_t eol_dflt = 0;
+    unsigned char *work_fl = eol_flags_from(plan->backup_content, &eol_dflt);
+    if (!work_fl)
+    {
+        free(work_buf);
+        return 0;
+    }
 
     /* Sequentially apply all hunks */
     for (uint32_t h = 0; h < plan->hunk_count; h++)
@@ -613,6 +634,7 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
             free(needle);
             free(repl);
             free(work_buf);
+            free(work_fl);
             return 0;
         }
 
@@ -622,6 +644,7 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
             free(needle);
             free(repl);
             free(work_buf);
+            free(work_fl);
             return 0;
         }
 
@@ -638,9 +661,48 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
             free(needle);
             free(repl);
             free(work_buf);
+            free(work_fl);
             return 0;
         }
 
+        unsigned char *new_fl = (unsigned char *)calloc(new_sz + 1, 1);
+        if (!new_fl)
+        {
+            free(new_content);
+            free(needle);
+            free(repl);
+            free(work_buf);
+            free(work_fl);
+            return 0;
+        }
+        memcpy(new_fl, work_fl, prefix_len);
+        memcpy(new_fl + prefix_len + repl_len, work_fl + prefix_len + needle_len, suffix_len);
+        {
+            /* k-th newline of the replacement takes the k-th newline's ending
+               of the replaced region; extra ones take its last, or the file's
+               first ending when the region had no newline. */
+            size_t k = 0, ncnt = 0;
+            unsigned char last = (unsigned char)eol_dflt;
+            for (size_t i = 0; i < needle_len; i++)
+                if (needle[i] == '\n') ncnt++;
+            for (size_t i = 0; i < repl_len; i++)
+            {
+                if (repl[i] != '\n') continue;
+                if (ncnt)
+                {
+                    size_t seen = 0, pos = 0;
+                    for (size_t q = 0; q < needle_len; q++)
+                        if (needle[q] == '\n')
+                        {
+                            pos = q;
+                            if (seen++ == k) break;
+                        }
+                    last = work_fl[prefix_len + pos];
+                }
+                new_fl[prefix_len + i] = last;
+                k++;
+            }
+        }
         memcpy(new_content, work_buf, prefix_len);
         memcpy(new_content + prefix_len, repl, repl_len);
         memcpy(new_content + prefix_len + repl_len,
@@ -650,13 +712,16 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
         free(needle);
         free(repl);
         free(work_buf);
+        free(work_fl);
         work_buf = new_content;
+        work_fl = new_fl;
     }
 
     /* 4. Restore original line ending convention before writing to disk */
     size_t final_sz = 0;
-    char *final_content = restore_crlf_if_needed(work_buf, had_crlf, &final_sz);
+    char *final_content = restore_eol(work_buf, work_fl, &final_sz);
     free(work_buf);
+    free(work_fl);
 
     if (!final_content)
         return 0;
