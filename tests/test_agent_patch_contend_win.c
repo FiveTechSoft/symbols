@@ -17,6 +17,13 @@
        before it takes the lock, FsReplaceFile takes the lock, and replace_target passes the bytes it read
        as the expected bytes, so the loser sees drift.
    Mutant 12 (AGENT_PATCH_APPLY_MUTANT, target test_agent_patch_contend_win_mc) drops that drift guard.
+   FIRST RUN (545491e) MEASURED: the mutant SURVIVED (mask 0). Reason read from the source: the mutant
+   re-reads the target right after the hook, and FsReplaceFile (fs_read.c) compares again under the lock.
+   With both children waking together the re-read still saw OLD, so the second one was refused anyway.
+   m160 staggers the hooks (child 9 sleeps 1500 ms, child 7 sleeps 4000 ms) so that the re-read of the
+   second child happens after the first replaced. Prediction for that, not measured: the real test passes,
+   the mutant dies in exactly the W2 cell. If that is wrong the mutant target stays red.
+   Each child writes contend_child_<which>.log (rc, io_diag); the parent prints them after W2.
    Predicted kill set: exactly one cell, W2 "exactly one applier won". Then both children exit 10 and the
    later one overwrites the earlier. W1 and the other W2 cells pass in the mutant build.
    Limits: one runner, one account, two writers; the waiting child is not killed, power loss is not
@@ -102,7 +109,35 @@ static int leftovers(void)
 }
 
 /* ---- child ---- */
-static void hook_sleep(void) { Sleep(1500); }
+static DWORD hook_ms = 1500;
+static void hook_sleep(void) { Sleep(hook_ms); }
+static void child_log(const char *which, int rc, const char *diag)
+{
+    char name[64];
+    FILE *f;
+    snprintf(name, sizeof(name), "contend_child_%s.log", which);
+    f = fopen(name, "wb");
+    if (!f) return;
+    fprintf(f, "child %s: hook %lu ms, PatchApplyAtomic rc %d, io_diag [%s]\n", which,
+            (unsigned long)hook_ms, rc, diag ? diag : "");
+    fclose(f);
+}
+static void dump_logs(void)
+{
+    const char *w[2] = {"9", "7"};
+    int i;
+    for (i = 0; i < 2; i++)
+    {
+        char name[64], line[512];
+        FILE *f;
+        snprintf(name, sizeof(name), "contend_child_%s.log", w[i]);
+        f = fopen(name, "rb");
+        if (!f) { printf("  (no log from child %s)\n", w[i]); continue; }
+        while (fgets(line, sizeof(line), f)) printf("  (%s)", line);
+        fclose(f);
+        remove(name);
+    }
+}
 static int child_main(const char *which, int delay)
 {
     PATCH_PLAN p;
@@ -111,9 +146,10 @@ static int child_main(const char *which, int delay)
     PatchPlanInit(&p, WS "\\a.c");
     PatchPlanSetWorkspace(&p, WS);
     PatchPlanAddHunk(&p, 1, "", OLDC, repl, "");
-    if (delay) g_patch_test_before_replace = hook_sleep;
+    if (delay) { hook_ms = (DWORD)delay; g_patch_test_before_replace = hook_sleep; }
     rc = PatchApplyAtomic(&p);
     g_patch_test_before_replace = NULL;
+    child_log(which, rc, p.io_diag);
     PatchPlanFree(&p);
     return rc == 1 ? EXIT_APPLIED : rc == 0 ? EXIT_REFUSED : EXIT_OTHER;
 }
@@ -125,7 +161,7 @@ static int spawn(const char *which, int delay, PROCESS_INFORMATION *pi)
     STARTUPINFOA si;
     DWORD n = GetModuleFileNameA(NULL, exe, sizeof(exe));
     if (n == 0 || n >= sizeof(exe)) return 0;
-    snprintf(cmd, sizeof(cmd), "\"%s\" child %s%s", exe, which, delay ? " delay" : "");
+    snprintf(cmd, sizeof(cmd), "\"%s\" child %s %d", exe, which, delay);
     memset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     memset(pi, 0, sizeof(*pi));
@@ -156,7 +192,7 @@ int main(int argc, char **argv)
 {
     int ran = 0;
     if (argc >= 3 && !strcmp(argv[1], "child"))
-        return child_main(argv[2], argc >= 4 && !strcmp(argv[3], "delay"));
+        return child_main(argv[2], argc >= 4 ? atoi(argv[3]) : 0);
 
     puts("W1 a child waits behind a foreign exclusive lock, then applies");
     {
@@ -193,8 +229,8 @@ int main(int argc, char **argv)
         DWORD c9, c7;
         int applied, refused, winner9;
         reset();
-        ck(spawn("9", 1, &p9), "child 9 started");
-        ck(spawn("7", 1, &p7), "child 7 started");
+        ck(spawn("9", 1500, &p9), "child 9 started");
+        ck(spawn("7", 4000, &p7), "child 7 started");
         c9 = finish(&p9, "W2 child 9");
         c7 = finish(&p7, "W2 child 7");
         applied = (c9 == EXIT_APPLIED) + (c7 == EXIT_APPLIED);
@@ -202,6 +238,7 @@ int main(int argc, char **argv)
         winner9 = (c9 == EXIT_APPLIED);
         printf("  (measured: child 9 exit %lu, child 7 exit %lu, a.c %s)\n", (unsigned long)c9, (unsigned long)c7,
                is(WS "\\a.c", NEW9) ? "x = 9" : is(WS "\\a.c", NEW7) ? "x = 7" : is(WS "\\a.c", OLDC) ? "OLD" : "OTHER");
+        dump_logs();
         ck(applied == 1 && refused == 1, "exactly one applier won, the other was refused");
         ck(is(WS "\\a.c", NEW9) || is(WS "\\a.c", NEW7), "a.c holds exactly one applier's text");
         ck(applied != 1 || is(WS "\\a.c", winner9 ? NEW9 : NEW7), "a.c holds the text of the child that applied");

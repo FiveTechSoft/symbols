@@ -55,8 +55,11 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
    - L6 lock is a hard link to another empty file: **apply returned 1 and `a.c` became NEW.** This is a measured
      behaviour, not an asserted one: the test prints it and checks nothing. `wc_lock` checks the kind (file) and size
      (0) but no link count. **Decision (main agent, under the standing mandate, retractable by Antonio): accepted as a documented limit, no source change.** The lock is an empty file whose only function is mutual exclusion among cooperating writers; a hard link to it shares that lock object and exposes no user bytes; whoever can create hard links inside the workspace is outside the cooperating-writer model anyway. The test still asserts nothing for L6.
-   Limits: one runner and one account; no `LockFileEx` byte-range contention case (a second process waiting on the
-   lock was not tested); the lock cases are sequential in one process; the POSIX mode check has no Windows
+   Limits: one runner and one account; a second process waiting on the lock is now tried by `test_agent_patch_contend_win` (m159, two
+   processes on one runner, passed in msvc and asan, 2026-10-04). **W2 sensitivity is NOT shown:** its mutant target
+   survived on the first run because the mutant re-reads the target and `FsReplaceFile` compares again under the lock;
+   m160 staggers the sleeps and is not measured yet. Not tried: a waiter killed while holding the lock, power loss,
+   other runners; the lock cases are sequential in one process; the POSIX mode check has no Windows
    equivalent, so this is parity of intent, not of mechanism. **Shown for L1 to L5, L6 measured only.**
 3. **Mutant (m149).** Mutant 12 (`AGENT_PATCH_APPLY_MUTANT`, test-only, in `replace_target`): the drift guard is
    dropped, the bytes the target holds at replace time are passed as the expected bytes, so a change between the read
