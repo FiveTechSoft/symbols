@@ -1,15 +1,24 @@
-#ifndef _WIN32
 #include "agent_git.h"
 #include "agent_shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#define RMTREE(p) "if exist " p " rmdir /s /q " p
+#define DELFILE "del new.txt"
+#else
 #include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#define RMTREE(p) "rm -rf " p
+#define DELFILE "rm new.txt"
+#endif
 /* Phase 2: submodule states seen by AgentGitPreflight. Real repositories:
    a library repo used as a file:// submodule of a super repo. Every state
    that differs from the commit recorded in the super repo must be refused
-   as a dirty tree; a recorded and committed state must be ready. POSIX
-   only (fixtures use sh); the Windows build prints a skip. */
+   as a dirty tree; a recorded and committed state must be ready. Runs on
+   POSIX and, since m116, on Windows (rmdir, mkdir and del differ). */
 #define S "test_agent_git_submodule_scratch"
 #define SUP S "/super"
 #define SUB S "/super/lib"
@@ -43,8 +52,8 @@ static void expect(const char *repo,GIT_PREFLIGHT_STATUS want,unsigned staged,un
 int main(void)
 {
     printf("=== Submodule preflight ===\n");
-    (void)system("rm -rf " S);
-    CHECK(mkdir(S,0755)==0,"scratch");
+    (void)system(RMTREE(S));
+    CHECK(MKDIR(S)==0,"scratch");
     CHECK(Run(S,"git init -q -b main lib.git.work",0),"library repo");
     CHECK(Run(S "/lib.git.work","git config user.name F",0)&&Run(S "/lib.git.work","git config user.email f@example.invalid",0),"library identity");
     CHECK(Put(S "/lib.git.work/l.txt","one\n","wb")&&Run(S "/lib.git.work","git add l.txt",0)&&Run(S "/lib.git.work","git commit -q -m one",0),"library commit");
@@ -64,7 +73,7 @@ int main(void)
 
     CHECK(Put(SUB "/new.txt","x\n","wb"),"untracked file in submodule");
     expect(SUP,GIT_PREFLIGHT_DIRTY_TREE,0,1,"untracked file inside submodule: refused");
-    CHECK(Run(SUB,"rm new.txt",0),"remove it");
+    CHECK(Run(SUB,DELFILE,0),"remove it");
     expect(SUP,GIT_PREFLIGHT_READY,0,0,"removed: ready");
 
     CHECK(Run(SUB,"git config user.name F",0)&&Run(SUB,"git config user.email f@example.invalid",0),"submodule identity");
@@ -84,11 +93,7 @@ int main(void)
     CHECK(Run(S,"git clone -q super clone",0),"plain clone, submodule not initialised");
     expect(S "/clone",GIT_PREFLIGHT_READY,0,0,"uninitialised submodule: ready (nothing to compare)");
 
-    (void)system("rm -rf " S);
+    (void)system(RMTREE(S));
     printf("\n=== %d/%d passed ===\n",pass_n,run_n);
     return pass_n==run_n?0:1;
 }
-#else
-#include <stdio.h>
-int main(void){printf("test_agent_git_submodule: skipped on Windows\n");return 0;}
-#endif
