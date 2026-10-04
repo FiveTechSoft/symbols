@@ -4,7 +4,7 @@ Reading of the five Phase 1 exit criteria in `ROADMAP.md` against the tests on `
 with the open gaps named. It is a reading of sources and of CI results already recorded in
 [core-m0-m1-exit-audit.md](core-m0-m1-exit-audit.md); nothing here is a new measurement. M1 is not declared.
 The declaration is Antonio's. Last measured CI state recorded for the M1 cells: linux 171/171,
-msvc and asan-msvc 184/184 (run 37211667043, `5d0455f`; 181 at m134), one runner per platform (`windows-latest`, NTFS,
+msvc and asan-msvc 185/185 (run 37215099208, `85bc2ff`; 184 at m142, 181 at m134), one runner per platform (`windows-latest`, NTFS,
 one account; one Linux runner), cooperating writers, no power-loss claim. A ctest Passed line hides the
 test output, so statuses come from ctest pass lines and the sources.
 
@@ -14,7 +14,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 |---|---|---|---|
 | C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. **Not shown:** 8.3 aliases (`test_fs_win_aliases_short` is Skipped), per-directory case flag, other accounts, a rename race against a swapped parent (the POSIX `test_fs_race_parent` has no Windows counterpart). |
 | C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file calls do not sweep; an unshared `.fsrp-` pin is kept by design; no crash during the sweep was injected; a foreign inode at a target is refused, not restored (same on POSIX). |
-| C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue and the diff-apply mutant are the gaps below. |
+| C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the diff-apply mutant and the hard-linked lock question are the gaps below. |
 | C4 | Separator, case, permission, long path, newline, locked file fixtures | **Shown** for the six aspects within limits (`test_fs_c4_posix` and others). | **Shown** for the six aspects on the listed cells (`test_fs_win_case`, long-path, locked-file and EOL tests), not "met". Mutants only for permission. |
 | C5 | Fuzzing of malformed paths and manifests: no out-of-workspace write | **Shown** for path operations and manifests with logged seeds: default, 1, 7, 12648430 at 400 iterations. | **Shown for the same operations with fewer iterations on the default seed** (see correction). Seeds 1, 7, 12648430 at 400. |
 
@@ -39,10 +39,25 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
    hidden by ctest and was not read. Limits: Windows only, `windows-latest`, one account, process kill (not power
    loss), cooperating writers; an in-flight journal written by a build that named the stage `.fsrp-` is accepted
    by the validator but that case is not tested.
-2. **T9.** The POSIX case plants a `.fstxn.lock` with mode 0644 and expects a fail-closed apply. Windows has no mode
-   bits, so a port is not a translation. The nearest Windows question is what `AgentPatch` does when `.fstxn.lock`
-   is not a plain file (a directory, a symlink, a hard-linked file, or held open by another process). That is not
-   tested through `AgentPatch`. **Not shown.**
+2. **T9 analogue (m144 to m146).** The POSIX case plants a `.fstxn.lock` with mode 0644 and expects a fail-closed
+   apply. Windows has no mode bits, so a port is not a translation; `tests/test_agent_patch_lock_win.c` asks the
+   nearest question: what does `PatchApplyAtomic` do when `.fstxn.lock` is not a plain empty file. Final run 37215099208
+   (`297c41d` to `85bc2ff`), msvc and asan 185 of 185, marker "agentpatch lock cells ran: 6" (hidden by ctest on a
+   pass, so the pass line is the evidence). Two earlier reds were fixture bugs in the test, not source findings: m144
+   (run 37213626113) counted the symlink target file as a leftover name, m145 (run 37214252790) printed 5 for a
+   marker that expects 6. Measured on msvc (values read from the m145 log; the m146 log was not read, it passed):
+   - L1 lock is a directory: apply returned 0, `a.c` stayed OLD, io_diag "denied: file changed, is a link, or an Fs
+     transaction is pending", no leftover names, the directory untouched, the same plan applied after removal.
+   - L2 lock is a file symlink (the runner could create one, flag `0x2`): same refusal, the link was not followed.
+   - L3 lock is a non-empty file: same refusal, the file untouched.
+   - L4 lock held open by another handle with no sharing: same refusal, no hang, applies once the holder closes.
+   - L5 plain empty lock: applies (control).
+   - L6 lock is a hard link to another empty file: **apply returned 1 and `a.c` became NEW.** This is a measured
+     behaviour, not an asserted one: the test prints it and checks nothing. `wc_lock` checks the kind (file) and size
+     (0) but no link count. Whether that is acceptable is a question for Antonio, not a reading of the criterion.
+   Limits: one runner and one account; no `LockFileEx` byte-range contention case (a second process waiting on the
+   lock was not tested); the lock cases are sequential in one process; the POSIX mode check has no Windows
+   equivalent, so this is parity of intent, not of mechanism. **Shown for L1 to L5, L6 measured only.**
 3. **Mutant.** A Windows mutant of the `AgentPatch` apply itself is NOT DONE. Mutants 10 and 11 above are mutants of
    the orphan sweep, killed through the `AgentPatch` crash matrix, not of the diff-apply logic.
 4. **Printed values.** The values printed by T6 in `test_agent_patch_fs_win` were not read from a log. The values of
