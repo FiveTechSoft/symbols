@@ -257,6 +257,11 @@ if(WIN32)
     target_include_directories(test_fs_win_devext PRIVATE include)
     add_test(NAME test_fs_win_devext COMMAND test_fs_win_devext
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_createfileparent tests/test_fs_win_createfileparent.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_createfileparent PRIVATE include)
+    add_test(NAME test_fs_win_createfileparent COMMAND test_fs_win_createfileparent
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_perm tests/test_fs_win_perm.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_perm PRIVATE include)
