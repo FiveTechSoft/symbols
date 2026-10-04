@@ -32,6 +32,100 @@ static int Run(const char *cwd, const char *command, int expected)
     return !result.execution_failed && !result.timed_out && result.exit_code == expected;
 }
 
+/* M2: a refused preflight must leave the repository and the user's files exactly as they were. */
+static int Out(const char *cwd, const char *cmd, char *buf, size_t n)
+{
+    SHELL_EXEC_RESULT r;
+    size_t k;
+    if (!AgentShellExec(cmd, cwd, 10000, &r) || r.execution_failed || r.exit_code != 0) return 0;
+    snprintf(buf, n, "%s", r.stdout_buf);
+    k = strlen(buf);
+    while (k && (buf[k - 1] == '\n' || buf[k - 1] == '\r')) buf[--k] = 0;
+    return 1;
+}
+
+static void FileBytes(const char *path, char *out, size_t n)
+{
+    FILE *f = fopen(path, "rb");
+    size_t got = 0;
+    if (f == NULL) { snprintf(out, n, "<absent>"); return; }
+    got = fread(out, 1, n - 1, f);
+    out[got] = 0;
+    fclose(f);
+}
+
+/* HEAD, every ref, porcelain v2 (with untracked), index entries by stage (unmerged show as 1/2/3),
+   and the bytes of the three user files. */
+static int Snapshot(const char *repo, char *out, size_t n)
+{
+    char head[128] = "", refs[1024] = "", status[2048] = "", index[2048] = "";
+    char a[256], b[256], c[256];
+    if (!Out(repo, "git rev-parse HEAD", head, sizeof(head)) &&
+        !Out(repo, "git symbolic-ref -q HEAD", head, sizeof(head))) return 0;
+    if (!Out(repo, "git for-each-ref", refs, sizeof(refs)) ||
+        !Out(repo, "git status --porcelain=v2 --branch --untracked-files=all", status, sizeof(status)) ||
+        !Out(repo, "git ls-files -s", index, sizeof(index))) return 0;
+    FileBytes("test_agent_git_repo/tracked.txt", a, sizeof(a));
+    FileBytes("test_agent_git_repo/staged.txt", b, sizeof(b));
+    FileBytes("test_agent_git_repo/untracked.txt", c, sizeof(c));
+    snprintf(out, n, "HEAD:%s\nREFS:%s\nSTATUS:%s\nINDEX:%s\nTRACKED:%s\nSTAGED:%s\nUNTRACKED:%s\n",
+             head, refs, status, index, a, b, c);
+    return 1;
+}
+
+static char g_selfcheck_before[8192];
+
+/* Text of one snapshot section (label 0..6), for the detection-power cells. */
+static const char *kSnapLabels[] = {"HEAD:", "REFS:", "STATUS:", "INDEX:", "TRACKED:", "STAGED:", "UNTRACKED:"};
+static void SnapSection(const char *snap, int label, char *out, size_t n)
+{
+    char key[32];
+    const char *start, *end;
+    size_t len;
+    snprintf(key, sizeof(key), "%s%s", label == 0 ? "" : "\n", kSnapLabels[label]);
+    start = strstr(snap, key);
+    out[0] = 0;
+    if (start == NULL) return;
+    start += strlen(key);
+    if (label < 6) {
+        snprintf(key, sizeof(key), "\n%s", kSnapLabels[label + 1]);
+        end = strstr(start, key);
+    } else end = NULL;
+    len = end ? (size_t)(end - start) : strlen(start);
+    if (len >= n) len = n - 1;
+    memcpy(out, start, len);
+    out[len] = 0;
+}
+
+/* The snapshot must differ in exactly the named section when that dimension is changed. */
+static int DiffersIn(const char *repo, int label)
+{
+    char after[8192], a[4096], b[4096];
+    if (!Snapshot(repo, after, sizeof(after))) return 0;
+    SnapSection(g_selfcheck_before, label, a, sizeof(a));
+    SnapSection(after, label, b, sizeof(b));
+    if (strcmp(a, b) == 0) printf("    section %s did not change\n", kSnapLabels[label]);
+    return strcmp(a, b) != 0;
+}
+
+static int RefusedUntouched(const char *repo, const GIT_PRECONDITIONS *required,
+                            GIT_PREFLIGHT_STATUS want, const char *message)
+{
+    GIT_REPOSITORY_STATE state;
+    char err[512] = "", before[8192], after[8192];
+    GIT_PREFLIGHT_STATUS got;
+    int ok;
+    if (!Snapshot(repo, before, sizeof(before))) { printf("    snapshot before failed\n"); return 0; }
+    got = AgentGitPreflight(repo, required, &state, err, sizeof(err));
+    if (!Snapshot(repo, after, sizeof(after))) { printf("    snapshot after failed\n"); return 0; }
+    ok = got == want && strcmp(before, after) == 0;
+    if (!ok) {
+        printf("    %s: got status %d want %d, snapshots %s\n--- before\n%s--- after\n%s",
+               message, (int)got, (int)want, strcmp(before, after) == 0 ? "equal" : "DIFFER", before, after);
+    }
+    return ok;
+}
+
 static void ResetFixture(void)
 {
 #ifdef _WIN32
@@ -145,7 +239,59 @@ int main(void)
           state.conflicted_paths == 1, "unmerged path is structured conflict state");
     CHECK(AgentGitPreflight(repo, &required, &state, error, sizeof(error)) == GIT_PREFLIGHT_CONFLICTS,
           "conflict state abstains before dirty-tree handling");
+    CHECK(RefusedUntouched(repo, &required, GIT_PREFLIGHT_CONFLICTS, "conflict"),
+          "M2: refused conflict preflight changed no HEAD, ref, index entry or file byte");
     CHECK(Run(repo, "git merge --abort", 0), "fixture conflict aborted explicitly");
+
+    /* M2 cells: user work in flight (modified + staged + untracked), then refusals on it. */
+    CHECK(Run(repo, "git checkout main --quiet", 0), "M2 fixture on main");
+    CHECK(Out(repo, "git rev-parse HEAD", base, sizeof(base)), "M2 base read");
+    CHECK(WriteFile("test_agent_git_repo/tracked.txt", "user edit, not saved anywhere else\n") &&
+          WriteFile("test_agent_git_repo/staged.txt", "staged by the user\n") &&
+          Run(repo, "git add staged.txt", 0) &&
+          WriteFile("test_agent_git_repo/untracked.txt", "untracked by the user\n"),
+          "M2 user work: modified, staged and untracked files");
+    memset(&required, 0, sizeof(required));
+    required.expected_head = base;
+    required.expected_branch = "main";
+    required.require_clean = true;
+    CHECK(RefusedUntouched(repo, &required, GIT_PREFLIGHT_DIRTY_TREE, "dirty"),
+          "M2: refused dirty preflight left HEAD, refs, index and all three user files untouched");
+    required.expected_head = "0000000000000000000000000000000000000000";
+    CHECK(RefusedUntouched(repo, &required, GIT_PREFLIGHT_STALE_HEAD, "stale"),
+          "M2: refused stale-head preflight on the same work changed nothing");
+    required.expected_head = base;
+    required.expected_branch = "other";
+    CHECK(RefusedUntouched(repo, &required, GIT_PREFLIGHT_WRONG_BRANCH, "wrong branch"),
+          "M2: refused wrong-branch preflight on the same work changed nothing");
+    required.expected_branch = "main";
+    CHECK(Run(repo, "git checkout --detach --quiet", 0), "M2 fixture detached with the work in place");
+    CHECK(RefusedUntouched(repo, &required, GIT_PREFLIGHT_DETACHED_HEAD, "detached"),
+          "M2: refused detached preflight changed nothing");
+    CHECK(Run(repo, "git checkout main --quiet", 0), "M2 fixture back on main");
+    CHECK(Run(repo, "git reset --quiet", 0), "M2 staging reset explicitly");
+    remove("test_agent_git_repo/staged.txt");
+    remove("test_agent_git_repo/untracked.txt");
+    CHECK(Run(repo, "git checkout -- tracked.txt", 0), "M2 user edit restored explicitly");
+
+    /* Detection power: change each captured dimension in turn; the snapshot must see it. */
+    CHECK(Snapshot(repo, g_selfcheck_before, sizeof(g_selfcheck_before)), "self-check: baseline snapshot");
+    CHECK(Run(repo, "git branch selfcheck", 0) && DiffersIn(repo, 1) &&
+          Run(repo, "git branch -D selfcheck --quiet", 0), "self-check: a new ref is seen (REFS)");
+    CHECK(WriteFile("test_agent_git_repo/tracked.txt", "one byte differs\n") && DiffersIn(repo, 4) &&
+          Run(repo, "git checkout -- tracked.txt", 0), "self-check: a changed file byte is seen (TRACKED)");
+    CHECK(WriteFile("test_agent_git_repo/untracked.txt", "u\n") && DiffersIn(repo, 6) &&
+          DiffersIn(repo, 2), "self-check: an untracked file is seen (UNTRACKED and STATUS)");
+    remove("test_agent_git_repo/untracked.txt");
+    CHECK(Run(repo, "git update-index --chmod=+x tracked.txt", 0) && DiffersIn(repo, 3) &&
+          Run(repo, "git reset --quiet", 0), "self-check: an index entry change is seen (INDEX)");
+    CHECK(Run(repo, "git " "-c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -m selfcheck --quiet", 0) &&
+          DiffersIn(repo, 0) && Run(repo, "git reset --hard --quiet HEAD~1", 0), "self-check: a moved HEAD is seen (HEAD)");
+    {
+        char restored[8192];
+        CHECK(Snapshot(repo, restored, sizeof(restored)) && strcmp(restored, g_selfcheck_before) == 0,
+              "self-check: fixture restored to the baseline snapshot");
+    }
 
     CHECK(AgentGitInspect(".", &state, error, sizeof(error)) == GIT_INSPECT_OK,
           "containing project repository remains inspectable");
