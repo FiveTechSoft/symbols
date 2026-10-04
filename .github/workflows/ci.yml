@@ -35,6 +35,13 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
       - name: NTFS measurement probe (output only)
         run: .\build\Release\test_fs_win_probe.exe
+      - name: win_race cell E diagnostics (output only, not a gate)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          foreach ($i in 1..3) {
+            ctest --test-dir build -C Release -R '^test_fs_win_race$' -V | Select-String -Pattern 'E diag|fs win race ok|Test +#|FAIL'
+          }
       - name: Corpus lint (gate)
         run: python tools/lint_corpus.py --check
 
