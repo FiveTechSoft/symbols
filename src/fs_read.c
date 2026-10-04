@@ -1801,6 +1801,35 @@ static FS_READ_STATUS replace_recover_locked(const FS_READ_ROOT *r)
     if(oldstage&&!durable_remove(r->fd,i.oldstage)){s=FS_READ_IO;goto done;}
     crash_point(commit?54:55); /* staged cleanup partly complete */
     if(newstage&&!durable_remove(r->fd,i.newstage)){s=FS_READ_IO;goto done;}
+#ifndef FS_JREC_MUTANT_TMP
+    /* The create/replace temporary links of the journal record and of the marker
+       (.fstxn-<hex>, .fstxn-c<hex>). Each is removed only when it is provably the
+       journal's own link: same inode as the record, or the marker (read back and
+       equal to the record). Anything else is left alone, as before. Best effort. */
+    {
+        char it[48],mt[48];struct stat t;
+        uint64_t idev=present?(uint64_t)rec.st_dev:m.intentdev,
+                 iino=present?(uint64_t)rec.st_ino:m.intentino;
+        snprintf(it,sizeof(it),".fstxn-%.32s",i.newstage+6);
+        snprintf(mt,sizeof(mt),".fstxn-c%.31s",i.newstage+6);
+        if(fstatat(r->fd,it,&t,AT_SYMLINK_NOFOLLOW)==0&&replace_id(&t,idev,iino)&&
+           t.st_nlink<=2)(void)durable_remove(r->fd,it);
+        if(fstatat(r->fd,mt,&t,AT_SYMLINK_NOFOLLOW)==0){
+            int ok=0;
+            if(commit)ok=replace_id(&t,(uint64_t)mark.st_dev,(uint64_t)mark.st_ino)&&t.st_nlink<=2;
+            else{
+                FS_REPLACE_MARK tm={0};struct stat ts;
+                ok=replace_read(r->fd,mt,&tm,sizeof(tm),&ts)&&
+                   tm.magic==FS_REPLACE_MARK_MAGIC&&tm.version==1&&
+                   replace_valid(&tm.image)&&tm.image.olddev==i.olddev&&tm.image.oldino==i.oldino&&
+                   tm.image.newdev==i.newdev&&tm.image.newino==i.newino&&
+                   !strcmp(tm.image.target,i.target)&&!strcmp(tm.image.oldstage,i.oldstage)&&
+                   !strcmp(tm.image.newstage,i.newstage)&&tm.intentdev==idev&&tm.intentino==iino;
+            }
+            if(ok)(void)durable_remove(r->fd,mt);
+        }
+    }
+#endif
     if(commit){
         crash_point(50); /* marker only, stage cleanup completed */
         if(!durable_remove(r->fd,FS_REPLACE_COMMIT)){s=FS_READ_IO;goto done;}

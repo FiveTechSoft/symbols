@@ -262,8 +262,8 @@ static void one(int cls, int phase, FS_READ_ROOT **rp)
             DIR *d = opendir(WS);
             struct dirent *e;
             while ((e = readdir(d)))
-                if (!strncmp(e->d_name, ".fsrp-", 6) || !strncmp(e->d_name, ".fsrb-", 6))
-                    if (strcmp(e->d_name, D1) && strcmp(e->d_name, D2)) { fail("OK but a stage name is left"); break; }
+                if (!strncmp(e->d_name, ".fsrp-", 6) || !strncmp(e->d_name, ".fsrb-", 6) || !strncmp(e->d_name, ".fstxn-", 7))
+                    if (strcmp(e->d_name, D1) && strcmp(e->d_name, D2)) { fail("OK but a stage or temporary journal link is left"); break; }
             closedir(d);
         }
         if (run_child(0, 1, r) != 40 + FS_READ_OK) fail("second recovery not OK");
@@ -286,14 +286,22 @@ int main(void)
         if (!cls_runs[i]) { fprintf(stderr, "class %s never ran\n", CLS[i]); return 1; }
     printf("journal fuzz iterations: %u seed %u refused %d ok %d failures %d class mask %x\n", iters, (unsigned)g_seed, n_refused, n_ok, nfail, fail_mask);
 #ifdef FS_JFUZZ_MUTANT_MASK
-    /* Exit 0 only when the failing classes are exactly the predicted one. */
-    if (fail_mask == FS_JFUZZ_MUTANT_MASK)
+#ifndef FS_JFUZZ_MUTANT_IGNORE
+#define FS_JFUZZ_MUTANT_IGNORE 0
+#endif
+    /* Exit 0 only when the failing classes, outside the ignored ones, are exactly the predicted one.
+       FS_JFUZZ_MUTANT_IGNORE lists classes whose result under THIS mutant is not predicted (the random byte
+       classes: a mutant that accepts a damaged identity number can add failures there, seed dependent). */
     {
-        printf("mutant killed, failing class mask exactly %x\n", fail_mask);
-        return 0;
+        unsigned seen = (unsigned)fail_mask & ~(unsigned)FS_JFUZZ_MUTANT_IGNORE;
+        if (seen == (unsigned)FS_JFUZZ_MUTANT_MASK)
+        {
+            printf("mutant killed, failing class mask exactly %x\n", seen);
+            return 0;
+        }
+        printf("mutant SURVIVED or failed elsewhere: class mask %x (ignored %x), predicted %x\n", (unsigned)fail_mask, (unsigned)FS_JFUZZ_MUTANT_IGNORE, (unsigned)FS_JFUZZ_MUTANT_MASK);
+        return 1;
     }
-    printf("mutant SURVIVED or failed elsewhere: class mask %x, predicted %x\n", fail_mask, FS_JFUZZ_MUTANT_MASK);
-    return 1;
 #endif
     return nfail ? 1 : 0;
 }
