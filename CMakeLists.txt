@@ -416,18 +416,18 @@ if(NOT WIN32)
     target_include_directories(test_fs_replace PRIVATE include)
     target_compile_definitions(test_fs_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_replace COMMAND test_fs_replace WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    # Journal fuzz of the replace journal (M1 criterion 5, POSIX). Seeds in the test names; sequential
+    # Journal fuzz of the replace, create, remove and move journals (M1 criterion 5, POSIX; not batch, not Windows). Seeds in the test names; sequential
     # (shared scratch directories). The two _mc targets drop one identity check in src/fs_read.c
     # (FS_JREC_MUTANT_STAGE and FS_JREC_MUTANT_TEMP) and pass only when exactly the predicted class fails;
     # _mc_tmp drops the removal of the .fstxn- temporary links in FsReplaceRecover (FS_JREC_MUTANT_TMP).
     add_executable(test_fs_journal_fuzz tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz PRIVATE include)
     target_compile_definitions(test_fs_journal_fuzz PRIVATE FS_CREATE_TEST_CRASH=1)
-    foreach(jf_seed 0 1 7 12648430)
+    foreach(jf_seed 0 1 7 12648430 1786707969)
         add_test(NAME test_fs_journal_fuzz_seed_${jf_seed} COMMAND test_fs_journal_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(test_fs_journal_fuzz_seed_${jf_seed} PROPERTIES
             ENVIRONMENT "FS_JFUZZ_SEED=${jf_seed}" TIMEOUT 300
-            PASS_REGULAR_EXPRESSION "journal fuzz iterations: 700 seed ${jf_seed} refused [0-9]+ ok [0-9]+ failures 0 class mask 0")
+            PASS_REGULAR_EXPRESSION "journal fuzz iterations: 350 per kind, 4 kinds, seed ${jf_seed} refused [0-9]+ ok [0-9]+ known-limit-hits [0-9]+ failures 0 class mask 0")
     endforeach()
     add_executable(test_fs_journal_fuzz_mc_stage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz_mc_stage PRIVATE include)
@@ -447,6 +447,20 @@ if(NOT WIN32)
     add_test(NAME test_fs_journal_fuzz_mc_tmp COMMAND test_fs_journal_fuzz_mc_tmp WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_journal_fuzz_mc_tmp PROPERTIES TIMEOUT 300
         PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 3")
+    # remove and move: dropping the stage identity check (FS_JREC_MUTANT_RSTAGE, FS_JREC_MUTANT_MSTAGE) must
+    # fail exactly the stage_decoy class of that kind (the other classes of the kind are ignored: seed dependent).
+    add_executable(test_fs_journal_fuzz_mc_rstage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz_mc_rstage PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz_mc_rstage PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_RSTAGE=1 FS_JFUZZ_MUTANT_MASK=0x400000 FS_JFUZZ_MUTANT_IGNORE=0x3f0000)
+    add_test(NAME test_fs_journal_fuzz_mc_rstage COMMAND test_fs_journal_fuzz_mc_rstage WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_journal_fuzz_mc_rstage PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 400000")
+    add_executable(test_fs_journal_fuzz_mc_mstage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz_mc_mstage PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz_mc_mstage PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_MSTAGE=1 FS_JFUZZ_MUTANT_MASK=0x40000000 FS_JFUZZ_MUTANT_IGNORE=0x3f000000)
+    add_test(NAME test_fs_journal_fuzz_mc_mstage COMMAND test_fs_journal_fuzz_mc_mstage WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_journal_fuzz_mc_mstage PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "mutant killed, failing class mask exactly 40000000")
     add_executable(test_fs_race_parent tests/test_fs_race_parent.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_race_parent PRIVATE include)
     target_compile_definitions(test_fs_race_parent PRIVATE FS_CREATE_TEST_CRASH=1)

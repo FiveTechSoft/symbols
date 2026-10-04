@@ -1293,8 +1293,11 @@ static FS_READ_STATUS remove_recover_locked(const FS_READ_ROOT *r)
     }
     stage_present=fstatat(r->fd,i.stage,&stage,AT_SYMLINK_NOFOLLOW)==0;
     if(!stage_present)return FS_READ_DENIED;
-    if(!S_ISREG(stage.st_mode)||stage.st_dev!=(dev_t)i.dev||
-       stage.st_ino!=(ino_t)i.ino||stage.st_nlink>2)return FS_READ_DENIED;
+    if(!S_ISREG(stage.st_mode)||
+#ifndef FS_JREC_MUTANT_RSTAGE /* test only: the identity of the stage is not checked */
+       stage.st_dev!=(dev_t)i.dev||stage.st_ino!=(ino_t)i.ino||
+#endif
+       stage.st_nlink>2)return FS_READ_DENIED;
     strcpy(parent,i.target);slash=strrchr(parent,'/');
     if(slash){*slash=0;leaf=slash+1;}else{*parent=0;leaf=i.target;}
     s=posix_open(r,parent,&dir);if(s!=FS_READ_OK)return s;
@@ -1501,8 +1504,11 @@ static FS_READ_STATUS move_recover_locked(const FS_READ_ROOT *r)
        close(fd);
     }
     if(fstatat(r->fd,i.stage,&stage,AT_SYMLINK_NOFOLLOW)<0||
-       !S_ISREG(stage.st_mode)||stage.st_dev!=(dev_t)i.dev||
-       stage.st_ino!=(ino_t)i.ino||stage.st_nlink>3)return FS_READ_DENIED;
+       !S_ISREG(stage.st_mode)||
+#ifndef FS_JREC_MUTANT_MSTAGE /* test only: the identity of the stage is not checked */
+       stage.st_dev!=(dev_t)i.dev||stage.st_ino!=(ino_t)i.ino||
+#endif
+       stage.st_nlink>3)return FS_READ_DENIED;
     s=move_parent(r,i.source,&source_dir,&source_leaf);if(s!=FS_READ_OK)return s;
     s=move_parent(r,i.target,&target_dir,&target_leaf);
     if(s!=FS_READ_OK){close(source_dir);return s;}
