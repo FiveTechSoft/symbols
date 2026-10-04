@@ -252,6 +252,11 @@ if(WIN32)
     add_test(NAME test_fs_win_newline COMMAND test_fs_win_newline
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_newline PROPERTIES TIMEOUT 120)
+    add_executable(test_fs_win_devext tests/test_fs_win_devext.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_devext PRIVATE include)
+    add_test(NAME test_fs_win_devext COMMAND test_fs_win_devext
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     add_executable(test_fs_win_perm tests/test_fs_win_perm.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_perm PRIVATE include)
@@ -302,6 +307,16 @@ endif()
 sllm_test(test_fs_copy tests/test_fs_copy.c)
 sllm_test(test_fs_adversarial tests/test_fs_adversarial.c)
 sllm_test(test_fs_fuzz_ops tests/test_fs_fuzz_ops.c)
+# More fixed seeds of the same confinement fuzz (M1 criterion 5). The seed and
+# the iteration count are in the test name, so a CI log names what ran. The
+# test is sequential in CI (no ctest -j); every run uses the same scratch
+# directories, so do not run these in parallel.
+foreach(fz_seed 1 7 12648430)
+    add_test(NAME test_fs_fuzz_ops_seed_${fz_seed}_i400 COMMAND test_fs_fuzz_ops
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_fuzz_ops_seed_${fz_seed}_i400 PROPERTIES
+        ENVIRONMENT "FS_FUZZ_SEED=${fz_seed};FS_FUZZ_ITERS=400" TIMEOUT 300)
+endforeach()
 sllm_test(test_fs_c4_posix tests/test_fs_c4_posix.c)
 sllm_test(test_fs_race tests/test_fs_race.c)
 if(NOT WIN32)
