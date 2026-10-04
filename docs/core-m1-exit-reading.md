@@ -119,21 +119,29 @@ was INCONCLUSIVE). Status: **not shown fixed**; two clean runs since m150, sever
 did not work are recorded for honesty: holding the symlink until a writer heartbeat advanced, and calling
 `FsReplaceRecover` in the writers; the first did not remove the wedge, the second was worse locally.
 Open measured gap, not fixed: the NON-mutant `test_fs_race_parent` has the same wedge. In 12 local runs, no load, each
-writer made about 19000 calls in its 4 s window and only 0 to 21 returned OK; clearing the leftover files in the
-non-mutant build did not raise the OK counts in 8 runs, so the cause there is not only the leftover journal (a symlinked
-`D` is refused by design for about a third of each cycle). What its pass shows: no outside mismatch ever appeared, and
-the calls made in the first milliseconds were real. What it does not show: four seconds of racing writes. A further
-diagnostic is next; no claim of strength or weakness beyond these numbers.
+writer made about 19000 calls in its 4 s window and only 0 to 21 returned OK. A symlinked `D` is refused by design for
+about a third of each cycle. What its pass shows: no outside mismatch ever appeared, and the calls made in the first
+milliseconds were real. What it does not show: four seconds of racing writes. See the m153 correction below for what
+clearing the leftover files does to those counts.
 
-Correction (m152) to the m150 mechanism. What was measured for m150: the INCONCLUSIVE rate of the mutant build under artificial
-load in my sandbox (5 of 110 runs before, 0 of 110 after) and the kill times in CI (0.10 s and 0.19 s in the apply gate
-and the CI Linux job, four clean runs since). What was NOT measured, and is not claimed: that deleting the leftover files
-makes the writers make real calls again. Local numbers say it does not restore them in the non-mutant build: total OK
-calls of both writers in 4 s stayed at about 8 to 38 (of about 39000 calls) with the m150 file set deleted each cycle, with
-the writers reopening their root, with both, and with every `.fstxn.*` file except the lock deleted plus the pins
-(9 to 23 OK). A strace of a wedged run shows each call taking the lock, stat-ing `.fstxn.intent`, `.batch`, `.commit`,
-`.remove` and `.rcommit`, and returning DENIED without opening `D`; the leftover set varies between runs (a replace
-journal in some, a remove journal and its commit marker in others). Why deleting them does not cure it is unexplained.
-In the m150 mutant build every local run ended at the first kill (50 to 100 ms, 2 to 3 swaps, 1 to 17 OK calls per
-writer), so its OK counts cannot show whether writers recover. So the m150 effect is an observed drop in INCONCLUSIVE runs
-with an unproven mechanism; it may only narrow the time in which a wedge can land before a symlink window.
+Correction (m153), an error of mine in m151 and m152. Both state, from local variant builds, that deleting the leftover
+files did not raise the writers' OK counts in the non-mutant build (8 to 38 OK of about 39000 calls, 9 to 23 with every
+`.fstxn.*` except the lock deleted) and that why was unexplained. Those variants never ran their deletion: the
+`unwedge()` call sat inside `#ifdef FS_PARENT_FOLLOW_MUTANT`, so the non-mutant build deleted nothing until the
+end-of-run cleanup (an strace shows `.fstxn.replace` and `.fstxn.pcommit` unlinked only at the end). Those numbers and
+the "unexplained" sentence are withdrawn; I have not re-checked the earlier variant files for the same defect, so
+treat all of those variant numbers as unreliable. Redone with the call active in the non-mutant build, local sandbox
+(gcc, not the CI runner), 6 runs each, 4 s: with no deletion each writer made 0 to 4 OK per operation (about 3300
+DENIED per operation, the wedge); with the swapper deleting the leftover files each cycle, 26 to 96 OK per operation
+per writer (about 250 to 400 per writer in total), about 480 to 1600 DENIED per operation, and all 6 runs ended
+ALL PASS with 0 outside mismatches. So deleting the leftover files restores the writers' real calls by roughly 60 times
+in the non-mutant build. This supports the m150 mechanism for the non-mutant build locally. It does not show it for the
+mutant build, where every local run ended at the first kill (50 to 100 ms), nor on the CI runner, nor under load.
+The non-mutant test itself is unchanged and still has the wedge; a change plus a floor on OK calls is the next patch.
+
+Not a race_parent item, found while checking (m153): the CI job `ast-inspect-windows-ninja` is green, but in the runs
+read (m152 run 37221273660 and the m150 run 37219123908) `pip install libclang==18.1.1 ninja==1.12.1` fails with
+"No matching distribution found for ninja==1.12.1", the version check then raises PackageNotFoundError, the step still
+passes, and all 10 tests of `tests/test_ast_inspect.py` and `test_c_source_qa.py` report skipped ("pinned libclang
+18.1.1 not installed"): `OK (skipped=10)`. So that job has not exercised the AST tests in those runs, and its green is
+not evidence of them. The fix is in `.github/workflows/ci.yml`, which is Antonio's; not touched here.
