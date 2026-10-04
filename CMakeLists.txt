@@ -160,6 +160,12 @@ if(WIN32)
     target_compile_definitions(test_fs_create_windows PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_create_windows COMMAND test_fs_create_windows
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_symlink_leaf tests/test_fs_win_symlink_leaf.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_symlink_leaf PRIVATE include)
+    add_test(NAME test_fs_win_symlink_leaf COMMAND test_fs_win_symlink_leaf
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_symlink_leaf PROPERTIES SKIP_RETURN_CODE 77)
     add_executable(test_fs_win_journal tests/test_fs_win_journal.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_journal PRIVATE include)
