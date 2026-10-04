@@ -67,9 +67,11 @@ that writes a version 1 record by hand for each kind.
 - Tests: the fuzz oracle changes from "OK or refuse, and no extra name" to "refuse" for any damaged
   record that carries a checksum. The classes that stay valid (stage_decoy, temp_decoy, and the delete
   class) need their expected outcome re-read one by one. Estimate M with the version 1 compatibility cells.
-- Windows: the Windows journals are separate code (`src/fs_batch_win.inc` and the Windows replace path).
-  I have not read their record layouts for this note, so the Windows cost is not sized. Same field, same
-  compatibility rule, plus one CI round at about 10 minutes each, 2 to 3 rounds as before.
+- Windows: read afterwards (not run). The five Windows records already have a 32 bit FNV-1a checksum field
+  checked on read (`src/fs_create_win.inc` lines 119 to 148 and 344, 376, 408; `src/fs_batch_win.inc` lines
+  35 to 44, 74, 91), and the batch marker is a byte copy of the journal. So there is no integrity field to add
+  on Windows; what is missing is a measurement of the F2 and F4 shape there. See the Windows bullet in
+  `core-m1-exit-reading.md`.
 - Risk: moderate. It changes the format that recovery reads, so a bug here can make a good journal
   unreadable. The compatibility cells and the existing crash-point tests are the guard.
 

@@ -128,8 +128,21 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** every Windows journal (not read for this note, no claim), the 8 byte commit markers, damage to
-    two journal files at once. Criterion 5 stays partial.
+  - **Not shown:** every Windows journal, the POSIX 8 byte commit markers, damage to two journal files at once.
+    Criterion 5 stays partial.
+  - **Windows journals: read, not run, not fuzzed (source reading at a3e89a2, nothing executed for this note).**
+    The five Windows records already carry a 32 bit FNV-1a checksum over the whole struct except the checksum
+    field, checked on read: create, remove/move and replace in `src/fs_create_win.inc` (structs lines 30 to 56,
+    `wc_checksum`, `wo_checksum`, `wr_checksum` lines 119 to 148, checks at lines 344, 376, 408); batch create and
+    batch replace in `src/fs_batch_win.inc` (structs lines 16 to 32, `wb_sum` lines 35 to 44, checks at lines 74
+    and 91). Records are also checked for magic, version, size, name shape and file ids. The Windows batch commit
+    marker `.fstxn.commit` is a byte copy of the journal, compared with `memcmp` (`src/fs_batch_win.inc` lines
+    154 to 156 and 319). FNV-1a, like the POSIX CRC, detects accidental damage only, not a writer that recomputes
+    it. The only Windows record mutation test is `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to
+    989): 18 fixed mutations of batch records, one with a stale checksum and the rest resealed so only the
+    semantic checks can refuse them. It is a fixed list, not random byte fuzz. There is no Windows port of
+    `test_fs_journal_fuzz.c`. Whether a resealed damaged name field is followed on Windows (the F2 and F4 shape)
+    is not measured.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.
