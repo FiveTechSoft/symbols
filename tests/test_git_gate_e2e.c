@@ -45,7 +45,17 @@ static int retry_fail_n;
 static int Run(const char *cwd, const char *cmd, int want)
 {
     SHELL_EXEC_RESULT r;
-    if (!AgentShellExec(cmd, cwd, 20000, &r)) return 0;
+    if (!AgentShellExec(cmd, cwd, 20000, &r))
+    {
+        printf("    command not run: %s (cwd %s)\n", cmd, cwd);
+        return 0;
+    }
+    if (r.execution_failed || r.timed_out || r.exit_code != want)
+    {
+        /* Diagnostic only: a failed fixture command prints what it did, so a hidden ctest log shows the cause. */
+        printf("    command: %s (cwd %s)\n    exit %d, want %d, failed %d, timed out %d\n    stdout: %.300s\n    stderr: %.300s\n", cmd, cwd,
+               r.exit_code, want, r.execution_failed, r.timed_out, r.stdout_buf, r.stderr_buf);
+    }
     return !r.execution_failed && !r.timed_out && r.exit_code == want;
 }
 static int Out(const char *cwd, const char *cmd, char *buf, size_t n)
