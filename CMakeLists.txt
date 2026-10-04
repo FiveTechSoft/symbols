@@ -240,6 +240,22 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     # The marker is printed only at zero failures; PASS_REGULAR_EXPRESSION replaces the exit code check.
     set_tests_properties(test_agent_patch_lock_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch lock cells ran: 6")
+    # Two real processes on the workspace lock. The marker is printed only at zero failures.
+    add_executable(test_agent_patch_contend_win tests/test_agent_patch_contend_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_contend_win PRIVATE include)
+    target_compile_definitions(test_agent_patch_contend_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
+    add_test(NAME test_agent_patch_contend_win COMMAND test_agent_patch_contend_win
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_agent_patch_contend_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch contention cells ran: 2")
+    # Mutant 12 again: the drift guard is dropped. The same test must fail exactly one cell.
+    add_executable(test_agent_patch_contend_win_mc tests/test_agent_patch_contend_win.c src/agent_patch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_agent_patch_contend_win_mc PRIVATE include)
+    target_compile_definitions(test_agent_patch_contend_win_mc PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1 AGENT_PATCH_APPLY_MUTANT=1)
+    add_test(NAME test_agent_patch_contend_win_mc COMMAND test_agent_patch_contend_win_mc
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_agent_patch_contend_win_mc PROPERTIES PASS_REGULAR_EXPRESSION "mutant killed by 1 cell")
     add_executable(test_agent_patch_ntfs_win tests/test_agent_patch_ntfs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_ntfs_win PRIVATE include)
