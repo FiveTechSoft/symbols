@@ -4,7 +4,7 @@ Reading of the five Phase 1 exit criteria in `ROADMAP.md` against the tests on `
 with the open gaps named. It is a reading of sources and of CI results already recorded in
 [core-m0-m1-exit-audit.md](core-m0-m1-exit-audit.md); nothing here is a new measurement. M1 is not declared.
 The declaration is Antonio's. Last measured CI state recorded for the M1 cells: linux 171/171,
-msvc and asan-msvc 185/185 (run 37215099208, `85bc2ff`; 184 at m142, 181 at m134), one runner per platform (`windows-latest`, NTFS,
+msvc and asan-msvc 186/186 (run 37219123908, `b9e0c8f`; 185 at m146, 184 at m142, 181 at m134), one runner per platform (`windows-latest`, NTFS,
 one account; one Linux runner), cooperating writers, no power-loss claim. A ctest Passed line hides the
 test output, so statuses come from ctest pass lines and the sources.
 
@@ -14,7 +14,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 |---|---|---|---|
 | C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. **Not shown:** 8.3 aliases (`test_fs_win_aliases_short` is Skipped), per-directory case flag, other accounts, a rename race against a swapped parent (the POSIX `test_fs_race_parent` has no Windows counterpart). |
 | C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file calls do not sweep; an unshared `.fsrp-` pin is kept by design; no crash during the sweep was injected; a foreign inode at a target is refused, not restored (same on POSIX). |
-| C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the diff-apply mutant and the hard-linked lock question are the gaps below. |
+| C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the hard-linked lock is an accepted documented limit, and a Windows mutant of the diff-apply drift guard (mutant 12, m149) is killed by exactly four cells; lock contention with a waiting process, power loss and other runners are the gaps below. |
 | C4 | Separator, case, permission, long path, newline, locked file fixtures | **Shown** for the six aspects within limits (`test_fs_c4_posix` and others). | **Shown** for the six aspects on the listed cells (`test_fs_win_case`, long-path, locked-file and EOL tests), not "met". Mutants only for permission. |
 | C5 | Fuzzing of malformed paths and manifests: no out-of-workspace write | **Shown** for path operations and manifests with logged seeds: default, 1, 7, 12648430 at 400 iterations. | **Shown for the same operations with fewer iterations on the default seed** (see correction). Seeds 1, 7, 12648430 at 400. |
 
@@ -58,8 +58,16 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
    Limits: one runner and one account; no `LockFileEx` byte-range contention case (a second process waiting on the
    lock was not tested); the lock cases are sequential in one process; the POSIX mode check has no Windows
    equivalent, so this is parity of intent, not of mechanism. **Shown for L1 to L5, L6 measured only.**
-3. **Mutant.** A Windows mutant of the `AgentPatch` apply itself is NOT DONE. Mutants 10 and 11 above are mutants of
-   the orphan sweep, killed through the `AgentPatch` crash matrix, not of the diff-apply logic.
+3. **Mutant (m149).** Mutant 12 (`AGENT_PATCH_APPLY_MUTANT`, test-only, in `replace_target`): the drift guard is
+   dropped, the bytes the target holds at replace time are passed as the expected bytes, so a change between the read
+   and the replace is overwritten. Target `test_agent_patch_fs_win_mc` is `test_agent_patch_fs_win.c` compiled with the
+   define; it exits 0 only if the failing cells are exactly four (T1 "apply refuses", T1 "external bytes kept", T1
+   "diagnostic set, not applied", T8 "rollback refused, user edit kept") and prints "mutant killed by 4 cell(s)", matched
+   by `PASS_REGULAR_EXPRESSION`. Run 37218295633 (`1e9ac22`): Passed on msvc and asan, 186 of 186; the printed line was
+   not read (ctest hides it), the regex match is the evidence. Predicted before the run, held. Limits: this is one
+   mutant of one rule (the conditional replace); mutants of the hunk matching, the EOL handling and the path rules are
+   covered by the portable `test_agent_patch` and `test_agent_patch_eol` mutants, not by a Windows-only one. Mutants 10
+   and 11 above are mutants of the orphan sweep.
 4. **Printed values.** The values printed by T6 in `test_agent_patch_fs_win` were not read from a log. The values of
    `test_agent_patch_crash_win` were read from the red runs and the m138 and m140 diagnostics (msvc log), not from the
    final green run (ctest hides them).
@@ -95,3 +103,24 @@ patch: `test_fs_race_parent_mc` printed "FS_PARENT_FOLLOW_MUTANT INCONCLUSIVE, n
 in 30005 ms (swaps 663, writer calls OK 15 10, swapper exit 0)" and the test exited non-zero. The identical bytes passed
 on the rerun. m141 touches no file of that test. Treated as a timing result of the C1 mutant on that runner; not shown
 fixed, tally: one occurrence in the apply gate.
+
+Update (m151): the flake occurred twice more. Second: first dispatch of m148 (run 37216934858, apply gate): "no outside
+touch in 30011 ms (swaps 663, writer calls OK 5 14)". Third: the CI Linux job of the m149 run (37218295633): "no outside
+touch in 30004 ms (swaps 621, writer calls OK 9 5)". Tally: three occurrences since m141 (two in the apply gate, one in
+a CI Linux job), plus the one recorded in the test header for run 37181356800. Cause, measured locally in my own
+sandbox (gcc, not the CI runner) with a status histogram and a listing of the scratch directory: the writers are
+wedged. A replace cut off by the directory swap leaves `.fstxn.replace`, `.fstxn.pcommit` and `.fsrp-` files in the
+root, recovery refuses to restore over the swapped directory, and from then on about 99.9 percent of the writers'
+calls return DENIED, so no call meets a symlink window. Reproduced under artificial load: 5 of 110 mutant runs
+INCONCLUSIVE with the old code, 0 of 110 after m150. m150 (`b9e0c8f`, run 37219123908, test file only, mutant build only):
+the swapper deletes those leftover files at the top of each cycle; the non-mutant build compiles to identical assembly.
+In that run `test_fs_race_parent_mc` Passed in 0.10 s in both the apply gate and the CI Linux job (30.04 s when it
+was INCONCLUSIVE). Status: **not shown fixed**; two clean runs since m150, several more are needed. Two attempts that
+did not work are recorded for honesty: holding the symlink until a writer heartbeat advanced, and calling
+`FsReplaceRecover` in the writers; the first did not remove the wedge, the second was worse locally.
+Open measured gap, not fixed: the NON-mutant `test_fs_race_parent` has the same wedge. In 12 local runs, no load, each
+writer made about 19000 calls in its 4 s window and only 0 to 21 returned OK; clearing the leftover files in the
+non-mutant build did not raise the OK counts in 8 runs, so the cause there is not only the leftover journal (a symlinked
+`D` is refused by design for about a third of each cycle). What its pass shows: no outside mismatch ever appeared, and
+the calls made in the first milliseconds were real. What it does not show: four seconds of racing writes. A further
+diagnostic is next; no claim of strength or weakness beyond these numbers.
