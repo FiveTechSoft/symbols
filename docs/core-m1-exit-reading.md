@@ -83,7 +83,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   (`iters=150` in the Windows `main` of `tests/test_fs_fuzz_ops.c`), not 400. Only seeds 1, 7 and 12648430
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
-- **Journal byte fuzzing: not shown.** No test corrupts or truncates a `.fstxn.*` journal, marker or commit file at
+- **Journal byte fuzzing: not shown.** A sized design proposal (not implemented) is in [core-m1-c5-journal-fuzz-proposal.md](core-m1-c5-journal-fuzz-proposal.md). No test corrupts or truncates a `.fstxn.*` journal, marker or commit file at
   random and checks that recovery fails closed. Recovery is tested at fixed crash points and with a foreign inode.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
