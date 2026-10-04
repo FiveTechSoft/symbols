@@ -169,6 +169,7 @@ int main(void)
         PatchPlanFree(&p);
     }
     else puts("  (hard link fixture failed)");
+    ran++;
 
     wipe();
     if (!fails) printf("agentpatch lock cells ran: %d\n", ran);
