@@ -22,24 +22,37 @@
    Fixture: a workspace holding F ("OLD!"). A foreign handle opens F with
    GENERIC_READ and one share mode, then each of replace (to "NEW!"), remove,
    move (to M) and copy (to C) is called.
-   Predictions, stated before the first measurement (OK means FS_READ_OK, "no"
-   means a status other than OK; the code of a refusal is not asserted):
+   RETRACTION. The first version (run 37167486214, base 091843d, red on
+   build-test-msvc and asan-msvc with 10 mismatches in 23 cells) predicted OK
+   for replace, remove and move over a foreign handle that shares delete (share
+   read+delete and read+write+delete). That was wrong: all six returned
+   FS_READ_PENDING (6) and left their journal; I had flagged these as the least
+   certain cells. The same run showed a fault of my test expectation: it
+   required the replace, remove and move recoveries ALL to return OK, but a
+   recovery for another operation's journal returned FS_READ_DENIED (3) (remove
+   cells: replace recovery 3; move cells: replace and remove recovery 3), only
+   the matching recovery returned OK. The other 16 cells matched (all refusals,
+   all copies, the three lock file cells).
+   Predictions for this version, stated before the measurement (OK means
+   FS_READ_OK, "no" a status other than OK that is not PENDING, PENDING is
+   FS_READ_PENDING exactly; the code of a refusal is not asserted):
    - share none:            replace no, remove no, move no, copy no
    - share read:            replace no, remove no, move no, copy OK
    - share read+write:      replace no, remove no, move no, copy OK
-   - share read+delete:     replace OK, remove OK, move OK, copy OK
-   - share read+write+delete: replace OK, remove OK, move OK, copy OK
-   The OK predictions for replace, remove and move over a foreign handle that
-   shares delete are the least certain (a delete-pending name could make a
-   writer report PENDING); they are asserted like the others so that a wrong
-   prediction is named in the output.
-   Invariant asserted for every cell, whatever the status: after the foreign
-   handle is closed and the three recoveries (replace, remove, move) were
-   called and returned OK, the workspace is either exactly the old state (F
-   with "OLD!" and nothing else) or exactly the finished state of the
-   operation (replace: F "NEW!"; remove: nothing; move: M "OLD!"; copy: F and C
-   "OLD!"), never a partial one and with no stray journal or pin name; a status
-   of OK requires the finished state.
+   - share read+delete:     replace PENDING, remove PENDING, move PENDING, copy OK
+   - share read+write+delete: replace PENDING, remove PENDING, move PENDING, copy OK
+   After the foreign handle is closed:
+   - the recoveries of the OTHER two operations are called first, and they must
+     leave the workspace listing (names and sizes, journals included) exactly
+     as it was: a DENIED recovery leaves the journal intact (their statuses are
+     not asserted);
+   - the MATCHING recovery returns OK;
+   - a "no" cell is then in the old state (F "OLD!" and nothing else); a
+     PENDING cell is in the FINISHED state of its operation (replace: F "NEW!";
+     remove: nothing; move: M "OLD!"), because I predict recovery rolls forward
+     once the file is no longer held. This end-state prediction is a guess, not
+     read from the source; a wrong one is named in the output. OK requires the
+     finished state, copy cells end with F and C "OLD!".
    Lock file cells (the foreign handle is opened with the workspace lock file
    as the writer expects it, an empty file named .fstxn.lock):
    - a foreign exclusive LockFileEx on byte 0, held 1500 ms: a create in a
@@ -110,21 +123,44 @@ static int is_done(int op)
  case 1:return !exists(WS "\\F")&&entries()==0;
  case 2:return !exists(WS "\\F")&&bytes_are(WS "\\M","OLD!")&&entries()==1;
  default:return bytes_are(WS "\\F","OLD!")&&bytes_are(WS "\\C","OLD!")&&entries()==2;}}
-static void cell(const char *mode,DWORD share,int op,int predicted_ok)
-{FS_READ_ROOT *r;HANDLE fh;FS_READ_STATUS st,a,b,c;char name[96],m[200];
+/* names and sizes of every entry of the workspace, the lock file excluded */
+static void snap(char *out,size_t cap)
+{WIN32_FIND_DATAA d;HANDLE f=FindFirstFileA(WS "\\*",&d);size_t k=0;
+ out[0]=0;if(f==INVALID_HANDLE_VALUE)return;
+ do{if(strcmp(d.cFileName,".")&&strcmp(d.cFileName,"..")&&strcmp(d.cFileName,".fstxn.lock")){
+     int w=snprintf(out+k,cap-k,"%s:%lu;",d.cFileName,(unsigned long)d.nFileSizeLow);
+     if(w<0||(size_t)w>=cap-k)break;k+=(size_t)w;}}while(FindNextFileA(f,&d));
+ FindClose(f);}
+static FS_READ_STATUS recover_op(FS_READ_ROOT *r,int op)
+{switch(op){case 0:return FsReplaceRecover(r);case 1:return FsRemoveRecover(r);default:return FsMoveRecover(r);}}
+/* expect: 0 refused (not OK, not PENDING), 1 OK, 2 PENDING */
+static void cell(const char *mode,DWORD share,int op,int expect)
+{FS_READ_ROOT *r;HANDLE fh;FS_READ_STATUS st,mr;char name[96],m[240],before[600],after[600];int o;
  snprintf(name,sizeof(name),"share %s, %s",mode,OPN[op]);
  fixture(&r);
  fh=CreateFileA(WS "\\F",GENERIC_READ,share,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
  ck(fh!=INVALID_HANDLE_VALUE,"foreign open");
  st=run_op(r,op);
- if((st==FS_READ_OK)!=(predicted_ok!=0)){
-  snprintf(m,sizeof(m),"predicted %s, status %d",predicted_ok?"OK":"refused",(int)st);note(name,m);}
+ if(expect==1?st!=FS_READ_OK:expect==2?st!=FS_READ_PENDING:(st==FS_READ_OK||st==FS_READ_PENDING)){
+  snprintf(m,sizeof(m),"predicted %s, status %d",expect==1?"OK":expect==2?"PENDING":"refused",(int)st);note(name,m);}
  CloseHandle(fh);
- a=FsReplaceRecover(r);b=FsRemoveRecover(r);c=FsMoveRecover(r);
- if(a!=FS_READ_OK||b!=FS_READ_OK||c!=FS_READ_OK){
-  snprintf(m,sizeof(m),"recovery statuses replace=%d remove=%d move=%d",(int)a,(int)b,(int)c);note(name,m);}
- if(!is_old()&&!is_done(op))note(name,"state after recovery is neither the old state nor the finished state");
- else if(st==FS_READ_OK&&!is_done(op)){snprintf(m,sizeof(m),"status OK but the finished state is not there");note(name,m);}
+ /* the recoveries of the other operations first: they must change nothing */
+ for(o=0;o<3;o++){
+  if(o==op)continue;
+  snap(before,sizeof(before));
+  m[0]=0;{FS_READ_STATUS x=recover_op(r,o);(void)x;}
+  snap(after,sizeof(after));
+  if(strcmp(before,after)){
+   snprintf(m,sizeof(m),"the %s recovery changed the workspace: [%s] -> [%s]",OPN[o],before,after);note(name,m);}}
+ if(op<3){
+  mr=recover_op(r,op);
+  if(mr!=FS_READ_OK){snprintf(m,sizeof(m),"the matching %s recovery returned %d",OPN[op],(int)mr);note(name,m);}}
+ if(expect==2){
+  if(!is_done(op)){snap(after,sizeof(after));
+   snprintf(m,sizeof(m),"PENDING cell: the end state is not the finished state (old state %d), listing [%s]",is_old(),after);note(name,m);}}
+ else if(expect==0){
+  if(!is_old()){snap(after,sizeof(after));snprintf(m,sizeof(m),"refused cell: the state is not the old state, listing [%s]",after);note(name,m);}}
+ else if(!is_done(op)){snap(after,sizeof(after));snprintf(m,sizeof(m),"status OK but the finished state is not there, listing [%s]",after);note(name,m);}
  FsReadClose(r);cells++;}
 typedef struct{FS_READ_ROOT *r;volatile LONG done;FS_READ_STATUS st;}JOB;
 static DWORD WINAPI worker(LPVOID p)
@@ -135,8 +171,8 @@ int main(void)
   {"none",0,{0,0,0,0}},
   {"read",FILE_SHARE_READ,{0,0,0,1}},
   {"read+write",FILE_SHARE_READ|FILE_SHARE_WRITE,{0,0,0,1}},
-  {"read+delete",FILE_SHARE_READ|FILE_SHARE_DELETE,{1,1,1,1}},
-  {"read+write+delete",FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,{1,1,1,1}}};
+  {"read+delete",FILE_SHARE_READ|FILE_SHARE_DELETE,{2,2,2,1}},
+  {"read+write+delete",FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,{2,2,2,1}}};
  int i,op;
  for(i=0;i<5;i++)for(op=0;op<4;op++)cell(M[i].name,M[i].share,op,M[i].ok[op]);
  /* foreign exclusive byte-range lock on the workspace lock file */
