@@ -272,6 +272,14 @@ FS_READ_STATUS FsReadOpen(const char *root,FS_READ_ROOT **out)
     r->fd=fd;*out=r;return FS_READ_OK;
 }
 void FsReadClose(FS_READ_ROOT *r){if(r){close(r->fd);free(r);}}
+/* Per-component open of a parent path. The mutant (test_fs_race_parent_mc) drops
+   O_NOFOLLOW here only; production always has it. */
+#ifdef FS_PARENT_FOLLOW_MUTANT
+#define FS_PART_NOFOLLOW 0
+#else
+#define FS_PART_NOFOLLOW O_NOFOLLOW
+#endif
+
 static FS_READ_STATUS posix_open(const FS_READ_ROOT *r,const char *rel,int *out)
 {
     int fd;char *copy,*part,*next;
@@ -283,7 +291,7 @@ static FS_READ_STATUS posix_open(const FS_READ_ROOT *r,const char *rel,int *out)
     while (*part) {
         int child;
         next=strchr(part,'/');if(next)*next++=0;
-        child=openat(fd,part,O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_NOFOLLOW|(next?O_DIRECTORY:0));
+        child=openat(fd,part,O_RDONLY|O_NONBLOCK|O_CLOEXEC|FS_PART_NOFOLLOW|(next?O_DIRECTORY:0));
         if(child<0){FS_READ_STATUS s=error_status();free(copy);close(fd);return s;}
         close(fd);fd=child;if(!next)break;part=next;
     }
