@@ -1,10 +1,21 @@
-#ifndef _WIN32
 #include "git_gate.h"
 #include "agent_shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#define RMTREE(p) "if exist " p " rmdir /s /q " p
+#define NOERR "2>nul"
+#define DELFILE "del third.txt"
+#else
 #include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#define RMTREE(p) "rm -rf " p
+#define NOERR "2>/dev/null"
+#define DELFILE "rm third.txt"
+#endif
 /* M2: the workflow sequence end to end against a real bare remote, with the remote advancing
    after the first preflight and before the push (what apply-patch.yml does not guard in its
    own steps). Local clone L, other clone O, bare remote B. POSIX only, nothing mocked.
@@ -70,8 +81,15 @@ static int Gate(const char *a1, const char *a2, const char *a3, const char *a4, 
     if (a6) argv[argc++] = (char *)a6;
     if (a7) argv[argc++] = (char *)a7;
     if (a8) argv[argc++] = (char *)a8;
+#ifdef _WIN32
+    /* tmpfile() writes to the drive root on Windows and can be refused; use files in the working directory. */
+    o = fopen("test_git_gate_e2e_out.tmp", "w+b");
+    e = fopen("test_git_gate_e2e_err.tmp", "w+b");
+    if (o == NULL || e == NULL) return 99;
+#else
     o = tmpfile();
     e = tmpfile();
+#endif
     rc = GitGateRun(argc, argv, o, e);
     rewind(o);
     rewind(e);
@@ -81,6 +99,10 @@ static int Gate(const char *a1, const char *a2, const char *a3, const char *a4, 
     gerr[n] = 0;
     fclose(o);
     fclose(e);
+#ifdef _WIN32
+    (void)remove("test_git_gate_e2e_out.tmp");
+    (void)remove("test_git_gate_e2e_err.tmp");
+#endif
     return rc;
 }
 int main(void)
@@ -89,12 +111,12 @@ int main(void)
          local_after[80] = "", porcelain[256] = "x";
     int rc;
     printf("=== gate sequence with the remote advancing before the push ===\n");
-    (void)system("rm -rf " S);
-    CHECK(mkdir(S, 0755) == 0 && Run(S, "git init -q --bare -b main b.git", 0) && Run(S, "git clone -q b.git l 2>/dev/null", 0) &&
-          Run(S, "git clone -q b.git o 2>/dev/null", 0), "bare remote and two clones");
-    CHECK(Run(L, "git config user.name L && git config user.email l@example.invalid && git checkout -q -b main", 0) &&
-          Run(O, "git config user.name O && git config user.email o@example.invalid && git checkout -q -b main", 0), "identities, branch main");
-    CHECK(Put(L "/a.txt", "one\ntwo\nthree\n") && Run(L, "git add -A && git commit -q -m base && git push -q -u origin main 2>/dev/null", 0), "base pushed with upstream");
+    (void)system(RMTREE(S));
+    CHECK(MKDIR(S) == 0 && Run(S, "git init -q --bare -b main b.git", 0) && Run(S, "git clone -q b.git l " NOERR, 0) &&
+          Run(S, "git clone -q b.git o " NOERR, 0), "bare remote and two clones");
+    CHECK(Run(L, "git config user.name L && git config user.email l@example.invalid && git config core.autocrlf false && git checkout -q -b main", 0) &&
+          Run(O, "git config user.name O && git config user.email o@example.invalid && git config core.autocrlf false && git checkout -q -b main", 0), "identities, branch main");
+    CHECK(Put(L "/a.txt", "one\ntwo\nthree\n") && Run(L, "git add -A && git commit -q -m base && git push -q -u origin main " NOERR, 0), "base pushed with upstream");
     CHECK(Out(L, "git rev-parse HEAD", head, sizeof head) && Out(S "/b.git", "git rev-parse main", tip0, sizeof tip0) && !strcmp(head, tip0),
           "local head equals the remote tip");
 
@@ -103,8 +125,8 @@ int main(void)
     rc = Gate("preflight", "--expected-head", head, "--branch", "main", "--remote-sync", "--dir", L);
     CHECK(rc == 0 && strstr(gout, "ready"), "1: preflight --remote-sync is ready before the advance");
 
-    CHECK(Run(O, "git pull -q origin main 2>/dev/null", 0) && Put(O "/other.txt", "o\n") &&
-          Run(O, "git add -A && git commit -q -m other && git push -q origin main 2>/dev/null", 0) &&
+    CHECK(Run(O, "git pull -q origin main " NOERR, 0) && Put(O "/other.txt", "o\n") &&
+          Run(O, "git add -A && git commit -q -m other && git push -q origin main " NOERR, 0) &&
           Out(O, "git rev-parse HEAD", tip_other, sizeof tip_other) && strcmp(tip_other, head) != 0, "the other clone advances the remote");
 
     rc = Gate("preflight", "--expected-head", head, "--branch", "main", "--remote-sync", "--dir", L);
@@ -120,7 +142,7 @@ int main(void)
     CHECK(rc == 0, "3: verify-head passes");
     CHECK(Out(L, "git rev-parse HEAD", local_commit, sizeof local_commit) && strcmp(local_commit, head) != 0, "local commit recorded");
 
-    CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 1), "4: git push origin HEAD:main is refused (non-fast-forward)");
+    CHECK(Run(L, "git push origin HEAD:main " NOERR, 1), "4: git push origin HEAD:main is refused (non-fast-forward)");
     CHECK(Out(S "/b.git", "git rev-parse main", tip_after, sizeof tip_after) && !strcmp(tip_after, tip_other),
           "4: the remote tip is still the other clone's commit");
     CHECK(Out(L, "git rev-parse HEAD", local_after, sizeof local_after) && !strcmp(local_after, local_commit),
@@ -141,7 +163,7 @@ int main(void)
           Gate("verify-staged", ".git/change2.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0 &&
           Run(L, "git commit -q -m change2", 0) &&
           Gate("verify-head", ".git/change2.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0, "7: control apply, stage, verify, commit, verify");
-    CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 0), "7: control push succeeds when the remote did not advance");
+    CHECK(Run(L, "git push origin HEAD:main " NOERR, 0), "7: control push succeeds when the remote did not advance");
     CHECK(Out(L, "git rev-parse HEAD", local_commit, sizeof local_commit) && Out(S "/b.git", "git rev-parse main", tip_after, sizeof tip_after) &&
           !strcmp(local_commit, tip_after) && strcmp(tip_after, tip_other) != 0, "7: control remote tip equals the local commit");
 
@@ -158,7 +180,7 @@ int main(void)
     {
         char before[80] = "", count0[32] = "", count1[32] = "", count2[32] = "", c3[80] = "", tip3[80] = "", head3[80] = "";
         CHECK(Out(L, "git rev-parse HEAD", before, sizeof before) && Out(S "/b.git", "git rev-list --count main", count0, sizeof count0) &&
-              Put(L "/third.txt", "t\n") && Run(L, "git add -A -N && git diff --binary > .git/change3.patch && git reset -q && rm third.txt", 0) &&
+              Put(L "/third.txt", "t\n") && Run(L, "git add -A -N && git diff --binary > .git/change3.patch && git reset -q && " DELFILE, 0) &&
               Run(L, "git apply .git/change3.patch && git add -A", 0) &&
               Gate("verify-staged", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0 &&
               Run(L, "git commit -q -m change3", 0) && Out(L, "git rev-parse HEAD", c3, sizeof c3) && strcmp(c3, before) != 0,
@@ -167,18 +189,18 @@ int main(void)
         if (rc != 3) printf("    got exit %d out=%s err=%s\n", rc, gout, gerr);
         CHECKR(rc == 3 && strstr(gout, "already applied"), "R1: patch-state on the committed tree reports already applied, exit 3");
         CHECK(Gate("verify-head", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0, "R2: verify-head passes on the committed tree");
-        CHECK(Run(L, "git apply .git/change3.patch 2>/dev/null", 1) && Out(L, "git rev-parse HEAD", head3, sizeof head3) && !strcmp(head3, c3) &&
+        CHECK(Run(L, "git apply .git/change3.patch " NOERR, 1) && Out(L, "git rev-parse HEAD", head3, sizeof head3) && !strcmp(head3, c3) &&
               Out(L, "git status --porcelain", porcelain, sizeof porcelain) && porcelain[0] == 0, "R3: a naive second git apply is refused and changes nothing");
-        CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
               Out(S "/b.git", "git rev-list --count main", count1, sizeof count1) && atoi(count1) == atoi(count0) + 1, "R4: the push finishes once, remote has exactly one more commit");
-        CHECK(Run(L, "git push origin HEAD:main 2>/dev/null", 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-parse main", tip3, sizeof tip3) && !strcmp(tip3, c3) &&
               Out(S "/b.git", "git rev-list --count main", count2, sizeof count2) && !strcmp(count1, count2), "R5: a second push is a no-op, tip and commit count unchanged");
         rc = Gate("patch-state", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL);
         CHECKR(rc == 3 && strstr(gout, "already applied"), "R6: patch-state after the push still reports already applied, exit 3");
     }
 
     printf("\n%d/%d passed\n", pass_n, run_n);
-    (void)system("rm -rf " S);
+    (void)system(RMTREE(S));
 #ifdef AGENT_GIT_PATCH_STATE_MUTANT
     if (retry_fail_n > 0 && pass_n + retry_fail_n == run_n) { printf("mutant killed by %d retry cell(s)\n", retry_fail_n); return 0; }
     printf("MUTANT SURVIVED or a non-retry cell failed\n");
@@ -187,7 +209,3 @@ int main(void)
     return pass_n == run_n ? 0 : 1;
 #endif
 }
-#else
-#include <stdio.h>
-int main(void) { printf("SKIP: test_git_gate_e2e is POSIX only\n"); return 0; }
-#endif
