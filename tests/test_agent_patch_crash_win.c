@@ -83,6 +83,28 @@ static int run_child(const char *exe, int phase)
     CloseHandle(pi.hProcess);
     return (int)code;
 }
+/* Diagnostic: link count, size and which known content a leftover name holds. */
+static void describe(const char *name)
+{
+    char path[MAX_PATH], buf[256];
+    BY_HANDLE_FILE_INFORMATION bi;
+    DWORD got = 0;
+    const char *cls = "NEITHER";
+    HANDLE h;
+    snprintf(path, sizeof(path), WS "\\%s", name);
+    h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) { printf("  (leftover detail: cannot open, error %lu)\n", GetLastError()); return; }
+    memset(&bi, 0, sizeof(bi));
+    if (!GetFileInformationByHandle(h, &bi)) { printf("  (leftover detail: no info)\n"); CloseHandle(h); return; }
+    if (ReadFile(h, buf, sizeof(buf) - 1, &got, NULL)) buf[got] = 0; else got = 0, buf[0] = 0;
+    if (got == strlen(NEWC) && !memcmp(buf, NEWC, got)) cls = "NEW";
+    else if (got == strlen(OLDC) && !memcmp(buf, OLDC, got)) cls = "OLD";
+    else if (got == 0) cls = "EMPTY";
+    printf("  (leftover detail: links %lu, size %lu, bytes %s)\n", (unsigned long)bi.nNumberOfLinks,
+           (unsigned long)bi.nFileSizeLow, cls);
+    CloseHandle(h);
+}
 /* Names in the workspace other than the target and the persistent lock. */
 static int leftovers(void)
 {
@@ -94,6 +116,7 @@ static int leftovers(void)
         if (!strcmp(d.cFileName, ".") || !strcmp(d.cFileName, "..") ||
             !strcmp(d.cFileName, "a.c") || !strcmp(d.cFileName, ".fstxn.lock")) continue;
         printf("  (leftover: %s)\n", d.cFileName);
+        describe(d.cFileName);
         n++;
     } while (FindNextFileA(h, &d));
     FindClose(h);
