@@ -265,7 +265,7 @@ Not shown, declared:
 - T9 (a `.fstxn.lock` with an unsafe mode) is a POSIX permission case and is not ported.
 - E3, the Windows port of `test_swe_bench_harness_fs`, is not ported by decision. That test drives `FsCreateFile` and `FsRemoveFile` through the benchmark harness, which already have direct Windows coverage in `test_fs_win_*`; the harness is auxiliary benchmark tooling and not the `AgentPatch` path.
 - File attributes after a successful apply (the new file does not inherit READONLY) are not claimed.
-- Mixed line endings: if a file has any CRLF, `AgentPatch` rewrites every line ending to CRLF. This is earlier behavior, platform independent, and not tested here.
+- Mixed line endings: this entry is superseded. It described an earlier behaviour that was measured on 2026-10-04 and fixed (see "AgentPatch keeps each line's own ending" below).
 - The single-replace crash matrix through `AgentPatch`: only crash point 4 is exercised; the other points are inherited from `FsReplaceFile` and are covered by `test_fs_win_replace`, not through `AgentPatch`.
 - The values printed by the tests (the return code of the pending case, the file contents after the crash, whether the symlink case ran) were not read, because ctest hides the output of a passing test.
 - Power-loss durability, filesystems other than NTFS, a non-cooperating writer, antivirus and indexer interference, and any runner other than `windows-latest`.
@@ -409,6 +409,16 @@ Not shown: recovery of an intent left by the old behaviour (NOT DONE).
 **Reserved names pinned (`tests/test_fs_win_devext.c`, run 37171472851, Passed on msvc and asan).** `CONIN$`, `CONOUT$` and COM/LPT with the superscript digits U+00B9, U+00B2 and U+00B3 are accepted by `FsCreateFile` as plain files inside the workspace, read back, removed with the exact image, with a sentinel outside unchanged (16 cells). This pins current behaviour; it does not say those names should be accepted. `wc_device_name` still matches only `CON`, `PRN`, `AUX`, `NUL` and `COM`/`LPT` with an ASCII digit 1 to 9.
 
 Criterion 5 on Windows stays **partial**: fuzz with four seeds (default plus three), not other seeds, not journal byte fuzzing, not content fuzzing, one runner, one account.
+
+## Update: AgentPatch keeps each line's own ending, and a test timing flake (2026-10-04)
+
+**Finding (production), fixed.** `AgentPatch` set "this file is CRLF" when it found any `\r\n` and then wrote every line ending as CRLF. Measured on Linux with `PatchApplyAtomic`, one hunk, a fresh fixture per cell (the prediction was made before measuring and held): `a\r\nb\nc\r\n` with line `b` edited gave `a\r\nB\r\nc\r\n`; with line `a` edited gave `A\r\nb\r\nc\r\n` (the untouched `b` was rewritten); `a\nb\nc\r\n` with `a` edited gave `A\r\nb\r\nc\r\n`. Pure CRLF and pure LF files were already correct.
+
+**Fix (run 37174895716, master a16246d).** The writer keeps one flag per newline of the original (written as CRLF or not). Each hunk copies the flags of the untouched text; the k-th newline of a replacement takes the ending of the k-th newline of the replaced region (extra ones take the last one, or the file's first ending when the region had none). `tests/test_agent_patch_eol.c` has nine cells (the three above, pure CRLF, pure LF, two hunks, no trailing newline, a hunk that adds a line, a multi-line hunk), all passing. Mutant `AGENT_PATCH_EOL_MUTANT` (the old rule, one macro in `src/agent_patch.c`): `test_agent_patch_eol_mc` kills it, seven of the nine cells notice it. CI: build-test-linux 166/166, build-test-msvc 176/176, asan-msvc 176/176, ast-inspect success.
+
+Not shown: the nine cells run on POSIX only. `src/agent_patch.c` is shared code and compiles in the Windows jobs, and the existing Windows patch tests still pass, but the mixed-ending behaviour is **not shown on Windows**. A lone `\r` not followed by `\n` is still dropped (unchanged, not measured). The 1 MiB limit is not touched.
+
+**Flake in `test_agent_runner` (not shown fixed).** Test 6 asserts `attempts_executed == 2`. The runner gives every build a fixed 10 s limit. In run 37174365271 (`build-test-msvc`) the first compiler call timed out (exit 124, `timeout=1`), no repair could be derived on that attempt, the runner replanned, and the task was solved in three attempts, so the assertion failed (12.49 s test time). Earlier asan runs showed one timing flake in `test_agent_runner` and one in `test_commonsense` (run ids not recorded here). Three occurrences in total, all on Windows runners, none reproduced locally. Change (m88, run 37175477916): a warm-up `gcc -fsyntax-only` with a 60 s limit before Test 6, and an explicit "ENVIRONMENT TIMEOUT" line when the first build times out. The assertions are unchanged. Result: green on all four jobs; the warm-up seconds are **not shown** (a passing ctest hides stderr). Whole-test time was 4.06 s on msvc and 10.56 s on asan in that run (2.90 s and 2.46 s one run earlier), which shows the cold start varies on that runner. One green run does not show the flake is gone.
 
 ## Update: Phase 2 commit contract and "already applied" (`tests/test_agent_git_contract.c`, POSIX)
 
