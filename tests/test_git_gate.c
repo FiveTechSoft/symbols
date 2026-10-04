@@ -11,6 +11,8 @@
 #define COPYPATCH "copy p.patch r\\.git\\change.patch >nul"
 /* Windows has no chmod: the index mode bit is set with git itself, which makes the same mode-only change in the patch. */
 #define MODEPLUS "git update-index --chmod=+x x.sh"
+/* git apply on Windows (core.filemode false) does not carry a mode-only change into the index, and git add -A does not either, so the staging step sets it again. This is the index mode, not a filesystem exec bit. */
+#define STAGEALL "git add -A && git update-index --chmod=+x x.sh"
 #else
 #include <sys/stat.h>
 #define MKDIR(p) mkdir(p, 0755)
@@ -18,6 +20,7 @@
 #define DELCMD "rm "
 #define COPYPATCH "cp p.patch r/.git/change.patch"
 #define MODEPLUS "chmod +x x.sh"
+#define STAGEALL "git add -A"
 #endif
 /* Phase 2 step 5a: the command line front end (symbols_git_gate) over the Git
    contracts, and the manifest derived from a patch. Real repositories. Runs on
@@ -160,7 +163,7 @@ int main(void)
         CHECK(Run(S,cmd,64),"executable: no arguments exits 64");
     }
 #endif
-    CHECK(Run(R,"git add -A",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0&&strstr(gout,"match (7 paths)"),"verify-staged: match");
+    CHECK(Run(R,STAGEALL,0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0&&strstr(gout,"match (7 paths)"),"verify-staged: match");
     CHECK(Put(R "/extra.c","e\n")&&Run(R,"git add extra.c",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==1&&strstr(gerr,"extra.c"),"an extra staged file: mismatch names it");
     CHECK(Run(R,"git rm -q --cached extra.c && " DELCMD "extra.c",0)&&Gate("verify-staged",".git/change.patch","--dir",R,NULL,NULL,NULL)==0,"unstaged: match");
     CHECK(Run(R,"git commit -q -m change",0)&&Gate("verify-head",".git/change.patch","--dir",R,NULL,NULL,NULL)==0,"verify-head: match");
