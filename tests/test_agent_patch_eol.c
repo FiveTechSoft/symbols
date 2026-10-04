@@ -15,6 +15,10 @@
    Predictions before the first run of the fix: J to M and the new cells N, P, Q pass,
    O (needle with a lone CR against a file without it) is refused with the file unchanged.
    AGENT_PATCH_CR_MUTANT (strip every CR again) must be killed by J to M.
+   R, S (the "\r\r\n replacement" edge, predicted before running): a replacement whose text
+   ends in CR CR LF keeps one content CR and takes the file's own newline ending (LF file
+   gives "b\r\n", CRLF file gives "b\r\r\n"). Measured on Linux: both pass; the CR mutant
+   fails both.
    Windows: this file was POSIX only until m90. Prediction made before the first
    Windows run: all nine cells pass, because the line-ending logic is shared code
    and the Fs* write path was shown to pass newlines through (test_fs_win_newline). */
@@ -117,6 +121,8 @@ int main(void)
     refused("O same needle does not match a file without the CR", "ab\nc\n", sizeof("ab\nc\n") - 1, "a\rb\n", "X\n");
     C("P CRLF needle still matches a CRLF file", "a\r\nb\r\nc\r\n", "a\r\nb\r\n", "A\r\nB\r\n", 0, 0, "A\r\nB\r\nc\r\n");
     C("Q replacement with a lone CR is written as is", "a\nb\n", "b\n", "b\rX\n", 0, 0, "a\nb\rX\n");
+    C("R replacement CR CR LF in an LF file: content CR kept, LF ending kept", "a\nb\n", "b\n", "b\r\r\n", 0, 0, "a\nb\r\n");
+    C("S replacement CR CR LF in a CRLF file: content CR kept, CRLF ending kept", "a\r\nb\r\n", "b\n", "b\r\r\n", 0, 0, "a\r\nb\r\r\n");
     if (system(RMWS) != 0) return 2;
 #if defined(AGENT_PATCH_EOL_MUTANT) || defined(AGENT_PATCH_CR_MUTANT)
     if (mism) { printf("MUTANT killed: %d cells\n", mism); return 0; }
