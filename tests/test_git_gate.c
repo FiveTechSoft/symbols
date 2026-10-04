@@ -69,6 +69,8 @@ static int Gate(const char *a1,const char *a2,const char *a3,const char *a4,cons
     n=fread(gout,1,sizeof gout-1,o);gout[n]=0;
     n=fread(gerr,1,sizeof gerr-1,e);gerr[n]=0;
     fclose(o);fclose(e);
+    /* Diagnostic: show every non-zero result, so a red cell prints what the gate said. */
+    if(rc!=0)printf("    [gate %s rc=%d] out=[%s] err=[%s]\n",a1?a1:"",rc,gout,gerr);
 #ifdef _WIN32
     (void)remove("test_git_gate_out.tmp");(void)remove("test_git_gate_err.tmp");
 #endif
