@@ -371,6 +371,16 @@ if(WIN32)
     target_include_directories(test_fs_win_case PRIVATE include)
     add_test(NAME test_fs_win_case COMMAND test_fs_win_case
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    # m198: the library on a case-sensitive directory (per-directory flag), with entries x.txt/X.txt, z.txt/Z.txt (equal bytes).
+    # The regex holds my predictions: lookups prefer the exact name, so "d/X.txt" acts on X.txt only; create/copy/move onto
+    # "d/Y.txt" next to y.txt is refused. A wrong one goes red and prints the measured line.
+    add_executable(test_fs_win_case_flag tests/test_fs_win_case_flag.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_case_flag PRIVATE include)
+    add_test(NAME test_fs_win_case_flag COMMAND test_fs_win_case_flag
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_case_flag PROPERTIES
+        PASS_REGULAR_EXPRESSION "case flag: read_xX=0U replace_xX=0on remove_xX=0o- copy_source_xX=0oo move_source_xX=0o- replace_zZ=0on remove_zZ=0o- copy_source_zZ=0oo move_source_zZ=0o- create_yY=3o- copy_target_yY=3o- move_target_yY=3o-")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
