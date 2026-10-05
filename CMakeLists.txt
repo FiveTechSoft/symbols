@@ -1091,3 +1091,15 @@ add_executable(test_agent_patch_eol_crmc tests/test_agent_patch_eol.c src/agent_
 target_include_directories(test_agent_patch_eol_crmc PRIVATE include)
 target_compile_definitions(test_agent_patch_eol_crmc PRIVATE AGENT_PATCH_CR_MUTANT=1)
 add_test(NAME test_agent_patch_eol_crmc COMMAND test_agent_patch_eol_crmc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+# A NUL byte in the target is refused (m221); the mutant build removes the check and must fail exactly cells A B D F G.
+add_executable(test_agent_patch_nul tests/test_agent_patch_nul.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_nul PRIVATE include)
+add_test(NAME test_agent_patch_nul COMMAND test_agent_patch_nul WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_nul PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS \\(0 cells wrong\\)")
+add_executable(test_agent_patch_nul_mc tests/test_agent_patch_nul.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_nul_mc PRIVATE include)
+target_compile_definitions(test_agent_patch_nul_mc PRIVATE AGENT_PATCH_NUL_MUTANT=1)
+add_test(NAME test_agent_patch_nul_mc COMMAND test_agent_patch_nul_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_nul_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B D F G")

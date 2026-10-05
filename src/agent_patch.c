@@ -254,6 +254,16 @@ static char *read_target(const PATCH_PLAN *plan, size_t *out_size, char *diag)
         set_diag(diag, fs_status_text(s));
         return NULL;
     }
+#ifndef AGENT_PATCH_NUL_MUTANT /* test only: without this check a hunk before a NUL byte cuts the file there */
+    /* The work buffers below are C strings: a NUL in the file would end them, and the write would drop
+       the NUL and everything after it while reporting success. Refuse such a target (measured m220). */
+    if (n && memchr(bytes, 0, n))
+    {
+        free(bytes);
+        set_diag(diag, "target contains a NUL byte");
+        return NULL;
+    }
+#endif
     char *buf = (char *)malloc(n + 1);
     if (!buf)
     {
