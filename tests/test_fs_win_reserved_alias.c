@@ -15,8 +15,10 @@
    prefix=<long status><state><alias status><state>; status is the FS_READ_STATUS number (3 DENIED, 0 OK), state is of the file
    afterwards: e empty and present, - missing, n other bytes. One more cell, "dir": a directory ".fstxn.dir" holding
    "inner.txt" (bytes "IN") replaced through its long path and through the 8.3 name of the directory ("FSTXN~1.DIR/inner.txt");
-   the reserved check names every path segment, but the parent directory is opened by win_open, not wc_open, so m204 does not
-   cover it (stated as not covered in the docs). Cell dir=<long status><state><alias status><state>, state of inner.txt: o
+   the reserved check names every path segment, but the parent directory is opened by win_open, not wc_open, so m204 did
+   not cover it: m206 measured dir=3o0n (alias accepted, inner.txt replaced). m207 checks the segments of the parent's
+   final path in wc_parent and the cell is predicted dir=3o3o. "dirord" is the control for over-refusal: an ordinary
+   directory "ordinary_long_dir" through its long path and through its 8.3 name, both predicted accepted (0n0n). Cell dir=<long status><state><alias status><state>, state of inner.txt: o
    original "IN", n other bytes, - missing. The line is matched by PASS_REGULAR_EXPRESSION in CMakeLists.txt; the values there are my
    predictions, so a wrong one goes red and prints the measured line. The 8.3 setting of the volume is switched on for the test
    and restored by atexit, as in test_fs_win_aliases_short. Only a scratch directory under the working directory is touched. */
@@ -69,14 +71,16 @@ int main(void)
    s[a]=FsReplaceFile(r,name,"",0,"NEW!",4);st[a]=state(path,NULL);FsReadClose(r);rmtree(WS);}
   snprintf(cellbuf,sizeof(cellbuf),"%s=%d%c%d%c",pre[i],(int)s[0],st[0],(int)s[1],st[1]);
   snprintf(out+strlen(out),sizeof(out)-strlen(out),"%s%s",out[0]?" ":"",cellbuf);}
- {FS_READ_STATUS s[2];char st[2];int b;
-  for(b=0;b<2;b++){FS_READ_ROOT *r;char al[96],name[160];
-   fixture(&r);ck(_mkdir(WS "\\.fstxn.dir")==0,"mkdir reserved dir");put(WS "\\.fstxn.dir\\inner.txt","IN");
-   if(b){shortleaf(WS "\\.fstxn.dir",al,sizeof(al));snprintf(name,sizeof(name),"%s/inner.txt",al);}
-   else snprintf(name,sizeof(name),".fstxn.dir/inner.txt");
-   ck(FsReadOpen(WS,&r)==FS_READ_OK,"open workspace");
-   s[b]=FsReplaceFile(r,name,"IN",2,"NEW!",4);st[b]=state(WS "\\.fstxn.dir\\inner.txt","IN");FsReadClose(r);rmtree(WS);}
-  snprintf(out+strlen(out),sizeof(out)-strlen(out)," dir=%d%c%d%c",(int)s[0],st[0],(int)s[1],st[1]);}
+ {static const char *dn[2]={".fstxn.dir","ordinary_long_dir"};static const char *lab[2]={"dir","dirord"};int d;
+  for(d=0;d<2;d++){FS_READ_STATUS s[2];char st[2];int b;char dpath[96],ipath[128];
+   snprintf(dpath,sizeof(dpath),WS "\\%s",dn[d]);snprintf(ipath,sizeof(ipath),"%s\\inner.txt",dpath);
+   for(b=0;b<2;b++){FS_READ_ROOT *r;char al[96],name[160];
+    fixture(&r);ck(_mkdir(dpath)==0,"mkdir dir");put(ipath,"IN");
+    if(b){shortleaf(dpath,al,sizeof(al));snprintf(name,sizeof(name),"%s/inner.txt",al);}
+    else snprintf(name,sizeof(name),"%s/inner.txt",dn[d]);
+    ck(FsReadOpen(WS,&r)==FS_READ_OK,"open workspace");
+    s[b]=FsReplaceFile(r,name,"IN",2,"NEW!",4);st[b]=state(ipath,"IN");FsReadClose(r);rmtree(WS);}
+   snprintf(out+strlen(out),sizeof(out)-strlen(out)," %s=%d%c%d%c",lab[d],(int)s[0],st[0],(int)s[1],st[1]);}}
  rmtree(WS);
  printf("reserved alias cells: %s\n",out);
  return 0;}

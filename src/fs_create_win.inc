@@ -505,6 +505,41 @@ bad:CloseHandle(*out);*out=INVALID_HANDLE_VALUE;return s;
 }
 static void wc_unlock(HANDLE h,OVERLAPPED *o)
 {if(h!=INVALID_HANDLE_VALUE){UnlockFileEx(h,0,1,0,o);CloseHandle(h);}}
+/* m207: parents are opened by win_open (src/fs_read.c), not wc_open, so the final-name check of m204 never saw a directory:
+   the 8.3 name of a reserved-prefix directory passed the per-segment name check (m206, dir cell) and the file inside was
+   replaced. After the parent is open, its normalized final path is compared with the workspace root's and every segment
+   below the root is run through wc_reserved. Returns 1 reserved, 0 none, -1 unreadable or not below the root (the caller
+   refuses). */
+static WCHAR *wc_final_path(HANDLE h)
+{
+    DWORD cap=512,n;WCHAR *buf=(WCHAR*)malloc((size_t)cap*sizeof(WCHAR));
+    if(!buf)return NULL;
+    n=GetFinalPathNameByHandleW(h,buf,cap,FILE_NAME_NORMALIZED|VOLUME_NAME_NONE);
+    if(n>=cap){
+        WCHAR *bigger;cap=n+1;bigger=(WCHAR*)realloc(buf,(size_t)cap*sizeof(WCHAR));
+        if(!bigger){free(buf);return NULL;}
+        buf=bigger;n=GetFinalPathNameByHandleW(h,buf,cap,FILE_NAME_NORMALIZED|VOLUME_NAME_NONE);
+    }
+    if(!n||n>=cap){free(buf);return NULL;}
+    return buf;
+}
+static int wc_below_root_reserved(HANDLE root,HANDLE dir)
+{
+    WCHAR *rp=wc_final_path(root),*dp=wc_final_path(dir);int r=-1;size_t rl;const WCHAR *p;
+    if(!rp||!dp)goto out;
+    rl=wcslen(rp);while(rl>1&&rp[rl-1]==L'\\')rl--;
+    if(rl<=1||_wcsnicmp(dp,rp,rl)!=0)goto out;
+    p=dp+rl;if(*p&&*p!=L'\\')goto out;
+    r=0;
+    while(*p){
+        const WCHAR *seg;size_t n;WCHAR tmp[256];
+        p++;seg=p;while(*p&&*p!=L'\\')p++;
+        n=(size_t)(p-seg);
+        if(n>=256){r=-1;break;}
+        if(n){memcpy(tmp,seg,n*sizeof(WCHAR));tmp[n]=0;if(wc_reserved(tmp)){r=1;break;}}
+    }
+out:free(rp);free(dp);return r;
+}
 static FS_READ_STATUS wc_parent(const FS_READ_ROOT *r,const WCHAR *target,HANDLE *dir,const WCHAR **leaf)
 {
     WCHAR path[WC_MAX_PATH];WCHAR *slash;char utf8[WC_MAX_PATH*3];int n;
@@ -526,6 +561,8 @@ static FS_READ_STATUS wc_parent(const FS_READ_ROOT *r,const WCHAR *target,HANDLE
         if(win_meta(*dir,&m)!=FS_READ_OK||m.kind!=FS_KIND_DIR){
             CloseHandle(*dir);*dir=INVALID_HANDLE_VALUE;return FS_READ_DENIED;}}
 #endif
+     if(s==FS_READ_OK&&*path&&wc_below_root_reserved(r->handle,*dir)!=0){
+        CloseHandle(*dir);*dir=INVALID_HANDLE_VALUE;return FS_READ_DENIED;}
      return s;}
 }
 /* All operation families share one workspace lock. An unknown control name
