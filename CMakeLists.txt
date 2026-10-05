@@ -544,6 +544,12 @@ if(WIN32)
     set_tests_properties(test_fs_fuzz_ops_default_seed_i400 PROPERTIES
         ENVIRONMENT "FS_FUZZ_ITERS=400${fz_req}" TIMEOUT 300)
 endif()
+# Windows write path with generated file contents (m218). The regex pins the last printed line.
+if(WIN32)
+    sllm_test(test_fs_win_content_fuzz tests/test_fs_win_content_fuzz.c)
+    set_tests_properties(test_fs_win_content_fuzz PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "content fuzz done: seeds=4 iterations=400 ops_ok=1200")
+endif()
 sllm_test(test_fs_c4_posix tests/test_fs_c4_posix.c)
 sllm_test(test_fs_race tests/test_fs_race.c)
 if(NOT WIN32)
