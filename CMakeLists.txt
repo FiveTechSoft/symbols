@@ -424,6 +424,14 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_reserved_alias PROPERTIES
         PASS_REGULAR_EXPRESSION "reserved alias cells: .fstxn.=3e3e .fst-=3e3e .fsp-=3e3e .fsj-=3e3e .fsrp-=3e3e .fsrs-=3e3e .fsrb-=3e3e .fsrm-=3e3e .fsmv-=3e3e dir=3o3o dirord=0n0n")
+    # m213: the orphan sweep against a FOREIGN file of the exact shape of a control name. The regex holds my predictions (.fst- .fsp- .fsrs- deleted, one-link .fsrp- and the four other prefixes kept, a two-link .fsrp- loses the name only); a wrong one goes red and prints the measured line.
+    add_executable(test_fs_win_sweep_foreign tests/test_fs_win_sweep_foreign.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_sweep_foreign PRIVATE include)
+    add_test(NAME test_fs_win_sweep_foreign COMMAND test_fs_win_sweep_foreign
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_sweep_foreign PROPERTIES
+        PASS_REGULAR_EXPRESSION "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
