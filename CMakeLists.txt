@@ -236,6 +236,18 @@ if(WIN32)
         set_tests_properties(test_fs_win_journal_fuzz_ops_seed_${wjo_seed} PROPERTIES
             ENVIRONMENT "FS_WJFUZZ_SEED=${wjo_seed}" TIMEOUT 900)
     endforeach()
+    # Windows batch journal byte fuzz (m180): kinds 1 (create) and 2 (replace), points 3 to 6, two seeds, strict
+    # oracle, predictions written before the first run.
+    add_executable(test_fs_win_journal_fuzz_batch tests/test_fs_win_journal_fuzz_batch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_journal_fuzz_batch PRIVATE include)
+    target_compile_definitions(test_fs_win_journal_fuzz_batch PRIVATE FS_CREATE_TEST_CRASH=1)
+    foreach(wjb_seed 1786707969 12648430)
+        add_test(NAME test_fs_win_journal_fuzz_batch_seed_${wjb_seed} COMMAND test_fs_win_journal_fuzz_batch
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(test_fs_win_journal_fuzz_batch_seed_${wjb_seed} PROPERTIES
+            ENVIRONMENT "FS_WJFUZZ_SEED=${wjb_seed}" TIMEOUT 900)
+    endforeach()
     add_executable(test_agent_patch_fs_win tests/test_agent_patch_fs_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_agent_patch_fs_win PRIVATE include)
