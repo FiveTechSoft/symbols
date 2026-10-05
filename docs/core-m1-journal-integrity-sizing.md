@@ -11,7 +11,7 @@ stay Antonio's.
   marker keeps embedding the record, and a build older than m168 refuses a new file by size (fail closed).
 - Old-format rule as designed: a file of exactly the old record size is accepted unchecked; new files always have
   the trailer. A test cuts the trailer at every crash point of every kind and requires recovery OK.
-- Not covered: the 8 byte commit markers (batch, remove, move: the journal inode id), and Windows.
+- Not covered by the trailer: the 8 byte commit markers (batch, remove, move: the journal inode id), and Windows. Since m183 the markers are measured instead: they are protected by an inode compare (size 8, value equals the live journal inode), every damaged marker is refused, and no trailer is planned (see core-m1-exit-reading.md, "POSIX commit marker fuzz").
 - Measured effect: plain damage to a record is refused; F2, F4, F6, F7 as plain damage are refusals. With the CRC
   recomputed they behave as before, because a CRC is not authentication (cooperating-writer model).
 - Cost seen: about +44 and -20 lines in `src/fs_read.c`, a test change of about 260 lines, one CI round, no red.

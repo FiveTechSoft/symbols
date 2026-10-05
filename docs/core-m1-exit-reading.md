@@ -95,7 +95,9 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   trailer (magic and CRC-32). Plain damage to a record is refused. A record without a trailer (written by a build
   before m168) is still accepted unchecked, so an interrupted older operation can be recovered; the legacy cells
   of the fuzz cut the trailer at every crash point of every kind and require recovery OK. The 8 byte commit
-  markers (batch, remove, move) are not covered. **A CRC detects accidental damage only. A writer that rewrites a
+  markers (batch, remove, move) have no CRC trailer and need none: recovery requires a regular file with one link, size
+  exactly 8 and the value of the live journal's inode number, so any damage that changes the size or the value is refused
+  (measured since m183, see "Journal marker fuzz" below). **A CRC detects accidental damage only. A writer that rewrites a
   field and recomputes the CRC is not detected: that is the cooperating-writer model, not authentication.**
   Measured, with the status words that apply:
   - **F1, fixed (m164).** Replace recovery left the `.fstxn-<hex>` and `.fstxn-c<hex>` temporary links. It
@@ -128,7 +130,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** the POSIX 8 byte commit markers, damage to
+  - **Not shown:** damage to
     two journal files at once except the Windows replace pair-mismatch cell.
     Criterion 5 stays partial.
   - **Windows journals: read (source reading at a3e89a2), and the replace journal fuzzed (m171 to m175).**
@@ -242,6 +244,24 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     leftovers together. Not covered: crash points with no journal (1, 2, 21, 22, 23: by reading of the code),
     batches of more than two items, two journal files damaged differently except the pair-mismatch class, power
     loss, one runner.
+  - **POSIX commit marker fuzz (`tests/test_fs_journal_fuzz_marker.c`, m183): measured, Linux CI, two seeds.** The
+    marker of remove (`.fstxn.rcommit`), move (`.fstxn.mcommit`), batch create and batch replace (`.fstxn.commit`) is
+    8 bytes, the inode number of the live journal. Recovery requires a regular file, one link, size 8 and that value
+    (`src/fs_read.c`: batch replace line 829, batch create 910, remove 1316, move 1527). The test kills the writer at every
+    crash point of the kind (one point per kind leaves a marker: found by looking at the files), damages only the
+    marker, then recovers in a forked child. Per kind 89 damage cells: 64 single bit flips, 8 set bytes, truncation to 0
+    to 7 bytes, 4 appends (1, 8, 9, 16 bytes), eight zero bytes, the inode of an unrelated file, a stale inode (the marker
+    file's own), a symlink in place of the marker, a second hard link; plus 2 control cells that are not damage (91 cells per kind) (the
+    journal's own inode number written back in place, and the marker replaced by a new file holding the same 8 bytes). 364
+    cells per seed, 0 failures: every damaged marker is refused (DENIED), the workspace is byte for byte unchanged, nothing
+    outside it changed, the journal and the marker stay; the controls recover OK in the committed state with no journal or
+    marker left and a second recovery OK. Mutants, run locally once and not in CI: dropping the value compare at each of the
+    four sites makes exactly that kind fail with "a damaged marker was not refused" (20 failures printed for each, the print is
+    capped). **This is not authentication:** a writer that writes the journal's inode number into the marker is accepted,
+    the same cooperating-writer limit as a recomputed CRC. An earlier plan to add a CRC trailer to these markers was
+    dropped (a retraction, m183): the inode compare is already stronger against accidental damage and the trailer would
+    only change the on-disk size. Not covered: the replace marker (it embeds its record and has the trailer), a marker
+    that is deleted (delete class of `test_fs_journal_fuzz`), Windows, power loss, one runner.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

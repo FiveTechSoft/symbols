@@ -494,6 +494,17 @@ if(NOT WIN32)
             ENVIRONMENT "FS_JFUZZ_SEED=${jf_seed}" TIMEOUT 300
             PASS_REGULAR_EXPRESSION "journal fuzz iterations: 350 per kind, 6 kinds, seed ${jf_seed} refused [0-9]+ ok [0-9]+ known-limit-hits [0-9]+ failures 0 class mask 0")
     endforeach()
+    # Damage to the 8 byte commit marker alone (remove, move, batch create, batch replace), m183: 89 damage cells and
+    # 2 control cells per kind, every damaged marker refused, the controls recover OK. The printed line is matched so a pass is not hidden.
+    add_executable(test_fs_journal_fuzz_marker tests/test_fs_journal_fuzz_marker.c src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_journal_fuzz_marker PRIVATE include)
+    target_compile_definitions(test_fs_journal_fuzz_marker PRIVATE FS_CREATE_TEST_CRASH=1)
+    foreach(jm_seed 1786707970 12648430)
+        add_test(NAME test_fs_journal_fuzz_marker_seed_${jm_seed} COMMAND test_fs_journal_fuzz_marker WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(test_fs_journal_fuzz_marker_seed_${jm_seed} PROPERTIES
+            ENVIRONMENT "FS_JMARK_SEED=${jm_seed}" TIMEOUT 300
+            PASS_REGULAR_EXPRESSION "journal marker fuzz: 364 cells, seed ${jm_seed}, marker phases per kind 1 1 1 1, control cells 8, failures 0")
+    endforeach()
     add_executable(test_fs_journal_fuzz_mc_stage tests/test_fs_journal_fuzz.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz_mc_stage PRIVATE include)
     target_compile_definitions(test_fs_journal_fuzz_mc_stage PRIVATE FS_CREATE_TEST_CRASH=1 FS_JREC_MUTANT_STAGE=1 FS_JFUZZ_MUTANT_MASK=0x40 FS_JFUZZ_MUTANT_IGNORE=0x3f)
