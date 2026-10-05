@@ -391,6 +391,14 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_case_root PROPERTIES
         PASS_REGULAR_EXPRESSION "root flag: foreign_lock=0ooo reserved_create=3- reserved_remove=3o root_replace_aA=0on root_remove_aA=0o-")
+    # m201: batch operations in a case-sensitive directory. The regex holds my predictions: a batch naming x.txt and X.txt is refused whole (status 1, nothing touched, the batch code folds names); a batch naming X.txt or Z.txt plus k.txt acts on the exact-case entry only; a create batch of n.txt and N.txt is refused; a create batch of Y.txt and k.txt next to y.txt succeeds. A wrong one goes red and prints the line.
+    add_executable(test_fs_win_case_batch tests/test_fs_win_case_batch.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_case_batch PRIVATE include)
+    add_test(NAME test_fs_win_case_batch COMMAND test_fs_win_case_batch
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_case_batch PROPERTIES
+        PASS_REGULAR_EXPRESSION "batch flag: rep_dup_xX=1ooo rep_X_xX=0onn rep_Z_zZ=0onn cre_dup_nN=1--- cre_Y_yY=0onn")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
