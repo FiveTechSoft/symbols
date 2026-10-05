@@ -3,8 +3,8 @@
 Reading of the five Phase 1 exit criteria in `ROADMAP.md` against the tests on `master`, per platform,
 with the open gaps named. It is a reading of sources and of CI results already recorded in
 [core-m0-m1-exit-audit.md](core-m0-m1-exit-audit.md); nothing here is a new measurement. M1 is not declared.
-The declaration is Antonio's. Last measured CI state recorded for the M1 cells: linux 171/171,
-msvc and asan-msvc 186/186 (run 37219123908, `b9e0c8f`; 185 at m146, 184 at m142, 181 at m134), one runner per platform (`windows-latest`, NTFS,
+The declaration is Antonio's. Last measured CI state recorded for the M1 cells: linux 181/181,
+msvc and asan-msvc 196/196, `ast-inspect-windows-ninja` 10 tests OK (run 37247707282, `15de1a7`, m181; 186 at `b9e0c8f`, 185 at m146, 184 at m142, 181 at m134), one runner per platform (`windows-latest`, NTFS,
 one account; one Linux runner), cooperating writers, no power-loss claim. A ctest Passed line hides the
 test output, so statuses come from ctest pass lines and the sources.
 
