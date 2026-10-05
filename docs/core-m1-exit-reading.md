@@ -60,8 +60,16 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
    different patches give one applied and one refused. Its mutant target `test_agent_patch_contend_win_mc` SURVIVED on
    the first run (the mutant re-reads the target and `FsReplaceFile` compares again under the lock, and the two
    children woke together); with staggered sleeps (m160) it was killed by exactly the W2 cell, msvc and asan-msvc
-   188/188 in run 37227572528 at `ed21782`, one run, not repeated, so not shown stable. Not tried: a waiter killed
-   while holding the lock, power loss, other runners; the lock cases are sequential in one process; the POSIX mode check has no Windows
+   188/188 in run 37227572528 at `ed21782`, one run, not repeated, so not shown stable. A holder killed from outside while another process waits is shown by `sc_killholder` in
+   `tests/test_fs_win_batch_replace.c` (m191, run 37265496715, `8da58de`, msvc and asan 196 of 196, the test Passed in
+   5.85 s and 10.41 s): the holder is a batch replace parked by `FS_WIN_BATCH_HOLD=k` (journal written, lock held, k = 0, 1, 2),
+   the waiter is a second process in `FsBatchRecover`; the waiter was still running 1500 ms after its start, the holder was
+   killed with `TerminateProcess`, the waiter then finished within 20 s with status OK, the tree was back to the old bytes
+   with no journal and no orphan name, and the batch then worked. Mutant 13 (test only, `wc_lock` takes no lock) was killed.
+   Limits of that cell: the 1500 ms check alone cannot tell a waiter blocked in `LockFileEx` from one that started slowly
+   (the mutant kill is what shows it bites); only an `FsBatchRecover` waiter, not a waiter inside `FsBatchCreate`,
+   `FsBatchReplace` or `PatchApplyAtomic`; one park point per k; one runner; a process kill is not power loss. Not tried:
+   power loss, other runners; the lock cases are sequential in one process; the POSIX mode check has no Windows
    equivalent, so this is parity of intent, not of mechanism. **Shown for L1 to L5, L6 measured only.**
 3. **Mutant (m149).** Mutant 12 (`AGENT_PATCH_APPLY_MUTANT`, test-only, in `replace_target`): the drift guard is
    dropped, the bytes the target holds at replace time are passed as the expected bytes, so a change between the read
