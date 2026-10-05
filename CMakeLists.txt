@@ -332,7 +332,10 @@ if(WIN32)
     target_compile_definitions(test_fs_win_aliases_short PRIVATE ALIAS_SHORT=1)
     add_test(NAME test_fs_win_aliases_short COMMAND test_fs_win_aliases_short
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(test_fs_win_aliases_short PROPERTIES SKIP_RETURN_CODE 77)
+    # m194: the test enables 8.3 names on its volume (restored at exit) and prints a table, one fresh fixture per cell.
+    # The regex holds my predictions; a wrong one goes red and prints the measured table.
+    set_tests_properties(test_fs_win_aliases_short PROPERTIES
+        PASS_REGULAR_EXPRESSION "fs win short cells: create=R copy_target=R copy_source=A move_target=R move_source=A replace=A remove=A batch_create=R batch_replace=A")
     # m193: probe of 8.3 short names on the workspace volume. The regex holds my predictions: no short name before,
     # `fsutil 8dot3name set` returns 0 and a new file then has one, the setting is restored. A wrong one goes red and prints the line.
     add_executable(test_fs_win_8dot3_probe tests/test_fs_win_8dot3_probe.c)

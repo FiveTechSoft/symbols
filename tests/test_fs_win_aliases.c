@@ -146,27 +146,67 @@ static void fixture(FS_READ_ROOT **r)
  ck(FsRemoveFile(*r,"inside/b1","B1",2)==FS_READ_OK&&FsRemoveFile(*r,"inside/b2","B2",2)==FS_READ_OK,"control cleanup");
  ck(FsBatchRecover(*r)==FS_READ_OK,"control recover");
  label[0]=0;snprintf(label,sizeof(label),"after controls");untouched();matrix_started=1;}
+#ifdef ALIAS_SHORT
+static char sdrive_cmd_off[64];static int restore_needed;
+static void restore_8dot3(void){if(restore_needed){restore_needed=0;system(sdrive_cmd_off);}}
+#endif
 int main(void)
 {
  FS_READ_ROOT *r;
 #ifdef ALIAS_SHORT
- char full[MAX_PATH],shortp[MAX_PATH],*leaf;DWORD n;
- fixture(&r);
- n=GetFullPathNameA(WS "\\.fstxn.lock",MAX_PATH,full,NULL);
- ck(n>0&&n<MAX_PATH,"lock path");
- n=GetShortPathNameA(full,shortp,MAX_PATH);
- leaf=strrchr(shortp,'\\');leaf=leaf?leaf+1:shortp;
- if(!n||n>=MAX_PATH||!_stricmp(leaf,".fstxn.lock")){
-  FsReadClose(r);cleanup();
-  printf("SKIP: this volume has no 8.3 short name for .fstxn.lock (%s)\n",n?leaf:"none");return 77;}
- {char name[64];snprintf(name,sizeof(name),"%s",leaf);nine(r,name,"",0);}
- ck(cells==9,"cell count");
- /* the control file itself must still be a usable, empty lock */
- {HANDLE h=CreateFileA(WS "\\.fstxn.lock",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,0,NULL);
-  ck(h!=INVALID_HANDLE_VALUE&&GetFileSize(h,NULL)==0,"lock file intact");CloseHandle(h);}
- FsReadClose(r);cleanup();
- printf("fs win short ok: 8.3 alias %s refused in %d cells\n",leaf,cells);
- return 0;
+ /* m194: 8.3 cells with the volume setting switched on for the test (m193 measured that the runner allows it).
+    One fresh fixture per cell, so a cell that is ACCEPTED cannot change the next one. The result is a table, not a
+    pass/fail: a cell is R (refused and nothing changed) or A (accepted or changed something). The table line is
+    matched by PASS_REGULAR_EXPRESSION in CMakeLists.txt; the values there are predictions, so a wrong one goes
+    red and prints the measured table. The volume setting is restored by atexit, so also on a failed check. */
+ {static const char *op[9]={"create","copy_target","copy_source","move_target","move_source","replace","remove","batch_create","batch_replace"};
+  char drive,tbl[256]="",full[MAX_PATH],shortp[MAX_PATH],*leaf;DWORD n;int i,changed=0;
+  {char probe[MAX_PATH];FILE *f;int had;
+   n=GetFullPathNameA(".",MAX_PATH,full,NULL);ck(n>0&&n<MAX_PATH,"cwd path");drive=full[0];
+   snprintf(sdrive_cmd_off,sizeof(sdrive_cmd_off),"fsutil 8dot3name set %c: 1 >NUL 2>&1",drive);
+   cleanup();ck(_mkdir(WS)==0,"mkdir probe");
+   f=fopen(WS "\\probe_long_file_name_first.txt","wb");ck(f&&fclose(f)==0,"probe file");
+   n=GetFullPathNameA(WS "\\probe_long_file_name_first.txt",MAX_PATH,probe,NULL);ck(n>0&&n<MAX_PATH,"probe path");
+   n=GetShortPathNameA(probe,shortp,MAX_PATH);leaf=strrchr(probe,'\\');
+   had=n&&n<MAX_PATH&&_stricmp(strrchr(shortp,'\\')+1,leaf+1)!=0;
+   cleanup();
+   if(!had){char cmd[64];atexit(restore_8dot3);restore_needed=1;
+    snprintf(cmd,sizeof(cmd),"fsutil 8dot3name set %c: 0 >NUL 2>&1",drive);ck(system(cmd)==0,"enable 8dot3");}}
+  for(i=0;i<9;i++){
+   char name[64];FS_READ_STATUS st=FS_READ_OK;FS_READ_STATUS res;
+   fixture(&r);
+   n=GetFullPathNameA(WS "\\.fstxn.lock",MAX_PATH,full,NULL);ck(n>0&&n<MAX_PATH,"lock path");
+   n=GetShortPathNameA(full,shortp,MAX_PATH);ck(n>0&&n<MAX_PATH,"short path");
+   leaf=strrchr(shortp,'\\');leaf=leaf?leaf+1:shortp;
+   ck(_stricmp(leaf,".fstxn.lock")!=0,"lock has no short name even with 8.3 on");
+   snprintf(name,sizeof(name),"%s",leaf);
+   switch(i){
+   case 0:res=FsCreateFile(r,name,"x",1,0666);break;
+   case 1:res=FsCopyFile(r,"inside/f",name,"REAL",4);break;
+   case 2:res=FsCopyFile(r,name,"inside/c","",0);break;
+   case 3:res=FsMoveFile(r,"inside/f",name,"REAL",4);break;
+   case 4:res=FsMoveFile(r,name,"inside/m","",0);break;
+   case 5:res=FsReplaceFile(r,name,"",0,"NEW!",4);break;
+   case 6:res=FsRemoveFile(r,name,"",0);break;
+   case 7:{FS_BATCH_CREATE b[2]={{"inside/ok1","x",1,0666},{name,"x",1,0666}};res=FsBatchCreate(r,b,2);break;}
+   default:{FS_BATCH_REPLACE b[2]={{"inside/f","REAL",4,"NEW!",4},{name,"",0,"NEW!",4}};res=FsBatchReplace(r,b,2);}
+   }
+   (void)st;(void)nine;
+   /* untouched without a failing check: any difference counts as a change */
+   {char m[16]="";int ok=res!=FS_READ_OK;
+    if(ok){FILE *f=fopen(OUTD "\\victim","rb");char b[16]={0};
+     ok=f&&fread(b,1,15,f)==6&&!memcmp(b,"VICTIM",6);if(f)fclose(f);
+     ok=ok&&count(OUTD "\\*")==1&&count(WS "\\inside\\*")==1&&count(WS "\\*")==1;
+     {FILE *g=fopen(WS "\\inside\\f","rb");char c[16]={0};
+      ok=ok&&g&&fread(c,1,15,g)==4&&!memcmp(c,"REAL",4);if(g)fclose(g);}
+     {HANDLE h=CreateFileA(WS "\\.fstxn.lock",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,0,NULL);
+      ok=ok&&h!=INVALID_HANDLE_VALUE&&GetFileSize(h,NULL)==0;if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);}}
+    (void)m;if(!ok)changed++;
+    snprintf(tbl+strlen(tbl),sizeof(tbl)-strlen(tbl),"%s%s=%c",i?" ":"",op[i],ok?'R':'A');}
+   FsReadClose(r);cleanup();
+  }
+  printf("fs win short cells: %s\n",tbl);
+  return 0;}
 #else
  char absv[MAX_PATH],plain[MAX_PATH+16],ext[MAX_PATH+16],dev[MAX_PATH+16];DWORD n;
  static const char *fixed[]={
