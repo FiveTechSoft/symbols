@@ -396,6 +396,25 @@ guards (junctions seen at least 5 times, at least one writer call OK). Not cover
   Limits: an invariant over one 5 s budget, not a proof that no interleaving exists; one runner (`windows-latest`); cooperating writers only; one swap target (a junction to
   a directory outside the root); the root itself and a swapped component deeper than one level are not swapped; no crash or recovery during the swap.
 
+## C2 and C1 on Windows: sweep against a foreign file, and the cell E window
+
+- **The sweep and a foreign file of control-name shape (m213, run 37325720596, commit b6e5626): measured, msvc and asan; a limit, not a repair.**
+  `tests/test_fs_win_sweep_foreign.c` puts one foreign file `<prefix>` + 32 lowercase hex with the bytes "FOREIGN" in a fresh workspace root and calls
+  `FsBatchRecover` and, separately, `FsReplaceRecover`, with no journal or marker present (one call, one fixture per cell). Prediction before the run (about
+  70 percent), and it held: `.fst-`, `.fsp-` and `.fsrs-` files are deleted with their bytes; a one-link `.fsrp-` file and files with the prefixes `.fsj-`, `.fsrb-`, `.fsrm-`,
+  `.fsmv-` stay; a `.fsrp-` file that has a second name (`other.txt`) loses only the `.fsrp-` name and the data stays under `other.txt`. The result is the same for both
+  entry points. The line is pinned by `PASS_REGULAR_EXPRESSION`, so it is known from the regex pass (msvc and asan Passed), not read in the log. Reading: the sweep
+  treats the root names of that exact shape as its own; a foreign writer that uses such a name loses the file. The library refuses to create these names (`wc_reserved`), so the
+  loss needs a non-library writer, outside the cooperating-writer model. POSIX has no sweep. No source change was made; whether to narrow the shape check is a design decision
+  that has not been taken. Limits: one runner, files of 7 bytes, root only, regular files only (the sweep skips directories and reparse points by its own code, not tested here).
+- **Cell E window (m214, run 37329239811, commit 474bf68): a test-only change, the fix is not shown.** `test_fs_win_race` cell E checks the parent swap invariant over
+  `SWAP_BUDGET_MS` (5000 ms) and has a guard that at least one writer call succeeded. That guard failed once in CI (m213 run, msvc job 111817148358, "E: at least
+  one writer call succeeded (0)"), as in the earlier flake. m214 extends the window in 50 ms steps while no writer call has succeeded, up to `SWAP_CAP_MS` (30000 ms), checks the
+  outside directory in every step, and prints "E window: <ms> ms (... extended 0|1)" before the guards. The guards and the invariant are unchanged. m214 ran green on msvc (205 of 205)
+  and asan (205 of 205); the extension was probably not exercised in that run (I did not read the "E window" line, ctest hides stdout), so **the green run does not show that the flake is
+  fixed**. It may also not be fixable by a longer window: for the POSIX parent-swap test the zero-OK flake was measured to be a wedge (a cut-off operation leaves journal files and later calls
+  are refused, see the gate note below); whether cell E has the same cause on Windows has not been measured. The next step if the flake recurs is to list the root names when the guard fails.
+
 ## Not shown, whole reading
 
 Power-loss durability (deferred); other runners, filesystems, accounts, inherited ACLs; 8.3 aliases other than the lock-file cell set in the 8.3 section above;
