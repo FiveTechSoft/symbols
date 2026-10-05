@@ -366,6 +366,13 @@ if(WIN32)
     target_include_directories(test_fs_win_race PRIVATE include)
     add_test(NAME test_fs_win_race COMMAND test_fs_win_race
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_executable(test_fs_win_race_swap tests/test_fs_win_race_swap.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_race_swap PRIVATE include)
+    add_test(NAME test_fs_win_race_swap COMMAND test_fs_win_race_swap
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_race_swap PROPERTIES
+        PASS_REGULAR_EXPRESSION "fs win race swap ok: parent swap invariant held")
     add_executable(test_fs_win_case tests/test_fs_win_case.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_case PRIVATE include)
