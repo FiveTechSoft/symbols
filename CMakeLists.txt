@@ -537,6 +537,13 @@ foreach(fz_seed 1 7 12648430)
     set_tests_properties(test_fs_fuzz_ops_seed_${fz_seed}_i400 PROPERTIES
         ENVIRONMENT "FS_FUZZ_SEED=${fz_seed};FS_FUZZ_ITERS=400${fz_req}" TIMEOUT 300)
 endforeach()
+# Windows only: the default seed of the same fuzz at 400 iterations (its own default there is 150; the POSIX default is already 400).
+if(WIN32)
+    add_test(NAME test_fs_fuzz_ops_default_seed_i400 COMMAND test_fs_fuzz_ops
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_fuzz_ops_default_seed_i400 PROPERTIES
+        ENVIRONMENT "FS_FUZZ_ITERS=400${fz_req}" TIMEOUT 300)
+endif()
 sllm_test(test_fs_c4_posix tests/test_fs_c4_posix.c)
 sllm_test(test_fs_race tests/test_fs_race.c)
 if(NOT WIN32)
