@@ -13,7 +13,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 | # | Criterion | Linux | Windows |
 |---|---|---|---|
 | C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. **Not shown:** 8.3 aliases (`test_fs_win_aliases_short` is Skipped), per-directory case flag, other accounts, a rename race against a swapped parent (the POSIX `test_fs_race_parent` has no Windows counterpart). |
-| C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file calls do not sweep; an unshared `.fsrp-` pin is kept by design; no crash during the sweep was injected; a foreign inode at a target is refused, not restored (same on POSIX). |
+| C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file calls do not sweep; an unshared `.fsrp-` pin is kept by design; a crash during the sweep is injected only after its first removal (m184 to m186, see the sweep bullet below), not after a later one; a foreign inode at a target is refused, not restored (same on POSIX). |
 | C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the hard-linked lock is an accepted documented limit, and a Windows mutant of the diff-apply drift guard (mutant 12, m149) is killed by exactly four cells; lock contention with a waiting process, power loss and other runners are the gaps below. |
 | C4 | Separator, case, permission, long path, newline, locked file fixtures | **Shown** for the six aspects within limits (`test_fs_c4_posix` and others). | **Shown** for the six aspects on the listed cells (`test_fs_win_case`, long-path, locked-file and EOL tests), not "met". Mutants only for permission. |
 | C5 | Fuzzing of malformed paths and manifests: no out-of-workspace write | **Shown** for path operations and manifests with logged seeds: default, 1, 7, 12648430 at 400 iterations. | **Shown for the same operations with fewer iterations on the default seed** (see correction). Seeds 1, 7, 12648430 at 400. |
@@ -244,7 +244,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     leftovers together. Not covered: crash points with no journal (1, 2, 21, 22, 23: by reading of the code),
     batches of more than two items, two journal files damaged differently except the pair-mismatch class, power
     loss, one runner.
-  - **POSIX commit marker fuzz (`tests/test_fs_journal_fuzz_marker.c`, m183): measured, Linux CI, two seeds.** The
+  - **POSIX commit marker fuzz (`tests/test_fs_journal_fuzz_marker.c`, m183, third seed m184): measured, Linux CI, three seeds (1786707970, 12648430, 305419896; about 1.0 to 1.2 s each on linux).** The
     marker of remove (`.fstxn.rcommit`), move (`.fstxn.mcommit`), batch create and batch replace (`.fstxn.commit`) is
     8 bytes, the inode number of the live journal. Recovery requires a regular file, one link, size 8 and that value
     (`src/fs_read.c`: batch replace line 829, batch create 910, remove 1316, move 1527). The test kills the writer at every
@@ -262,6 +262,16 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     dropped (a retraction, m183): the inode compare is already stronger against accidental damage and the trailer would
     only change the on-disk size. Not covered: the replace marker (it embeds its record and has the trailer), a marker
     that is deleted (delete class of `test_fs_journal_fuzz`), Windows, power loss, one runner.
+- **Windows orphan sweep killed after its first removal (`tests/test_fs_win_batch_replace.c` `sc_sweepcrash`, m184, m185, m186): measured, msvc and asan.**
+  A writer killed at point 23 leaves orphan names and no journal. A second process is killed by test point 37 (exit
+  117) right after the sweep removed its first name, once through each of `FsBatchRecover`, `FsBatchCreate` and
+  `FsBatchReplace`. Asserted per mode: at least 4 orphan names before, exactly one fewer after, the three targets keep
+  their old bytes, a later `FsBatchRecover` (twice) leaves a clean tree and the batch then works. Mutant 12 (the sweep
+  stops after one removal) is killed. Read: run 37254495035 (m185, `922e410`), msvc and asan 196 of 196, the test
+  Passed. The first run of the same cells (m184, run 37253372878) aborted on a loop error of mine (mutant 11 does not
+  belong to this test) and left both Windows jobs red until m185. Limits: only the kill after the FIRST removal, one
+  3-item replace batch as the source of the orphans, one runner, a process kill and not power loss. A kill after a later
+  removal is not injected. The orphan counts are printed by the test since m186 and are not recorded here.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

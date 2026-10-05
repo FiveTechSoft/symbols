@@ -145,6 +145,7 @@ static void sc_reccrash(const char *exe,int spt,int rpt)
    The targets must keep their old bytes, exactly one orphan must be gone, and a later
    recovery must finish the sweep and leave a tree where the batch works. Mutant 12 makes
    the sweep stop after one removal, so the later recovery leaves orphans behind. */
+static int g_sw[3][2];static int g_swn=0; /* orphan names before and after the killed sweep, per run */
 static void sc_sweepcrash(const char *exe,int mode)
 {FS_READ_ROOT *r;int before,after;
  fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open sweep crash");
@@ -295,7 +296,7 @@ int main(int argc,char **argv)
  /* Mutants: each must fail the scenario that targets it. */
  for(int m=6;m<=12;m++){char a[32];int code;if(m==11)continue; /* mutant 11 belongs to another test */sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
- printf("test_fs_win_batch_replace ok\n");
+ printf("test_fs_win_batch_replace ok, sweep crash cells %d, orphans before/after mode1 %d/%d mode2 %d/%d mode0 %d/%d\n",g_swn,g_sw[0][0],g_sw[0][1],g_sw[1][0],g_sw[1][1],g_sw[2][0],g_sw[2][1]);
  return 0;
 }
 #else
