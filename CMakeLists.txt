@@ -408,6 +408,14 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_lock_alias PROPERTIES
         PASS_REGULAR_EXPRESSION "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e")
+    # m206: the other eight reserved prefixes and a reserved directory as a path component, through the 8.3 name. The regex holds my predictions: every prefix refused through the long name and through the alias (m204 check), the file unchanged; the directory case refused by its long path and ACCEPTED through the alias of the directory (not covered by m204, 60 percent). A wrong one goes red and prints the line.
+    add_executable(test_fs_win_reserved_alias tests/test_fs_win_reserved_alias.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_reserved_alias PRIVATE include)
+    add_test(NAME test_fs_win_reserved_alias COMMAND test_fs_win_reserved_alias
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_reserved_alias PROPERTIES
+        PASS_REGULAR_EXPRESSION "reserved alias cells: .fstxn.=3e3e .fst-=3e3e .fsp-=3e3e .fsj-=3e3e .fsrp-=3e3e .fsrs-=3e3e .fsrb-=3e3e .fsrm-=3e3e .fsmv-=3e3e dir=3o0n")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
