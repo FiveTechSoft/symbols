@@ -550,6 +550,12 @@ if(WIN32)
     set_tests_properties(test_fs_win_content_fuzz PROPERTIES TIMEOUT 300
         PASS_REGULAR_EXPRESSION "content fuzz done: seeds=4 iterations=400 ops_ok=1200")
 endif()
+# AgentPatch on Windows with generated files and hunks (m220). The regex pins the last printed line.
+if(WIN32)
+    sllm_test(test_fs_win_agentpatch_fuzz tests/test_fs_win_agentpatch_fuzz.c)
+    set_tests_properties(test_fs_win_agentpatch_fuzz PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "agentpatch fuzz done: seeds=4 rounds=400 ok=400")
+endif()
 sllm_test(test_fs_c4_posix tests/test_fs_c4_posix.c)
 sllm_test(test_fs_race tests/test_fs_race.c)
 if(NOT WIN32)
