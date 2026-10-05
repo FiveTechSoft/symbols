@@ -469,6 +469,10 @@ static FS_READ_STATUS wc_lock(HANDLE root,HANDLE *out,OVERLAPPED *overlap)
     if(s!=FS_READ_OK)return s;
     if(win_meta(*out,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||m.size!=0){s=FS_READ_DENIED;goto bad;}
     memset(overlap,0,sizeof(*overlap));
+#ifdef FS_CREATE_TEST_CRASH
+    /* Test only, mutant 13: take no lock at all, so a waiter does not wait. */
+    {const char *mv=getenv("FS_WIN_BATCH_MUTANT");if(mv&&atoi(mv)==13)return FS_READ_OK;}
+#endif
     {BOOL ok=LockFileEx(*out,LOCKFILE_EXCLUSIVE_LOCK,0,1,0,overlap);
      WC_TRACE("wc_lock LockFileEx ok=%d error=%lu\n",(int)ok,
               (unsigned long)(ok?0:GetLastError()));

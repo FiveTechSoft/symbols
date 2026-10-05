@@ -91,6 +91,10 @@ static void hchild(int k,const char *sync)
  ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"holder child open");
  sprintf(v,"%d",k);_putenv_s("FS_WIN_BATCH_HOLD",v);_putenv_s("FS_WIN_BATCH_SYNC",sync);
  s=FsBatchReplace(r,trio,3);FsReadClose(r);ExitProcess((UINT)(100+(int)s));}
+static void wchild(void)
+{FS_READ_ROOT *r;FS_READ_STATUS s;
+ ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"waiter child open");
+ s=FsBatchRecover(r);FsReadClose(r);ExitProcess((UINT)(100+(int)s));}
 static void put_old(void)
 {put(ROOT "\\r1","one-old");put(ROOT "\\sub\\r2","two-old!");put(ROOT "\\r3","three");}
 static void is_old(void)
@@ -160,6 +164,37 @@ static void sc_sweepcrash(const char *exe,int mode)
  is_old();
  ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"batch works after the resumed sweep");is_new();
  FsReadClose(r);cleanup();}
+/* m191: a process that holds the workspace lock is killed from outside (TerminateProcess) while another
+   process waits on that lock. The holder is the batch writer parked by FS_WIN_BATCH_HOLD=k (journal
+   written, lock held). The waiter is a second process in FsBatchRecover. Asserted: the waiter is still
+   waiting 1500 ms after it started, it finishes within 20 s after the holder is killed with status OK,
+   the tree is back to the old bytes with no journal and no orphans, and the batch then works. Mutant 13
+   (test only, wc_lock takes no lock) makes the waiter run at once, so the first check fails. */
+static void sc_killholder(const char *exe,int k)
+{FS_READ_ROOT *r;char sync[64]="test_fs_winbatch_sync2",f1[96],f2[96],cmd[1024];
+ STARTUPINFOA si={0},sw={0};PROCESS_INFORMATION hp={0},wp={0};DWORD code=0;int i,blocked;
+ snprintf(f1,sizeof(f1),"%s.ready",sync);snprintf(f2,sizeof(f2),"%s.go",sync);
+ DeleteFileA(f1);DeleteFileA(f2);
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open kill holder");
+ sprintf(cmd,"\"%s\" hchild %d %s",exe,k,sync);si.cb=sizeof(si);
+ ck(CreateProcessA(NULL,cmd,NULL,NULL,FALSE,0,NULL,NULL,&si,&hp),"spawn holder");
+ for(i=0;i<1000&&GetFileAttributesA(f1)==INVALID_FILE_ATTRIBUTES;i++)Sleep(20);
+ if(GetFileAttributesA(f1)==INVALID_FILE_ATTRIBUTES)TerminateProcess(hp.hProcess,78);
+ ck(GetFileAttributesA(f1)!=INVALID_FILE_ATTRIBUTES,"holder reached the hold point");
+ sprintf(cmd,"\"%s\" wchild",exe);sw.cb=sizeof(sw);
+ ck(CreateProcessA(NULL,cmd,NULL,NULL,FALSE,0,NULL,NULL,&sw,&wp),"spawn waiter");
+ blocked=WaitForSingleObject(wp.hProcess,1500)==WAIT_TIMEOUT;
+ if(!blocked){TerminateProcess(hp.hProcess,78);}
+ ck(blocked,"waiter still waits while the holder is alive");
+ ck(TerminateProcess(hp.hProcess,77),"kill the holder");
+ ck(WaitForSingleObject(hp.hProcess,10000)==WAIT_OBJECT_0,"holder is gone");
+ ck(WaitForSingleObject(wp.hProcess,20000)==WAIT_OBJECT_0,"waiter finishes after the holder is killed");
+ ck(GetExitCodeProcess(wp.hProcess,&code),"waiter exit");
+ CloseHandle(hp.hThread);CloseHandle(hp.hProcess);CloseHandle(wp.hThread);CloseHandle(wp.hProcess);
+ ck(code==(DWORD)(100+(int)FS_READ_OK),"waiter recovery status OK");
+ is_old();ck(GetFileAttributesA(ROOT "\\.fstxn.batch")==INVALID_FILE_ATTRIBUTES,"journal gone");
+ ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"batch works after the killed holder");is_new();
+ FsReadClose(r);DeleteFileA(f1);DeleteFileA(f2);cleanup();}
 /* Another process holds the target open without delete sharing, opened after
    our handle on it was closed: the rename-over is refused. */
 static void sc_foreign_handle(const char *exe,int k)
@@ -229,11 +264,13 @@ static void mutant_child(const char *exe,int m)
  else if(m==8)sc_reccrash(exe,26,30);/* rollback in ascending order */
  else if(m==10)sc_early(exe,21);   /* orphan sweep skipped */
  else if(m==12)sc_sweepcrash(exe,1);/* sweep stops after one removal */
+ else if(m==13)sc_killholder(exe,1);/* wc_lock takes no lock */
  else sc_foreign_pin(exe);         /* pin accepted by name, no FileId */
  ExitProcess(0);}
 int main(int argc,char **argv)
 {char exe[768];DWORD got;FS_READ_ROOT *r;
  if(argc==4&&!strcmp(argv[1],"rchild")){child(atoi(argv[2]),atoi(argv[3]));return 200;}
+ if(argc==2&&!strcmp(argv[1],"wchild")){wchild();return 200;}
  if(argc==4&&!strcmp(argv[1],"hchild")){hchild(atoi(argv[2]),argv[3]);return 200;}
  if(argc==3&&!strcmp(argv[1],"rmutant")){got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");mutant_child(exe,atoi(argv[2]));return 0;}
  got=GetModuleFileNameA(NULL,exe,sizeof(exe));ck(got&&got<sizeof(exe),"exe");
@@ -294,8 +331,10 @@ int main(int argc,char **argv)
  sc_foreign_pin(exe);
  /* Sweep killed after its first removal, three entry points. */
  sc_sweepcrash(exe,1);sc_sweepcrash(exe,2);sc_sweepcrash(exe,0);
+ /* Lock holder killed from outside while a second process waits, hold points 0 to 2. */
+ for(int k=0;k<3;k++)sc_killholder(exe,k);
  /* Mutants: each must fail the scenario that targets it. */
- for(int m=6;m<=12;m++){char a[32];int code;if(m==11)continue; /* mutant 11 belongs to another test */sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
+ for(int m=6;m<=13;m++){char a[32];int code;if(m==11)continue; /* mutant 11 belongs to another test */sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
  printf("test_fs_win_batch_replace ok, sweep crash cells %d, orphans before/after mode1 %d/%d mode2 %d/%d mode0 %d/%d\n",g_swn,g_sw[0][0],g_sw[0][1],g_sw[1][0],g_sw[1][1],g_sw[2][0],g_sw[2][1]);
  return 0;
