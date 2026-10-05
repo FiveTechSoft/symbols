@@ -118,6 +118,7 @@ static volatile LONG g_rcalls,g_rok;               /* calls that started and end
 static volatile LONG g_rseq;                       /* counts real-phase starts so a call can tell it spanned two */
 static volatile LONG g_opok[6],g_opn[6],g_opms[6],g_opmax[6]; /* g_opms: microseconds */
 static volatile LONG g_flipn,g_flipms,g_flipmax; /* microseconds */
+static volatile LONG g_stat[16];                  /* m216: writer call count per FS_READ_STATUS value (15 = anything above), a diagnostic, not a gate */
 static LARGE_INTEGER g_qbase,g_qfreq;
 /* microseconds since the start of cell E; GetTickCount would tick only every 15.6 ms */
 static LONG now_us(void)
@@ -184,6 +185,7 @@ static DWORD WINAPI writer(LPVOID p)
    InterlockedIncrement(&g_opn[i]);InterlockedExchangeAdd(&g_opms[i],d);
    if(d>g_opmax[i])InterlockedExchange(&g_opmax[i],d);
    if(s[i]==FS_READ_OK)InterlockedIncrement(&g_opok[i]);
+   {int q=(int)s[i];if(q<0||q>14)q=15;InterlockedIncrement(&g_stat[q]);}
    /* a call counts as inside a real phase when D was real at its start and no new real phase began since;
       the junction phase in between is not observed, so this is an upper bound on calls with a real parent */
    if(real0[i]&&g_real&&g_rseq==seq0[i]){InterlockedIncrement(&g_rcalls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_rok);}}
@@ -267,6 +269,12 @@ int main(int argc,char **argv)
   {static const char *opn[6]={"create","replace","remove","batch","rm_b1","rm_b2"};
    for(int i=0;i<6;i++)printf("E diag op %s: calls %ld ok %ld us avg %ld max %ld\n",opn[i],(long)g_opn[i],(long)g_opok[i],
         (long)(g_opn[i]?g_opms[i]/g_opn[i]:0),(long)g_opmax[i]);}
+  /* m216 diagnostic, printed before the guards: the writers' status histogram and the names that start with '.' left in the
+     root, to tell a wedge (control files left by a cut-off call, later calls refused) from a window with no real phase. */
+  {int q;printf("E diag status:");for(q=0;q<16;q++)if(g_stat[q])printf(" %d=%ld",q,(long)g_stat[q]);printf("\n");}
+  {WIN32_FIND_DATAA fd;HANDLE fh=FindFirstFileA(ROOT "\\.*",&fd);int n=0;printf("E diag root dot names:");
+   if(fh!=INVALID_HANDLE_VALUE){do{if(strcmp(fd.cFileName,".")&&strcmp(fd.cFileName,"..")&&n++<20)printf(" %s",fd.cFileName);}while(FindNextFileA(fh,&fd));FindClose(fh);}
+   printf(" (count %d)\n",n);}
   fflush(stdout);
   ck(g_junctions>=5,"E: junction state verified at least 5 times");
   ck(g_ok>0,"E: at least one writer call succeeded");
