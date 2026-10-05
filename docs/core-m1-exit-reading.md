@@ -271,7 +271,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   Passed. The first run of the same cells (m184, run 37253372878) aborted on a loop error of mine (mutant 11 does not
   belong to this test) and left both Windows jobs red until m185. Limits: only the kill after the FIRST removal, one
   3-item replace batch as the source of the orphans, one runner, a process kill and not power loss. A kill after a later
-  removal is not injected. The orphan counts are printed by the test since m186 and are not recorded here.
+  removal is not injected. Orphan names in the root before the killed sweep and after it: 9 and 8 in all three modes (read on msvc, run 37260112093 of m188: the first guess of 6 and 5 was wrong, a 3-item batch leaves three names per item, the old `.fsrp-` pin, the `.fst-` stage and the new `.fsp-` pin). The test asserts that line.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.
