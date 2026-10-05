@@ -84,7 +84,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
 - **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
-  replace), with measured limits. Shown for four Windows journals (replace, create, remove, move), not for batch, m171 to m179.**
+  replace), with measured limits. Shown for six Windows journals (replace, create, remove, move, batch create, batch replace), with measured limits, m171 to m181.**
   `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
   appended bytes, path-field rewrites, deleted journal files and stage or temp-name decoys, at every crash point
   of each kind, 350 iterations per kind, seeds 0, 1, 7, 12648430 and the test default 1786707969. A run passes
@@ -128,7 +128,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     seeds: a rewritten stage field changes the name the record temp link is derived from, so the record is refused
     before the stage identity check; that check is not independently exercised by the current classes). There is
     no batch mutant: none was both cheap and killable.
-  - **Not shown:** the Windows batch journals, the POSIX 8 byte commit markers, damage to
+  - **Not shown:** the POSIX 8 byte commit markers, damage to
     two journal files at once except the Windows replace pair-mismatch cell.
     Criterion 5 stays partial.
   - **Windows journals: read (source reading at a3e89a2), and the replace journal fuzzed (m171 to m175).**
@@ -140,7 +140,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     marker `.fstxn.commit` is a byte copy of the journal, compared with `memcmp` (`src/fs_batch_win.inc` lines
     154 to 156 and 319). FNV-1a, like the POSIX CRC, detects accidental damage only, not a writer that recomputes
     it. `FsWinBatchTestMutate` (`src/fs_batch_win.inc` lines 957 to 989) is a fixed list of 18 mutations of batch
-    records, not random byte fuzz; the batch journals on Windows are not fuzzed by bytes.
+    records, not random byte fuzz; the Windows batch journals have been fuzzed by bytes since m180 (bullet below).
   - **Windows replace journal fuzz (`tests/test_fs_win_journal_fuzz.c`, m171 to m175): measured, one runner
     (`windows-latest`), replace only, real process kills at crash phases 3 to 6.** 9 damage classes (bit flip,
     set byte, truncate, append, sealed name fields, sealed scalar fields, sealed shape, deleted journal files,
@@ -151,8 +151,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     was refused where the stage link exists and harmless where it does not, a renamed rollback name was harmless,
     and every scalar, shape and pair cell was refused: no miss in 2 x 660 cells outside the deleted-journal
     class. So the POSIX shapes F2, F4, F6 and F7 did not appear on Windows replace. This says nothing about the
-    Windows batch journals, which are not fuzzed by bytes (create, remove and move are in the next bullets). Their record checks differ and were
-    only read.
+    Windows batch journals (create, remove, move and batch are in the next bullets). Their record checks differ.
   - **Windows replace, journal deleted after the publish: limit, outside the crash model, measured.** With the
     intent deleted at crash phases 4 and 5, or both the intent and the marker deleted at phase 6, recovery
     returns OK, the new bytes are in place, and exactly one `.fsrp-` pin is left in the root (46 of 660 cells,
@@ -209,7 +208,40 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
     leaves it at the target with the pin as a second link (20 each); with both files deleted at point 4 the pin
     stays (6 each). Since m179 the test pins all 9 groups with the exact outcome (file set of inside/, bytes,
     link counts, names of leftovers). Not covered: point 0 (pin only, no journal: recovery returns OK without
-    cleanup, by reading of the code), and the batch journals.
+    cleanup, by reading of the code); the batch journals are in the next bullet.
+  - **Windows batch journal fuzz (`tests/test_fs_win_journal_fuzz_batch.c`, m180 and m181): measured, one runner
+    (`windows-latest`, msvc and asan jobs: the m180 tables are identical on both jobs and both seeds), real process kills at the
+    points that leave a journal (`FS_WIN_BATCH_CRASH`: create 3 to 6, replace 24 to 27).** Same 9 classes, two
+    seeds, 1848 cells per seed (28 per class and point), batches of TWO items: `FsBatchCreate` of inside/a (mode
+    0644) and inside/b (mode 0444), and `FsBatchReplace` of two files. The oracle requires both targets to end in
+    the same state (create: both absent or both new; replace: both old or both new), one link each, no stage, pin,
+    rollback or journal name, the decoy unchanged, the read-only attribute on the 0444 target after a create, and
+    a second recovery that is OK and changes nothing. This recovery runs an orphan sweep after a successful
+    `FsBatchRecover` when no journal or marker exists (`wb_sweep_orphans`). The first run (m180) missed in 11
+    table lines, 146 cells per seed, identical on both seeds. All other cells held as predicted: all unsealed
+    damage (bit flip, set byte, truncate, append), every scalar field except the benign create mode flip (0444
+    versus 0644 only changes the read-only bit), every shape cell, the pair mismatch, and the target resealed to the
+    decoy were refused with the workspace unchanged; stage and rollback names resealed were harmless.
+    **The weakest result: a resealed target name IS followed, by a writer that recomputes the checksum in both
+    journal files (outside the cooperating-writer model, same stance as the POSIX CRC: it detects accidental
+    damage, not a writer that recomputes it), and the batch is then NOT atomic.** Create, crash point 4 (first
+    target published), item 0 resealed to a missing leaf: recovery returns OK, a stays published, b is absent
+    (4 cells per seed). Create point 5 (all targets published), item 0 resealed: a stays, b absent; item 1
+    resealed: b stays, a absent (4 cells each). A half applied batch is stated here as a limit, not hidden. **Journal
+    deleted: limit, outside the crash model, measured, the same class as POSIX F5.** Create with the journal
+    deleted at point 4: a is new, b absent (28 cells). Create at point 5 and with both files deleted at point 6: both
+    targets are new but b, created with mode 0444, is NOT read-only (the attribute is only set on the
+    marker path); 28 and 9 cells. Replace with the journal deleted at point 4 (item 0 replaced): a new, b old, and
+    one `.fsrp-` pin holding the old bytes of a stays as a single link (28); at point 5 and with both files
+    deleted at point 6: both new and two `.fsrp-` pins stay (28 and 9). The sweep keeps an unshared old pin by
+    design, because it may be the last link to the old bytes (the same limit as the single replace). A resealed
+    old pin name at replace point 6 (item 0 or 1) leaves the real `.fsrp-` of that item (2 cells each, one
+    pin). Since m181 the test pins all 11 groups with the exact outcome (bytes of both targets, links, the
+    read-only attribute, names and contents of leftovers). The first version of the oracle did not report the
+    leftover pin of replace point 4: it stopped at the mixed state; the m181 oracle checks state, links and
+    leftovers together. Not covered: crash points with no journal (1, 2, 21, 22, 23: by reading of the code),
+    batches of more than two items, two journal files damaged differently except the pair-mismatch class, power
+    loss, one runner.
 - **Content fuzzing: not shown.** The generated inputs are paths and manifests (counts, duplicate targets,
   traversal, kinds). File contents, EOL mixes and patch text are not fuzzed here.
 - **Seeds:** four logged seeds. The criterion text does not say how many are enough; that is Antonio's call.

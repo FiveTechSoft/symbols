@@ -207,6 +207,63 @@ static int predicted(int kind,int point,int cls,int it,int *state_new)
    if(point==6)*state_new=(sub!=1);
    return 2;
  default:return 0;}}
+/* Known limits, measured in m180 (2 seeds x 1848 cells, same 11 table lines on both seeds, msvc), pinned in
+   m181 with the exact outcome. All need a writer that recomputes the checksum (name_sealed) or a journal
+   deleted by someone else (delete, same class as POSIX F5); none is inside the cooperating-writer model.
+   1: create, a is new and b is absent, no leftover (a resealed target name is followed, or the journal is lost
+      after the first publish: the batch is NOT atomic). 2: create, a absent and b new, no leftover (item 1
+      resealed at point 5). 3: create, both new, b (mode 0444) NOT read-only, no leftover (the attribute is only
+      set on the marker path). 4: replace, a new and b old, one .fsrp- holding olda with 1 link. 5: replace,
+      both new, two .fsrp- (olda, oldb), 1 link each. 6 and 7: replace, both new, one .fsrp- (olda for 6, oldb
+      for 7), the old pin of item 0 or 1 resealed. */
+static int limit_kind(int kind,int point,int cls,int sub)
+{if(kind==1){
+   if(point==4&&cls==C_NAME&&sub==2)return 1;
+   if(point==4&&cls==C_DELETE)return 1;
+   if(point==5&&cls==C_NAME&&sub==2)return 1;
+   if(point==5&&cls==C_NAME&&sub==3)return 2;
+   if(point==5&&cls==C_DELETE)return 3;
+   if(point==6&&cls==C_DELETE&&sub==2)return 3;
+   return 0;}
+ if(point==4&&cls==C_DELETE)return 4;
+ if(point==5&&cls==C_DELETE)return 5;
+ if(point==6&&cls==C_DELETE&&sub==2)return 5;
+ if(point==6&&cls==C_NAME&&sub==4)return 6;
+ if(point==6&&cls==C_NAME&&sub==5)return 7;
+ return 0;}
+static int split_names(char paths[4][600])
+{int n=0;char *p=g_ex;
+ while(*p&&n<4){char *e=strchr(p,' ');size_t l=e?(size_t)(e-p):strlen(p);
+   if(l>=600)l=599;memcpy(paths[n],p,l);paths[n][l]=0;n++;
+   if(!e)break;p=e+1;}
+ return n;}
+/* returns the message of the first deviation, or NULL when the cell has exactly the pinned outcome */
+static const char *check_limit(int lk,int kind)
+{static const char *A[8]={0,"newa",NULL,"newa","newa","newa","newa","newa"};
+ static const char *B[8]={0,NULL,"newb","newb","oldb","newb","newb","newb"};
+ const char *wa=A[lk],*wb=B[lk];
+ if(kind==1){
+   if(wa?!file_is(INS "\\a",wa):exists(INS "\\a"))return "limit cell: target a is not in the pinned state";
+   if(wb?!file_is(INS "\\b",wb):exists(INS "\\b"))return "limit cell: target b is not in the pinned state";
+ }else{
+   if(!file_is(INS "\\a",wa))return "limit cell: target a is not in the pinned state";
+   if(!file_is(INS "\\b",wb))return "limit cell: target b is not in the pinned state";
+ }
+ if(exists(INS "\\a")&&links_of(INS "\\a")!=1)return "limit cell: a is not a single link";
+ if(exists(INS "\\b")&&links_of(INS "\\b")!=1)return "limit cell: b is not a single link";
+ if(lk==3){DWORD aa=GetFileAttributesA(INS "\\a"),ab=GetFileAttributesA(INS "\\b");
+   if(aa==INVALID_FILE_ATTRIBUTES||ab==INVALID_FILE_ATTRIBUTES||(aa&FILE_ATTRIBUTE_READONLY)||(ab&FILE_ATTRIBUTE_READONLY))
+     return "limit cell: the read-only attribute is not absent on both targets";}
+ {int n=leftover_names();char names[4][600];int k,want=(lk<=3)?0:(lk==5?2:(lk==4||lk==6||lk==7)?1:0);
+  if(n!=want||split_names(names)!=want)return "limit cell: unexpected number of leftover names";
+  for(k=0;k<want;k++){
+    if(strncmp(names[k],ROOT "\\.fsrp-",strlen(ROOT "\\.fsrp-")))return "limit cell: a leftover is not a .fsrp- pin";
+    if(links_of(names[k])!=1)return "limit cell: a leftover pin is not a single link";}
+  if(lk==4||lk==6){if(!file_is(names[0],"olda"))return "limit cell: the leftover pin does not hold olda";}
+  if(lk==7){if(!file_is(names[0],"oldb"))return "limit cell: the leftover pin does not hold oldb";}
+  if(lk==5){int oa=file_is(names[0],"olda")||file_is(names[1],"olda"),ob=file_is(names[0],"oldb")||file_is(names[1],"oldb");
+    if(!oa||!ob)return "limit cell: the leftover pins are not olda and oldb";}}
+ return NULL;}
 static void hexname(WCHAR *dst,const WCHAR *orig)
 {size_t n=wcslen(orig),i;static const WCHAR hx[]=L"0123456789abcdef";
  ck(n>6&&n<48,"name length");wcscpy(dst,orig);
@@ -328,7 +385,7 @@ static int damage(int kind,int point,int cls,int it)
 int main(int argc,char **argv)
 {char exe[768];DWORD got;int kind,point,cls,it,iters=28;unsigned long long seed=1786707969ULL;
  static char before[65536],after[65536],again[65536];
- long cells=0,refused=0,ok_old=0,ok_new=0;
+ long cells=0,refused=0,ok_old=0,ok_new=0,limit_hits=0;
  if(argc==4&&!strcmp(argv[1],"child")){child(atoi(argv[2]),atoi(argv[3]));return 200;}
  remove_stale();
  if(getenv("FS_WJFUZZ_SEED"))seed=strtoull(getenv("FS_WJFUZZ_SEED"),NULL,10);
@@ -354,7 +411,7 @@ int main(int argc,char **argv)
      if(strcmp(before,after))FAIL("refusal changed the workspace");
      if(want==2)FAIL("predicted OK, recovery refused");
    }else if(s==FS_READ_OK){
-     int na,nb;
+     int na,nb,lk;
      if(want==1)FAIL("predicted refusal, recovery returned OK (damage followed or ignored)");
      if(kind==1){
        na=exists(INS "\\a")?(file_is(INS "\\a","newa")?1:-1):0;
@@ -363,17 +420,21 @@ int main(int argc,char **argv)
        na=file_is(INS "\\a","newa")?1:file_is(INS "\\a","olda")?0:-1;
        nb=file_is(INS "\\b","newb")?1:file_is(INS "\\b","oldb")?0:-1;
      }
+     lk=limit_kind(kind,point,cls,sub);
+     if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
+     if(lk){const char *bad=check_limit(lk,kind);if(bad)FAIL(bad);limit_hits++;}
+     else{
      if(na<0||nb<0)FAIL("OK but a target is neither the old/absent state nor the new bytes");
      if(na!=nb)FAIL("OK but the batch is MIXED (one target new, the other not)");
      if(want==2&&na!=state_new)FAIL("OK with the other state than predicted");
      if(exists(INS "\\a")&&links_of(INS "\\a")!=1)FAIL("OK but target a is not a single link");
      if(exists(INS "\\b")&&links_of(INS "\\b")!=1)FAIL("OK but target b is not a single link");
-     if(!file_is(INS "\\decoy","old"))FAIL("OK but the decoy changed");
      if(kind==1&&na==1&&cls!=C_SCALAR){
        DWORD at=GetFileAttributesA(INS "\\b");
        if(at==INVALID_FILE_ATTRIBUTES||!(at&FILE_ATTRIBUTE_READONLY))FAIL("OK new but the 0444 target b lacks the read-only attribute");
      }
      if(leftover_names())FAIL("OK but a stage, pin, rollback or journal name is left");
+     }
      if(na==1)ok_new++;else ok_old++;
      snap(after,sizeof(after));
      if(FsBatchRecover(r)!=FS_READ_OK)FAIL("second recovery not OK");
@@ -391,8 +452,8 @@ int main(int argc,char **argv)
         miss[m].sub,miss[m].n,miss[m].it,miss[m].what,miss[m].ex[0]?" | names: ":"",miss[m].ex);
    fprintf(stderr,"FAIL %d cells missed their prediction or the oracle in %d distinct groups (seed %llu), of %ld cells\n",
         total_miss,nmiss,(unsigned long long)seed,cells);exit(1);}
- printf("windows batch journal fuzz: %ld cells, seed %llu, %d per point and class: refused %ld, ok old/absent %ld, ok new %ld\n",
-        cells,seed,iters,refused,ok_old,ok_new);
+ printf("windows batch journal fuzz: %ld cells, seed %llu, %d per point and class: refused %ld, ok old/absent %ld, ok new %ld, known-limit hits %ld\n",
+        cells,seed,iters,refused,ok_old,ok_new,limit_hits);
  return 0;}
 #else
 int main(void){return 0;}
