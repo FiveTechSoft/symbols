@@ -82,7 +82,8 @@ static void child(int point,int recovery)
 {FS_READ_ROOT *r;char v[20];FS_READ_STATUS s;
  ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"child open");
  sprintf(v,"%d",point);_putenv_s("FS_WIN_BATCH_CRASH",v);
- s=recovery?FsBatchRecover(r):FsBatchReplace(r,trio,3);
+ FS_BATCH_CREATE zz[2]={{"zz1","x",1,0644},{"zz2","x",1,0644}};
+ s=recovery==1?FsBatchRecover(r):recovery==2?FsBatchCreate(r,zz,2):FsBatchReplace(r,trio,3);
  fprintf(stderr,"replace child point=%d recovery=%d status=%d\n",point,recovery,(int)s);
  FsReadClose(r);ExitProcess(200);}
 static void hchild(int k,const char *sync)
@@ -137,6 +138,25 @@ static void sc_reccrash(const char *exe,int spt,int rpt)
  ck(FsBatchRecover(r)==FS_READ_OK,"recover after recovery crash");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
  if(spt>=27)is_new();else is_old();
+ FsReadClose(r);cleanup();}
+/* m184: a writer killed at 23 leaves only orphan names (no journal). A second process
+   is killed by point 37 right after the orphan sweep removed its FIRST name, through each
+   of the three entry points (mode 1 FsBatchRecover, 2 FsBatchCreate, 0 FsBatchReplace).
+   The targets must keep their old bytes, exactly one orphan must be gone, and a later
+   recovery must finish the sweep and leave a tree where the batch works. Mutant 12 makes
+   the sweep stop after one removal, so the later recovery leaves orphans behind. */
+static void sc_sweepcrash(const char *exe,int mode)
+{FS_READ_ROOT *r;int before,after;
+ fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open sweep crash");
+ ck(run_child(exe,23,0)==80+23,"setup writer killed before any journal");
+ before=count(ROOT "\\*")-3;ck(before>=4,"orphan names are in the root");
+ ck(run_child(exe,37,mode)==80+37,"sweep killed after its first removal");
+ after=count(ROOT "\\*")-3;ck(after==before-1,"exactly one orphan removed by the killed sweep");
+ is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover finishes the sweep");
+ ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
+ is_old();
+ ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"batch works after the resumed sweep");is_new();
  FsReadClose(r);cleanup();}
 /* Another process holds the target open without delete sharing, opened after
    our handle on it was closed: the rename-over is refused. */
@@ -206,6 +226,7 @@ static void mutant_child(const char *exe,int m)
  else if(m==7)sc_crash(exe,26);    /* replace roll-forward without a marker */
  else if(m==8)sc_reccrash(exe,26,30);/* rollback in ascending order */
  else if(m==10)sc_early(exe,21);   /* orphan sweep skipped */
+ else if(m==12)sc_sweepcrash(exe,1);/* sweep stops after one removal */
  else sc_foreign_pin(exe);         /* pin accepted by name, no FileId */
  ExitProcess(0);}
 int main(int argc,char **argv)
@@ -269,8 +290,10 @@ int main(int argc,char **argv)
  sc_foreign_early();
  for(int k=0;k<3;k++)sc_foreign_handle(exe,k);
  sc_foreign_pin(exe);
+ /* Sweep killed after its first removal, three entry points. */
+ sc_sweepcrash(exe,1);sc_sweepcrash(exe,2);sc_sweepcrash(exe,0);
  /* Mutants: each must fail the scenario that targets it. */
- for(int m=6;m<=10;m++){char a[32];int code;sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
+ for(int m=6;m<=12;m++){char a[32];int code;sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
  printf("test_fs_win_batch_replace ok\n");
  return 0;

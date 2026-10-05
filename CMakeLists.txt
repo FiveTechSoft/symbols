@@ -499,7 +499,7 @@ if(NOT WIN32)
     add_executable(test_fs_journal_fuzz_marker tests/test_fs_journal_fuzz_marker.c src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_journal_fuzz_marker PRIVATE include)
     target_compile_definitions(test_fs_journal_fuzz_marker PRIVATE FS_CREATE_TEST_CRASH=1)
-    foreach(jm_seed 1786707970 12648430)
+    foreach(jm_seed 1786707970 12648430 305419896)
         add_test(NAME test_fs_journal_fuzz_marker_seed_${jm_seed} COMMAND test_fs_journal_fuzz_marker WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(test_fs_journal_fuzz_marker_seed_${jm_seed} PROPERTIES
             ENVIRONMENT "FS_JMARK_SEED=${jm_seed}" TIMEOUT 300

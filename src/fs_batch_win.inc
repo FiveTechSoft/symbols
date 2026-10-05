@@ -401,7 +401,7 @@ done:
    shared, because an unshared one may be the last link to bytes someone still
    needs (the target is gone), and then it stays. Best
    effort: a name that cannot be deleted stays, as before. At most 128 names per
-   call. Mutant 10 (test only) skips the sweep; mutant 11 keeps an unshared .fsrs-. */
+   call. Mutant 10 (test only) skips the sweep; mutant 11 keeps an unshared .fsrs-; mutant 12 stops after one removal. */
 #define WB_SWEEP_MAX 128
 static void wb_sweep_orphans(const FS_READ_ROOT *r)
 {
@@ -410,7 +410,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
     FILE_ID_INFO *ids=(FILE_ID_INFO*)calloc(WB_SWEEP_MAX,sizeof(*ids));
     DWORD *links=(DWORD*)calloc(WB_SWEEP_MAX,sizeof(*links));
     int *drop=(int*)calloc(WB_SWEEP_MAX,sizeof(*drop));
-    unsigned n=0,k;int restart=1,jk=0,jp=0,mk=0,mp=0;
+    unsigned n=0,k,removed=0;int restart=1,jk=0,jp=0,mk=0,mp=0;
     if(!names||!ids||!links||!drop)goto out;
     if(wb_mutant(10))goto out;
     if(wo_clear_other(r->handle,4)!=FS_READ_OK)goto out;
@@ -450,7 +450,11 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
         }
         CloseHandle(h);
     }
-    for(k=0;k<n;k++)if(drop[k])(void)wr_remove_pin(r->handle,names[k],&ids[k]);
+    for(k=0;k<n;k++)if(drop[k]){
+        (void)wr_remove_pin(r->handle,names[k],&ids[k]);
+        if(!removed++)wb_crash(37); /* test only: killed after the first removal */
+        if(wb_mutant(12))break;     /* test only: a sweep that stops after one removal */
+    }
 out:
     free(names);free(ids);free(links);free(drop);
 }
