@@ -91,6 +91,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   (`iters=150` in the Windows `main` of `tests/test_fs_fuzz_ops.c`), not 400. Only seeds 1, 7 and 12648430
   run 400 there, through `FS_FUZZ_ITERS=400` in the CMake registration. The POSIX default is 400. The
   earlier wording "default, 1, 7, 12648430 at 400 iterations" is right for POSIX and too strong for the Windows default seed.
+  **Since m217 (run 37341613712, commit 2d09f16)** CMake also registers the Windows default seed at 400 iterations (`test_fs_fuzz_ops_default_seed_i400`, `FS_FUZZ_ITERS=400`, timeout 300 s). It Passed on msvc (206 of 206) and asan (206 of 206); the printed "iterations=400" line and the run time were not read (ctest hides stdout), so the 400 is known from the registration, not from a log line. The Windows default seed run without that variable is still 150.
 - **Journal byte fuzzing: shown for six POSIX journals (replace, create, remove, move, batch create, batch
   replace), with measured limits. Shown for six Windows journals (replace, create, remove, move, batch create, batch replace), with measured limits, m171 to m181.**
   `tests/test_fs_journal_fuzz.c` (m163 to m168) damages the journals with bit flips, set bytes, truncation,
@@ -413,7 +414,7 @@ guards (junctions seen at least 5 times, at least one writer call OK). Not cover
   outside directory in every step, and prints "E window: <ms> ms (... extended 0|1)" before the guards. The guards and the invariant are unchanged. m214 ran green on msvc (205 of 205)
   and asan (205 of 205); the extension was probably not exercised in that run (I did not read the "E window" line, ctest hides stdout), so **the green run does not show that the flake is
   fixed**. It may also not be fixable by a longer window: for the POSIX parent-swap test the zero-OK flake was measured to be a wedge (a cut-off operation leaves journal files and later calls
-  are refused, see the gate note below); whether cell E has the same cause on Windows has not been measured. The next step if the flake recurs is to list the root names when the guard fails.
+  are refused, see the gate note below); whether cell E has the same cause on Windows has not been measured. That step is in place since m216 (run 37336840298, commit 25f4013, a test-only change, +8 lines in `tests/test_fs_win_race.c`): before the guards, cell E prints "E diag status:" (the writers' call count per `FS_READ_STATUS` value, 15 meaning above 14) and "E diag root dot names:" (up to 20 root names that start with a dot, and their count). It Passed on msvc (205 of 205 at m215, 205 of 205 in the m216 run) and asan; **I have not read either line, ctest hides stdout, so nothing is known about the flake from it yet.** It only helps if the guard fails again: a mostly refused status (DENIED 3 or PENDING 6) with leftover `.fstxn.*` or `.fsrp-` names would point to a wedge, mostly MISSING or INVALID with only `.fstxn.lock` to a window without a usable real phase. Those readings are hypotheses, not measurements.
 
 ## Not shown, whole reading
 
