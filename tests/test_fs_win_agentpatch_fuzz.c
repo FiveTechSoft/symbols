@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stdint.h>
 #define WS "test_agent_patch_fuzz_win_scratch"
-#define OUT "test_agent_patch_fuzz_win_outside.c"
+#define OUTSIDE "test_agent_patch_fuzz_win_outside.c"
 #define SENT "int x = 1;\n"
 #define MAXF 8192
 #define NL 8
@@ -59,7 +59,7 @@ static void round1(uint32_t k)
 {PATCH_PLAN p;size_t fn,an;int cls=(int)(k%5),kind=(int)((k/5)%5),i,rc;char tgt[200],rep[200];
  g_k=(int)k;g_cls=cls;g_kind=kind;
  fn=build(cls);
- wipe();ck(_mkdir(WS)==0,"mkdir");put(WS "\\a.c",file,fn);put(OUT,SENT,sizeof SENT-1);
+ wipe();ck(_mkdir(WS)==0,"mkdir");put(WS "\\a.c",file,fn);put(OUTSIDE,SENT,sizeof SENT-1);
  PatchPlanInit(&p,WS "/a.c");PatchPlanSetWorkspace(&p,WS);
  i=(kind==0)?(int)(rnd()%(uint32_t)nlines):0;
  if(kind==0){while(i==dup_a||i==dup_b)i=(i+1)%nlines;}
@@ -84,16 +84,16 @@ static void round1(uint32_t k)
   if(kind==1)snprintf(tgt,sizeof tgt,"ZZZ not there\n");
   else if(kind==2)snprintf(tgt,sizeof tgt,"DUP x\n");
   else if(kind==3){snprintf(tgt,sizeof tgt,"%s\n",line[0]);before="Q no such context\n";}
-  else{static const char *v[4]={WS "\\..\\" OUT,WS "/../" OUT,OUT,""};char ab[400];int vi=(int)(k%4);
+  else{static const char *v[4]={WS "\\..\\" OUTSIDE,WS "/../" OUTSIDE,OUTSIDE,""};char ab[400];int vi=(int)(k%4);
    PatchPlanFree(&p);
-   if(vi==3){if(!_getcwd(ab,sizeof ab))ck(0,"cwd");strcat(ab,"\\" OUT);PatchPlanInit(&p,ab);}
+   if(vi==3){if(!_getcwd(ab,sizeof ab))ck(0,"cwd");strcat(ab,"\\" OUTSIDE);PatchPlanInit(&p,ab);}
    else PatchPlanInit(&p,v[vi]);
    PatchPlanSetWorkspace(&p,WS);snprintf(tgt,sizeof tgt,SENT);}
   snprintf(rep,sizeof rep,"REPLACED\n");
   PatchPlanAddHunk(&p,0,before,tgt,rep,"");
   rc=PatchApplyAtomic(&p);ck(rc!=1,"broken or outside plan is refused");
   an=slurp(WS "/a.c",after,MAXF);ck(an==fn&&!memcmp(after,file,fn),"refused plan leaves the file unchanged");
-  an=slurp(OUT,after,MAXF);ck(an==sizeof SENT-1&&!memcmp(after,SENT,an),"outside sentinel unchanged");
+  an=slurp(OUTSIDE,after,MAXF);ck(an==sizeof SENT-1&&!memcmp(after,SENT,an),"outside sentinel unchanged");
  }
  ck(names()==1,"root holds only the target");
  PatchPlanFree(&p);}
@@ -101,7 +101,7 @@ int main(void)
 {static const uint32_t seeds[4]={1786707969u,1u,7u,12648430u};unsigned total=0;int s;uint32_t k;
  for(s=0;s<4;s++){rs=seeds[s];for(k=0;k<100;k++){round1(k);total++;}
   printf("agentpatch fuzz seed=%u rounds=100\n",(unsigned)seeds[s]);fflush(stdout);}
- wipe();DeleteFileA(OUT);
+ wipe();DeleteFileA(OUTSIDE);
  printf("agentpatch fuzz done: seeds=4 rounds=400 ok=%u\n",total);
  return total==400?0:1;}
 #else

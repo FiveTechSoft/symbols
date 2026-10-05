@@ -13,7 +13,7 @@
 extern void (*g_patch_test_before_replace)(void);
 
 #define WS "test_agent_patch_fs_win_scratch"
-#define OUT "test_agent_patch_fs_win_outside.c"
+#define OUTSIDE "test_agent_patch_fs_win_outside.c"
 #define OLDC "int x = 1;\n"
 #define NEWC "int x = 9;\n"
 
@@ -63,7 +63,7 @@ static void wipe(void)
     /* remove a junction as a link first, so the recursive delete never follows it */
     (void)system("if exist " WS "\\jn rmdir " WS "\\jn >NUL 2>NUL");
     (void)system("if exist " WS " rmdir /s /q " WS " >NUL 2>NUL");
-    (void)system("if exist " OUT " del /f /q " OUT " >NUL 2>NUL");
+    (void)system("if exist " OUTSIDE " del /f /q " OUTSIDE " >NUL 2>NUL");
 }
 static void reset(void)
 {
@@ -170,17 +170,17 @@ int main(int argc, char **argv)
 
     puts("T4 paths outside the workspace are rejected");
     reset();
-    put(OUT, OLDC);
-    plan_for(&p, WS "\\..\\" OUT);
+    put(OUTSIDE, OLDC);
+    plan_for(&p, WS "\\..\\" OUTSIDE);
     ck(PatchVerifyPlan(&p, &rep) == 0 && rep.status == PATCH_CHECK_IO_ERROR, "dotdot verify rejected");
-    ck(PatchApplyAtomic(&p) == 0 && is(OUT, OLDC), "dotdot apply rejected, file untouched");
+    ck(PatchApplyAtomic(&p) == 0 && is(OUTSIDE, OLDC), "dotdot apply rejected, file untouched");
     PatchPlanFree(&p);
-    snprintf(abs, sizeof(abs), "%s\\%s", cwd, OUT);
+    snprintf(abs, sizeof(abs), "%s\\%s", cwd, OUTSIDE);
     plan_for(&p, abs);
-    ck(PatchApplyAtomic(&p) == 0 && is(OUT, OLDC), "absolute path outside rejected");
+    ck(PatchApplyAtomic(&p) == 0 && is(OUTSIDE, OLDC), "absolute path outside rejected");
     PatchPlanFree(&p);
-    plan_for(&p, OUT);
-    ck(PatchApplyAtomic(&p) == 0 && is(OUT, OLDC), "relative path outside rejected");
+    plan_for(&p, OUTSIDE);
+    ck(PatchApplyAtomic(&p) == 0 && is(OUTSIDE, OLDC), "relative path outside rejected");
     PatchPlanFree(&p);
     snprintf(abs, sizeof(abs), "%s\\%s\\a.c", cwd, WS);
     plan_for(&p, abs);
