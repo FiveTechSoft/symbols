@@ -342,6 +342,13 @@ if(WIN32)
     add_test(NAME test_fs_win_8dot3_probe COMMAND test_fs_win_8dot3_probe WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_8dot3_probe PROPERTIES
         PASS_REGULAR_EXPRESSION "8dot3 probe: drive [A-Z] before short=no enable rc=0 after short=yes restore rc=0")
+    # m197: probe of the per-directory case flag. The regex holds my predictions: a default directory cannot hold "x.txt" and
+    # "X.txt", `fsutil file setCaseSensitiveInfo` returns 0, the query says enabled, and the flagged directory holds both.
+    # A wrong one goes red and prints the measured line.
+    add_executable(test_fs_win_case_probe tests/test_fs_win_case_probe.c)
+    add_test(NAME test_fs_win_case_probe COMMAND test_fs_win_case_probe WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_case_probe PROPERTIES
+        PASS_REGULAR_EXPRESSION "case probe: default both=no set rc=0 query enabled=yes flagged both=yes")
     add_executable(test_fs_win_aliases_mc2 tests/test_fs_win_aliases.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_aliases_mc2 PRIVATE include)
