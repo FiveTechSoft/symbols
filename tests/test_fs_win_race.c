@@ -107,6 +107,8 @@ static void reset(void)
  put(ROOT "\\t","ORIG");}
 /* ---- E: parent swap ---- */
 #define REAL_HOLD_MS 30
+#define SWAP_CAP_MS 30000 /* m214: hard cap of the adaptive window of cell E */
+static DWORD g_window_ms;
 static volatile LONG g_stop,g_swaps,g_junctions,g_ok,g_calls;
 /* Diagnostic counters (m172, not a gate): where the writer calls land relative to the real-directory phase,
    how long a call and a junction flip take, and the OK count per operation. They exist to measure the
@@ -247,12 +249,18 @@ int main(int argc,char **argv)
   th[1]=CreateThread(NULL,0,writer,r,0,NULL);
   th[2]=CreateThread(NULL,0,writer,r,0,NULL);
   ck(th[0]&&th[1]&&th[2],"threads");
-  while(GetTickCount()-t0<SWAP_BUDGET_MS){outside_intact("during swap");Sleep(50);}
+  /* m214: the window is SWAP_BUDGET_MS; if no writer call has succeeded by then (the cell E flake: 0 OK, so the invariant
+     was checked over a window in which the writers did nothing), it is extended in 50 ms steps until the first success or
+     SWAP_CAP_MS since the start. The guards below are unchanged: a run that reaches the cap with 0 OK still fails, and the
+     outside directory is checked in every step of the extension. */
+  while(GetTickCount()-t0<SWAP_BUDGET_MS||(g_ok==0&&GetTickCount()-t0<SWAP_CAP_MS)){outside_intact("during swap");Sleep(50);}
+  g_window_ms=GetTickCount()-t0;
   InterlockedExchange(&g_stop,1);
   WaitForMultipleObjects(3,th,TRUE,60000);
   for(int i=0;i<3;i++)CloseHandle(th[i]);
   outside_intact("after swap");
   /* printed BEFORE the guards, so a failing run still carries the numbers */
+  printf("E window: %lu ms (budget %d, cap %d, extended %d)\n",(unsigned long)g_window_ms,SWAP_BUDGET_MS,SWAP_CAP_MS,g_window_ms>SWAP_BUDGET_MS+100);
   printf("E diag: calls %ld ok %ld; inside-one-real-phase calls %ld ok %ld; swaps %ld junctions %ld; flip us n %ld avg %ld max %ld\n",
          (long)g_calls,(long)g_ok,(long)g_rcalls,(long)g_rok,(long)g_swaps,(long)g_junctions,
          (long)g_flipn,(long)(g_flipn?g_flipms/g_flipn:0),(long)g_flipmax);
