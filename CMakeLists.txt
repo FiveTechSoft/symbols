@@ -429,7 +429,7 @@ if(WIN32)
     target_compile_definitions(test_fs_win_batch_replace PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_batch_replace COMMAND test_fs_win_batch_replace
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    # The line is printed only after every cell and mutant passed (m186); it asserts the orphan counts of the killed sweep (9 before, 8 after: 3 names per item, read on msvc in the m188 run).
+    # The line is printed only after every cell and mutant passed (m186); it asserts the orphan counts of the killed sweep (9 before, 8 after: 3 names per item, read on msvc and asan in the m188 run).
     set_tests_properties(test_fs_win_batch_replace PROPERTIES
         PASS_REGULAR_EXPRESSION "test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8")
     add_executable(test_fs_win_probe tests/test_fs_win_probe.c)
