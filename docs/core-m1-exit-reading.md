@@ -12,7 +12,7 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 
 | # | Criterion | Linux | Windows |
 |---|---|---|---|
-| C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. **Not shown:** 8.3 aliases (`test_fs_win_aliases_short` is Skipped), per-directory case flag, other accounts, a rename race against a swapped parent (the POSIX `test_fs_race_parent` has no Windows counterpart). |
+| C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. 8.3 short names: **shown for one cell set** (the short name of the `.fstxn.lock` control file is refused by all 9 operations, `test_fs_win_aliases_short`, see the 8.3 bullet below; the ordinary-file alias is accepted, not refused). **Not shown:** other 8.3 cases (a reserved journal file reached through its alias, directories with short names, a volume where short names are off), per-directory case flag, other accounts, a rename race against a swapped parent (the POSIX `test_fs_race_parent` has no Windows counterpart). |
 | C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file calls do not sweep; an unshared `.fsrp-` pin is kept by design; a crash during the sweep is injected only after its first removal (m184 to m186, see the sweep bullet below), not after a later one; a foreign inode at a target is refused, not restored (same on POSIX). |
 | C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the hard-linked lock is an accepted documented limit, and a Windows mutant of the diff-apply drift guard (mutant 12, m149) is killed by exactly four cells; lock contention with a waiting process, power loss and other runners are the gaps below. |
 | C4 | Separator, case, permission, long path, newline, locked file fixtures | **Shown** for the six aspects within limits (`test_fs_c4_posix` and others). | **Shown** for the six aspects on the listed cells (`test_fs_win_case`, long-path, locked-file and EOL tests), not "met". Mutants only for permission. |
@@ -286,9 +286,31 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 - **Windows symlink leaf** is a fixed pass, not in the random pool.
 - **Windows `AgentPatch`-level fuzz:** not shown. The fuzz drives `Fs*` operations, not `PatchApplyAtomic`.
 
+## C1 on Windows: 8.3 short names
+
+- **8.3 short names, Windows (m193 to m195, runs 37269323016, 37271090475, 37273525033; msvc and asan-msvc 197 of 197 in the last run, the test Passed in 2.11 s and 2.96 s):**
+  the runner volume makes no short name by default (`test_fs_win_aliases_short` was Skipped until m194). `test_fs_win_8dot3_probe` (m193) measured that
+  `fsutil 8dot3name set X: 0` returns 0 on the runner and a file created afterwards then has a short name; the test restores the setting
+  (`set X: 1`) through `atexit`, so also after a failed check, but not if the process is killed in between. `test_fs_win_aliases_short`
+  (m194, m195) does the same, then runs 9 operations (create, copy target, copy source, move target, move source, replace, remove, batch create,
+  batch replace) through the short name of the `.fstxn.lock` control file, each on a fresh fixture. Measured (the CMake regex asserts the
+  line, so a pass is the line): all 9 refused with status DENIED and nothing changed (victim bytes, entry counts, `inside/f`, the lock
+  still empty). Controls: through the short name of an ordinary file the library accepts the 5 operations that need the file and refuses the 4
+  that need the target absent (status DENIED), so it has no alias check of its own; an empty ordinary file through its long name
+  is accepted by the 5 operations that pass expected bytes "", so a zero-length expected value is not what refuses the lock cells.
+  **The reason the lock cells are refused is not isolated.** The reserved-name check compares names only and `FSTXN~1.LOC` passes it
+  (read in `wc_target_status` and `wc_reserved`). The hypothesis that fits: the five operations that read the target bytes do it under the
+  `LockFileEx` the same call holds, and the other four need the target absent; not tested. **Wrong predictions, named:** in m194 I predicted A (accepted)
+  for copy source, move source, replace, remove and batch replace and R for the other four; all five A were R on msvc and asan
+  (run 37271090475, master was red on msvc and asan for that run by design, linux 184 and ninja 10 green), because my reading of src ("no
+  8.3 handling, so the alias gets through") missed what refuses the lock. m195 predicted all three groups (lock, ordinary alias, empty file) and the asserted line matched on msvc and asan.
+  Limits: one runner (`windows-latest`), one volume, short names switched on by the test (it changes a volume setting of the CI runner
+  temporarily); only the lock file, not the other reserved `.fstxn*` files, and only a single directory level; an alias accepted for
+  an ordinary file is the same file inside the tree (not an escape), nothing here shows more.
+
 ## Not shown, whole reading
 
-Power-loss durability (deferred); other runners, filesystems, accounts, inherited ACLs; 8.3 aliases;
+Power-loss durability (deferred); other runners, filesystems, accounts, inherited ACLs; 8.3 aliases other than the lock-file cell set in the 8.3 section above;
 non-cooperating writers; recovery of an intent left by the old file-parent bug (NOT DONE); one runner per platform.
 
 ## Not decided here
