@@ -399,6 +399,14 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_case_batch PROPERTIES
         PASS_REGULAR_EXPRESSION "batch flag: rep_dup_xX=1ooo rep_X_xX=0onn rep_Z_zZ=0onn cre_dup_nN=1--- cre_Y_yY=0onn")
+    # m203: why is the 8.3 alias of .fstxn.lock refused? Three groups of the five byte-checking ops on an empty target. The regex holds my predictions: a byte-range lock held on an ordinary empty file makes all five refuse (hypothesis H1); a foreign reserved-prefix file is refused by name through its long name; its 8.3 alias is accepted (50 percent; refused would mean a check that does not depend on the lock). A wrong one goes red and prints the line.
+    add_executable(test_fs_win_lock_alias tests/test_fs_win_lock_alias.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_lock_alias PRIVATE include)
+    add_test(NAME test_fs_win_lock_alias COMMAND test_fs_win_lock_alias
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_lock_alias PROPERTIES
+        PASS_REGULAR_EXPRESSION "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=0e move_source=0- replace=0n remove=0- batch_replace=0n")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
