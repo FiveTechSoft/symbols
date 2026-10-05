@@ -153,6 +153,7 @@ static void sc_sweepcrash(const char *exe,int mode)
  before=count(ROOT "\\*")-3;ck(before>=4,"orphan names are in the root");
  ck(run_child(exe,37,mode)==80+37,"sweep killed after its first removal");
  after=count(ROOT "\\*")-3;ck(after==before-1,"exactly one orphan removed by the killed sweep");
+ if(g_swn<3){g_sw[g_swn][0]=before;g_sw[g_swn][1]=after;g_swn++;}
  is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
  ck(FsBatchRecover(r)==FS_READ_OK,"recover finishes the sweep");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover twice");
