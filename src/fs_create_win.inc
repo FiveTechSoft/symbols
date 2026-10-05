@@ -175,6 +175,25 @@ static FS_NT_CREATE wc_create_fn(void)
 {HMODULE dll=GetModuleHandleW(L"ntdll.dll");return dll?(FS_NT_CREATE)(void*)GetProcAddress(dll,"NtCreateFile"):NULL;}
 static WC_NT_SET wc_set_fn(void)
 {HMODULE dll=GetModuleHandleW(L"ntdll.dll");return dll?(WC_NT_SET)(void*)GetProcAddress(dll,"NtSetInformationFile"):NULL;}
+/* m204: the reserved-name check is name-only, so the 8.3 short name of a reserved-prefix file (for example the short name of
+   ".fstxn.foreign") passed it and was acted on (m203, test_fs_win_lock_alias: foreign_alias accepted by all five ops). After a
+   successful open of a leaf that is not itself reserved, the final name of the opened handle is read back; NTFS reports the
+   normalized long name, so an alias of a reserved name shows up as that name. Returns 1 reserved, 0 not, -1 name unavailable
+   (the caller refuses). Library-internal opens use reserved leaf names literally and skip this. */
+static int wc_final_reserved(HANDLE h)
+{
+    WCHAR stack[512];WCHAR *buf=stack,*leaf;DWORD cap=512,n;int r;
+    n=GetFinalPathNameByHandleW(h,buf,cap,FILE_NAME_NORMALIZED|VOLUME_NAME_NONE);
+    if(n>=cap){
+        cap=n+1;buf=(WCHAR*)malloc((size_t)cap*sizeof(WCHAR));if(!buf)return -1;
+        n=GetFinalPathNameByHandleW(h,buf,cap,FILE_NAME_NORMALIZED|VOLUME_NAME_NONE);
+    }
+    if(!n||n>=cap){if(buf!=stack)free(buf);return -1;}
+    leaf=wcsrchr(buf,L'\\');leaf=leaf?leaf+1:buf;
+    r=wc_reserved(leaf)?1:0;
+    if(buf!=stack)free(buf);
+    return r;
+}
 static FS_READ_STATUS wc_open(HANDLE dir,const WCHAR *leaf,ACCESS_MASK access,ULONG disposition,HANDLE *out)
 {
     FS_NT_CREATE f=wc_create_fn();UNICODE_STRING name;OBJECT_ATTRIBUTES a;IO_STATUS_BLOCK io;
@@ -189,7 +208,11 @@ static FS_READ_STATUS wc_open(HANDLE dir,const WCHAR *leaf,ACCESS_MASK access,UL
          WC_SHARE,disposition,WC_OPTIONS,NULL,0);
     WC_TRACE("wc_open NtCreateFile name=%ls disposition=%lu access=0x%lx NTSTATUS=0x%08lx\n",
              leaf,(unsigned long)disposition,(unsigned long)access,(unsigned long)nt);
-    if(NT_SUCCESS(nt))return FS_READ_OK;
+    if(NT_SUCCESS(nt)){
+        if(!wc_reserved(leaf)&&wc_final_reserved(*out)!=0){
+            CloseHandle(*out);*out=INVALID_HANDLE_VALUE;return FS_READ_DENIED;}
+        return FS_READ_OK;
+    }
     *out=INVALID_HANDLE_VALUE;
     if(nt==(NTSTATUS)0xC0000034L||nt==(NTSTATUS)0xC000003AL)return FS_READ_MISSING;
     if(nt==(NTSTATUS)0xC0000035L)return FS_READ_DENIED;

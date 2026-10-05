@@ -20,7 +20,9 @@
    held_long   an ordinary empty file inside/held_long_name_file.txt reached by its long name while the test itself holds
                LockFileEx on byte 0 of it with another handle (H1 on an ordinary file: no name or control role involved);
    foreign_long a foreign empty file ".fstxn.foreign" in the root reached by its long name (control: the name check);
-   foreign_alias the same foreign file reached by its 8.3 name (a reserved-prefix file that nobody locks).
+   foreign_alias the same foreign file reached by its 8.3 name (a reserved-prefix file that nobody locks). m203 measured
+               this group accepted by all five ops (a name-only check bypassed); m204 adds the final-name check in wc_open
+               and the group is predicted refused like the long name.
    Each cell prints op=<status><state>: status is the FS_READ_STATUS number, state is of the target afterwards: e empty and
    present, - missing, n other bytes. The line is matched by PASS_REGULAR_EXPRESSION in CMakeLists.txt; the values there are
    my predictions, so a wrong one goes red and prints the measured line. The 8.3 setting of the volume is switched on for the
