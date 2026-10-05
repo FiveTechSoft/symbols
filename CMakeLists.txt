@@ -381,6 +381,16 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_case_flag PROPERTIES
         PASS_REGULAR_EXPRESSION "case flag: read_xX=0U replace_xX=0on remove_xX=0o- copy_source_xX=0oo move_source_xX=0o- replace_zZ=0on remove_zZ=0o- copy_source_zZ=0oo move_source_zZ=0o- create_yY=0on copy_target_yY=0on move_target_yY=0on")
+    # m200: the case flag on the workspace root. The regex holds my predictions: a foreign ".FSTXN.LOCK" does not stop the library
+    # from taking its own empty ".fstxn.lock" and stays untouched; the reserved name in another case is refused by name for
+    # create and remove; replace and remove of "A.txt" next to "a.txt" act on A.txt only. A wrong one goes red and prints the line.
+    add_executable(test_fs_win_case_root tests/test_fs_win_case_root.c
+        src/fs_read.c src/fs_manifest.c)
+    target_include_directories(test_fs_win_case_root PRIVATE include)
+    add_test(NAME test_fs_win_case_root COMMAND test_fs_win_case_root
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_case_root PROPERTIES
+        PASS_REGULAR_EXPRESSION "root flag: foreign_lock=0ooo reserved_create=3- reserved_remove=3o root_replace_aA=0on root_remove_aA=0o-")
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
