@@ -333,6 +333,12 @@ if(WIN32)
     add_test(NAME test_fs_win_aliases_short COMMAND test_fs_win_aliases_short
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_aliases_short PROPERTIES SKIP_RETURN_CODE 77)
+    # m193: probe of 8.3 short names on the workspace volume. The regex holds my predictions: no short name before,
+    # `fsutil 8dot3name set` returns 0 and a new file then has one, the setting is restored. A wrong one goes red and prints the line.
+    add_executable(test_fs_win_8dot3_probe tests/test_fs_win_8dot3_probe.c)
+    add_test(NAME test_fs_win_8dot3_probe COMMAND test_fs_win_8dot3_probe WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_8dot3_probe PROPERTIES
+        PASS_REGULAR_EXPRESSION "8dot3 probe: drive [A-Z] before short=no enable rc=0 after short=yes restore rc=0")
     add_executable(test_fs_win_aliases_mc2 tests/test_fs_win_aliases.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_aliases_mc2 PRIVATE include)
