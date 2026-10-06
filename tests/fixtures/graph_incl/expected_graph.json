@@ -1,0 +1,8 @@
+{"targets": [
+ {"name": "lib", "type": "STATIC_LIBRARY", "sources": ["src/lib.c"], "deps": []},
+ {"name": "t_inc", "type": "EXECUTABLE", "sources": ["tests/t_inc.c"], "deps": []},
+ {"name": "t_lib", "type": "EXECUTABLE", "sources": ["tests/t_lib.c"], "deps": ["lib"]}],
+ "tests": [
+ {"name": "inc_ok", "target": "t_inc", "labels": []},
+ {"name": "lib_ok", "target": "t_lib", "labels": []}],
+ "unknown": []}

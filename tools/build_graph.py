@@ -10,7 +10,7 @@ Rule: anything the model cannot prove selects the full gate (mode "full").
 The tests of the build must be built first: ctest omits the command of a test
 whose executable does not exist, and such a test is unmapped.
 """
-import argparse, glob, json, os, subprocess, sys
+import argparse, collections, glob, json, os, re, subprocess, sys
 
 SUPPORTED_GENERATORS = ("Unix Makefiles", "Ninja")
 CODEMODEL_MAJOR = 2
@@ -106,9 +106,48 @@ def load_graph(build, config=None):
     return g
 
 
-def select(g, changed):
+SCAN_EXT = (".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".inc", ".inl")
+HEADER_EXT = (".h", ".hpp", ".hh", ".inc", ".inl")
+INCLUDE_RX = re.compile(r'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\n]+)[>"]', re.M)
+
+
+def scan_includes(root):
+    """Textual include scan of the source tree. Returns (files, includers,
+    unresolved): files is the set of scanned paths (relative, '/'), includers
+    maps a basename to the files that include something with that basename,
+    unresolved lists quoted includes whose basename matches no scanned file.
+    Matching is by basename only (over-approximation), no -I resolution."""
+    files, incs = set(), {}
+    for d, dirs, names in os.walk(root):
+        dirs[:] = [x for x in dirs if not x.startswith(".") and
+                   not os.path.exists(os.path.join(d, x, "CMakeCache.txt"))]
+        for n in names:
+            if n.endswith(SCAN_EXT):
+                rel = os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")
+                files.add(rel)
+                try:
+                    text = open(os.path.join(d, n), encoding="utf-8", errors="replace").read()
+                except OSError:
+                    incs[rel] = None
+                    continue
+                incs[rel] = [(m.group(1), os.path.basename(m.group(2))) for m in INCLUDE_RX.finditer(text)]
+    bases = {os.path.basename(f) for f in files}
+    includers, unresolved = collections.defaultdict(set), []
+    for f, lst in incs.items():
+        if lst is None:
+            unresolved.append("%s: unreadable" % f)
+            continue
+        for kind, b in lst:
+            includers[b].add(f)
+            if kind == '"' and b not in bases:
+                unresolved.append("%s: %s" % (f, b))
+    return files, includers, sorted(unresolved)
+
+
+def select(g, changed, scan=True):
     """Changed paths are relative to the source root. Returns
-    {mode: 'subset'|'full', tests: [...], reasons: [...]}."""
+    {mode: 'subset'|'full', tests: [...], reasons: [...]}. With scan, a changed
+    file also affects every file that includes its basename, transitively."""
     if g["unknown"]:
         return {"mode": "full", "tests": [t["name"] for t in g["tests"]], "reasons": list(g["unknown"])}
     full = lambda why: {"mode": "full", "tests": [t["name"] for t in g["tests"]], "reasons": why}
@@ -116,15 +155,28 @@ def select(g, changed):
     for t in g["targets"]:
         for s in t["sources"]:
             owners.setdefault(s, set()).add(t["name"])
+    scanned, includers = set(), {}
+    if scan and g.get("source"):
+        scanned, includers, unresolved = scan_includes(g["source"])
+        if unresolved:
+            return full(["unresolved include: %s" % u for u in unresolved[:5]])
     hit = set()
     for f in changed:
         f = f.replace(os.sep, "/")
         base = os.path.basename(f)
         if base == "CMakeLists.txt" or base == "CMakeCache.txt" or f.endswith(".cmake"):
             return full(["build definition changed: %s" % f])
-        if f not in owners:
-            return full(["changed file is in no target: %s" % f])
-        hit |= owners[f]
+        if f in owners:
+            hit |= owners[f]
+        elif not (f in scanned and includers.get(base)):
+            return full(["changed file is in no target and has no includer: %s" % f])
+        closure, todo = {f}, [f]
+        while todo:
+            for i in includers.get(os.path.basename(todo.pop()), ()):
+                if i not in closure:
+                    closure.add(i)
+                    todo.append(i)
+                    hit |= owners.get(i, set())
     rdeps = {}
     for t in g["targets"]:
         for d in t["deps"]:

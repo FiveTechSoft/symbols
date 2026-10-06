@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))
 import build_graph as bg
 
 FIX = os.path.join(HERE, "fixtures")
-MUTANT = "--mutant" in sys.argv
+MUTANT = sys.argv[sys.argv.index("--mutant") + 1] if "--mutant" in sys.argv else None
 
 
 def gen_name():
@@ -49,7 +49,9 @@ def expected(name):
 
 
 def select(g, files):
-    if MUTANT:
+    if MUTANT == "scan_off":
+        return bg.select(g, files, scan=False)
+    if MUTANT == "no_closure":
         g = json.loads(json.dumps(g))
         for t in g["targets"]:
             t["deps"] = []
@@ -61,7 +63,8 @@ def recall(name, tmp, stats):
     g = bg.load_graph(b)
     exes = {t["name"]: os.path.join(b, t["command"][0]) if not os.path.isabs(t["command"][0]) else t["command"][0]
             for t in g["tests"] if t["command"]}
-    files = sorted({s for t in g["targets"] for s in t["sources"]})
+    files = sorted({s for t in g["targets"] for s in t["sources"]} |
+                   {f for f in bg.scan_includes(src)[0] if f.endswith(bg.HEADER_EXT)})
     ok = True
     for f in files:
         before = {n: os.stat(p).st_mtime_ns for n, p in exes.items()}
@@ -85,7 +88,7 @@ def main():
         return 77
     fails, stats = [], []
     with tempfile.TemporaryDirectory() as tmp:
-        for name in ("basic", "mixed"):
+        for name in ("basic", "mixed", "incl"):
             _, b = setup(name, tmp)
             if view(bg.load_graph(b)) != expected(name):
                 fails.append("graph_" + name)
@@ -94,15 +97,21 @@ def main():
         if g["unknown"] != ["test script_ok is not mapped to a target"] or \
            select(g, ["prog.c"])["mode"] != "full":
             fails.append("graph_script")
-        for name in ("basic", "mixed"):
+        for name in ("basic", "mixed", "incl"):
             if not recall(name, tmp, stats):
                 fails.append("recall_" + name)
         src, b = setup("mixed", tmp)
         g = bg.load_graph(b)
         rules = [select(g, ["CMakeLists.txt"])["mode"] == "full",
-                 select(g, ["src/base.h"])["mode"] == "full",
                  select(g, ["src/gen.c.in"])["mode"] == "full",
                  select(g, ["src/base.c"])["mode"] == "subset"]
+        src3, b3 = setup("incl", tmp)
+        g3 = bg.load_graph(b3)
+        hdr = [select(g3, ["src/lib.h"]), select(g3, ["src/lib.c"])]
+        if not (hdr[0]["mode"] == "subset" and hdr[0]["tests"] == ["inc_ok", "lib_ok"] and
+                hdr[1]["tests"] == ["inc_ok", "lib_ok"] and
+                select(g, ["src/base.h"])["tests"] == ["base_ok", "gen_ok"]):
+            fails.append("header_scan")
         _, bu = setup("basic", tmp, build=False)
         gu = bg.load_graph(bu)
         rules.append(select(gu, ["src/core.c"])["mode"] == "full" and bool(gu["unknown"]))
@@ -124,7 +133,8 @@ def main():
         print("  %s %s oracle=%s selected=%s mode=%s" % r)
     print("failed checks: %s" % (" ".join(sorted(fails)) or "none"))
     if MUTANT:
-        want = ["recall_basic", "recall_mixed"]
+        want = {"no_closure": ["header_scan", "recall_basic", "recall_incl", "recall_mixed"],
+                "scan_off": ["header_scan", "recall_incl"]}[MUTANT]
         if sorted(fails) == want:
             print("MUTANT killed by exactly " + " ".join(want)); return 0
         print("MUTANT not killed by the exact set"); return 1

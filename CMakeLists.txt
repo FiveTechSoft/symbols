@@ -834,9 +834,13 @@ if(Python3_Interpreter_FOUND)
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_build_graph PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
     add_test(NAME test_build_graph_mc
-             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py --mutant
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py --mutant no_closure
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_build_graph_mc PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+    add_test(NAME test_build_graph_mc_scan
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py --mutant scan_off
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_mc_scan PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
