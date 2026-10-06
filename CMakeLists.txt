@@ -1116,3 +1116,10 @@ target_include_directories(test_agent_patch_multi_mc PRIVATE include)
 target_compile_definitions(test_agent_patch_multi_mc PRIVATE AGENT_PATCH_UNIQ_MUTANT=1)
 add_test(NAME test_agent_patch_multi_mc COMMAND test_agent_patch_multi_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_agent_patch_multi_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly C D")
+# Multi-hunk and multi-line AgentPatch fuzz (m225): 4 seeds x 100 rounds against a line model; refused plans leave the file unchanged.
+add_executable(test_agent_patch_multi_fuzz tests/test_agent_patch_multi_fuzz.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_multi_fuzz PRIVATE include)
+add_test(NAME test_agent_patch_multi_fuzz COMMAND test_agent_patch_multi_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_multi_fuzz PROPERTIES TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "multi fuzz done: seeds=4 rounds=400 ok=400")
