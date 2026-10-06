@@ -50,16 +50,18 @@ jobs:
         run: |
           gcc --version
           cmake --version
+      # The e2e and typed_c tests look for symbols-server and c_contract_static under build/ and skip or
+      # fail without them, so the sanitizer build uses build/ too.
       - name: Configure (gcc, ASan and UBSan)
         run: >
-          cmake -S . -B build-san -DCMAKE_BUILD_TYPE=Debug
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=gcc
           "-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
           "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
       - name: Build
-        run: cmake --build build-san -j4
+        run: cmake --build build -j4
       - name: Tests under ASan and UBSan
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=0:print_stacktrace=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: ctest --test-dir build-san --output-on-failure
+        run: ctest --test-dir build --output-on-failure
