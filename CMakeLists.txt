@@ -820,6 +820,15 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bank_harness_setup.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_bank_harness_setup PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
+    # Wording-robustness probe (m229): the declared rewrites, and the harness accepts --rewrite (noop agent: nothing passes).
+    add_test(NAME test_wording_rewrites
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/wording_rewrites.py --self-test
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_wording_rewrites PROPERTIES TIMEOUT 60 PASS_REGULAR_EXPRESSION "wording_rewrites self-test ok")
+    add_test(NAME test_wording_rewrite_harness
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/bank_harness.py --agent noop --rewrite R3 --counts-only
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120 PASS_REGULAR_EXPRESSION "\"tasks_passed\": 0")
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)

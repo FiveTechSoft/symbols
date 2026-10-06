@@ -54,6 +54,9 @@ import subprocess
 import sys
 import tempfile
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wording_rewrites  # noqa: E402
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -156,6 +159,7 @@ def run_agent(template: str, workdir: Path, task_text: str, task_file: Path,
 
 
 TASK_TEXT_OVERRIDE = None
+REWRITE = None
 
 # Closed vocabulary for --reasons: an abstention reason is reported only as one
 # of these fixed classes, so no workspace-derived text (names, paths, numbers)
@@ -248,6 +252,8 @@ def run_task(tid: str, cat: str, tdir: Path, agent: str, self_test: bool,
     task_text = task_md.read_text(encoding="utf-8").strip() if task_md.is_file() else ""
     if TASK_TEXT_OVERRIDE is not None:
         task_text = TASK_TEXT_OVERRIDE
+    elif REWRITE is not None:
+        task_text = wording_rewrites.apply(REWRITE, task_text)
     with tempfile.TemporaryDirectory(prefix="bank_") as td:
         wd = Path(td) / "work"
         shutil.copytree(tdir / "before", wd)
@@ -337,12 +343,19 @@ def main() -> int:
     ap.add_argument("--task-text",
                     help="replace every task.md with this text (wording-robustness probe: what the "
                          "agent can do from the code's own evidence alone)")
+    ap.add_argument("--rewrite", choices=sorted(wording_rewrites.REWRITES),
+                    help="apply one declared mechanical rewrite (tools/wording_rewrites.py) to every "
+                         "task.md; not combinable with --task-text")
     ap.add_argument("--reasons", action="store_true",
                     help="add counts of failed tasks per closed-vocabulary abstention reason, "
                          "by category (safe with --counts-only)")
     a = ap.parse_args()
-    global TASK_TEXT_OVERRIDE
+    global TASK_TEXT_OVERRIDE, REWRITE
     TASK_TEXT_OVERRIDE = a.task_text
+    if a.rewrite and a.task_text is not None:
+        print("--rewrite and --task-text cannot be combined", file=sys.stderr)
+        return 2
+    REWRITE = a.rewrite
     rows = [r for r in read_index(Path(a.bank)) if a.split == "all" or split_of(r[0]) == a.split]
     if not rows:
         print("no tasks in index.tsv", file=sys.stderr)
