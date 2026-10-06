@@ -1,9 +1,14 @@
-name: Compilers and sanitizers (manual)
+name: Compilers and sanitizers (nightly and manual)
 
 # M3 exit criterion 3 needs a Clang build and a sanitizer job on Linux. This workflow
-# is manual only, so a red result here does not touch the CI gate. Fold the jobs into
-# ci.yml once a run of each is read green.
+# is not part of the CI gate (ci.yml), so a red result here does not block a push.
+# It runs nightly on the default branch and can still be dispatched by hand.
+# A red nightly shows as a failed run of this workflow with event "schedule" in the
+# Actions tab. Nothing here sends an alert. Fold the jobs into ci.yml only after the
+# nightly runs have been read stable for a stretch.
 on:
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       target_sha:
