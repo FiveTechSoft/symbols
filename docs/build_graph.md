@@ -170,3 +170,47 @@ Limits.
 - My R5 prediction (that this path is reached only by non-rename operators, and checked by mutant only) was framed too narrowly; the test shows only the mutant check.
 - The report is as complete as the sidecar and the codemodel (see S2a). Windows is unmeasured. Nothing skips a test.
 - Correction to the S2a section: its last sentence says S2b would call the report from the runner. The hook is in `TaskOpsSolve` instead, for the reason above. The runner loop is not hooked.
+
+## Update: CTest result classes, and the first Clang and sanitizer runs (S3, S4, Y1, Y2)
+
+This reads M3 exit criteria 3 and 4 against what is landed. Criterion 5 (benchmarks) is untouched.
+
+### S3: `tools/ctest_report.py` (criterion 4)
+
+Landed in `5922344` (run 37468916459, base 552590e, readback equal to the GO sha). All jobs read: apply 209, linux 209, msvc 233, asan-msvc 233, `ast-inspect-windows-ninja` 10 tests OK. On the two Windows jobs the new test prints SKIP, so it is unmeasured there.
+
+Why not JUnit. On CTest 3.22.1 (a hand fixture, then the repository fixture) `ctest --output-junit` writes a timeout, an abort and a segfault all as `<failure message="">`, so JUnit cannot tell them apart. The Test.xml that `ctest -T Test` writes can: it holds the reason in the "Exit Code" and "Completion Status" measurements.
+
+What it reads. `ctest_report.py TEST_XML [--registered BUILD]` prints JSON with one record per test (name, class, detail, exit code, exit value, seconds) and a count per class: passed, failed, timed_out, crashed, skipped, not_run, unknown. The reason strings it classifies are those read from CTest 3.22.1:
+- failed: "Failed". timed_out: "Timeout".
+- crashed: SEGFAULT, "Subprocess aborted", NUMERICAL, ILLEGAL, "Subprocess killed", "Subprocess terminated".
+- skipped: "SKIP_RETURN_CODE=77", "SKIP_REGULAR_EXPRESSION_MATCHED". not_run: "Unable to find executable", "Disabled".
+- passed needs Status passed, Completion Status "Completed" and no Exit Code or "Completed" (a WILL_FAIL test is passed, with Exit Value 1).
+Any other string, a missing field or an unknown Status gives `unknown`, never `passed`. A malformed, missing or empty file exits 2 with no report. With `--registered`, a test that the build registers and Test.xml lacks (after `ctest -R`) is `not_run`, "absent from Test.xml".
+
+Test. `tests/test_ctest_report.py` (one ctest entry, SKIP on Windows) builds `tests/fixtures/ctest_report` (17 tests, one reason each), runs `ctest -T Test`, and checks: each test lands in its designed class (passed: pass, will_fail; failed: fail, fail_regex, regex_fail, exit77_noskip; timed_out: timeout; crashed: segv, abort, fpe, ill, kill9, term; skipped: skip, skip_regex; not_run: notrun, notrun_disabled); no phantom tests from the `<TestList>` entries; the counts add up; five edited copies of the real Test.xml (unknown Exit Code, unknown Status, a bad Completion Status on a passed, a notrun and a failed test) give `unknown`; three bad inputs exit 2 with no output; the `-R` absent case. Ten mutants of the tool (text replacements in a temp copy, inside the same test) must each fail exactly their expected set of checks. Those mutants are part of the test and run in CI. The test takes 6.6 s under ctest locally.
+
+Wrong predictions, named. I predicted the first run of the mutants would show a wrong expected set, and it did: for `segv_unlisted` and `skip_regex_unlisted` I expected one failed check, but `counts_add_up` also fails (it requires 0 unknown). That was my expectation, not a tool defect; the expected sets were corrected and all 10 mutants die on their exact sets. My first parser also counted the 17 bare `<Test>name</Test>` entries of `<TestList>` as unknown tests; skipping childless entries and a phantom-tests check fixed that. I guessed the test would take 3-5 s; it takes 6.6 s.
+
+Limits. Linux only. Windows reason strings are unmeasured and would land in `unknown`. Only CTest 3.22.1 was read locally; the CTest versions on the CI runners were not read (the compilers run below printed cmake 3.31.6). "Subprocess killed" and "terminated" (SIGKILL, SIGTERM) are classed crashed, but an external kill (an out-of-memory kill, a CI time limit) looks the same. Reasons not in the fixture land in `unknown`. Nothing in CI runs the tool on the real suite's results: this is a classifier and a fixture. So criterion 4 is shown on Linux on a labeled fixture, not "CI test reports distinguish the six states".
+
+### Y1, S4, Y2: a manual Clang and sanitizer workflow (criterion 3)
+
+Criterion 3 asks for GCC, Clang and MSVC builds in CI and sanitizer jobs with zero findings. Before this, `ci.yml` had gcc and MSVC builds and an MSVC ASan job; its only clang was the pinned libclang for the AST corpus. There was no Clang compile of the C core and no Linux sanitizer job.
+
+Y1, `a3c0a8e` (apply-github-patch run 37471326454): one new file, `.github/workflows/compilers.yml`, `workflow_dispatch` only, with a Clang job and a gcc ASan and UBSan job. It is manual so that a red result would not touch the CI gate. It went through the bootstrap `apply-github-patch.yml`; the readback `git diff --binary` equal to the GO sha; the push needed the `WORKFLOW_PAT` secret and it went through.
+
+First dispatch (run 37473220913, head a3c0a8e): both jobs red.
+- Clang 18.1.3: the build stopped at `tests/test_task_ops_refactor_guard.c:83`, an implicit declaration of `TaskOpsTestRefactorGuards`, an error in clang 18 and a warning in gcc. Cause: `include/task_ops.h` declares the test hooks only under `TASK_OPS_TEST_FAULTS`, and `CMakeLists.txt` built `test_task_ops_refactor_guard_mc` with only `REFACTOR_GUARD_MUTANT=1`. A latent defect in a test target, not in `src/`. ctest never ran.
+- gcc ASan and UBSan: 207 of 209 passed, 2 failed, 7 skipped. This was my job configuration: I built into `build-san`, while the e2e scripts look for `build/symbols-server` (they exit 77 when it is missing) and the typed_c tests need `build/c_contract_static` (ValueError generator_unavailable). The e2e tests that run the server under ASan did not run at all. No sanitizer line was in the log for the tests that ran.
+- Wrong predictions, named: I wrote the job without checking the build directory the tests expect, and I assumed gcc and clang would not differ.
+
+S4, `9a0acab` (run 37476377141, readback equal to the GO sha): one line in `CMakeLists.txt`, `TASK_OPS_TEST_FAULTS` added to the compile definitions of `test_task_ops_refactor_guard_mc`. All jobs read: apply 209, linux 209, msvc 233, asan-msvc 233, ninja 10 OK. A gcc build of the unmodified tree with `-Werror=implicit-function-declaration` and `make -k` (412 objects) found only that one site.
+
+Y2, `3ccbe78` (apply-github-patch run 37478476302, readback equal to the GO sha): the sanitizer job builds into `build/`.
+
+Second dispatch (run 37479988705, head 3ccbe78, status Success), logs read:
+- Clang 18.1.3, cmake 3.31.6, Release: `100% tests passed, 0 tests failed out of 209`, test time 186.99 s, 0 skipped.
+- gcc 13.3.0, cmake 3.31.6, `-fsanitize=address,undefined -fno-sanitize-recover=undefined`, ASAN `detect_leaks=1`, UBSAN `halt_on_error=1`: `100% tests passed, 0 tests failed out of 209`, test time 564.82 s, 0 skipped. I found no AddressSanitizer, LeakSanitizer, `runtime error` or `SUMMARY:` line in the log. A clean run prints none, so "zero findings" rests on the pass total (a finding would abort a test) plus that empty search, not on sanitizer output.
+
+What this shows, and what it does not. Criterion 3 is shown on one manual run at `3ccbe78`: Clang Release 209/209 and GCC with ASan and UBSan 209/209, zero skips. It is not in the gate: `ci.yml` still has no Clang job and no Linux sanitizer job, so nothing re-checks it on later pushes. That is one run on one runner image, with no Clang sanitizer and no Windows clang; Clang ran without `-Werror`, and I did not read its build warnings. Folding the jobs into `ci.yml` (or a nightly `schedule:` trigger) is left to Antonio. The runs of `ci.yml` that the Y1, S4 and Y2 pushes may have started were not all read by me beyond S4's.
