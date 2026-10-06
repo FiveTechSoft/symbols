@@ -1069,6 +1069,16 @@ add_executable(test_task_ops_rollback tests/test_task_ops_rollback.c)
 target_compile_definitions(test_task_ops_rollback PRIVATE TASK_OPS_TEST_FAULTS)
 target_link_libraries(test_task_ops_rollback symbolic_rollback_test)
 add_test(NAME test_task_ops_rollback COMMAND test_task_ops_rollback WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+# Refactor guards (m230): rename_symbol and literal_to_constant need a build probe, a rename may not use a build-file word,
+# a literal sentence may not be about a preprocessor directive. The mutant (isolated test library) switches the guards off and
+# must fail exactly cells A B C.
+sllm_test(test_task_ops_refactor_guard tests/test_task_ops_refactor_guard.c)
+set_tests_properties(test_task_ops_refactor_guard PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS \\(0 cells wrong\\)")
+add_executable(test_task_ops_refactor_guard_mc tests/test_task_ops_refactor_guard.c)
+target_compile_definitions(test_task_ops_refactor_guard_mc PRIVATE REFACTOR_GUARD_MUTANT=1)
+target_link_libraries(test_task_ops_refactor_guard_mc symbolic_rollback_test)
+add_test(NAME test_task_ops_refactor_guard_mc COMMAND test_task_ops_refactor_guard_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_task_ops_refactor_guard_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B C")
 
 sllm_test(test_runner_episode_shadow tests/test_runner_episode_shadow.c)
 add_library(engineering_episode_report_lib STATIC tools/engineering_episode_report.c)

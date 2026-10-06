@@ -1239,6 +1239,48 @@ static int missing_named_header(const TASK_OPS_WORKSPACE *ws, const char *task, 
     return n == 1;
 }
 
+/* Refactor guards (m230). rename_symbol and literal_to_constant are behaviour-preserving edits: they are only
+   trusted when a build probe exists (compile_before >= 0), the rename tokens are not build-file names, and the
+   literal sentence is not about a preprocessor directive. The switch is compiled only into the isolated test
+   library (TASK_OPS_TEST_FAULTS) so a test can show what the guards stop; production always has them on. */
+#ifdef TASK_OPS_TEST_FAULTS
+static int g_refactor_guards = 1;
+void TaskOpsTestRefactorGuards(int on) { g_refactor_guards = on; }
+#define REFACTOR_GUARDS() (g_refactor_guards)
+#else
+#define REFACTOR_GUARDS() 1
+#endif
+
+/* a token that names a workspace file (its base name or its stem) or a CMake command */
+static int token_is_file_or_build_word(const TASK_OPS_WORKSPACE *ws, const char *tok)
+{
+    if (!strncasecmp(tok, "cmake_", 6) || !strcasecmp(tok, "CMakeLists") || !strcasecmp(tok, "Makefile"))
+        return 1;
+    for (int f = 0; f < ws->count; f++) {
+        const char *rel = ws->files[f].rel, *base = strrchr(rel, '/');
+        base = base ? base + 1 : rel;
+        size_t bl = strlen(base), dot = bl;
+        const char *d = strrchr(base, '.');
+        if (d && d != base) dot = (size_t)(d - base);
+        if (!strcmp(base, tok) || (strlen(tok) == dot && !strncmp(base, tok, dot)))
+            return 1;
+    }
+    return 0;
+}
+
+/* the sentence talks about a preprocessor directive (#ifndef, #define, ...) */
+static int sentence_has_directive(const char *sent)
+{
+    static const char *const dirs[] = {"ifndef", "ifdef", "define", "undef", "include", "pragma", "endif", "if", "elif", "else"};
+    for (const char *p = strchr(sent, '#'); p; p = strchr(p + 1, '#'))
+        for (size_t i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+            size_t n = strlen(dirs[i]);
+            if (!strncmp(p + 1, dirs[i], n) && !ident_char((unsigned char)p[1 + n]))
+                return 1;
+        }
+    return 0;
+}
+
 /* -------------------------------------------- literal -> named constant */
 
 /* In one sentence the task names a new constant N (code-shaped, absent from
@@ -1305,6 +1347,10 @@ static int find_literal_plan(const TASK_OPS_WORKSPACE *ws, const char *task, LIT
         size_t sl = e - s < sizeof(sent) - 1 ? e - s : sizeof(sent) - 1;
         memcpy(sent, task + s, sl);
         sent[sl] = '\0';
+        if (REFACTOR_GUARDS() && sentence_has_directive(sent)) {
+            s = e + 1;
+            continue;
+        }
         /* the new name: code-shaped, absent from the workspace, unique here */
         TASK_TOKEN tok[32];
         int nt = lex_code_tokens(sent, tok, 32), names = 0;
@@ -4042,6 +4088,9 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
     char a[128] = {0}, b[128] = {0};
     int touched = 0;
     int renames = TaskOpsFindRename(ws, task, a, sizeof(a), b, sizeof(b));
+    if (renames == 1 && REFACTOR_GUARDS() &&
+        (rep->compile_before < 0 || token_is_file_or_build_word(ws, a) || token_is_file_or_build_word(ws, b)))
+        renames = 0;   /* nothing builds to show the rename kept behaviour, or a token is a file / build word */
     char y_text[128] = {0};
     int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
     char da[128] = {0}, db[128] = {0}, dead[128] = {0};
@@ -4084,7 +4133,7 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
             snprintf(rep->detail, sizeof(rep->detail), "'%.*s' -> '%.100s' in %.100s",
                      (int)(hit.to - hit.from > 80 ? 80 : hit.to - hit.from), f->data + hit.from,
                      y_text, f->rel);
-        } else if (op == OP_LITERAL &&
+        } else if (op == OP_LITERAL && (rep->compile_before >= 0 || !REFACTOR_GUARDS()) &&
                    find_literal_plan(ws, task, &lit) == 1 &&
                    (lit_out = apply_literal_plan(ws, &lit, &lit_file)) != NULL) {
             next[lit_file] = lit_out;

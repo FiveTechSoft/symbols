@@ -85,6 +85,7 @@ int TaskOpsContinueStdout(const char *workspace, const char *task,
 /* Test-only hooks. The production symbolic target never defines this macro. */
 #ifdef TASK_OPS_TEST_FAULTS
 void TaskOpsTestFailRestore(int write_call, int remove_call, int after_operation);
+void TaskOpsTestRefactorGuards(int on);   /* 0 switches the refactor guards off (mutant) */
 #endif
 
 /* Full loop on a workspace directory. Returns 1 when an edit was kept. */
