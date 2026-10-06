@@ -70,6 +70,17 @@
     "tools/build_graph_inputs.json"
    ]
   },
+  "test_select_hook": {
+   "files": [
+    "tests/test_select_hook.py",
+    "*.c",
+    "*.h",
+    "*.inc"
+   ],
+   "targets": [
+    "symbols-agent"
+   ]
+  },
   "test_select_report": {
    "files": [
     "tests/test_select_report.py",

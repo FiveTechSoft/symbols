@@ -30,6 +30,7 @@
 #include "code_graph.h"
 #include "agent_diagnose.h"
 #include "task_ops.h"
+#include "select_report.h"
 
 static void PrintHelp(const char *prog)
 {
@@ -77,73 +78,11 @@ static char *ReadFile(const char *path, size_t *out_size)
     return buf;
 }
 
-/* --select-report: a read-only report of the build-graph test selection
-   (tools/build_graph.py). It runs nothing but that script, skips no test and
-   changes no state. Every way it can fail to produce a selection is reported
-   as "mode: full" with the reason: the full gate is the answer whenever the
-   selection is not known. Arguments reach a shell, so only a conservative
-   path alphabet is accepted. */
-static int PathArgSafe(const char *a)
-{
-    if (!a[0] || a[0] == '-') return 0;
-    for (const char *c = a; *c; c++)
-    {
-        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') ||
-              *c == '_' || *c == '.' || *c == '/' || *c == '+' || *c == '-'))
-            return 0;
-    }
-    return 1;
-}
-
-static int SelectReportFull(const char *reason)
-{
-    printf("[symbols-agent] select-report (read-only: nothing is skipped, the full gate stays the default)\n");
-    printf("mode: full\nreason: %s\n", reason);
-    return 0;
-}
-
+/* --select-report: a read-only report of the build-graph test selection.
+   The implementation is shared with the opt-in TaskOps hook (select_report.c). */
 static int SelectReport(const char *workspace, const char *build, char **changed, int nchanged)
 {
-    char script[MAX_PATCH_PATH + 32];
-    char cmd[8192];
-    FILE *f;
-    SHELL_EXEC_RESULT *res;
-    size_t n;
-    const char *p;
-
-    if (nchanged <= 0) return SelectReportFull("no changed files were given");
-    if (!PathArgSafe(build)) return SelectReportFull("the build directory path has a character outside the supported set");
-    snprintf(script, sizeof(script), "%s/tools/build_graph.py", workspace);
-    f = fopen(script, "rb");
-    if (!f) return SelectReportFull("tools/build_graph.py was not found in the workspace");
-    fclose(f);
-    n = (size_t)snprintf(cmd, sizeof(cmd), "python3 tools/build_graph.py select %s --changed", build);
-    for (int i = 0; i < nchanged; i++)
-    {
-        if (!PathArgSafe(changed[i])) return SelectReportFull("a changed file path has a character outside the supported set");
-        if (n + strlen(changed[i]) + 2 >= sizeof(cmd)) return SelectReportFull("the changed file list is too long");
-        n += (size_t)snprintf(cmd + n, sizeof(cmd) - n, " %s", changed[i]);
-    }
-    res = (SHELL_EXEC_RESULT *)malloc(sizeof(*res));
-    if (!res) return SelectReportFull("out of memory");
-    AgentShellResultInit(res);
-    AgentShellExecGuarded(cmd, workspace, 60000, res);
-    if (res->execution_failed || res->exit_code != 0)
-    {
-        free(res);
-        return SelectReportFull("python3 tools/build_graph.py did not run to a successful exit");
-    }
-    p = strstr(res->stdout_buf, "\"mode\": \"");
-    if (!p || res->stdout_buf[0] != '{' || res->stdout_truncated)
-    {
-        free(res);
-        return SelectReportFull("the selection output was not recognised");
-    }
-    printf("[symbols-agent] select-report (read-only: nothing is skipped, the full gate stays the default)\n");
-    printf("%s", res->stdout_buf);
-    if (res->stdout_len && res->stdout_buf[res->stdout_len - 1] != '\n') printf("\n");
-    free(res);
-    return 0;
+    return SelectReportPrint(stdout, workspace, build, changed, nchanged, 60000);
 }
 
 int main(int argc, char **argv)

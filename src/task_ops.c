@@ -2,6 +2,7 @@
  * task_ops.c - see include/task_ops.h.
  */
 #include "task_ops.h"
+#include "select_report.h"
 #include "git_ops.h"
 #include "agent_shell.h"
 #include "shell_ops.h"
@@ -4327,12 +4328,21 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
     /* act */
     int ok = 1;
     for (int i = 0; i < ws->count; i++)
-        if (next[i] && !write_file(ws->root, ws->files[i].rel, next[i]))
+        if (next[i]) {
+            if (!write_file(ws->root, ws->files[i].rel, next[i]))
+                ok = 0;
+            SelectReportNote(ws->files[i].rel);
+        }
+    if (created.data) {
+        if (!write_file(ws->root, created.rel, created.data))
             ok = 0;
-    if (created.data && !write_file(ws->root, created.rel, created.data))
-        ok = 0;
-    if (created2.data && !write_file(ws->root, created2.rel, created2.data))
-        ok = 0;
+        SelectReportNote(created.rel);
+    }
+    if (created2.data) {
+        if (!write_file(ws->root, created2.rel, created2.data))
+            ok = 0;
+        SelectReportNote(created2.rel);
+    }
     rep->applied = touched;
 
     /* verify: operator intent holds and the agent's own probe did not
@@ -4802,6 +4812,7 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             getenv("SYMBOLS_ATTEMPT_CAPTURE") && *getenv("SYMBOLS_ATTEMPT_CAPTURE");
         if(capturing && !AttemptCaptureBegin(&capture,workspace,audit_run,(unsigned)attempt))
             fprintf(stderr,"attempt capture unavailable (solve result unchanged)\n");
+        SelectReportNoteReset();
         v = task_ops_attempt(workspace, task, rep);
         if(capturing && capture.ready) {
             const char *outcome=rep->rollback_failed?"rollback_failed":
@@ -4836,6 +4847,8 @@ int TaskOpsSolve(const char *workspace, const char *task, TASK_OPS_REPORT *rep)
             snprintf(trail, sizeof(trail), "reflection not persisted");
         rep->reflections_written = ++written;
     }
+    if (v)   /* v is the verified flag of the attempt that stopped the loop */
+        SelectReportAfterVerified(workspace);
     if (trail[0] && !v)
         snprintf(rep->reason + strlen(rep->reason), sizeof(rep->reason) - strlen(rep->reason), " (%s)", trail);
     /* Bind the read-only question gate to the task and post-solve workspace.

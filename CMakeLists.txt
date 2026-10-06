@@ -46,6 +46,7 @@ add_library(symbolic STATIC
     src/agent_runner.c
     src/agent_diagnose.c
     src/agent_shell.c
+    src/select_report.c
     src/task_ops.c
     src/agent_git.c
     src/git_gate.c
@@ -845,6 +846,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_select_report.py $<TARGET_FILE:symbols-agent> ${CMAKE_BINARY_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_select_report PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
+    add_test(NAME test_select_hook
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_select_hook.py $<TARGET_FILE:symbols-agent>
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_select_hook PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
