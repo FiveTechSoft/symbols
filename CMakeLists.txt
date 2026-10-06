@@ -829,6 +829,18 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/bank_harness.py --agent noop --rewrite R3 --counts-only
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120 PASS_REGULAR_EXPRESSION "\"tasks_passed\": 0")
+    add_test(NAME test_build_graph_repo
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_repo.py ${CMAKE_BINARY_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_repo PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
+    add_test(NAME test_build_graph_repo_mc_drop
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_repo.py ${CMAKE_BINARY_DIR} --mutant drop_decl
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_repo_mc_drop PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
+    add_test(NAME test_build_graph_repo_mc_glob
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_repo.py ${CMAKE_BINARY_DIR} --mutant stale_glob
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_repo_mc_glob PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

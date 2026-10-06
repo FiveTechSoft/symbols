@@ -49,6 +49,27 @@
     "tests/fixtures/graph_*"
    ]
   },
+  "test_build_graph_repo": {
+   "files": [
+    "tests/test_build_graph_repo.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json"
+   ]
+  },
+  "test_build_graph_repo_mc_drop": {
+   "files": [
+    "tests/test_build_graph_repo.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json"
+   ]
+  },
+  "test_build_graph_repo_mc_glob": {
+   "files": [
+    "tests/test_build_graph_repo.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json"
+   ]
+  },
   "test_builder_rootfs_policy": {
    "files": [
     "tests/test_builder_rootfs_policy.py",
