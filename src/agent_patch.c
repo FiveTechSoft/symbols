@@ -518,7 +518,11 @@ static int seq_apply(const PATCH_PLAN *plan, const char *src, const unsigned cha
                 if (occurrences == 0)
                     match = q;
                 occurrences++;
+#ifdef AGENT_PATCH_OVERLAP_MUTANT /* test-only: skip past each match, as before; overlapping matches count once */
                 q += needle_len;
+#else
+                q += 1; /* count overlapping matches too: a needle that matches at two places is ambiguous */
+#endif
             }
         }
         if (h == 0)

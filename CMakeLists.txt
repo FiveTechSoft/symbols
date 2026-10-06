@@ -1123,3 +1123,22 @@ target_include_directories(test_agent_patch_multi_fuzz PRIVATE include)
 add_test(NAME test_agent_patch_multi_fuzz COMMAND test_agent_patch_multi_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_agent_patch_multi_fuzz PROPERTIES TIMEOUT 300
     PASS_REGULAR_EXPRESSION "multi fuzz done: seeds=4 rounds=400 ok=400")
+# AgentPatch context-string and expected_line fuzz: repeated lines, 0 to 2 context lines each side, count-based oracle.
+add_executable(test_agent_patch_ctx_fuzz tests/test_agent_patch_ctx_fuzz.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_ctx_fuzz PRIVATE include)
+add_test(NAME test_agent_patch_ctx_fuzz COMMAND test_agent_patch_ctx_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_ctx_fuzz PROPERTIES TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "ctx fuzz done: seeds=4 rounds=400 ok=400")
+# Overlapping matches (m227): the occurrence count advances one byte per match; the mutant restores the old advance and must fail exactly cells A B C F.
+add_executable(test_agent_patch_overlap tests/test_agent_patch_overlap.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_overlap PRIVATE include)
+add_test(NAME test_agent_patch_overlap COMMAND test_agent_patch_overlap WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_overlap PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS \\(0 cells wrong\\)")
+add_executable(test_agent_patch_overlap_mc tests/test_agent_patch_overlap.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_overlap_mc PRIVATE include)
+target_compile_definitions(test_agent_patch_overlap_mc PRIVATE AGENT_PATCH_OVERLAP_MUTANT=1)
+add_test(NAME test_agent_patch_overlap_mc COMMAND test_agent_patch_overlap_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_overlap_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B C F")
