@@ -29,7 +29,7 @@
 #define MKWS(p) mkdir((p), 0700)
 #define RMWS "rm -rf " WS
 #endif
-#define WS "test_agent_patch_multi_fuzz_scratch"
+#define WS "test_agent_patch_ctx_fuzz_scratch"
 #define MAXF 8192
 #define NL 8
 static uint32_t rs;

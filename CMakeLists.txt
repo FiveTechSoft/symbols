@@ -1142,3 +1142,10 @@ target_include_directories(test_agent_patch_overlap_mc PRIVATE include)
 target_compile_definitions(test_agent_patch_overlap_mc PRIVATE AGENT_PATCH_OVERLAP_MUTANT=1)
 add_test(NAME test_agent_patch_overlap_mc COMMAND test_agent_patch_overlap_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_agent_patch_overlap_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B C F")
+# AgentPatch fuzz of multi-hunk plans with context strings and files without a final newline (m228); substring-count oracle, overlaps counted.
+add_executable(test_agent_patch_ctxm_fuzz tests/test_agent_patch_ctxm_fuzz.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_ctxm_fuzz PRIVATE include)
+add_test(NAME test_agent_patch_ctxm_fuzz COMMAND test_agent_patch_ctxm_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_ctxm_fuzz PROPERTIES TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "ctxm fuzz done: seeds=4 rounds=400 ok=400")
