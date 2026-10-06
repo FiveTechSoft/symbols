@@ -70,6 +70,13 @@
     "tools/build_graph_inputs.json"
    ]
   },
+  "test_ctest_report": {
+   "files": [
+    "tests/test_ctest_report.py",
+    "tools/ctest_report.py",
+    "tests/fixtures/ctest_report/*"
+   ]
+  },
   "test_select_hook": {
    "files": [
     "tests/test_select_hook.py",
