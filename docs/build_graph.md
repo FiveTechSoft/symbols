@@ -62,7 +62,7 @@ Landed in `9c884ec` (m233, run 37423145841, all jobs read: apply 202, linux 202,
 
 Why. A test that runs a script or reads data files has no executable the codemodel can map, so the tool sent every change to the full gate. 29 of 199 tests were in that class at m232; the repository has 32 unmapped tests of 202 on the m235 tree, and the sidecar declares exactly those 32 (checked: the graph's `unknown` list is empty).
 
-What it does. A JSON sidecar, `tools/build_graph_inputs.json`, declares inputs per unmapped test: `{"version": 1, "tests": {NAME: {"files": [globs], "targets": [names]}}}`. It applies only to tests the codemodel cannot map. A declared test is selected when a changed file (or a file that includes it, through the include scan) matches one of its globs, or when a declared target is in the affected set. Fail-closed: an unreadable sidecar, a wrong version, a malformed entry, an unknown test or target, an empty entry, or an unmapped test with no declaration each select the full gate. A changed sidecar is itself in no target and matches no glob, so it selects the full gate.
+What it does. A JSON sidecar, `tools/build_graph_inputs.json`, declares inputs per unmapped test: `{"version": 1, "tests": {NAME: {"files": [globs], "targets": [names]}}}`. It applies only to tests the codemodel cannot map. A declared test is selected when a changed file (or a file that includes it, through the include scan) matches one of its globs, or when a declared target is in the affected set. Fail-closed: an unreadable sidecar, a wrong version, a malformed entry, an unknown test or target, an empty entry, or an unmapped test with no declaration each select the full gate. Until m236 a changed sidecar matched no glob and selected the full gate; since m236 three tests declare it as an input, so a change to it selects those 3 tests (see the m236 section).
 
 Evidence (local, fixtures).
 - Fixture `graph_script` oracle: 5 of 5 rows (touch a declared input, rebuild or rerun, compare). `fail_closed`: 6 of 6 cases.
@@ -76,7 +76,7 @@ What the comparison does not show.
 - An open-only strace misses a Python source that is loaded from a cached `.pyc` (only a stat of the source happens), which is why the stat family is traced.
 - Precision of the declared subsets is not measured against an oracle; only coverage of traced reads is.
 
-Measured on this repository with the sidecar (local): `tests/test_i18n.c` selects 1 of 202 tests, `tools/wording_rewrites.py` 4, `tools/build_graph.py` 6, `src/relation.c` 145, `src/vsa.c` 144; `CMakeLists.txt`, `docs/build_graph.md` and `tools/build_graph_inputs.json` select the full 202. This is the first time a subset appears on the repository itself; it is a local measurement, not a CI run.
+Measured on this repository with the sidecar (local): `tests/test_i18n.c` selects 1 of 202 tests, `tools/wording_rewrites.py` 4, `tools/build_graph.py` 6, `src/relation.c` 145, `src/vsa.c` 144; `CMakeLists.txt` and `docs/build_graph.md` select the full 202, and so did `tools/build_graph_inputs.json` before m236. This is the first time a subset appears on the repository itself; it is a local measurement, not a CI run.
 
 A failed dispatch (m234). The first version placed the sidecar at the repository root. `apply-patch.yml` refused it ("Disallowed path: build_graph_inputs.json", run 37426761333): its path allowlist does not include a new root file. Nothing landed. That is the guardrail working as designed, and the mistake was mine: I did not check the allowlist before building the diff. m235 moved the default location to `tools/` and the `graph_script` fixture sidecar to `tests/fixtures/graph_script/tools/`; a sidecar at the root is no longer read (a garbage file placed there produced no problem).
 
@@ -84,3 +84,19 @@ Limits.
 - The sidecar is a hand-maintained declaration. A new input to a script test that nobody adds to it is not detected; the strace comparison is a one-time check, not a gate.
 - Windows is unmeasured for these tests (they skip there). Nothing is connected to the agent; no `src/` change.
 - The "ok" and mutant-kill lines are known from the exit code, not from stdout, which CTest hides.
+
+## Update: repository guard (m236)
+
+Landed in `cf62d9f` (run 37434542274, base 3d8cbb0, readback equal to the GO sha). The linux log shows `test_build_graph_repo`, `test_build_graph_repo_mc_drop` and `test_build_graph_repo_mc_glob` Passed, followed by the five earlier `build_graph` entries. All jobs read: apply 205, linux 205, msvc 229, asan-msvc 229, `ast-inspect-windows-ninja` 10 tests OK.
+
+What it does. `tests/test_build_graph_repo.py BUILD` runs in the built tree and reads the real build graph of this repository with the real sidecar. It checks three things: `loads_clean` (the graph's `unknown` list is empty), `all_declared` (every test the codemodel cannot map has a declaration) and `globs_live` (every declared file glob matches at least one file of the source tree). Two mutants work on a copy of the sidecar and exit 0 only on the exact failing set: `drop_decl` fails `all_declared` and `loads_clean`; `stale_glob` fails `globs_live`. Windows prints SKIP.
+
+Scope. An undeclared or renamed test only costs precision (the full gate), so this guard protects precision and catches dead globs. It cannot detect an incomplete glob list; that stays the hand-maintained part, and the strace comparison of m234 is a one-time check.
+
+Two things found while building it.
+- A File API query written by `CMakeLists.txt` during configure is read only by the next cmake run (cmake 3.22.1: no reply after the first configure, a reply after a second `cmake .`). My prediction that one configure would be enough was wrong. The test therefore writes the query and re-runs cmake on the build directory when the reply is missing; that rewrites the generated build files with the same content and it is a side effect on the build tree. On the CI run the reply was created this way (the three tests passed on a fresh configure and build; I read the Passed lines, not the test's stdout).
+- The first version of that re-run failed 2 of 3 new tests under `ctest -j8`: two tests re-ran cmake at once and one read a reply file that was being replaced. The three tests now share `RESOURCE_LOCK build_graph_repo_reply`. Locally 3 runs with the reply deleted before each passed 6 of 6; CI runs ctest without `-j`, so CI does not exercise the lock.
+
+Consequence. The three tests declare `tools/build_graph_inputs.json` as an input, so a change to the sidecar selects 3 of 205 tests and a change to `tools/build_graph.py` selects 9 (local measure). `CMakeLists.txt` still selects all 205.
+
+Limits. Windows is unmeasured (SKIP). The linux job configures with the default generator (no `-G` in `ci.yml`); Ninja and multi-configuration generators are not covered by this test. Nothing is connected to the agent; no `src/` change.
