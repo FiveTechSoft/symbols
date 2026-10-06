@@ -93,7 +93,9 @@
    "files": [
     "scripts/test_engineering_bank.py",
     "tools/bank_harness.py",
-    "tests/fixtures/engineering_bank/*"
+    "tests/fixtures/engineering_bank/*",
+    "CMakeLists.txt",
+    "README.md"
    ]
   },
   "test_episode_replay_contract": {
@@ -266,7 +268,9 @@
    "files": [
     "tools/bank_harness.py",
     "tools/wording_rewrites.py",
-    "tests/fixtures/engineering_bank/*"
+    "tests/fixtures/engineering_bank/*",
+    "CMakeLists.txt",
+    "README.md"
    ]
   },
   "test_wording_rewrites": {
