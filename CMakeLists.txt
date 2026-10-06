@@ -1124,7 +1124,7 @@ add_test(NAME test_task_ops_rollback COMMAND test_task_ops_rollback WORKING_DIRE
 sllm_test(test_task_ops_refactor_guard tests/test_task_ops_refactor_guard.c)
 set_tests_properties(test_task_ops_refactor_guard PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS \\(0 cells wrong\\)")
 add_executable(test_task_ops_refactor_guard_mc tests/test_task_ops_refactor_guard.c)
-target_compile_definitions(test_task_ops_refactor_guard_mc PRIVATE REFACTOR_GUARD_MUTANT=1)
+target_compile_definitions(test_task_ops_refactor_guard_mc PRIVATE REFACTOR_GUARD_MUTANT=1 TASK_OPS_TEST_FAULTS)
 target_link_libraries(test_task_ops_refactor_guard_mc symbolic_rollback_test)
 add_test(NAME test_task_ops_refactor_guard_mc COMMAND test_task_ops_refactor_guard_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_task_ops_refactor_guard_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B C")
