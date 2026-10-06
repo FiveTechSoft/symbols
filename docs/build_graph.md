@@ -144,3 +144,29 @@ Mutants, local only. I did not add a test hook to `src/`: a read-only report mod
 Local runs. A full local `ctest` of 207 tests gave 21 failures in a first `-j6` run: 19 fs fuzz, journal, race and git-gate tests pass when rerun without `-j` (they race under `-j`; CI runs without it), and `test_typed_c_verify` and `test_typed_c_preview` need `build/c_contract_static` in the source tree's `build/` directory and pass once it is there. This is a local measurement; the CI numbers are above. My trace tool had the source root hardcoded; I made it read `SRC` from the environment and saw that a trace on a full build lists the same 155 test executables as undeclared targets for two different tests (`test_select_report` and `test_build_graph_repo`); I read that as the `ctest` wrapper touching them, not as test inputs, but I did not isolate the cause.
 
 Limits. The report is as complete as the sidecar and the codemodel: a changed file nobody declared is not selected. Windows is unmeasured. Nothing consumes the report yet (S2b would call it from the runner, after this is read in use); no test is skipped anywhere.
+
+## Update: an opt-in selection report in the TaskOps solver (S2b)
+
+Landed in `e316608` (run 37460501856, base fc2f84f, readback `git diff --binary` equal to the GO sha). All jobs read: apply 208, linux 208, msvc 232, asan-msvc 232, `ast-inspect-windows-ninja` 10 tests OK. I read the pass totals on the Windows jobs and not a skip line; the new test returns SKIP there by design, so the new C code is unmeasured on Windows.
+
+Where the hook is. The CLI task path is `TaskOpsSolve` in `src/task_ops.c`, not the runner loop in `src/agent_runner.c`. I measured this with a temporary print (reverted): a CLI rename task resolved in `TaskOpsSolve` and never reached `AgentRunnerSolveTask`, which fails first for a task without a hunk. So the hook is in `TaskOpsSolve`; a hook in the runner loop would only be reached by the harness.
+
+What it does. With `SYMBOLS_SELECT_REPORT=<build dir>` set (unset or `0` means nothing runs and no path is recorded), a verified solve prints one report to stderr: a header line, then the S2a report for the files the solve wrote. Stdout and the edited files are unchanged. The report is information only: the build and test commands are untouched and nothing is skipped. `src/select_report.c` holds the logic that S2a had in `agent_cli_main.c`; `--select-report` now calls it (60 s timeout) and its output is unchanged (`test_select_report` passes unmodified). The hook uses a 30 s timeout, at most once per solve.
+
+Which files. TaskOps does not report its changed files (`TASK_OPS_REPORT` has a count only) and `TaskOpsLoadWorkspace` is capped at 64 text files, depth 4. So the hook records the relative paths at the three places the generic act step writes (`next[i]`, `created`, `created2`) and clears the record before every attempt. The two workspace loads I had planned to measure are therefore not needed, and I have no number for them. The cost is one subprocess: `python3 tools/build_graph.py select` took 0.13-0.16 s and `symbols-agent --select-report` 0.13-0.22 s on this repository (5 runs each, local, not CI).
+
+Fail-closed. A missing script, a non-zero exit, unrecognised output, a path outside `[A-Za-z0-9_./+-]`, more than 64 files, or no recorded files each print one `mode: full` line with a reason. The solve result and the edit do not change.
+
+Test. `tests/test_select_hook.py` (one ctest entry, SKIP on Windows) runs the real `symbols-agent` on a temporary workspace with a fake `tools/build_graph.py` that prints its arguments. It checks: gate unset and gate `0` print nothing on stderr; gate on, a verified rename of `a.c` and `b.c` gives exactly one report naming those two files and the build directory; stdout (time and task-id lines removed) and the edited files are identical with the gate on and off; four failure cases (missing script, exit 3, unsafe build directory, garbage output) give one `mode: full` line and identical stdout, exit code and files; a task that changes nothing prints no report. It is declared in the sidecar with the `symbols-agent` target and `*.c`, `*.h`, `*.inc`; I did not run the strace trace on it.
+
+Mutants, local only (not CI). Six source mutants, each against the test: no note at the file write site, gate `0` treated as on, report to stdout, silent failure (no full line) are killed. Two survived:
+- `if (v && rep->verified)` against `if (v)`: equivalent. `v` is the verified flag, so I used `if (v)`.
+- Removing `SelectReportNoteReset()` survives. It needs a first attempt that writes and is refuted, then a second that verifies. I tried several tasks and could not get the operator to run on them, so the refuted-attempt path and the reset are untested. The reset is one line; its effect (a refuted attempt's files leaking into the next report) is not shown absent by any test.
+
+Limits.
+- Outside this repository there is no `tools/build_graph.py`, so real use there reports `mode: full` with "not found". Real-usage data will mostly say that.
+- Only the generic act step records files. Other operators write files elsewhere in `task_ops.c` (I read those sites; I did not run them) and give `mode: full`, "not recorded", even when verified.
+- The test covers the rename operator only. The "not recorded" path is checked by a mutant (removing the note call), not by a test of another operator.
+- My R5 prediction (that this path is reached only by non-rename operators, and checked by mutant only) was framed too narrowly; the test shows only the mutant check.
+- The report is as complete as the sidecar and the codemodel (see S2a). Windows is unmeasured. Nothing skips a test.
+- Correction to the S2a section: its last sentence says S2b would call the report from the runner. The hook is in `TaskOpsSolve` instead, for the reason above. The runner loop is not hooked.
