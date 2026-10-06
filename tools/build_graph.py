@@ -40,9 +40,12 @@ SIDECAR = "tools/build_graph_inputs.json"
 
 def load_sidecar(path, tests, targets):
     """Declared inputs for tests the codemodel cannot map (scripts, wrappers).
-    Format: {"version": 1, "tests": {NAME: {"files": [glob...], "targets": [name...]}}}.
-    Returns (declared, problems). Fail-closed: any problem is a reason for the
-    full gate, and an entry with neither files nor targets declares nothing."""
+    Format: {"version": 1, "tests": {NAME: {"files": [glob...], "targets": [name...],
+    "always": true}}}. "always" marks a test that reads so much that no file list is
+    honest: it is selected in every subset selection and claims no inputs, so an
+    unknown file still selects the full gate. Returns (declared, problems).
+    Fail-closed: any problem is a reason for the full gate, and an entry with no
+    files, no targets and no "always": true declares nothing."""
     try:
         d = json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError) as e:
@@ -53,17 +56,19 @@ def load_sidecar(path, tests, targets):
     for name, e in d["tests"].items():
         ok = isinstance(e, dict) and all(isinstance(e.get(k, []), list) and
                                          all(isinstance(x, str) for x in e.get(k, []))
-                                         for k in ("files", "targets"))
+                                         for k in ("files", "targets")) and \
+            isinstance(e.get("always", False), bool)
         if not ok:
             problems.append("sidecar entry malformed: %s" % name)
         elif name not in tests:
             problems.append("sidecar names an unknown test: %s" % name)
-        elif not e.get("files") and not e.get("targets"):
+        elif not e.get("files") and not e.get("targets") and not e.get("always"):
             problems.append("sidecar entry declares nothing: %s" % name)
         elif any(t not in targets for t in e.get("targets", [])):
             problems.append("sidecar names an unknown target for test %s" % name)
         else:
-            declared[name] = {"files": list(e.get("files", [])), "targets": list(e.get("targets", []))}
+            declared[name] = {"files": list(e.get("files", [])), "targets": list(e.get("targets", [])),
+                              "always": bool(e.get("always"))}
     return declared, problems
 
 
@@ -236,7 +241,7 @@ def select(g, changed, scan=True, declared_targets=True):
         if t["target"] is not None:
             return t["target"] in seen
         d = t.get("declared")
-        return bool(d) and (any(fnmatch.fnmatchcase(f, pat) for f in touched for pat in d["files"]) or
+        return bool(d) and (d.get("always") or any(fnmatch.fnmatchcase(f, pat) for f in touched for pat in d["files"]) or
                             (declared_targets and any(x in seen for x in d["targets"])))
     return {"mode": "subset", "tests": sorted(t["name"] for t in g["tests"] if picked(t)), "reasons": []}
 

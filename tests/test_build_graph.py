@@ -53,6 +53,11 @@ def select(g, files):
         return bg.select(g, files, scan=False)
     if MUTANT == "decl_targets_off":
         return bg.select(g, files, declared_targets=False)
+    if MUTANT == "always_off":
+        g = json.loads(json.dumps(g))
+        for t in g["tests"]:
+            if t.get("declared"):
+                t["declared"]["always"] = False
     if MUTANT == "sidecar_off" and any(t.get("declared") for t in g["tests"]):
         g = json.loads(json.dumps(g))
         for t in g["tests"]:
@@ -130,11 +135,14 @@ def main():
         srcs, b = setup("script", tmp)
         g = bg.load_graph(b)
         if g["unknown"] != [] or [(t["name"], t["target"]) for t in g["tests"]] != \
-                [("prog_ok", "prog"), ("script_ok", None), ("wrap_ok", None)]:
+                [("always_ok", None), ("prog_ok", "prog"), ("script_ok", None), ("wrap_ok", None)]:
             fails.append("graph_script")
         r = select(g, ["data.txt"])
-        if r["mode"] != "subset" or r["tests"] != ["script_ok"]:
+        if r["mode"] != "subset" or [x for x in r["tests"] if x != "always_ok"] != ["script_ok"]:
             fails.append("script_subset")
+        ra = select(g, ["helper.script"])
+        if ra["mode"] != "subset" or ra["tests"] != ["always_ok", "script_ok"]:
+            fails.append("script_always")
         if not recall_script(srcs, b, stats):
             fails.append("recall_script")
         closed = []
@@ -144,6 +152,10 @@ def main():
                     {"version": 1, "tests": {"script_ok": {"files": ["a"]},
                                              "wrap_ok": {"targets": ["nosuch"]}}},
                     {"version": 1, "tests": {"script_ok": {"files": ["a"]}, "wrap_ok": {}}},
+                    {"version": 1, "tests": {"script_ok": {"files": ["a"]}, "wrap_ok": {"files": ["a"]},
+                                             "always_ok": {"always": "yes"}}},
+                    {"version": 1, "tests": {"script_ok": {"files": ["a"]}, "wrap_ok": {"files": ["a"]},
+                                             "always_ok": {"always": False}}},
                     {"version": 2, "tests": {}}, "not json"):
             ip = os.path.join(tmp, "bad.json")
             open(ip, "w").write(bad if isinstance(bad, str) else json.dumps(bad))
@@ -189,7 +201,8 @@ def main():
     if MUTANT:
         want = {"no_closure": ["header_scan", "recall_basic", "recall_incl", "recall_mixed"],
                 "scan_off": ["header_scan", "recall_incl"],
-                "sidecar_off": ["script_subset"],
+                "sidecar_off": ["script_always", "script_subset"],
+                "always_off": ["script_always"],
                 "decl_targets_off": ["recall_script"]}[MUTANT]
         if sorted(fails) == want:
             print("MUTANT killed by exactly " + " ".join(want)); return 0

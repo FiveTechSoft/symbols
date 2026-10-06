@@ -28,6 +28,13 @@
     "tests/fixtures/graph_*"
    ]
   },
+  "test_build_graph_mc_always": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
   "test_build_graph_mc_decl": {
    "files": [
     "tests/test_build_graph.py",
@@ -100,6 +107,7 @@
    ]
   },
   "test_episodic_memory_e2e": {
+   "always": true,
    "files": [
     "tests/test_episodic_memory_e2e.sh",
     "data/*",
@@ -110,6 +118,7 @@
    ]
   },
   "test_git_inquiry_e2e": {
+   "always": true,
    "files": [
     "tests/test_git_inquiry_e2e.sh",
     "data/*",
@@ -184,6 +193,7 @@
    ]
   },
   "test_session_isolation_e2e": {
+   "always": true,
    "files": [
     "tests/test_session_isolation.sh",
     "data/*",
