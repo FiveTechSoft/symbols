@@ -449,6 +449,178 @@ int PatchPlanAddHunk(PATCH_PLAN *plan,
    Pre-Flight Verification API
    ============================================================ */
 
+/* The hunks of a plan are applied one after another to a buffer, each located in
+   the buffer as the earlier hunks left it. PatchVerifyAgainstBuffer and
+   PatchApplyAtomic both run this one routine, so they cannot disagree. A hunk
+   must occur exactly once in the buffer at its own step; otherwise the plan is
+   refused. This closes the wrong-site case: a later hunk can no longer land on
+   a copy that an earlier hunk wrote while its own site goes unchecked. The
+   result depends on the order of the hunks (limit, measured in
+   tests/test_agent_patch_multi.c). */
+typedef struct
+{
+    PATCH_CHECK_STATUS status; /* OK when the whole plan applied */
+    uint32_t           hunk;   /* 1-based hunk that failed */
+    uint32_t           occ;    /* occurrences of that hunk's text at its step */
+    uint32_t           occ0;   /* occurrences of hunk 1 in the original buffer */
+    size_t             off0;   /* offset of hunk 1 in the original buffer */
+} SEQ_RESULT;
+
+static int seq_apply(const PATCH_PLAN *plan, const char *src, const unsigned char *fl0,
+                     size_t eol_dflt, char **out_buf, unsigned char **out_fl, SEQ_RESULT *res)
+{
+    size_t src_len = strlen(src);
+    char *work_buf = (char *)malloc(src_len + 1);
+    unsigned char *work_fl = (unsigned char *)calloc(src_len + 1, 1);
+    memset(res, 0, sizeof(*res));
+    if (!work_buf || !work_fl)
+    {
+        free(work_buf);
+        free(work_fl);
+        res->status = PATCH_CHECK_IO_ERROR;
+        return 0;
+    }
+    memcpy(work_buf, src, src_len + 1);
+    memcpy(work_fl, fl0, src_len);
+
+    for (uint32_t h = 0; h < plan->hunk_count; h++)
+    {
+        const PATCH_HUNK *hunk = &plan->hunks[h];
+
+        char raw_needle[MAX_HUNK_TEXT * 3];
+        snprintf(raw_needle, sizeof(raw_needle), "%s%s%s",
+                 hunk->context_before, hunk->target_content, hunk->context_after);
+        char *needle = strip_cr(raw_needle);
+
+        char raw_repl[MAX_HUNK_TEXT * 3];
+        snprintf(raw_repl, sizeof(raw_repl), "%s%s%s",
+                 hunk->context_before, hunk->replacement, hunk->context_after);
+        char *repl = strip_cr(raw_repl);
+
+        if (!needle || !repl)
+        {
+            free(needle);
+            free(repl);
+            free(work_buf);
+            free(work_fl);
+            res->status = PATCH_CHECK_IO_ERROR;
+            return 0;
+        }
+
+        size_t needle_len = strlen(needle);
+        const char *match = NULL;
+        uint32_t occurrences = 0;
+        if (needle_len > 0)
+        {
+            const char *q = work_buf;
+            while ((q = strstr(q, needle)) != NULL)
+            {
+                if (occurrences == 0)
+                    match = q;
+                occurrences++;
+                q += needle_len;
+            }
+        }
+        if (h == 0)
+        {
+            res->occ0 = occurrences;
+            res->off0 = match ? (size_t)(match - work_buf) : 0;
+        }
+#ifdef AGENT_PATCH_UNIQ_MUTANT /* test-only: later hunks take the first match, as before the fix */
+        if (occurrences > 1 && h > 0)
+            occurrences = 1;
+#endif
+        if (occurrences != 1)
+        {
+            res->status = occurrences == 0 ? PATCH_CHECK_NOT_FOUND : PATCH_CHECK_AMBIGUOUS;
+            res->hunk = h + 1;
+            res->occ = occurrences;
+            free(needle);
+            free(repl);
+            free(work_buf);
+            free(work_fl);
+            return 0;
+        }
+
+        size_t prefix_len = (size_t)(match - work_buf);
+        size_t repl_len   = strlen(repl);
+        size_t work_sz    = strlen(work_buf);
+        size_t suffix_len = work_sz - (prefix_len + needle_len);
+
+        size_t new_sz = prefix_len + repl_len + suffix_len;
+        char *new_content = (char *)malloc(new_sz + 1);
+        unsigned char *new_fl = (unsigned char *)calloc(new_sz + 1, 1);
+        if (!new_content || !new_fl)
+        {
+            free(new_content);
+            free(new_fl);
+            free(needle);
+            free(repl);
+            free(work_buf);
+            free(work_fl);
+            res->status = PATCH_CHECK_IO_ERROR;
+            return 0;
+        }
+        memcpy(new_fl, work_fl, prefix_len);
+        memcpy(new_fl + prefix_len + repl_len, work_fl + prefix_len + needle_len, suffix_len);
+        {
+            /* k-th newline of the replacement takes the k-th newline's ending
+               of the replaced region; extra ones take its last, or the file's
+               first ending when the region had no newline. */
+            size_t k = 0, ncnt = 0;
+            unsigned char last = (unsigned char)eol_dflt;
+            for (size_t i = 0; i < needle_len; i++)
+                if (needle[i] == '\n') ncnt++;
+            for (size_t i = 0; i < repl_len; i++)
+            {
+                if (repl[i] != '\n') continue;
+                if (ncnt)
+                {
+                    size_t seen = 0, pos = 0;
+                    for (size_t q = 0; q < needle_len; q++)
+                        if (needle[q] == '\n')
+                        {
+                            pos = q;
+                            if (seen++ == k) break;
+                        }
+                    last = work_fl[prefix_len + pos];
+                }
+                new_fl[prefix_len + i] = last;
+                k++;
+            }
+        }
+        memcpy(new_content, work_buf, prefix_len);
+        memcpy(new_content + prefix_len, repl, repl_len);
+        memcpy(new_content + prefix_len + repl_len,
+               work_buf + prefix_len + needle_len, suffix_len);
+        new_content[new_sz] = '\0';
+
+        free(needle);
+        free(repl);
+        free(work_buf);
+        free(work_fl);
+        work_buf = new_content;
+        work_fl = new_fl;
+    }
+
+    res->status = PATCH_CHECK_OK;
+    *out_buf = work_buf;
+    *out_fl = work_fl;
+    return 1;
+}
+
+static void seq_diag(const SEQ_RESULT *r, char *dst, size_t cap)
+{
+    if (r->status == PATCH_CHECK_NOT_FOUND)
+        snprintf(dst, cap, "Hunk %u: Target content not found in target buffer.", r->hunk);
+    else if (r->status == PATCH_CHECK_AMBIGUOUS)
+        snprintf(dst, cap,
+                 "Hunk %u: Target content found %u times; ambiguous. Provide additional context anchors.",
+                 r->hunk, r->occ);
+    else
+        snprintf(dst, cap, "Out of memory while checking the hunks.");
+}
+
 int PatchVerifyAgainstBuffer(const PATCH_PLAN *plan,
                               const char *source_buffer,
                               PATCH_VERIFY_REPORT *report)
@@ -469,99 +641,55 @@ int PatchVerifyAgainstBuffer(const PATCH_PLAN *plan,
 
     /* Normalize buffer to LF for cross-platform CRLF/LF resilience */
     char *norm_source = strip_cr(source_buffer);
-    if (!norm_source)
+    size_t dflt = 0;
+    unsigned char *fl = eol_flags_from(source_buffer, &dflt);
+    if (!norm_source || !fl)
     {
+        free(norm_source);
+        free(fl);
         report->status = PATCH_CHECK_IO_ERROR;
         report->is_applicable = false;
         return 0;
     }
 
-    /* Verify each hunk */
-    for (uint32_t h = 0; h < plan->hunk_count; h++)
+    /* The same routine the apply runs, on a copy: each hunk must be found
+       exactly once in the text as the earlier hunks leave it. */
+    char *res_buf = NULL;
+    unsigned char *res_fl = NULL;
+    SEQ_RESULT sr;
+    int ok = seq_apply(plan, norm_source, fl, dflt, &res_buf, &res_fl, &sr);
+    free(res_buf);
+    free(res_fl);
+    free(fl);
+    report->occurrences_found = sr.occ0;
+    if (!ok)
     {
-        const PATCH_HUNK *hunk = &plan->hunks[h];
-
-        char raw_needle[MAX_HUNK_TEXT * 3];
-        snprintf(raw_needle, sizeof(raw_needle), "%s%s%s",
-                 hunk->context_before, hunk->target_content, hunk->context_after);
-
-        char *needle = strip_cr(raw_needle);
-        if (!needle)
-        {
-            free(norm_source);
-            report->status = PATCH_CHECK_IO_ERROR;
-            report->is_applicable = false;
-            return 0;
-        }
-
-        /* Count occurrences */
-        size_t needle_len = strlen(needle);
-        const char *p = norm_source;
-        const char *first_match = NULL;
-        uint32_t occurrences = 0;
-
-        while ((p = strstr(p, needle)) != NULL)
-        {
-            if (occurrences == 0)
-                first_match = p;
-
-            occurrences++;
-            p += needle_len;
-        }
-
-        if (h == 0)
-            report->occurrences_found = occurrences;
-
-        if (occurrences == 0)
-        {
-            report->status = PATCH_CHECK_NOT_FOUND;
-            report->is_applicable = false;
-            snprintf(report->diagnostic, sizeof(report->diagnostic),
-                     "Hunk %u: Target content not found in target buffer.", h + 1);
-            free(needle);
-            free(norm_source);
-            return 0;
-        }
-
-        if (occurrences > 1)
-        {
-            report->status = PATCH_CHECK_AMBIGUOUS;
-            report->is_applicable = false;
-            snprintf(report->diagnostic, sizeof(report->diagnostic),
-                     "Hunk %u: Target content found %u times; ambiguous. Provide additional context anchors.",
-                     h + 1, occurrences);
-            free(needle);
-            free(norm_source);
-            return 0;
-        }
-
-        /* Exactly 1 occurrence located */
-        size_t match_offset = (size_t)(first_match - norm_source);
-        char *norm_cb = strip_cr(hunk->context_before);
-        if (norm_cb)
-        {
-            match_offset += strlen(norm_cb);
-            free(norm_cb);
-        }
-
-        uint32_t line = 1;
-        for (size_t i = 0; i < match_offset; i++)
-        {
-            if (norm_source[i] == '\n')
-                line++;
-        }
-
-        if (h == 0)
-        {
-            report->matched_line = line;
-            if (hunk->expected_line > 0)
-                report->line_drift = (int32_t)line - (int32_t)hunk->expected_line;
-            else
-                report->line_drift = 0;
-        }
-
-        free(needle);
+        report->status = sr.status;
+        report->is_applicable = false;
+        seq_diag(&sr, report->diagnostic, sizeof(report->diagnostic));
+        free(norm_source);
+        return 0;
     }
+
+    /* Line of hunk 1 in the original buffer */
+    size_t match_offset = sr.off0;
+    char *norm_cb = strip_cr(plan->hunks[0].context_before);
+    if (norm_cb)
+    {
+        match_offset += strlen(norm_cb);
+        free(norm_cb);
+    }
+    uint32_t line = 1;
+    for (size_t i = 0; i < match_offset; i++)
+    {
+        if (norm_source[i] == '\n')
+            line++;
+    }
+    report->matched_line = line;
+    if (plan->hunks[0].expected_line > 0)
+        report->line_drift = (int32_t)line - (int32_t)plan->hunks[0].expected_line;
+    else
+        report->line_drift = 0;
 
     report->is_applicable = true;
 
@@ -650,107 +778,22 @@ int PatchApplyAtomic(PATCH_PLAN *plan)
         return 0;
     }
 
-    /* Sequentially apply all hunks */
-    for (uint32_t h = 0; h < plan->hunk_count; h++)
+    /* Apply every hunk, in plan order, to the buffer as the earlier hunks left it
+       (the routine PatchVerifyAgainstBuffer runs); a hunk that is not found
+       exactly once at its step refuses the plan and nothing is written. */
     {
-        const PATCH_HUNK *hunk = &plan->hunks[h];
-
-        char raw_needle[MAX_HUNK_TEXT * 3];
-        snprintf(raw_needle, sizeof(raw_needle), "%s%s%s",
-                 hunk->context_before, hunk->target_content, hunk->context_after);
-        char *needle = strip_cr(raw_needle);
-
-        char raw_repl[MAX_HUNK_TEXT * 3];
-        snprintf(raw_repl, sizeof(raw_repl), "%s%s%s",
-                 hunk->context_before, hunk->replacement, hunk->context_after);
-        char *repl = strip_cr(raw_repl);
-
-        if (!needle || !repl)
-        {
-            free(needle);
-            free(repl);
-            free(work_buf);
-            free(work_fl);
-            return 0;
-        }
-
-        const char *match = strstr(work_buf, needle);
-        if (!match)
-        {
-            free(needle);
-            free(repl);
-            free(work_buf);
-            free(work_fl);
-            return 0;
-        }
-
-        size_t prefix_len = (size_t)(match - work_buf);
-        size_t needle_len = strlen(needle);
-        size_t repl_len   = strlen(repl);
-        size_t work_sz    = strlen(work_buf);
-        size_t suffix_len = work_sz - (prefix_len + needle_len);
-
-        size_t new_sz = prefix_len + repl_len + suffix_len;
-        char *new_content = (char *)malloc(new_sz + 1);
-        if (!new_content)
-        {
-            free(needle);
-            free(repl);
-            free(work_buf);
-            free(work_fl);
-            return 0;
-        }
-
-        unsigned char *new_fl = (unsigned char *)calloc(new_sz + 1, 1);
-        if (!new_fl)
-        {
-            free(new_content);
-            free(needle);
-            free(repl);
-            free(work_buf);
-            free(work_fl);
-            return 0;
-        }
-        memcpy(new_fl, work_fl, prefix_len);
-        memcpy(new_fl + prefix_len + repl_len, work_fl + prefix_len + needle_len, suffix_len);
-        {
-            /* k-th newline of the replacement takes the k-th newline's ending
-               of the replaced region; extra ones take its last, or the file's
-               first ending when the region had no newline. */
-            size_t k = 0, ncnt = 0;
-            unsigned char last = (unsigned char)eol_dflt;
-            for (size_t i = 0; i < needle_len; i++)
-                if (needle[i] == '\n') ncnt++;
-            for (size_t i = 0; i < repl_len; i++)
-            {
-                if (repl[i] != '\n') continue;
-                if (ncnt)
-                {
-                    size_t seen = 0, pos = 0;
-                    for (size_t q = 0; q < needle_len; q++)
-                        if (needle[q] == '\n')
-                        {
-                            pos = q;
-                            if (seen++ == k) break;
-                        }
-                    last = work_fl[prefix_len + pos];
-                }
-                new_fl[prefix_len + i] = last;
-                k++;
-            }
-        }
-        memcpy(new_content, work_buf, prefix_len);
-        memcpy(new_content + prefix_len, repl, repl_len);
-        memcpy(new_content + prefix_len + repl_len,
-               work_buf + prefix_len + needle_len, suffix_len);
-        new_content[new_sz] = '\0';
-
-        free(needle);
-        free(repl);
+        char *res_buf = NULL;
+        unsigned char *res_fl = NULL;
+        SEQ_RESULT sr;
+        int ok = seq_apply(plan, work_buf, work_fl, eol_dflt, &res_buf, &res_fl, &sr);
+        if (!ok)
+            seq_diag(&sr, plan->io_diag, sizeof(plan->io_diag));
         free(work_buf);
         free(work_fl);
-        work_buf = new_content;
-        work_fl = new_fl;
+        if (!ok)
+            return 0;
+        work_buf = res_buf;
+        work_fl = res_fl;
     }
 
     /* 4. Restore original line ending convention before writing to disk */

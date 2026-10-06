@@ -1103,3 +1103,16 @@ target_include_directories(test_agent_patch_nul_mc PRIVATE include)
 target_compile_definitions(test_agent_patch_nul_mc PRIVATE AGENT_PATCH_NUL_MUTANT=1)
 add_test(NAME test_agent_patch_nul_mc COMMAND test_agent_patch_nul_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_agent_patch_nul_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly A B D F G")
+# Multi-hunk plans (m224): verify and apply share one routine, each hunk must occur exactly once at its own step;
+# the mutant lets later hunks take the first match (the old behaviour) and must fail exactly cells C and D.
+add_executable(test_agent_patch_multi tests/test_agent_patch_multi.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_multi PRIVATE include)
+add_test(NAME test_agent_patch_multi COMMAND test_agent_patch_multi WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_multi PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS \\(0 cells wrong\\)")
+add_executable(test_agent_patch_multi_mc tests/test_agent_patch_multi.c src/agent_patch.c
+    src/fs_read.c src/fs_manifest.c)
+target_include_directories(test_agent_patch_multi_mc PRIVATE include)
+target_compile_definitions(test_agent_patch_multi_mc PRIVATE AGENT_PATCH_UNIQ_MUTANT=1)
+add_test(NAME test_agent_patch_multi_mc COMMAND test_agent_patch_multi_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_agent_patch_multi_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed by exactly C D")
