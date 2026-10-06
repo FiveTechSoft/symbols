@@ -1,0 +1,13 @@
+{"targets": [
+ {"name": "app", "type": "EXECUTABLE", "sources": ["src/app.c"], "deps": ["base", "objs"]},
+ {"name": "base", "type": "STATIC_LIBRARY", "sources": ["src/base.c"], "deps": []},
+ {"name": "genlib", "type": "STATIC_LIBRARY", "sources": [], "deps": ["base"]},
+ {"name": "objs", "type": "OBJECT_LIBRARY", "sources": ["src/obj.c"], "deps": []},
+ {"name": "t_base", "type": "EXECUTABLE", "sources": ["tests/t_base.c"], "deps": ["base"]},
+ {"name": "t_gen", "type": "EXECUTABLE", "sources": ["tests/t_gen.c"], "deps": ["base", "genlib"]},
+ {"name": "t_obj", "type": "EXECUTABLE", "sources": ["tests/t_obj.c"], "deps": ["objs"]}],
+ "tests": [
+ {"name": "base_ok", "target": "t_base", "labels": ["unit"]},
+ {"name": "gen_ok", "target": "t_gen", "labels": []},
+ {"name": "obj_ok", "target": "t_obj", "labels": []}],
+ "unknown": []}

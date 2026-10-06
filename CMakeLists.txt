@@ -829,6 +829,14 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/bank_harness.py --agent noop --rewrite R3 --counts-only
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120 PASS_REGULAR_EXPRESSION "\"tasks_passed\": 0")
+    add_test(NAME test_build_graph
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+    add_test(NAME test_build_graph_mc
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py --mutant
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_mc PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)

@@ -1,0 +1,8 @@
+{"targets": [
+ {"name": "app", "type": "EXECUTABLE", "sources": ["src/main.c"], "deps": ["core"]},
+ {"name": "core", "type": "STATIC_LIBRARY", "sources": ["src/core.c"], "deps": []},
+ {"name": "t_core", "type": "EXECUTABLE", "sources": ["tests/t_core.c"], "deps": ["core"]}],
+ "tests": [
+ {"name": "app_ok", "target": "app", "labels": []},
+ {"name": "core_ok", "target": "t_core", "labels": ["fast", "unit"]}],
+ "unknown": []}

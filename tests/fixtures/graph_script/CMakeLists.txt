@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(scr C)
+enable_testing()
+add_executable(prog prog.c)
+add_test(NAME prog_ok COMMAND prog)
+add_test(NAME script_ok COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/check.cmake)
