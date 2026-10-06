@@ -35,7 +35,7 @@ def _rel(path, root):
     return path.replace(os.sep, "/")
 
 
-SIDECAR = "build_graph_inputs.json"
+SIDECAR = "tools/build_graph_inputs.json"
 
 
 def load_sidecar(path, tests, targets):

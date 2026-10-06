@@ -1,0 +1,248 @@
+{
+ "tests": {
+  "test_ast_inspect": {
+   "files": [
+    "tests/test_ast_inspect.py",
+    "tests/test_c_source_qa.py",
+    "tools/ast_inspect/*"
+   ]
+  },
+  "test_bank_harness_setup": {
+   "files": [
+    "tests/test_bank_harness_setup.py",
+    "tools/bank_harness.py",
+    "tools/wording_rewrites.py"
+   ]
+  },
+  "test_build_graph": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
+  "test_build_graph_mc": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
+  "test_build_graph_mc_decl": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
+  "test_build_graph_mc_scan": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
+  "test_build_graph_mc_sidecar": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
+  "test_builder_rootfs_policy": {
+   "files": [
+    "tests/test_builder_rootfs_policy.py",
+    "tools/builder_rootfs/*"
+   ]
+  },
+  "test_c_source_qa": {
+   "files": [
+    "tests/test_c_source_qa.py",
+    "tools/ast_inspect/*"
+   ]
+  },
+  "test_engineering_bank": {
+   "files": [
+    "scripts/test_engineering_bank.py",
+    "tools/bank_harness.py",
+    "tests/fixtures/engineering_bank/*"
+   ]
+  },
+  "test_episode_replay_contract": {
+   "files": [
+    "tests/test_episode_replay.py",
+    "tools/*.py"
+   ],
+   "targets": [
+    "attempt_capture_report",
+    "symbols-agent"
+   ]
+  },
+  "test_episodic_memory_e2e": {
+   "files": [
+    "tests/test_episodic_memory_e2e.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_git_inquiry_e2e": {
+   "files": [
+    "tests/test_git_inquiry_e2e.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_impact_compare": {
+   "files": [
+    "tests/test_impact_compare.py",
+    "tools/ast_inspect/*"
+   ],
+   "targets": [
+    "lexical_impact"
+   ]
+  },
+  "test_minimal_initramfs": {
+   "files": [
+    "tests/test_minimal_initramfs.py",
+    "tools/minimal_initramfs/*"
+   ]
+  },
+  "test_opencode_repository_stream_e2e": {
+   "files": [
+    "tests/test_opencode_repository_stream.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_opencode_subagent_e2e": {
+   "files": [
+    "tests/test_opencode_subagent.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_qemu_closure": {
+   "files": [
+    "tests/test_qemu_closure.py",
+    "tools/qemu_closure/*"
+   ]
+  },
+  "test_qemu_collection": {
+   "files": [
+    "tests/test_qemu_collection.py",
+    "tools/qemu_closure/*",
+    "tests/test_qemu_closure.py"
+   ]
+  },
+  "test_qemu_trace": {
+   "files": [
+    "tests/test_qemu_trace.py",
+    "tools/qemu_closure/*"
+   ]
+  },
+  "test_repository_c_repair_e2e": {
+   "files": [
+    "tests/test_repository_c_repair.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_session_isolation_e2e": {
+   "files": [
+    "tests/test_session_isolation.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_shell_routing_e2e": {
+   "files": [
+    "tests/test_shell_routing.sh",
+    "data/*",
+    "tests/fixtures/*"
+   ],
+   "targets": [
+    "symbols-server"
+   ]
+  },
+  "test_typed_c_binary_preview": {
+   "files": [
+    "tests/test_typed_c_binary_preview.py",
+    "tools/typed_c_contract/*"
+   ]
+  },
+  "test_typed_c_framing": {
+   "files": [
+    "tests/test_typed_c_framing.py",
+    "tools/typed_c_contract/*"
+   ]
+  },
+  "test_typed_c_lock_wire": {
+   "files": [
+    "tests/test_typed_c_lock_wire.py",
+    "tools/typed_c_contract/*"
+   ]
+  },
+  "test_typed_c_preview": {
+   "files": [
+    "tests/test_typed_c_preview.py",
+    "tools/typed_c_contract/*"
+   ],
+   "targets": [
+    "c_contract_static"
+   ]
+  },
+  "test_typed_c_schema": {
+   "files": [
+    "tests/test_typed_c_schema.py",
+    "tools/typed_c_contract/*"
+   ]
+  },
+  "test_typed_c_verify": {
+   "files": [
+    "tests/test_typed_c_verify.py",
+    "tools/typed_c_contract/*"
+   ],
+   "targets": [
+    "c_contract_static"
+   ]
+  },
+  "test_typed_c_verify_lock": {
+   "files": [
+    "tests/test_typed_c_verify_lock.py",
+    "tools/typed_c_contract/*",
+    "tests/typed_c_measured_lock.sbl1"
+   ]
+  },
+  "test_wording_rewrite_harness": {
+   "files": [
+    "tools/bank_harness.py",
+    "tools/wording_rewrites.py",
+    "tests/fixtures/engineering_bank/*"
+   ]
+  },
+  "test_wording_rewrites": {
+   "files": [
+    "tools/wording_rewrites.py"
+   ]
+  }
+ },
+ "version": 1
+}
