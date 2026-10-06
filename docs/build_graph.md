@@ -35,3 +35,23 @@ Predictions that were wrong: precision below 100% (measured 1.00) and a first-ve
 - Windows is not measured: both tests print SKIP and are reported as skipped on `msvc` and `asan-msvc`. The counts of 223 include them as skipped.
 - The "ok" and the mutant-kill lines are known from the exit code, not from stdout, which CTest hides.
 - No `src/` change, no agent integration. Nothing here changes what the agent does.
+
+## Update: include scan (m232)
+
+Landed in `cdc13be` (run 37419789922, all jobs read: apply 200, linux 200, msvc 224, asan-msvc 224, `ast-inspect-windows-ninja` 10 tests OK). Linux ran the three `build_graph` entries (log lines read: all Passed); the Windows jobs skip them.
+
+Why. The first run of the tool on this repository's own build (178 targets, 199 tests) found a miss that the fixtures could not show. `tests/test_relation_subject_index.c` does `#include "../src/relation.c"`. The codemodel lists `relation.c` only under the `symbolic` library and lists no dependency for that test, so touching `relation.c` relinked the test (oracle) and the selection did not contain it. The first sample was 6 files: 5 matched, 1 missed. With the rule as landed in m231 the recall claim was false for any listed source that is also included textually.
+
+What it does now. `select` scans the source tree (`.c .h .cc .cpp .cxx .hpp .hh .inc .inl`, skipping dot directories and directories that hold a `CMakeCache.txt`), matches each `#include` by basename only, and treats every file that includes a changed file as changed, transitively. A header is no longer a blanket full gate: it selects through its includers. Still the full gate: a changed file in no target with no includer, a changed CMake file, any quoted include whose basename matches no scanned file (for example a generated header), and any unmapped test.
+
+Evidence.
+- Fixture `graph_incl` reproduces the miss (a test target that includes a library `.c` and links nothing). The mutant with the scan off (`--mutant scan_off`) exits 0 only if exactly `header_scan` and `recall_incl` fail; measured, killed by exactly those two. The older mutant (`--mutant no_closure`) now fails exactly `header_scan recall_basic recall_incl recall_mixed`; I had predicted three, the fourth is measured.
+- Repository oracle, local Linux, 15 files chosen with `random.seed(232)` (`src/relation.c`, 9 random sources, 5 random `include/*.h`), each touched and rebuilt, comparing the tests whose executable relinked with the selection (the 29 unmapped tests ignored for this hypothetical): 0 misses, 1502 selected, 1502 needed, 0 extra. The `relation.c` case is fixed (134 of 134). The scan found 0 unresolved quoted includes after `.inc` was added to the scanned extensions (one existed before, `fs_create_win.inc`). 12 basenames collide in the repository.
+- Predictions that were wrong: that precision would drop through basename collisions (extra was 0 on the 15 files; I did not check whether any of them touches a colliding basename); that a new miss class would appear (none did; the classes I listed were not tested, they are not shown absent); the exact mutant set for `no_closure` (see above).
+
+Limits.
+- Macro-built includes (`#include MACRO`) are not matched by the scan and are not covered by the unresolved-include rule: a hole.
+- Includes resolved through `-I` with the same basename in two directories are over-approximated, not tested. Generated headers rely on the unresolved-include rule, not tested on a real case.
+- The oracle sees only relinked test executables, not tests that read data files.
+- On this repository 29 of 199 tests are not mapped to a target (20 python, 7 bash, 2 `cmake -P`), so every selection here is still the full gate; a subset is selected only on fixtures. 362 of the 603 tracked `.c` and `.h` files are in no target.
+- Windows is unmeasured. Nothing is connected to the agent; no `src/` change.
