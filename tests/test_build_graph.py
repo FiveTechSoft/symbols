@@ -51,6 +51,13 @@ def expected(name):
 def select(g, files):
     if MUTANT == "scan_off":
         return bg.select(g, files, scan=False)
+    if MUTANT == "decl_targets_off":
+        return bg.select(g, files, declared_targets=False)
+    if MUTANT == "sidecar_off" and any(t.get("declared") for t in g["tests"]):
+        g = json.loads(json.dumps(g))
+        for t in g["tests"]:
+            t.pop("declared", None)
+        g["unknown"] = ["sidecar ignored"]
     if MUTANT == "no_closure":
         g = json.loads(json.dumps(g))
         for t in g["targets"]:
@@ -80,6 +87,34 @@ def recall(name, tmp, stats):
     return ok
 
 
+MUT = {".c": "int main(void){return 1;}\n", ".script": "message(FATAL_ERROR broken)\n", ".txt": "BROKEN\n"}
+
+
+def recall_script(src, b, stats):
+    """Mutation oracle for tests the codemodel cannot map: overwrite one file
+    with garbage, rebuild, run each test, and see which ones fail."""
+    g = bg.load_graph(b)
+    ok = True
+    for f in ("check.script", "helper.script", "data.txt", "wrap.script", "prog.c"):
+        p = os.path.join(src, f)
+        old = open(p).read()
+        open(p, "w").write(MUT[os.path.splitext(f)[1]])
+        subprocess.run(["cmake", "--build", b], check=True, stdout=subprocess.DEVNULL)
+        failed = set()
+        for t in g["tests"]:
+            r = subprocess.run(["ctest", "-R", "^%s$" % t["name"]], cwd=b, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+            if r.returncode != 0:
+                failed.add(t["name"])
+        open(p, "w").write(old)
+        subprocess.run(["cmake", "--build", b], check=True, stdout=subprocess.DEVNULL)
+        sel = select(g, [f])
+        stats.append(("script", f, sorted(failed), sorted(sel["tests"]), sel["mode"]))
+        if not failed <= set(sel["tests"]):
+            ok = False
+    return ok
+
+
 def main():
     global GEN
     GEN = gen_name()
@@ -92,11 +127,30 @@ def main():
             _, b = setup(name, tmp)
             if view(bg.load_graph(b)) != expected(name):
                 fails.append("graph_" + name)
-        _, b = setup("script", tmp)
+        srcs, b = setup("script", tmp)
         g = bg.load_graph(b)
-        if g["unknown"] != ["test script_ok is not mapped to a target"] or \
-           select(g, ["prog.c"])["mode"] != "full":
+        if g["unknown"] != [] or [(t["name"], t["target"]) for t in g["tests"]] != \
+                [("prog_ok", "prog"), ("script_ok", None), ("wrap_ok", None)]:
             fails.append("graph_script")
+        r = select(g, ["data.txt"])
+        if r["mode"] != "subset" or r["tests"] != ["script_ok"]:
+            fails.append("script_subset")
+        if not recall_script(srcs, b, stats):
+            fails.append("recall_script")
+        closed = []
+        for bad in ({"version": 1, "tests": {"script_ok": {"files": ["data.txt"]}}},
+                    {"version": 1, "tests": {"nope": {"files": ["x"]}, "script_ok": {"files": ["a"]},
+                                             "wrap_ok": {"files": ["a"]}}},
+                    {"version": 1, "tests": {"script_ok": {"files": ["a"]},
+                                             "wrap_ok": {"targets": ["nosuch"]}}},
+                    {"version": 1, "tests": {"script_ok": {"files": ["a"]}, "wrap_ok": {}}},
+                    {"version": 2, "tests": {}}, "not json"):
+            ip = os.path.join(tmp, "bad.json")
+            open(ip, "w").write(bad if isinstance(bad, str) else json.dumps(bad))
+            gb = bg.load_graph(b, inputs=ip)
+            closed.append(bool(gb["unknown"]) and bg.select(gb, ["data.txt"])["mode"] == "full")
+        if not all(closed):
+            fails.append("fail_closed")
         for name in ("basic", "mixed", "incl"):
             if not recall(name, tmp, stats):
                 fails.append("recall_" + name)
@@ -134,7 +188,9 @@ def main():
     print("failed checks: %s" % (" ".join(sorted(fails)) or "none"))
     if MUTANT:
         want = {"no_closure": ["header_scan", "recall_basic", "recall_incl", "recall_mixed"],
-                "scan_off": ["header_scan", "recall_incl"]}[MUTANT]
+                "scan_off": ["header_scan", "recall_incl"],
+                "sidecar_off": ["script_subset"],
+                "decl_targets_off": ["recall_script"]}[MUTANT]
         if sorted(fails) == want:
             print("MUTANT killed by exactly " + " ".join(want)); return 0
         print("MUTANT not killed by the exact set"); return 1

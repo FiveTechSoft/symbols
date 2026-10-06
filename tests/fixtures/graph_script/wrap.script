@@ -1,0 +1,4 @@
+execute_process(COMMAND ${PROG} RESULT_VARIABLE R)
+if(NOT R EQUAL 0)
+  message(FATAL_ERROR "prog failed")
+endif()

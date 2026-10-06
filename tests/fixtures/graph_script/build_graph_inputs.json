@@ -1,0 +1,3 @@
+{"version": 1, "tests": {
+ "script_ok": {"files": ["check.script", "helper.script", "data.txt"]},
+ "wrap_ok": {"files": ["wrap.script"], "targets": ["prog"]}}}

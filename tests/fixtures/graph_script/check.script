@@ -1,0 +1,6 @@
+get_filename_component(HERE ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+include(${HERE}/helper.script)
+file(READ ${HERE}/data.txt D)
+if(NOT D MATCHES "good")
+  message(FATAL_ERROR "bad data")
+endif()

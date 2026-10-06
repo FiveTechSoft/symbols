@@ -10,7 +10,7 @@ Rule: anything the model cannot prove selects the full gate (mode "full").
 The tests of the build must be built first: ctest omits the command of a test
 whose executable does not exist, and such a test is unmapped.
 """
-import argparse, collections, glob, json, os, re, subprocess, sys
+import argparse, collections, fnmatch, glob, json, os, re, subprocess, sys
 
 SUPPORTED_GENERATORS = ("Unix Makefiles", "Ninja")
 CODEMODEL_MAJOR = 2
@@ -35,7 +35,39 @@ def _rel(path, root):
     return path.replace(os.sep, "/")
 
 
-def load_graph(build, config=None):
+SIDECAR = "build_graph_inputs.json"
+
+
+def load_sidecar(path, tests, targets):
+    """Declared inputs for tests the codemodel cannot map (scripts, wrappers).
+    Format: {"version": 1, "tests": {NAME: {"files": [glob...], "targets": [name...]}}}.
+    Returns (declared, problems). Fail-closed: any problem is a reason for the
+    full gate, and an entry with neither files nor targets declares nothing."""
+    try:
+        d = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return {}, ["sidecar unreadable: %s" % e]
+    if not isinstance(d, dict) or d.get("version") != 1 or not isinstance(d.get("tests"), dict):
+        return {}, ["sidecar is not version 1 with a tests object"]
+    declared, problems = {}, []
+    for name, e in d["tests"].items():
+        ok = isinstance(e, dict) and all(isinstance(e.get(k, []), list) and
+                                         all(isinstance(x, str) for x in e.get(k, []))
+                                         for k in ("files", "targets"))
+        if not ok:
+            problems.append("sidecar entry malformed: %s" % name)
+        elif name not in tests:
+            problems.append("sidecar names an unknown test: %s" % name)
+        elif not e.get("files") and not e.get("targets"):
+            problems.append("sidecar entry declares nothing: %s" % name)
+        elif any(t not in targets for t in e.get("targets", [])):
+            problems.append("sidecar names an unknown target for test %s" % name)
+        else:
+            declared[name] = {"files": list(e.get("files", [])), "targets": list(e.get("targets", []))}
+    return declared, problems
+
+
+def load_graph(build, config=None, inputs=None, use_sidecar=True):
     """Return a graph dict. Unknowns are listed in graph['unknown']; they are
     reasons to select the full gate. Never raises on missing metadata."""
     g = {"targets": [], "tests": [], "unknown": []}
@@ -101,6 +133,15 @@ def load_graph(build, config=None):
                                             [x for x in labels.split(";") if x])})
         if mapped is None:
             g["unknown"].append("test %s is not mapped to a target" % t["name"])
+    sc = inputs or os.path.join(src_root, SIDECAR)
+    if use_sidecar and os.path.exists(sc):
+        declared, problems = load_sidecar(sc, {t["name"] for t in g["tests"]},
+                                          {t["name"] for t in g["targets"]})
+        g["unknown"] += problems
+        for t in g["tests"]:
+            if t["target"] is None and t["name"] in declared:
+                t["declared"] = declared[t["name"]]
+                g["unknown"] = [u for u in g["unknown"] if u != "test %s is not mapped to a target" % t["name"]]
     g["targets"].sort(key=lambda x: x["name"])
     g["tests"].sort(key=lambda x: x["name"])
     return g
@@ -144,7 +185,7 @@ def scan_includes(root):
     return files, includers, sorted(unresolved)
 
 
-def select(g, changed, scan=True):
+def select(g, changed, scan=True, declared_targets=True):
     """Changed paths are relative to the source root. Returns
     {mode: 'subset'|'full', tests: [...], reasons: [...]}. With scan, a changed
     file also affects every file that includes its basename, transitively."""
@@ -160,7 +201,7 @@ def select(g, changed, scan=True):
         scanned, includers, unresolved = scan_includes(g["source"])
         if unresolved:
             return full(["unresolved include: %s" % u for u in unresolved[:5]])
-    hit = set()
+    hit, touched = set(), set()
     for f in changed:
         f = f.replace(os.sep, "/")
         base = os.path.basename(f)
@@ -168,14 +209,18 @@ def select(g, changed, scan=True):
             return full(["build definition changed: %s" % f])
         if f in owners:
             hit |= owners[f]
-        elif not (f in scanned and includers.get(base)):
-            return full(["changed file is in no target and has no includer: %s" % f])
+        elif not (f in scanned and includers.get(base)) and not any(
+                fnmatch.fnmatchcase(f, pat) for t in g["tests"]
+                for pat in (t.get("declared") or {}).get("files", [])):
+            return full(["changed file is in no target, has no includer and is no declared input: %s" % f])
         closure, todo = {f}, [f]
+        touched.add(f)
         while todo:
             for i in includers.get(os.path.basename(todo.pop()), ()):
                 if i not in closure:
                     closure.add(i)
                     todo.append(i)
+                    touched.add(i)
                     hit |= owners.get(i, set())
     rdeps = {}
     for t in g["targets"]:
@@ -187,8 +232,13 @@ def select(g, changed, scan=True):
             if r not in seen:
                 seen.add(r)
                 todo.append(r)
-    return {"mode": "subset", "tests": sorted(t["name"] for t in g["tests"] if t["target"] in seen),
-            "reasons": []}
+    def picked(t):
+        if t["target"] is not None:
+            return t["target"] in seen
+        d = t.get("declared")
+        return bool(d) and (any(fnmatch.fnmatchcase(f, pat) for f in touched for pat in d["files"]) or
+                            (declared_targets and any(x in seen for x in d["targets"])))
+    return {"mode": "subset", "tests": sorted(t["name"] for t in g["tests"] if picked(t)), "reasons": []}
 
 
 def main(argv):
