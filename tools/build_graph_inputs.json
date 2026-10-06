@@ -70,6 +70,19 @@
     "tools/build_graph_inputs.json"
    ]
   },
+  "test_select_report": {
+   "files": [
+    "tests/test_select_report.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json",
+    "*.c",
+    "*.h",
+    "*.inc"
+   ],
+   "targets": [
+    "symbols-agent"
+   ]
+  },
   "test_build_graph_repo_mc_glob": {
    "files": [
     "tests/test_build_graph_repo.py",

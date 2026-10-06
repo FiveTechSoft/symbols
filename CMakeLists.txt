@@ -841,6 +841,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_repo.py ${CMAKE_BINARY_DIR} --mutant stale_glob
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_build_graph_repo_mc_glob PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
+    add_test(NAME test_select_report
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_select_report.py $<TARGET_FILE:symbols-agent> ${CMAKE_BINARY_DIR}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_select_report PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 RESOURCE_LOCK build_graph_repo_reply)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

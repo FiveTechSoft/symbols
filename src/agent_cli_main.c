@@ -15,6 +15,9 @@
      --ask-missing-goal     Ask only for a typed stdout-goal-missing task
      --continue-stdout-goal --workspace-key HEX --stdout-answer TEXT
                             Continue a bound typed request noninteractively
+     --select-report <build> --changed <file>...
+                            Print which tests the build graph selects for the
+                            changed files (read-only report, runs no test)
      -h, --help               Show this help message
    ============================================================ */
 
@@ -46,6 +49,9 @@ static void PrintHelp(const char *prog)
     printf("  -r, --replans <num>      Max healing replans on failure (default: 3)\n");
     printf("  --ask-missing-goal      Ask only for a typed stdout-goal-missing task\n");
     printf("  --continue-stdout-goal --workspace-key HEX --stdout-answer TEXT\n");
+    printf("  --select-report <build> --changed <file>...\n");
+    printf("                           Report the build-graph test selection (read-only;\n");
+    printf("                           nothing is skipped, the full gate stays the default)\n");
     printf("  -h, --help               Display this help guide\n\n");
     printf("Examples:\n");
     printf("  %s -b AgentProcessObservation\n", prog);
@@ -71,6 +77,75 @@ static char *ReadFile(const char *path, size_t *out_size)
     return buf;
 }
 
+/* --select-report: a read-only report of the build-graph test selection
+   (tools/build_graph.py). It runs nothing but that script, skips no test and
+   changes no state. Every way it can fail to produce a selection is reported
+   as "mode: full" with the reason: the full gate is the answer whenever the
+   selection is not known. Arguments reach a shell, so only a conservative
+   path alphabet is accepted. */
+static int PathArgSafe(const char *a)
+{
+    if (!a[0] || a[0] == '-') return 0;
+    for (const char *c = a; *c; c++)
+    {
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') ||
+              *c == '_' || *c == '.' || *c == '/' || *c == '+' || *c == '-'))
+            return 0;
+    }
+    return 1;
+}
+
+static int SelectReportFull(const char *reason)
+{
+    printf("[symbols-agent] select-report (read-only: nothing is skipped, the full gate stays the default)\n");
+    printf("mode: full\nreason: %s\n", reason);
+    return 0;
+}
+
+static int SelectReport(const char *workspace, const char *build, char **changed, int nchanged)
+{
+    char script[MAX_PATCH_PATH + 32];
+    char cmd[8192];
+    FILE *f;
+    SHELL_EXEC_RESULT *res;
+    size_t n;
+    const char *p;
+
+    if (nchanged <= 0) return SelectReportFull("no changed files were given");
+    if (!PathArgSafe(build)) return SelectReportFull("the build directory path has a character outside the supported set");
+    snprintf(script, sizeof(script), "%s/tools/build_graph.py", workspace);
+    f = fopen(script, "rb");
+    if (!f) return SelectReportFull("tools/build_graph.py was not found in the workspace");
+    fclose(f);
+    n = (size_t)snprintf(cmd, sizeof(cmd), "python3 tools/build_graph.py select %s --changed", build);
+    for (int i = 0; i < nchanged; i++)
+    {
+        if (!PathArgSafe(changed[i])) return SelectReportFull("a changed file path has a character outside the supported set");
+        if (n + strlen(changed[i]) + 2 >= sizeof(cmd)) return SelectReportFull("the changed file list is too long");
+        n += (size_t)snprintf(cmd + n, sizeof(cmd) - n, " %s", changed[i]);
+    }
+    res = (SHELL_EXEC_RESULT *)malloc(sizeof(*res));
+    if (!res) return SelectReportFull("out of memory");
+    AgentShellResultInit(res);
+    AgentShellExecGuarded(cmd, workspace, 60000, res);
+    if (res->execution_failed || res->exit_code != 0)
+    {
+        free(res);
+        return SelectReportFull("python3 tools/build_graph.py did not run to a successful exit");
+    }
+    p = strstr(res->stdout_buf, "\"mode\": \"");
+    if (!p || res->stdout_buf[0] != '{' || res->stdout_truncated)
+    {
+        free(res);
+        return SelectReportFull("the selection output was not recognised");
+    }
+    printf("[symbols-agent] select-report (read-only: nothing is skipped, the full gate stays the default)\n");
+    printf("%s", res->stdout_buf);
+    if (res->stdout_len && res->stdout_buf[res->stdout_len - 1] != '\n') printf("\n");
+    free(res);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char workspace[MAX_PATCH_PATH] = ".";
@@ -85,6 +160,10 @@ int main(int argc, char **argv)
     bool has_key = false, has_answer = false, bad_input = false, extraneous = false;
     bool has_workspace = false, has_task = false;
     uint32_t max_replans = 3;
+    bool select_report = false, has_changed = false;
+    char select_build[MAX_PATCH_PATH] = {0};
+    char *changed_files[256];
+    int nchanged = 0;
 
     if (argc < 2)
     {
@@ -120,6 +199,27 @@ int main(int argc, char **argv)
         {
             extraneous = true;
             max_replans = (uint32_t)atoi(argv[++i]);
+        }
+        else if (strcmp(argv[i], "--select-report") == 0 && i + 1 < argc && !select_report)
+        {
+            const char *v = argv[++i];
+            select_report = true;
+            if (strlen(v) >= sizeof(select_build)) bad_input = true;
+            else snprintf(select_build, sizeof(select_build), "%s", v);
+        }
+        else if (strcmp(argv[i], "--changed") == 0 && !has_changed)
+        {
+            has_changed = true;
+            while (i + 1 < argc && argv[i + 1][0] != '-')
+            {
+                if (nchanged >= 256) bad_input = true;
+                else changed_files[nchanged++] = argv[i + 1];
+                i++;
+            }
+        }
+        else if (strcmp(argv[i], "--select-report") == 0 || strcmp(argv[i], "--changed") == 0)
+        {
+            bad_input = true;
         }
         else if (strcmp(argv[i], "--ask-missing-goal") == 0)
         {
@@ -189,6 +289,16 @@ int main(int argc, char **argv)
         printf("[symbols-agent] Verified: your stated goal is reachable by exactly one safe edit.\n");
         printf("[symbols-agent] Goal: user-asserted via typed CLI; edit: executed (normalized stdout, exit 0, no regression). No durable episode.\n");
         return 0;
+    }
+    if (select_report || has_changed)
+    {
+        if (!select_report || !has_changed || bad_input || extraneous || has_task || ask_missing_goal ||
+            has_key || has_answer)
+        {
+            fprintf(stderr, "[symbols-agent] --select-report needs --changed and cannot be combined with other modes.\n");
+            return 1;
+        }
+        return SelectReport(workspace, select_build, changed_files, nchanged);
     }
     if (bad_input || has_key || has_answer) {
         fprintf(stderr, "[symbols-agent] Continuation flags require --continue-stdout-goal.\n");
