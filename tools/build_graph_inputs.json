@@ -91,6 +91,12 @@
     "tools/build_graph_inputs.json"
    ]
   },
+  "test_ctest_report_locations": {
+   "files": [
+    "tests/test_ctest_report_locations.py",
+    "tools/ctest_report.py"
+   ]
+  },
   "test_ctest_report_json_duplicates": {
    "files": [
     "tests/test_ctest_report_json_duplicates.py",

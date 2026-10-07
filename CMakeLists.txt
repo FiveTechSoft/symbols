@@ -870,6 +870,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report_json_duplicates.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_ctest_report_json_duplicates PROPERTIES TIMEOUT 120)
+    add_test(NAME test_ctest_report_locations
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report_locations.py
+    )
+    set_tests_properties(test_ctest_report_locations PROPERTIES TIMEOUT 120)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
