@@ -862,6 +862,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report_registered.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_ctest_report_registered PROPERTIES TIMEOUT 120)
+    add_test(NAME test_ctest_report_values
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report_values.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_ctest_report_values PROPERTIES TIMEOUT 120)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

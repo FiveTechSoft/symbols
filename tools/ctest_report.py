@@ -19,6 +19,7 @@ With --registered, a test the build registers but Test.xml lacks is reported as
 not_run with detail "absent from Test.xml" (for example after `ctest -R`).
 Structural ambiguity (wrong root/Testing layout, duplicate test identities, Name
 fields or critical measurements, including equal duplicates) exits 2 without JSON.
+Each present critical measurement needs one scalar Value.
 Registered names must be nonempty unique strings and cover the XML result names.
 Unknown well-formed reason/status strings still produce unknown.
 Registered JSON must be an object with a tests list of objects with names.
@@ -96,6 +97,11 @@ def validate_structure(root):
                 critical.add(key)
                 if len(n.findall("Value")) > 1:
                     raise ValueError("duplicate critical measurement Value: %s" % key)
+                values = n.findall("Value")
+                if not values:
+                    raise ValueError("critical measurement needs a Value: %s" % key)
+                if len(values[0]):
+                    raise ValueError("critical measurement Value is not scalar: %s" % key)
     validate_names([t.findtext("Name") for t in real], "Test.xml")
 
 
