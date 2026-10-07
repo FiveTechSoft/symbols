@@ -1249,3 +1249,6 @@ target_include_directories(test_agent_patch_ctxm_fuzz PRIVATE include)
 add_test(NAME test_agent_patch_ctxm_fuzz COMMAND test_agent_patch_ctxm_fuzz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_agent_patch_ctxm_fuzz PROPERTIES TIMEOUT 300
     PASS_REGULAR_EXPRESSION "ctxm fuzz done: seeds=4 rounds=400 ok=400")
+
+add_executable(test_liveness_window tests/test_liveness_window.c)
+add_test(NAME test_liveness_window COMMAND test_liveness_window)

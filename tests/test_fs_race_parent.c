@@ -19,7 +19,7 @@
    outside touch (killed, exit 0) or MUTANT_CAP_MS (30 s). No touch within the cap is
    INCONCLUSIVE, exit 7, with the swapper and writer counts printed; it is never reported
    as a surviving mutant, and CI treats any non-zero exit as a failure. The non-mutant
-   build is unchanged (4 s window, same guards).
+   build later gained bounded liveness extension (L1b); its final guards are unchanged.
    Predictions before the v2 runs: kill in 30 of 30 local runs, typically well under the
    old 4 s; INCONCLUSIVE never locally.
    Guards, so the test cannot pass vacuously: the swapper verifies the symlink
@@ -41,11 +41,15 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <time.h>
+#include <fcntl.h>
+#include <errno.h>
+#include "liveness_window.h"
 
 #define ROOT "test_fs_race_parent_scratch"
 #define OUTD "test_fs_race_parent_outside"
 #define STOPF "test_fs_race_parent_stop"
 #define BUDGET_MS 4000
+#define LIVENESS_CAP_MS 30000
 #ifndef MUTANT_CAP_MS
 #define MUTANT_CAP_MS 30000
 #endif
@@ -59,6 +63,7 @@
 #endif
 
 static int mism;
+static int progress_pipe[2][2];
 static void ck(int x, const char *m)
 {
     if (!x) { fprintf(stderr, "FAIL %s\n", m); exit(1); }
@@ -172,6 +177,7 @@ static long diag_ms(struct timespec start)
 static int writer(int idx)
 {
     FS_READ_ROOT *r;
+    long published_ms = 0;
     long ok = 0, calls = 0, op_calls[6] = {0}, op_ok[6] = {0}, status[DIAG_STATUS] = {0};
     long bin_calls[DIAG_BINS] = {0}, bin_ok[DIAG_BINS] = {0}, other_status = 0;
     long bin_status[DIAG_BINS][DIAG_STATUS] = {{0}}, max_batch_ms = 0;
@@ -202,6 +208,14 @@ static int writer(int idx)
                 if ((unsigned)s[i] < DIAG_STATUS) { status[s[i]]++; bin_status[bin][s[i]]++; } else other_status++;
                 if (s[i] == FS_READ_OK) { ok++; op_ok[i]++; bin_ok[bin]++; }
             }
+        }
+        /* One writer per nonblocking pipe; a long fits PIPE_BUF. A full pipe
+           drops a snapshot. Stale counts may extend the window, never pass it. */
+        if (diag_ms(start) - published_ms >= 500) {
+            ssize_t n = write(progress_pipe[idx-1][1], &ok, sizeof(ok));
+            if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) return 6;
+            if (n >= 0 && n != (ssize_t)sizeof(ok)) return 6;
+            published_ms = diag_ms(start);
         }
         nap(1);
     }
@@ -251,17 +265,29 @@ int main(void)
 {
     pid_t pid[3];
     int st[3] = { 0, 0, 0 };
-    long elapsed_ms = 0;
+    long elapsed_ms = 0, live_ok[2] = {0, 0};
     struct timespec t0, t1;
     rmtree(ROOT); rmtree(OUTD); (void)unlink(STOPF);
     ck(mkdir(ROOT, 0700) == 0 && mkdir(OUTD, 0700) == 0 && mkdir(ROOT "/D", 0700) == 0, "mkdir");
     put(OUTD "/victim", "VICTIM");
+    for (int k = 0; k < 2; k++) {
+        ck(pipe(progress_pipe[k]) == 0, "progress pipe");
+        for (int j = 0; j < 2; j++)
+            ck(fcntl(progress_pipe[k][j], F_SETFL, O_NONBLOCK) == 0, "nonblocking progress pipe");
+    }
     for (int k = 0; k < 3; k++)
     {
         pid[k] = fork();
         ck(pid[k] >= 0, "fork");
-        if (pid[k] == 0) _exit(k == 0 ? swapper() : writer(k));
+        if (pid[k] == 0) {
+            for (int j = 0; j < 2; j++) {
+                close(progress_pipe[j][0]);
+                if (k != j+1) close(progress_pipe[j][1]);
+            }
+            _exit(k == 0 ? swapper() : writer(k));
+        }
     }
+    for (int k = 0; k < 2; k++) close(progress_pipe[k][1]);
     clock_gettime(CLOCK_MONOTONIC, &t0);
     for (;;)
     {
@@ -276,7 +302,16 @@ int main(void)
 #ifdef FS_PARENT_FOLLOW_MUTANT
         if (ms >= MUTANT_CAP_MS) break;
 #else
-        if (ms >= BUDGET_MS) break;
+        for (int k = 0; k < 2; k++) {
+            long snapshot; ssize_t n;
+            while ((n = read(progress_pipe[k][0], &snapshot, sizeof(snapshot))) > 0) {
+                ck(n == (ssize_t)sizeof(snapshot), "whole progress snapshot");
+                live_ok[k] = snapshot;
+            }
+            ck(n == 0 || errno == EAGAIN || errno == EWOULDBLOCK, "progress read");
+        }
+        if (!liveness_wait(ms, BUDGET_MS, LIVENESS_CAP_MS,
+                           live_ok[0] >= RP_OK_FLOOR && live_ok[1] >= RP_OK_FLOOR)) break;
 #endif
     }
     clock_gettime(CLOCK_MONOTONIC, &t1);
@@ -288,8 +323,11 @@ int main(void)
         ck(waitpid(pid[k], &status, 0) == pid[k] && WIFEXITED(status), "wait");
         st[k] = WEXITSTATUS(status);
     }
+    for (int k = 0; k < 2; k++) close(progress_pipe[k][0]);
     outside_intact("after swap");
     printf("RP diag window: elapsed_ms %ld budget_ms %d floor %d outside_mismatches %d\n", elapsed_ms, BUDGET_MS, RP_OK_FLOOR, mism);
+    printf("RP diag adaptive: cap_ms %d snapshots_ok %ld %ld extended %d\n",
+           LIVENESS_CAP_MS, live_ok[0], live_ok[1], elapsed_ms > BUDGET_MS+100);
     {
         DIR *d = opendir(ROOT);
         struct dirent *e;

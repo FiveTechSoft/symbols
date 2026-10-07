@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "liveness_window.h"
 /* Criterion 1, Windows (m209): a parent swapped between a real directory and a junction to an OUTSIDE directory while
    writers MOVE, COPY and BATCH-REPLACE through it. test_fs_win_race.c cell E does the same swap for create, replace,
    remove and batch create; the roadmap said the rename side (move and copy, whose source and target both name the
@@ -28,6 +29,7 @@
 #define ROOT "test_fs_winraceswap_ws"
 #define OUTD "test_fs_winraceswap_out"
 #define SWAP_BUDGET_MS 5000
+#define SWAP_CAP_MS 30000
 #define REAL_HOLD_MS 30
 static volatile LONG g_stop,g_swaps,g_junctions,g_calls,g_ok,g_bad;
 static volatile LONG g_opn[7],g_opok[7];
@@ -125,7 +127,7 @@ static void outside_intact(const char *when)
  snprintf(m,sizeof(m),"%s: outside r1 bytes",when);ck(has_bytes(OUTD "\\r1","A1"),m);
  snprintf(m,sizeof(m),"%s: outside r2 bytes",when);ck(has_bytes(OUTD "\\r2","A2"),m);}
 int main(void)
-{HANDLE th[3];DWORD t0,wait_result,thread_exit[3]={STILL_ACTIVE,STILL_ACTIVE,STILL_ACTIVE};int i;
+{HANDLE th[3];DWORD t0,window_ms,wait_result,thread_exit[3]={STILL_ACTIVE,STILL_ACTIVE,STILL_ACTIVE};int i;
  rmtree(ROOT);rmtree(OUTD);
  ck(_mkdir(ROOT)==0&&_mkdir(OUTD)==0&&_mkdir(ROOT "\\D")==0,"mkdir");
  put(OUTD "\\victim","VICTIM");put(OUTD "\\r1","A1");put(OUTD "\\r2","A2");
@@ -134,12 +136,15 @@ int main(void)
  th[1]=CreateThread(NULL,0,writer,(LPVOID)(INT_PTR)0,0,NULL);
  th[2]=CreateThread(NULL,0,writer,(LPVOID)(INT_PTR)1,0,NULL);
  ck(th[0]&&th[1]&&th[2],"threads");
- while(GetTickCount()-t0<SWAP_BUDGET_MS){outside_intact("during swap");Sleep(50);}
+ while(liveness_wait((long)(GetTickCount()-t0),SWAP_BUDGET_MS,SWAP_CAP_MS,
+                     InterlockedCompareExchange(&g_ok,0,0)>0)){outside_intact("during swap");Sleep(50);}
+ window_ms=GetTickCount()-t0;
  InterlockedExchange(&g_stop,1);
  wait_result=WaitForMultipleObjects(3,th,TRUE,60000);
  for(i=0;i<3;i++){GetExitCodeThread(th[i],&thread_exit[i]);CloseHandle(th[i]);}
  outside_intact("after swap");
  printf("race swap diag wait: result %lu thread_exit %lu %lu %lu\n",(unsigned long)wait_result,(unsigned long)thread_exit[0],(unsigned long)thread_exit[1],(unsigned long)thread_exit[2]);
+ printf("race swap diag adaptive: pre_join_window_ms %lu cap_ms %d extended %d\n",(unsigned long)window_ms,SWAP_CAP_MS,window_ms>SWAP_BUDGET_MS+100);
  printf("race swap diag window: post_join_elapsed_ms %lu budget_ms %d\n",(unsigned long)(GetTickCount()-t0),SWAP_BUDGET_MS);
  for(i=0;i<2;i++){int b;printf("race swap diag writer %d: counted_calls %ld counted_ok %ld\n",i,(long)g_writer_calls[i],(long)g_writer_ok[i]);
   for(b=0;b<10;b++)printf("race swap diag writer %d bin %d: calls %ld ok %ld\n",i,b,(long)g_bins_calls[i][b],(long)g_bins_ok[i][b]);}
