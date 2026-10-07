@@ -23,6 +23,7 @@ Each present critical measurement needs one scalar Value.
 Registered names must be nonempty unique strings and cover the XML result names.
 Unknown well-formed reason/status strings still produce unknown.
 Registered JSON must be an object with a tests list of objects with names.
+Repeated JSON keys are rejected at every object depth, including unused fields.
 A failed launch or timeout of the registered query exits 2 without JSON.
 Not measured: Windows reasons (CTest writes other strings there)."""
 import json, os, subprocess, sys
@@ -128,11 +129,21 @@ def parse(path):
     return out
 
 
+def unique_json_object(pairs):
+    """Reject repeated keys even when their values agree, at every object depth."""
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            raise ValueError("registered metadata has duplicate JSON key: %s" % key)
+        out[key] = value
+    return out
+
+
 def registered(build):
     p = subprocess.run([os.environ.get("CTEST_COMMAND", "ctest"), "--test-dir", build, "--show-only=json-v1"], capture_output=True, text=True, timeout=60)
     if p.returncode != 0:
         raise ValueError("ctest --show-only failed")
-    data = json.loads(p.stdout)
+    data = json.loads(p.stdout, object_pairs_hook=unique_json_object)
     if not isinstance(data, dict):
         raise ValueError("registered metadata is not an object")
     if not isinstance(data.get("tests"), list):
