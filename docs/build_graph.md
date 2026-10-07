@@ -214,3 +214,39 @@ Second dispatch (run 37479988705, head 3ccbe78, status Success), logs read:
 - gcc 13.3.0, cmake 3.31.6, `-fsanitize=address,undefined -fno-sanitize-recover=undefined`, ASAN `detect_leaks=1`, UBSAN `halt_on_error=1`: `100% tests passed, 0 tests failed out of 209`, test time 564.82 s, 0 skipped. I found no AddressSanitizer, LeakSanitizer, `runtime error` or `SUMMARY:` line in the log. A clean run prints none, so "zero findings" rests on the pass total (a finding would abort a test) plus that empty search, not on sanitizer output.
 
 What this shows, and what it does not. Criterion 3 is shown on one manual run at `3ccbe78`: Clang Release 209/209 and GCC with ASan and UBSan 209/209, zero skips. It is not in the gate: `ci.yml` still has no Clang job and no Linux sanitizer job, so nothing re-checks it on later pushes. That is one run on one runner image, with no Clang sanitizer and no Windows clang; Clang ran without `-Werror`, and I did not read its build warnings. Folding the jobs into `ci.yml` (or a nightly `schedule:` trigger) is left to Antonio. The runs of `ci.yml` that the Y1, S4 and Y2 pushes may have started were not all read by me beyond S4's.
+
+## Update: bounded repository relink oracle (S5)
+
+Local measurement on `254b51e`, Linux, GCC, CMake 3.22.1 and Unix Makefiles. The graph has 178 targets and 209 tests. This is a 16-file nonrandom, stratified sample, not a census or an M3 exit claim. No selector change was needed.
+
+Method. Before each scored touch, `make -j2 -k` had to return 0 and print no `Linking C executable` line. Then `select --changed FILE` was run, the file was touched, and a real build was run. Needed tests are the graph-mapped tests whose target appeared in the executable relink lines. A dry-run build was rejected as an oracle because it did not propagate library relinks to test executables. Unmapped tests declared in the sidecar are excluded from needed, even when selected.
+
+Results. All 16 selections were `subset`, all scored builds returned 0, and every baseline guard passed. There were 0 missed mapped tests: 1027 selected test/file pairs, 548 needed and 479 extra, aggregate precision 548/1027 = 0.5336. Six touches relinked mapped test executables; ten relinked none. Scored touch/build time summed to 40.2 seconds; baseline and recovery time are additional.
+
+| Changed file | Selected | Needed | Extra |
+| --- | ---: | ---: | ---: |
+| `data/c_lang/c_std_lib.h` | 9 | 0 | 9 |
+| `docs/symbolic_wasm.c` | 5 | 0 | 5 |
+| `include/agent_action.h` | 146 | 133 | 13 |
+| `include/agent_patch.h` | 159 | 146 | 13 |
+| `src/agent_cli_main.c` | 6 | 0 | 6 |
+| `src/atomic_store.c` | 146 | 133 | 13 |
+| `src/attempt_capture.c` | 147 | 134 | 13 |
+| `src/fs_batch_win.inc` | 180 | 0 | 180 |
+| `src/fs_create_win.inc` | 180 | 0 | 180 |
+| `tools/relprobe.c` | 5 | 0 | 5 |
+| `tools/attempt_capture_report.c` | 6 | 0 | 6 |
+| `tools/qemu_closure/runner_vm_harness.c` | 8 | 0 | 8 |
+| `tests/test_atomic_store.c` | 6 | 1 | 5 |
+| `tests/test_agent_patch.c` | 6 | 1 | 5 |
+| `tests/fixtures/agent_runner/evaluation/case_ambiguous/a/first.h` | 9 | 0 | 9 |
+| `tests/fixtures/agent_runner_external/evaluation/amb_two_types/a/vec.h` | 9 | 0 | 9 |
+
+Corrections, kept separate from selector findings.
+- The first version omitted a settled baseline. Its first row attributed 134 needed tests to `data/c_lang/c_std_lib.h`. A settled baseline and isolated re-touch relinked no executable, so that row was contaminated by pre-existing build work. The original raw row was retained, not used in these totals.
+- I called the zero-miss prediction wrong before validating that row. That statement was wrong and is retracted. No selector defect was confirmed.
+- My launch wrapper waited for its background process and hit a command timeout, interrupting a tool rebuild. On restart the baseline guard caught outstanding relinks before `tools/relprobe.c`; it did not score that baseline. I settled the interrupted build, verified a no-op and resumed with a detached process.
+
+Predictions written before measuring. The corrected sample predicted zero misses, both subset and full modes, extra selections for library headers, completion within 30 minutes, and at least one zero-needed touch. Zero misses, header extras, the time bound and zero-needed touches were observed. Both modes was wrong: all 16 were subset. The original planned 619-file census predicted 35-65% full mode, precision 0.85-1.00 and completion under 40 minutes; it was cut for cost after one header rebuild took 885.5 seconds. Those population predictions are untested, not validated by this sample. The sample precision is below that predicted range.
+
+Limits. No recall claim beyond these 16 touches. The sample is not random, and zero-needed rows do not test mapped-test recall. The oracle sees executable relinks, not script tests or tests that read data files; sidecar coverage is not checked here. Only Linux/GCC/Unix Makefiles was measured. The Windows include fragments overselect on Linux; this says nothing about their Windows behavior. Full-mode cases would count as safe fallback, not measured recall, but none occurred here. These are local measurements, not CI results. Nothing skips a test, and no `src/` change or M3 exit declaration follows from them.
