@@ -31,6 +31,16 @@
 #define REAL_HOLD_MS 30
 static volatile LONG g_stop,g_swaps,g_junctions,g_calls,g_ok,g_bad;
 static volatile LONG g_opn[7],g_opok[7];
+/* Counted calls match the existing count() subset, not every library call.
+   Completion bins are 500 ms; bin 9 includes all >= 4500 ms. Diagnostics only. */
+static volatile LONG g_writer_calls[2],g_writer_ok[2],g_status[16];
+static volatile LONG g_bins_calls[2][10],g_bins_ok[2][10];
+static DWORD g_diag_start;
+static void diag_writer(LONG id,FS_READ_STATUS s)
+{DWORD bin=(GetTickCount()-g_diag_start)/500;if(bin>9)bin=9;
+ InterlockedIncrement(&g_writer_calls[id]);InterlockedIncrement(&g_bins_calls[id][bin]);
+ if((unsigned)s<16)InterlockedIncrement(&g_status[s]);
+ if(s==FS_READ_OK){InterlockedIncrement(&g_writer_ok[id]);InterlockedIncrement(&g_bins_ok[id][bin]);}}
 static void ck(int x,const char *m){if(!x){fprintf(stderr,"FAIL %s (%lu)\n",m,GetLastError());exit(1);}}
 static void put(const char *p,const char *v)
 {FILE *f=fopen(p,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
@@ -73,8 +83,8 @@ static DWORD WINAPI swapper(LPVOID p)
  }
  if(!exists(ROOT "\\D"))_mkdir(ROOT "\\D");
  return 0;}
-static void count(int op,FS_READ_STATUS s)
-{InterlockedIncrement(&g_calls);InterlockedIncrement(&g_opn[op]);
+static void count(int op,FS_READ_STATUS s,LONG id)
+{diag_writer(id,s);InterlockedIncrement(&g_calls);InterlockedIncrement(&g_opn[op]);
  if(s==FS_READ_OK){InterlockedIncrement(&g_ok);InterlockedIncrement(&g_opok[op]);}}
 static DWORD WINAPI writer(LPVOID p)
 {LONG id=(LONG)(INT_PTR)p;FS_READ_ROOT *r;char mv[32],cp[32],s1[32],s2[32],dm[32],dc[32],pm[64],pc[64],ps1[64],ps2[64];
@@ -87,18 +97,18 @@ static DWORD WINAPI writer(LPVOID p)
  snprintf(ps1,sizeof(ps1),ROOT "\\%s",s1);snprintf(ps2,sizeof(ps2),ROOT "\\%s",s2);
  while(!g_stop){
   FS_BATCH_REPLACE b[2]={{"D/r1","A1",2,"B1",2},{"D/r2","A2",2,"B2",2}};
-  s=FsMoveFile(r,"D/victim",mv,"VICTIM",6);count(0,s);if(s==FS_READ_OK||exists(pm))InterlockedIncrement(&g_bad);
-  s=FsCopyFile(r,"D/victim",cp,"VICTIM",6);count(1,s);if(s==FS_READ_OK||exists(pc))InterlockedIncrement(&g_bad);
-  put(ps1,"S1");s=FsMoveFile(r,s1,dm,"S1",2);count(2,s);
-  if(s==FS_READ_OK){s=FsRemoveFile(r,dm,"S1",2);count(3,s);}
+  s=FsMoveFile(r,"D/victim",mv,"VICTIM",6);count(0,s,id);if(s==FS_READ_OK||exists(pm))InterlockedIncrement(&g_bad);
+  s=FsCopyFile(r,"D/victim",cp,"VICTIM",6);count(1,s,id);if(s==FS_READ_OK||exists(pc))InterlockedIncrement(&g_bad);
+  put(ps1,"S1");s=FsMoveFile(r,s1,dm,"S1",2);count(2,s,id);
+  if(s==FS_READ_OK){s=FsRemoveFile(r,dm,"S1",2);count(3,s,id);}
   DeleteFileA(ps1);
-  put(ps2,"S2");s=FsCopyFile(r,s2,dc,"S2",2);count(4,s);
-  if(s==FS_READ_OK){s=FsRemoveFile(r,dc,"S2",2);count(3,s);}
+  put(ps2,"S2");s=FsCopyFile(r,s2,dc,"S2",2);count(4,s,id);
+  if(s==FS_READ_OK){s=FsRemoveFile(r,dc,"S2",2);count(3,s,id);}
   DeleteFileA(ps2);
   if(id==0){
    s=FsCreateFile(r,"D/r1","A1",2,0666);
    if(s==FS_READ_OK){FsCreateFile(r,"D/r2","A2",2,0666);
-    s=FsBatchReplace(r,b,2);count(5,s);
+    s=FsBatchReplace(r,b,2);count(5,s,id);
     if(FsRemoveFile(r,"D/r1","B1",2)!=FS_READ_OK)FsRemoveFile(r,"D/r1","A1",2);
     if(FsRemoveFile(r,"D/r2","B2",2)!=FS_READ_OK)FsRemoveFile(r,"D/r2","A2",2);}
   }
@@ -115,20 +125,25 @@ static void outside_intact(const char *when)
  snprintf(m,sizeof(m),"%s: outside r1 bytes",when);ck(has_bytes(OUTD "\\r1","A1"),m);
  snprintf(m,sizeof(m),"%s: outside r2 bytes",when);ck(has_bytes(OUTD "\\r2","A2"),m);}
 int main(void)
-{HANDLE th[3];DWORD t0;int i;
+{HANDLE th[3];DWORD t0,wait_result,thread_exit[3]={STILL_ACTIVE,STILL_ACTIVE,STILL_ACTIVE};int i;
  rmtree(ROOT);rmtree(OUTD);
  ck(_mkdir(ROOT)==0&&_mkdir(OUTD)==0&&_mkdir(ROOT "\\D")==0,"mkdir");
  put(OUTD "\\victim","VICTIM");put(OUTD "\\r1","A1");put(OUTD "\\r2","A2");
- t0=GetTickCount();
+ t0=GetTickCount();g_diag_start=t0;
  th[0]=CreateThread(NULL,0,swapper,NULL,0,NULL);
  th[1]=CreateThread(NULL,0,writer,(LPVOID)(INT_PTR)0,0,NULL);
  th[2]=CreateThread(NULL,0,writer,(LPVOID)(INT_PTR)1,0,NULL);
  ck(th[0]&&th[1]&&th[2],"threads");
  while(GetTickCount()-t0<SWAP_BUDGET_MS){outside_intact("during swap");Sleep(50);}
  InterlockedExchange(&g_stop,1);
- WaitForMultipleObjects(3,th,TRUE,60000);
- for(i=0;i<3;i++)CloseHandle(th[i]);
+ wait_result=WaitForMultipleObjects(3,th,TRUE,60000);
+ for(i=0;i<3;i++){GetExitCodeThread(th[i],&thread_exit[i]);CloseHandle(th[i]);}
  outside_intact("after swap");
+ printf("race swap diag wait: result %lu thread_exit %lu %lu %lu\n",(unsigned long)wait_result,(unsigned long)thread_exit[0],(unsigned long)thread_exit[1],(unsigned long)thread_exit[2]);
+ printf("race swap diag window: post_join_elapsed_ms %lu budget_ms %d\n",(unsigned long)(GetTickCount()-t0),SWAP_BUDGET_MS);
+ for(i=0;i<2;i++){int b;printf("race swap diag writer %d: counted_calls %ld counted_ok %ld\n",i,(long)g_writer_calls[i],(long)g_writer_ok[i]);
+  for(b=0;b<10;b++)printf("race swap diag writer %d bin %d: calls %ld ok %ld\n",i,b,(long)g_bins_calls[i][b],(long)g_bins_ok[i][b]);}
+ for(i=0;i<16;i++)if(g_status[i])printf("race swap diag status %d: %ld\n",i,(long)g_status[i]);
  printf("race swap diag: calls %ld ok %ld swaps %ld junctions %ld bad %ld; ok per op move_out %ld copy_out %ld move_in %ld remove %ld copy_in %ld batch_replace %ld\n",
         (long)g_calls,(long)g_ok,(long)g_swaps,(long)g_junctions,(long)g_bad,(long)g_opok[0],(long)g_opok[1],
         (long)g_opok[2],(long)g_opok[3],(long)g_opok[4],(long)g_opok[5]);

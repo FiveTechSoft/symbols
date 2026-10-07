@@ -39,6 +39,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <time.h>
 
 #define ROOT "test_fs_race_parent_scratch"
@@ -48,6 +49,8 @@
 #ifndef MUTANT_CAP_MS
 #define MUTANT_CAP_MS 30000
 #endif
+#define DIAG_BINS 8 /* 500 ms completion bins; final bin includes all >= 3500 ms. */
+#define DIAG_STATUS 16
 #define CNTF "test_fs_race_parent_count"
 /* Non-mutant floor on successful calls per writer in the 4 s window: local minimum 224 over 27 runs, floor about a
    fifth of it. Not yet measured on the CI runner; if CI shows fewer, report before changing it. */
@@ -160,13 +163,26 @@ static int swapper(void)
     savecount(0, verified);
     return verified >= 5 ? 0 : 3;
 }
+static long diag_ms(struct timespec start)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (now.tv_sec - start.tv_sec) * 1000 + (now.tv_nsec - start.tv_nsec) / 1000000;
+}
 static int writer(int idx)
 {
     FS_READ_ROOT *r;
-    long ok = 0;
+    long ok = 0, calls = 0, op_calls[6] = {0}, op_ok[6] = {0}, status[DIAG_STATUS] = {0};
+    long bin_calls[DIAG_BINS] = {0}, bin_ok[DIAG_BINS] = {0}, other_status = 0;
+    long bin_status[DIAG_BINS][DIAG_STATUS] = {{0}}, max_batch_ms = 0;
+    struct timespec start, cpu_start, cpu_end;
+    struct rusage usage;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_start);
     if (FsReadOpen(ROOT, &r) != FS_READ_OK) return 5;
     while (!exists(STOPF))
     {
+        long batch_start = diag_ms(start);
         FS_READ_STATUS s[6];
         FS_BATCH_CREATE b[2] = { { "D/b1", "x", 1, 0666 }, { "D/b2", "y", 1, 0666 } };
         s[0] = FsCreateFile(r, "D/w", "v1", 2, 0666);
@@ -175,10 +191,36 @@ static int writer(int idx)
         s[3] = FsBatchCreate(r, b, 2);
         s[4] = FsRemoveFile(r, "D/b1", "x", 1);
         s[5] = FsRemoveFile(r, "D/b2", "y", 1);
-        for (int i = 0; i < 6; i++) if (s[i] == FS_READ_OK) ok++;
+        {
+            long ms = diag_ms(start);
+            int bin = (int)(ms / 500);
+            if (ms - batch_start > max_batch_ms) max_batch_ms = ms - batch_start;
+            if (bin >= DIAG_BINS) bin = DIAG_BINS - 1;
+            for (int i = 0; i < 6; i++)
+            {
+                calls++; op_calls[i]++; bin_calls[bin]++;
+                if ((unsigned)s[i] < DIAG_STATUS) { status[s[i]]++; bin_status[bin][s[i]]++; } else other_status++;
+                if (s[i] == FS_READ_OK) { ok++; op_ok[i]++; bin_ok[bin]++; }
+            }
+        }
         nap(1);
     }
     FsReadClose(r);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_end);
+    printf("RP diag writer %d: elapsed_ms %ld cpu_ms %ld calls %ld ok %ld other_status %ld\n", idx,
+           diag_ms(start), (cpu_end.tv_sec - cpu_start.tv_sec) * 1000 +
+           (cpu_end.tv_nsec - cpu_start.tv_nsec) / 1000000, calls, ok, other_status);
+    if (getrusage(RUSAGE_SELF, &usage) == 0) printf("RP diag writer %d sched: voluntary %ld involuntary %ld inblock %ld outblock %ld\n", idx, usage.ru_nvcsw, usage.ru_nivcsw, usage.ru_inblock, usage.ru_oublock);
+    for (int i = 0; i < 6; i++) printf("RP diag writer %d op %d: calls %ld ok %ld\n", idx, i, op_calls[i], op_ok[i]);
+    for (int i = 0; i < DIAG_STATUS; i++) if (status[i]) printf("RP diag writer %d status %d: %ld\n", idx, i, status[i]);
+    printf("RP diag writer %d max_batch_ms %ld\n", idx, max_batch_ms);
+    for (int i = 0; i < DIAG_BINS; i++)
+    {
+        printf("RP diag writer %d bin %d: calls %ld ok %ld", idx, i, bin_calls[i], bin_ok[i]);
+        for (int j = 0; j < DIAG_STATUS; j++) if (bin_status[i][j]) printf(" status%d=%ld", j, bin_status[i][j]);
+        printf("\n");
+    }
+    fflush(stdout);
     savecount(idx, ok);
     return ok > 0 ? 0 : 4;
 }
@@ -247,6 +289,17 @@ int main(void)
         st[k] = WEXITSTATUS(status);
     }
     outside_intact("after swap");
+    printf("RP diag window: elapsed_ms %ld budget_ms %d floor %d outside_mismatches %d\n", elapsed_ms, BUDGET_MS, RP_OK_FLOOR, mism);
+    {
+        DIR *d = opendir(ROOT);
+        struct dirent *e;
+        int n = 0;
+        printf("RP diag root dot names:");
+        while (d && (e = readdir(d))) if (e->d_name[0] == '.' && strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) { if (n < 20) printf(" %s", e->d_name); n++; }
+        if (d) closedir(d);
+        printf(" (count %d, first 20 shown)\n", n);
+    }
+    fflush(stdout);
     printf("  swapper exit %d (0 = symlink state verified >= 5 times), writers exit %d %d (0 = that writer had a call OK)\n", st[0], st[1], st[2]);
     rmtree(ROOT); rmtree(OUTD); (void)unlink(STOPF);
 #ifdef FS_PARENT_FOLLOW_MUTANT
