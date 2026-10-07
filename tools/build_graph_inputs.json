@@ -14,6 +14,20 @@
     "tools/wording_rewrites.py"
    ]
   },
+  "test_build_graph_dynamic": {
+   "files": [
+    "tests/test_build_graph_dynamic.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_dynamic/*"
+   ]
+  },
+  "test_build_graph_dynamic_mc": {
+   "files": [
+    "tests/test_build_graph_dynamic.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_dynamic/*"
+   ]
+  },
   "test_build_graph": {
    "files": [
     "tests/test_build_graph.py",

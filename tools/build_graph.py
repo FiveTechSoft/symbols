@@ -157,6 +157,23 @@ HEADER_EXT = (".h", ".hpp", ".hh", ".inc", ".inl")
 INCLUDE_RX = re.compile(r'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\n]+)[>"]', re.M)
 
 
+DYNAMIC_INCLUDE_RX = re.compile(r'^[ \t]*#[ \t]*include\b(?![ \t]*[<"])[^\n]*', re.M)
+
+
+def scan_dynamic_includes(root, files):
+    """Unknown include arguments cannot be resolved by a textual scan."""
+    dynamic = []
+    for f in sorted(files):
+        try:
+            text = open(os.path.join(root, f), encoding="utf-8", errors="replace").read()
+        except OSError:
+            dynamic.append(f)  # fail closed if a second read becomes unavailable
+            continue
+        if DYNAMIC_INCLUDE_RX.search(text):
+            dynamic.append(f)
+    return dynamic
+
+
 def scan_includes(root):
     """Textual include scan of the source tree. Returns (files, includers,
     unresolved): files is the set of scanned paths (relative, '/'), includers
@@ -204,6 +221,9 @@ def select(g, changed, scan=True, declared_targets=True):
     scanned, includers = set(), {}
     if scan and g.get("source"):
         scanned, includers, unresolved = scan_includes(g["source"])
+        dynamic = scan_dynamic_includes(g["source"], scanned)
+        if dynamic:
+            return full(["dynamic-include: %s" % f for f in dynamic[:5]])
         if unresolved:
             return full(["unresolved include: %s" % u for u in unresolved[:5]])
     hit, touched = set(), set()

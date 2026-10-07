@@ -1,0 +1,3 @@
+#define IMPLEMENTATION "../src/lib.c"
+#include IMPLEMENTATION
+int main(void){return lib();}
