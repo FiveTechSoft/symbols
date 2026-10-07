@@ -17,6 +17,10 @@ classified. Any other string, a missing field or an unknown Status gives
 "unknown", never "passed". A malformed or empty file exits 2 with no report.
 With --registered, a test the build registers but Test.xml lacks is reported as
 not_run with detail "absent from Test.xml" (for example after `ctest -R`).
+Structural ambiguity (wrong root/Testing layout, duplicate test identities, Name
+fields or critical measurements, including equal duplicates) exits 2 without JSON.
+Registered names must be nonempty unique strings and cover the XML result names.
+Unknown well-formed reason/status strings still produce unknown.
 Not measured: Windows reasons (CTest writes other strings there)."""
 import json, os, subprocess, sys
 import xml.etree.ElementTree as ET
@@ -53,8 +57,49 @@ def classify(status, exit_code, completion):
     return "unknown", "Status %r" % status
 
 
+CRITICAL_MEASUREMENTS = {"Exit Code", "Completion Status", "Exit Value", "Execution Time"}
+
+
+def validate_names(names, context):
+    if any(not isinstance(n, str) or not n.strip() for n in names):
+        raise ValueError("%s has an empty or invalid name" % context)
+    if len(names) != len(set(names)):
+        raise ValueError("%s has duplicate names" % context)
+
+
+def validate_structure(root):
+    """Validate real results before parsing; bare TestList entries are metadata."""
+    if root.tag != "Site":
+        raise ValueError("root is not Site")
+    sections = root.findall("Testing")
+    if len(sections) != 1 or len(list(root.iter("Testing"))) != 1:
+        raise ValueError("expected one direct Testing section")
+    section = sections[0]
+    real = section.findall("Test")
+    lists = section.findall("TestList")
+    listed = [t for group in lists for t in group.findall("Test")]
+    if len(real) + len(listed) != len(list(root.iter("Test"))) or any(len(t) or t.attrib for t in listed):
+        raise ValueError("Test outside result or bare TestList entry")
+    for t in real:
+        names = t.findall("Name")
+        if len(names) != 1 or len(names[0]):
+            raise ValueError("test needs exactly one scalar Name")
+        validate_names([t.findtext("Name")], "test")
+        critical = set()
+        for n in t.iter("NamedMeasurement"):
+            key = n.get("name")
+            if key in CRITICAL_MEASUREMENTS:
+                if key in critical:
+                    raise ValueError("duplicate critical measurement: %s" % key)
+                critical.add(key)
+                if len(n.findall("Value")) > 1:
+                    raise ValueError("duplicate critical measurement Value: %s" % key)
+    validate_names([t.findtext("Name") for t in real], "Test.xml")
+
+
 def parse(path):
     root = ET.parse(path).getroot()
+    validate_structure(root)
     out = []
     for t in root.iter("Test"):
         status = t.get("Status")
@@ -79,7 +124,9 @@ def registered(build):
     p = subprocess.run([os.environ.get("CTEST_COMMAND", "ctest"), "--test-dir", build, "--show-only=json-v1"], capture_output=True, text=True, timeout=60)
     if p.returncode != 0:
         raise ValueError("ctest --show-only failed")
-    return [t["name"] for t in json.loads(p.stdout)["tests"]]
+    names = [t["name"] for t in json.loads(p.stdout)["tests"]]
+    validate_names(names, "registered tests")
+    return names
 
 
 def main(argv):
@@ -92,7 +139,10 @@ def main(argv):
             raise ValueError("no test with a Status in the file")
         if len(argv) == 4:
             seen = set(r["name"] for r in recs)
-            for n in registered(argv[3]):
+            names = registered(argv[3])
+            if not (seen - {""}) <= set(names):
+                raise ValueError("Test.xml names are absent from registered tests")
+            for n in names:
                 if n not in seen:
                     recs.append({"name": n, "class": "not_run", "detail": "absent from Test.xml",
                                  "exit_code": None, "exit_value": None, "seconds": None})

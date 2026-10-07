@@ -854,6 +854,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report.py ${CMAKE_COMMAND} ${CMAKE_CTEST_COMMAND}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_ctest_report PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+    add_test(NAME test_ctest_report_structure
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ctest_report_structure.py ${CMAKE_COMMAND} ${CMAKE_CTEST_COMMAND}
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_ctest_report_structure PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
     add_test(NAME test_build_graph
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
