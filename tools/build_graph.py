@@ -160,6 +160,52 @@ INCLUDE_RX = re.compile(r'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\n]+)[>"]', re.M
 DYNAMIC_INCLUDE_RX = re.compile(r'^[ \t]*#[ \t]*include\b(?![ \t]*[<"])[^\n]*', re.M)
 
 
+def normalize_include_text(text):
+    """Splice physical lines and hide comments, preserving quoted tokens.
+    This is a textual scan, not conditional evaluation or macro expansion.
+    """
+    text = re.sub(r'\\\r?\n', '', text)
+    out, i = [], 0
+    while i < len(text):
+        if text.startswith('/*', i):
+            end = text.find('*/', i + 2)
+            if end < 0:
+                return ''.join(out), True
+            comment = text[i:end + 2]
+            out.append(' ' + '\n' * comment.count('\n'))
+            i = end + 2
+        elif text.startswith('//', i):
+            end = text.find('\n', i + 2)
+            i = len(text) if end < 0 else end
+            out.append(' ')
+        elif text[i] in ('"', "'"):
+            quote, start = text[i], i
+            i += 1
+            while i < len(text) and text[i] != '\n':
+                if text[i] == '\\':
+                    i += 2
+                elif text[i] == quote:
+                    i += 1
+                    break
+                else:
+                    i += 1
+            out.append(text[start:i])
+        else:
+            out.append(text[i])
+            i += 1
+    return ''.join(out), False
+
+
+def unsupported_include(text):
+    for m in re.finditer(r'^[ \t]*#[ \t]*(include|include_next|import)\b([^\n]*)', text, re.M):
+        arg = m.group(2).strip()
+        if m.group(1) != 'include':
+            return True
+        if arg.startswith(('"', '<')) and not re.fullmatch(r'"[^"\n]+"|<[^>\n]+>', arg):
+            return True
+    return False
+
+
 def scan_dynamic_includes(root, files):
     """Unknown include arguments cannot be resolved by a textual scan."""
     dynamic = []
@@ -169,7 +215,8 @@ def scan_dynamic_includes(root, files):
         except OSError:
             dynamic.append(f)  # fail closed if a second read becomes unavailable
             continue
-        if DYNAMIC_INCLUDE_RX.search(text):
+        text, malformed = normalize_include_text(text)
+        if malformed or unsupported_include(text) or DYNAMIC_INCLUDE_RX.search(text):
             dynamic.append(f)
     return dynamic
 
@@ -193,6 +240,7 @@ def scan_includes(root):
                 except OSError:
                     incs[rel] = None
                     continue
+                text, _ = normalize_include_text(text)
                 incs[rel] = [(m.group(1), os.path.basename(m.group(2))) for m in INCLUDE_RX.finditer(text)]
     bases = {os.path.basename(f) for f in files}
     includers, unresolved = collections.defaultdict(set), []

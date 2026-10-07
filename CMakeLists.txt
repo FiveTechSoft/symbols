@@ -886,6 +886,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_dynamic.py --mutant
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_build_graph_dynamic_mc PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
+    add_test(NAME test_build_graph_spelling
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_spelling.py
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_build_graph_spelling PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77)
 endif()
 sllm_test(test_agent_hard_tasks tests/test_agent_hard_tasks.c)
 sllm_test(test_tps_benchmark tests/test_tps_benchmark.c)
