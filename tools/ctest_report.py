@@ -21,6 +21,8 @@ Structural ambiguity (wrong root/Testing layout, duplicate test identities, Name
 fields or critical measurements, including equal duplicates) exits 2 without JSON.
 Registered names must be nonempty unique strings and cover the XML result names.
 Unknown well-formed reason/status strings still produce unknown.
+Registered JSON must be an object with a tests list of objects with names.
+A failed launch or timeout of the registered query exits 2 without JSON.
 Not measured: Windows reasons (CTest writes other strings there)."""
 import json, os, subprocess, sys
 import xml.etree.ElementTree as ET
@@ -124,7 +126,14 @@ def registered(build):
     p = subprocess.run([os.environ.get("CTEST_COMMAND", "ctest"), "--test-dir", build, "--show-only=json-v1"], capture_output=True, text=True, timeout=60)
     if p.returncode != 0:
         raise ValueError("ctest --show-only failed")
-    names = [t["name"] for t in json.loads(p.stdout)["tests"]]
+    data = json.loads(p.stdout)
+    if not isinstance(data, dict):
+        raise ValueError("registered metadata is not an object")
+    if not isinstance(data.get("tests"), list):
+        raise ValueError("registered tests is not a list")
+    if any(not isinstance(t, dict) or "name" not in t for t in data["tests"]):
+        raise ValueError("registered test is not an object with a name")
+    names = [t["name"] for t in data["tests"]]
     validate_names(names, "registered tests")
     return names
 
@@ -146,7 +155,7 @@ def main(argv):
                 if n not in seen:
                     recs.append({"name": n, "class": "not_run", "detail": "absent from Test.xml",
                                  "exit_code": None, "exit_value": None, "seconds": None})
-    except (ET.ParseError, OSError, ValueError, KeyError) as e:
+    except (ET.ParseError, OSError, subprocess.TimeoutExpired, ValueError, KeyError) as e:
         print("ctest_report: %s" % e, file=sys.stderr)
         return 2
     counts = {c: 0 for c in CLASSES}
