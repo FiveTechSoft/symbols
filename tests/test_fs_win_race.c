@@ -119,7 +119,26 @@ static volatile LONG g_rseq;                       /* counts real-phase starts s
 static volatile LONG g_opok[6],g_opn[6],g_opms[6],g_opmax[6]; /* g_opms: microseconds */
 static volatile LONG g_flipn,g_flipms,g_flipmax; /* microseconds */
 static volatile LONG g_stat[16];                  /* m216: writer call count per FS_READ_STATUS value (15 = anything above), a diagnostic, not a gate */
+/* Output-only diagnostics: endpoints are sampled immediately after each call.
+   Phase 0: not real at start; 1: same real phase at both endpoints;
+   2: started real but crossed a transition. This is not an OS-handle proof; mkdir failures are reported separately. */
+static volatile LONG g_phase_stat[6][3][16],g_bucket_stat[6][3][16];
+static volatile LONG g_first_ok[6],g_first_pending[6]; /* earliest call-start us + 1; 0 means absent */
+static volatile LONG g_mkdir_ok,g_mkdir_fail,g_remove_ok,g_remove_fail;
+static volatile LONG g_real_us,g_real_n,g_real_max,g_clear_us,g_clear_max;
+static volatile LONG g_thread_cpu_us[3];
 static LARGE_INTEGER g_qbase,g_qfreq;
+static void first_us(volatile LONG *slot,LONG value)
+{LONG old=*slot;
+ while(old==0||value<old){LONG seen=InterlockedCompareExchange(slot,value,old);
+  if(seen==old)return;old=seen;}}
+static LONG cpu_us(HANDLE h,int process)
+{FILETIME c,e,k,u;ULARGE_INTEGER kk,uu;
+ if(!(process?GetProcessTimes(h,&c,&e,&k,&u):GetThreadTimes(h,&c,&e,&k,&u)))return -1;
+ kk.LowPart=k.dwLowDateTime;kk.HighPart=k.dwHighDateTime;
+ uu.LowPart=u.dwLowDateTime;uu.HighPart=u.dwHighDateTime;
+ return (LONG)((kk.QuadPart+uu.QuadPart)/10);}
+
 /* microseconds since the start of cell E; GetTickCount would tick only every 15.6 ms */
 static LONG now_us(void)
 {LARGE_INTEGER q;QueryPerformanceCounter(&q);
@@ -142,55 +161,79 @@ static void clear_dir(const char *dir)
    snprintf(p,sizeof(p),"%s\\%s",dir,d.cFileName);DeleteFileA(p);}}while(FindNextFileA(h,&d));
  FindClose(h);}
 static DWORD WINAPI swapper(LPVOID p)
-{(void)p;
+{LONG real_start=-1;(void)p;
  while(!g_stop){
   /* real directory -> junction */
-  clear_dir(ROOT "\\D");
+  {LONG t=now_us(),d;clear_dir(ROOT "\\D");d=now_us()-t;
+   InterlockedExchangeAdd(&g_clear_us,d);if(d>g_clear_max)g_clear_max=d;}
   InterlockedExchange(&g_real,0);
+  if(real_start>=0){LONG d=now_us()-real_start;g_real_us+=d;g_real_n++;
+   if(d>g_real_max)g_real_max=d;real_start=-1;}
   if(RemoveDirectoryA(ROOT "\\D")){
+   InterlockedIncrement(&g_remove_ok);
    flip_to_junction();
    {DWORD a=GetFileAttributesA(ROOT "\\D");
     if(a!=INVALID_FILE_ATTRIBUTES&&(a&FILE_ATTRIBUTE_REPARSE_POINT))InterlockedIncrement(&g_junctions);}
    Sleep(15);
    /* junction -> real directory */
-   if(RemoveDirectoryA(ROOT "\\D")){_mkdir(ROOT "\\D");InterlockedIncrement(&g_rseq);InterlockedExchange(&g_real,1);}
+   if(RemoveDirectoryA(ROOT "\\D")){int rc;
+    InterlockedIncrement(&g_remove_ok);rc=_mkdir(ROOT "\\D");
+    if(rc==0)InterlockedIncrement(&g_mkdir_ok);else InterlockedIncrement(&g_mkdir_fail);
+    InterlockedIncrement(&g_rseq);InterlockedExchange(&g_real,1);real_start=now_us();
+   }else InterlockedIncrement(&g_remove_fail);
    Sleep(REAL_HOLD_MS); /* hold the real phase so writers get a window */
    InterlockedIncrement(&g_swaps);
-  }else Sleep(5);
+  }else {InterlockedIncrement(&g_remove_fail);Sleep(5);}
  }
+ if(real_start>=0){LONG d=now_us()-real_start;g_real_us+=d;g_real_n++;
+  if(d>g_real_max)g_real_max=d;}
+ g_thread_cpu_us[0]=cpu_us(GetCurrentThread(),0);
  /* leave a real directory behind */
  if(!exists(ROOT "\\D"))_mkdir(ROOT "\\D");
  return 0;}
+typedef struct {FS_READ_ROOT *root;int slot;} WRITER_ARG;
 static DWORD WINAPI writer(LPVOID p)
-{FS_READ_ROOT *r=(FS_READ_ROOT*)p;
+{WRITER_ARG *arg=(WRITER_ARG*)p;FS_READ_ROOT *r=arg->root;
  while(!g_stop){
   FS_READ_STATUS s[6];
   FS_BATCH_CREATE b[2]={{"D/b1","x",1,0666},{"D/b2","y",1,0666}};
-  LONG t[7],seq0[6],real0[6];
+  LONG t[7],seq0[6],real0[6],seq1[6],real1[6];
   t[0]=now_us();seq0[0]=g_rseq;real0[0]=g_real;
   s[0]=FsCreateFile(r,"D/w","v1",2,0666);
+  seq1[0]=g_rseq;real1[0]=g_real;
   t[1]=now_us();seq0[1]=g_rseq;real0[1]=g_real;
   s[1]=FsReplaceFile(r,"D/w","v1",2,"v2",2);
+  seq1[1]=g_rseq;real1[1]=g_real;
   t[2]=now_us();seq0[2]=g_rseq;real0[2]=g_real;
   s[2]=FsRemoveFile(r,"D/w","v2",2);
+  seq1[2]=g_rseq;real1[2]=g_real;
   t[3]=now_us();seq0[3]=g_rseq;real0[3]=g_real;
   s[3]=FsBatchCreate(r,b,2);
+  seq1[3]=g_rseq;real1[3]=g_real;
   t[4]=now_us();seq0[4]=g_rseq;real0[4]=g_real;
   s[4]=FsRemoveFile(r,"D/b1","x",1);
+  seq1[4]=g_rseq;real1[4]=g_real;
   t[5]=now_us();seq0[5]=g_rseq;real0[5]=g_real;
   s[5]=FsRemoveFile(r,"D/b2","y",1);
+  seq1[5]=g_rseq;real1[5]=g_real;
   t[6]=now_us();
   for(int i=0;i<6;i++){LONG d=t[i+1]-t[i];
    InterlockedIncrement(&g_calls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_ok);
    InterlockedIncrement(&g_opn[i]);InterlockedExchangeAdd(&g_opms[i],d);
    if(d>g_opmax[i])InterlockedExchange(&g_opmax[i],d);
    if(s[i]==FS_READ_OK)InterlockedIncrement(&g_opok[i]);
-   {int q=(int)s[i];if(q<0||q>14)q=15;InterlockedIncrement(&g_stat[q]);}
-   /* a call counts as inside a real phase when D was real at its start and no new real phase began since;
-      the junction phase in between is not observed, so this is an upper bound on calls with a real parent */
-   if(real0[i]&&g_real&&g_rseq==seq0[i]){InterlockedIncrement(&g_rcalls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_rok);}}
+   {int q=(int)s[i],phase=real0[i]?(real1[i]&&seq1[i]==seq0[i]?1:2):0;
+    int bucket=t[i]/5000000;if(bucket>5)bucket=5;
+    if(q<0||q>14)q=15;InterlockedIncrement(&g_stat[q]);
+    InterlockedIncrement(&g_phase_stat[i][phase][q]);
+    InterlockedIncrement(&g_bucket_stat[bucket][phase][q]);
+    if(s[i]==FS_READ_OK)first_us(&g_first_ok[i],t[i]+1);
+    if(s[i]==FS_READ_PENDING)first_us(&g_first_pending[i],t[i]+1);}
+   /* Endpoint samples describe the swapper's marker, not the parent handle held by the call. */
+   if(real0[i]&&real1[i]&&seq1[i]==seq0[i]){InterlockedIncrement(&g_rcalls);if(s[i]==FS_READ_OK)InterlockedIncrement(&g_rok);}}
   Sleep(1);
  }
+ g_thread_cpu_us[arg->slot]=cpu_us(GetCurrentThread(),0);
  return 0;}
 static void outside_intact(const char *when)
 {WIN32_FIND_DATAA d;HANDLE h=FindFirstFileA(OUTD "\\*",&d);int n=0;char m[96];
@@ -244,12 +287,13 @@ int main(int argc,char **argv)
   only_fixture_names("D");recovers(r,"D");
  }
  /* E */
- {HANDLE th[3];DWORD t0=GetTickCount();
+ {HANDLE th[3];WRITER_ARG args[2]={{r,1},{r,2}};DWORD t0=GetTickCount(),wait_result,thread_exit[3];
+  LONG process_cpu0=cpu_us(GetCurrentProcess(),1),process_cpu1;
   QueryPerformanceFrequency(&g_qfreq);QueryPerformanceCounter(&g_qbase);
   ck(_mkdir(ROOT "\\D")==0,"mkdir D");
   th[0]=CreateThread(NULL,0,swapper,NULL,0,NULL);
-  th[1]=CreateThread(NULL,0,writer,r,0,NULL);
-  th[2]=CreateThread(NULL,0,writer,r,0,NULL);
+  th[1]=CreateThread(NULL,0,writer,&args[0],0,NULL);
+  th[2]=CreateThread(NULL,0,writer,&args[1],0,NULL);
   ck(th[0]&&th[1]&&th[2],"threads");
   /* m214: the window is SWAP_BUDGET_MS; if no writer call has succeeded by then (the cell E flake: 0 OK, so the invariant
      was checked over a window in which the writers did nothing), it is extended in 50 ms steps until the first success or
@@ -258,11 +302,26 @@ int main(int argc,char **argv)
   while(GetTickCount()-t0<SWAP_BUDGET_MS||(g_ok==0&&GetTickCount()-t0<SWAP_CAP_MS)){outside_intact("during swap");Sleep(50);}
   g_window_ms=GetTickCount()-t0;
   InterlockedExchange(&g_stop,1);
-  WaitForMultipleObjects(3,th,TRUE,60000);
-  for(int i=0;i<3;i++)CloseHandle(th[i]);
+  wait_result=WaitForMultipleObjects(3,th,TRUE,60000);
+  for(int i=0;i<3;i++){thread_exit[i]=STILL_ACTIVE;GetExitCodeThread(th[i],&thread_exit[i]);CloseHandle(th[i]);}
+  process_cpu1=cpu_us(GetCurrentProcess(),1);
   outside_intact("after swap");
   /* printed BEFORE the guards, so a failing run still carries the numbers */
   printf("E window: %lu ms (budget %d, cap %d, extended %d)\n",(unsigned long)g_window_ms,SWAP_BUDGET_MS,SWAP_CAP_MS,g_window_ms>SWAP_BUDGET_MS+100);
+  printf("E diag join: wait %lu exits %lu %lu %lu; process_cpu_us %ld thread_cpu_us %ld %ld %ld\n",
+    (unsigned long)wait_result,(unsigned long)thread_exit[0],(unsigned long)thread_exit[1],(unsigned long)thread_exit[2],
+    (long)((process_cpu0<0||process_cpu1<0)?-1:process_cpu1-process_cpu0),
+    (long)g_thread_cpu_us[0],(long)g_thread_cpu_us[1],(long)g_thread_cpu_us[2]);
+  printf("E diag phase: mkdir_ok %ld fail %ld remove_ok %ld fail %ld; marker_real_us %ld n %ld max %ld; clear_us %ld max %ld\n",
+    (long)g_mkdir_ok,(long)g_mkdir_fail,(long)g_remove_ok,(long)g_remove_fail,
+    (long)g_real_us,(long)g_real_n,(long)g_real_max,(long)g_clear_us,(long)g_clear_max);
+  for(int i=0;i<6;i++){
+   printf("E diag first op %d: ok_us %ld pending_us %ld\n",i,
+     (long)(g_first_ok[i]?g_first_ok[i]-1:-1),(long)(g_first_pending[i]?g_first_pending[i]-1:-1));
+   for(int phase=0;phase<3;phase++){printf("E diag op_phase %d %d:",i,phase);
+    for(int q=0;q<16;q++)if(g_phase_stat[i][phase][q])printf(" %d=%ld",q,(long)g_phase_stat[i][phase][q]);printf("\n");}}
+  for(int bucket=0;bucket<6;bucket++)for(int phase=0;phase<3;phase++){printf("E diag bucket %d phase %d (start_us %d):",bucket,phase,bucket*5000000);
+   for(int q=0;q<16;q++)if(g_bucket_stat[bucket][phase][q])printf(" %d=%ld",q,(long)g_bucket_stat[bucket][phase][q]);printf("\n");}
   printf("E diag: calls %ld ok %ld; inside-one-real-phase calls %ld ok %ld; swaps %ld junctions %ld; flip us n %ld avg %ld max %ld\n",
          (long)g_calls,(long)g_ok,(long)g_rcalls,(long)g_rok,(long)g_swaps,(long)g_junctions,
          (long)g_flipn,(long)(g_flipn?g_flipms/g_flipn:0),(long)g_flipmax);
