@@ -122,7 +122,15 @@ static volatile LONG g_stat[16];                  /* m216: writer call count per
 /* Output-only diagnostics: endpoints are sampled immediately after each call.
    Phase 0: not real at start; 1: same real phase at both endpoints;
    2: started real but crossed a transition. This is not an OS-handle proof; mkdir failures are reported separately. */
-static volatile LONG g_phase_stat[6][3][16],g_bucket_stat[6][3][16];
+/* Trap stays armed in CI: fine early buckets, bounded coarse tail to the cap.
+   Per-op counts distinguish the first pending operation from later refusals. */
+#define E_BUCKETS 31
+static volatile LONG g_phase_stat[6][3][16],g_bucket_stat[E_BUCKETS][6][3][16];
+static int bucket_start_us(int bucket)
+{return bucket<20?bucket*100000:bucket<26?2000000+(bucket-20)*500000:5000000+(bucket-26)*5000000;}
+static int bucket_for_us(LONG us)
+{int bucket=us<2000000?(int)(us/100000):us<5000000?20+(int)((us-2000000)/500000):26+(int)((us-5000000)/5000000);
+ return bucket<0?0:bucket>=E_BUCKETS?E_BUCKETS-1:bucket;}
 static volatile LONG g_first_ok[6],g_first_pending[6]; /* earliest call-start us + 1; 0 means absent */
 static volatile LONG g_mkdir_ok,g_mkdir_fail,g_remove_ok,g_remove_fail;
 static volatile LONG g_real_us,g_real_n,g_real_max,g_clear_us,g_clear_max;
@@ -223,10 +231,10 @@ static DWORD WINAPI writer(LPVOID p)
    if(d>g_opmax[i])InterlockedExchange(&g_opmax[i],d);
    if(s[i]==FS_READ_OK)InterlockedIncrement(&g_opok[i]);
    {int q=(int)s[i],phase=real0[i]?(real1[i]&&seq1[i]==seq0[i]?1:2):0;
-    int bucket=t[i]/5000000;if(bucket>5)bucket=5;
+    int bucket=bucket_for_us(t[i]);
     if(q<0||q>14)q=15;InterlockedIncrement(&g_stat[q]);
     InterlockedIncrement(&g_phase_stat[i][phase][q]);
-    InterlockedIncrement(&g_bucket_stat[bucket][phase][q]);
+    InterlockedIncrement(&g_bucket_stat[bucket][i][phase][q]);
     if(s[i]==FS_READ_OK)first_us(&g_first_ok[i],t[i]+1);
     if(s[i]==FS_READ_PENDING)first_us(&g_first_pending[i],t[i]+1);}
    /* Endpoint samples describe the swapper's marker, not the parent handle held by the call. */
@@ -320,8 +328,12 @@ int main(int argc,char **argv)
      (long)(g_first_ok[i]?g_first_ok[i]-1:-1),(long)(g_first_pending[i]?g_first_pending[i]-1:-1));
    for(int phase=0;phase<3;phase++){printf("E diag op_phase %d %d:",i,phase);
     for(int q=0;q<16;q++)if(g_phase_stat[i][phase][q])printf(" %d=%ld",q,(long)g_phase_stat[i][phase][q]);printf("\n");}}
-  for(int bucket=0;bucket<6;bucket++)for(int phase=0;phase<3;phase++){printf("E diag bucket %d phase %d (start_us %d):",bucket,phase,bucket*5000000);
-   for(int q=0;q<16;q++)if(g_bucket_stat[bucket][phase][q])printf(" %d=%ld",q,(long)g_bucket_stat[bucket][phase][q]);printf("\n");}
+  for(int bucket=0;bucket<E_BUCKETS;bucket++)for(int i=0;i<6;i++)for(int phase=0;phase<3;phase++){
+   int any=0;for(int q=0;q<16;q++)if(g_bucket_stat[bucket][i][phase][q])any=1;
+   if(!any)continue; /* omit empty rows, never omit a recorded count */
+   printf("E diag bucket %d op %d phase %d (start_us %d end_us %d):",bucket,i,phase,
+     bucket_start_us(bucket),bucket_start_us(bucket+1));
+   for(int q=0;q<16;q++)if(g_bucket_stat[bucket][i][phase][q])printf(" %d=%ld",q,(long)g_bucket_stat[bucket][i][phase][q]);printf("\n");}
   printf("E diag: calls %ld ok %ld; inside-one-real-phase calls %ld ok %ld; swaps %ld junctions %ld; flip us n %ld avg %ld max %ld\n",
          (long)g_calls,(long)g_ok,(long)g_rcalls,(long)g_rok,(long)g_swaps,(long)g_junctions,
          (long)g_flipn,(long)(g_flipn?g_flipms/g_flipn:0),(long)g_flipmax);
