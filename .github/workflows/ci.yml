@@ -39,8 +39,14 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
+          Write-Output "E diag runner logical_cpus=$([Environment]::ProcessorCount)"
           foreach ($i in 1..3) {
-            ctest --test-dir build -C Release -R '^test_fs_win_race$' -V | Select-String -Pattern 'E diag|fs win race ok|Test +#|FAIL'
+            $cpuBefore = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+            Write-Output "E diag iteration=$i cpu_load_before=$cpuBefore"
+            ctest --test-dir build -C Release -R '^test_fs_win_race$' -V | Select-String -Pattern 'E window|E diag|fs win race ok|Test +#|FAIL'
+            $testExit = $LASTEXITCODE
+            $cpuAfter = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+            Write-Output "E diag iteration=$i ctest_exit=$testExit cpu_load_after=$cpuAfter"
           }
       - name: Corpus lint (gate)
         run: python tools/lint_corpus.py --check
