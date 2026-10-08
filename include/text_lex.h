@@ -63,6 +63,12 @@ typedef struct
        one file per store; freed with the store) */
     unsigned char *image;
     size_t imagelen;
+    /* per-store inverted index (symbol -> sentences), rebuilt on
+       every ingest of THIS store; NULL before first ingest and for
+       large corpora. Owned by the store, freed by TextLexClear.
+       Per-store so a retrieve never reads sentence indices from
+       another file's store (multi-file chat contexts). */
+    struct tl_invindex *inv;
 } TEXTLEX;
 
 TEXTLEX *TextLexCreate(void);

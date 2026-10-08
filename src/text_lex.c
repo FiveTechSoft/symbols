@@ -40,15 +40,25 @@ typedef struct
     uint32_t cap;
 } TL_INVENTRY;
 
-typedef struct
+struct tl_invindex
 {
     TL_INVENTRY *entries;
     uint32_t nent;
     uint32_t cap;
     int ready;
-} TL_INVINDEX;
+};
+typedef struct tl_invindex TL_INVINDEX;
 
-static TL_INVINDEX g_invindex = {NULL, 0, 0, 0};
+static void InvIndexFree(TL_INVINDEX *inv)
+{
+    uint32_t ei;
+    if (inv == NULL)
+        return;
+    for (ei = 0; ei < inv->nent; ei++)
+        free(inv->entries[ei].sents);
+    free(inv->entries);
+    free(inv);
+}
 
 /* Phase 4: KV-cache — per-session cache for query token novelty.
    Avoids recomputing 1/(1+freq) for repeated query tokens. */
@@ -133,6 +143,8 @@ void TextLexClear(TEXTLEX *tl){
     free(tl->image);
     tl->image = NULL;
     tl->imagelen = 0;
+    InvIndexFree(tl->inv);
+    tl->inv = NULL;
 }
 
 void TextLexFree(TEXTLEX *tl)
@@ -310,7 +322,8 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
                       const float *qnov, const uint32_t *qpos,
                       uint32_t nq, const uint32_t *qsig,
                       const GRAPH *graph,
-                      const EMBEDDING_TABLE *emb)
+                      const EMBEDDING_TABLE *emb,
+                      const TL_INVINDEX *inv)
 {
     float qsum[EMBEDDING_DIM];
     float ssum[EMBEDDING_DIM];
@@ -346,14 +359,14 @@ static float QKVScore(const TL_SENT *s, const SYMBOL_ID *qids,
             if (g_scoring & SF_RARITY)
             {
                 float nv = qnov[i];
-                if (g_invindex.ready)
+                if (inv != NULL && inv->ready)
                 {
                     uint32_t ei;
-                    for (ei = 0; ei < g_invindex.nent; ei++)
+                    for (ei = 0; ei < inv->nent; ei++)
                     {
-                        if (g_invindex.entries[ei].sym == qids[i])
+                        if (inv->entries[ei].sym == qids[i])
                         {
-                            nv = g_invindex.entries[ei].novelty;
+                            nv = inv->entries[ei].novelty;
                             break;
                         }
                     }
@@ -871,25 +884,28 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
            candidate sentences (those containing >=1 query symbol)
            instead of scanning all sentences. O(matches) vs O(nsent).
            Skip for large corpora (>10k sentences) to avoid build cost. */
-        if (tl->nsent < 10000 && g_invindex.ready)
+        if (tl->nsent < 10000 && tl->inv != NULL && tl->inv->ready)
         {
             /* build candidate set from inverted index */
             char *seen = (char *)calloc(tl->nsent, 1);
             uint32_t *cands = NULL;
             uint32_t ncands = 0;
             uint32_t ci;
-            for (i = 0; i < nq && g_invindex.ready; i++)
+            for (i = 0; i < nq; i++)
             {
                 uint32_t ei;
-                for (ei = 0; ei < g_invindex.nent; ei++)
+                for (ei = 0; ei < tl->inv->nent; ei++)
                 {
-                    if (g_invindex.entries[ei].sym == qids[i])
+                    if (tl->inv->entries[ei].sym == qids[i])
                     {
-                        TL_INVENTRY *e = &g_invindex.entries[ei];
+                        TL_INVENTRY *e = &tl->inv->entries[ei];
                         for (ci = 0; ci < e->nsents; ci++)
                         {
                             uint32_t si = e->sents[ci];
-                            if (!seen[si])
+                            /* bounds check: the index is built from
+                               this same store, so si < nsent holds;
+                               keep the guard as cheap insurance */
+                            if (si < tl->nsent && !seen[si])
                             {
                                 seen[si] = 1;
                                 ncands++;
@@ -957,7 +973,7 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
                 uint32_t j;
                 i = cands[ci];
                 sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
-                              qsig, graph, emb);
+                              qsig, graph, emb, tl->inv);
                 if (sc <= 0.0f)
                     continue;
                 j = nret;
@@ -1001,7 +1017,7 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
                     float sc;
                     uint32_t j;
                     sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
-                                  qsig, graph, emb);
+                                  qsig, graph, emb, tl->inv);
                     if (sc <= 0.0f)
                         continue;
                     j = nret;
@@ -1046,7 +1062,7 @@ uint32_t TextLexRetrieve(const TEXTLEX *tl, const GRAPH *graph,
                 float sc;
                 uint32_t j;
                 sc = QKVScore(&tl->sents[i], qids, qnov, qpos, nq,
-                              qsig, graph, emb);
+                              qsig, graph, emb, tl->inv);
                 if (sc <= 0.0f)
                     continue;
                 j = nret;
@@ -1166,22 +1182,21 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
         TopDims(cent, s->sig, TL_TOPM);
         s->sig_ready = 1;
     }
-    /* Build inverted index: symbol → sentences containing it + novelty.
-       Skip for large corpora (>10k sentences) to avoid build cost. */
+    /* Build THIS store's inverted index: symbol -> sentences containing
+       it + novelty. Rebuilt on every ingest; the old index is dropped
+       first, so a large re-ingest never leaves a stale index describing
+       a previous sentence space. Skipped for large corpora (>10k
+       sentences) to avoid build cost (index stays NULL). */
+    InvIndexFree(tl->inv);
+    tl->inv = NULL;
     if (tl->nsent < 10000)
     {
+        TL_INVINDEX *inv = (TL_INVINDEX *)calloc(1, sizeof(TL_INVINDEX));
         uint32_t si;
-        if (g_invindex.entries != NULL)
-        {
-            for (si = 0; si < g_invindex.nent; si++)
-                free(g_invindex.entries[si].sents);
-            free(g_invindex.entries);
-        }
-        g_invindex.nent = 0;
-        g_invindex.cap = 256;
-        g_invindex.entries = (TL_INVENTRY *)calloc(g_invindex.cap,
-                                                   sizeof(TL_INVENTRY));
-        g_invindex.ready = 1;
+        inv->cap = 256;
+        inv->entries = (TL_INVENTRY *)calloc(inv->cap,
+                                             sizeof(TL_INVENTRY));
+        inv->ready = 1;
         for (si = 0; si < tl->nsent; si++)
         {
             TL_SENT *s = &tl->sents[si];
@@ -1191,11 +1206,11 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
                 SYMBOL_ID id = s->ids[ti];
                 uint32_t ei;
                 int found = 0;
-                for (ei = 0; ei < g_invindex.nent; ei++)
+                for (ei = 0; ei < inv->nent; ei++)
                 {
-                    if (g_invindex.entries[ei].sym == id)
+                    if (inv->entries[ei].sym == id)
                     {
-                        TL_INVENTRY *e = &g_invindex.entries[ei];
+                        TL_INVENTRY *e = &inv->entries[ei];
                         if (e->nsents >= e->cap)
                         {
                             e->cap = e->cap ? e->cap * 2 : 16;
@@ -1211,14 +1226,14 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
                 {
                     TL_INVENTRY *e;
                     const SYMBOL *sym;
-                    if (g_invindex.nent >= g_invindex.cap)
+                    if (inv->nent >= inv->cap)
                     {
-                        g_invindex.cap *= 2;
-                        g_invindex.entries = (TL_INVENTRY *)realloc(
-                            g_invindex.entries,
-                            g_invindex.cap * sizeof(TL_INVENTRY));
+                        inv->cap *= 2;
+                        inv->entries = (TL_INVENTRY *)realloc(
+                            inv->entries,
+                            inv->cap * sizeof(TL_INVENTRY));
                     }
-                    e = &g_invindex.entries[g_invindex.nent];
+                    e = &inv->entries[inv->nent];
                     e->sym = id;
                     e->sents = (uint32_t *)malloc(16 * sizeof(uint32_t));
                     e->sents[0] = si;
@@ -1227,10 +1242,11 @@ static void FinalizeSigs(TEXTLEX *tl, GRAPH *graph,
                     sym = SymbolGet(graph ? graph->symbols : NULL, id);
                     e->novelty = (sym == NULL) ? 1.0f
                                               : 1.0f / (1.0f + (float)sym->frequency);
-                    g_invindex.nent++;
+                    inv->nent++;
                 }
             }
         }
+        tl->inv = inv;
     }
 }
 
