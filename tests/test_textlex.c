@@ -35,6 +35,94 @@ static int IsContentByte(unsigned char c)
            (c >= '0' && c <= '9') || c >= 0x80;
 }
 
+/* Explicit evidence gold: sentence boundaries remain legacy; label context is
+   separately optional. Unsupported forms and year ambiguity are not solved. */
+static void CheckRetrievalSpanFixture(const char *bytes, const char *query,
+                                     const char *content, const char *label)
+{
+    const char *path = "textlex_retrieval_span_regression.txt";
+    FILE *f = fopen(path, "wb");
+    int written = f && fwrite(bytes, 1, strlen(bytes), f) == strlen(bytes);
+    if (f) fclose(f);
+    check("retrieval-span fixture written", written);
+    if (!written) return;
+    GRAPH *g = GraphCreate(512, 256);
+    EMBEDDING_TABLE *e = EmbeddingTableCreate(512);
+    TEXTLEX *t = TextLexCreate();
+    GraphSetEmbeddingTable(g, e); TextLexPosReset();
+    TEXTLEX_STATS a = TextLexIngest(g, t, path, 1, 0);
+    const char *q[] = {query}; uint32_t ix[8], ix2[8]; float sc[8], sc2[8];
+    uint32_t n = TextLexRetrieve(t, g, e, q, 1, ix, sc, 8);
+    check("retrieval-span query source hit", n > 0);
+    if (n)
+    {
+        TL_RETRIEVAL_SPANS spans;
+        const char *source_content = strstr(bytes, content);
+        const char *source_label = label ? strstr(bytes, label) : NULL;
+        int valid = TextLexRetrievalSpans(t, ix[0], &spans);
+        check("retrieval-span content gold", valid && source_content &&
+              spans.content_first == (uint64_t)(source_content - bytes) &&
+              spans.content_end - spans.content_first == strlen(content) &&
+              memcmp(t->image + spans.content_first, content, strlen(content)) == 0);
+        check("retrieval-span label gold", valid &&
+              spans.has_label == (label != NULL) &&
+              (label ? source_label && spans.label_first == (uint64_t)(source_label - bytes) &&
+               spans.label_end - spans.label_first == strlen(label) &&
+               memcmp(t->image + spans.label_first, label, strlen(label)) == 0 :
+               spans.label_first == 0 && spans.label_end == 0));
+        check("retrieval-span combined gold", valid && spans.combined_end == spans.content_end &&
+              spans.combined_first == (label ? spans.label_first : spans.content_first) &&
+              spans.combined_end <= t->imagelen);
+        uint32_t n2 = TextLexRetrieve(t, g, e, q, 1, ix2, sc2, 8);
+        check("retrieval-span call leaves ranking exact", n == n2 &&
+              memcmp(ix, ix2, n * sizeof(ix[0])) == 0 &&
+              memcmp(sc, sc2, n * sizeof(sc[0])) == 0);
+    }
+    TEXTLEX_STATS b = TextLexIngest(g, t, path, 1, 0);
+    check("retrieval-span replay idempotent", b.nsent_new == 0 && b.syms_new == 0 &&
+          b.ntok_kept == 0 && b.pair_updates == 0);
+    check("retrieval-span image exact and lines covered", t->imagelen == strlen(bytes) &&
+          memcmp(t->image, bytes, strlen(bytes)) == 0 && a.lines_content == a.lines_covered);
+    const char *absent[] = {"zzyyzzspanabsent20261012"};
+    check("retrieval-span absent zero", TextLexRetrieve(t, g, e, absent, 1, ix, sc, 8) == 0);
+    TL_RETRIEVAL_SPANS bad;
+    memset(&bad, 0xff, sizeof(bad));
+    check("retrieval-span invalid idx cleared", !TextLexRetrievalSpans(t, UINT32_MAX, &bad) &&
+          bad.content_first == 0 && bad.combined_end == 0 && bad.has_label == 0);
+    check("retrieval-span null inputs safe", !TextLexRetrievalSpans(NULL, 0, &bad) &&
+          !TextLexRetrievalSpans(t, 0, NULL));
+    TextLexFree(t); EmbeddingTableDestroy(e); GraphDestroy(g);
+    check("retrieval-span fixture removed", remove(path) == 0);
+}
+
+static void CheckRetrievalSpans(void)
+{
+    CheckRetrievalSpanFixture("Intro:\n1. Alpha content.\n2. Beta content.\n", "Alpha", "Alpha content.", "1.");
+    CheckRetrievalSpanFixture("Intro:\n1. Alpha content.\n2. Beta content.\n", "Beta", "Beta content.", "2.");
+    CheckRetrievalSpanFixture("12. Alpha content. More detail.\n", "Alpha", "Alpha content.", "12.");
+    CheckRetrievalSpanFixture("12. Alpha content. More detail.\n", "More", "More detail.", NULL);
+    CheckRetrievalSpanFixture("1. Primer postulado\nContenido completo.\n", "Contenido", "Primer postulado\nContenido completo.", "1.");
+    CheckRetrievalSpanFixture("Intro:\r\n1. Alpha content.\r\n", "Alpha", "Alpha content.", "1.");
+    CheckRetrievalSpanFixture("Count 7. Next sentence.\n", "Next", "Next sentence.", NULL);
+    CheckRetrievalSpanFixture("Value 1.7 seconds.\n", "seconds", "Value 1.7 seconds.", NULL);
+    CheckRetrievalSpanFixture("Year 2026. Next year.\n", "Next", "Next year.", NULL);
+    CheckRetrievalSpanFixture("Measure 7. Next measure.\n", "Next", "Next measure.", NULL);
+    CheckRetrievalSpanFixture("Version 1.2.3 remains.\n", "Version", "Version 1.2.3 remains.", NULL);
+    CheckRetrievalSpanFixture("Date 2026-10-12 remains.\n", "Date", "Date 2026-10-12 remains.", NULL);
+    CheckRetrievalSpanFixture("1.\nContenido.\n", "Contenido", "Contenido.", NULL);
+    CheckRetrievalSpanFixture("  1. Alpha content.\n", "Alpha", "Alpha content.", NULL);
+    CheckRetrievalSpanFixture("1. Alpha.\n    2. Beta.\n", "Beta", "Beta.", NULL);
+    CheckRetrievalSpanFixture("1) Alpha content.\n", "Alpha", "1) Alpha content.", NULL);
+    CheckRetrievalSpanFixture("a) Alpha content.\n", "Alpha", "a) Alpha content.", NULL);
+    CheckRetrievalSpanFixture("1.\tAlpha content.\n", "Alpha", "Alpha content.", NULL);
+    CheckRetrievalSpanFixture("1.  Alpha content.\n", "Alpha", "Alpha content.", NULL);
+    CheckRetrievalSpanFixture("1. Extra. Beta content.\n", "Beta", "Beta content.", NULL);
+    CheckRetrievalSpanFixture("7. Next sentence.\n", "Next", "Next sentence.", "7."); /* ambiguous FP */
+    CheckRetrievalSpanFixture("Reference:\n1909. This is the work.\n", "This", "This is the work.", "1909."); /* known FP, not semantic success */
+    CheckRetrievalSpanFixture("Formula f(x)=x^2 remains.\n", "Formula", "Formula f(x)=x^2 remains.", NULL);
+    CheckRetrievalSpanFixture("Code foo(1.7); Count 7. Next sentence.\n", "Next", "Next sentence.", NULL);
+}
+
 int main(void)
 {
     GRAPH *g = GraphCreate(65536, 256);
@@ -364,6 +452,7 @@ int main(void)
         }
         check("decimal fixture removed", remove(fixture) == 0);
     }
+    CheckRetrievalSpans();
     printf("test_textlex: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

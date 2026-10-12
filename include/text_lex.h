@@ -83,6 +83,25 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
                             uint32_t first_line, uint32_t last_line);
 uint32_t TextLexSentCount(const TEXTLEX *tl);
 const TL_SENT *TextLexSentence(const TEXTLEX *tl, uint32_t idx);
+/* Retrieval evidence only: half-open byte spans into tl->image.
+   Content is the unchanged stored sentence. A strict adjacent label is
+   optional context, not a verified list classification. No allocation. */
+typedef struct
+{
+    uint64_t content_first, content_end;
+    uint64_t combined_first, combined_end;
+    uint64_t label_first, label_end; /* zero when has_label == 0 */
+    int has_label;
+} TL_RETRIEVAL_SPANS;
+
+/* Return 1 for valid evidence, 0 for invalid input/span. Output is zeroed
+   on failure when non-NULL. Does not change rank, storage or display.
+   Label rule: column-zero ASCII digits + dot + one ASCII space directly
+   preceding content. Years such as "1909. This..." can match: callers
+   must not treat has_label as semantic proof of a list. */
+int TextLexRetrievalSpans(const TEXTLEX *tl, uint32_t idx,
+                          TL_RETRIEVAL_SPANS *out);
+
 /* first symbol id matching w under ASCII case variants
    (exact, First-upper, UPPER, lower); INVALID when absent */
 SYMBOL_ID TextLexFindSymbol(const GRAPH *graph, const char *w);

@@ -167,6 +167,48 @@ const TL_SENT *TextLexSentence(const TEXTLEX *tl, uint32_t idx)
     return &tl->sents[idx];
 }
 
+/* Add byte-contiguous label context without changing stored sentences.
+   A syntactic match is not a semantic list classification (e.g. a year). */
+int TextLexRetrievalSpans(const TEXTLEX *tl, uint32_t idx,
+                          TL_RETRIEVAL_SPANS *out)
+{
+    const TL_SENT *s;
+    uint64_t first, end, dot, start;
+    if (out == NULL)
+        return 0;
+    memset(out, 0, sizeof(*out));
+    if (tl == NULL || tl->image == NULL || idx >= tl->nsent)
+        return 0;
+    s = &tl->sents[idx];
+    if (s->ntok == 0 || s->offs == NULL || s->lens == NULL)
+        return 0;
+    first = s->offs[0];
+    if (s->offs[s->ntok - 1] > tl->imagelen ||
+        s->lens[s->ntok - 1] > tl->imagelen - s->offs[s->ntok - 1])
+        return 0;
+    end = s->offs[s->ntok - 1] + s->lens[s->ntok - 1];
+    if (first >= end || end > tl->imagelen)
+        return 0;
+    out->content_first = out->combined_first = first;
+    out->content_end = out->combined_end = end;
+    /* Exactly one ASCII space; no tabs, newline or intervening content. */
+    if (first < 3 || tl->image[first - 1] != ' ' ||
+        tl->image[first - 2] != '.')
+        return 1;
+    dot = first - 2;
+    start = dot;
+    while (start > 0 && tl->image[start - 1] >= '0' &&
+           tl->image[start - 1] <= '9')
+        start--;
+    if (start == dot || (start > 0 && tl->image[start - 1] != '\n'))
+        return 1;
+    out->has_label = 1;
+    out->label_first = start;
+    out->label_end = dot + 1;
+    out->combined_first = start;
+    return 1;
+}
+
 /* Literal display: join token byte slices with single spaces
    (words byte-exact; wrap whitespace normalized, source intact).
    Over-long sentences truncate with a marked tail (display-only;
