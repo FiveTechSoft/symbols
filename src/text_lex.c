@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "text_lex.h"
+#include "tl_sha256.h"
 #include "symbol.h"
 #include "embedding.h"
 
@@ -207,6 +208,56 @@ int TextLexRetrievalSpans(const TEXTLEX *tl, uint32_t idx,
     out->label_end = dot + 1;
     out->combined_first = start;
     return 1;
+}
+
+/* Source-bound content quotes. Never reconstruct from token text. */
+TL_CITE_RESULT TextLexCitation(const TEXTLEX *tl, uint32_t idx,
+                               TL_CITATION *out)
+{
+    TL_RETRIEVAL_SPANS spans;
+    const TL_SENT *s;
+    uint64_t prev = 0;
+    uint32_t i;
+    if (out == NULL) return TL_CITE_INVALID;
+    memset(out, 0, sizeof(*out));
+    if (!TextLexRetrievalSpans(tl, idx, &spans)) return TL_CITE_INVALID;
+    s = &tl->sents[idx];
+    for (i = 0; i < s->ntok; i++)
+    {
+        uint64_t off = s->offs[i];
+        if (s->lens[i] == 0 || off > tl->imagelen ||
+            s->lens[i] > tl->imagelen - off || (i && off < prev))
+            return TL_CITE_INVALID;
+        prev = off + s->lens[i];
+    }
+    out->version = 1;
+    out->source_bytes = tl->imagelen;
+    out->first = spans.content_first;
+    out->end = spans.content_end;
+    TLSha256(tl->image, tl->imagelen, out->source_sha256);
+    return TL_CITE_OK;
+}
+TL_CITE_RESULT TextLexCitationCopy(const TEXTLEX *tl,
+                                   const TL_CITATION *citation,
+                                   unsigned char *dst, size_t capacity,
+                                   size_t *required)
+{
+    unsigned char hash[32];
+    size_t n;
+    if (required) *required = 0;
+    if (!tl || !tl->image || !citation || citation->version != 1 ||
+        citation->first >= citation->end ||
+        citation->end > citation->source_bytes || (!dst && capacity))
+        return TL_CITE_INVALID;
+    if (citation->source_bytes != tl->imagelen) return TL_CITE_SOURCE_MISMATCH;
+    TLSha256(tl->image, tl->imagelen, hash);
+    if (memcmp(hash, citation->source_sha256, 32)) return TL_CITE_SOURCE_MISMATCH;
+    n = (size_t)(citation->end - citation->first);
+    if (required) *required = n;
+    if (!dst) return TL_CITE_OK;
+    if (capacity < n) return TL_CITE_BUFFER_SMALL;
+    memcpy(dst, tl->image + citation->first, n);
+    return TL_CITE_OK;
 }
 
 /* Literal display: join token byte slices with single spaces
@@ -1708,9 +1759,10 @@ static void IngestSentence(GRAPH *graph, EMBEDDING_TABLE *emb,
     free(ids);
 }
 
-TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
+TL_INGEST_RESULT TextLexIngestVerified(GRAPH *graph, TEXTLEX *tl,
                             const char *path,
-                            uint32_t first_line, uint32_t last_line)
+                            uint32_t first_line, uint32_t last_line,
+                            TEXTLEX_STATS *stats)
 {
     TEXTLEX_STATS st;
     FILE *f;
@@ -1730,38 +1782,47 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
     uint32_t k;
     EMBEDDING_TABLE *emb;
     memset(&st, 0, sizeof(st));
-    if (graph == NULL || tl == NULL || path == NULL)
-        return st;
+    if (stats) memset(stats, 0, sizeof(*stats));
+    if (graph == NULL || tl == NULL || path == NULL || stats == NULL)
+        return TL_INGEST_INVALID;
     emb = graph->embeddings;
     f = fopen(path, "rb");
     if (f == NULL)
-        return st;
-    fseek(f, 0, SEEK_END);
-    fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
+        return TL_INGEST_IO;
+    if (fseek(f, 0, SEEK_END) != 0 || (fsize = ftell(f)) < 0 ||
+        fseek(f, 0, SEEK_SET) != 0)
+    { fclose(f); return TL_INGEST_IO; }
     if (fsize <= 0)
     {
         fclose(f);
-        return st;
+        return TL_INGEST_EMPTY;
     }
     img = (unsigned char *)malloc((size_t)fsize);
     if (img == NULL)
     {
         fclose(f);
-        return st;
+        return TL_INGEST_MEMORY;
     }
     got = fread(img, 1, (size_t)fsize, f);
     fclose(f);
     if (got != (size_t)fsize)
     {
         free(img);
-        return st;
+        return TL_INGEST_IO;
     }
+    /* Compare the SAME buffer that will be lexed, not a second path read. */
+    if (tl->image != NULL && (tl->imagelen != got ||
+        memcmp(tl->image, img, got) != 0))
+    { free(img); return TL_INGEST_SOURCE_MISMATCH; }
+    if (tl->image == NULL && tl->nsent != 0)
+    { free(img); return TL_INGEST_SOURCE_MISMATCH; }
     st.bytes_read = (uint64_t)got;
     /* keep one image per store for literal display (session) */
     if (tl->image == NULL)
     {
         tl->image = (unsigned char *)malloc((size_t)fsize);
+        if (tl->image == NULL)
+        { free(img); return TL_INGEST_MEMORY; }
         if (tl->image != NULL)
         {
             memcpy(tl->image, img, (size_t)fsize);
@@ -1775,7 +1836,7 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
     if (linestarts == NULL)
     {
         free(img);
-        return st;
+        return TL_INGEST_MEMORY;
     }
     nlines = 1;
     linestarts[0] = 0;
@@ -1793,7 +1854,7 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
                 {
                     free(linestarts);
                     free(img);
-                    return st;
+                    return TL_INGEST_MEMORY;
                 }
                 linestarts = nl;
             }
@@ -1811,7 +1872,7 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
     {
         free(linestarts);
         free(img);
-        return st;
+        return TL_INGEST_MEMORY;
     }
     memset(&para, 0, sizeof(para));
     cursor = 0;
@@ -1959,7 +2020,17 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
     free(linestarts);
     free(img);
     FinalizeSigs(tl, graph, emb);
-    return st;
+    *stats = st;
+    return TL_INGEST_OK;
+}
+
+TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl, const char *path,
+                            uint32_t first_line, uint32_t last_line)
+{
+    TEXTLEX_STATS stats;
+    /* Legacy signature, fail-closed zero stats on rejected snapshots. */
+    TextLexIngestVerified(graph, tl, path, first_line, last_line, &stats);
+    return stats;
 }
 
 static int IsAllUpperStr(const char *s)

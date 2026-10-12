@@ -89,6 +89,7 @@ add_library(symbolic STATIC
     src/reflect.c
     src/git_ops.c
     src/text_lex.c
+    src/tl_sha256.c
     src/meta_graph.c
     src/vsa.c
     src/ccg_realizer.c

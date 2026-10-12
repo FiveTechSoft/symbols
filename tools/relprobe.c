@@ -1,6 +1,7 @@
 /* relprobe: inspect a symbol's relations in a converted corpus.
    Scratch diagnostic (Temp build, not part of ctest).
    Usage: relprobe <corpus.txt> <word>
+          relprobe <corpus.txt> --cite <query-symbol>
    Prints: variant lookup + frequency; top co-occurring symbols
    (exact counts over stored sentences); top retrieval sentence
    (the established sentence joining them). */
@@ -28,8 +29,63 @@ static int CmpNeigh(const void *a, const void *b)
     return (x->id < y->id) ? -1 : (x->id > y->id);
 }
 
+/* Explicit citation mode. Hex is authoritative for arbitrary source bytes. */
+static void CiteHex(const unsigned char *p, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n; i++) printf("%02x", p[i]);
+}
+static int CiteMode(const char *path, const char *word)
+{
+    GRAPH *g = GraphCreate(65536, 256);
+    EMBEDDING_TABLE *e = EmbeddingTableCreate(65536);
+    TEXTLEX *tl = TextLexCreate();
+    TEXTLEX_STATS st;
+    uint32_t ix[8], n, i;
+    float scores[8];
+    const char *words[] = {word};
+    int rc = 0;
+    if (!g || !e || !tl) { rc = 2; goto done; }
+    GraphSetEmbeddingTable(g, e);
+    TextLexPosReset();
+    if (TextLexIngestVerified(g, tl, path, 1, 0, &st) != TL_INGEST_OK)
+    { fprintf(stderr, "citation ingest failed\n"); rc = 2; goto done; }
+    n = TextLexRetrieve(tl, g, e, words, 1, ix, scores, 8);
+    /* One receipt per line. No legacy display, normalization or disk reread. */
+    for (i = 0; i < n; i++)
+    {
+        TL_CITATION c;
+        size_t required = 0;
+        unsigned char *quote;
+        uint32_t score_bits;
+        if (TextLexCitation(tl, ix[i], &c) != TL_CITE_OK ||
+            TextLexCitationCopy(tl, &c, NULL, 0, &required) != TL_CITE_OK)
+        { rc = 2; break; }
+        quote = (unsigned char *)malloc(required);
+        if (!quote || TextLexCitationCopy(tl, &c, quote, required, &required) != TL_CITE_OK)
+        { free(quote); rc = 2; break; }
+        memcpy(&score_bits, &scores[i], sizeof(score_bits));
+        printf("{\"version\":1,\"source_sha256\":\"");
+        CiteHex(c.source_sha256, 32);
+        printf("\",\"source_bytes\":%llu,\"first\":%llu,\"end\":%llu,"
+               "\"index\":%u,\"score_bits\":%u,\"quote_bytes\":%llu,\"quote_hex\":\"",
+               (unsigned long long)c.source_bytes, (unsigned long long)c.first,
+               (unsigned long long)c.end, ix[i], score_bits, (unsigned long long)required);
+        CiteHex(quote, required);
+        printf("\"}\n");
+        free(quote);
+    }
+done:
+    TextLexFree(tl);
+    EmbeddingTableDestroy(e);
+    GraphDestroy(g);
+    return rc;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 4 && strcmp(argv[2], "--cite") == 0)
+        return CiteMode(argv[1], argv[3]);
     GRAPH *g;
     EMBEDDING_TABLE *emb;
     TEXTLEX *tl;

@@ -81,6 +81,46 @@ void TextLexPosReset(void);
 TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
                             const char *path,
                             uint32_t first_line, uint32_t last_line);
+/* Verified ingestion uses one owned byte snapshot. Identical replay/ranges
+   are allowed; changed bytes fail before any graph or store mutation.
+   Empty inputs and read/allocation failures have explicit statuses. */
+typedef enum
+{
+    TL_INGEST_OK = 0, TL_INGEST_INVALID, TL_INGEST_IO,
+    TL_INGEST_EMPTY, TL_INGEST_MEMORY, TL_INGEST_SOURCE_MISMATCH
+} TL_INGEST_RESULT;
+TL_INGEST_RESULT TextLexIngestVerified(GRAPH *graph, TEXTLEX *tl,
+                                      const char *path,
+                                      uint32_t first_line, uint32_t last_line,
+                                      TEXTLEX_STATS *stats);
+
+/* Content-only citation into the exact ingested file, not an upstream page
+   before extraction. Half-open byte offsets, no path or pointer identity.
+   Metadata such as URL, revision and extraction method is caller-owned.
+   Creation/resolution hashes the full image: O(source bytes), no cache. */
+typedef struct
+{
+    uint32_t version; /* 1 */
+    unsigned char source_sha256[32];
+    uint64_t source_bytes;
+    uint64_t first, end;
+} TL_CITATION;
+typedef enum
+{
+    TL_CITE_OK = 0, TL_CITE_INVALID, TL_CITE_SOURCE_MISMATCH,
+    TL_CITE_BUFFER_SMALL
+} TL_CITE_RESULT;
+TL_CITE_RESULT TextLexCitation(const TEXTLEX *tl, uint32_t idx,
+                               TL_CITATION *out);
+/* Copy exact bytes, no NUL or truncation marker added. required reports
+   quote byte length after validation. NULL dst with capacity 0 queries size.
+   Too-small buffers are untouched; failed validation sets required to 0.
+   A receipt can outlive a store; resolving requires a matching live image. */
+TL_CITE_RESULT TextLexCitationCopy(const TEXTLEX *tl,
+                                   const TL_CITATION *citation,
+                                   unsigned char *dst, size_t capacity,
+                                   size_t *required);
+
 uint32_t TextLexSentCount(const TEXTLEX *tl);
 const TL_SENT *TextLexSentence(const TEXTLEX *tl, uint32_t idx);
 /* Retrieval evidence only: half-open byte spans into tl->image.

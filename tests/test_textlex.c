@@ -10,6 +10,7 @@
 #include "symbol.h"
 #include "embedding.h"
 #include "text_lex.h"
+#include "tl_sha256.h"
 
 #define CORPUS "data/texts/jung.txt"
 
@@ -27,6 +28,134 @@ static void check(const char *name, int cond)
         printf("  FAIL %s\n", name);
         g_fail++;
     }
+}
+
+static int WriteCitationFixture(const char *path, const unsigned char *bytes, size_t n)
+{
+    FILE *f = fopen(path, "wb");
+    int ok = f && fwrite(bytes, 1, n, f) == n;
+    if (f) fclose(f);
+    return ok;
+}
+static void CheckShaVector(const unsigned char *b, size_t n, const char *gold)
+{
+    unsigned char hash[32]; char hex[65]; unsigned i;
+    TLSha256(b, n, hash);
+    for (i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", hash[i]);
+    check("citation SHA-256 known answer", strcmp(hex, gold) == 0);
+}
+static void CheckCitationFixture(const unsigned char *bytes, size_t len)
+{
+    const char *path = "textlex_citation_regression.txt";
+    GRAPH *g = GraphCreate(512, 256);
+    EMBEDDING_TABLE *e = EmbeddingTableCreate(512);
+    TEXTLEX *t = TextLexCreate();
+    TEXTLEX_STATS a, b;
+    uint32_t i;
+    GraphSetEmbeddingTable(g, e); TextLexPosReset();
+    check("citation fixture written", WriteCitationFixture(path, bytes, len));
+    check("citation verified ingest", TextLexIngestVerified(g, t, path, 1, 0, &a) == TL_INGEST_OK);
+    check("citation image intact", t->imagelen == len && memcmp(t->image, bytes, len) == 0);
+    check("citation unchanged replay", TextLexIngestVerified(g, t, path, 1, 0, &b) == TL_INGEST_OK && b.nsent_new == 0 && b.syms_new == 0 && b.ntok_kept == 0 && b.pair_updates == 0);
+    check("citation fixture has sentences", t->nsent > 0);
+    for (i = 0; i < t->nsent; i++)
+    {
+        TL_CITATION c, invalid; size_t n = 0, needed = 0;
+        unsigned char quote[4096], sentinel[4096], digest[32];
+        check("citation create", TextLexCitation(t, i, &c) == TL_CITE_OK);
+        TLSha256(bytes, len, digest);
+        check("citation hash/length bind image", c.version == 1 && c.source_bytes == len && memcmp(c.source_sha256, digest, 32) == 0);
+        check("citation half-open gold bounds", c.first == t->sents[i].offs[0] && c.end == t->sents[i].offs[t->sents[i].ntok-1] + t->sents[i].lens[t->sents[i].ntok-1]);
+        check("citation size query", TextLexCitationCopy(t, &c, NULL, 0, &n) == TL_CITE_OK && n == c.end - c.first);
+        check("citation test buffer bound", n < sizeof(quote));
+        if (n >= sizeof(quote)) continue;
+        memset(quote, 0xa5, sizeof(quote)); memcpy(sentinel, quote, sizeof(quote));
+        check("citation short buffer no write", TextLexCitationCopy(t, &c, quote, n-1, &needed) == TL_CITE_BUFFER_SMALL && needed == n && memcmp(quote, sentinel, sizeof(quote)) == 0);
+        check("citation exact fit byte copy", TextLexCitationCopy(t, &c, quote, n, &needed) == TL_CITE_OK && needed == n && memcmp(quote, bytes+c.first, n) == 0 && quote[n] == 0xa5);
+        invalid = c; invalid.source_sha256[0] ^= 1;
+        check("citation wrong hash rejected", TextLexCitationCopy(t, &invalid, quote, sizeof(quote), &needed) == TL_CITE_SOURCE_MISMATCH && needed == 0);
+        invalid = c; invalid.source_bytes++;
+        check("citation wrong length rejected", TextLexCitationCopy(t, &invalid, quote, sizeof(quote), &needed) == TL_CITE_SOURCE_MISMATCH);
+        invalid = c; invalid.first = UINT64_MAX;
+        check("citation overflow span rejected", TextLexCitationCopy(t, &invalid, quote, sizeof(quote), &needed) == TL_CITE_INVALID);
+        invalid = c; invalid.version = 2;
+        check("citation wrong version rejected", TextLexCitationCopy(t, &invalid, quote, sizeof(quote), &needed) == TL_CITE_INVALID);
+        {
+            uint64_t off = t->sents[i].offs[0];
+            t->sents[i].offs[0] = UINT64_MAX;
+            memset(&invalid, 0xa5, sizeof(invalid));
+            check("citation corrupt token rejected and output zeroed", TextLexCitation(t, i, &invalid) == TL_CITE_INVALID && invalid.version == 0 && invalid.end == 0);
+            t->sents[i].offs[0] = off;
+        }
+    }
+    {
+        TL_CITATION receipt; size_t n;
+        check("citation receipt before unlink", TextLexCitation(t, 0, &receipt) == TL_CITE_OK);
+        check("citation source file unlink", remove(path) == 0);
+        check("citation resolves owned snapshot after unlink", TextLexCitationCopy(t, &receipt, NULL, 0, &n) == TL_CITE_OK);
+        TextLexClear(t);
+        check("citation clear invalidates resolver", TextLexCitationCopy(t, &receipt, NULL, 0, &n) == TL_CITE_INVALID);
+        WriteCitationFixture(path, (const unsigned char *)"Different source.", 17);
+        TextLexIngestVerified(g, t, path, 1, 0, &a);
+        check("citation reload mismatch rejected", TextLexCitationCopy(t, &receipt, NULL, 0, &n) == TL_CITE_SOURCE_MISMATCH);
+        remove(path);
+    }
+    TextLexFree(t); EmbeddingTableDestroy(e); GraphDestroy(g);
+}
+static void CheckCitationMismatch(void)
+{
+    const char *path = "textlex_citation_mutable.txt";
+    const char *original = "Alpha old.\n";
+    const char *changed[] = {"Alpha new.\n", "Beta.\n", "Alpha  old.\n"};
+    unsigned i;
+    for (i = 0; i < 3; i++)
+    {
+        GRAPH *g = GraphCreate(512, 256); EMBEDDING_TABLE *e = EmbeddingTableCreate(512);
+        TEXTLEX *t = TextLexCreate(); TEXTLEX_STATS a, b;
+        TL_CITATION c; const char *q[] = {"Alpha"}; uint32_t ix[8], jx[8], n, m, syms, nsent; float sc[8], tc[8];
+        GraphSetEmbeddingTable(g, e); TextLexPosReset(); WriteCitationFixture(path, (const unsigned char *)original, strlen(original));
+        TextLexIngestVerified(g, t, path, 1, 0, &a);
+        n = TextLexRetrieve(t, g, e, q, 1, ix, sc, 8); syms = SymbolCount(g->symbols); nsent = t->nsent;
+        TextLexCitation(t, 0, &c);
+        WriteCitationFixture(path, (const unsigned char *)changed[i], strlen(changed[i]));
+        check("citation changed image rejected", TextLexIngestVerified(g, t, path, 1, 0, &b) == TL_INGEST_SOURCE_MISMATCH);
+        check("citation mismatch zero stats", b.bytes_read == 0 && b.nsent_new == 0 && b.syms_new == 0 && b.pair_updates == 0);
+        m = TextLexRetrieve(t, g, e, q, 1, jx, tc, 8);
+        check("citation mismatch no index/rank/symbol mutation", n == m && nsent == t->nsent && syms == SymbolCount(g->symbols) && memcmp(ix,jx,n*sizeof(*ix)) == 0 && memcmp(sc,tc,n*sizeof(*sc)) == 0);
+        b = TextLexIngest(g, t, path, 1, 0);
+        check("citation legacy changed image fail closed", b.bytes_read == 0 && b.nsent_new == 0);
+        { size_t needed; check("citation old snapshot still resolvable", TextLexCitationCopy(t, &c, NULL, 0, &needed) == TL_CITE_OK); }
+        remove(path); TextLexFree(t); EmbeddingTableDestroy(e); GraphDestroy(g);
+    }
+    {
+        GRAPH *g = GraphCreate(512,256); EMBEDDING_TABLE *e = EmbeddingTableCreate(512); TEXTLEX *t = TextLexCreate(); TEXTLEX_STATS a;
+        const unsigned char *bytes = (const unsigned char *)"Alpha first.\nBeta second.\n";
+        GraphSetEmbeddingTable(g,e);TextLexPosReset();WriteCitationFixture(path,bytes,strlen((const char*)bytes));
+        check("citation range ingest first", TextLexIngestVerified(g,t,path,1,1,&a)==TL_INGEST_OK && t->nsent==1);
+        check("citation range same image second", TextLexIngestVerified(g,t,path,2,2,&a)==TL_INGEST_OK && t->nsent==2);
+        check("citation range replay", TextLexIngestVerified(g,t,path,1,0,&a)==TL_INGEST_OK && a.nsent_new==0);
+        remove(path);TextLexFree(t);EmbeddingTableDestroy(e);GraphDestroy(g);
+    }
+}
+static void CheckCitations(void)
+{
+    unsigned char binary[256]; unsigned i;
+    for (i=0;i<256;i++) binary[i]=(unsigned char)i;
+    CheckShaVector((const unsigned char *)"",0,"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    CheckShaVector((const unsigned char *)"abc",3,"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    CheckShaVector((const unsigned char *)"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",56,"248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    CheckShaVector(binary,256,"40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880");
+    {
+        static const unsigned char a[]="\xc3\x81rbol  caf\xc3\xa9\tlim.\r\n";
+        static const unsigned char b[]="Alpha\n\tBeta  Gamma.";
+        static const unsigned char c[]="Formula \\lim_{h\\rightarrow 0}\\frac{x^2}{h}.";
+        static const unsigned char d[]="Echo same.\nEcho same.";
+        static const unsigned char e[]={'A','l','p','h','a',0,'B','e','t','a','.'};
+        static const unsigned char f[]={'A','l','p','h','a',' ',0xff,'B','e','t','a','.'};
+        CheckCitationFixture(a,sizeof(a)-1);CheckCitationFixture(b,sizeof(b)-1);CheckCitationFixture(c,sizeof(c)-1);
+        CheckCitationFixture(d,sizeof(d)-1);CheckCitationFixture(e,sizeof(e));CheckCitationFixture(f,sizeof(f));
+    }
+    CheckCitationMismatch();
 }
 
 static int IsContentByte(unsigned char c)
@@ -453,6 +582,7 @@ int main(void)
         check("decimal fixture removed", remove(fixture) == 0);
     }
     CheckRetrievalSpans();
+    CheckCitations();
     printf("test_textlex: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
