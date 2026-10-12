@@ -1831,7 +1831,16 @@ TEXTLEX_STATS TextLexIngest(GRAPH *graph, TEXTLEX *tl,
                 int found = 0;
                 while (j < para.ntok)
                 {
-                    if (IsTermTok(img, para.toks[j].off,
+                    /* A dot directly between ASCII digits belongs to a
+                       decimal, not a sentence boundary. Keep lexical
+                       tokens and literal display unchanged. */
+                    uint64_t off = para.toks[j].off;
+                    int decimal_dot = para.toks[j].len == 1 &&
+                        img[off] == '.' && off > 0 && off + 1 < pend &&
+                        img[off - 1] >= '0' && img[off - 1] <= '9' &&
+                        img[off + 1] >= '0' && img[off + 1] <= '9';
+                    if (!decimal_dot &&
+                        IsTermTok(img, para.toks[j].off,
                                   para.toks[j].len))
                     {
                         tend = para.toks[j].off +

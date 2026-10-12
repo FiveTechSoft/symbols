@@ -318,6 +318,52 @@ int main(void)
     TextLexFree(tl);
     EmbeddingTableDestroy(emb);
     GraphDestroy(g);
+
+    /* Numeric-science regression: segmentation retains a decimal in
+       one retrieved sentence, without changing punctuation display. */
+    {
+        const char *fixture = "textlex_decimal_regression.txt";
+        const char *bytes = "Gamma rays arrived 1.7 seconds later. Count 7. Next sentence.\n";
+        FILE *f = fopen(fixture, "wb");
+        int written = f && fwrite(bytes, 1, strlen(bytes), f) == strlen(bytes);
+        if (f) fclose(f);
+        check("decimal fixture written", written);
+        if (written)
+        {
+            GRAPH *dg = GraphCreate(256, 256);
+            EMBEDDING_TABLE *de = EmbeddingTableCreate(256);
+            TEXTLEX *dt = TextLexCreate();
+            GraphSetEmbeddingTable(dg, de);
+            TextLexPosReset();
+            TextLexIngest(dg, dt, fixture, 1, 0);
+            const char *query[] = {"seconds"};
+            uint32_t ix[8]; float sc[8]; char display[256];
+            uint32_t nr = TextLexRetrieve(dt, dg, de, query, 1, ix, sc, 8);
+            check("decimal and integer-ending sentence boundaries", dt->nsent == 3);
+            int complete = 0, original = 0, unchanged = 0;
+            if (nr)
+            {
+                const TL_SENT *sent = TextLexSentence(dt, ix[0]);
+                uint64_t first = sent->offs[0];
+                uint64_t end = sent->offs[sent->ntok - 1] + sent->lens[sent->ntok - 1];
+                const char *anchor = strstr(bytes, "1.7 seconds");
+                original = anchor && first <= (uint64_t)(anchor - bytes) &&
+                    end >= (uint64_t)(anchor - bytes) + strlen("1.7 seconds") &&
+                    end <= dt->imagelen &&
+                    memcmp(dt->image + first, bytes + first, (size_t)(end - first)) == 0;
+                TextLexSentenceText(dt, ix[0], dt->image, dt->imagelen,
+                                    display, sizeof(display));
+                complete = strstr(display, "Gamma rays arrived") &&
+                    strstr(display, "1 . 7 seconds later .");
+                unchanged = strstr(display, "1 . 7") != NULL;
+            }
+            check("seconds retrieves complete decimal sentence", complete);
+            check("retrieved source span preserves 1.7 seconds bytes", original);
+            check("decimal display remains token-space normalized", unchanged);
+            TextLexFree(dt); EmbeddingTableDestroy(de); GraphDestroy(dg);
+        }
+        check("decimal fixture removed", remove(fixture) == 0);
+    }
     printf("test_textlex: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
