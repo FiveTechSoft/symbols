@@ -90,6 +90,7 @@ add_library(symbolic STATIC
     src/git_ops.c
     src/text_lex.c
     src/tl_sha256.c
+    src/condition_match.c
     src/meta_graph.c
     src/vsa.c
     src/ccg_realizer.c
@@ -714,6 +715,7 @@ sllm_test(test_textlex         tests/test_textlex.c)
 sllm_test(test_chat_buffer     tests/test_chat_buffer.c)
 sllm_test(test_chat_citation   tests/test_chat_citation.c)
 sllm_test(test_chat_selected_guard tests/test_chat_selected_guard.c)
+sllm_test(test_condition_match tests/test_condition_match.c)
 # Removed: test_server_proto, test_chain, test_bible_bfs, test_compose
 # (depend on bible_relations.tsv)
 sllm_test(test_learn          tests/test_learn.c)
