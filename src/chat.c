@@ -8422,9 +8422,11 @@ static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t si
    same calibrated coverage test as the retrieval path.  Continuations
    (no content word, or a single word the corpus does not know: clitic
    follow-ups, near-spelling substitutes) keep their own logic. */
-static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
+static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out,
+                             const CHAT_EMISSION *emission)
 {
     const char *sent, *e;
+    const TEXTLEX *tl;
     char sbuf[2048], words[TQ_MAXLEN][CHAT_TOKEN_MAX];
     const char *wp[TQ_MAXLEN];
     char low[512];
@@ -8432,6 +8434,13 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
     size_t i;
     if (ch->ntfiles == 0 || ch->tlex[0].image == NULL || strncmp(out, "Segun el texto", 14) != 0)
         return 1;
+    /* Literal TEXTQ carries per-call identity. Other quote paths keep the
+       legacy calibration until they carry their own source contract. */
+    tl = &ch->tlex[0];
+    if (emission && emission->selected && emission->file < ch->ntfiles &&
+        ch->tlex[emission->file].image != NULL &&
+        TextLexSentence(&ch->tlex[emission->file], emission->sentence) != NULL)
+        tl = &ch->tlex[emission->file];
     sent = strstr(out, ": ");
     if (sent == NULL) return 1;
     sent += 2;
@@ -8462,13 +8471,14 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
        way; here only require that the quoted sentence covers the known ones
        above chance (no majority rule: request words like "sirve" are not in
        the corpus) */
-    return TextQueryCoveredEx(&ch->tlex[0], wp, nw, sbuf, 0);
+    return TextQueryCoveredEx(tl, wp, nw, sbuf, 0);
 }
 
 int ChatHandleToBufEx(CHAT *ch, const char *line, char *out, size_t size, CHAT_CITATION *citation)
 {
     CHAT_EMISSION identity = {0};
-    CHAT_EMISSION *emission = citation ? &identity : NULL;
+    /* The guard needs identity even when no receipt was requested. */
+    CHAT_EMISSION *emission = &identity;
     ChatCitationClear(citation);
     char evaluated[CHAT_ANSWER_MAX];
     size_t eval_size = size > sizeof(evaluated) ? size : sizeof(evaluated);
@@ -8481,7 +8491,7 @@ int ChatHandleToBufEx(CHAT *ch, const char *line, char *out, size_t size, CHAT_C
     r = ChatHandleToBufInner(ch, line, answer, eval_size, emission);
     /* Verify before presentation truncation. A small output buffer must
        not change an answer into an abstention or bypass a rejection. */
-    if (r && !ChatQuoteVerified(ch, line, answer))
+    if (r && !ChatQuoteVerified(ch, line, answer, emission))
     {
         if (getenv("SYMBOLS_TQ_DEBUG")) fprintf(stderr, "[tq] quote rejected for: %s\n", line);
         if (emission) memset(emission, 0, sizeof(*emission));
