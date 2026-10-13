@@ -2,6 +2,7 @@
    Scratch diagnostic (Temp build, not part of ctest).
    Usage: relprobe <corpus.txt> <word>
           relprobe <corpus.txt> --cite <query-symbol>
+          relprobe <corpus.txt> --cite-context <query-symbol>
    Prints: variant lookup + frequency; top co-occurring symbols
    (exact counts over stored sentences); top retrieval sentence
    (the established sentence joining them). */
@@ -35,7 +36,7 @@ static void CiteHex(const unsigned char *p, size_t n)
     size_t i;
     for (i = 0; i < n; i++) printf("%02x", p[i]);
 }
-static int CiteMode(const char *path, const char *word)
+static int CiteMode(const char *path, const char *word, int context)
 {
     GRAPH *g = GraphCreate(65536, 256);
     EMBEDDING_TABLE *e = EmbeddingTableCreate(65536);
@@ -55,6 +56,7 @@ static int CiteMode(const char *path, const char *word)
     for (i = 0; i < n; i++)
     {
         TL_CITATION c;
+        TL_RETRIEVAL_SPANS spans;
         size_t required = 0;
         unsigned char *quote;
         uint32_t score_bits;
@@ -64,6 +66,17 @@ static int CiteMode(const char *path, const char *word)
         quote = (unsigned char *)malloc(required);
         if (!quote || TextLexCitationCopy(tl, &c, quote, required, &required) != TL_CITE_OK)
         { free(quote); rc = 2; break; }
+        /* Context is separate evidence into this same owned image, not part
+           of the content quote and never semantic proof of a list. */
+        if (context && (!TextLexRetrievalSpans(tl, ix[i], &spans) ||
+            spans.content_first != c.first || spans.content_end != c.end ||
+            spans.combined_first > c.first || spans.combined_end != c.end ||
+            spans.combined_end > tl->imagelen ||
+            (spans.has_label && (spans.label_first != spans.combined_first ||
+             spans.label_first >= spans.label_end || spans.label_end >= c.first)) ||
+            (!spans.has_label && (spans.label_first || spans.label_end ||
+             spans.combined_first != c.first))))
+        { free(quote); rc = 2; break; }
         memcpy(&score_bits, &scores[i], sizeof(score_bits));
         printf("{\"version\":1,\"source_sha256\":\"");
         CiteHex(c.source_sha256, 32);
@@ -72,6 +85,19 @@ static int CiteMode(const char *path, const char *word)
                (unsigned long long)c.source_bytes, (unsigned long long)c.first,
                (unsigned long long)c.end, ix[i], score_bits, (unsigned long long)required);
         CiteHex(quote, required);
+        if (context)
+        {
+            printf("\",\"has_label\":%d,\"label_first\":%llu,\"label_end\":%llu,\"label_hex\":\"",
+                   spans.has_label, (unsigned long long)spans.label_first,
+                   (unsigned long long)spans.label_end);
+            if (spans.has_label)
+                CiteHex(tl->image + spans.label_first, (size_t)(spans.label_end - spans.label_first));
+            printf("\",\"combined_first\":%llu,\"combined_end\":%llu,\"combined_hex\":\"",
+                   (unsigned long long)spans.combined_first,
+                   (unsigned long long)spans.combined_end);
+            CiteHex(tl->image + spans.combined_first,
+                    (size_t)(spans.combined_end - spans.combined_first));
+        }
         printf("\"}\n");
         free(quote);
     }
@@ -85,7 +111,9 @@ done:
 int main(int argc, char **argv)
 {
     if (argc == 4 && strcmp(argv[2], "--cite") == 0)
-        return CiteMode(argv[1], argv[3]);
+        return CiteMode(argv[1], argv[3], 0);
+    if (argc == 4 && strcmp(argv[2], "--cite-context") == 0)
+        return CiteMode(argv[1], argv[3], 1);
     GRAPH *g;
     EMBEDDING_TABLE *emb;
     TEXTLEX *tl;

@@ -1253,3 +1253,9 @@ set_tests_properties(test_agent_patch_ctxm_fuzz PROPERTIES TIMEOUT 300
 
 add_executable(test_liveness_window tests/test_liveness_window.c)
 add_test(NAME test_liveness_window COMMAND test_liveness_window)
+
+# Opt-in citation-context consumer regression (diagnostic CLI only).
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_relprobe_cite_context
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_relprobe_cite_context.py $<TARGET_FILE:relprobe>)
+endif()

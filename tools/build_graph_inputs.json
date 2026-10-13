@@ -1,5 +1,13 @@
 {
  "tests": {
+  "test_relprobe_cite_context": {
+   "files": [
+    "tests/test_relprobe_cite_context.py"
+   ],
+   "targets": [
+    "relprobe"
+   ]
+  },
   "test_ast_inspect": {
    "files": [
     "tests/test_ast_inspect.py",
