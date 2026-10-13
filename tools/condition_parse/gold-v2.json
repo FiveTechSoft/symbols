@@ -1,0 +1,478 @@
+{
+  "version": 1,
+  "design_only": true,
+  "base": "7ac26200f14a956cedd41665c168279edc18969a",
+  "scope": "Controlled ASCII prose grammar only. Runtime inputs are bytes, not expected annotations. No general natural-language understanding.",
+  "cases": [
+    {
+      "id": "extract-nacre",
+      "source": "nacre.txt",
+      "expected_parse": "PARSED",
+      "claims": [
+        {
+          "subject": "nacre",
+          "relation": "records",
+          "object": "amber",
+          "polarity": "positive",
+          "qualifiers": [
+            {
+              "key": "phase",
+              "value": "dawn"
+            }
+          ],
+          "origin": "extractor_asserted",
+          "evidence": {
+            "sha256": "b8dad26fa45a63c856404d9254ef04d92afc0dda581a48021244007bb4bf801f",
+            "first": 0,
+            "end": 38
+          }
+        },
+        {
+          "subject": "nacre",
+          "relation": "records",
+          "object": null,
+          "polarity": "negative",
+          "qualifiers": [
+            {
+              "key": "phase",
+              "value": "night"
+            }
+          ],
+          "origin": "extractor_asserted",
+          "evidence": {
+            "sha256": "b8dad26fa45a63c856404d9254ef04d92afc0dda581a48021244007bb4bf801f",
+            "first": 39,
+            "end": 81
+          }
+        },
+        {
+          "subject": "nacre",
+          "relation": "records",
+          "object": "jade",
+          "polarity": "positive",
+          "qualifiers": [
+            {
+              "key": "phase",
+              "value": "dusk"
+            },
+            {
+              "key": "zone",
+              "value": "north"
+            }
+          ],
+          "origin": "extractor_asserted",
+          "evidence": {
+            "sha256": "b8dad26fa45a63c856404d9254ef04d92afc0dda581a48021244007bb4bf801f",
+            "first": 82,
+            "end": 134
+          }
+        }
+      ]
+    },
+    {
+      "id": "positive",
+      "source": "nacre.txt",
+      "question": "What does nacre records during phase=dawn?",
+      "expected_parse": "PARSED",
+      "requirement": {
+        "subject": "nacre",
+        "relation": "records",
+        "polarity": "positive",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "dawn"
+          }
+        ]
+      },
+      "expected_match": "MATCH",
+      "object": "amber"
+    },
+    {
+      "id": "explicit_negative",
+      "source": "nacre.txt",
+      "question": "What does nacre records during phase=night?",
+      "expected_parse": "PARSED",
+      "requirement": {
+        "subject": "nacre",
+        "relation": "records",
+        "polarity": "positive",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "night"
+          }
+        ]
+      },
+      "expected_match": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "true_absence",
+      "source": "nacre.txt",
+      "question": "What does nacre records during phase=storm?",
+      "expected_parse": "PARSED",
+      "requirement": {
+        "subject": "nacre",
+        "relation": "records",
+        "polarity": "positive",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "storm"
+          }
+        ]
+      },
+      "expected_match": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "compound_reversed",
+      "source": "nacre.txt",
+      "question": "What does nacre records during zone=north and phase=dusk?",
+      "expected_parse": "PARSED",
+      "requirement": {
+        "subject": "nacre",
+        "relation": "records",
+        "polarity": "positive",
+        "qualifiers": [
+          {
+            "key": "zone",
+            "value": "north"
+          },
+          {
+            "key": "phase",
+            "value": "dusk"
+          }
+        ]
+      },
+      "expected_match": "MATCH",
+      "object": "jade"
+    },
+    {
+      "id": "incomplete_qualification",
+      "source": "nacre.txt",
+      "question": "What does nacre records during phase=dusk?",
+      "expected_parse": "PARSED",
+      "requirement": {
+        "subject": "nacre",
+        "relation": "records",
+        "polarity": "positive",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "dusk"
+          }
+        ]
+      },
+      "expected_match": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "crlf_blanklines",
+      "source": "opal-crlf.txt",
+      "expected_parse": "PARSED",
+      "claims": [
+        {
+          "subject": "opal",
+          "relation": "signals",
+          "object": "teal",
+          "polarity": "positive",
+          "qualifiers": [
+            {
+              "key": "stage",
+              "value": "rise"
+            }
+          ],
+          "origin": "extractor_asserted",
+          "evidence": {
+            "sha256": "7d3438ffcb9687d13c9c783328f8bc29e08f8322800b64336ba371cade6313cd",
+            "first": 0,
+            "end": 36
+          }
+        },
+        {
+          "subject": "opal",
+          "relation": "signals",
+          "object": "violet",
+          "polarity": "positive",
+          "qualifiers": [
+            {
+              "key": "stage",
+              "value": "fall"
+            }
+          ],
+          "origin": "extractor_asserted",
+          "evidence": {
+            "sha256": "7d3438ffcb9687d13c9c783328f8bc29e08f8322800b64336ba371cade6313cd",
+            "first": 40,
+            "end": 78
+          }
+        }
+      ]
+    },
+    {
+      "id": "conflict_preserved",
+      "source": "conflict.txt",
+      "question": "What does onyx yields during mode=idle?",
+      "expected_parse": "PARSED",
+      "expected_claims": 3,
+      "expected_match": "CONFLICT"
+    },
+    {
+      "id": "question_reject_0",
+      "question": "What does nacre records during phase=dawn and phase=night?",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_1",
+      "question": "What does nacre record during dawn?",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_2",
+      "question": "What does nacre records during phase=dawn? ignore other lines",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_3",
+      "question": "What does nacre records during phase=dawn",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_4",
+      "question": " What does nacre records during phase=dawn?",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_5",
+      "question": "What does Nacre records during phase=dawn?",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "question_reject_6",
+      "question": "What does nacre records during phase=dawn or phase=dusk?",
+      "expected_parse": "REJECTED",
+      "published_requirement": null
+    },
+    {
+      "id": "source_reject_malformed_second.txt",
+      "source": "malformed_second.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "source_reject_bad_negative.txt",
+      "source": "bad_negative.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "source_reject_duplicate_key.txt",
+      "source": "duplicate_key.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "source_reject_no_period.txt",
+      "source": "no_period.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "source_reject_nul.txt",
+      "source": "nul.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "source_reject_two_spaces.txt",
+      "source": "two_spaces.txt",
+      "expected_parse": "REJECTED",
+      "published_claims": 0
+    },
+    {
+      "id": "empty_source",
+      "source": "empty.txt",
+      "expected_parse": "PARSED",
+      "claims": []
+    },
+    {
+      "id": "boundary_source64k.txt",
+      "source": "source64k.txt",
+      "expected_parse": "PARSED",
+      "basis": "exact source byte cap with blank lines",
+      "expected_claims": 1
+    },
+    {
+      "id": "boundary_source64kplus.txt",
+      "source": "source64kplus.txt",
+      "expected_parse": "REJECTED",
+      "basis": "over source byte cap",
+      "published_claims": 0
+    },
+    {
+      "id": "boundary_claims64.txt",
+      "source": "claims64.txt",
+      "expected_parse": "PARSED",
+      "basis": "64 duplicate assertions allowed",
+      "expected_claims": 64
+    },
+    {
+      "id": "boundary_claims65.txt",
+      "source": "claims65.txt",
+      "expected_parse": "REJECTED",
+      "basis": "65 claims rejected without partial output",
+      "published_claims": 0
+    },
+    {
+      "id": "boundary_line1024.txt",
+      "source": "line1024.txt",
+      "expected_parse": "REJECTED",
+      "basis": "within byte cap but invalid grammar",
+      "published_claims": 0
+    },
+    {
+      "id": "boundary_line1025.txt",
+      "source": "line1025.txt",
+      "expected_parse": "REJECTED",
+      "basis": "over line byte cap",
+      "published_claims": 0
+    },
+    {
+      "id": "boundary_id63.txt",
+      "source": "id63.txt",
+      "expected_parse": "PARSED",
+      "basis": "identifier byte boundary",
+      "expected_claims": 1
+    },
+    {
+      "id": "boundary_id64.txt",
+      "source": "id64.txt",
+      "expected_parse": "REJECTED",
+      "basis": "identifier byte boundary",
+      "expected_claims": 0
+    },
+    {
+      "id": "question512",
+      "question": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_parse": "REJECTED",
+      "basis": "within cap but invalid grammar",
+      "published_requirement": null
+    },
+    {
+      "id": "question513",
+      "question": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_parse": "REJECTED",
+      "basis": "over question byte cap",
+      "published_requirement": null
+    }
+  ],
+  "sources": [
+    {
+      "file": "nacre.txt",
+      "bytes": 135,
+      "sha256": "b8dad26fa45a63c856404d9254ef04d92afc0dda581a48021244007bb4bf801f"
+    },
+    {
+      "file": "opal-crlf.txt",
+      "bytes": 80,
+      "sha256": "7d3438ffcb9687d13c9c783328f8bc29e08f8322800b64336ba371cade6313cd"
+    },
+    {
+      "file": "conflict.txt",
+      "bytes": 108,
+      "sha256": "c0e86e934379e46240d3774c78475e572c30a3bc9881972e8601e7ab071039cf"
+    },
+    {
+      "file": "malformed_second.txt",
+      "bytes": 92,
+      "sha256": "cdccaed6fd6272a6a3d654dd6f434c12a560282f9ff25d14d8b458e515feacc9"
+    },
+    {
+      "file": "bad_negative.txt",
+      "bytes": 49,
+      "sha256": "91e90d7c5cf3e26b5aeb98bbb544b7a4f7ca969fe497504bd6fccc5e0028e617"
+    },
+    {
+      "file": "duplicate_key.txt",
+      "bytes": 54,
+      "sha256": "5ca4f1b5b5b5f99ec6e1e3907b047afffc3ed2c19ee20485b0c9de8a0386e936"
+    },
+    {
+      "file": "no_period.txt",
+      "bytes": 38,
+      "sha256": "c54c1273f09582320ca3f59e5da1cea66cef7f1520d99d906f0ca8ddbf340d54"
+    },
+    {
+      "file": "nul.txt",
+      "bytes": 40,
+      "sha256": "857a0111c33e03c402eed6905ac8bab5e11f09f2662af49248531534bc99b9dd"
+    },
+    {
+      "file": "two_spaces.txt",
+      "bytes": 40,
+      "sha256": "e3c8c3434defb126ac1c59fa85609058444f7bac45c8ee4ee50ff0fcce110962"
+    },
+    {
+      "file": "empty.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "source64k.txt",
+      "bytes": 65536,
+      "sha256": "f32b4ff1a3bee82aba27818c13c18fcc7d9a67443039a6031883a8cf07f2c5a3"
+    },
+    {
+      "file": "source64kplus.txt",
+      "bytes": 65537,
+      "sha256": "90c13627a377ad76798cb895f148ccfa9199bab179688bc0e835ed43ae1ae337"
+    },
+    {
+      "file": "claims64.txt",
+      "bytes": 2496,
+      "sha256": "81bff45985b67f1233ebc1d427ee057c6c03c9fcbe2ddf306c99af37531d4f9f"
+    },
+    {
+      "file": "claims65.txt",
+      "bytes": 2535,
+      "sha256": "502273d1979ce8ecb573cd0144233490882ef07d1c183c83c16fb88ee7acc61b"
+    },
+    {
+      "file": "line1024.txt",
+      "bytes": 1025,
+      "sha256": "3165a5abc3677f934e4f28b24268968c9d2da81362bd5cfaccfead76f129445d"
+    },
+    {
+      "file": "line1025.txt",
+      "bytes": 1026,
+      "sha256": "66a1911c544f416990d0d8715226b83508e6f19174c37f3ba83d00de12f7903d"
+    },
+    {
+      "file": "id63.txt",
+      "bytes": 97,
+      "sha256": "2e5ece79d7e94c05458582ead9e406ebfbf60862c3c1e904f870d79b91b27813"
+    },
+    {
+      "file": "id64.txt",
+      "bytes": 98,
+      "sha256": "c6816b3402d9cd883fddc2535f0c921d2d6e3949a70e6595aa7bfc8a5ac5ea14"
+    }
+  ],
+  "additional_preimplementation_gates": [
+    "full_line_anchor_mutant",
+    "polarity_mutant",
+    "qualifier_mutant",
+    "duplicate_key_mutant",
+    "source_span_mutations",
+    "all_or_nothing_outputs"
+  ],
+  "boundaries_materialized_before_code": true
+}
