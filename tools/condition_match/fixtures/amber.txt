@@ -1,0 +1,3 @@
+lumen reports seven during cycle dawn.
+lumen reports nine during cycle dusk.
+lumen does not reports during cycle night.

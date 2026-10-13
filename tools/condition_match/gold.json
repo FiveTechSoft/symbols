@@ -1,0 +1,785 @@
+{
+  "version": 1,
+  "design_only": true,
+  "base": "785c709a0bcf31b7aea0240773194cd703b567b0",
+  "claims_are_manual_assertions_not_extracted": true,
+  "sources": [
+    {
+      "name": "amber",
+      "sha256": "60d89c1fa4a7ba20fae1eb054de6362e10041116cac599ab3f0fc3e2afd28dc0",
+      "bytes": 120
+    },
+    {
+      "name": "cobalt",
+      "sha256": "9ead888c81e558ffcc7b70b9d435b5e7d46a0c45ad32cf53c4e77a91d57abe62",
+      "bytes": 119
+    },
+    {
+      "name": "jade",
+      "sha256": "c00a7c95ab26f0aa86a92f4b8983c4205ea43874a45dc2d102ae59822677722e",
+      "bytes": 124
+    },
+    {
+      "name": "sienna",
+      "sha256": "5895393dafce774892c1daa853dbe910f3ccc0da7de129a266e135002a82740f",
+      "bytes": 113
+    },
+    {
+      "name": "conflict",
+      "sha256": "459db35399b6a0f45d8e6e5f581d4039d104873f078aee3a87e9664784081db8",
+      "bytes": 119
+    }
+  ],
+  "claims": [
+    {
+      "source": "amber",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "dawn"
+        }
+      ],
+      "object": "seven",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "60d89c1fa4a7ba20fae1eb054de6362e10041116cac599ab3f0fc3e2afd28dc0",
+        "first": 0,
+        "end": 39
+      }
+    },
+    {
+      "source": "amber",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "dusk"
+        }
+      ],
+      "object": "nine",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "60d89c1fa4a7ba20fae1eb054de6362e10041116cac599ab3f0fc3e2afd28dc0",
+        "first": 39,
+        "end": 77
+      }
+    },
+    {
+      "source": "amber",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "night"
+        }
+      ],
+      "object": null,
+      "polarity": "negative",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "60d89c1fa4a7ba20fae1eb054de6362e10041116cac599ab3f0fc3e2afd28dc0",
+        "first": 77,
+        "end": 120
+      }
+    },
+    {
+      "source": "cobalt",
+      "version": 1,
+      "subject": "prism",
+      "relation": "returns",
+      "qualifiers": [
+        {
+          "key": "phase",
+          "value": "warm"
+        }
+      ],
+      "object": "blue",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "9ead888c81e558ffcc7b70b9d435b5e7d46a0c45ad32cf53c4e77a91d57abe62",
+        "first": 0,
+        "end": 38
+      }
+    },
+    {
+      "source": "cobalt",
+      "version": 1,
+      "subject": "prism",
+      "relation": "returns",
+      "qualifiers": [
+        {
+          "key": "phase",
+          "value": "cold"
+        }
+      ],
+      "object": "green",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "9ead888c81e558ffcc7b70b9d435b5e7d46a0c45ad32cf53c4e77a91d57abe62",
+        "first": 38,
+        "end": 77
+      }
+    },
+    {
+      "source": "cobalt",
+      "version": 1,
+      "subject": "prism",
+      "relation": "returns",
+      "qualifiers": [
+        {
+          "key": "phase",
+          "value": "idle"
+        }
+      ],
+      "object": null,
+      "polarity": "negative",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "9ead888c81e558ffcc7b70b9d435b5e7d46a0c45ad32cf53c4e77a91d57abe62",
+        "first": 77,
+        "end": 119
+      }
+    },
+    {
+      "source": "jade",
+      "version": 1,
+      "subject": "vector",
+      "relation": "stores",
+      "qualifiers": [
+        {
+          "key": "scope",
+          "value": "local"
+        }
+      ],
+      "object": "alpha",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "c00a7c95ab26f0aa86a92f4b8983c4205ea43874a45dc2d102ae59822677722e",
+        "first": 0,
+        "end": 40
+      }
+    },
+    {
+      "source": "jade",
+      "version": 1,
+      "subject": "vector",
+      "relation": "stores",
+      "qualifiers": [
+        {
+          "key": "scope",
+          "value": "remote"
+        }
+      ],
+      "object": "beta",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "c00a7c95ab26f0aa86a92f4b8983c4205ea43874a45dc2d102ae59822677722e",
+        "first": 40,
+        "end": 80
+      }
+    },
+    {
+      "source": "jade",
+      "version": 1,
+      "subject": "vector",
+      "relation": "stores",
+      "qualifiers": [
+        {
+          "key": "scope",
+          "value": "closed"
+        }
+      ],
+      "object": null,
+      "polarity": "negative",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "c00a7c95ab26f0aa86a92f4b8983c4205ea43874a45dc2d102ae59822677722e",
+        "first": 80,
+        "end": 124
+      }
+    },
+    {
+      "source": "sienna",
+      "version": 1,
+      "subject": "relay",
+      "relation": "emits",
+      "qualifiers": [
+        {
+          "key": "mode",
+          "value": "quiet"
+        }
+      ],
+      "object": "low",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "5895393dafce774892c1daa853dbe910f3ccc0da7de129a266e135002a82740f",
+        "first": 0,
+        "end": 35
+      }
+    },
+    {
+      "source": "sienna",
+      "version": 1,
+      "subject": "relay",
+      "relation": "emits",
+      "qualifiers": [
+        {
+          "key": "mode",
+          "value": "active"
+        }
+      ],
+      "object": "high",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "5895393dafce774892c1daa853dbe910f3ccc0da7de129a266e135002a82740f",
+        "first": 35,
+        "end": 72
+      }
+    },
+    {
+      "source": "sienna",
+      "version": 1,
+      "subject": "relay",
+      "relation": "emits",
+      "qualifiers": [
+        {
+          "key": "mode",
+          "value": "paused"
+        }
+      ],
+      "object": null,
+      "polarity": "negative",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "5895393dafce774892c1daa853dbe910f3ccc0da7de129a266e135002a82740f",
+        "first": 72,
+        "end": 113
+      }
+    },
+    {
+      "source": "conflict",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "dawn"
+        }
+      ],
+      "object": "seven",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "459db35399b6a0f45d8e6e5f581d4039d104873f078aee3a87e9664784081db8",
+        "first": 0,
+        "end": 39
+      }
+    },
+    {
+      "source": "conflict",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "dawn"
+        }
+      ],
+      "object": "nine",
+      "polarity": "positive",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "459db35399b6a0f45d8e6e5f581d4039d104873f078aee3a87e9664784081db8",
+        "first": 39,
+        "end": 77
+      }
+    },
+    {
+      "source": "conflict",
+      "version": 1,
+      "subject": "lumen",
+      "relation": "reports",
+      "qualifiers": [
+        {
+          "key": "cycle",
+          "value": "dawn"
+        }
+      ],
+      "object": null,
+      "polarity": "negative",
+      "annotation_origin": "caller_asserted",
+      "evidence": {
+        "sha256": "459db35399b6a0f45d8e6e5f581d4039d104873f078aee3a87e9664784081db8",
+        "first": 77,
+        "end": 119
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "amber-match1",
+      "source": "amber",
+      "reader_question": "What does lumen reports during cycle dawn?",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "seven"
+    },
+    {
+      "id": "amber-match2",
+      "source": "amber",
+      "reader_question": "What does lumen reports during cycle dusk?",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dusk"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "nine"
+    },
+    {
+      "id": "amber-negative",
+      "source": "amber",
+      "reader_question": "What does lumen reports during cycle night?",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "night"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "amber-absent",
+      "source": "amber",
+      "reader_question": "What does lumen reports during cycle storm?",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "storm"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "cobalt-match1",
+      "source": "cobalt",
+      "reader_question": "What does prism returns during phase warm?",
+      "requirement": {
+        "version": 1,
+        "subject": "prism",
+        "relation": "returns",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "warm"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "blue"
+    },
+    {
+      "id": "cobalt-match2",
+      "source": "cobalt",
+      "reader_question": "What does prism returns during phase cold?",
+      "requirement": {
+        "version": 1,
+        "subject": "prism",
+        "relation": "returns",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "cold"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "green"
+    },
+    {
+      "id": "cobalt-negative",
+      "source": "cobalt",
+      "reader_question": "What does prism returns during phase idle?",
+      "requirement": {
+        "version": 1,
+        "subject": "prism",
+        "relation": "returns",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "idle"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "cobalt-absent",
+      "source": "cobalt",
+      "reader_question": "What does prism returns during phase rain?",
+      "requirement": {
+        "version": 1,
+        "subject": "prism",
+        "relation": "returns",
+        "qualifiers": [
+          {
+            "key": "phase",
+            "value": "rain"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "jade-match1",
+      "source": "jade",
+      "reader_question": "What does vector stores during scope local?",
+      "requirement": {
+        "version": 1,
+        "subject": "vector",
+        "relation": "stores",
+        "qualifiers": [
+          {
+            "key": "scope",
+            "value": "local"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "alpha"
+    },
+    {
+      "id": "jade-match2",
+      "source": "jade",
+      "reader_question": "What does vector stores during scope remote?",
+      "requirement": {
+        "version": 1,
+        "subject": "vector",
+        "relation": "stores",
+        "qualifiers": [
+          {
+            "key": "scope",
+            "value": "remote"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "beta"
+    },
+    {
+      "id": "jade-negative",
+      "source": "jade",
+      "reader_question": "What does vector stores during scope closed?",
+      "requirement": {
+        "version": 1,
+        "subject": "vector",
+        "relation": "stores",
+        "qualifiers": [
+          {
+            "key": "scope",
+            "value": "closed"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "jade-absent",
+      "source": "jade",
+      "reader_question": "What does vector stores during scope wide?",
+      "requirement": {
+        "version": 1,
+        "subject": "vector",
+        "relation": "stores",
+        "qualifiers": [
+          {
+            "key": "scope",
+            "value": "wide"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "sienna-match1",
+      "source": "sienna",
+      "reader_question": "What does relay emits during mode quiet?",
+      "requirement": {
+        "version": 1,
+        "subject": "relay",
+        "relation": "emits",
+        "qualifiers": [
+          {
+            "key": "mode",
+            "value": "quiet"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "low"
+    },
+    {
+      "id": "sienna-match2",
+      "source": "sienna",
+      "reader_question": "What does relay emits during mode active?",
+      "requirement": {
+        "version": 1,
+        "subject": "relay",
+        "relation": "emits",
+        "qualifiers": [
+          {
+            "key": "mode",
+            "value": "active"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "MATCH",
+      "object": "high"
+    },
+    {
+      "id": "sienna-negative",
+      "source": "sienna",
+      "reader_question": "What does relay emits during mode paused?",
+      "requirement": {
+        "version": 1,
+        "subject": "relay",
+        "relation": "emits",
+        "qualifiers": [
+          {
+            "key": "mode",
+            "value": "paused"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "sienna-absent",
+      "source": "sienna",
+      "reader_question": "What does relay emits during mode dense?",
+      "requirement": {
+        "version": 1,
+        "subject": "relay",
+        "relation": "emits",
+        "qualifiers": [
+          {
+            "key": "mode",
+            "value": "dense"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "control-unqualified",
+      "source": "amber",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "control-extra_scope",
+      "source": "amber",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          },
+          {
+            "key": "region",
+            "value": "east"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "control-negative_request",
+      "source": "amber",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "negative"
+      },
+      "expected": "REFUTED",
+      "object": null
+    },
+    {
+      "id": "control-duplicate_key",
+      "source": "amber",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          },
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "INVALID",
+      "object": null
+    },
+    {
+      "id": "control-wrong_subject",
+      "source": "amber",
+      "requirement": {
+        "version": 1,
+        "subject": "Lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "UNDETERMINED",
+      "object": null
+    },
+    {
+      "id": "control-wrong_version",
+      "source": "amber",
+      "requirement": {
+        "version": 2,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "INVALID",
+      "object": null
+    },
+    {
+      "id": "conflict-all",
+      "source": "conflict",
+      "requirement": {
+        "version": 1,
+        "subject": "lumen",
+        "relation": "reports",
+        "qualifiers": [
+          {
+            "key": "cycle",
+            "value": "dawn"
+          }
+        ],
+        "requested_polarity": "positive"
+      },
+      "expected": "CONFLICT",
+      "object": null
+    }
+  ],
+  "not_measured": [
+    "question_parsing",
+    "text_claim_extraction",
+    "entailment",
+    "domain_truth",
+    "resource_limits",
+    "implementation"
+  ],
+  "meta_gates": [
+    "claim_order_invariance",
+    "qualifier_order_invariance",
+    "fresh_call_isolation",
+    "source_hash_and_spans",
+    "qualifier_polarity_conflict_mutants"
+  ]
+}

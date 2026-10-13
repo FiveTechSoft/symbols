@@ -1,0 +1,3 @@
+prism returns blue during phase warm.
+prism returns green during phase cold.
+prism does not returns during phase idle.
