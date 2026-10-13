@@ -1,0 +1,3 @@
+En el archivo de prueba, el hipocampo conserva recuerdos durante el sueño.
+Durante la vigilia, el hipocampo no conserva recuerdos; la corteza conserva recuerdos.
+El archivo no describe hipocampo ni corteza durante la anestesia.

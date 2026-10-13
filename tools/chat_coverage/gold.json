@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "base": "a7b5ca8293e63968e7ab86448adbc37853f26db2",
+  "created_before_execution": true,
+  "synthetic_closed_world": true,
+  "cases": [
+    {
+      "id": "memory-1",
+      "corpus": "memory.txt",
+      "query": "¿Qué conserva el hipocampo durante el sueño?",
+      "condition": "sueño",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "hipocampo conserva recuerdos durante el sueño",
+      "topic_expected": true,
+      "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c"
+    },
+    {
+      "id": "memory-2",
+      "corpus": "memory.txt",
+      "query": "¿Qué conserva el hipocampo durante la vigilia?",
+      "condition": "vigilia",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "explicit_negative",
+      "topic_expected": true,
+      "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c"
+    },
+    {
+      "id": "memory-3",
+      "corpus": "memory.txt",
+      "query": "¿Qué conserva la corteza durante la vigilia?",
+      "condition": "vigilia",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "corteza conserva recuerdos",
+      "topic_expected": true,
+      "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c"
+    },
+    {
+      "id": "memory-4",
+      "corpus": "memory.txt",
+      "query": "¿Qué conserva la corteza durante la anestesia?",
+      "condition": "anestesia",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "not_described",
+      "topic_expected": true,
+      "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c"
+    },
+    {
+      "id": "astronomy-1",
+      "corpus": "astronomy.txt",
+      "query": "¿Qué emite la colisión durante el destello?",
+      "condition": "destello",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "colisión emite fotones durante el destello",
+      "topic_expected": true,
+      "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a"
+    },
+    {
+      "id": "astronomy-2",
+      "corpus": "astronomy.txt",
+      "query": "¿Qué emite la colisión durante la pausa?",
+      "condition": "pausa",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "explicit_negative",
+      "topic_expected": true,
+      "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a"
+    },
+    {
+      "id": "astronomy-3",
+      "corpus": "astronomy.txt",
+      "query": "¿Qué emite la estrella durante la pausa?",
+      "condition": "pausa",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "estrella emite fotones",
+      "topic_expected": true,
+      "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a"
+    },
+    {
+      "id": "astronomy-4",
+      "corpus": "astronomy.txt",
+      "query": "¿Qué emite la estrella durante el eclipse?",
+      "condition": "eclipse",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "not_described",
+      "topic_expected": true,
+      "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a"
+    },
+    {
+      "id": "physics-1",
+      "corpus": "physics.txt",
+      "query": "¿Qué mide el sensor durante el movimiento?",
+      "condition": "movimiento",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "sensor mide velocidad durante el movimiento",
+      "topic_expected": true,
+      "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08"
+    },
+    {
+      "id": "physics-2",
+      "corpus": "physics.txt",
+      "query": "¿Qué mide el sensor durante el reposo?",
+      "condition": "reposo",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "explicit_negative",
+      "topic_expected": true,
+      "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08"
+    },
+    {
+      "id": "physics-3",
+      "corpus": "physics.txt",
+      "query": "¿Qué mide el detector durante el reposo?",
+      "condition": "reposo",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "detector mide velocidad",
+      "topic_expected": true,
+      "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08"
+    },
+    {
+      "id": "physics-4",
+      "corpus": "physics.txt",
+      "query": "¿Qué mide el detector durante la aceleración?",
+      "condition": "aceleración",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "not_described",
+      "topic_expected": true,
+      "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08"
+    },
+    {
+      "id": "math-1",
+      "corpus": "math.txt",
+      "query": "¿Qué devuelve la función durante la evaluación?",
+      "condition": "evaluación",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "función devuelve dos durante la evaluación",
+      "topic_expected": true,
+      "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a"
+    },
+    {
+      "id": "math-2",
+      "corpus": "math.txt",
+      "query": "¿Qué devuelve la función durante la inversión?",
+      "condition": "inversión",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "explicit_negative",
+      "topic_expected": true,
+      "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a"
+    },
+    {
+      "id": "math-3",
+      "corpus": "math.txt",
+      "query": "¿Qué devuelve el operador durante la inversión?",
+      "condition": "inversión",
+      "positive": true,
+      "full_support_gold": "stated_fact",
+      "basis": "operador devuelve dos",
+      "topic_expected": true,
+      "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a"
+    },
+    {
+      "id": "math-4",
+      "corpus": "math.txt",
+      "query": "¿Qué devuelve el operador durante la integración?",
+      "condition": "integración",
+      "positive": false,
+      "full_support_gold": "abstain_or_explicit_no_support",
+      "basis": "not_described",
+      "topic_expected": true,
+      "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a"
+    }
+  ],
+  "modes": [
+    "resolve",
+    "try",
+    "handle"
+  ],
+  "capacities": [
+    32,
+    4096
+  ],
+  "repetitions": 2,
+  "arms": [
+    "fresh_per_query",
+    "stateful_domain_sequence"
+  ],
+  "scoring": "Semantic misses logged as red outcomes; technical integrity errors stop. Quote-only negative does not fulfill full support; marked substitute is separate. No semantic correctness inferred from source provenance."
+}

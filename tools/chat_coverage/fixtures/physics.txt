@@ -1,0 +1,3 @@
+En el archivo de prueba, el sensor mide velocidad durante el movimiento.
+Durante el reposo, el sensor no mide velocidad; el detector mide velocidad.
+El archivo no describe mediciones del detector durante la aceleración.

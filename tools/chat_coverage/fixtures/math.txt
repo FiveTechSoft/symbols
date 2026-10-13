@@ -1,0 +1,3 @@
+En el archivo de prueba, la función devuelve dos durante la evaluación.
+Durante la inversión, la función no devuelve dos; el operador devuelve dos.
+El archivo no describe resultados del operador durante la integración.

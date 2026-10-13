@@ -1,0 +1,3 @@
+En el archivo de prueba, la colisión emite fotones durante el destello.
+Durante la pausa, la colisión no emite fotones; la estrella emite fotones.
+El archivo no describe emisiones de la estrella durante el eclipse.
