@@ -712,6 +712,7 @@ sllm_test(test_fixtures        tests/test_fixtures.c)
 # test_ingiere (tests loading .tsv files)
 sllm_test(test_textlex         tests/test_textlex.c)
 sllm_test(test_chat_buffer     tests/test_chat_buffer.c)
+sllm_test(test_chat_citation   tests/test_chat_citation.c)
 # Removed: test_server_proto, test_chain, test_bible_bfs, test_compose
 # (depend on bible_relations.tsv)
 sllm_test(test_learn          tests/test_learn.c)

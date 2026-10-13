@@ -4534,10 +4534,53 @@ static int ChatFindGroundedSentence(const CHAT *ch, const char *need,
     return 1;
 }
 
+/* Per-call emission identity, never retrieval history or a string lookup. */
+typedef struct {
+    int selected, answered;
+    uint32_t file, sentence;
+    size_t first, end;
+    int display_truncated;
+} CHAT_EMISSION;
+static void ChatCitationClear(CHAT_CITATION *c)
+{
+    if (c) memset(c, 0, sizeof(*c));
+}
+static void ChatCitationFinish(CHAT *ch, const CHAT_EMISSION *e,
+                               const char *answer, size_t copied,
+                               CHAT_CITATION *c)
+{
+    const TL_SENT *sn;
+    size_t display_bytes = 0;
+    uint32_t i;
+    if (!c) return;
+    if (!e || !e->selected) { if (e && e->answered) c->state = CHAT_CITE_NOT_SUPPORTED; return; }
+    c->answer_bytes = strlen(answer);
+    c->copied_bytes = copied;
+    c->output_truncated = copied < c->answer_bytes;
+    c->quote_first = e->first;
+    c->quote_end = e->end;
+    c->visible_quote_end = copied < e->end ? copied : e->end;
+    if (copied <= e->first) { c->visible_quote_end = e->first; return; }
+    c->state = CHAT_CITE_UNAVAILABLE;
+    if (e->file >= ch->ntfiles) return;
+    sn = TextLexSentence(&ch->tlex[e->file], e->sentence);
+    if (!sn) return;
+    for (i = 0; i < sn->ntok; i++) display_bytes += sn->lens[i] + (i != 0);
+    c->display_truncated = e->display_truncated || display_bytes > e->end - e->first;
+    /* Internal display cuts are outside this pilot. Preserve the answer,
+       but never turn the full source sentence into an emission receipt. */
+    if (c->display_truncated) return;
+    if (TextLexCitation(&ch->tlex[e->file], e->sentence, &c->source) != TL_CITE_OK)
+        return;
+    c->file_slot = e->file; c->sentence_index = e->sentence;
+    snprintf(c->source_label, sizeof(c->source_label), "%s", ch->tfiles[e->file]);
+    c->state = CHAT_CITE_VERIFIED;
+}
+
 /* buffered answer: byte-identical text to the former ChatAnswer,
    plus the per-goal status for the composite dispatcher. */
 static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
-                               size_t size, int *status)
+                               size_t size, int *status, CHAT_EMISSION *emission)
 {
     size_t pos = 0;
     int st = GOAL_UNKNOWN;
@@ -5180,6 +5223,13 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                             sent);
                 else
                     EMIT_OK("Segun el texto: %s\n", sent);
+                if (emission)
+                {
+                    emission->selected = 1;
+                    emission->file = bestf; emission->sentence = best;
+                    emission->first = p->t_sub[0] ? strlen(p->t_sub) + 19 : 16;
+                    emission->end = emission->first + strlen(sent);
+                }
             }
             else
                 EMIT("No entendi la pregunta.\n");
@@ -6776,10 +6826,10 @@ static const char *ChatDefSubject(const PARSED *p)
    unrelated verse. Applies only to quoted sentences; KB facts,
    commonsense and abstentions pass through unchanged. */
 static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
-                            size_t size, int *status)
+                            size_t size, int *status, CHAT_EMISSION *emission)
 {
     const char *subj, *q, *tr;
-    ChatAnswerToBufRaw(ch, p, out, size, status);
+    ChatAnswerToBufRaw(ch, p, out, size, status, emission);
     if (out == NULL || size == 0 || strncmp(out, "Segun el texto", 14) != 0)
         return;
     subj = ChatDefSubject(p);
@@ -6799,10 +6849,12 @@ static void ChatAnswerToBuf(CHAT *ch, const PARSED *p, char *out,
         const char *k = (tr != NULL && tr[0] != '\0') ? tr : (p->t_sub[0] ? p->t_sub : NULL);
         if (k != NULL && ChatFindDefinition(ch, k, def, sizeof(def)))
         {
+            if (emission) memset(emission, 0, sizeof(*emission));
             snprintf(out, size, "Segun el texto [%s]: %s\n", k, def);
             return;
         }
     }
+    if (emission) memset(emission, 0, sizeof(*emission));
     snprintf(out, size, "No tengo constancia suficiente para responder a eso.\n");
     if (status)
         *status = GOAL_UNKNOWN;
@@ -7381,7 +7433,7 @@ static int ChatHandleMultiBuf(CHAT *ch, const QueryPlan *plan,
                 }
                 else
                 {
-                    ChatAnswerToBuf(ch, &p, gbuf, sizeof(gbuf), &st);
+                    ChatAnswerToBuf(ch, &p, gbuf, sizeof(gbuf), &st, NULL);
                     any = 1;
                     if (st == GOAL_UNKNOWN)
                         cause = VocabIdx(ch, p.a) < 0
@@ -8198,8 +8250,12 @@ static int SelfAnswer(const char *line, char *out, size_t size)
     return 0;
 }
 
-int ChatTryTextLine(CHAT *ch, const char *line, char *out,
-                      size_t size)
+static int ChatResolveLineCore(CHAT *, const char *, char *, size_t,
+                              char *, size_t, char *, size_t, GoalCause *,
+                              CHAT_EMISSION *);
+
+static int ChatTryTextLineCore(CHAT *ch, const char *line, char *out,
+                      size_t size, CHAT_EMISSION *emission)
 {
     char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
     SURFACE_FLAGS sf;
@@ -8227,8 +8283,8 @@ int ChatTryTextLine(CHAT *ch, const char *line, char *out,
        before a copula or at sentence start. */
     if (tp.intent == INT_TEXTQ && n > 0 && LooksLikeQuestionWord(toks[0], 0, toks, n))
         return 0;
-    st = ChatResolveLine(ch, line, out, size, NULL, 0, NULL, 0,
-                         NULL);
+    st = ChatResolveLineCore(ch, line, out, size, NULL, 0, NULL, 0,
+                         NULL, emission);
     if (st < 0)
     {
         snprintf(out, size, "No entendi la pregunta.\n");
@@ -8237,10 +8293,10 @@ int ChatTryTextLine(CHAT *ch, const char *line, char *out,
     return 1;
 }
 
-int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
+static int ChatResolveLineCore(CHAT *ch, const char *line, char *out, size_t size,
                     char *slot, size_t slot_size,
                     char *family, size_t family_size,
-                    GoalCause *cause)
+                    GoalCause *cause, CHAT_EMISSION *emission)
 {
     PARSED p;
     if (size > 0)
@@ -8292,7 +8348,8 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
         if (cause != NULL) *cause = CAUSE_NO_DERIVATION;
         return GOAL_UNKNOWN;
     }
-    ChatAnswerToBuf(ch, &p, answer, eval_size, &st);
+    ChatAnswerToBuf(ch, &p, answer, eval_size, &st, emission);
+    if (emission) emission->answered = st == GOAL_ANSWER;
     if (out != NULL && size > 0)
     {
         strncpy(out, answer, size - 1);
@@ -8305,7 +8362,61 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
     return st;
 }
 
-static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size);
+
+int ChatResolveLineEx(CHAT *ch, const char *line, char *out, size_t size,
+                    char *slot, size_t slot_size, char *family, size_t family_size,
+                    GoalCause *cause, CHAT_CITATION *citation)
+{
+    CHAT_EMISSION emission = {0};
+    char evaluated[CHAT_ANSWER_MAX];
+    size_t capacity = size > sizeof(evaluated) ? size : sizeof(evaluated);
+    char *answer;
+    int st;
+    ChatCitationClear(citation);
+    if (!citation) return ChatResolveLineCore(ch, line, out, size, slot, slot_size, family, family_size, cause, NULL);
+    if (!ch || !line || !out || !size) return -1;
+    out[0] = '\0';
+    answer = capacity == sizeof(evaluated) ? evaluated : (char *)malloc(capacity);
+    if (!answer) { if (cause) *cause = CAUSE_NO_DERIVATION; return GOAL_UNKNOWN; }
+    st = ChatResolveLineCore(ch, line, answer, capacity, slot, slot_size, family, family_size, cause, &emission);
+    strncpy(out, answer, size - 1); out[size - 1] = '\0';
+    if (st == GOAL_ANSWER) ChatCitationFinish(ch, &emission, answer, strlen(out), citation);
+    if (answer != evaluated) free(answer);
+    return st;
+}
+int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
+                    char *slot, size_t slot_size, char *family, size_t family_size,
+                    GoalCause *cause)
+{
+    return ChatResolveLineCore(ch, line, out, size, slot, slot_size, family, family_size, cause, NULL);
+}
+int ChatTryTextLineEx(CHAT *ch, const char *line, char *out, size_t size, CHAT_CITATION *citation)
+{
+    CHAT_EMISSION emission = {0};
+    char evaluated[CHAT_ANSWER_MAX];
+    size_t capacity = size > sizeof(evaluated) ? size : sizeof(evaluated);
+    char *answer;
+    int r;
+    ChatCitationClear(citation);
+    if (!citation) return ChatTryTextLineCore(ch, line, out, size, NULL);
+    if (!ch || !line || !out || !size) return 0;
+    answer = capacity == sizeof(evaluated) ? evaluated : (char *)malloc(capacity);
+    if (!answer) return 0;
+    answer[0] = '\0';
+    r = ChatTryTextLineCore(ch, line, answer, capacity, &emission);
+    if (r) {
+        strncpy(out, answer, size - 1); out[size - 1] = '\0';
+        ChatCitationFinish(ch, &emission, answer, strlen(out), citation);
+    }
+    if (answer != evaluated) free(answer);
+    return r;
+}
+int ChatTryTextLine(CHAT *ch, const char *line, char *out, size_t size)
+{
+    return ChatTryTextLineCore(ch, line, out, size, NULL);
+}
+
+static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size, CHAT_EMISSION *emission);
 
 /* verificar: every path that quotes the corpus ("Segun el texto") passes the
    same calibrated coverage test as the retrieval path.  Continuations
@@ -8354,8 +8465,11 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
     return TextQueryCoveredEx(&ch->tlex[0], wp, nw, sbuf, 0);
 }
 
-int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
+int ChatHandleToBufEx(CHAT *ch, const char *line, char *out, size_t size, CHAT_CITATION *citation)
 {
+    CHAT_EMISSION identity = {0};
+    CHAT_EMISSION *emission = citation ? &identity : NULL;
+    ChatCitationClear(citation);
     char evaluated[CHAT_ANSWER_MAX];
     size_t eval_size = size > sizeof(evaluated) ? size : sizeof(evaluated);
     char *answer;
@@ -8364,12 +8478,13 @@ int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
     out[0] = '\0';
     answer = eval_size == sizeof(evaluated) ? evaluated : (char *)malloc(eval_size);
     if (answer == NULL) return 0;
-    r = ChatHandleToBufInner(ch, line, answer, eval_size);
+    r = ChatHandleToBufInner(ch, line, answer, eval_size, emission);
     /* Verify before presentation truncation. A small output buffer must
        not change an answer into an abstention or bypass a rejection. */
     if (r && !ChatQuoteVerified(ch, line, answer))
     {
         if (getenv("SYMBOLS_TQ_DEBUG")) fprintf(stderr, "[tq] quote rejected for: %s\n", line);
+        if (emission) memset(emission, 0, sizeof(*emission));
         snprintf(answer, eval_size, "No tengo constancia suficiente para responder a eso.\n");
     }
     if (r)
@@ -8377,11 +8492,16 @@ int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
         strncpy(out, answer, size - 1);
         out[size - 1] = '\0';
     }
+    if (r && citation) ChatCitationFinish(ch, emission, answer, strlen(out), citation);
     if (answer != evaluated) free(answer);
     return r;
 }
+int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
+{
+    return ChatHandleToBufEx(ch, line, out, size, NULL);
+}
 
-static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size)
+static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t size, CHAT_EMISSION *emission)
 {
     if (ch == NULL || line == NULL || out == NULL || size == 0)
         return 0;
@@ -8402,7 +8522,7 @@ static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t si
            plan splitter (fragments re-parse into vetoed goals,
            gluing answers or abstaining whole plans). */
         char tbuf[CHAT_ANSWER_MAX];
-        if (ChatTryTextLine(ch, line, tbuf, sizeof(tbuf)))
+        if (ChatTryTextLineCore(ch, line, tbuf, sizeof(tbuf), emission))
         {
             strncpy(out, tbuf, size - 1);
             out[size - 1] = '\0';
@@ -8417,8 +8537,8 @@ static int ChatHandleToBufInner(CHAT *ch, const char *line, char *out, size_t si
     }
     char ans[CHAT_ANSWER_MAX];
     char slot[CHAT_TOKEN_MAX];
-    int st = ChatResolveLine(ch, line, ans, sizeof(ans), slot,
-                             sizeof(slot), NULL, 0, NULL);
+    int st = ChatResolveLineCore(ch, line, ans, sizeof(ans), slot,
+                             sizeof(slot), NULL, 0, NULL, emission);
     (void)slot;
     (void)st;
     if (st < 0)

@@ -119,6 +119,31 @@ uint32_t ChatFactCount(const CHAT *ch);
 void ChatHandle(CHAT *ch, const char *line);
 /* Output capacity affects presentation only: semantic quote checks run
    before copying the decided answer. Small outputs are NUL-ended prefixes. */
+/* Opt-in pilot: only direct/continued INT_TEXTQ emissions are supported.
+   The source is the original ingested sentence; display is token-spaced,
+   not a byte-for-byte source quotation. This is provenance, not truth.
+   No receipt is verified when presentation stops before the quote starts.
+   Internally cut sentence displays return UNAVAILABLE with version 0;
+   accepted display-cut paths are not covered by this pilot.
+   Source validation costs O(source bytes) only when a receipt is requested.
+   Receipts are caller-owned and cleared on every Ex call; no CHAT history. */
+typedef enum {
+    CHAT_CITE_NONE = 0, CHAT_CITE_VERIFIED, CHAT_CITE_UNAVAILABLE,
+    CHAT_CITE_NOT_SUPPORTED
+} CHAT_CITE_STATE;
+typedef struct {
+    CHAT_CITE_STATE state;
+    uint32_t file_slot, sentence_index; /* session hints, not durable identity */
+    char source_label[128]; /* copied label, not an authenticated URL */
+    TL_CITATION source;
+    size_t answer_bytes, copied_bytes;
+    size_t quote_first, quote_end, visible_quote_end; /* display offsets */
+    int output_truncated, display_truncated;
+} CHAT_CITATION;
+int ChatHandleToBufEx(CHAT *ch, const char *line, char *out, size_t size,
+                       CHAT_CITATION *citation);
+int ChatTryTextLineEx(CHAT *ch, const char *line, char *out, size_t size,
+                       CHAT_CITATION *citation);
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size);
 /* TEXT fast path for serving dispatchers (whole-line trial parse;
    TEXT intents bypass the plan splitter). Returns 1 when handled
@@ -152,6 +177,11 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
                     char *slot, size_t slot_size,
                     char *family, size_t family_size,
                     GoalCause *cause);
+
+int ChatResolveLineEx(CHAT *ch, const char *line, char *out, size_t size,
+                    char *slot, size_t slot_size,
+                    char *family, size_t family_size,
+                    GoalCause *cause, CHAT_CITATION *citation);
 
 /* Parent candidates of child in ingest order, deduped (Fase B). */
 uint32_t ChatParentsList(const CHAT *ch, const char *child,
