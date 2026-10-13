@@ -8281,7 +8281,24 @@ int ChatResolveLine(CHAT *ch, const char *line, char *out, size_t size,
         family[family_size - 1] = '\0';
     }
     int st = GOAL_UNKNOWN;
-    ChatAnswerToBuf(ch, &p, out, size, &st);
+    /* Semantic guards inspect the decided answer, never the caller's
+       truncated presentation. Preserve larger caller capacities as well. */
+    char evaluated[CHAT_ANSWER_MAX];
+    size_t eval_size = size > sizeof(evaluated) ? size : sizeof(evaluated);
+    char *answer = eval_size == sizeof(evaluated) ? evaluated : (char *)malloc(eval_size);
+    if (answer == NULL)
+    {
+        if (out != NULL && size > 0) out[0] = '\0';
+        if (cause != NULL) *cause = CAUSE_NO_DERIVATION;
+        return GOAL_UNKNOWN;
+    }
+    ChatAnswerToBuf(ch, &p, answer, eval_size, &st);
+    if (out != NULL && size > 0)
+    {
+        strncpy(out, answer, size - 1);
+        out[size - 1] = '\0';
+    }
+    if (answer != evaluated) free(answer);
     if (st == GOAL_UNKNOWN && cause != NULL)
         *cause = VocabIdx(ch, p.a) < 0 ? CAUSE_NO_VOCAB
                                        : CAUSE_NO_DERIVATION;
@@ -8339,12 +8356,28 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out)
 
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size)
 {
-    int r = ChatHandleToBufInner(ch, line, out, size);
-    if (r && ch != NULL && line != NULL && out != NULL && !ChatQuoteVerified(ch, line, out))
+    char evaluated[CHAT_ANSWER_MAX];
+    size_t eval_size = size > sizeof(evaluated) ? size : sizeof(evaluated);
+    char *answer;
+    int r;
+    if (ch == NULL || line == NULL || out == NULL || size == 0) return 0;
+    out[0] = '\0';
+    answer = eval_size == sizeof(evaluated) ? evaluated : (char *)malloc(eval_size);
+    if (answer == NULL) return 0;
+    r = ChatHandleToBufInner(ch, line, answer, eval_size);
+    /* Verify before presentation truncation. A small output buffer must
+       not change an answer into an abstention or bypass a rejection. */
+    if (r && !ChatQuoteVerified(ch, line, answer))
     {
         if (getenv("SYMBOLS_TQ_DEBUG")) fprintf(stderr, "[tq] quote rejected for: %s\n", line);
-        snprintf(out, size, "No tengo constancia suficiente para responder a eso.\n");
+        snprintf(answer, eval_size, "No tengo constancia suficiente para responder a eso.\n");
     }
+    if (r)
+    {
+        strncpy(out, answer, size - 1);
+        out[size - 1] = '\0';
+    }
+    if (answer != evaluated) free(answer);
     return r;
 }
 

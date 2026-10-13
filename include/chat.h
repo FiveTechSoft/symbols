@@ -117,6 +117,8 @@ int ChatIsBinaryModel(const char *path);
 uint32_t ChatLoadModel(CHAT *ch, const char *path);
 uint32_t ChatFactCount(const CHAT *ch);
 void ChatHandle(CHAT *ch, const char *line);
+/* Output capacity affects presentation only: semantic quote checks run
+   before copying the decided answer. Small outputs are NUL-ended prefixes. */
 int ChatHandleToBuf(CHAT *ch, const char *line, char *out, size_t size);
 /* TEXT fast path for serving dispatchers (whole-line trial parse;
    TEXT intents bypass the plan splitter). Returns 1 when handled
