@@ -124,6 +124,104 @@ class ReplayContractTest(unittest.TestCase):
         with self.assertRaises(replay.Unavailable):
             replay.capture_v2(cap,Path(report),branch/'.symbols'/'engineering_episodes.v1',src,branch)
 
+    def test_structured_oracle_strict_contract(self):
+        import json
+        import subprocess
+        good = {'class': 'pass', 'phase': 'run', 'rc': 0,
+                'timeout': False, 'diagnostic_hash': '0' * 64}
+        def result(obj, rc=0):
+            return subprocess.CompletedProcess([], rc, json.dumps(obj), '')
+        self.assertEqual(replay.parse_oracle(result(good)), good)
+        for cls, phase in [('semantic_reject', 'run'), ('compile_reject', 'compile')]:
+            obj = dict(good, **{'class': cls, 'phase': phase, 'rc': 1})
+            self.assertEqual(replay.parse_oracle(result(obj, 1)), obj)
+        bad = [dict(good, extra=1), dict(good, rc=True), dict(good, timeout=1),
+               dict(good, diagnostic_hash='bad'), dict(good, phase='compile'),
+               dict(good, **{'class': 'other'}), dict(good, timeout=True),
+               dict(good, **{'class': 'infrastructure_error', 'rc': 127})]
+        for obj in bad:
+            with self.subTest(obj=obj), self.assertRaises(replay.OracleFailure):
+                replay.parse_oracle(result(obj))
+        for text in ['not json', '{}', json.dumps(good) + '{}',
+                     json.dumps(good)[:-1] + ',"rc":0}']:
+            with self.assertRaises(replay.OracleFailure):
+                replay.parse_oracle(subprocess.CompletedProcess([], 0, text, ''))
+        with self.assertRaises(replay.OracleFailure):
+            replay.parse_oracle(result(good, 1))
+        with self.assertRaises(replay.OracleFailure):
+            replay.parse_oracle(result(dict(good, **{'class': 'infrastructure_error',
+                                                       'phase': 'compile', 'rc': 127}), 2))
+
+    def test_readonly_root_private_copy_and_oracle_evidence(self):
+        import json
+        src = self.root / 'before'; src.mkdir()
+        (src / 'main.c').write_text('int main(void){return 1;}')
+        src.chmod(0o500)
+        task = self.root / 'task'; task.mkdir()
+        obj = {'class': 'semantic_reject', 'phase': 'run', 'rc': 1,
+               'timeout': False, 'diagnostic_hash': 'a' * 64}
+        (task / 'check.py').write_text('import json\nprint(' + repr(json.dumps(obj)) + ')\nraise SystemExit(1)\n')
+        report = replay.oracle(task, src, self.root / 'private-logs', 'cell')
+        self.assertEqual(report, obj)
+        self.assertTrue((self.root / 'private-logs/cell.stdout').is_file())
+        self.assertFalse((src / 'check.py').exists())
+        src.chmod(0o700)
+
+    def test_outcome_disposition_does_not_hide_refuted_attempts(self):
+        self.assertEqual(replay.attempt_disposition([{'outcome': 'abstained'}], False), 'no_candidate')
+        self.assertEqual(replay.attempt_disposition([{'outcome': 'refuted'}, {'outcome': 'abstained'}], False), 'refuted_rollback')
+        self.assertEqual(replay.attempt_disposition([{'outcome': 'verified'}], True), 'emitted_edit')
+        self.assertEqual(replay.attempt_disposition([{'outcome': 'verification_incomplete'}], False), 'unchanged_other')
+
+    def test_technical_pair_retains_revalidatable_raw_capture(self):
+        import os
+        agent = os.environ.get('SYMBOLS_AGENT_BIN')
+        cap_report = os.environ.get('ATTEMPT_CAPTURE_REPORT_BIN')
+        episode_report = os.environ.get('EPISODE_REPORT_BIN')
+        if not all((agent, cap_report, episode_report)):
+            self.skipTest('integration executables not configured')
+        task = self.root / 'technical'; (task / 'before').mkdir(parents=True)
+        (task / 'before/main.c').write_text('int old_name(void){return 1;} int main(void){return old_name()-1;}\n')
+        (task / 'task.md').write_text('Rename old_name to new_name.')
+        (task / 'check.py').write_text(
+            "import json,pathlib,hashlib\n"
+            "ok='new_name' in pathlib.Path('main.c').read_text()\n"
+            "print(json.dumps({'class':'pass' if ok else 'semantic_reject','phase':'run',"
+            "'rc':0 if ok else 1,'timeout':False,'diagnostic_hash':hashlib.sha256(b'fixture').hexdigest()}))\n"
+            "raise SystemExit(0 if ok else 1)\n")
+        out = self.root / 'output'
+        result = replay.evaluate(self.root, [('technical', task)], Path(agent),
+                                 Path(episode_report), Path(cap_report), out)
+        self.assertEqual(result['aggregate']['baseline']['resolved'], 1)
+        self.assertEqual(result['aggregate']['replay']['resolved'], 1)
+        for mode in ('baseline', 'replay'):
+            branch = result['paired'][0][mode]
+            evidence = out / branch['evidence']
+            self.assertTrue((evidence / 'agent.stdout').is_file())
+            nodes = replay.capture_v2(evidence / 'capture', Path(cap_report),
+                                     evidence / 'engineering_episodes.v1',
+                                     out / 'snapshots/000-initial',
+                                     self._with_audit_copy(out / ('snapshots/000-' + mode + '-post'), evidence, mode))
+            self.assertEqual(nodes, branch['attempts'])
+            self.assertIsNotNone(branch['probe'])
+
+    def _with_audit_copy(self, snapshot, evidence, mode):
+        import shutil
+        root = self.root / ('revalidate-' + mode)
+        shutil.copytree(snapshot, root)
+        (root / '.symbols').mkdir()
+        shutil.copy2(evidence / 'engineering_episodes.v1', root / '.symbols/engineering_episodes.v1')
+        return root
+
+    def test_infrastructure_oracle_stops_before_agent(self):
+        from unittest.mock import patch
+        task = self.root / 'task'; (task / 'before').mkdir(parents=True)
+        (task / 'before/main.c').write_text('int main(void){return 0;}')
+        with patch.object(replay, 'oracle', side_effect=replay.OracleFailure('oracle_infrastructure_error')), patch.object(replay, 'run_agent') as run:
+            with self.assertRaises(replay.OracleFailure):
+                replay.evaluate(self.root, [('technical', task)], Path('agent'), Path('report'), Path('cap'), self.root / 'out')
+            run.assert_not_called()
+
     def test_changes_and_prior_only_veto(self):
         self.assertEqual(replay.source_changes({'a': 'old'}, {'a': 'new'}), ['a'])
         self.assertEqual(replay.source_changes({'a': 'old'}, {'a': 'old'}), [])

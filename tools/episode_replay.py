@@ -22,6 +22,11 @@ class Unavailable(Exception):
     pass
 
 
+class OracleFailure(Exception):
+    """Infrastructure/unknown is not a semantic rejection and stops the run."""
+    pass
+
+
 def tree_digest(root):
     root = Path(root)
     files, total, digests = [], 0, {}
@@ -97,6 +102,7 @@ def call(argv, cwd, timeout=60, env=None):
 
 def private_copy(src, dst):
     shutil.copytree(src, dst)
+    dst.chmod(0o700)
     for p in dst.rglob('*'):
         if p.is_dir():
             p.chmod(0o700)
@@ -142,14 +148,74 @@ def should_veto(prior, operator, changed):
     return bool(changed and operator and any(h['operator'] == operator and h['wrong_edit'] for h in prior))
 
 
-def oracle(task, snapshot):
-    # Never run hidden checker in the solver workspace. It cannot write to the snapshot.
+ORACLE_CLASSES = {'pass', 'semantic_reject', 'compile_reject', 'infrastructure_error'}
+ORACLE_KEYS = {'class', 'phase', 'rc', 'timeout', 'diagnostic_hash'}
+
+
+def parse_oracle(result):
+    def unique(pairs):
+        obj = {}
+        for k, v in pairs:
+            if k in obj:
+                raise ValueError('duplicate key')
+            obj[k] = v
+        return obj
+    try:
+        if len(result.stdout.encode('utf-8')) > 4096:
+            raise ValueError('oversize')
+        obj = json.loads(result.stdout, object_pairs_hook=unique)
+        if not isinstance(obj, dict) or set(obj) != ORACLE_KEYS:
+            raise ValueError('schema')
+        if not isinstance(obj['class'], str) or not isinstance(obj['phase'], str) or obj['class'] not in ORACLE_CLASSES or obj['phase'] not in {'preflight', 'compile', 'run'}:
+            raise ValueError('enum')
+        if type(obj['rc']) is not int or not -255 <= obj['rc'] <= 255 or type(obj['timeout']) is not bool:
+            raise ValueError('types')
+        if not isinstance(obj['diagnostic_hash'], str) or not re.fullmatch(r'[0-9a-f]{64}', obj['diagnostic_hash']):
+            raise ValueError('hash')
+        expected = 0 if obj['class'] == 'pass' else 2 if obj['class'] == 'infrastructure_error' else 1
+        if result.returncode != expected:
+            raise ValueError('exit_mismatch')
+        if obj['class'] == 'pass' and (obj['rc'] != 0 or obj['timeout'] or obj['phase'] != 'run'):
+            raise ValueError('pass_inconsistent')
+        if obj['class'] == 'compile_reject' and (obj['phase'] != 'compile' or obj['rc'] == 0):
+            raise ValueError('compile_inconsistent')
+        if obj['class'] == 'semantic_reject' and (obj['phase'] != 'run' or obj['rc'] == 0):
+            raise ValueError('semantic_inconsistent')
+        if obj['timeout'] and obj['class'] != 'infrastructure_error':
+            raise ValueError('timeout_not_infrastructure')
+    except (ValueError, TypeError, KeyError):
+        raise OracleFailure('oracle_unknown_or_malformed')
+    if obj['class'] == 'infrastructure_error':
+        raise OracleFailure('oracle_infrastructure_error')
+    return obj
+
+
+def oracle(task, snapshot, diagnostics=None, label='oracle'):
+    # The checker runs only on a separate copy. Raw output stays private.
     with tempfile.TemporaryDirectory(prefix='episode-oracle-') as temp:
         wd = Path(temp) / 'work'
         private_copy(snapshot, wd)
         shutil.copy2(task / 'check.py', wd / 'check.py')
-        result = call([sys.executable, 'check.py'], wd)
-        return result.returncode == 0
+        try:
+            result = call([sys.executable, 'check.py'], wd)
+        except Unavailable:
+            raise OracleFailure('oracle_process_unavailable')
+        if diagnostics is not None:
+            diagnostics.mkdir(mode=0o700, parents=True, exist_ok=True)
+            for suffix, text in (('stdout', result.stdout), ('stderr', result.stderr)):
+                f = diagnostics / f'{label}.{suffix}'
+                f.write_text(text, encoding='utf-8'); f.chmod(0o600)
+        return parse_oracle(result)
+
+
+def attempt_disposition(nodes, changed):
+    if changed:
+        return 'emitted_edit'
+    if any(n['outcome'] in ('refuted', 'write_failed') for n in nodes):
+        return 'refuted_rollback'
+    if all(n['outcome'] == 'abstained' for n in nodes):
+        return 'no_candidate'
+    return 'unchanged_other'
 
 
 def capture_v2(root, report_bin, episode, initial, final):
@@ -208,14 +274,24 @@ def run_agent(task, initial, branch, exe, report_bin, capture_report_bin, snapsh
     task_text = (task / 'task.md').read_text(encoding='utf-8').strip()
     env = dict(os.environ)
     env['SYMBOLS_ENGINEERING_EPISODES'] = '1'
-    private_root = branch.parent / f'{mode}-capture'
+    private_root = snapshots.parent / 'evidence' / f'{seq:03d}-{mode}' / 'capture'
+    private_root.parent.mkdir(mode=0o700, parents=True, exist_ok=False)
+    private_root.parent.parent.chmod(0o700)
     private_root.mkdir(mode=0o700)
     private_root.chmod(0o700)
     env['SYMBOLS_ATTEMPT_CAPTURE'] = str(private_root.resolve())
     # No inherited decision-memory or trace switch.
     for key in ('SYMBOLS_TASK_OPS_MEMORY', 'SYMBOLS_TRACE'):
         env.pop(key, None)
-    result = call([str(exe), '-w', str(branch), task_text], branch, env=env)
+    try:
+        result = call([str(exe), '-w', str(branch), task_text], branch, env=env)
+    except Unavailable:
+        raise OracleFailure('agent_process_unavailable')
+    evidence = private_root.parent
+    for name, text in (('agent.stdout', result.stdout), ('agent.stderr', result.stderr)):
+        f = evidence / name; f.write_text(text, encoding='utf-8'); f.chmod(0o600)
+    if result.returncode in (124, 127) or result.returncode < 0:
+        raise OracleFailure('agent_process_error')
     episode = branch / '.symbols' / 'engineering_episodes.v1'
     if not episode.is_file():
         raise Unavailable('missing_episode')
@@ -227,6 +303,8 @@ def run_agent(task, initial, branch, exe, report_bin, capture_report_bin, snapsh
     nodes = capture_v2(private_root, capture_report_bin, episode, initial, branch)
     if int(match.group(1)) != len(nodes):
         raise Unavailable('v1_v2_count_mismatch')
+    shutil.copy2(episode, evidence / 'engineering_episodes.v1')
+    (evidence / 'engineering_episodes.v1').chmod(0o600)
     # Strip the private audit store before hashing source. Capture it separately
     # for validation only, not policy: old v1 rows have no workspace bytes.
     shutil.rmtree(branch / '.symbols')
@@ -235,7 +313,10 @@ def run_agent(task, initial, branch, exe, report_bin, capture_report_bin, snapsh
     operator = op_matches[-1] if op_matches else None
     snap = snapshots / f'{seq:03d}-{mode}-post'
     private_copy(branch, snap)
+    probe_matches = re.findall(r'Probe compile (-?[0-9]+)->(-?[0-9]+), run (-?[0-9]+)->(-?[0-9]+)', result.stdout)
     return {'agent_rc': result.returncode, 'operator': operator,
+            'probe': [int(x) for x in probe_matches[-1]] if probe_matches else None,
+            'evidence': evidence.relative_to(snapshots.parent).as_posix(),
             'post_sha256': digest, 'after': after, 'snapshot': snap,
             'attempts': nodes}
 
@@ -257,7 +338,7 @@ def evaluate(bank, tasks, exe, report_bin, capture_report_bin, output):
         private_copy(task / 'before', original)
         before_digest, before = tree_digest(original)
         # A frozen checker must reject the original state; run in a copy.
-        if oracle(task, original):
+        if oracle(task, original, output / 'oracle-evidence', f'{seq:03d}-original')['class'] == 'pass':
             raise Unavailable('oracle_accepts_original')
         # Leave out identical workspaces even if they happened earlier.
         prior = tuple(h for h in history if h['initial_sha256'] != before_digest)
@@ -275,7 +356,8 @@ def evaluate(bank, tasks, exe, report_bin, capture_report_bin, output):
                     # edit of the same operator triggers abstention. It is a
                     # deliberately testable candidate, not a live recommendation.
                     final_snap = original if veto else run['snapshot']
-                    correct = oracle(task, final_snap)
+                    oracle_report = oracle(task, final_snap, output / 'oracle-evidence', f'{seq:03d}-{mode}')
+                    correct = oracle_report['class'] == 'pass'
                     final_changed = changed and not veto
                     status = 'resolved' if correct else 'wrong_edits' if final_changed else 'abstentions'
                     aggregate[mode][status] += 1
@@ -285,10 +367,13 @@ def evaluate(bank, tasks, exe, report_bin, capture_report_bin, output):
                                       'wrong_edit': status == 'wrong_edits', 'veto': veto,
                                       'initial_sha256': before_digest,
                                       'final_sha256': before_digest if veto else run['post_sha256'],
-                                      'attempts': run['attempts']}
-                except (Unavailable, OSError, ValueError, UnicodeError):
+                                      'attempts': run['attempts'], 'agent_rc': run['agent_rc'],
+                                      'probe': run['probe'], 'evidence': run['evidence'],
+                                      'oracle': oracle_report,
+                                      'disposition': 'vetoed' if veto else 'wrong_final' if status == 'wrong_edits' else attempt_disposition(run['attempts'], changed)}
+                except (Unavailable, OSError, ValueError, UnicodeError) as exc:
                     aggregate[mode]['unavailable'] += 1
-                    branches[mode] = {'status': 'unavailable'}
+                    branches[mode] = {'status': 'unavailable', 'reason': str(exc) or type(exc).__name__}
             # Only completed baseline observations from a previous task may
             # enter the next target's history; never target replay feedback.
             if branches['baseline']['status'] != 'unavailable':
@@ -296,7 +381,7 @@ def evaluate(bank, tasks, exe, report_bin, capture_report_bin, output):
                                 'initial_sha256': before_digest,
                                 'wrong_edit': branches['baseline']['wrong_edit']})
             counts.append({'sequence': seq, 'case': f'case-{seq:03d}', **branches})
-    return {'schema': 1, 'mode': 'offline_read_only_replay',
+    return {'schema': 2, 'mode': 'offline_read_only_replay',
             'history_rule': 'strict_prior_baseline_only_exclude_identical_workspace',
             'candidate_gate': 'abstain_if_prior_same_operator_wrong_edit',
             'task_count': len(tasks), 'aggregate': aggregate, 'paired': counts,
@@ -338,6 +423,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Unavailable as exc:
+    except (Unavailable, OracleFailure) as exc:
         print(f'REPLAY_UNAVAILABLE {exc}', file=sys.stderr)
         sys.exit(2)

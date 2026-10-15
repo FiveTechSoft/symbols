@@ -1134,6 +1134,7 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME test_episode_replay_contract
              COMMAND ${CMAKE_COMMAND} -E env
                      ATTEMPT_CAPTURE_REPORT_BIN=$<TARGET_FILE:attempt_capture_report>
+                     EPISODE_REPORT_BIN=$<TARGET_FILE:engineering_episode_report>
                      SYMBOLS_AGENT_BIN=$<TARGET_FILE:symbols-agent>
                      ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_episode_replay.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

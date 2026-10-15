@@ -71,3 +71,51 @@ evaluator, policy, binaries and commit SHA before an independent sealed set,
 then compare old baseline and candidate on identical immutable inputs in one
 paired first run. Report correct positives, wrong edits, abstentions, errors,
 unavailable reasons and valid capture coverage. Set O remains archived.
+
+
+## Observational evaluator v2
+
+Schema 2 requires a structured hidden checker. Stdout is exactly one JSON
+object (at most 4096 UTF-8 bytes), with only `class`, `phase`, `rc`, `timeout`,
+and `diagnostic_hash`. Duplicate keys, trailing content, unknown values or
+inconsistent exits stop the experiment as unavailable, not as a semantic
+rejection. `class` is `pass`, `semantic_reject`, `compile_reject`, or
+`infrastructure_error`; `phase` is `preflight`, `compile`, or `run`; `rc` is
+an integer -255..255, `timeout` is a boolean, and `diagnostic_hash` is a
+lowercase SHA-256 of the checker's retained diagnostic bytes.
+
+Checker process exits: pass=0, semantic/compile rejection=1, infrastructure=2.
+Pass must be run/rc0/not timed out; semantic rejection must be run/nonzero;
+compile rejection must be compile/nonzero. Any timeout is infrastructure.
+The author must distinguish a missing compiler, process launch failure,
+sanitizer runtime failure or timeout from a genuine contract rejection.
+A digest is not proof that this attribution is correct. Self-test original,
+reference, wrong and infrastructure fixtures before sealing. No raw diagnostic
+or source goes into public reports.
+
+The evaluator retains private agent stdout/stderr, v1 rows, raw v2 attempt
+trees, final CLI probe compile/run fields and oracle output for each branch.
+Raw v2 trees survive the temporary solve directory and can be revalidated.
+The CLI probe fields describe the final report, not every earlier attempt;
+raw reports and v1/v2 attempts preserve what was actually recorded, without
+inventing missing per-attempt compiler diagnostics. Permissions are private
+0700/0600. A copied workspace root is made writable for its own isolated
+checker even when the sealed input root was read-only. The input digest is
+still checked before and after the run.
+
+`disposition` separates `no_candidate` (all attempts abstained),
+`refuted_rollback` (unchanged final bytes after refuted/write-failed attempts),
+`wrong_final` (changed final bytes rejected by the checker), `emitted_edit`,
+`vetoed`, and `unchanged_other`. A final abstention is not automatically a
+no-edit decision. Agent timeouts, missing executables and signals stop before
+another branch; malformed/infrastructure checkers stop without automatic
+retry. Preserve the terminal diagnostic and partial private evidence instead
+of completing an efficacy table after an invalid run.
+
+The historical veto, chronology and solver are unchanged. Technical fixtures
+exercise reporting and retention, not replay efficacy. The next independent
+bank must supply `main` plus visible tests in `before/` compatible with the
+agent's executable probe, plus a private additional checker. Do not silently
+add a hidden main only inside the oracle and treat agent link failures as
+semantic abstentions. Freeze evaluator/binaries/runtime, decision rule and
+bank order before one fresh paired run; never rerun the old bank for gain.
