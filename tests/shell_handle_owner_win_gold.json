@@ -1,0 +1,20 @@
+{
+  "base": "28edb94da11d36bbf78ef5d331cb5d95b5c7e02d",
+  "arms": ["normal", "private_instrumented"],
+  "failure_calls_per_arm": 27,
+  "probe_errors": [193,216],
+  "failure_mask": 0,
+  "positive_sensitivity_mask": 5,
+  "owned_handles_per_failed_call": 5,
+  "successful_closes_per_owned_handle": 1,
+  "borrowed_stdin_closed": false,
+  "boundary_delta_sum_equals_call_delta": true,
+  "trace_capacity": 1024,
+  "child_limit_ms": 30000,
+  "counts_classifications": ["flat", "one_time_increase", "unexpected"],
+  "unexpected_is_nonzero": true,
+  "predicted_responsible_api": null,
+  "original_fixture_sha256_unchanged": true,
+  "production_abi_changed": false,
+  "causal_limit": "boundary localization and explicit handle ledger only; not proof of handle ownership or harmlessness"
+}

@@ -1329,3 +1329,13 @@ if(WIN32)
     set_tests_properties(test_shell_spawn_handles_win PROPERTIES TIMEOUT 90
         PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_HANDLE_DIAG calls=27; counts=28")
 endif()
+
+# Separate private-translation-unit API boundary diagnostic. No production hook.
+if(WIN32)
+    add_executable(test_shell_handle_owner_win tests/test_shell_handle_owner_win.c
+        tests/shell_handle_boundary_win.c)
+    target_link_libraries(test_shell_handle_owner_win symbolic)
+    add_test(NAME test_shell_handle_owner_win COMMAND test_shell_handle_owner_win)
+    set_tests_properties(test_shell_handle_owner_win PROPERTIES TIMEOUT 180
+        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_OWNER_DIAG arms=2; calls_per_arm=27")
+endif()
