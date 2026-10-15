@@ -50,9 +50,40 @@ No raw diagnostic, command, task, or source bytes are written to the store.
 The target-file FNV64 fingerprints are **not** complete workspace snapshots;
 other files mutated by commands are outside this audit. This slice does not
 inject patch-apply, verification, rollback-write or audit-write faults at every
-boundary; a deterministic audit-lock refusal is tested, but rollback failure
-labels are not exercised with a forced failed `PatchRollback`. Those cases
-remain a known untested gate, not evidence of recovery. The old runner result
+boundary; a deterministic audit-lock refusal is tested.
+
+## Runner rollback boundary gate
+
+The runner rollback-boundary test exercises return/post-state simulation
+in a separately compiled archive: failed return with altered bytes, failed return
+even when bytes match, successful return with mismatched or absent target, and
+ordinary successful rollback. Audit off/on runs compare selected solve fields
+and final target bytes. The failed-return cases permit two recovery cycles but
+must stop after one attempt with `rollback_failed` / `failed`. Mismatched or
+absent readback cases explicitly set the public runner field to zero recovery
+cycles; they test audit honesty (`verification_incomplete` / `unknown`), not
+whether the production runner stops recovery after such a readback.
+
+This seam simulates a rollback return value and post-state. It does not inject
+an actual disk write/removal failure inside `PatchRollback`, test disk-full,
+power loss, patch-apply partial effects or complete-workspace restoration. The
+fault hook is absent from the production archive and has no environment switch.
+Local mutants that mislabel a failed return, bypass readback, or suppress the
+failed-return stop each fail the new test. These are local logical controls,
+not a Dream-RSI gain experiment or a corpus natural-language capability.
+
+The five fixture contracts were fixed before code in
+`tools/runner_rollback/gold.json`, SHA256
+`bb3c49f1dc313ec009ba99ca4ce46464429daacb94a3251cdf5e02beac51d5f2`.
+An original local test run failed because the adapter passed constructor
+`max_replans=0`, which means the default three, not zero. One instrumented
+run showed ordinary-control attempts=2 and replans=1, before fault cases ran.
+The adapter now constructs with one and sets the public field to zero only
+where the fixed gold requires zero recovery cycles. Gold, engine semantics
+and expected counts were not changed. The original error and diagnostic are
+retained in the development evidence; this is not a production defect fix.
+
+The old runner result
 and its planner's decision inputs are unchanged. `test_agent_runner` had a
 flaky Windows MSVC attempt-count assertion in slice 2: the first run failed
 39/40, and an unchanged rerun passed. It is not modified here.

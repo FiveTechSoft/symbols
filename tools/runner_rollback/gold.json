@@ -1,0 +1,64 @@
+{
+  "base": "0d2a7ced2e25b366a8b9cbee3cae2deebd3bdaef",
+  "fixed_before_code": true,
+  "before": "int Value(void) { return 1; }\n",
+  "after": "int Value(void) { return 2; }\n",
+  "cases": [
+    {
+      "id": "failed_unrestored",
+      "mode": 1,
+      "outcome": "rollback_failed",
+      "rollback": "failed",
+      "file": "after",
+      "attempts": 1,
+      "max_replans": 2
+    },
+    {
+      "id": "failed_but_matching",
+      "mode": 2,
+      "outcome": "rollback_failed",
+      "rollback": "failed",
+      "file": "before",
+      "attempts": 1,
+      "max_replans": 2
+    },
+    {
+      "id": "success_but_mismatch",
+      "mode": 3,
+      "outcome": "verification_incomplete",
+      "rollback": "unknown",
+      "file": "after",
+      "attempts": 1,
+      "max_replans": 0
+    },
+    {
+      "id": "success_but_unreadable",
+      "mode": 4,
+      "outcome": "verification_incomplete",
+      "rollback": "unknown",
+      "file": "absent",
+      "attempts": 1,
+      "max_replans": 0
+    },
+    {
+      "id": "ordinary_refuted",
+      "mode": 0,
+      "outcome": "refuted",
+      "rollback": "confirmed",
+      "file": "before",
+      "attempts": 1,
+      "max_replans": 0
+    }
+  ],
+  "boundaries": "test seam simulates rollback outcomes, not actual filesystem write/removal failures; mismatch/absent cases deliberately no recovery cycle, no claim that existing runner stops there",
+  "audit_equivalence": "same solve fields and file state audit off/on",
+  "production": "no exported hooks or environment fault controls",
+  "not_claimed": [
+    "Dream-RSI gain",
+    "complete workspace recovery",
+    "disk-full",
+    "power-loss",
+    "rollback primitive verification",
+    "source entailment"
+  ]
+}

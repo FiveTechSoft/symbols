@@ -20,6 +20,30 @@
 #endif
 #include "agent_runner.h"
 
+/* Fault outcomes exist only in the isolated test archive. No environment hook. */
+#ifdef RUNNER_ROLLBACK_TEST_FAULTS
+static unsigned runner_rollback_fault;
+void AgentRunnerTestRollbackMode(unsigned mode) { runner_rollback_fault=mode; }
+static int runner_attempt_rollback(PATCH_PLAN *patch, const char *target)
+{
+    if(runner_rollback_fault==1) return 0;
+    int ok=PatchRollback(patch);
+    if(runner_rollback_fault==2) return 0;
+    if(ok && runner_rollback_fault==3) {
+        FILE *f=fopen(target,"wb");
+        if(!f) return 0;
+        const char *text="int Value(void) { return 2; }\n";
+        int wrote=fwrite(text,1,strlen(text),f)==strlen(text);
+        if(fclose(f)) wrote=0;
+        return wrote;
+    }
+    if(ok && runner_rollback_fault==4) return remove(target)==0;
+    return ok;
+}
+#else
+#define runner_attempt_rollback(p,t) PatchRollback(p)
+#endif
+
 /* Audit-only shadow writer. The runner never reads this store. Source bytes
    and returned solve status remain authoritative when audit persistence fails. */
 static unsigned long runner_audit_sequence;
@@ -554,7 +578,7 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
         }
 
         /* Fail closed before any decision to retry. */
-        if (!PatchRollback(&patch))
+        if (!runner_attempt_rollback(&patch,task->target_file))
         {
             if(audit)runner_audit(runner,task,audit_run,attempt+1,before,
                                   "rollback_failed","failed","rollback_failed",
