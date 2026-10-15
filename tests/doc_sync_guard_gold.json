@@ -1,0 +1,166 @@
+{
+  "base": "aa99ecd2f7df9267dc9678e86a65052981451d96",
+  "status": "PRECODE_NO_ENGINE_EXECUTION",
+  "cases": [
+    {
+      "id": "misleading_identifier",
+      "files": {
+        "app.c": "int max_retries = 3;\nint main(void) { return 0; }\n",
+        "notes.md": "The Symbols setting is max_replans.\n"
+      },
+      "task": "notes.md mentions max_replans but app.c uses max_retries. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "app.c": "65ce83f7e73d98c4077ba2d788da91aefe890234e041d04297f15de682f1b963",
+        "notes.md": "e2ce5e4dcb4a449d6c035242d99e1798066008069de88992632e5b56e72e7b4f"
+      }
+    },
+    {
+      "id": "real_flag_lost",
+      "files": {
+        "app.c": "#include <string.h>\nint main(int c, char **v) { return c > 1 && !strcmp(v[1], \"--quiet\") ? 0 : 0; }\n",
+        "USAGE.md": "Pass --silent to mute it. --silent is optional.\n"
+      },
+      "task": "USAGE.md says --silent but app.c checks --quiet. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": true,
+      "source_sha256": {
+        "app.c": "1ecbab23f3500dbbdabcbfa62b41d183d7cb851b7e7b2ec486d6f9b5575d1cb6",
+        "USAGE.md": "9070761cf827d0b4997d812973be250c62d87f9cfada9fc4c2191a7cd392cda3"
+      }
+    },
+    {
+      "id": "real_signature_lost",
+      "files": {
+        "lib.c": "int scale(int k, int f) { return k * f; }\n",
+        "README": "Call `scale(k)` to scale.\n"
+      },
+      "task": "The README shows scale(k) but lib.c defines scale(int k, int f); document scale(int k, int f).",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": true,
+      "source_sha256": {
+        "lib.c": "392506b419ade3691fbe2c3cca4f909d15870009a5f1096f497889cfb9fec9c3",
+        "README": "04cb64b704fa907ca8eac3137204a269699a398a8a99c338aa42d087c6141cd3"
+      }
+    },
+    {
+      "id": "history_decoy",
+      "files": {
+        "app.c": "int max_retries=3;\nint main(void){return 0;}\n",
+        "notes.md": "The retired setting was max_replans.\n",
+        "old.patch": "- int max_replans;\n+ int max_retries;\n"
+      },
+      "task": "notes.md mentions max_replans but app.c uses max_retries. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "app.c": "e01014af86afef7a6dad6f48f13ebed121d24e4997e09a396108a7d749e78e9a",
+        "notes.md": "4111a11d6284672e4a7b3b822f4b904398174d5b4dd2d9e15e4550181fd40a9b",
+        "old.patch": "5c57388ece6d7a1e1ddfb0f62f212b6369ec6ac8f65f5a88d7dc302e4667ffb9"
+      }
+    },
+    {
+      "id": "comment_match",
+      "files": {
+        "app.c": "/* max_retries */\nint main(void){return 0;}\n",
+        "notes.md": "Use max_replans.\n"
+      },
+      "task": "notes.md mentions max_replans but app.c uses max_retries. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "app.c": "9c8fe32842ca65058ad93dc6623a35dee9c2e5cbe9bb10e44933305776b502b8",
+        "notes.md": "f9d66a890ad203e1893c4d230106fcde97dbe4d61c201770d26d43a13f563c1b"
+      }
+    },
+    {
+      "id": "intentional_historical_doc",
+      "files": {
+        "app.c": "int main(void){const char *flag=\"--quiet\";return flag[0]==0;}\n",
+        "notes.md": "Previous versions accepted --silent; current versions accept --quiet.\n"
+      },
+      "task": "notes.md says --silent but app.c checks --quiet. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": true
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "app.c": "db6d2ab96bad5fa1b011463016732d503210e3e35ab7951a17d8aea5c5f2f8b2",
+        "notes.md": "e63706c8f27b9cce182dd1b6cc7f82b7c42c12cef83875940e1a7d650762b2e5"
+      }
+    },
+    {
+      "id": "ambiguous",
+      "files": {
+        "main.c": "int main(void) { const char *a = \"--quick\", *b = \"--small\"; return a == b; }\n",
+        "notes.md": "Use --fast or --tiny.\n"
+      },
+      "task": "notes.md mentions --fast and --tiny; code has --quick and --small.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": false
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "main.c": "c31735b22621b46f43b3ffac741a05d484fd860310cdd29f566784fddd310b4b",
+        "notes.md": "d5ae8a9c69dd4ef2a8fa014cb31eee03438c7decb5f71f15f04bb26d8b0ae0c8"
+      }
+    },
+    {
+      "id": "docs_only",
+      "files": {
+        "notes.md": "Use --silent.\n"
+      },
+      "task": "notes.md says --silent but code checks --quiet. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": false
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "notes.md": "6c583ae21aa2d0d6817a64c4426dd982f323a23636dac31daf0fd316a6eeefd1"
+      }
+    },
+    {
+      "id": "no_docs",
+      "files": {
+        "app.c": "int main(void){const char *flag=\"--quiet\";return flag[0]==0;}\n"
+      },
+      "task": "notes.md says --silent but app.c checks --quiet. Make the docs match.",
+      "expected": {
+        "kept": false,
+        "all_original_bytes_unchanged": true,
+        "guard_reason_required": false
+      },
+      "coverage_loss": false,
+      "source_sha256": {
+        "app.c": "db6d2ab96bad5fa1b011463016732d503210e3e35ab7951a17d8aea5c5f2f8b2"
+      }
+    }
+  ]
+}

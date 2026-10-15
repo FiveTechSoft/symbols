@@ -1482,6 +1482,16 @@ static char *apply_literal_plan(const TASK_OPS_WORKSPACE *ws, const LIT_PLAN *p,
    lexical rule): flag "-x"/"--name", call "name(...)", identifier with '_'
    or a digit for A (any identifier of 3+ chars, not a C keyword, for B). */
 
+/* Lexical coincidence is not a verified documentation relation. Production
+   discovers candidates but never auto-applies them. Only fault tests reopen. */
+#ifdef TASK_OPS_TEST_FAULTS
+static int g_doc_sync_guard = 1;
+void TaskOpsTestDocSyncGuard(int on) { g_doc_sync_guard = on; }
+#define DOC_SYNC_GUARD() (g_doc_sync_guard)
+#else
+#define DOC_SYNC_GUARD() 1
+#endif
+
 enum { DS_NONE, DS_FLAG, DS_CALL, DS_IDENT };
 
 static int is_doc_file(const char *rel)
@@ -4093,7 +4103,7 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
         (rep->compile_before < 0 || token_is_file_or_build_word(ws, a) || token_is_file_or_build_word(ws, b)))
         renames = 0;   /* nothing builds to show the rename kept behaviour, or a token is a file / build word */
     char y_text[128] = {0};
-    int uses_before = 0, lit_file = -1, frags = 0, docs = 0;
+    int uses_before = 0, lit_file = -1, frags = 0, docs = 0, doc_blocked = 0;
     char da[128] = {0}, db[128] = {0}, dead[128] = {0};
     int deads = 0, relops_found = 0, evidence_wins = 0, evidence_tried = 0;
     RELOP_HIT rhit;
@@ -4156,6 +4166,10 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
                 snprintf(rep->detail, sizeof(rep->detail), "%d fix-it(s) in %d file(s)", fixes, touched);
             }
         } else if (op == OP_DOCSYNC && (docs = find_doc_sync(ws, task, da, sizeof(da), db, sizeof(db))) == 1) {
+            if (DOC_SYNC_GUARD()) {
+                doc_blocked = 1;
+                continue; /* no allocation, write or verified claim for this plan */
+            }
             int sh = ds_shape(da);
             for (int i = 0; i < ws->count; i++)
                 if (is_doc_file(ws->files[i].rel) && ds_in_file(ws->files[i].data, da, sh) > 0) {
@@ -4300,7 +4314,9 @@ static int task_ops_attempt(const char *workspace, const char *task, TASK_OPS_RE
         }
     }
     if (!touched) {
-        if (evidence_wins > 1)
+        if (doc_blocked)
+            snprintf(rep->reason, sizeof(rep->reason), "doc_sync requires verified documentation relation");
+        else if (evidence_wins > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d single edits make the failing program exit 0", evidence_wins);
         else if (relops_found > 1)
             snprintf(rep->reason, sizeof(rep->reason), "ambiguous: %d relational swaps make it exit 0", relops_found);

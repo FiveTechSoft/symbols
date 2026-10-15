@@ -1286,3 +1286,11 @@ endif()
 add_executable(test_runner_rollback_boundary tests/test_runner_rollback_boundary.c)
 target_link_libraries(test_runner_rollback_boundary symbolic_runner_rollback_test)
 add_test(NAME test_runner_rollback_boundary COMMAND test_runner_rollback_boundary WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# Documentation lexical matches do not establish a verified edit relation.
+sllm_test(test_doc_sync_guard tests/test_doc_sync_guard.c)
+add_executable(test_doc_sync_guard_mc tests/test_doc_sync_guard.c)
+target_compile_definitions(test_doc_sync_guard_mc PRIVATE TASK_OPS_TEST_FAULTS DOC_SYNC_MUTANT)
+target_link_libraries(test_doc_sync_guard_mc symbolic_rollback_test)
+add_test(NAME test_doc_sync_guard_mc COMMAND test_doc_sync_guard_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_doc_sync_guard_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed exactly six unique doc plans")

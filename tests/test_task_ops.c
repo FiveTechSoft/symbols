@@ -589,8 +589,9 @@ int main(void)
         put(d, "USAGE.md", "Pass --silent to mute it. --silent is optional.\n");
         TASK_OPS_REPORT r;
         int kept = TaskOpsSolve(d, "USAGE.md says --silent but app.c checks --quiet. Make the docs match.", &r);
-        CHECK(kept && !strcmp(r.op, "doc_sync") && !strcmp(get(d, "USAGE.md"), "Pass --quiet to mute it. --quiet is optional.\n") &&
-              !strcmp(get(d, "app.c"), c), "doc_sync: flag in docs replaced by the one the code uses; code untouched");
+        CHECK(!kept && !r.applied && !strcmp(get(d, "USAGE.md"), "Pass --silent to mute it. --silent is optional.\n") &&
+              !strcmp(get(d, "app.c"), c) && strstr(r.reason, "doc_sync requires verified documentation relation"),
+              "doc_sync: flag update now refused; prior positive coverage lost");
     }
     {
         char d[512]; make_dir(d, sizeof(d), "doccall");
@@ -598,8 +599,9 @@ int main(void)
         put(d, "README", "Call `scale(k)` to scale.\n");
         TASK_OPS_REPORT r;
         int kept = TaskOpsSolve(d, "The README shows scale(k) but lib.c defines scale(int k, int f); document scale(int k, int f).", &r);
-        CHECK(kept && strstr(get(d, "README"), "`scale(int k, int f)`") && !strstr(get(d, "README"), "scale(k)"),
-              "doc_sync: call signature synced from the definition");
+        CHECK(!kept && !r.applied && !strcmp(get(d, "README"), "Call `scale(k)` to scale.\n") &&
+              strstr(r.reason, "doc_sync requires verified documentation relation"),
+              "doc_sync: signature update now refused; prior positive coverage lost");
     }
     {
         char d[512]; make_dir(d, sizeof(d), "docamb");
