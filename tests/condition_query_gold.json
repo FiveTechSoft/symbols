@@ -1,0 +1,491 @@
+{
+  "contract_version": 1,
+  "base": "01a45609fa6e7b7538219e782f2a755612c8f2a8",
+  "corpora": {
+    "a": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+    "b": "s47 does not r53 during k59=v61.\ns47 r53 o67 during k59=v71.\n",
+    "c": "s73 r79 o83 during k89=v97.\ns73 r79 o101 during k89=v97.\ns107 r109 o113 during k127=v131.\n",
+    "d": "s137 r139 o149 during k151=v157.\ns137 does not r139 during k151=v157.\ns163 r167 o173 during k179=v181.\n"
+  },
+  "cases": [
+    {
+      "id": "a_match",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19 and k29=v37?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o31",
+        "origin": "extractor_asserted",
+        "source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+        "first": 0,
+        "end": 39
+      }
+    },
+    {
+      "id": "a_pair_permutation",
+      "corpus": "a",
+      "question": "What does s17 r23 during k29=v37 and k11=v19?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o31",
+        "origin": "extractor_asserted",
+        "source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+        "first": 0,
+        "end": 39
+      }
+    },
+    {
+      "id": "a_other_condition",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v43 and k29=v37?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o41",
+        "origin": "extractor_asserted",
+        "source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+        "first": 40,
+        "end": 79
+      }
+    },
+    {
+      "id": "a_missing_qualifier",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "UNKNOWN",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "a_wrong_condition",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v191 and k29=v37?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "UNKNOWN",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "a_source_pair_permutation",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19 and k29=v37?",
+      "source": "s17 r23 o31 during k29=v37 and k11=v19.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "5b4d0725e8b39ae55f5f182be9a4dcf61e67a2da97371791669efc34bc94ffe1",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o31",
+        "origin": "extractor_asserted",
+        "source_sha256": "5b4d0725e8b39ae55f5f182be9a4dcf61e67a2da97371791669efc34bc94ffe1",
+        "first": 0,
+        "end": 39
+      }
+    },
+    {
+      "id": "a_line_permutation",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19 and k29=v37?",
+      "source": "s17 r23 o41 during k11=v43 and k29=v37.\ns17 r23 o31 during k11=v19 and k29=v37.\n",
+      "expected_source_sha256": "309ec46ec73b13e44893f485515698d7844bb7f345ada759b69e3c75cce71489",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o31",
+        "origin": "extractor_asserted",
+        "source_sha256": "309ec46ec73b13e44893f485515698d7844bb7f345ada759b69e3c75cce71489",
+        "first": 40,
+        "end": 79
+      }
+    },
+    {
+      "id": "b_negative",
+      "corpus": "b",
+      "question": "What does s47 r53 during k59=v61?",
+      "source": "s47 does not r53 during k59=v61.\ns47 r53 o67 during k59=v71.\n",
+      "expected_source_sha256": "4105893a7a6266a01e102ee635ccdde9824f04bf179c16d3e945f6acb0a4d775",
+      "expected": {
+        "status": "ASSERTION_REFUTED",
+        "object": "",
+        "origin": "extractor_asserted",
+        "source_sha256": "4105893a7a6266a01e102ee635ccdde9824f04bf179c16d3e945f6acb0a4d775",
+        "first": 0,
+        "end": 32
+      }
+    },
+    {
+      "id": "b_positive",
+      "corpus": "b",
+      "question": "What does s47 r53 during k59=v71?",
+      "source": "s47 does not r53 during k59=v61.\ns47 r53 o67 during k59=v71.\n",
+      "expected_source_sha256": "4105893a7a6266a01e102ee635ccdde9824f04bf179c16d3e945f6acb0a4d775",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o67",
+        "origin": "extractor_asserted",
+        "source_sha256": "4105893a7a6266a01e102ee635ccdde9824f04bf179c16d3e945f6acb0a4d775",
+        "first": 33,
+        "end": 60
+      }
+    },
+    {
+      "id": "b_unknown",
+      "corpus": "b",
+      "question": "What does s47 r53 during k59=v73?",
+      "source": "s47 does not r53 during k59=v61.\ns47 r53 o67 during k59=v71.\n",
+      "expected_source_sha256": "4105893a7a6266a01e102ee635ccdde9824f04bf179c16d3e945f6acb0a4d775",
+      "expected": {
+        "status": "UNKNOWN",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "c_object_conflict",
+      "corpus": "c",
+      "question": "What does s73 r79 during k89=v97?",
+      "source": "s73 r79 o83 during k89=v97.\ns73 r79 o101 during k89=v97.\ns107 r109 o113 during k127=v131.\n",
+      "expected_source_sha256": "17078926efed81815cda05743ec9227295663042f8d85c294442552c7c3e2068",
+      "expected": {
+        "status": "CONFLICT",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "c_unrelated_conflict",
+      "corpus": "c",
+      "question": "What does s107 r109 during k127=v131?",
+      "source": "s73 r79 o83 during k89=v97.\ns73 r79 o101 during k89=v97.\ns107 r109 o113 during k127=v131.\n",
+      "expected_source_sha256": "17078926efed81815cda05743ec9227295663042f8d85c294442552c7c3e2068",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o113",
+        "origin": "extractor_asserted",
+        "source_sha256": "17078926efed81815cda05743ec9227295663042f8d85c294442552c7c3e2068",
+        "first": 57,
+        "end": 89
+      }
+    },
+    {
+      "id": "d_polarity_conflict",
+      "corpus": "d",
+      "question": "What does s137 r139 during k151=v157?",
+      "source": "s137 r139 o149 during k151=v157.\ns137 does not r139 during k151=v157.\ns163 r167 o173 during k179=v181.\n",
+      "expected_source_sha256": "779788c09dd556e7123816edc4f97cbc8ebe40f38cdb221945428806dd1b186c",
+      "expected": {
+        "status": "CONFLICT",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "d_unrelated_polarity",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s137 r139 o149 during k151=v157.\ns137 does not r139 during k151=v157.\ns163 r167 o173 during k179=v181.\n",
+      "expected_source_sha256": "779788c09dd556e7123816edc4f97cbc8ebe40f38cdb221945428806dd1b186c",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o173",
+        "origin": "extractor_asserted",
+        "source_sha256": "779788c09dd556e7123816edc4f97cbc8ebe40f38cdb221945428806dd1b186c",
+        "first": 70,
+        "end": 102
+      }
+    },
+    {
+      "id": "d_late_malformed",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s137 r139 o149 during k151=v157.\ns137 does not r139 during k151=v157.\ns163 r167 o173 during k179=v181.\nbroken.\n",
+      "expected_source_sha256": "673e7fd6f217742668c91d06b5a8a74871f2d8551154d7e475286eb7385b449e",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "d_stale_pin",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s137 r139 o149 during k151=v157.\ns137 does not r139 during k151=v157.\ns163 r167 o173 during k179=v181.\n",
+      "expected_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "d_lf",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s163 r167 o173 during k179=v181.\n",
+      "expected_source_sha256": "d9340cab315c9c55ab9b94bf3ddc35fec23d58a1b7491702b2e6cac7208ebc67",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o173",
+        "origin": "extractor_asserted",
+        "source_sha256": "d9340cab315c9c55ab9b94bf3ddc35fec23d58a1b7491702b2e6cac7208ebc67",
+        "first": 0,
+        "end": 32
+      }
+    },
+    {
+      "id": "d_crlf",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s163 r167 o173 during k179=v181.\r\n",
+      "expected_source_sha256": "b8b065d973e88757210d33f35c0f7fb9c7ff7d82e12a72e36802d811f7d586e8",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o173",
+        "origin": "extractor_asserted",
+        "source_sha256": "b8b065d973e88757210d33f35c0f7fb9c7ff7d82e12a72e36802d811f7d586e8",
+        "first": 0,
+        "end": 32
+      }
+    },
+    {
+      "id": "d_no_lf",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s163 r167 o173 during k179=v181.",
+      "expected_source_sha256": "550504a80ae8dd4a13c5da693dc0516e78a07d59141c6b0d9e370c4431c555d0",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o173",
+        "origin": "extractor_asserted",
+        "source_sha256": "550504a80ae8dd4a13c5da693dc0516e78a07d59141c6b0d9e370c4431c555d0",
+        "first": 0,
+        "end": 32
+      }
+    },
+    {
+      "id": "d_duplicate",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "s163 r167 o173 during k179=v181.\ns163 r167 o173 during k179=v181.\n",
+      "expected_source_sha256": "6340f92cd809fa5b583166c9f7013aff426a5bd21a221e57b5c42c428dd24fe6",
+      "expected": {
+        "status": "ASSERTION_MATCH",
+        "object": "o173",
+        "origin": "extractor_asserted",
+        "source_sha256": "6340f92cd809fa5b583166c9f7013aff426a5bd21a221e57b5c42c428dd24fe6",
+        "first": 0,
+        "end": 32
+      }
+    },
+    {
+      "id": "d_blank",
+      "corpus": "d",
+      "question": "What does s163 r167 during k179=v181?",
+      "source": "\n\r\n",
+      "expected_source_sha256": "7393ba4f11e19a5f6bee10ed995b0d959a52c4470855f6d68d4d1e34e26cb70f",
+      "expected": {
+        "status": "UNKNOWN",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "invalid_duplicate_key",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19 and k11=v37?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "invalid_third_pair",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19 and k29=v37 and k31=v41?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "invalid_suffix",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19? extra",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "invalid_nonascii",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v\u00e9?",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    },
+    {
+      "id": "invalid_nul",
+      "corpus": "a",
+      "question": "What does s17 r23 during k11=v19?\u0000",
+      "source": "s17 r23 o31 during k11=v19 and k29=v37.\ns17 r23 o41 during k11=v43 and k29=v37.\n",
+      "expected_source_sha256": "c00a02a5c57e3bf7a0b203b19a0bb445725b340b165d00dbce7900a225da3398",
+      "expected": {
+        "status": "INVALID",
+        "object": "",
+        "origin": 0,
+        "source_sha256": null,
+        "first": 0,
+        "end": 0
+      }
+    }
+  ],
+  "boundary_scenarios": [
+    {
+      "id": "source_limit",
+      "construct": "a_match source + LF padding to exactly 65536 bytes; recompute pin",
+      "expected": "ASSERTION_MATCH"
+    },
+    {
+      "id": "source_over",
+      "construct": "same padded source at 65537 bytes; recompute pin",
+      "expected": "INVALID"
+    },
+    {
+      "id": "claims_64",
+      "construct": "repeat d_lf source 64 times; recompute pin",
+      "expected": "ASSERTION_MATCH"
+    },
+    {
+      "id": "claims_65",
+      "construct": "repeat d_lf source 65 times; recompute pin",
+      "expected": "INVALID"
+    },
+    {
+      "id": "identifier_63",
+      "construct": "replace s163 in d_lf question/source with s repeated 63 times; recompute pin",
+      "expected": "ASSERTION_MATCH"
+    },
+    {
+      "id": "identifier_64",
+      "construct": "same with s repeated 64 times; recompute pin",
+      "expected": "INVALID"
+    },
+    {
+      "id": "question_512",
+      "construct": "a_match question padded with ASCII space to 512 bytes",
+      "expected": "INVALID"
+    },
+    {
+      "id": "question_513",
+      "construct": "a_match question padded with ASCII space to 513 bytes",
+      "expected": "INVALID"
+    },
+    {
+      "id": "line_1024",
+      "construct": "a_match source + line of x repeated 1024 times + LF; recompute pin",
+      "expected": "INVALID"
+    },
+    {
+      "id": "line_1025",
+      "construct": "a_match source + line of x repeated 1025 times + LF; recompute pin",
+      "expected": "INVALID"
+    },
+    {
+      "id": "empty_source",
+      "construct": "source size=0, valid pointer and pin for empty bytes",
+      "expected": "INVALID"
+    },
+    {
+      "id": "null_question",
+      "construct": "NULL question, otherwise d_lf inputs",
+      "expected": "INVALID"
+    },
+    {
+      "id": "null_source",
+      "construct": "NULL source, otherwise d_lf inputs",
+      "expected": "INVALID"
+    },
+    {
+      "id": "null_pin",
+      "construct": "NULL pin, otherwise d_lf inputs",
+      "expected": "INVALID"
+    },
+    {
+      "id": "null_output",
+      "construct": "NULL output, otherwise d_lf inputs",
+      "expected": "INVALID"
+    },
+    {
+      "id": "bare_cr",
+      "construct": "d_no_lf source + CR, recompute pin",
+      "expected": "INVALID"
+    }
+  ],
+  "state_sequence": [
+    "a_match",
+    "d_late_malformed",
+    "d_polarity_conflict",
+    "b_unknown",
+    "a_match"
+  ]
+}
