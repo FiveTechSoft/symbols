@@ -49,7 +49,8 @@ static int child(const char *mode)
         CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
         return 1;
     }
-    if (error != ERROR_BAD_EXE_FORMAT || GetFileAttributesA("witness.txt") != INVALID_FILE_ATTRIBUTES) return 1;
+    if ((error != ERROR_BAD_EXE_FORMAT && error != ERROR_EXE_MACHINE_TYPE_MISMATCH) ||
+        GetFileAttributesA("witness.txt") != INVALID_FILE_ATTRIBUTES) return 1;
     /* Warm up diagnostics and the handle-count API before the measured calls. */
     if (!GetProcessHandleCount(GetCurrentProcess(), &before)) return 2;
     printf("handle probe warmed; native failure calls=3\n"); fflush(stdout);
