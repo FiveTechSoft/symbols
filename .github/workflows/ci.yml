@@ -36,6 +36,12 @@ jobs:
         run: |
           & .\build\Release\test_shell_spawn_handles_win.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native spawn handle owner diagnostic (output and gate)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          & .\build\Release\test_shell_handle_owner_win.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Tests
         if: ${{ !cancelled() }}
         run: ctest --test-dir build -C Release --output-on-failure
@@ -134,7 +140,10 @@ jobs:
           $env:PATH = "$($dll.DirectoryName);$env:PATH"
           & .\build-asan\Debug\test_shell_spawn_handles_win.exe
           $diagnosticExit = $LASTEXITCODE
+          & .\build-asan\Debug\test_shell_handle_owner_win.exe
+          $ownerExit = $LASTEXITCODE
           ctest --test-dir build-asan -C Debug --output-on-failure
           $suiteExit = $LASTEXITCODE
           if ($diagnosticExit -ne 0) { exit $diagnosticExit }
+          if ($ownerExit -ne 0) { exit $ownerExit }
           exit $suiteExit
