@@ -19,10 +19,15 @@ static int child(const char *mode)
     SHELL_EXEC_RESULT r;
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    DWORD before, after, error;
+    DWORD before, after, error, old_mode;
     char command[] = "cmd.exe /c echo witness>witness.txt";
     int ok, i;
     unsigned mask;
+    /* Only this isolated private runner changes its error mode. */
+    old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
+    printf("private child entered mode=%s error_mode=%u critical_dialogs_disabled=1\n", mode, (unsigned)(old_mode | SEM_FAILCRITICALERRORS));
+    fflush(stdout);
     if (!strcmp(mode, "positive")) {
         memset(&r, 0xa5, sizeof(r));
         ok = AgentShellExec("echo witness>witness.txt", ".", 5000, &r);
@@ -34,9 +39,10 @@ static int child(const char *mode)
     if (strcmp(mode, "invalid")) return 2;
     memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
     memset(&pi, 0, sizeof(pi));
+    puts("invalid-image probe before CreateProcessA"); fflush(stdout);
     ok = CreateProcessA(NULL, command, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, ".", &si, &pi);
     error = ok ? 0 : GetLastError();
-    printf("invalid-image native probe ok=%d error=%lu\n", ok, (unsigned long)error);
+    printf("invalid-image native probe ok=%d error=%lu\n", ok, (unsigned long)error); fflush(stdout);
     if (ok) {
         TerminateProcess(pi.hProcess, 2);
         WaitForSingleObject(pi.hProcess, 5000);
@@ -55,7 +61,7 @@ static int child(const char *mode)
         printf("invalid iteration=%d mask=%u ok=%d exit=%d launch=%d timeout=%d stored=%llu/%llu total=%llu/%llu\n",
                i, mask, ok, r.exit_code, r.execution_failed, r.timed_out,
                (unsigned long long)r.stdout_len, (unsigned long long)r.stderr_len,
-               (unsigned long long)r.stdout_total_len, (unsigned long long)r.stderr_total_len);
+               (unsigned long long)r.stdout_total_len, (unsigned long long)r.stderr_total_len); fflush(stdout);
         if (mask) return 1;
     }
     if (!GetProcessHandleCount(GetCurrentProcess(), &after)) return 2;
@@ -88,12 +94,26 @@ static int run_copy(const char *exe, const char *dir, const char *mode)
         printf("private runner launch error=%lu\n", (unsigned long)GetLastError());
         CloseHandle(job); return 0;
     }
-    if (!AssignProcessToJobObject(job, pi.hProcess) || ResumeThread(pi.hThread) == (DWORD)-1) {
-        TerminateProcess(pi.hProcess, 2); WaitForSingleObject(pi.hProcess, 5000);
+    if (!AssignProcessToJobObject(job, pi.hProcess)) {
+        printf("private runner assign error=%lu\n", (unsigned long)GetLastError()); fflush(stdout);
+        if (!TerminateProcess(pi.hProcess, 2)) printf("private runner terminate error=%lu\n", (unsigned long)GetLastError());
+        printf("private runner assign-failure cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
+    } else if (ResumeThread(pi.hThread) == (DWORD)-1) {
+        printf("private runner resume error=%lu\n", (unsigned long)GetLastError()); fflush(stdout);
+        if (!TerminateJobObject(job, 2)) printf("private runner terminate-job error=%lu\n", (unsigned long)GetLastError());
+        printf("private runner resume-failure cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
     } else {
         wait = WaitForSingleObject(pi.hProcess, 30000);
-        if (wait == WAIT_OBJECT_0) GetExitCodeProcess(pi.hProcess, &code);
-        else {TerminateJobObject(job, 2); WaitForSingleObject(pi.hProcess, 5000);}
+        if (wait == WAIT_OBJECT_0) {
+            if (!GetExitCodeProcess(pi.hProcess, &code)) {
+                printf("private runner exit-query error=%lu\n", (unsigned long)GetLastError()); code = 2;
+            }
+        } else {
+            DWORD wait_error = wait == WAIT_FAILED ? GetLastError() : 0;
+            printf("private runner mode=%s wait=%lu error=%lu limit_ms=30000\n", mode, (unsigned long)wait, (unsigned long)wait_error); fflush(stdout);
+            if (!TerminateJobObject(job, 2)) printf("private runner terminate-job error=%lu\n", (unsigned long)GetLastError());
+            printf("private runner timeout cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
+        }
     }
     CloseHandle(pi.hThread); CloseHandle(pi.hProcess); CloseHandle(job);
     printf("private runner mode=%s exit=%lu\n", mode, (unsigned long)code);

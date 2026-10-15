@@ -24,3 +24,22 @@ cleanup fail. There is no non-Windows stub registration.
 This does not cover every launch failure or introduce stable error categories.
 It does not prove a phase exit, ASAN execution before CI, or efficacy of any
 solver. The existing invalid-cwd and overlong-command tests are unchanged.
+
+## First native red and bounded diagnostic revision
+
+Run [586](https://github.com/FiveTechSoft/symbols/actions/runs/38794982933)
+on `0ae3e9b147ff75a5647b1e57acac800f446cc957` failed the new MSVC and ASAN tests (30.16 s and 30.22 s):
+the positive control and sensitivity mask 5 passed, but the invalid runner
+reached its 30-second bound without a probe diagnostic. This is a fixture
+failure with unconfirmed cause, not evidence that the shell API handled the
+invalid image incorrectly.
+
+The private runner now sets `SEM_FAILCRITICALERRORS` while preserving its other
+inherited error-mode bits. No production process changes its error mode.
+[Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-seterrormode)
+documents this flag as preventing critical-error dialogs from hanging an
+application. A modal loader error is a hypothesis, not a confirmed diagnosis.
+Diagnostics are flushed at private-runner entry and before/after the OS probe;
+wait, assignment, resume and cleanup errors are explicit. The gold, expected
+error 193, three failure calls, sensitivity mask 5 and 30-second bound are
+unchanged. A second unexpected result remains red, never a redefined pass.
