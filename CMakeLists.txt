@@ -1320,3 +1320,12 @@ if(WIN32)
     set_tests_properties(test_shell_spawn_win PROPERTIES TIMEOUT 90
         PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_FAILURE native cases=3")
 endif()
+
+# Diagnostic only: original test_shell_spawn_win remains strict and unchanged.
+if(WIN32)
+    add_executable(test_shell_spawn_handles_win tests/test_shell_spawn_handles_win.c)
+    target_link_libraries(test_shell_spawn_handles_win symbolic)
+    add_test(NAME test_shell_spawn_handles_win COMMAND test_shell_spawn_handles_win)
+    set_tests_properties(test_shell_spawn_handles_win PROPERTIES TIMEOUT 90
+        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_HANDLE_DIAG calls=27; counts=28")
+endif()

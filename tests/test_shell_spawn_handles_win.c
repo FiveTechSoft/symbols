@@ -1,0 +1,208 @@
+/* Separate native Windows handle trace. Original fixture stays unchanged. */
+#include "agent_shell.h"
+#include <windows.h>
+#include <stdio.h>
+#include <string.h>
+
+static unsigned failure_mask(int ok, const SHELL_EXEC_RESULT *r)
+{
+    unsigned mask = 0;
+    if (ok != 0 || !r->execution_failed || r->exit_code != -1 || r->timed_out) mask |= 1;
+    if (r->stdout_len || r->stderr_len || r->stdout_total_len || r->stderr_total_len ||
+        r->stdout_truncated || r->stderr_truncated || r->stdout_buf[0] || r->stderr_buf[0]) mask |= 2;
+    if (GetFileAttributesA("witness.txt") != INVALID_FILE_ATTRIBUTES) mask |= 4;
+    return mask;
+}
+
+static int child(const char *mode)
+{
+    SHELL_EXEC_RESULT r;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    DWORD before, after, error, old_mode, counts[28];
+    char command[] = "cmd.exe /c echo witness>witness.txt";
+    int ok, i, flat = 1, one_time = 1, bad_mask = 0;
+    unsigned mask;
+    /* Only this isolated private runner changes its error mode. */
+    old_mode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    SetErrorMode(old_mode | SEM_FAILCRITICALERRORS);
+    printf("private child entered mode=%s error_mode=%u critical_dialogs_disabled=1\n", mode, (unsigned)(old_mode | SEM_FAILCRITICALERRORS));
+    fflush(stdout);
+    if (!strcmp(mode, "positive")) {
+        memset(&r, 0xa5, sizeof(r));
+        ok = AgentShellExec("echo witness>witness.txt", ".", 5000, &r);
+        mask = failure_mask(ok, &r);
+        printf("positive ok=%d exit=%d launch=%d timeout=%d failure_mask=%u\n",
+               ok, r.exit_code, r.execution_failed, r.timed_out, mask);
+        return !(ok == 1 && r.exit_code == 0 && !r.execution_failed && !r.timed_out && mask == 5);
+    }
+    if (strcmp(mode, "invalid")) return 2;
+    memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
+    memset(&pi, 0, sizeof(pi));
+    puts("invalid-image probe before CreateProcessA"); fflush(stdout);
+    ok = CreateProcessA(NULL, command, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, ".", &si, &pi);
+    error = ok ? 0 : GetLastError();
+    printf("invalid-image native probe ok=%d error=%lu\n", ok, (unsigned long)error); fflush(stdout);
+    if (ok) {
+        TerminateProcess(pi.hProcess, 2);
+        WaitForSingleObject(pi.hProcess, 5000);
+        CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+        return 1;
+    }
+    if ((error != ERROR_BAD_EXE_FORMAT && error != ERROR_EXE_MACHINE_TYPE_MISMATCH) ||
+        GetFileAttributesA("witness.txt") != INVALID_FILE_ATTRIBUTES) return 1;
+    /* Warm up diagnostics and the handle-count API before the measured calls. */
+    if (!GetProcessHandleCount(GetCurrentProcess(), &before)) return 2;
+    printf("handle probe warmed; native failure calls=27\n"); fflush(stdout);
+    if (!GetProcessHandleCount(GetCurrentProcess(), &before)) return 2;
+    counts[0] = before;
+    printf("SPAWN_HANDLE_TRACE baseline=%lu calls=27 blocks=3,12,12\n", (unsigned long)before);
+    fflush(stdout);
+    for (i = 0; i < 27; i++) {
+        memset(&r, 0xa5, sizeof(r));
+        ok = AgentShellExec("echo witness>witness.txt", ".", 5000, &r);
+        if (!GetProcessHandleCount(GetCurrentProcess(), &counts[i+1])) return 2;
+        mask = failure_mask(ok, &r);
+        if (mask) bad_mask = 1;
+        printf("SPAWN_HANDLE_TRACE call=%d block=%d count=%lu mask=%u ok=%d exit=%d launch=%d timeout=%d stored=%llu/%llu total=%llu/%llu\n",
+               i+1, i<3 ? 1 : (i<15 ? 2 : 3), (unsigned long)counts[i+1], mask,
+               ok, r.exit_code, r.execution_failed, r.timed_out,
+               (unsigned long long)r.stdout_len, (unsigned long long)r.stderr_len,
+               (unsigned long long)r.stdout_total_len, (unsigned long long)r.stderr_total_len);
+        fflush(stdout);
+        if (i == 2 || i == 14 || i == 26) {
+            printf("SPAWN_HANDLE_TRACE block_end=%d count=%lu delta=%lld\n",
+                   i==2 ? 1 : (i==14 ? 2 : 3), (unsigned long)counts[i+1],
+                   (long long)counts[i+1]-(long long)before); fflush(stdout);
+        }
+    }
+    for (i = 1; i <= 27; i++) {
+        if (counts[i] != before) flat = 0;
+        if ((unsigned long long)counts[1] != (unsigned long long)before+1 || counts[i] != counts[1]) one_time = 0;
+    }
+    after = counts[27];
+    printf("SPAWN_HANDLE_TRACE classification=%s baseline=%lu final=%lu delta=%lld result_masks_ok=%d\n",
+           flat ? "flat" : (one_time ? "one_time_increase" : "unexpected_trace"),
+           (unsigned long)before, (unsigned long)after,
+           (long long)after-(long long)before, !bad_mask); fflush(stdout);
+    return bad_mask || (!flat && !one_time) ? 1 : 0;
+}
+
+static int run_copy(const char *exe, const char *dir, const char *mode)
+{
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limit;
+    HANDLE job;
+    DWORD code = 2, wait;
+    char command[MAX_PATH + 64];
+    int n = snprintf(command, sizeof(command), "\"%s\" --child %s", exe, mode);
+    if (n < 0 || (size_t)n >= sizeof(command)) return 0;
+    memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    memset(&pi, 0, sizeof(pi));
+    memset(&limit, 0, sizeof(limit));
+    limit.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    job = CreateJobObjectA(NULL, NULL);
+    if (!job) return 0;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limit, sizeof(limit))) {CloseHandle(job); return 0;}
+    if (!CreateProcessA(exe, command, NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED, NULL, dir, &si, &pi)) {
+        printf("private runner launch error=%lu\n", (unsigned long)GetLastError());
+        CloseHandle(job); return 0;
+    }
+    if (!AssignProcessToJobObject(job, pi.hProcess)) {
+        printf("private runner assign error=%lu\n", (unsigned long)GetLastError()); fflush(stdout);
+        if (!TerminateProcess(pi.hProcess, 2)) printf("private runner terminate error=%lu\n", (unsigned long)GetLastError());
+        printf("private runner assign-failure cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
+    } else if (ResumeThread(pi.hThread) == (DWORD)-1) {
+        printf("private runner resume error=%lu\n", (unsigned long)GetLastError()); fflush(stdout);
+        if (!TerminateJobObject(job, 2)) printf("private runner terminate-job error=%lu\n", (unsigned long)GetLastError());
+        printf("private runner resume-failure cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
+    } else {
+        wait = WaitForSingleObject(pi.hProcess, 30000);
+        if (wait == WAIT_OBJECT_0) {
+            if (!GetExitCodeProcess(pi.hProcess, &code)) {
+                printf("private runner exit-query error=%lu\n", (unsigned long)GetLastError()); code = 2;
+            }
+        } else {
+            DWORD wait_error = wait == WAIT_FAILED ? GetLastError() : 0;
+            printf("private runner mode=%s wait=%lu error=%lu limit_ms=30000\n", mode, (unsigned long)wait, (unsigned long)wait_error); fflush(stdout);
+            if (!TerminateJobObject(job, 2)) printf("private runner terminate-job error=%lu\n", (unsigned long)GetLastError());
+            printf("private runner timeout cleanup wait=%lu\n", (unsigned long)WaitForSingleObject(pi.hProcess, 5000));
+        }
+    }
+    CloseHandle(pi.hThread); CloseHandle(pi.hProcess); CloseHandle(job);
+    printf("private runner mode=%s exit=%lu\n", mode, (unsigned long)code);
+    return code == 0;
+}
+
+static int scenario(const char *self, const char *root, const char *mode)
+{
+    char dir[MAX_PATH], exe[MAX_PATH], shell[MAX_PATH], system[MAX_PATH], real_shell[MAX_PATH];
+    char witness[MAX_PATH], image[64];
+    WIN32_FIND_DATAA fd;
+    HANDLE h, find;
+    DWORD n, written;
+    int ok = 0;
+    if (snprintf(dir, sizeof(dir), "%s\\%s", root, mode) >= sizeof(dir) ||
+        snprintf(exe, sizeof(exe), "%s\\runner.exe", dir) >= sizeof(exe) ||
+        snprintf(shell, sizeof(shell), "%s\\cmd.exe", dir) >= sizeof(shell) ||
+        snprintf(witness, sizeof(witness), "%s\\witness.txt", dir) >= sizeof(witness)) return 0;
+    if (!CreateDirectoryA(dir, NULL)) return 0;
+    if (!CopyFileA(self, exe, TRUE)) goto cleanup;
+    if (!strcmp(mode, "positive")) {
+        n = GetSystemDirectoryA(system, sizeof(system));
+        if (!n || n >= sizeof(system) || snprintf(real_shell, sizeof(real_shell), "%s\\cmd.exe", system) >= sizeof(real_shell)) goto cleanup;
+        if (!CopyFileA(real_shell, shell, TRUE)) goto cleanup;
+    } else {
+        memset(image, 'X', sizeof(image));
+        h = CreateFileA(shell, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h == INVALID_HANDLE_VALUE) goto cleanup;
+        ok = WriteFile(h, image, sizeof(image), &written, NULL) && written == sizeof(image);
+        if (!CloseHandle(h)) ok = 0;
+        if (!ok) goto cleanup;
+    }
+    ok = run_copy(exe, dir, mode);
+    /* Inspect names before deleting only our declared files. */
+    if (snprintf(system, sizeof(system), "%s\\*", dir) >= sizeof(system)) {ok = 0; goto cleanup;}
+    find = FindFirstFileA(system, &fd);
+    if (find == INVALID_HANDLE_VALUE) ok = 0;
+    else {
+        do {
+            if (strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
+                strcmp(fd.cFileName, "runner.exe") && strcmp(fd.cFileName, "cmd.exe") &&
+                (strcmp(mode, "positive") || strcmp(fd.cFileName, "witness.txt"))) ok = 0;
+        } while (FindNextFileA(find, &fd));
+        if (GetLastError() != ERROR_NO_MORE_FILES) ok = 0;
+        FindClose(find);
+    }
+cleanup:
+    if (GetFileAttributesA(witness) != INVALID_FILE_ATTRIBUTES && !DeleteFileA(witness)) ok = 0;
+    if (GetFileAttributesA(shell) != INVALID_FILE_ATTRIBUTES && !DeleteFileA(shell)) ok = 0;
+    if (GetFileAttributesA(exe) != INVALID_FILE_ATTRIBUTES && !DeleteFileA(exe)) ok = 0;
+    if (!RemoveDirectoryA(dir)) ok = 0;
+    return ok;
+}
+
+int main(int argc, char **argv)
+{
+    char self[MAX_PATH], temp[MAX_PATH], root[MAX_PATH];
+    DWORD n;
+    int ok;
+    if (argc == 3 && !strcmp(argv[1], "--child")) return child(argv[2]);
+    if (argc != 1) return 2;
+    n = GetModuleFileNameA(NULL, self, sizeof(self)); if (!n || n >= sizeof(self)) return 2;
+    n = GetTempPathA(sizeof(temp), temp); if (!n || n >= sizeof(temp)) return 2;
+    if (snprintf(root, sizeof(root), "%ssymbols-spawn-diag-%lu-%lu", temp,
+                 (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount()) >= sizeof(root)) return 2;
+    if (!CreateDirectoryA(root, NULL)) return 2;
+    ok = scenario(self, root, "positive");
+    /* Stop on a failed control, rather than interpreting the failure arm. */
+    if (ok) ok = scenario(self, root, "invalid");
+    if (!RemoveDirectoryA(root)) ok = 0;
+    if (ok) puts("WINDOWS_SPAWN_HANDLE_DIAG calls=27; counts=28; sensitivity mask=5");
+    return ok ? 0 : 1;
+}

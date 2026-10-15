@@ -1,0 +1,19 @@
+{
+  "base": "f8482e99999cedaa03e7914fbc37d0141ee21870",
+  "original_gold_sha256": "967f4af56aec751e00ec043eecd0037b4725e94ec03426d8ffc7a9c7139f218a",
+  "original_no_increase_unchanged": true,
+  "blocks": [3, 12, 12],
+  "calls": 27,
+  "counts": 28,
+  "probe_errors": [193, 216],
+  "failure_oracle_masks": [0],
+  "positive_failure_oracle_mask": 5,
+  "child_limit_ms": 30000,
+  "classifications": {
+    "flat": "all 27 counts equal baseline",
+    "one_time_increase": "first equals baseline+1 and all 26 later counts equal first",
+    "unexpected_trace": "anything else; diagnostic nonzero"
+  },
+  "causal_claim": "none; handle trace does not identify handle owner",
+  "expected_full_ci": "original fixture remains strict and may keep both native jobs red"
+}
