@@ -1311,3 +1311,12 @@ if(WIN32)
     set_tests_properties(test_shell_dual_win PROPERTIES TIMEOUT 180
         PASS_REGULAR_EXPRESSION "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5")
 endif()
+
+# Real Windows CreateProcess failure in a private application directory.
+if(WIN32)
+    add_executable(test_shell_spawn_win tests/test_shell_spawn_win.c)
+    target_link_libraries(test_shell_spawn_win symbolic)
+    add_test(NAME test_shell_spawn_win COMMAND test_shell_spawn_win)
+    set_tests_properties(test_shell_spawn_win PROPERTIES TIMEOUT 90
+        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_FAILURE native cases=3")
+endif()

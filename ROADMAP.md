@@ -193,7 +193,7 @@ These decisions change the order of work, not the dependency chain above. No pul
 
 ### Exit criteria
 
-- Invalid `cwd` and spawn failures produce zero command side effects.
+- Invalid `cwd` and spawn failures produce zero command side effects. Windows invalid-image spawn failure has a native fixture with private application-directory isolation, a real-shell positive control and three zero-side-effect failure checks; see [test scope](docs/shell-spawn-win.md). This is one failure class, not a phase-exit claim.
 - A fixture writing at least 100,000 bytes simultaneously to both streams completes without deadlock or false timeout on Linux and Windows.
 - Timeout fixtures leave no surviving child or grandchild process on either platform.
 - Truncation is distinguishable from timeout and ordinary command failure.

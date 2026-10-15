@@ -1,0 +1,8 @@
+{
+  "base": "e54df4e4523d58f7b39eb85dc6811ac4795197b4",
+  "case_count": 3,
+  "invalid_image": {"bytes": 64, "fill_hex": "58", "probe_ok": false, "probe_error": 193, "repetitions": 3, "exec_return": 0, "execution_failed": true, "exit_code": -1, "timed_out": false, "stdout_len": 0, "stderr_len": 0, "stdout_total_len": 0, "stderr_total_len": 0, "stdout_truncated": false, "stderr_truncated": false, "witness": false, "failure_oracle_mask": 0},
+  "positive": {"exec_return": 1, "execution_failed": false, "exit_code": 0, "timed_out": false, "witness": true},
+  "sensitivity": {"status_bit": 1, "capture_bit": 2, "witness_bit": 4, "positive_failure_oracle_mask": 5},
+  "scope": "native Windows single invalid-image OS launch failure; no stable error categories; no phase closure"
+}
