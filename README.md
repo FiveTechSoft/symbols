@@ -55,27 +55,26 @@ The current focus is systems work: shell, git, and C. C and C++ are both the sub
 
 ### 2.1 Progress metrics (measured, not estimated)
 
-Every number in this table comes from a real run of `python3 tools/metrics.py --write --ci` on the stated commit; nothing is filled in by hand. Anything that cannot be measured yet is shown as "not measured". The per-commit history is in [`tools/metrics_history.csv`](tools/metrics_history.csv), and the per-phase targets are in [`ROADMAP.md`](ROADMAP.md#measurable-targets-per-phase). The fixed task bank has its own per-commit JSONL report and CI gate in [`scripts/bank_report.py`](scripts/bank_report.py) (workflow `bank`); this table reads the same runner output.
+This block is rendered from the reviewed, versioned evidence snapshot in
+[`tools/metrics/current.json`](tools/metrics/current.json), not from a new
+measurement run. Each row names its exact subject or measurement commit and
+source. Technical CI and developer contracts are not efficacy measurements.
+Unknown effectiveness stays unmeasured; historical outcomes are never carried
+forward as current scores. The older metrics table and CSV remain history, not
+current results. `tools/metrics_snapshot.py` renders this block without running
+tests, the solver, the bank or a server. `tools/metrics.py --write` is deprecated
+and refuses before measuring anything; measurement-only use remains separate.
 
 <!-- METRICS:BEGIN -->
-Measured on commit `d6a0aad` on 2026-09-24 (linux, build) with `python3 tools/metrics.py`.
+Evidence snapshot for subject commit `1ae65742e420e1c464452f6bc7429059b8529e37`.
 
-| Metric | Value | How it is measured |
-|---|---|---|
-| CTest suite | 98/108 pass, 0 fail, 10 skipped | full `ctest`; skipped = optional data missing |
-| Unit asserts | 866 pass, 0 fail | sum of `TEST RESULTS` over all tests |
-| Agent: C repair, evaluation | 12/25 resolved (48%), 0 harmful edits, 13 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
-| Agent: C repair, development | 2/4 resolved (50%), 0 harmful edits, 2 correct abstentions | `test_agent_runner_external` / `_heldout` (separated fixtures) |
-| Agent: C repair, held-out | 2/4 resolved (50%), 0 harmful edits | `test_agent_runner_external` / `_heldout` (separated fixtures) |
-| Grounded QA (fixed set of 32) | precision 78%, recall 82% (TP 14, FP 4, FN 3, TN 11) | `tools/metrics/qa_battery.tsv` against the server; labels from the corpus, not from the engine |
-| Invented or wrong answers | 4 of 32 | FP from the row above |
-| Server latency | p50 0.8 ms, p95 1.3 ms | same set, local |
-| Procedural memory: repeat benefit | 6 real commands: 6 probes the first time → 0 on repeat | same list twice, the probe really runs; non-commands are re-probed on purpose |
-| C edit operator (OpenCode) | 46 asserts pass, 0 fail | `test_c_edit_ops` |
-| Engineering task bank (59 tasks, 9 categories) | `symbols-agent`: 47/59 pass (80%; dev 34/34, retired held-out 13/25 (seen since fa230f4); blind batch counted separately by Mimo with --counts-only, see COORDINATION.md), 0 wrong edits, 12 untouched; by category: build_ci 7/7, compiler_repair 7/7, debug 5/7, docs 4/7, git 3/3, multi_file 6/7, refactor 5/7, shell 5/7, test_authoring 5/7 | `tools/bank_harness.py` (before/ + task.md + check.py; golden after/ only in `--self-test`, self-test 59/59) |
-| Wikidata QA evaluation (`test_eval_*`) | not measured | `wiki_model.bin` missing (not bundled) |
-| CI per platform | apply: success, ci / asan-msvc: success, ci / build-test-linux: success, ci / build-test-msvc: success | [run](https://github.com/FiveTechSoft/symbols/actions/runs/35963803283); failing tests are listed in each job log |
-| Hand-written rules (declared) | 51 rules; tables: `tools.tsv` 16 rows, `fixtures.tsv` 5 rows, `english-spanish.txt` 357 rows | `tools/metrics/declared_rules.tsv` (the script checks each one is still in the code) |
+Curated source claims, not new measurements. CI success is not semantic efficacy.
+
+| Metric | Evidence class | Value | Measurement context | Source |
+|---|---|---|---|---|
+| Final-SHA CI | Current technical | 5 of 5 latest jobs success. One MSVC rerun after a 60-second fixture-check timeout; no code change. | 2026-10-15; GitHub Linux and Windows; run 583, attempt 2; `1ae65742e420e1c464452f6bc7429059b8529e37` | [source](https://github.com/FiveTechSoft/symbols/actions/runs/38773260537) |
+| Documentation assertion edit boundary | Current developer | 9 refusal fixtures; mutant reopens exactly 6 unique plans. Two useful prior developer updates are deliberately lost, not efficacy gains. | 2026-10-15; Nine fixed developer fixtures; fault-only reopening mutant; `1ae65742e420e1c464452f6bc7429059b8529e37` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
+| Current solver, bank and corpus QA effectiveness | Unmeasured on subject SHA | Unmeasured | 2026-10-15; No fresh efficacy run authorized for this snapshot; `1ae65742e420e1c464452f6bc7429059b8529e37` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
 <!-- METRICS:END -->
 
 ## 3. Architecture

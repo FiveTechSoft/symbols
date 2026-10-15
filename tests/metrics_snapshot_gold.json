@@ -1,0 +1,197 @@
+{
+  "status": "PRECODE_NO_RENDERER_IMPLEMENTED",
+  "base_snapshot": {
+    "version": 1,
+    "subject_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "entries": [
+      {
+        "id": "ci",
+        "title": "CI jobs",
+        "claim_type": "technical_result",
+        "measured_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "date": "2026-10-15",
+        "environment": "Linux and Windows",
+        "source_url": "https://github.com/FiveTechSoft/symbols/actions/runs/123",
+        "value": "5 of 5 jobs success"
+      }
+    ]
+  },
+  "readme_lf": "prefix\n<!-- METRICS:BEGIN -->\nold\n<!-- METRICS:END -->\nsuffix\n",
+  "cases": [
+    {
+      "id": "current_technical",
+      "construction": "base",
+      "expected": "Current technical; measured SHA a*40; value unchanged"
+    },
+    {
+      "id": "historical_technical",
+      "construction": "entry measured_sha=b*40",
+      "expected": "Historical technical; no current label"
+    },
+    {
+      "id": "historical_developer",
+      "construction": "claim_type=developer_contract; measured_sha=b*40",
+      "expected": "Historical developer; no current label"
+    },
+    {
+      "id": "same_sha_historical_efficacy",
+      "construction": "claim_type=historical_efficacy",
+      "expected": "Historical efficacy; never current"
+    },
+    {
+      "id": "unknown",
+      "construction": "claim_type=unknown; measured_sha=null; value=null",
+      "expected": "Unmeasured on subject SHA; no score"
+    },
+    {
+      "id": "duplicate_id",
+      "construction": "append identical entry",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "missing_field",
+      "construction": "remove date",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "unknown_field",
+      "construction": "add root extra=true",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "bad_type",
+      "construction": "version=true",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "duplicate_json_key",
+      "construction": "literal JSON repeats version",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "nan",
+      "construction": "value=JSON NaN token",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "infinity",
+      "construction": "value=JSON Infinity token",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "invalid_utf8",
+      "construction": "raw input byte ff",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "oversize",
+      "construction": "raw input 65537 bytes",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "empty_entries",
+      "construction": "entries=[]",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "too_many",
+      "construction": "33 unique entries",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "invalid_date",
+      "construction": "date=2026-02-30",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "bad_sha",
+      "construction": "subject_sha=ABC",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "markdown_title",
+      "construction": "title=one|two",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "newline_value",
+      "construction": "value contains LF",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "wrong_url_host",
+      "construction": "source_url=https://evil.invalid/x",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "url_credentials",
+      "construction": "source_url=https://u@github.com/FiveTechSoft/symbols/actions/runs/123",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "url_suffix",
+      "construction": "source_url=https://github.com/FiveTechSoft/symbols/actions/runs/123/evil",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "unknown_claim",
+      "construction": "claim_type=entailment",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "numeric_value",
+      "construction": "value=5",
+      "expected": "REJECT; original README byte-identical; no measurements"
+    },
+    {
+      "id": "lf",
+      "construction": "README LF with before/after sentinel",
+      "expected": "write exact expected block; outside bytes unchanged"
+    },
+    {
+      "id": "crlf_bom",
+      "construction": "README UTF8BOM+CRLF",
+      "expected": "write CRLF interior; BOM/outside unchanged"
+    },
+    {
+      "id": "render_only",
+      "construction": "no --write",
+      "expected": "stdout only; no files changed"
+    },
+    {
+      "id": "missing_marker",
+      "construction": "README no end marker",
+      "expected": "REJECT; unchanged"
+    },
+    {
+      "id": "duplicate_marker",
+      "construction": "two BEGIN markers",
+      "expected": "REJECT; unchanged"
+    },
+    {
+      "id": "reversed_marker",
+      "construction": "END before BEGIN",
+      "expected": "REJECT; unchanged"
+    },
+    {
+      "id": "mixed_marker_eol",
+      "construction": "BEGIN LF END CRLF",
+      "expected": "REJECT; unchanged"
+    },
+    {
+      "id": "nul_readme",
+      "construction": "NUL outside block",
+      "expected": "REJECT; unchanged"
+    },
+    {
+      "id": "symlink_readme",
+      "construction": "README symlink to regular file",
+      "expected": "REJECT; referent unchanged"
+    },
+    {
+      "id": "legacy_write",
+      "construction": "metrics.py --write with measurement functions instrumented to fail if called",
+      "expected": "nonzero migration message; zero measurement calls"
+    }
+  ]
+}

@@ -1,5 +1,14 @@
 {
  "tests": {
+  "test_metrics_snapshot": {
+   "files": [
+    "tests/test_metrics_snapshot.py",
+    "tests/metrics_snapshot_gold.json",
+    "tools/metrics_snapshot.py",
+    "tools/metrics.py",
+    "tools/metrics/current.json"
+   ]
+  },
   "test_relprobe_cite_context": {
    "files": [
     "tests/test_relprobe_cite_context.py"

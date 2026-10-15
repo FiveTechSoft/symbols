@@ -2,11 +2,13 @@
 """Progress metrics measured from real runs (nothing estimated by hand).
 
 Usage (from the repo root, with the build in ./build):
-    python3 tools/metrics.py            # measure and print the table
-    python3 tools/metrics.py --write    # also rewrite the README section
-                                        # (between <!-- METRICS:BEGIN --> and <!-- METRICS:END -->)
-                                        # and append a row to tools/metrics_history.csv
-    python3 tools/metrics.py --ci       # include the GitHub CI status for the commit
+    python3 tools/metrics.py            # explicitly run legacy measurements
+    python3 tools/metrics.py --ci       # also inspect GitHub CI
+
+--write is deprecated and rejected before any measurements. The README metrics
+block has one writer: tools/metrics_snapshot.py from a reviewed evidence file.
+Measurement-only use can execute fixtures, server QA and bank checks; it is not
+a pure render and must be requested separately.
 
 Anything that cannot be measured here is reported as "not measured", never invented.
 The fixed task bank also has scripts/bank_report.py (per-commit JSONL, CI workflow `bank`),
@@ -310,6 +312,8 @@ def render(m):
 
 
 def main():
+    if "--write" in sys.argv:
+        raise SystemExit("metrics.py --write is deprecated; use metrics_snapshot.py with a reviewed evidence snapshot")
     write = "--write" in sys.argv
     sha = git("rev-parse", "HEAD")
     m = {"sha": sha, "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),

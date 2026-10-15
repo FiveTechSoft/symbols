@@ -1294,3 +1294,9 @@ target_compile_definitions(test_doc_sync_guard_mc PRIVATE TASK_OPS_TEST_FAULTS D
 target_link_libraries(test_doc_sync_guard_mc symbolic_rollback_test)
 add_test(NAME test_doc_sync_guard_mc COMMAND test_doc_sync_guard_mc WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_doc_sync_guard_mc PROPERTIES PASS_REGULAR_EXPRESSION "MUTANT killed exactly six unique doc plans")
+
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_metrics_snapshot
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_metrics_snapshot.py)
+    set_tests_properties(test_metrics_snapshot PROPERTIES TIMEOUT 30)
+endif()

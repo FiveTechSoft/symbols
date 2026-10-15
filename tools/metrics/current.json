@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "subject_sha": "1ae65742e420e1c464452f6bc7429059b8529e37",
+  "entries": [
+    {
+      "id": "final_ci",
+      "title": "Final-SHA CI",
+      "claim_type": "technical_result",
+      "measured_sha": "1ae65742e420e1c464452f6bc7429059b8529e37",
+      "date": "2026-10-15",
+      "environment": "GitHub Linux and Windows; run 583, attempt 2",
+      "source_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38773260537",
+      "value": "5 of 5 latest jobs success. One MSVC rerun after a 60-second fixture-check timeout; no code change."
+    },
+    {
+      "id": "doc_sync_boundary",
+      "title": "Documentation assertion edit boundary",
+      "claim_type": "developer_contract",
+      "measured_sha": "1ae65742e420e1c464452f6bc7429059b8529e37",
+      "date": "2026-10-15",
+      "environment": "Nine fixed developer fixtures; fault-only reopening mutant",
+      "source_url": "https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37",
+      "value": "9 refusal fixtures; mutant reopens exactly 6 unique plans. Two useful prior developer updates are deliberately lost, not efficacy gains."
+    },
+    {
+      "id": "current_effectiveness",
+      "title": "Current solver, bank and corpus QA effectiveness",
+      "claim_type": "unknown",
+      "measured_sha": null,
+      "date": "2026-10-15",
+      "environment": "No fresh efficacy run authorized for this snapshot",
+      "source_url": "https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37",
+      "value": null
+    }
+  ]
+}
