@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "base": "832ccae01b41dc66a249a59ba85ddf0ed985a815",
+  "status": "PRECODE_NO_NATIVE_EXECUTION",
+  "cases": [
+    {"id":"concurrent_1","helper_mode":"normal","stdout_total":100000,"stderr_total":100000,"stdout_byte":79,"stderr_byte":69,"capture_each":65535,"exit_code":0,"timed_out":false,"execution_failed":false,"truncated_each":true,"files_created":0},
+    {"id":"concurrent_2","same_as":"concurrent_1"},
+    {"id":"concurrent_3","same_as":"concurrent_1"},
+    {"id":"contamination_sensitivity","helper_mode":"stderr_x","same_totals_as":"concurrent_1","expected_oracle_failures":["stderr_purity"],"expected_oracle_other_checks_pass":true},
+    {"id":"short_stream_sensitivity","helper_mode":"stderr_short","stderr_total":99999,"other_fields_as":"concurrent_1","expected_oracle_failures":["stderr_total"],"expected_oracle_other_checks_pass":true}
+  ]
+}

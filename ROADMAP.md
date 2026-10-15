@@ -486,3 +486,13 @@ archived, not counted as efficacy gains. Nine frozen developer fixtures and a
 fault-only reopening mutant check the refusal boundary. This supplies neither
 a prose truth evaluator nor a corpus-general reasoning guarantee. See
 [doc_sync guard](docs/doc-sync-guard.md). Core phase declarations are unchanged.
+
+### M0 concurrent Windows stream fixture (2026-10-15)
+
+A Windows-only native helper supplies two independent writer threads released
+from a common event, one for stdout and one for stderr. The new test checks
+100000 bytes on each stream, capture limits, purity and termination, plus fixed
+contamination and short-stream sensitivity controls. The prior PowerShell
+interleaved test is unchanged. This adds an exact-SHA CI measurement opportunity,
+not a declaration that M0 criterion 2 or the phase is met before native evidence
+is read. No production shell code changed. See [fixture scope](docs/shell-dual-win.md).

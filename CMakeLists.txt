@@ -1300,3 +1300,14 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_metrics_snapshot.py)
     set_tests_properties(test_metrics_snapshot PROPERTIES TIMEOUT 30)
 endif()
+
+if(WIN32)
+    add_executable(shell_dual_writer_win tests/shell_dual_writer_win.c)
+    add_executable(test_shell_dual_win tests/test_shell_dual_win.c)
+    target_link_libraries(test_shell_dual_win symbolic)
+    add_dependencies(test_shell_dual_win shell_dual_writer_win)
+    add_test(NAME test_shell_dual_win
+             COMMAND test_shell_dual_win $<TARGET_FILE:shell_dual_writer_win>)
+    set_tests_properties(test_shell_dual_win PROPERTIES TIMEOUT 180
+        PASS_REGULAR_EXPRESSION "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5")
+endif()
