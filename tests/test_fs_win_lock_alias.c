@@ -45,6 +45,30 @@ static char state(const char *path)
 static void fixture(FS_READ_ROOT **r)
 {rmtree(WS);ck(_mkdir(WS)==0&&_mkdir(WS "\\inside")==0,"mkdir");
  put(WS "\\inside\\f","REAL");ck(FsReadOpen(WS,r)==FS_READ_OK,"open workspace");}
+/* Check the destination, not merely the untouched source printed in the table.
+   An arbitrary attributes error is not proof of absence. The parent exists. */
+static void copy_absent(void)
+{DWORD a=GetFileAttributesA(WS "\\inside\\c"),err=GetLastError();
+ ck(a==INVALID_FILE_ATTRIBUTES&&err==ERROR_FILE_NOT_FOUND,"copy destination absent");}
+static void exact_file(const char *path,const char *want)
+{char b[32];FILE *f=fopen(path,"rb");size_t n;
+ ck(f!=NULL,"copy control open");n=fread(b,1,sizeof(b),f);
+ ck(!ferror(f)&&fclose(f)==0,"copy control read");
+ ck(n==strlen(want)&&!memcmp(b,want,n),"copy control exact bytes");}
+static void ordinary_copy_controls(void)
+{static const char *values[2]={"","COPY!"};int i;
+ for(i=0;i<2;i++){FS_READ_ROOT *r;char full[MAX_PATH],sp[MAX_PATH],*leaf;DWORD n;
+  fixture(&r);put(WS "\\ordinary_long_copy_source.txt",values[i]);
+  n=GetFullPathNameA(WS "\\ordinary_long_copy_source.txt",MAX_PATH,full,NULL);
+  ck(n>0&&n<MAX_PATH,"ordinary copy full path");
+  n=GetShortPathNameA(full,sp,MAX_PATH);ck(n>0&&n<MAX_PATH,"ordinary copy short path");
+  leaf=strrchr(sp,'\\');leaf=leaf?leaf+1:sp;
+  ck(_stricmp(leaf,"ordinary_long_copy_source.txt")!=0,"ordinary copy real alias");
+  copy_absent();
+  ck(FsCopyFile(r,leaf,"inside/c",values[i],strlen(values[i]))==FS_READ_OK,"ordinary alias copy accepted");
+  exact_file(WS "\\inside\\c",values[i]);
+  exact_file(WS "\\ordinary_long_copy_source.txt",values[i]);
+  FsReadClose(r);rmtree(WS);}}
 static const char *op[5]={"copy_source","move_source","replace","remove","batch_replace"};
 static void group(const char *label,int g,char *out)
 {char tbl[300]="",full[MAX_PATH],shortp[MAX_PATH],name[96],path[MAX_PATH+16];int i;DWORD n;
@@ -70,6 +94,9 @@ static void group(const char *label,int g,char *out)
   case 3:res=FsRemoveFile(r,name,"",0);break;
   default:{FS_BATCH_REPLACE b[2]={{"inside/f","REAL",4,"NEW!",4},{name,"",0,"NEW!",4}};res=FsBatchReplace(r,b,2);}
   }
+  if(i==0&&g!=0){
+   ck(res==FS_READ_DENIED,"reserved copy source denied");
+   exact_file(path,"");copy_absent();}
   if(held!=INVALID_HANDLE_VALUE){UnlockFileEx(held,0,1,0,&o);CloseHandle(held);}
   snprintf(tbl+strlen(tbl),sizeof(tbl)-strlen(tbl),"%s%s=%d%c",i?" ":"",op[i],(int)res,state(path));
   FsReadClose(r);rmtree(WS);}
@@ -88,6 +115,7 @@ int main(void)
   rmtree(WS);
   if(!had){char cmd[64];atexit(restore_8dot3);restore_needed=1;
    snprintf(cmd,sizeof(cmd),"fsutil 8dot3name set %c: 0 >NUL 2>&1",drive);ck(system(cmd)==0,"enable 8dot3");}}
+ ordinary_copy_controls();
  group("held_long",0,out);group("foreign_long",1,out);group("foreign_alias",2,out);
  printf("lock alias cells: %s\n",out);
  return 0;}

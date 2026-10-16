@@ -908,6 +908,8 @@ static FS_READ_STATUS wc_copy_source(const FS_READ_ROOT *r,const char *src,
     unsigned char *buf=NULL;DWORD got=0,extra=0;unsigned char one;
     LARGE_INTEGER zero;FS_READ_STATUS s=win_open(r,src,&current);
     if(s!=FS_READ_OK)return s;
+    /* Copy sources use the read-only opener, not wc_open: check its handle too. */
+    if(wc_final_reserved(current)!=0){s=FS_READ_DENIED;goto done;}
     if(win_meta(current,&m)!=FS_READ_OK||m.kind!=FS_KIND_FILE||
        m.size!=len||!wc_id(current,&check)||!wc_same(&check,id)||
        !wc_id(held,&check)||!wc_same(&check,id)){
@@ -1037,6 +1039,8 @@ FS_READ_STATUS FsCopyFile(const FS_READ_ROOT *r,const char *src,const char *dst,
     if(!_wcsicmp(ws,wd)){s=FS_READ_DENIED;goto done;}
     s=wc_lock(r->handle,&lock,&overlap);if(s!=FS_READ_OK)goto done;
     s=win_open(r,src,&source);if(s!=FS_READ_OK)goto done;
+    /* Reject a reserved long name reached through an ordinary-looking alias. */
+    if(wc_final_reserved(source)!=0){s=FS_READ_DENIED;goto done;}
     s=win_meta(source,&m);
     if(s!=FS_READ_OK)goto done;
     if(m.kind!=FS_KIND_FILE||m.size!=len||

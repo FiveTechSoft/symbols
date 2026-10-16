@@ -12,7 +12,7 @@
     },
     "lock_alias": {
       "test_name": "test_fs_win_lock_alias",
-      "final_line": "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+      "final_line": "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
       "native_exit": 0,
       "final_unique": true,
       "last_nonempty_line": true,
@@ -28,7 +28,7 @@
     },
     "batch_replace": {
       "test_name": "test_fs_win_batch_replace",
-      "final_line": "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+      "final_line": "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
       "native_exit": 0,
       "final_unique": true,
       "last_nonempty_line": true,
@@ -207,7 +207,7 @@
       "id": "lock_alias_full",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": true
@@ -216,7 +216,7 @@
       "id": "lock_alias_crlf",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": true,
@@ -226,7 +226,7 @@
       "id": "lock_alias_nonzero",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 1,
       "valid": false
@@ -249,8 +249,8 @@
       "id": "lock_alias_duplicate",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": false
@@ -259,7 +259,7 @@
       "id": "lock_alias_wrong_field",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e wrong"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e wrong"
       ],
       "exit": 0,
       "valid": false
@@ -268,7 +268,7 @@
       "id": "lock_alias_prefix",
       "kind": "lock_alias",
       "lines": [
-        "prefix lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "prefix lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": false
@@ -277,7 +277,7 @@
       "id": "lock_alias_suffix",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e suffix"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e suffix"
       ],
       "exit": 0,
       "valid": false
@@ -286,7 +286,7 @@
       "id": "lock_alias_trailing_garbage",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
         "late_failure"
       ],
       "exit": 0,
@@ -296,7 +296,7 @@
       "id": "lock_alias_bad_utf8",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": false,
@@ -306,7 +306,7 @@
       "id": "lock_alias_launch_error",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": false,
@@ -316,7 +316,7 @@
       "id": "lock_alias_timeout",
       "kind": "lock_alias",
       "lines": [
-        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
       ],
       "exit": 0,
       "valid": false,
@@ -335,7 +335,7 @@
       "id": "lock_alias_fragment_1",
       "kind": "lock_alias",
       "lines": [
-        "foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+        "foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e"
       ],
       "exit": 0,
       "valid": false
@@ -490,7 +490,7 @@
       "id": "batch_replace_full",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": true
@@ -499,7 +499,7 @@
       "id": "batch_replace_crlf",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": true,
@@ -509,7 +509,7 @@
       "id": "batch_replace_nonzero",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 1,
       "valid": false
@@ -532,8 +532,8 @@
       "id": "batch_replace_duplicate",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false
@@ -542,7 +542,7 @@
       "id": "batch_replace_wrong_field",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 wrong"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 wrong"
       ],
       "exit": 0,
       "valid": false
@@ -551,7 +551,7 @@
       "id": "batch_replace_prefix",
       "kind": "batch_replace",
       "lines": [
-        "prefix sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "prefix sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false
@@ -560,7 +560,7 @@
       "id": "batch_replace_suffix",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 suffix"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 suffix"
       ],
       "exit": 0,
       "valid": false
@@ -569,7 +569,7 @@
       "id": "batch_replace_trailing_garbage",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
         "late_failure"
       ],
       "exit": 0,
@@ -579,7 +579,7 @@
       "id": "batch_replace_bad_utf8",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,
@@ -589,7 +589,7 @@
       "id": "batch_replace_launch_error",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,
@@ -599,7 +599,7 @@
       "id": "batch_replace_timeout",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,
@@ -609,7 +609,7 @@
       "id": "batch_replace_fragment_0",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3"
+        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0"
       ],
       "exit": 0,
       "valid": false
@@ -996,9 +996,36 @@
       ],
       "exit": 0,
       "valid": false
+    },
+    {
+      "id": "old_lock_oracle",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "old_batch_oracle",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "reserved_copy_alias_bypass",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=1e ; foreign_alias: copy_source=0e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
     }
   ],
-  "vector_count": 98,
+  "vector_count": 101,
   "native_required": [
     "MSVC_RELEASE",
     "MSVC_ASAN"
