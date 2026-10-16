@@ -17,8 +17,38 @@ typedef struct
     uint32_t state;
     uint32_t op_indices[MAX_PLAN_STEPS];
     uint32_t step_count;
-    uint32_t total_cost;
+    uint64_t total_cost;
+    bool active;
+    bool settled;
 } SEARCH_NODE;
+
+/* Stable order for equal-cost plans. Full paths avoid mutable predecessors. */
+static int SearchPathCompare(const SEARCH_NODE *a, const SEARCH_NODE *b)
+{
+    uint32_t n = a->step_count < b->step_count ? a->step_count : b->step_count;
+    for (uint32_t i = 0; i < n; i++)
+    {
+        if (a->op_indices[i] < b->op_indices[i]) return -1;
+        if (a->op_indices[i] > b->op_indices[i]) return 1;
+    }
+    return a->step_count < b->step_count ? -1 : a->step_count > b->step_count;
+}
+
+static int SearchBefore(const SEARCH_NODE *a, const SEARCH_NODE *b)
+{
+    if (a->total_cost != b->total_cost) return a->total_cost < b->total_cost;
+    if (a->step_count != b->step_count) return a->step_count < b->step_count;
+    return SearchPathCompare(a, b) < 0;
+}
+
+static int SearchDominates(const SEARCH_NODE *a, const SEARCH_NODE *b)
+{
+    if (a->state != b->state || a->total_cost > b->total_cost ||
+        a->step_count > b->step_count) return 0;
+    if (a->total_cost == b->total_cost && a->step_count == b->step_count)
+        return SearchPathCompare(a, b) <= 0;
+    return 1;
+}
 
 /* ============================================================
    Lifecycle API
@@ -134,7 +164,7 @@ int AgentPlannerFormulate(const AGENT_PLANNER *planner,
                            uint32_t goal_state,
                            STRIPS_PLAN *out_plan)
 {
-    if (!planner || !out_plan)
+    if (!planner || !out_plan || planner->operator_count > MAX_PLAN_OPERATORS)
         return 0;
 
     memset(out_plan, 0, sizeof(*out_plan));
@@ -152,73 +182,72 @@ int AgentPlannerFormulate(const AGENT_PLANNER *planner,
         return 1;
     }
 
-    /* BFS state-space search queue */
-    SEARCH_NODE queue[MAX_SEARCH_QUEUE];
-    uint32_t head = 0;
-    uint32_t tail = 0;
-
-    uint32_t visited_states[MAX_SEARCH_QUEUE];
-    uint32_t visited_count = 0;
-
-    queue[tail++] = (SEARCH_NODE){
-        .state       = initial_state,
-        .step_count  = 0,
-        .total_cost  = 0
-    };
-    visited_states[visited_count++] = initial_state;
+    /* Uniform-cost labels retain both cost and remaining step budget. */
+    SEARCH_NODE labels[MAX_SEARCH_QUEUE];
+    uint32_t label_count = 1;
+    memset(labels, 0, sizeof(labels));
+    labels[0].state = initial_state;
+    labels[0].active = true;
 
     bool found_plan = false;
     SEARCH_NODE best_node;
     memset(&best_node, 0, sizeof(best_node));
 
-    while (head < tail)
+    for (;;)
     {
-        SEARCH_NODE curr = queue[head++];
+        uint32_t pick = MAX_SEARCH_QUEUE;
+        for (uint32_t i = 0; i < label_count; i++)
+        {
+            if (labels[i].active && !labels[i].settled &&
+                (pick == MAX_SEARCH_QUEUE || SearchBefore(&labels[i], &labels[pick])))
+                pick = i;
+        }
+        if (pick == MAX_SEARCH_QUEUE) break;
+        SEARCH_NODE curr = labels[pick];
+        labels[pick].settled = true;
 
-        /* Check if goal state is satisfied */
         if ((curr.state & goal_state) == goal_state)
         {
             found_plan = true;
             best_node = curr;
             break;
         }
+        if (curr.step_count >= MAX_PLAN_STEPS) continue;
 
-        if (curr.step_count >= MAX_PLAN_STEPS)
-            continue;
-
-        /* Try expanding with each valid operator */
         for (uint32_t i = 0; i < planner->operator_count; i++)
         {
             const STRIPS_OPERATOR *op = &planner->operators[i];
+            if ((curr.state & op->preconditions) != op->preconditions) continue;
+            SEARCH_NODE next = curr;
+            next.state = (curr.state | op->add_effects) & ~op->del_effects;
+            next.op_indices[next.step_count++] = i;
+            next.total_cost += (uint64_t)op->cost;
+            next.active = true;
+            next.settled = false;
 
-            /* Preconditions check */
-            if ((curr.state & op->preconditions) == op->preconditions)
+            bool dominated = false;
+            for (uint32_t j = 0; j < label_count; j++)
             {
-                uint32_t next_state = (curr.state | op->add_effects) & ~op->del_effects;
-
-                /* Check visited */
-                bool visited = false;
-                for (uint32_t v = 0; v < visited_count; v++)
+                if (labels[j].active && SearchDominates(&labels[j], &next))
                 {
-                    if (visited_states[v] == next_state)
-                    {
-                        visited = true;
-                        break;
-                    }
-                }
-
-                if (!visited && visited_count < MAX_SEARCH_QUEUE && tail < MAX_SEARCH_QUEUE)
-                {
-                    visited_states[visited_count++] = next_state;
-
-                    SEARCH_NODE next_node = curr;
-                    next_node.state = next_state;
-                    next_node.op_indices[next_node.step_count++] = i;
-                    next_node.total_cost += op->cost;
-
-                    queue[tail++] = next_node;
+                    dominated = true;
+                    break;
                 }
             }
+            if (dominated) continue;
+            for (uint32_t j = 0; j < label_count; j++)
+                if (labels[j].active && SearchDominates(&next, &labels[j]))
+                    labels[j].active = false;
+
+            uint32_t slot = 0;
+            while (slot < label_count && labels[slot].active) slot++;
+            if (slot == label_count)
+            {
+                /* Losing a non-dominated frontier prevents an optimality claim. */
+                if (label_count == MAX_SEARCH_QUEUE) return 0;
+                label_count++;
+            }
+            labels[slot] = next;
         }
     }
 

@@ -98,7 +98,10 @@ int  AgentPlannerInit(AGENT_PLANNER *planner);
    Planning Engine API
    ============================================================ */
 
-/* Formulate optimal STRIPS plan from initial state to goal state */
+/* Minimum cost among plans of at most MAX_PLAN_STEPS; ties prefer fewer
+   steps, then lexicographically earlier operator indices. Nonnegative uint32
+   costs sum in uint64 internally. Returns 0 for no bounded plan or exhausted
+   internal label budget: resource failure is not proof of impossibility. */
 int  AgentPlannerFormulate(const AGENT_PLANNER *planner,
                            const char *goal_description,
                            uint32_t initial_state,
