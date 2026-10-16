@@ -148,6 +148,11 @@ add_executable(bench_stress tests/bench_stress_50k.c)
 target_link_libraries(bench_stress symbolic)
 
 enable_testing()
+# Six Windows output oracles require a real Python runner, never a silent skip.
+if(WIN32)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
 
 function(sllm_test name source)
     add_executable(${name} ${source})
@@ -335,12 +340,12 @@ if(WIN32)
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_aliases_short PRIVATE include)
     target_compile_definitions(test_fs_win_aliases_short PRIVATE ALIAS_SHORT=1)
-    add_test(NAME test_fs_win_aliases_short COMMAND test_fs_win_aliases_short
+    add_test(NAME test_fs_win_aliases_short COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind aliases_short -- $<TARGET_FILE:test_fs_win_aliases_short>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     # m194/m195: the test enables 8.3 names on its volume (restored at exit) and prints a table, one fresh fixture per cell.
-    # The regex holds the m195 predictions (not yet measured): a wrong one goes red and prints the measured table.
-    set_tests_properties(test_fs_win_aliases_short PROPERTIES
-        PASS_REGULAR_EXPRESSION "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0")
+    # The Python gate requires exit zero and the complete frozen three-group table.
+    set_tests_properties(test_fs_win_aliases_short PROPERTIES TIMEOUT 300)
     # m193: probe of 8.3 short names on the workspace volume. The regex holds my predictions: no short name before,
     # `fsutil 8dot3name set` returns 0 and a new file then has one, the setting is restored. A wrong one goes red and prints the line.
     add_executable(test_fs_win_8dot3_probe tests/test_fs_win_8dot3_probe.c)
@@ -416,10 +421,10 @@ if(WIN32)
     add_executable(test_fs_win_lock_alias tests/test_fs_win_lock_alias.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_lock_alias PRIVATE include)
-    add_test(NAME test_fs_win_lock_alias COMMAND test_fs_win_lock_alias
+    add_test(NAME test_fs_win_lock_alias COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind lock_alias -- $<TARGET_FILE:test_fs_win_lock_alias>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(test_fs_win_lock_alias PROPERTIES
-        PASS_REGULAR_EXPRESSION "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e")
+    set_tests_properties(test_fs_win_lock_alias PROPERTIES TIMEOUT 300)
     # m207 note: m206 measured dir=3o0n (runs 37303780972); the regex now holds my prediction after the wc_parent segment check (dir=3o3o) and an over-refusal control (dirord=0n0n).
     # m206: the other eight reserved prefixes and a reserved directory as a path component, through the 8.3 name. The regex holds my predictions: every prefix refused through the long name and through the alias (m204 check), the file unchanged; the directory case refused by its long path and ACCEPTED through the alias of the directory (not covered by m204, 60 percent). A wrong one goes red and prints the line.
     add_executable(test_fs_win_reserved_alias tests/test_fs_win_reserved_alias.c
@@ -433,10 +438,10 @@ if(WIN32)
     add_executable(test_fs_win_sweep_foreign tests/test_fs_win_sweep_foreign.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_sweep_foreign PRIVATE include)
-    add_test(NAME test_fs_win_sweep_foreign COMMAND test_fs_win_sweep_foreign
+    add_test(NAME test_fs_win_sweep_foreign COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign -- $<TARGET_FILE:test_fs_win_sweep_foreign>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(test_fs_win_sweep_foreign PROPERTIES
-        PASS_REGULAR_EXPRESSION "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o")
+    set_tests_properties(test_fs_win_sweep_foreign PROPERTIES TIMEOUT 300)
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)
@@ -509,11 +514,12 @@ if(WIN32)
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_batch_replace PRIVATE include)
     target_compile_definitions(test_fs_win_batch_replace PRIVATE FS_CREATE_TEST_CRASH=1)
-    add_test(NAME test_fs_win_batch_replace COMMAND test_fs_win_batch_replace
+    add_test(NAME test_fs_win_batch_replace COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind batch_replace -- $<TARGET_FILE:test_fs_win_batch_replace>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    # The line is printed only after every cell and mutant passed (m186); it asserts the orphan counts of the killed sweep (9 before, 8 after: 3 names per item, read on msvc and asan in the m188 run) and, since m211, the chained kills: the counts 9 8 7 6 5 4 3 3 are a PREDICTION pinned before the first run, not a measurement.
-    set_tests_properties(test_fs_win_batch_replace PROPERTIES
-        PASS_REGULAR_EXPRESSION "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8")
+    # Preserve both existing oracle groups in windows_six_gate_gold.json: the chained counts and final orphan summary.
+    # The runner requires exit zero and one complete line; predictions are not retuned to observed output.
+    set_tests_properties(test_fs_win_batch_replace PROPERTIES TIMEOUT 300)
     add_executable(test_fs_win_probe tests/test_fs_win_probe.c)
     add_test(NAME test_fs_win_probe COMMAND test_fs_win_probe
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -774,6 +780,11 @@ sllm_test(test_agent_runner_external tests/test_agent_runner_external.c)
 sllm_test(test_agent_runner_learning tests/test_agent_runner_learning.c)
 # Per-commit bank report: runs external+heldout+learning, appends one JSONL row.
 find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_windows_six_gate
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_windows_six_gate.py)
+    set_tests_properties(test_windows_six_gate PROPERTIES TIMEOUT 60)
+endif()
 if(Python3_Interpreter_FOUND)
     add_test(NAME test_typed_c_schema
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_schema.py
@@ -1375,9 +1386,9 @@ if(WIN32)
     target_link_libraries(test_shell_dual_win symbolic)
     add_dependencies(test_shell_dual_win shell_dual_writer_win)
     add_test(NAME test_shell_dual_win
-             COMMAND test_shell_dual_win $<TARGET_FILE:shell_dual_writer_win>)
-    set_tests_properties(test_shell_dual_win PROPERTIES TIMEOUT 180
-        PASS_REGULAR_EXPRESSION "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5")
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py
+                     --kind dual_win -- $<TARGET_FILE:test_shell_dual_win> $<TARGET_FILE:shell_dual_writer_win>)
+    set_tests_properties(test_shell_dual_win PROPERTIES TIMEOUT 180)
 endif()
 
 # Real Windows CreateProcess failure in a private application directory.
@@ -1414,9 +1425,10 @@ endif()
 # Documented PSS observation from a separate parent, never inside the child.
 if(WIN32)
     add_executable(test_shell_handle_snapshot_win tests/test_shell_handle_snapshot_win.c)
-    add_test(NAME test_shell_handle_snapshot_win COMMAND test_shell_handle_snapshot_win)
-    set_tests_properties(test_shell_handle_snapshot_win PROPERTIES TIMEOUT 120
-        PASS_REGULAR_EXPRESSION "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1")
+    add_test(NAME test_shell_handle_snapshot_win
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py
+                --kind snapshot_win -- $<TARGET_FILE:test_shell_handle_snapshot_win>)
+    set_tests_properties(test_shell_handle_snapshot_win PROPERTIES TIMEOUT 120)
 endif()
 
 # Isolated external resource queries, separate from the frozen snapshot fixture.

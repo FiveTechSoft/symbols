@@ -428,6 +428,13 @@
     "tests/compiler_environment_win_mutant_gate.py"
    ]
   },
+  "test_windows_six_gate": {
+   "files": [
+    "tests/test_windows_six_gate.py",
+    "tests/windows_six_gate.py",
+    "tests/windows_six_gate_gold.json"
+   ]
+  },
   "test_compiler_environment_mutant_gate": {
    "files": [
     "tests/compiler_environment_win_mutant_gate.py"
