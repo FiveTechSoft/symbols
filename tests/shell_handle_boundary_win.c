@@ -142,6 +142,8 @@ int ShellBoundaryReport(int call, DWORD outer_before, DWORD outer_after)
 #define AgentShellExecExplicit PrivateAgentShellExecExplicit
 #define AgentShellExec PrivateAgentShellExec
 #define AgentShellExecGuarded PrivateAgentShellExecGuarded
+#define AgentShellExecCompiler PrivateAgentShellExecCompiler
+#define AgentShellExecCompilerGuarded PrivateAgentShellExecCompilerGuarded
 #define GetFileAttributesA traced_GetFileAttributesA
 #define QueryPerformanceFrequency traced_QueryPerformanceFrequency
 #define QueryPerformanceCounter traced_QueryPerformanceCounter

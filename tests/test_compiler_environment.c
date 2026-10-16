@@ -161,13 +161,12 @@ static int environment_test(const char *cwd, const char *cmd)
     CHECK(r->exit_code == 17 && !r->execution_failed);
     CHECK(AgentShellExecCompiler(cmd, "__symbols_E_missing_directory__", 2000, r) == 0);
     CHECK(r->execution_failed && r->exit_code == -1);
-    CHECK(AgentShellExecCompiler(
 #ifdef _WIN32
-        "test_compiler_environment.exe --sleep-child",
+    const char *sleep_command = "test_compiler_environment.exe --sleep-child";
 #else
-        "./test_compiler_environment --sleep-child",
+    const char *sleep_command = "./test_compiler_environment --sleep-child";
 #endif
-        cwd, 20, r) == 1);
+    CHECK(AgentShellExecCompiler(sleep_command, cwd, 20, r) == 1);
     CHECK(r->timed_out);
     CHECK(AgentShellExecCompilerGuarded("rm -rf __symbols_E_never_delete__", cwd, 2000, r) == 1);
     CHECK(r->execution_failed && r->exit_code == 126);
