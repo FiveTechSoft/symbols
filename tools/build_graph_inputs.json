@@ -452,6 +452,14 @@
     "tests/shell_diag_gate.py",
     "tests/shell_diag_gate_gold.json"
    ]
+  },
+  "test_i18n_warning": {
+   "files": [
+    "tests/test_i18n_warning.py",
+    "tests/i18n_warning_gold.json",
+    "include/i18n.h",
+    "src/i18n.c"
+   ]
   }
  },
  "version": 1

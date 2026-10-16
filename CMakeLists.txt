@@ -851,6 +851,10 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120)
+    add_test(NAME test_i18n_warning
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_i18n_warning.py
+                     --compiler ${CMAKE_C_COMPILER} --compiler-id ${CMAKE_C_COMPILER_ID})
+    set_tests_properties(test_i18n_warning PROPERTIES TIMEOUT 180)
     add_test(NAME test_shell_diag_gate
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_diag_gate.py --self-test)
     set_tests_properties(test_shell_diag_gate PROPERTIES TIMEOUT 30)

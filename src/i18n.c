@@ -225,7 +225,7 @@ const char *LangShortName(const LANG_ID id)
     return (id >= LANG_COUNT) ? LANG_CODES[LANG_EN] : LANG_CODES[id];
 }
 
-const LANG_ID LangFindByCode(const char *code)
+LANG_ID LangFindByCode(const char *code)
 {
     if (code == NULL)
         return LANG_COUNT;

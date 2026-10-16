@@ -48,7 +48,7 @@ const char *LangName(LANG_ID id);         /* "English" / "Espanol" / "Francais" 
 const char *LangShortName(LANG_ID id);    /* "EN" / "ES" / "FR" */
 
 /* Case-insensitive "EN"/"ES"/"FR" lookup; LANG_COUNT when unknown. */
-const LANG_ID LangFindByCode(const char *code);
+LANG_ID LangFindByCode(const char *code);
 
 int LangVariantCount(I18N_KEY key);
 /* Template for language `id`, variant index wraps by the count. */
