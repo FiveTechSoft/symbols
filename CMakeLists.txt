@@ -1349,12 +1349,15 @@ endif()
 if(WIN32)
     add_executable(test_shell_spawn_win tests/test_shell_spawn_win.c)
     target_link_libraries(test_shell_spawn_win symbolic)
-    add_test(NAME test_shell_spawn_win COMMAND test_shell_spawn_win)
-    set_tests_properties(test_shell_spawn_win PROPERTIES TIMEOUT 90
-        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_FAILURE native cases=3")
+    if(NOT Python3_Interpreter_FOUND)
+        message(FATAL_ERROR "Python3 is required for the native spawn v2 evidence gate")
+    endif()
+    add_test(NAME test_shell_spawn_win COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/shell_spawn_v2_gate.py -- $<TARGET_FILE:test_shell_spawn_win>)
+    set_tests_properties(test_shell_spawn_win PROPERTIES TIMEOUT 200)
 endif()
 
-# Diagnostic only: original test_shell_spawn_win remains strict and unchanged.
+# Diagnostic only: historical count trace, separate from the revised v2 contract.
 if(WIN32)
     add_executable(test_shell_spawn_handles_win tests/test_shell_spawn_handles_win.c)
     target_link_libraries(test_shell_spawn_handles_win symbolic)
@@ -1400,4 +1403,10 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME test_shell_resource_gate
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_shell_resource_gate.py)
     set_tests_properties(test_shell_resource_gate PROPERTIES TIMEOUT 120)
+endif()
+
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_shell_spawn_v2_gate COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/test_shell_spawn_v2_gate.py)
+    set_tests_properties(test_shell_spawn_v2_gate PROPERTIES TIMEOUT 60)
 endif()

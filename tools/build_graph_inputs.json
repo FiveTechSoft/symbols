@@ -384,6 +384,14 @@
    "files": [
     "tools/wording_rewrites.py"
    ]
+  },
+  "test_shell_spawn_v2_gate": {
+   "files": [
+    "tests/test_shell_spawn_v2_gate.py",
+    "tests/shell_spawn_v2_gate.py",
+    "tests/shell_resource_gate.py",
+    "tests/shell_spawn_win_v2_gold.json"
+   ]
   }
  },
  "version": 1
