@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <limits.h>
 #include "agent_shell.h"
 #include "command_policy.h"
 
@@ -24,6 +25,7 @@
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+extern char **environ;
 #endif
 
 /* ============================================================
@@ -170,11 +172,12 @@ static void AgentShellDrainWinPipe(HANDLE pipe,
     }
 }
 
-int AgentShellExecExplicit(SHELL_BACKEND backend,
+static int AgentShellExecEnvironment(SHELL_BACKEND backend,
                            const char *cmd_line,
                            const char *working_dir,
                            uint32_t timeout_ms,
-                           SHELL_EXEC_RESULT *out_result)
+                           SHELL_EXEC_RESULT *out_result,
+                           void *child_environment)
 {
     SECURITY_ATTRIBUTES sa;
     STARTUPINFOA si;
@@ -248,7 +251,7 @@ int AgentShellExecExplicit(SHELL_BACKEND backend,
     /* Suspended creation closes the race where descendants could escape the job. */
     ok = CreateProcessA(NULL, wrapped_cmd, NULL, NULL, TRUE,
                         CREATE_NO_WINDOW | CREATE_SUSPENDED,
-                        NULL, work_dir, &si, &pi);
+                        child_environment, work_dir, &si, &pi);
     if (!ok)
         goto launch_failure;
     if (!AssignProcessToJobObject(hJob, pi.hProcess))
@@ -405,11 +408,12 @@ static void AgentShellDrainFd(struct pollfd *pfd,
     }
 }
 
-int AgentShellExecExplicit(SHELL_BACKEND backend,
+static int AgentShellExecEnvironment(SHELL_BACKEND backend,
                            const char *cmd_line,
                            const char *working_dir,
                            uint32_t timeout_ms,
-                           SHELL_EXEC_RESULT *out_result)
+                           SHELL_EXEC_RESULT *out_result,
+                           void *child_environment)
 {
     struct timespec ts_start, ts_now, ts_end;
     struct stat work_stat;
@@ -463,6 +467,10 @@ int AgentShellExecExplicit(SHELL_BACKEND backend,
         close(err_pipe[0]);
         close(err_pipe[1]);
 
+        /* The copy was prepared before fork. No allocation or global parent
+           environment mutation occurs here. Existing shell selection is unchanged. */
+        if (child_environment)
+            environ = (char **)child_environment;
         if (backend == SHELL_BACKEND_ZSH)
             execlp("zsh", "zsh", "-c", cmd_line, (char *)NULL);
         else if (backend == SHELL_BACKEND_BASH)
@@ -575,6 +583,217 @@ launch_failure_parent:
 
 #endif
 
+/* Only the compiler APIs construct a child environment. Normal execution
+   still passes NULL, preserving inherited environment and spawn behavior. */
+#ifdef SYMBOLS_COMPILER_ENV_TEST
+static long compiler_env_fail_after = -1;
+void AgentShellCompilerEnvTestFailAfter(long allocations)
+{
+    compiler_env_fail_after = allocations;
+}
+#endif
+
+static void *CompilerEnvAlloc(size_t bytes)
+{
+#ifdef SYMBOLS_COMPILER_ENV_TEST
+    if (compiler_env_fail_after == 0) return NULL;
+    if (compiler_env_fail_after > 0) --compiler_env_fail_after;
+#endif
+    return malloc(bytes);
+}
+
+static int CompilerEnvPinnedKey(const char *entry)
+{
+    static const char *keys[] = {"LC_ALL=", "LC_MESSAGES=", "LANG="
+#if defined(_WIN32) && !(defined(SYMBOLS_COMPILER_ENV_TEST) && defined(SYMBOLS_COMPILER_ENV_DROP_VSLANG))
+        , "VSLANG="
+#endif
+    };
+    size_t i;
+    for (i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
+    {
+        size_t n = strlen(keys[i]);
+#ifdef _WIN32
+        size_t j;
+        for (j = 0; j < n; ++j)
+        {
+            unsigned char c = (unsigned char)entry[j];
+            if (c >= 'a' && c <= 'z') c = (unsigned char)(c - 'a' + 'A');
+            if (c != (unsigned char)keys[i][j]) break;
+        }
+        if (j == n) return 1;
+#else
+        if (strncmp(entry, keys[i], n) == 0) return 1;
+#endif
+    }
+    return 0;
+}
+
+#ifdef _WIN32
+typedef struct
+{
+    const char *entry;
+    WCHAR *key;
+    int key_len;
+} COMPILER_ENV_ENTRY;
+
+static int CompilerEnvCompare(const void *a, const void *b)
+{
+    const COMPILER_ENV_ENTRY *left = (const COMPILER_ENV_ENTRY *)a;
+    const COMPILER_ENV_ENTRY *right = (const COMPILER_ENV_ENTRY *)b;
+    return CompareStringOrdinal(left->key, left->key_len, right->key,
+                                right->key_len, TRUE) - CSTR_EQUAL;
+}
+#endif
+
+/* Returns one owned allocation: pointer table followed by entry bytes on
+   POSIX, or the ANSI environment block on Windows. No inherited fallback. */
+static void *CompilerEnvironmentCopy(void)
+{
+    static const char *pinned[] = {"LC_ALL=C", "LC_MESSAGES=C", "LANG=C"
+#if defined(_WIN32) && !(defined(SYMBOLS_COMPILER_ENV_TEST) && defined(SYMBOLS_COMPILER_ENV_DROP_VSLANG))
+        , "VSLANG=1033"
+#endif
+    };
+    size_t count = 0, bytes = 0, i, total, off;
+    char **entries;
+    char *storage;
+#ifdef _WIN32
+    char *snapshot = GetEnvironmentStringsA();
+    const char *entry;
+    void *block;
+    if (!snapshot) return NULL;
+    for (entry = snapshot; *entry; entry += strlen(entry) + 1)
+        if (!CompilerEnvPinnedKey(entry)) { ++count; bytes += strlen(entry) + 1; }
+#else
+    char **snapshot = environ;
+    for (i = 0; snapshot && snapshot[i]; ++i)
+        if (!CompilerEnvPinnedKey(snapshot[i])) { ++count; bytes += strlen(snapshot[i]) + 1; }
+#endif
+    for (i = 0; i < sizeof(pinned) / sizeof(pinned[0]); ++i)
+        { ++count; bytes += strlen(pinned[i]) + 1; }
+    if (count > SIZE_MAX / sizeof(char *) - 1 ||
+        bytes > SIZE_MAX - (count + 1) * sizeof(char *))
+    {
+#ifdef _WIN32
+        FreeEnvironmentStringsA(snapshot);
+#endif
+        return NULL;
+    }
+    total = (count + 1) * sizeof(char *) + bytes;
+    entries = (char **)CompilerEnvAlloc(total);
+    if (!entries)
+    {
+#ifdef _WIN32
+        FreeEnvironmentStringsA(snapshot);
+#endif
+        return NULL;
+    }
+    storage = (char *)(entries + count + 1);
+    off = 0; count = 0;
+#ifdef _WIN32
+    for (entry = snapshot; *entry; entry += strlen(entry) + 1)
+    {
+        if (CompilerEnvPinnedKey(entry)) continue;
+        entries[count++] = storage + off;
+        memcpy(storage + off, entry, strlen(entry) + 1);
+        off += strlen(entry) + 1;
+    }
+    FreeEnvironmentStringsA(snapshot);
+#else
+    for (i = 0; snapshot && snapshot[i]; ++i)
+    {
+        if (CompilerEnvPinnedKey(snapshot[i])) continue;
+        entries[count++] = storage + off;
+        memcpy(storage + off, snapshot[i], strlen(snapshot[i]) + 1);
+        off += strlen(snapshot[i]) + 1;
+    }
+#endif
+    for (i = 0; i < sizeof(pinned) / sizeof(pinned[0]); ++i)
+    {
+        entries[count++] = storage + off;
+        memcpy(storage + off, pinned[i], strlen(pinned[i]) + 1);
+        off += strlen(pinned[i]) + 1;
+    }
+    entries[count] = NULL;
+#ifdef _WIN32
+    {
+        COMPILER_ENV_ENTRY *ordered;
+        WCHAR *keys;
+        size_t key_off = 0;
+        if (count > SIZE_MAX / sizeof(*ordered) || bytes > SIZE_MAX / sizeof(*keys))
+            { free(entries); return NULL; }
+        ordered = (COMPILER_ENV_ENTRY *)CompilerEnvAlloc(count * sizeof(*ordered));
+        keys = (WCHAR *)CompilerEnvAlloc(bytes * sizeof(*keys));
+        block = bytes < SIZE_MAX ? CompilerEnvAlloc(bytes + 1) : NULL;
+        if (!ordered || !keys || !block)
+            { free(ordered); free(keys); free(block); free(entries); return NULL; }
+        for (i = 0; i < count; ++i)
+        {
+            /* Sort by NAME, not value, with Windows ordinal case folding.
+               Preserve special drive entries such as '=C:=C:\\'. The ANSI
+               entry bytes and CreateProcessA command API stay unchanged. */
+            const char *equal = strchr(entries[i] + (entries[i][0] == '='), '=');
+            size_t name_len = equal ? (size_t)(equal - entries[i]) : 0;
+            int wide_len;
+            if (!name_len || name_len > INT_MAX || bytes - key_off > INT_MAX)
+                { free(ordered); free(keys); free(block); free(entries); return NULL; }
+            wide_len = MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, entries[i],
+                                          (int)name_len, keys + key_off, (int)(bytes - key_off));
+            if (!wide_len)
+                { free(ordered); free(keys); free(block); free(entries); return NULL; }
+            ordered[i].entry = entries[i];
+            ordered[i].key = keys + key_off;
+            ordered[i].key_len = wide_len;
+            key_off += (size_t)wide_len;
+        }
+        qsort(ordered, count, sizeof(*ordered), CompilerEnvCompare);
+        off = 0;
+        for (i = 0; i < count; ++i)
+        {
+            size_t n = strlen(ordered[i].entry) + 1;
+            memcpy((char *)block + off, ordered[i].entry, n);
+            off += n;
+        }
+        ((char *)block)[off] = '\0';
+        free(ordered); free(keys); free(entries);
+        return block;
+    }
+#else
+    return entries;
+#endif
+}
+
+int AgentShellExecExplicit(SHELL_BACKEND backend,
+                           const char *cmd_line,
+                           const char *working_dir,
+                           uint32_t timeout_ms,
+                           SHELL_EXEC_RESULT *out_result)
+{
+    return AgentShellExecEnvironment(backend, cmd_line, working_dir,
+                                    timeout_ms, out_result, NULL);
+}
+
+int AgentShellExecCompiler(const char *cmd_line,
+                          const char *working_dir,
+                          uint32_t timeout_ms,
+                          SHELL_EXEC_RESULT *out_result)
+{
+    void *environment;
+    int rc;
+    if (!out_result) return 0;
+    AgentShellResultInit(out_result);
+    if (!cmd_line || !(environment = CompilerEnvironmentCopy()))
+    {
+        out_result->execution_failed = true;
+        return 0;
+    }
+    rc = AgentShellExecEnvironment(SHELL_BACKEND_AUTO, cmd_line, working_dir,
+                                  timeout_ms, out_result, environment);
+    free(environment);
+    return rc;
+}
+
 int AgentShellExec(const char *cmd_line,
                    const char *working_dir,
                    uint32_t timeout_ms,
@@ -583,12 +802,13 @@ int AgentShellExec(const char *cmd_line,
     return AgentShellExecExplicit(SHELL_BACKEND_AUTO, cmd_line, working_dir, timeout_ms, out_result);
 }
 
-int AgentShellExecGuarded(const char *cmd_line,
+static int AgentShellExecGuardedMode(const char *cmd_line,
                           const char *working_dir,
                           uint32_t timeout_ms,
-                          SHELL_EXEC_RESULT *out_result)
+                          SHELL_EXEC_RESULT *out_result, int compiler_mode)
 {
     char why[160];
+    if (!out_result) return 0;
     POLICY_CLASS c = CommandPolicyClassify(cmd_line, why, sizeof(why));
     const char *grant = getenv("SYMBOLS_ALLOW_DESTRUCTIVE");
     if (!CommandPolicyAllowed(c) && !(grant && !strcmp(grant, "1"))) {
@@ -601,5 +821,18 @@ int AgentShellExecGuarded(const char *cmd_line,
         out_result->stderr_total_len = out_result->stderr_len;
         return 1;
     }
-    return AgentShellExec(cmd_line, working_dir, timeout_ms, out_result);
+    return compiler_mode ? AgentShellExecCompiler(cmd_line, working_dir, timeout_ms, out_result)
+                         : AgentShellExec(cmd_line, working_dir, timeout_ms, out_result);
+}
+
+int AgentShellExecGuarded(const char *cmd_line, const char *working_dir,
+                          uint32_t timeout_ms, SHELL_EXEC_RESULT *out_result)
+{
+    return AgentShellExecGuardedMode(cmd_line, working_dir, timeout_ms, out_result, 0);
+}
+
+int AgentShellExecCompilerGuarded(const char *cmd_line, const char *working_dir,
+                                  uint32_t timeout_ms, SHELL_EXEC_RESULT *out_result)
+{
+    return AgentShellExecGuardedMode(cmd_line, working_dir, timeout_ms, out_result, 1);
 }

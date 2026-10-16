@@ -522,7 +522,7 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
         int build_rc = 0;
         if (task->build_command[0] != '\0')
         {
-            AgentShellExecGuarded(task->build_command, runner->workspace_dir, 10000, &shell_res);
+            AgentShellExecCompilerGuarded(task->build_command, runner->workspace_dir, 10000, &shell_res);
             build_rc = shell_res.exit_code;
         }
 

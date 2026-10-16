@@ -390,7 +390,7 @@ static void probe_out(const TASK_OPS_WORKSPACE *ws, const char *flags, int *comp
     if (!r)
         return;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     if (r->execution_failed || r->exit_code == 127 || r->exit_code == 9009) {
         free(r);
         return;
@@ -749,7 +749,7 @@ static int compiler_fixits(const TASK_OPS_WORKSPACE *ws, const char *flags, char
     FIXIT *fx = (FIXIT *)malloc(sizeof(FIXIT) * 32);
     if (!r || !fx) { free(r); free(fx); return 0; }
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     int n = (r->exit_code != 0 && !r->execution_failed) ? parse_fixits(ws, r->stderr_buf, fx, 32) : 0;
     free(r);
     int files = 0;
@@ -849,7 +849,7 @@ static int implicit_uses(const TASK_OPS_WORKSPACE *ws, const char *flags, IMPLIC
     if (!r)
         return 0;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     int n = 0;
     if (!r->execution_failed) {
         const char *key = "implicit declaration of function ";
@@ -2051,7 +2051,7 @@ static int run_test_plan(const TASK_OPS_WORKSPACE *ws, const TEST_PLAN *tp, cons
     SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
     if (!r) return 0;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     int ok = !r->execution_failed && r->exit_code == 0;
     if (ok) {
         char run_cmd[TASK_OPS_MAX_PATH + 8];
@@ -2183,7 +2183,7 @@ static int run_examples(const TASK_OPS_WORKSPACE *ws, const char *flags, const E
             snprintf(objs[nobj], sizeof(objs[nobj]), "%s_%d.o", bin, nobj);
             snprintf(cmd, sizeof(cmd), "gcc %s-w -Dmain=symbols_ws_main -c \"%s\" -o \"%s\"", flags, ws->files[i].rel, objs[nobj]);
             AgentShellResultInit(r);
-            AgentShellExec(cmd, ws->root, 20000, r);
+            AgentShellExecCompiler(cmd, ws->root, 20000, r);
             nobj++;
             if (r->execution_failed || r->exit_code != 0) goto done;
         }
@@ -2196,7 +2196,7 @@ static int run_examples(const TASK_OPS_WORKSPACE *ws, const char *flags, const E
         o += (size_t)snprintf(cmd + o, sizeof(cmd) - o, " \"%s\"", objs[k]);
     {
         AgentShellResultInit(r);
-        AgentShellExec(cmd, ws->root, 20000, r);
+        AgentShellExecCompiler(cmd, ws->root, 20000, r);
         if (!r->execution_failed && r->exit_code == 0) {
             char run_cmd[TASK_OPS_MAX_PATH + 8];
             snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", bin);
@@ -2606,7 +2606,7 @@ static void first_diag_class(const TASK_OPS_WORKSPACE *ws, const char *flags, ch
     SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
     if (!r) return;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     const char *p = r->execution_failed ? NULL : strstr(r->stderr_buf, "error: ");
     if (!p && !r->execution_failed) p = strstr(r->stderr_buf, "warning: ");
     if (p) {
@@ -2920,13 +2920,14 @@ static int build_plan(const TASK_OPS_WORKSPACE *ws, const char *task, BUILD_EDIT
 /* cmake configure of the workspace in a scratch dir; stdout+stderr into buf */
 static int cmake_output(const TASK_OPS_WORKSPACE *ws, char *buf, size_t size);
 
-static int run_ok(const char *cmd, const char *cwd, int timeout_ms, const char *must_not, const char *must)
+static int run_ok(const char *cmd, const char *cwd, int timeout_ms, const char *must_not, const char *must, int compiler_mode)
 {
     SHELL_EXEC_RESULT *r = (SHELL_EXEC_RESULT *)malloc(sizeof(*r));
     if (!r)
         return 0;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, cwd, timeout_ms, r);
+    if (compiler_mode) AgentShellExecCompiler(cmd, cwd, timeout_ms, r);
+    else AgentShellExec(cmd, cwd, timeout_ms, r);
     int ok = !r->execution_failed && !r->timed_out && r->exit_code == 0;
     if (ok && (must_not || must)) {
         char *all = (char *)malloc(r->stdout_len + r->stderr_len + 1);
@@ -2968,13 +2969,13 @@ static int cmake_output(const TASK_OPS_WORKSPACE *ws, char *buf, size_t size)
     if (!r)
         return 0;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 60000, r);
+    AgentShellExecCompiler(cmd, ws->root, 60000, r);
     int ran = !r->execution_failed && !r->timed_out;
     snprintf(buf, size, "%.*s%.*s", (int)(r->stdout_len < size / 2 ? r->stdout_len : size / 2 - 1), r->stdout_buf,
              (int)(r->stderr_len < size / 2 ? r->stderr_len : size / 2 - 1), r->stderr_buf);
     free(r);
     snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
-    run_ok(cmd, ws->root, 30000, NULL, NULL);
+    run_ok(cmd, ws->root, 30000, NULL, NULL, 0);
     return ran;
 }
 
@@ -3011,15 +3012,15 @@ static int build_verified(const TASK_OPS_WORKSPACE *after, const BUILD_EDIT *e)
     int ok = 0;
     if (!strncmp(e->rule, "cmake_", 6)) {
         snprintf(cmd, sizeof(cmd), "cmake -S \"%s\" -B \"%s\"", after->root, tmp);
-        ok = run_ok(cmd, after->root, 60000, "No project() command", NULL);
+        ok = run_ok(cmd, after->root, 60000, "No project() command", NULL, 1);
         if (ok && strcmp(e->rule, "cmake_project") != 0) {
             snprintf(cmd, sizeof(cmd), "cmake --build \"%s\"", tmp);
-            ok = run_ok(cmd, after->root, 120000, NULL, NULL);
+            ok = run_ok(cmd, after->root, 120000, NULL, NULL, 1);
         }
         snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
-        run_ok(cmd, after->root, 30000, NULL, NULL);
+        run_ok(cmd, after->root, 30000, NULL, NULL, 0);
     } else if (!strcmp(e->rule, "make_dep")) {
-        ok = run_ok("make -n all", after->root, 20000, NULL, e->expect);
+        ok = run_ok("make -n all", after->root, 20000, NULL, e->expect, 1);
     } else if (!strcmp(e->rule, "build_compile_step")) {
         make_dir(tmp);
         int wrote = 1;
@@ -3028,13 +3029,13 @@ static int build_verified(const TASK_OPS_WORKSPACE *after, const BUILD_EDIT *e)
                 wrote &= write_file(tmp, after->files[i].rel, after->files[i].data);
         if (wrote && !strchr(e->rel, '"')) {
             snprintf(cmd, sizeof(cmd), "sh \"%s\"", e->rel);
-            int good = run_ok(cmd, tmp, 30000, NULL, NULL);
+            int good = run_ok(cmd, tmp, 30000, NULL, NULL, 1);
             write_file(tmp, e->expect, "int broken(\n");
-            int bad_fails = !run_ok(cmd, tmp, 30000, NULL, NULL);
+            int bad_fails = !run_ok(cmd, tmp, 30000, NULL, NULL, 1);
             ok = good && bad_fails;
         }
         snprintf(cmd, sizeof(cmd), "cmake -E rm -rf \"%s\"", tmp);
-        if (!run_ok(cmd, after->root, 30000, NULL, NULL)) {
+        if (!run_ok(cmd, after->root, 30000, NULL, NULL, 0)) {
             for (int i = 0; i < after->count; i++) {
                 char path[TASK_OPS_MAX_PATH * 2];
                 snprintf(path, sizeof(path), "%s/%s", tmp, after->files[i].rel);
@@ -3114,7 +3115,7 @@ static void warn_text(const TASK_OPS_WORKSPACE *ws, const char *flags, char *buf
     if (!r)
         return;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     snprintf(buf, size, "%.*s", (int)(r->stderr_len < size - 1 ? r->stderr_len : size - 1), r->stderr_buf);
     free(r);
     remove(bin);
@@ -3515,7 +3516,7 @@ static int ccc_check(const TASK_OPS_WORKSPACE *ws, const char *flags, int idx, c
         goto out;
     snprintf(cmd, sizeof(cmd), "gcc %s-o ccc_bin %s", flags, srcs);
     AgentShellResultInit(r);
-    AgentShellExec(cmd, dir, 20000, r);
+    AgentShellExecCompiler(cmd, dir, 20000, r);
     if (!r->execution_failed && r->exit_code == 0) {
 #ifdef _WIN32
         snprintf(cmd, sizeof(cmd), "ccc_bin.exe");
@@ -3663,7 +3664,7 @@ static int compile_repair_target(const TASK_OPS_WORKSPACE *ws, const char *flags
     if (!r)
         return 0;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     if (!r->execution_failed && r->exit_code != 0) {
         diag = (char *)malloc(r->stderr_len + r->stdout_len + 1);
         if (diag) {
@@ -3939,7 +3940,7 @@ static void diag_shape(const TASK_OPS_WORKSPACE *ws, char *out, size_t size)
     if (!r)
         return;
     AgentShellResultInit(r);
-    AgentShellExec(cmd, ws->root, 20000, r);
+    AgentShellExecCompiler(cmd, ws->root, 20000, r);
     if (!r->execution_failed && !r->timed_out) {
         if (r->exit_code == 0)
             cls = "link";

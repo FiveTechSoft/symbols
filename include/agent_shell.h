@@ -91,4 +91,13 @@ int AgentShellExecExplicit(SHELL_BACKEND backend,
                            uint32_t timeout_ms,
                            SHELL_EXEC_RESULT *out_result);
 
+/* Compiler/build diagnostics: copy the inherited environment for this child
+   only, pin LC_ALL/LC_MESSAGES/LANG=C (also VSLANG=1033 on Windows).
+   No command rewriting, parent environment change, or fallback on copy failure.
+   Explicit environment overrides inside the command remain possible. */
+int AgentShellExecCompiler(const char *cmd_line, const char *working_dir,
+                          uint32_t timeout_ms, SHELL_EXEC_RESULT *out_result);
+int AgentShellExecCompilerGuarded(const char *cmd_line, const char *working_dir,
+                                 uint32_t timeout_ms, SHELL_EXEC_RESULT *out_result);
+
 #endif /* AGENT_SHELL_H */

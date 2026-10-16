@@ -411,6 +411,27 @@
    "files": [
     "tests/atomic_store_win_mutant_gate.py"
    ]
+  },
+  "test_compiler_environment_E": {
+   "files": [
+    "tests/test_compiler_environment.c",
+    "tests/test_compiler_environment_E.py",
+    "tests/compiler_environment_E_gold.json",
+    "src/agent_shell.c",
+    "src/agent_diagnose.c",
+    "include/agent_shell.h",
+    "src/task_ops.c",
+    "src/agent_runner.c",
+    "tests/shell_spawn_v2_gate.py",
+    "tests/shell_spawn_win_v2_gold.json",
+    "tests/test_shell_spawn_win.c",
+    "tests/compiler_environment_win_mutant_gate.py"
+   ]
+  },
+  "test_compiler_environment_mutant_gate": {
+   "files": [
+    "tests/compiler_environment_win_mutant_gate.py"
+   ]
   }
  },
  "version": 1

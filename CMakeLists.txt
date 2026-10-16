@@ -1440,3 +1440,32 @@ if(Python3_Interpreter_FOUND)
         ${CMAKE_SOURCE_DIR}/tests/test_shell_spawn_v2_gate.py)
     set_tests_properties(test_shell_spawn_v2_gate PROPERTIES TIMEOUT 60)
 endif()
+
+# Audit E: use a private copy for allocation failure checks. Production symbolic
+# has no failpoint. The Python gate checks exit and every frozen case directly.
+if(Python3_Interpreter_FOUND)
+    add_executable(test_compiler_environment tests/test_compiler_environment.c src/agent_shell.c)
+    target_compile_definitions(test_compiler_environment PRIVATE SYMBOLS_COMPILER_ENV_TEST)
+    target_link_libraries(test_compiler_environment PRIVATE symbolic Threads::Threads)
+    add_test(NAME test_compiler_environment_E COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_SOURCE_DIR}/tests/test_compiler_environment_E.py $<TARGET_FILE:test_compiler_environment>)
+    set_tests_properties(test_compiler_environment_E PROPERTIES TIMEOUT 260)
+    if(WIN32)
+        add_dependencies(test_compiler_environment test_shell_spawn_win)
+    endif()
+endif()
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_compiler_environment_mutant_gate COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_SOURCE_DIR}/tests/compiler_environment_win_mutant_gate.py --selftest)
+    set_tests_properties(test_compiler_environment_mutant_gate PROPERTIES TIMEOUT 20)
+    if(WIN32)
+        add_executable(test_compiler_environment_win_mc tests/test_compiler_environment.c src/agent_shell.c)
+        target_compile_definitions(test_compiler_environment_win_mc PRIVATE
+                                   SYMBOLS_COMPILER_ENV_TEST SYMBOLS_COMPILER_ENV_DROP_VSLANG)
+        target_link_libraries(test_compiler_environment_win_mc PRIVATE symbolic Threads::Threads)
+        add_test(NAME test_compiler_environment_win_mc COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_SOURCE_DIR}/tests/compiler_environment_win_mutant_gate.py
+                 $<TARGET_FILE:test_compiler_environment_win_mc>)
+        set_tests_properties(test_compiler_environment_win_mc PROPERTIES TIMEOUT 35)
+    endif()
+endif()

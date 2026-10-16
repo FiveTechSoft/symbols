@@ -77,6 +77,45 @@ static int ExtractDidYouMean(const char *msg, char *out, size_t out_size)
     return ExtractQuotedIdentifier(dym, "did you mean", out, out_size);
 }
 
+/* Arity fields are evidence, not best-effort integer conversions. ASCII
+   only, no signs/partial tokens, and no overflow or magic sentinel value. */
+static int AritySpace(unsigned char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n' ||
+           c == '\v' || c == '\f';
+}
+
+static int ParseArityField(const char *message, const char *key, uint32_t *out)
+{
+    const char *found = NULL, *scan = message;
+    size_t key_len = strlen(key);
+    uint32_t value = 0;
+    while ((scan = strstr(scan, key)) != NULL)
+    {
+        if (scan == message || AritySpace((unsigned char)scan[-1]) ||
+            scan[-1] == ';' || scan[-1] == ',' || scan[-1] == ':')
+        {
+            if (found) return 0; /* duplicate evidence is ambiguous */
+            found = scan + key_len;
+        }
+        scan += key_len;
+    }
+    if (!found || *found < '0' || *found > '9') return 0;
+    while (*found >= '0' && *found <= '9')
+    {
+        uint32_t digit = (uint32_t)(*found - '0');
+        if (value > (UINT32_MAX - digit) / 10u) return 0;
+        value = value * 10u + digit;
+        ++found;
+    }
+    if (*found != '\0' && !AritySpace((unsigned char)*found) &&
+        *found != ',' && *found != ';' &&
+        !(*found == '.' && !(found[1] >= '0' && found[1] <= '9')))
+        return 0;
+    *out = value;
+    return 1;
+}
+
 /* Parse a single line from compiler stderr */
 static bool ParseCompilerLine(const char *line, DIAGNOSTIC_ITEM *item)
 {
@@ -192,13 +231,21 @@ static bool ParseCompilerLine(const char *line, DIAGNOSTIC_ITEM *item)
     }
     else if (strstr(p, "too few arguments") != NULL || strstr(p, "too many arguments") != NULL)
     {
-        item->type = DIAG_ERR_ARITY_MISMATCH;
+        uint32_t expected, actual;
         ExtractQuotedIdentifier(p, "to function", item->offending_symbol, sizeof(item->offending_symbol));
-        
-        const char *exp = strstr(p, "expected ");
-        if (exp) item->expected_arity = (uint32_t)atoi(exp + 9);
-        const char *hav = strstr(p, "have ");
-        if (hav) item->actual_arity = (uint32_t)atoi(hav + 5);
+        if (ParseArityField(p, "expected ", &expected) &&
+            ParseArityField(p, "have ", &actual))
+        {
+            item->type = DIAG_ERR_ARITY_MISMATCH;
+            item->expected_arity = expected;
+            item->actual_arity = actual;
+        }
+        else
+        {
+            /* Keep the diagnostic, severity, raw text and location. Do not
+               turn malformed/absent evidence into a zero-arity claim. */
+            item->type = DIAG_ERR_UNKNOWN;
+        }
     }
     else if (strstr(p, "incompatible type") != NULL || strstr(p, "incompatible pointer") != NULL)
     {
@@ -359,12 +406,25 @@ int DiagnosticAbduceRemedy(const DIAGNOSTIC_REPORT *report,
             break;
 
         case DIAG_ERR_ARITY_MISMATCH:
+        {
+            const DIAGNOSTIC_ITEM *root = NULL;
+            uint32_t i;
+            for (i = 0; i < report->item_count && i < MAX_DIAGNOSTIC_ITEMS; ++i)
+                if (!report->items[i].is_warning) { root = &report->items[i]; break; }
+            if (!root || root->type != DIAG_ERR_ARITY_MISMATCH ||
+                strcmp(root->file, report->root_file) || root->line != report->root_line ||
+                root->col != report->root_col || strcmp(root->offending_symbol, report->root_symbol))
+            {
+                snprintf(out_remedy_summary, summary_size,
+                         "Arity evidence is incomplete: inspect the compiler diagnostic.");
+                break;
+            }
             snprintf(out_remedy_summary, summary_size,
                      "Call to '%s' at line %u has arity mismatch: expected %u arguments, provided %u.",
                      report->root_symbol, report->root_line,
-                     report->items[0].expected_arity,
-                     report->items[0].actual_arity);
+                     root->expected_arity, root->actual_arity);
             break;
+        }
 
         case DIAG_ERR_MISSING_HEADER:
             snprintf(out_remedy_summary, summary_size,
