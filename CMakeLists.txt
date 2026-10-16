@@ -1339,3 +1339,11 @@ if(WIN32)
     set_tests_properties(test_shell_handle_owner_win PROPERTIES TIMEOUT 180
         PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_OWNER_DIAG arms=2; calls_per_arm=27")
 endif()
+
+# Documented PSS observation from a separate parent, never inside the child.
+if(WIN32)
+    add_executable(test_shell_handle_snapshot_win tests/test_shell_handle_snapshot_win.c)
+    add_test(NAME test_shell_handle_snapshot_win COMMAND test_shell_handle_snapshot_win)
+    set_tests_properties(test_shell_handle_snapshot_win PROPERTIES TIMEOUT 120
+        PASS_REGULAR_EXPRESSION "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1")
+endif()
