@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "base": "e3171d33cf7c94ddba21f5a1b000ccbb5af590ce",
+  "valid": {
+    "EN": [
+      "EN",
+      "en",
+      "En",
+      "eN"
+    ],
+    "ES": [
+      "ES",
+      "es",
+      "Es",
+      "eS"
+    ],
+    "FR": [
+      "FR",
+      "fr",
+      "Fr",
+      "fR"
+    ]
+  },
+  "unknown": [
+    null,
+    "",
+    "ENG",
+    "en-US",
+    " ",
+    "English",
+    "E",
+    "ZZ",
+    "ENx",
+    " EN",
+    "EN "
+  ],
+  "lookup_preserves_active_state": [
+    "EN",
+    "ES",
+    "FR"
+  ],
+  "strict_compile": [
+    "header_consumer",
+    "source_implementation"
+  ],
+  "mutants": [
+    "restore_header_scalar_const",
+    "restore_source_scalar_const",
+    "wrong_en_mapping",
+    "lookup_changes_active_state"
+  ],
+  "not_claimed": [
+    "phase_exit",
+    "corpus_reasoning",
+    "C++linkage",
+    "whole_project_warningclean"
+  ]
+}
