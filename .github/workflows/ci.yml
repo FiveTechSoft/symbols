@@ -52,7 +52,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          & .\build\Release\test_shell_file_resource_win.exe
+          python .\tests\shell_resource_gate.py -- .\build\Release\test_shell_file_resource_win.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Tests
         if: ${{ !cancelled() }}
@@ -156,7 +156,7 @@ jobs:
           $ownerExit = $LASTEXITCODE
           & .\build-asan\Debug\test_shell_handle_snapshot_win.exe
           $snapshotExit = $LASTEXITCODE
-          & .\build-asan\Debug\test_shell_file_resource_win.exe
+          python .\tests\shell_resource_gate.py -- .\build-asan\Debug\test_shell_file_resource_win.exe
           $resourceExit = $LASTEXITCODE
           ctest --test-dir build-asan -C Debug --output-on-failure
           $suiteExit = $LASTEXITCODE
