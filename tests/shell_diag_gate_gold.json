@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "scope": "strict diagnostic trace, not ownership/255/productionchanges",
+  "source": "b70d13b264ebb2e888d890e1586b9f7983d1c736",
+  "calls": 27,
+  "blocks": [
+    3,
+    12,
+    12
+  ],
+  "positive": {
+    "ok": 1,
+    "exit": 0,
+    "launch": 0,
+    "timeout": 0,
+    "failure_mask": 5
+  },
+  "invalid": {
+    "ok": 0,
+    "exit": -1,
+    "launch": 1,
+    "timeout": 0,
+    "mask": 0,
+    "stored": [
+      0,
+      0
+    ],
+    "total": [
+      0,
+      0
+    ]
+  },
+  "accepted_classifications": [
+    "flat",
+    "one_time_increase"
+  ],
+  "native_probe_errors": [
+    193,
+    216
+  ],
+  "owned_count": 5,
+  "closes_per_owned": 1,
+  "boundary_api_sequence": [
+    "GetFileAttributesA",
+    "QueryPerformanceFrequency",
+    "QueryPerformanceCounter",
+    "CreatePipe",
+    "SetHandleInformation",
+    "CreatePipe",
+    "SetHandleInformation",
+    "CreateJobObjectA",
+    "SetInformationJobObject",
+    "GetStdHandle",
+    "CreateProcessA",
+    "CloseHandle",
+    "CloseHandle",
+    "CloseHandle",
+    "CloseHandle",
+    "CloseHandle"
+  ],
+  "baseline_receipts": {
+    "release-handles-baseline.txt": {
+      "lines": 41,
+      "sha256": "9cb53f08caee7870525b7a073c931951c8d9ea073f7b11dc66d4bb0f70f1a001"
+    },
+    "release-owner-baseline.txt": {
+      "lines": 675,
+      "sha256": "e458ecff839084432901806f689f2550040eb4a8cdb457d60fcb66c1e638d7af"
+    },
+    "asan-handles-baseline.txt": {
+      "lines": 41,
+      "sha256": "5c2ba0df4284c0d3725b65343735baf68bc386ef81465241989000a11c220ccf"
+    },
+    "asan-owner-baseline.txt": {
+      "lines": 675,
+      "sha256": "cf3589ac262c6296dbb46b48f62dc6eb85758c75561fd5a2dbe32ca37b1aac57"
+    }
+  },
+  "negative_cases": [
+    "partial_terminal",
+    "terminal_exit1",
+    "control_only",
+    "missing_call",
+    "duplicate_call",
+    "reorder_calls",
+    "wrong_block",
+    "count_drift",
+    "wrong_classification",
+    "wrong_delta",
+    "wrong_mask",
+    "wrong_result_fields",
+    "missing_arm",
+    "incomplete_ledger",
+    "borrowed_closed",
+    "wrong_owned_handle",
+    "duplicate_close",
+    "missing_close",
+    "wrong_api",
+    "wrong_boundary_index",
+    "wrong_boundary_call",
+    "boundary_delta_mismatch",
+    "extra_unknown_line",
+    "stderr_nonempty",
+    "truncated",
+    "timeout"
+  ],
+  "private_mutants": [
+    "ignore_exit",
+    "partial_marker",
+    "skip_calls",
+    "skip_ledger",
+    "skip_stderr"
+  ],
+  "status": "gold before wrapper, native receipts recovered; compatibility not yet tested"
+}
