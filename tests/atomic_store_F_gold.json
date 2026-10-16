@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "design_base": "8f808befd39c0bcad5f512537095148b55b51529",
+  "scope": "audit2-F only; design before code",
+  "states": [
+    "UNCHANGED",
+    "COMMITTED_DURABILITY_UNKNOWN",
+    "DURABLE"
+  ],
+  "wrapper_success_only": "DURABLE",
+  "permission_review": "Approved: O_CREAT|O_EXCL0666 under umask; existing destination fstat then best-effort fchmod(temp) before rename; no ownership/ACL guarantee",
+  "cases": [
+    {
+      "id": "existing_pre_create",
+      "platform": "both",
+      "fault": "create",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "no target truncation",
+        "remove only own unpublished temp",
+        "no success marker on nonzero"
+      ]
+    },
+    {
+      "id": "existing_pre_write",
+      "platform": "both",
+      "fault": "write",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "no target truncation",
+        "remove only own unpublished temp",
+        "no success marker on nonzero"
+      ]
+    },
+    {
+      "id": "existing_pre_file_sync",
+      "platform": "both",
+      "fault": "file_sync",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "no target truncation",
+        "remove only own unpublished temp",
+        "no success marker on nonzero"
+      ]
+    },
+    {
+      "id": "existing_pre_file_close",
+      "platform": "both",
+      "fault": "file_close",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "no target truncation",
+        "remove only own unpublished temp",
+        "no success marker on nonzero"
+      ]
+    },
+    {
+      "id": "existing_pre_rename",
+      "platform": "both",
+      "fault": "rename",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "no target truncation",
+        "remove only own unpublished temp",
+        "no success marker on nonzero"
+      ]
+    },
+    {
+      "id": "existing_pre_flush",
+      "platform": "posix_stream_only",
+      "fault": "fflush",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_complete"
+      },
+      "checks": [
+        "required only if implementation uses a buffered FILE stream"
+      ]
+    },
+    {
+      "id": "absent_pre_rename",
+      "platform": "both",
+      "fault": "rename",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "absent"
+      },
+      "checks": [
+        "parent directories may have been created",
+        "own unpublished temp cleanup attempted"
+      ]
+    },
+    {
+      "id": "existing_parent_sync_after_rename",
+      "platform": "posix",
+      "fault": "parent_fsync_after_successful_rename",
+      "expected": {
+        "state": "COMMITTED_DURABILITY_UNKNOWN",
+        "wrapper": 0,
+        "target": "new_complete"
+      },
+      "checks": [
+        "never report UNCHANGED",
+        "no destination removal",
+        "no compensating rename",
+        "new disk image remains visible"
+      ]
+    },
+    {
+      "id": "absent_parent_sync_after_rename",
+      "platform": "posix",
+      "fault": "parent_fsync_after_successful_rename",
+      "expected": {
+        "state": "COMMITTED_DURABILITY_UNKNOWN",
+        "wrapper": 0,
+        "target": "new_complete"
+      },
+      "checks": [
+        "never report UNCHANGED",
+        "no destination removal",
+        "no compensating rename",
+        "new disk image remains visible"
+      ]
+    },
+    {
+      "id": "success",
+      "platform": "both",
+      "fault": null,
+      "expected": {
+        "state": "DURABLE",
+        "wrapper": 1,
+        "target": "new_complete"
+      },
+      "checks": [
+        "exclusive unique sibling create",
+        "all bytes written",
+        "file sync before checked file close before publication",
+        "POSIX parent fsync after rename",
+        "Windows FlushFileBuffers then MoveFileEx WRITE_THROUGH"
+      ]
+    },
+    {
+      "id": "new_parent_sync_failure",
+      "platform": "posix",
+      "fault": "created_directory_parent_fsync",
+      "expected": {
+        "state": "UNCHANGED",
+        "wrapper": 0,
+        "target": "old_or_absent_as_initial"
+      },
+      "checks": [
+        "no target publication",
+        "created directories may remain"
+      ]
+    },
+    {
+      "id": "episodic_append_UNCHANGED",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "UNCHANGED",
+      "expected": {
+        "legacy": 0,
+        "disk": "old",
+        "RAM": "old",
+        "session": "old"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_append_COMMITTED_DURABILITY_UNKNOWN",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "COMMITTED_DURABILITY_UNKNOWN",
+      "expected": {
+        "legacy": 0,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_append_DURABLE",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "DURABLE",
+      "expected": {
+        "legacy": 1,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_forget_UNCHANGED",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "UNCHANGED",
+      "expected": {
+        "legacy": 0,
+        "disk": "old",
+        "RAM": "old",
+        "session": "old"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_forget_COMMITTED_DURABILITY_UNKNOWN",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "COMMITTED_DURABILITY_UNKNOWN",
+      "expected": {
+        "legacy": 0,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_forget_DURABLE",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "DURABLE",
+      "expected": {
+        "legacy": 1,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_clear_UNCHANGED",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "UNCHANGED",
+      "expected": {
+        "legacy": 0,
+        "disk": "old",
+        "RAM": "old",
+        "session": "old"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_clear_COMMITTED_DURABILITY_UNKNOWN",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "COMMITTED_DURABILITY_UNKNOWN",
+      "expected": {
+        "legacy": 0,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "episodic_clear_DURABLE",
+      "platform": "posix_fault_and_both_normal",
+      "fault": "DURABLE",
+      "expected": {
+        "legacy": 1,
+        "disk": "new",
+        "RAM": "new",
+        "session": "new"
+      },
+      "checks": [
+        "Ex out-status equals injected atomic state",
+        "no false RAM rollback after publication",
+        "chat legacy failure preserved on durability unknown",
+        "failure text never claims intact/definitely absent"
+      ]
+    },
+    {
+      "id": "save_unknown",
+      "platform": "posix",
+      "fault": "parent_fsync_after_successful_rename",
+      "expected": {
+        "legacy": 0,
+        "out_status": "COMMITTED_DURABILITY_UNKNOWN",
+        "target": "new_complete",
+        "RAM": "unchanged_by_save"
+      },
+      "checks": [
+        "save serializes exactly current records"
+      ]
+    },
+    {
+      "id": "episode_unknown",
+      "platform": "posix",
+      "fault": "parent_fsync_after_successful_rename",
+      "expected": {
+        "legacy": 0,
+        "load": "new_valid_complete_image",
+        "warning": "durability not confirmed"
+      },
+      "checks": [
+        "whole-cycle lock retained",
+        "no false record-absence claim",
+        "checksum and format unchanged"
+      ]
+    },
+    {
+      "id": "foreign_fixed_tmp",
+      "platform": "both",
+      "fault": null,
+      "expected": {
+        "state": "DURABLE",
+        "foreign_tmp": "untouched",
+        "target": "new_complete"
+      },
+      "checks": [
+        "existing path.tmp file/directory/symlink never opened,truncated,deleted",
+        "do not delete unrelated artifacts"
+      ]
+    },
+    {
+      "id": "collision",
+      "platform": "both",
+      "fault": "first_candidate_already_exists",
+      "expected": {
+        "target": "new_complete",
+        "foreign_candidate": "untouched"
+      },
+      "checks": [
+        "exclusive creation retries bounded",
+        "candidate collision never opens existing file",
+        "exhaustion means UNCHANGED"
+      ]
+    },
+    {
+      "id": "two_writers",
+      "platform": "both",
+      "fault": null,
+      "expected": {
+        "final_target": "exactly complete A or complete B",
+        "temporary_paths": "distinct"
+      },
+      "checks": [
+        "controlled overlap after temp creation",
+        "no mixed image",
+        "one operation cleanup cannot remove peer temp",
+        "no claim of read-modify-write serialization"
+      ]
+    },
+    {
+      "id": "empty_and_invalid",
+      "platform": "both",
+      "fault": null,
+      "expected": {
+        "empty_NULL_data": "DURABLE",
+        "nonzero_NULL_data": "UNCHANGED",
+        "invalid_path": "UNCHANGED"
+      },
+      "checks": [
+        "existing path size bound preserved",
+        "leaf relative/absolute/nested/spaces cases",
+        "zero-length target exact"
+      ]
+    },
+    {
+      "id": "episodic_no_publication",
+      "platform": "both",
+      "fault": null,
+      "expected": {
+        "duplicate_return": 2,
+        "absent_forget_return": 2,
+        "auto_save_0_append_return": 1,
+        "out_status": "UNCHANGED"
+      },
+      "checks": [
+        "out-status explicitly initialized on every path",
+        "legacy semantics unchanged",
+        "no fabricated persistence"
+      ]
+    },
+    {
+      "id": "existing_mode_preserved",
+      "platform": "posix",
+      "fault": null,
+      "expected": {
+        "mode": "existing0640",
+        "state": "DURABLE"
+      },
+      "checks": [
+        "fstat prior destination",
+        "fchmod temp before rename",
+        "injected fchmod failure is best effort, does not fail persistence"
+      ]
+    },
+    {
+      "id": "new_mode_umask",
+      "platform": "posix",
+      "fault": null,
+      "expected": {
+        "mode": "0666 & ~umask",
+        "state": "DURABLE"
+      },
+      "checks": [
+        "test umask0027 yields0640",
+        "restore process umask"
+      ]
+    }
+  ],
+  "mutants_must_fail": [
+    "skip_file_sync",
+    "skip_parent_sync",
+    "parent_failure_as_DURABLE",
+    "parent_failure_as_UNCHANGED",
+    "postcommit_RAM_rollback",
+    "shared_fixed_tmp",
+    "nonexclusive_temp_open",
+    "delete_foreign_temp",
+    "drop_Windows_WRITE_THROUGH",
+    "enum_truthiness_wrapper"
+  ],
+  "limits": [
+    "API sequence, not physical power-cut proof",
+    "Windows native evidence required",
+    "trusted stable parent namespace",
+    "no episodic whole-cycle concurrent merge",
+    "cleanup artifacts possible on failure/crash"
+  ],
+  "publication": "separate exact patch approval after design/gold review"
+}
