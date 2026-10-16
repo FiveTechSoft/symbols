@@ -1,0 +1,12 @@
+{
+  "schema":1,
+  "scope":"noop R3 counts-only execution gate; not proof rewrite consumed or solver quality",
+  "source":"0b20877062579624d1766b880b9d221fae482cb5",
+  "command":["python","tools/bank_harness.py","--agent","noop","--rewrite","R3","--counts-only"],
+  "must_exit":0,
+  "baseline":{"schema":1,"mode":"agent","agent":"noop","tasks_total":59,"tasks_passed":0,"pass_rate":0.0,"wrong_edits":0,"untouched":59,"agent_errors":0,"setup_failures":0,"categories":{"build_ci":7,"compiler_repair":7,"debug":7,"docs":7,"git":3,"multi_file":7,"refactor":7,"shell":7,"test_authoring":7},"splits":{"dev":34,"heldout":25}},
+  "dynamic":"derive totals/categories/splits from validated index metadata; wall_ms_total finite>=0; exact stdoutkeys and stderrsummary",
+  "negative_cases":["nonzero_exit_full_valid","partial_JSON_exit0","partial_JSON_exit1","stderr_only_marker","wrong_mode","wrong_agent","wrong_schema","bool_as_integer","zero_tasks","wrong_total","wrong_category","wrong_split","setup_failure","agent_error","wrong_edit","untouched_partial","passed_nonzero","duplicate_key","NaN","Infinity","negative_walltime","bool_walltime","per_task_leak","extra_stdout","malformed_JSON","truncated_JSON","stderr_mismatch","extra_stderr","timeout"],
+  "private_mutants":["ignore_exit","substring_only","ignore_index_totals","ignore_stderr"],
+  "status":"design before wrapper; actual Linux baseline exit0 retained; synthetic oldCTest repro next"
+}
