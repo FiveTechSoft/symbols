@@ -1,0 +1,64 @@
+{
+  "base": "d3f0dccbad1392c3bc3e899d32f89dcaca88c89d",
+  "required_facts": {
+    "correction_date": "2026-10-16",
+    "prior610": {
+      "pass": 252,
+      "skip": 16,
+      "fail": 2,
+      "total": 270
+    },
+    "repair612": {
+      "pass": 254,
+      "skip": 16,
+      "fail": 0,
+      "total": 270
+    },
+    "strict_gates": 6,
+    "selftest_vectors": 101,
+    "chain_kills": 9,
+    "chain_counts": [
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2,
+      1,
+      0,
+      0
+    ],
+    "old_pins_shared_links": 2,
+    "foreign_long_batch_status": "1e INVALID",
+    "foreign_alias_copy_pre_fix": "0e OK, bypass",
+    "foreign_alias_copy_fixed": "3e DENIED, destination absent",
+    "ordinary_alias_controls": [
+      "empty",
+      "COPY!"
+    ]
+  },
+  "must_retract": [
+    "regex pass proves full line",
+    "m204 protects all five operations",
+    "m2116kills3remain demonstrated"
+  ],
+  "limits": [
+    "M1 not declared",
+    "other old regex-derived claims unverified",
+    "one runner per mode",
+    "no power-loss claim",
+    "no hostile-writer rename proof"
+  ],
+  "private_mutants": [
+    "chain6",
+    "remaining3",
+    "alias0accepted",
+    "batch3",
+    "all270PASS",
+    "skip6gate",
+    "oldpassprovesline",
+    "M1declared"
+  ]
+}
