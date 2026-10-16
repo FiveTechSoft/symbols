@@ -48,6 +48,12 @@ jobs:
         run: |
           & .\build\Release\test_shell_handle_snapshot_win.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native file resource diagnostic (output and gate)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          & .\build\Release\test_shell_file_resource_win.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Tests
         if: ${{ !cancelled() }}
         run: ctest --test-dir build -C Release --output-on-failure
@@ -150,9 +156,12 @@ jobs:
           $ownerExit = $LASTEXITCODE
           & .\build-asan\Debug\test_shell_handle_snapshot_win.exe
           $snapshotExit = $LASTEXITCODE
+          & .\build-asan\Debug\test_shell_file_resource_win.exe
+          $resourceExit = $LASTEXITCODE
           ctest --test-dir build-asan -C Debug --output-on-failure
           $suiteExit = $LASTEXITCODE
           if ($diagnosticExit -ne 0) { exit $diagnosticExit }
           if ($ownerExit -ne 0) { exit $ownerExit }
           if ($snapshotExit -ne 0) { exit $snapshotExit }
+          if ($resourceExit -ne 0) { exit $resourceExit }
           exit $suiteExit
