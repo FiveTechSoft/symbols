@@ -223,7 +223,7 @@ void ClarifyHandle(CLARIFY *w, const char *line)
             else if (rc == 2)
                 printf("[memoria] Hecho ya conocido, reforzado en memoria: %s --%s--> %s.\n", s, r, o);
             else
-                printf("[memoria] No se pudo incorporar la tripleta.\n");
+                printf("[memoria] No se confirmo la persistencia; el estado puede haber cambiado.\n");
         }
         else
         {
@@ -272,7 +272,7 @@ void ClarifyHandle(CLARIFY *w, const char *line)
             else if (rc == 0)
                 printf("[memoria] Ese hecho no estaba en la memoria episodica: %s --%s--> %s.\n", s_tok, r_tok, o_tok);
             else
-                printf("[memoria] No se pudo escribir la memoria en disco; el hecho sigue intacto.\n");
+                printf("[memoria] No se confirmo la persistencia; el estado puede haber cambiado.\n");
         }
         else
         {
@@ -287,7 +287,7 @@ void ClarifyHandle(CLARIFY *w, const char *line)
         if (ChatEpisodicClear(&w->ch))
             printf("[memoria] Memoria episodica borrada tanto de la sesion como de disco.\n");
         else
-            printf("[memoria] No se pudo escribir la memoria en disco; sigue intacta.\n");
+            printf("[memoria] No se confirmo la persistencia; el estado puede haber cambiado.\n");
         return;
     }
 

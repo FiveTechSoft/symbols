@@ -20,7 +20,8 @@ typedef struct { ENGINEERING_EPISODE rows[EE_MAX_RECORDS]; size_t count; } EPISO
 /* 1 valid, 0 absent, -1 corrupt/unsupported/I/O error. Entire image is
    rejected on a bad row. Reads do not create or modify any file. */
 int EpisodeLoad(const char *path, EPISODE_STORE *out);
-/* 1 persisted, 0 refused. No solver is connected to this API. */
+/* 1 durability confirmed, 0 unconfirmed/refused; a 0 after publication may
+   have changed disk. No solver is connected to this API. */
 int EpisodeAppend(const char *path, const ENGINEERING_EPISODE *row);
 /* Read-only aggregate printer; same function used by the CLI and tests. */
 int EpisodeReport(const char *path, FILE *out, FILE *error);

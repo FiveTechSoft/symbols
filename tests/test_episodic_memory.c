@@ -3,6 +3,9 @@
    selective forgetting, atomic save behavior, and persistence-failure
    propagation (a failed write must never be reported as learned). */
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +17,7 @@
 #define UNLINK _unlink
 #else
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #define UNLINK unlink
 #endif
@@ -206,7 +210,11 @@ int main(void)
     fclose(snap);
     assert(after_len == before_len);
     assert(memcmp(before, after, before_len) == 0);
-    assert(access("build-gcc/test_episodic_ro/episodic.tsv.tmp", F_OK) != 0);
+    DIR *entries = opendir(ro_dir); assert(entries);
+    struct dirent *entry;
+    while ((entry = readdir(entries)) != NULL)
+        assert(strncmp(entry->d_name, "episodic.tsv.tmp.", sizeof("episodic.tsv.tmp.")-1) != 0);
+    assert(closedir(entries) == 0);
     printf("  [PASS] Failed writes left the store byte-identical (atomic)\n");
 
     /* Restore writability: the store works again */

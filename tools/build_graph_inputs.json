@@ -392,6 +392,25 @@
     "tests/shell_resource_gate.py",
     "tests/shell_spawn_win_v2_gold.json"
    ]
+  },
+  "test_atomic_store_durability": {
+   "files": [
+    "tests/test_atomic_store_durability.c",
+    "tests/atomic_store_test_adapter.h",
+    "src/atomic_store.c",
+    "src/episodic_memory.c",
+    "include/atomic_store.h",
+    "include/episodic_memory.h",
+    "src/chat.c",
+    "include/chat.h",
+    "docs/atomic-store-F.md",
+    "tests/atomic_store_F_gold.json"
+   ]
+  },
+  "test_atomic_store_mutant_gate": {
+   "files": [
+    "tests/atomic_store_win_mutant_gate.py"
+   ]
   }
  },
  "version": 1

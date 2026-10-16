@@ -4763,7 +4763,7 @@ static void audit_attempt(const char *workspace, const char *task,
     char path[TASK_OPS_MAX_PATH*2];
     int n=snprintf(path,sizeof(path),"%s/.symbols/engineering_episodes.v1",workspace);
     if(n<=0 || (size_t)n>=sizeof(path) || !EpisodeAppend(path,&e))
-        fprintf(stderr,"engineering episode audit not persisted (solve result unchanged)\n");
+        fprintf(stderr,"engineering episode audit durability not confirmed (solve result unchanged)\n");
     if(loaded) TaskOpsFreeWorkspace(after);
     free(after);
 }

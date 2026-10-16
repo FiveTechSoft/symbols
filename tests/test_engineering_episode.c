@@ -70,10 +70,12 @@ int main(void)
     assert(AtomicStoreReplace(path,escaped,n));assert(EpisodeLoad(path,s)==-1);
     assert(AtomicStoreReplace(path,original,n));
 #ifndef _WIN32
-    /* An unwritable temporary path must preserve prior bytes. */
+    /* A foreign historical temp path no longer blocks a unique temp write.
+       Pre-publication failure preservation is tested by the private adapter. */
     const char *tmp="build/engineering-episode-test-dir/engineering-episode-test.v1.tmp";
     assert(mkdir(tmp,0700)==0);
-    c=make("third",NULL);assert(!EpisodeAppend(path,&c));
+    c=make("foreign-tmp",NULL);assert(EpisodeAppend(path,&c));
+    assert(AtomicStoreReplace(path,original,n));
     assert(readfile(path,current,sizeof(current))==n && !memcmp(original,current,n));
     assert(rmdir(tmp)==0);
     /* A competing writer holds the whole-cycle lock, never silently wins. */

@@ -2359,7 +2359,7 @@ static void HandleCompletions(socket_t s, const char *body,
             else if (rc == 2)
                 snprintf(content, sizeof(content), "[memoria] Hecho ya conocido, reforzado en memoria: %s --%s--> %s.", s_tok, r_tok, o_tok);
             else
-                snprintf(content, sizeof(content), "[memoria] No se pudo incorporar la tripleta.");
+                snprintf(content, sizeof(content), "[memoria] No se confirmo la persistencia; el estado puede haber cambiado.");
         }
         else
         {
@@ -2480,7 +2480,7 @@ static void HandleCompletions(socket_t s, const char *body,
             else if (rc == 0)
                 snprintf(content, sizeof(content), "[memoria] Ese hecho no estaba en la memoria episodica: %s --%s--> %s.", s_tok, r_tok, o_tok);
             else
-                snprintf(content, sizeof(content), "[memoria] No se pudo escribir la memoria en disco; el hecho sigue intacto.");
+                snprintf(content, sizeof(content), "[memoria] No se confirmo la persistencia; el estado puede haber cambiado.");
         }
         else
         {
@@ -2498,7 +2498,7 @@ static void HandleCompletions(socket_t s, const char *body,
         if (ChatEpisodicClear(&g_session))
             snprintf(content, sizeof(content), "[memoria] Memoria episodica borrada tanto de la sesion como de disco.");
         else
-            snprintf(content, sizeof(content), "[memoria] No se pudo escribir la memoria en disco; sigue intacta.");
+            snprintf(content, sizeof(content), "[memoria] No se confirmo la persistencia; el estado puede haber cambiado.");
         ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
         SendJson(s, 200, "OK", resp);
         return;

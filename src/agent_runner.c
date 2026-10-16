@@ -102,7 +102,7 @@ static void runner_audit(const AGENT_RUNNER *runner,const SWE_BENCH_TASK *task,
     char path[MAX_PATCH_PATH+64];
     int n=snprintf(path,sizeof(path),"%s/.symbols/engineering_episodes.v1",runner->workspace_dir);
     if(n<=0 || (size_t)n>=sizeof(path) || !EpisodeAppend(path,&e))
-        fprintf(stderr,"engineering episode audit not persisted (runner result unchanged)\n");
+        fprintf(stderr,"engineering episode audit durability not confirmed (runner result unchanged)\n");
 }
 
 /* ============================================================

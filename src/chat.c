@@ -7958,8 +7958,9 @@ int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const c
     ChatNormRelation(relation, rel_buf, sizeof(rel_buf));
 
     /* 1. Append to episodic store (auto-persists to disk) */
-    int rc = EpisodicStoreAppend(&ch->episodic, norm_s, rel_buf, norm_o, source ? source : "user");
-    if (rc == 0) return 0;
+    ATOMIC_STORE_RESULT state;
+    int rc = EpisodicStoreAppendEx(&ch->episodic, norm_s, rel_buf, norm_o, source ? source : "user", &state);
+    if (rc == 0 && state == ATOMIC_STORE_UNCHANGED) return 0;
 
     /* 2. Ingest into schema / meta reasoning engine */
     char conn_buf[LEARN_MAX_LINE];
@@ -7983,7 +7984,7 @@ int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const c
         IngestTripleSource(ch->tgraph, norm_s, rel_buf, norm_o, source ? source : "user");
     }
 
-    return 1;
+    return rc == 0 ? 0 : 1;
 }
 
 uint32_t ChatEpisodicCount(const CHAT *ch)
@@ -8003,15 +8004,15 @@ int ChatForgetTriple(CHAT *ch, const char *subject, const char *relation, const 
     char rel_buf[CHAT_TOKEN_MAX];
     ChatNormRelation(relation, rel_buf, sizeof(rel_buf));
 
-    /* Persistent store first: a forget that cannot reach disk changes
-       nothing, so the session never diverges from the saved memory. */
-    int rc = EpisodicStoreForget(&ch->episodic, norm_s, rel_buf, norm_o);
-    if (rc == 0) return -1; /* persistence failure; session untouched */
+    /* Publish first. Unknown durability still requires session synchronization. */
+    ATOMIC_STORE_RESULT state;
+    int rc = EpisodicStoreForgetEx(&ch->episodic, norm_s, rel_buf, norm_o, &state);
+    if (rc == 0 && state == ATOMIC_STORE_UNCHANGED) return -1;
     if (rc == 2) return 0;  /* not present in episodic memory */
 
     ChatScrubLearnedTriple(ch, norm_s, rel_buf, norm_o);
     ChatReasonSync(ch);
-    return 1;
+    return rc == 0 ? -1 : 1;
 }
 
 int ChatEpisodicClear(CHAT *ch)
@@ -8031,9 +8032,11 @@ int ChatEpisodicClear(CHAT *ch)
         }
     }
 
-    /* Disk first: the session is scrubbed only after the empty store
-       is confirmed persisted. */
-    if (!EpisodicStoreClear(&ch->episodic))
+    /* A published empty image must also clear the session, even if the
+       durability confirmation failed after publication. */
+    ATOMIC_STORE_RESULT state;
+    int cleared = EpisodicStoreClearEx(&ch->episodic, &state);
+    if (!cleared && state == ATOMIC_STORE_UNCHANGED)
     {
         free(snap);
         return 0;
@@ -8047,7 +8050,7 @@ int ChatEpisodicClear(CHAT *ch)
     }
     free(snap);
     ChatReasonSync(ch);
-    return 1;
+    return cleared;
 }
 
 const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx)

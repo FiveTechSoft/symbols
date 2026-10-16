@@ -1164,6 +1164,36 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 sllm_test(test_atomic_store tests/test_atomic_store.c)
+# Fault adapters are linked only into this private target, never symbolic.
+find_package(Threads REQUIRED)
+add_executable(test_atomic_store_durability tests/test_atomic_store_durability.c
+               src/atomic_store.c src/episodic_memory.c)
+target_compile_definitions(test_atomic_store_durability PRIVATE ATOMIC_STORE_PRIVATE_TEST)
+target_link_libraries(test_atomic_store_durability PRIVATE symbolic Threads::Threads)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/atomic-durability-scratch)
+add_test(NAME test_atomic_store_durability COMMAND test_atomic_store_durability
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/atomic-durability-scratch)
+set_tests_properties(test_atomic_store_durability PROPERTIES TIMEOUT 60)
+if(WIN32)
+    add_executable(test_atomic_store_durability_win_mc tests/test_atomic_store_durability.c
+                   src/atomic_store.c src/episodic_memory.c)
+    target_compile_definitions(test_atomic_store_durability_win_mc PRIVATE
+                               ATOMIC_STORE_PRIVATE_TEST ATOMIC_STORE_PRIVATE_DROP_WRITE_THROUGH)
+    target_link_libraries(test_atomic_store_durability_win_mc PRIVATE symbolic Threads::Threads)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/atomic-durability-mutant-scratch)
+    add_test(NAME test_atomic_store_durability_win_mc COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_SOURCE_DIR}/tests/atomic_store_win_mutant_gate.py
+             $<TARGET_FILE:test_atomic_store_durability_win_mc>)
+    set_tests_properties(test_atomic_store_durability_win_mc PROPERTIES
+                         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/atomic-durability-mutant-scratch TIMEOUT 40)
+endif()
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_atomic_store_mutant_gate COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_SOURCE_DIR}/tests/atomic_store_win_mutant_gate.py --selftest)
+    set_tests_properties(test_atomic_store_mutant_gate PROPERTIES TIMEOUT 20)
+endif()
+
+
 sllm_test(test_engineering_episode tests/test_engineering_episode.c)
 if(Python3_Interpreter_FOUND)
     add_test(NAME test_episode_replay_contract

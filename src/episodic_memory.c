@@ -114,8 +114,9 @@ static int EnsureCapacity(EPISODIC_STORE *store)
     return 1;
 }
 
-int EpisodicStoreAppend(EPISODIC_STORE *store, const char *subject, const char *relation, const char *object, const char *source)
+int EpisodicStoreAppendEx(EPISODIC_STORE *store, const char *subject, const char *relation, const char *object, const char *source, ATOMIC_STORE_RESULT *status)
 {
+    if (status) *status = ATOMIC_STORE_UNCHANGED;
     if (!store || !subject || !relation || !object) return 0;
 
     char s[EPISODIC_STR_MAX], r[EPISODIC_STR_MAX], o[EPISODIC_STR_MAX], src[EPISODIC_STR_MAX];
@@ -147,34 +148,33 @@ int EpisodicStoreAppend(EPISODIC_STORE *store, const char *subject, const char *
 
     if (store->auto_save)
     {
-        if (!EpisodicStoreSave(store))
-        {
-            /* Roll the append back: RAM must never claim more than disk. */
-            store->count--;
+        ATOMIC_STORE_RESULT state;
+        int saved = EpisodicStoreSaveEx(store, &state);
+        if (status) *status = state;
+        if (!saved) {
+            /* A published image is already current, even if durability is unknown. */
+            if (state == ATOMIC_STORE_UNCHANGED) store->count--;
             return 0;
         }
     }
     return 1;
 }
 
-/* Write one full store image to a sibling temporary file and rename it
-   over the target. The target is replaced in one atomic step, so a
-   crash or I/O error mid-write can never leave a truncated store
-   behind. Any failure removes the temporary file, leaves the previous
-   target untouched and returns 0. */
-static int WriteStoreAtomic(const char *filepath, const char *header,
+/* Serialize a full image. The detailed result separates publication from
+   durability, so callers never roll RAM back after a successful rename. */
+static ATOMIC_STORE_RESULT WriteStoreAtomic(const char *filepath, const char *header,
                             const EPISODIC_RECORD *records, uint32_t count)
 {
-    if (!filepath || !*filepath) return 0;
+    if (!filepath || !*filepath) return ATOMIC_STORE_UNCHANGED;
     size_t n = strlen(header) + 1;
     for (uint32_t i = 0; i < count; ++i) {
         const EPISODIC_RECORD *r = &records[i];
         n += strlen(r->subject) + strlen(r->relation) + strlen(r->object) +
              strlen(r->source[0] ? r->source : "user") + 4 + 20 + 1;
-        if (n > 16 * 1024 * 1024) return 0;
+        if (n > 16 * 1024 * 1024) return ATOMIC_STORE_UNCHANGED;
     }
     char *buf = (char *)malloc(n);
-    if (!buf) return 0;
+    if (!buf) return ATOMIC_STORE_UNCHANGED;
     size_t used = (size_t)snprintf(buf, n, "%s", header);
     for (uint32_t i = 0; i < count; ++i) {
         const EPISODIC_RECORD *r = &records[i];
@@ -182,24 +182,28 @@ static int WriteStoreAtomic(const char *filepath, const char *header,
                              r->subject, r->relation, r->object,
                              r->source[0] ? r->source : "user",
                              (unsigned long long)r->timestamp);
-        if (wrote < 0 || (size_t)wrote >= n - used) { free(buf); return 0; }
+        if (wrote < 0 || (size_t)wrote >= n - used) { free(buf); return ATOMIC_STORE_UNCHANGED; }
         used += (size_t)wrote;
     }
-    int ok = AtomicStoreReplace(filepath, buf, used);
+    ATOMIC_STORE_RESULT ok = AtomicStoreReplaceDetailed(filepath, buf, used);
     free(buf);
     return ok;
 }
 
-int EpisodicStoreSave(const EPISODIC_STORE *store)
+int EpisodicStoreSaveEx(const EPISODIC_STORE *store, ATOMIC_STORE_RESULT *status)
 {
+    if (status) *status = ATOMIC_STORE_UNCHANGED;
     if (!store || store->filepath[0] == '\0') return 0;
-    return WriteStoreAtomic(store->filepath,
+    ATOMIC_STORE_RESULT state = WriteStoreAtomic(store->filepath,
                             "# symbols episodic memory store (TSV: subject \\t relation \\t object \\t source \\t timestamp)\n",
                             store->records, store->count);
+    if (status) *status = state;
+    return state == ATOMIC_STORE_DURABLE;
 }
 
-int EpisodicStoreForget(EPISODIC_STORE *store, const char *subject, const char *relation, const char *object)
+int EpisodicStoreForgetEx(EPISODIC_STORE *store, const char *subject, const char *relation, const char *object, ATOMIC_STORE_RESULT *status)
 {
+    if (status) *status = ATOMIC_STORE_UNCHANGED;
     if (!store || !store->records || !subject || !relation || !object) return 0;
     if (!EpisodicStoreExists(store, subject, relation, object)) return 2;
 
@@ -231,17 +235,20 @@ int EpisodicStoreForget(EPISODIC_STORE *store, const char *subject, const char *
             (store->count - pos - 1) * sizeof(EPISODIC_RECORD));
     store->count--;
 
-    if (store->auto_save && !EpisodicStoreSave(store))
-    {
-        /* Persistence failed: restore the record so RAM matches disk. */
-        if (EnsureCapacity(store))
-        {
-            memmove(&store->records[pos + 1], &store->records[pos],
-                    (store->count - pos) * sizeof(EPISODIC_RECORD));
-            store->records[pos] = removed;
-            store->count++;
+    if (store->auto_save) {
+        ATOMIC_STORE_RESULT state;
+        int saved = EpisodicStoreSaveEx(store, &state);
+        if (status) *status = state;
+        if (!saved) {
+            if (state == ATOMIC_STORE_UNCHANGED) {
+                /* count decreased, so the prior allocation already has room. */
+                memmove(&store->records[pos + 1], &store->records[pos],
+                        (store->count - pos) * sizeof(EPISODIC_RECORD));
+                store->records[pos] = removed;
+                store->count++;
+            }
+            return 0;
         }
-        return 0;
     }
     return 1;
 }
@@ -319,18 +326,27 @@ uint32_t EpisodicStoreLoad(EPISODIC_STORE *store)
     return loaded;
 }
 
-int EpisodicStoreClear(EPISODIC_STORE *store)
+int EpisodicStoreClearEx(EPISODIC_STORE *store, ATOMIC_STORE_RESULT *status)
 {
+    if (status) *status = ATOMIC_STORE_UNCHANGED;
     if (!store) return 0;
-    if (store->filepath[0] != '\0')
-    {
-        if (!WriteStoreAtomic(store->filepath,
-                              "# symbols episodic memory store (cleared)\n",
-                              NULL, 0))
-        {
-            return 0;
-        }
+    ATOMIC_STORE_RESULT state = ATOMIC_STORE_UNCHANGED;
+    if (store->filepath[0] != '\0') {
+        state = WriteStoreAtomic(store->filepath,
+                                "# symbols episodic memory store (cleared)\n", NULL, 0);
+        if (status) *status = state;
+        if (state == ATOMIC_STORE_UNCHANGED) return 0;
     }
     store->count = 0;
-    return 1;
+    return state != ATOMIC_STORE_COMMITTED_DURABILITY_UNKNOWN;
 }
+
+/* Legacy ABI: preserve result codes, expose publication through Ex only. */
+int EpisodicStoreAppend(EPISODIC_STORE *s, const char *a, const char *b, const char *c, const char *d)
+{ return EpisodicStoreAppendEx(s,a,b,c,d,NULL); }
+int EpisodicStoreSave(const EPISODIC_STORE *s)
+{ return EpisodicStoreSaveEx(s,NULL); }
+int EpisodicStoreForget(EPISODIC_STORE *s, const char *a, const char *b, const char *c)
+{ return EpisodicStoreForgetEx(s,a,b,c,NULL); }
+int EpisodicStoreClear(EPISODIC_STORE *s)
+{ return EpisodicStoreClearEx(s,NULL); }

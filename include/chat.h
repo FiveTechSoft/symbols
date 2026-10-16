@@ -100,16 +100,17 @@ void ChatInit(CHAT *ch, const char *corpus_path);
 void ChatDestroy(CHAT *ch);
 void ChatSetPersona(CHAT *ch, PERSONA_ID id);
 PERSONA_ID ChatGetPersona(const CHAT *ch);
+/* 0 can mean published but durability unconfirmed; session then follows disk. */
 int ChatLearnTriple(CHAT *ch, const char *subject, const char *relation, const char *object, const char *source);
 /* Forget one learned triple: removed from the persistent store
    atomically first, then from the live session (schema pair, text
    graph, rebuilt reasoning graph). Returns 1 forgotten, 0 not present,
-   -1 persistence failure (nothing changed). */
+   -1 persistence not confirmed (publication may have changed disk/session). */
 int ChatForgetTriple(CHAT *ch, const char *subject, const char *relation, const char *object);
 uint32_t ChatEpisodicCount(const CHAT *ch);
 /* Clear all episodic memory: the empty store is persisted first, then
    every learned fact is scrubbed from the live session. Returns 1 on
-   success, 0 on persistence failure (nothing changed). */
+   success, 0 if persistence was not confirmed (disk/session may have changed). */
 int ChatEpisodicClear(CHAT *ch);
 const EPISODIC_RECORD *ChatEpisodicGet(const CHAT *ch, uint32_t idx);
 uint32_t ChatLoadCorpus(CHAT *ch, const char *path);

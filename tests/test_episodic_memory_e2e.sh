@@ -33,7 +33,7 @@ cleanup() {
     [ -n "$SRV" ] && kill "$SRV" 2>/dev/null
     chmod "$(cat "$TMPD/memdir.mode")" "$MEMDIR" 2>/dev/null
     cp "$TMPD/store.orig" "$STORE" 2>/dev/null
-    rm -f "$STORE.tmp" 2>/dev/null
+    # The store owns unique temps; never sweep historical/foreign temp names.
     rm -rf "$TMPD"
 }
 trap cleanup EXIT
@@ -123,7 +123,7 @@ else
 STORE_BEFORE=$(md5sum "$STORE" | cut -d' ' -f1)
 chmod 0555 "$MEMDIR"
 post faillearn "/learn Barbara hermano_de McClintock"
-assert_contains faillearn "No se pudo" "failed write is reported, never claimed"
+assert_contains faillearn "No se confirmo la persistencia; el estado puede haber cambiado" "failed write is reported, never claimed"
 assert_not_contains faillearn "Hecho aprendido" "failed write never claims success"
 post q5 "es barbara hermano de mcclintock?"
 assert_not_contains q5 "Si," "failed learn never answers Si"
@@ -132,7 +132,10 @@ assert_contains failforget "no estaba en la memoria" "forget of unknown fact sti
 chmod 0755 "$MEMDIR"
 STORE_AFTER=$(md5sum "$STORE" | cut -d' ' -f1)
 [ "$STORE_BEFORE" = "$STORE_AFTER" ] || { echo "FAIL: store changed under read-only dir"; fail=1; }
-[ ! -e "$STORE.tmp" ] || { echo "FAIL: temporary file left behind"; fail=1; }
+# No operation-owned unique temp may remain after this ordinary failure.
+if find "$MEMDIR" -maxdepth 1 -name 'episodic.tsv.tmp.*' | grep -q .; then
+    echo "FAIL: operation temporary file left behind"; fail=1
+fi
 echo "ok: failed writes left the store byte-identical (atomic)"
 fi
 
@@ -145,7 +148,7 @@ else
 STORE_BEFORE=$(md5sum "$STORE" | cut -d' ' -f1)
 chmod 0555 "$MEMDIR"
 post roforget "/forget Barbara hermano_de McClintock"
-assert_contains roforget "sigue intacto" "failed forget reported, fact kept"
+assert_contains roforget "No se confirmo la persistencia; el estado puede haber cambiado" "failed forget reported, fact kept"
 chmod 0755 "$MEMDIR"
 STORE_AFTER=$(md5sum "$STORE" | cut -d' ' -f1)
 [ "$STORE_BEFORE" = "$STORE_AFTER" ] || { echo "FAIL: store changed by failed forget"; fail=1; }

@@ -225,17 +225,19 @@ The current episodic store persists records of:
 (subject, relation, object, source, timestamp)
 ```
 
-It loads them at startup, deduplicates triples case-insensitively, grows dynamically, and can rewrite or clear a TSV file. Saves write a sibling temporary file, check `fflush` and `fclose`, then replace the destination by rename (`MoveFileExA` on Windows). A failed auto-save rolls an append back in memory; a failed save during selective forgetting restores the removed record. `test_episodic_memory` exercises initialization, append, duplicate handling, save/load into a second store, attributes, timestamps, accumulation, selective forgetting, failed-write propagation, atomic replacement, and clear.
+It loads them at startup, deduplicates triples case-insensitively, grows dynamically, and can rewrite or clear a TSV file. Saves write an exclusively created, per-operation sibling temporary file. POSIX checks all writes, `fsync(file)`, close, rename, then `fsync(parent)`; traversed parent directory entries (including existing entries on retry) are synchronized before use. Windows checks writes, `FlushFileBuffers` and close, then keeps `MoveFileExA` with `REPLACE_EXISTING | WRITE_THROUGH`. Only pre-publication failures roll RAM back. After a successful rename, a failed parent sync means the new image is visible with durability unknown; append, forget, clear and the live chat session follow the published image even though the legacy API reports failure. `test_episodic_memory` exercises initialization, append, duplicate handling, save/load into a second store, attributes, timestamps, accumulation, selective forgetting, failed-write propagation, atomic replacement, and clear.
 
 It is a prototype, not the verified episodic memory specified in Roadmap Phase 6:
 
 - lookup is a linear scan;
 - records do not contain repository SHA, problem signature, diagnosis, chosen operator, patch hash, evaluator evidence, outcome, or negative episode;
 - there is no confidence model, contradiction resolution, selective correction, or invalidation policy;
-- the atomic replacement does not include `fsync` of the file and parent directory, so crash-durable persistence is not guaranteed;
+- the storage API reports OS/filesystem synchronization success, not a physical power-cut guarantee on every filesystem or device;
 - clearing the store does not prove that an already injected fact stops influencing the live graph in the same process.
 
-These are active correctness gaps. A reported successful write does not by itself prove crash durability or remove a fact already injected into the live graph.
+These remain limits of the prototype. `AtomicStoreReplaceDetailed` distinguishes `UNCHANGED` (this invocation did not publish), `COMMITTED_DURABILITY_UNKNOWN` (published, later sync failed), and `DURABLE` (the prescribed platform calls succeeded). The legacy `AtomicStoreReplace` returns 1 only for `DURABLE`; 0 can mean the disk already changed. Episodic `Ex` variants expose that status without changing legacy return codes or struct layouts. No-op, invalid and `auto_save=0` paths report `UNCHANGED` in the out-status even if an in-memory operation succeeds.
+
+POSIX new images use mode0666 under the current umask. An existing regular destination's mode is read with `fstat` and copied with best-effort `fchmod` before rename; failure to preserve the mode is not a persistence failure. Ownership and ACL preservation are not promised. A stable, trusted parent namespace is required. Unsupported directory sync fails honestly. Cleanup removes only the invocation's own unpublished temp, best effort; crashes or cleanup errors can leave orphan temps or created directories. Unique temps prevent collisions but do not serialize a caller's read-modify-write cycle: episodic concurrent updates can still lose a writer's update. Engineering episodes retain their separate whole-cycle lock. A failed durability result must not be read as proof that an episode is absent. `test_atomic_store_durability` uses private OS-call adapters and injected failures; these are API-sequence tests, not power-cut experiments.
 
 ## 7. Boundaries
 

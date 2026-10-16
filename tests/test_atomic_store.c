@@ -32,17 +32,19 @@ int main(void)
     assert(AtomicStoreReplace(path,"again!!!",8));image(path,b,8);assert(!memcmp(b,"again!!!",8));
 #else
     assert(!AtomicStoreReplace("build/atomic-store-test/subdir/store/child","x",1));
-    /* Blocking the temporary file forces failure before rename. */
+    /* The old shared temp name is foreign: never touch it. */
     assert(mkdir("build/atomic-store-test/subdir/store.tmp",0700)==0);
-    assert(!AtomicStoreReplace(path,"bad-data",8));
+    assert(AtomicStoreReplace(path,"updated!",8));
     image(path,b,8);assert(!memcmp(b,"updated!",8));
     assert(rmdir("build/atomic-store-test/subdir/store.tmp")==0);
-    /* /dev/full accepts a buffered write, then rejects flush: target survives. */
+    /* A foreign symlink is neither followed nor removed. Fault-stage
+       no-truncation checks now live in the private adapter target. */
     if (access("/dev/full", F_OK)==0) {
         assert(symlink("/dev/full", "build/atomic-store-test/subdir/store.tmp")==0);
-        assert(!AtomicStoreReplace(path,"bad-data",8));
+        assert(AtomicStoreReplace(path,"updated!",8));
         image(path,b,8);assert(!memcmp(b,"updated!",8));
-        assert(access("build/atomic-store-test/subdir/store.tmp",F_OK)!=0);
+        assert(access("build/atomic-store-test/subdir/store.tmp",F_OK)==0);
+        assert(UNLINK("build/atomic-store-test/subdir/store.tmp")==0);
     }
     /* A directory target cannot be replaced, original still exists. */
     assert(mkdir("build/atomic-store-test/target",0700)==0);
