@@ -935,6 +935,39 @@ sllm_test(test_agent_shell tests/test_agent_shell.c)
 sllm_test(test_task_ops tests/test_task_ops.c)
 sllm_test(test_shell_ops tests/test_shell_ops.c)
 sllm_test(test_server_taskops tests/test_server_taskops.c)
+# These two tests execute task_ops' sh -n / stated-contract probes, not just
+# shell parsing. Keep the shell local to these tests and preserve runtime PATH
+# additions (notably the ASAN DLL directory installed after configure).
+if(WIN32)
+    if(CMAKE_VERSION VERSION_LESS 3.22)
+        message(FATAL_ERROR "Windows shell tests require CMake 3.22+ for ENVIRONMENT_MODIFICATION")
+    endif()
+    find_package(Git QUIET)
+    set(_symbols_sh_hints
+        "$ENV{ProgramFiles}/Git/usr/bin"
+        "$ENV{LOCALAPPDATA}/Programs/Git/usr/bin")
+    if(GIT_EXECUTABLE)
+        get_filename_component(_symbols_git_dir "${GIT_EXECUTABLE}" DIRECTORY)
+        list(APPEND _symbols_sh_hints
+            "${_symbols_git_dir}/../usr/bin"
+            "${_symbols_git_dir}/../bin"
+            "${_symbols_git_dir}/../../usr/bin")
+    endif()
+    find_program(SYMBOLS_TEST_SH NAMES sh.exe sh HINTS ${_symbols_sh_hints}
+        DOC "POSIX sh for Windows task_ops tests (for example Git/usr/bin/sh.exe)")
+    if(NOT SYMBOLS_TEST_SH)
+        message(FATAL_ERROR "Windows task_ops tests need sh.exe. Install Git for Windows or set SYMBOLS_TEST_SH to its absolute path.")
+    endif()
+    execute_process(COMMAND "${SYMBOLS_TEST_SH}" -c "exit 0"
+        RESULT_VARIABLE _symbols_sh_rc ERROR_VARIABLE _symbols_sh_error TIMEOUT 10)
+    if(NOT "${_symbols_sh_rc}" STREQUAL "0")
+        message(FATAL_ERROR "SYMBOLS_TEST_SH cannot run sh -c exit 0: ${_symbols_sh_rc} ${_symbols_sh_error}")
+    endif()
+    get_filename_component(_symbols_sh_dir "${SYMBOLS_TEST_SH}" DIRECTORY)
+    set_property(TEST test_task_ops test_server_taskops APPEND PROPERTY
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_symbols_sh_dir}")
+    message(STATUS "Windows task_ops test shell: ${SYMBOLS_TEST_SH}")
+endif()
 sllm_test(test_build_ops tests/test_build_ops.c)
 sllm_test(test_command_policy tests/test_command_policy.c)
 sllm_test(test_core_fuzz tests/test_core_fuzz.c)
