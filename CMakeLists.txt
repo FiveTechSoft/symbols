@@ -853,7 +853,10 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120)
     add_test(NAME test_i18n_warning
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_i18n_warning.py
-                     --compiler ${CMAKE_C_COMPILER} --compiler-id ${CMAKE_C_COMPILER_ID})
+                     --compiler ${CMAKE_C_COMPILER} --compiler-id ${CMAKE_C_COMPILER_ID}
+                     --cmake ${CMAKE_COMMAND} --generator "${CMAKE_GENERATOR}"
+                     --platform "${CMAKE_GENERATOR_PLATFORM}" --toolset "${CMAKE_GENERATOR_TOOLSET}"
+                     --config $<CONFIG>)
     set_tests_properties(test_i18n_warning PROPERTIES TIMEOUT 180)
     add_test(NAME test_shell_diag_gate
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_diag_gate.py --self-test)

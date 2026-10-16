@@ -28,6 +28,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compiler', required=True)
     parser.add_argument('--compiler-id', required=True)
+    parser.add_argument('--cmake', default='cmake')
+    parser.add_argument('--generator', default='')
+    parser.add_argument('--platform', default='')
+    parser.add_argument('--toolset', default='')
+    parser.add_argument('--config', default='Release')
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     root = args.root.resolve()
@@ -50,11 +55,34 @@ def main():
         (tmp/'lookup.c').write_text('\n'.join(body)+'\n', encoding='utf-8')
         (tmp/'header.c').write_text('#include "i18n.h"\nint check(void) { return LangFindByCode("EN") == LANG_EN; }\n', encoding='utf-8')
         if args.compiler_id == 'MSVC':
-            common = [args.compiler, '/nologo', '/W4', '/WX', '/TC', '/I'+str(root/'include')]
-            checked(common+['/c', str(tmp/'header.c'), '/Fo'+str(tmp/'header.obj')], cwd=tmp)
-            checked(common+['/Dstrcasecmp=_stricmp', str(tmp/'lookup.c'), str(root/'src/i18n.c'),
-                            '/Fe'+str(tmp/'lookup.exe')], cwd=tmp)
-            executable = tmp/'lookup.exe'
+            # Visual Studio's build selects CRT/SDK; CTest need not inherit vcvars.
+            # Keep both consumer compilation and implementation under /W4 /WX.
+            project = [
+                'cmake_minimum_required(VERSION 3.16)',
+                'project(i18n_warning_probe C)',
+                'add_library(header_probe OBJECT header.c)',
+                'add_executable(lookup lookup.c "'+(root/'src/i18n.c').as_posix()+'")',
+                'foreach(t header_probe lookup)',
+                '  target_include_directories(${t} PRIVATE "'+(root/'include').as_posix()+'")',
+                '  target_compile_options(${t} PRIVATE /W4 /WX)',
+                'endforeach()',
+                'target_compile_definitions(lookup PRIVATE strcasecmp=_stricmp)',
+            ]
+            (tmp/'CMakeLists.txt').write_text('\n'.join(project)+'\n', encoding='utf-8')
+            build = tmp/'build'
+            configure = [args.cmake, '-S', str(tmp), '-B', str(build)]
+            if args.generator:
+                configure += ['-G', args.generator]
+            if args.platform:
+                configure += ['-A', args.platform]
+            if args.toolset:
+                configure += ['-T', args.toolset]
+            checked(configure, cwd=tmp)
+            checked([args.cmake, '--build', str(build), '--config', args.config,
+                     '--target', 'header_probe', 'lookup'], cwd=tmp)
+            executable = build/args.config/'lookup.exe'
+            if not executable.is_file():
+                executable = build/'lookup.exe'  # single-config generator
         elif args.compiler_id in ('GNU', 'Clang', 'AppleClang'):
             common = [args.compiler, '-Wall', '-Wextra', '-Werror', '-I'+str(root/'include')]
             checked(common+['-std=c11', '-c', str(tmp/'header.c'), '-o', str(tmp/'header.o')], cwd=tmp)
