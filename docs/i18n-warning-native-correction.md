@@ -1,0 +1,12 @@
+# Native i18n regression infrastructure correction
+
+2026-10-17. Original code623 published3c98c16d20c3da4dcef93f4a6aacdd72dba5716e, after support497fc94f2b4a52ce0f31ad290b8b54d41a82fa78. Preserve original failure. Release117222651095 failed only new test_i18n_warning: direct cl.exe could compile header-only consumer without CRT, then implementation failed fatal C1083 string.h not found. CTest on Visual Studio does not necessarily inherit vcvars INCLUDE/LIB. This is regression-driver setup failure, not evidence of wrong lookup, and not a green final gate. No rerun623 or warning suppression.
+
+Correction changes only CMake test arguments and MSVC driver branch. GCC branch, gold23casesx3states, source_contract, fixed declaration/definition (two removed const) and source body remain identical. Pass CMAKE_COMMAND, CMAKE_GENERATOR, CMAKE_GENERATOR_PLATFORM, CMAKE_GENERATOR_TOOLSET and current CONFIG into driver. MSVC creates temporary CMake C subproject, matching generator/platform/toolset. Two native targets: header_probe OBJECT(header-only consumer), lookup EXE(fixed gold consumer + actual src/i18n.c). Both target_compile_options /W4 /WX; same declared strcasecmp=_stricmp compatibility macro, no hand-built CRT/SDK include/lib paths. CMake configure/build timeouts remain fail-closed; execute exact built lookup and require exit0. No SKIP and no workflow/allowlist change.
+
+Gold unchanged (eedd515aa5d0b456015b856d328c52eb07147cc50de41430a1dab3b9fc0d5b13), original source fix unchanged. Linux branch regression rerun locally, originalred retained; native corrected MSVC remains unverified until final Release+ASAN completed. Current CMake config supplies compiler version/SDK via generator, not a claim that subprocess targets inherit parent's ASAN instrumentation. Existing full-project ASAN job still builds instrumented main project; lookup subprocess is strict compile/run but not claimed independently ASAN-instrumented. Local GNU direct fixture ASAN+UBSan already measured separately. A future instrumentation change would require separate design.
+
+This is a follow-up correction on current3c98c16, not a replacement that replays the earlier source diff. Native totals remain273 unless measured otherwise; derive counts live. Keep original failure counts in closeout and verify all final native gates, not only the new test. One fs_win_race repeat permitted if needed, not applicable to this infrastructure failure.
+
+Source raw failure:
+https://github.com/FiveTechSoft/symbols/commit/497fc94f2b4a52ce0f31ad290b8b54d41a82fa78/checks/117222651095/logs
