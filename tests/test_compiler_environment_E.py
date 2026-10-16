@@ -15,7 +15,11 @@ gold = json.loads((root / 'tests/compiler_environment_E_gold.json').read_text())
 completed = []
 
 def run(args, text=None, env=None, timeout=90):
+    # Diagnostic fixtures are byte-defined UTF-8, including curly quotes.
+    # Windows' default ANSI encoding would turn U+2018/U+2019 into 91/92.
+    # Other child/tool output keeps the platform encoding it already used.
     result = subprocess.run([str(binary), *args], input=text, text=True,
+                            encoding='utf-8' if text is not None else None,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             env=env, timeout=timeout)
     if result.returncode:
