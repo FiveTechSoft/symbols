@@ -1,0 +1,793 @@
+{
+  "version": 1,
+  "base": "d7eb5a33ee012f47c3dad9dabc29ec5ca8eb7386",
+  "precode": true,
+  "scope": "audit2-E only",
+  "struct_layout_changes": false,
+  "shell_quoting_changes": false,
+  "cases": [
+    {
+      "id": "ordinary",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "3",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "zero",
+      "route": "parser",
+      "expected_token": "0,",
+      "have_token": "0",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "max",
+      "route": "parser",
+      "expected_token": "4294967295,",
+      "have_token": "4294967294",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "leading_zero",
+      "route": "parser",
+      "expected_token": "0004,",
+      "have_token": "003",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "semicolon",
+      "route": "parser",
+      "expected_token": "4;",
+      "have_token": "3.",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "whitespace",
+      "route": "parser",
+      "expected_token": "4\t",
+      "have_token": "3",
+      "expected": {
+        "type": "ARITY_MISMATCH",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": true,
+        "numeric_fields": "exact input values"
+      }
+    },
+    {
+      "id": "expected_overflow",
+      "route": "parser",
+      "expected_token": "4294967296,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_overflow",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4294967296,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_very_long",
+      "route": "parser",
+      "expected_token": "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_very_long",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_negative",
+      "route": "parser",
+      "expected_token": "-1,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_negative",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "-1,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_positive_sign",
+      "route": "parser",
+      "expected_token": "+4,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_positive_sign",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "+4,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_letters",
+      "route": "parser",
+      "expected_token": "4x,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_letters",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4x,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_underscore",
+      "route": "parser",
+      "expected_token": "4_0,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_underscore",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4_0,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_hex",
+      "route": "parser",
+      "expected_token": "0x4,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_hex",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "0x4,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_exponent",
+      "route": "parser",
+      "expected_token": "4e2,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_exponent",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4e2,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_fraction",
+      "route": "parser",
+      "expected_token": "4.5,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_fraction",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4.5,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_unicode_digit",
+      "route": "parser",
+      "expected_token": "٤,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_unicode_digit",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "٤,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_missing_digits",
+      "route": "parser",
+      "expected_token": ",",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_missing_digits",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": ",",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_newline_before_digit",
+      "route": "parser",
+      "expected_token": "\t4,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_newline_before_digit",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "\t4,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "expected_nonascii_suffix",
+      "route": "parser",
+      "expected_token": "4é,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "have_nonascii_suffix",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "4é,",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "missing_both",
+      "route": "parser",
+      "expected_token": null,
+      "have_token": null,
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "missing_expected",
+      "route": "parser",
+      "expected_token": null,
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "missing_have",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": null,
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "key_inside_word",
+      "route": "parser",
+      "expected_token": "unexpected 4,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "duplicate_expected",
+      "route": "parser",
+      "expected_token": "4, expected 5,",
+      "have_token": "3",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "duplicate_have",
+      "route": "parser",
+      "expected_token": "4,",
+      "have_token": "3 have 2",
+      "expected": {
+        "type": "UNKNOWN",
+        "error_count": 1,
+        "item_count": 1,
+        "raw_location_symbol_retained": true,
+        "numeric_remedy": false,
+        "numeric_fields": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "warning_precedes_error",
+      "route": "parser_and_remedy",
+      "input": "warning with different/no arity, then error expected7 have2",
+      "expected": {
+        "root": "first actual error",
+        "expected": 7,
+        "actual": 2,
+        "no_warning_numbers": true
+      }
+    },
+    {
+      "id": "invalid_arity_then_valid_error",
+      "route": "parser_and_remedy",
+      "input": "invalid arity error then valid arity error",
+      "expected": {
+        "root": "first error UNKNOWN",
+        "numeric_remedy": false,
+        "item_count": 2
+      }
+    },
+    {
+      "id": "nonarity_and_quotes",
+      "route": "parser",
+      "input": "existing ASCII/curly-quoted missing-member and undeclared fixtures",
+      "expected": "unchanged existing classifications/symbol/suggestion"
+    },
+    {
+      "id": "compiler_child_env",
+      "route": "real_child",
+      "parent": {
+        "LC_ALL": "nonC",
+        "LC_MESSAGES": "nonC",
+        "LANG": "nonC",
+        "sentinel": "kept"
+      },
+      "expected": {
+        "child_LC_ALL": "C",
+        "child_LC_MESSAGES": "C",
+        "child_LANG": "C",
+        "sentinel": "kept",
+        "parent": "unchanged"
+      }
+    },
+    {
+      "id": "windows_env_case_duplicates",
+      "route": "native_windows_real_child",
+      "parent": "mixed-case replaced keys and ordinary/special drive entries",
+      "expected": {
+        "VSLANG": "1033",
+        "locale_keys": "one canonical pinned value each",
+        "PATH": "preserved",
+        "drive_entries": "preserved",
+        "parent": "unchanged"
+      }
+    },
+    {
+      "id": "normal_and_test_inherit",
+      "route": "real_child_and_caller",
+      "parent": "nonC",
+      "expected": {
+        "normal_api": "inherited",
+        "runner_test_command": "inherited",
+        "postcompile_program": "inherited",
+        "cleanup_command": "normal"
+      }
+    },
+    {
+      "id": "build_routes_pinned",
+      "route": "caller_integration",
+      "input": "owned GCC probes, CMake configure/build, make dryrun, build-script check, runner build_command",
+      "expected": "compiler child-only mode; original command/policy unchanged"
+    },
+    {
+      "id": "concurrent_normal_compiler",
+      "route": "real_threads_real_children",
+      "expected": {
+        "compiler": "pinned",
+        "normal": "inherited",
+        "parent": "unchanged",
+        "no_cross_contamination": true
+      }
+    },
+    {
+      "id": "allocation_failure",
+      "route": "private_fault_target",
+      "expected": {
+        "child_launch": false,
+        "execution_failed": true,
+        "parent": "unchanged",
+        "no_inherited_fallback": true
+      }
+    },
+    {
+      "id": "guarded_refusal",
+      "route": "compiler_guarded",
+      "input": "command rejected by current policy without existing grant",
+      "expected": {
+        "exit": 126,
+        "execution_failed": true,
+        "child_launch": false,
+        "no_policy_bypass": true
+      }
+    },
+    {
+      "id": "failure_timeout_cleanup",
+      "route": "real_child",
+      "input": "invalid cwd / nonzero exit / timeout / launch failure",
+      "expected": {
+        "parent": "unchanged",
+        "owned_env": "freed",
+        "result": "existing initialized semantics",
+        "job_group_cleanup": "unchanged"
+      }
+    },
+    {
+      "id": "actual_compiler",
+      "route": "native_toolchain",
+      "input": "broken C source through compiler mode",
+      "expected": "record actual emitted diagnostics and parse; no invented Spanish reproduction"
+    },
+    {
+      "id": "windows_v2_release_unchanged",
+      "route": "native_MSVC_Release",
+      "input": "frozen v2 unmodified ordinary AgentShellExec",
+      "expected": "native exit0 AND complete frozen27-call/PSS/File/NTroot/PIPE3/control protocol, candidate not closed"
+    },
+    {
+      "id": "windows_v2_asan_unchanged",
+      "route": "native_MSVC_ASAN",
+      "input": "frozen v2 unmodified ordinary AgentShellExec",
+      "expected": "native exit0 AND complete frozen27-call/PSS/File/NTroot/PIPE3/control protocol, candidate not closed"
+    }
+  ],
+  "mutants_must_fail": [
+    "skip_compiler_routing",
+    "missing_LC_ALL",
+    "missing_LC_MESSAGES",
+    "missing_LANG",
+    "missing_Windows_VSLANG",
+    "mutate_global_environment",
+    "fallback_inherited_on_alloc_failure",
+    "bypass_guarded_policy",
+    "unchecked_atoi_overflow",
+    "accept_partial_integer",
+    "drop_invalid_arity_line",
+    "invent_numeric_remedy",
+    "use_warning_item_numbers"
+  ],
+  "limits": [
+    "English grammar only for imported diagnostics",
+    "command may explicitly override child environment",
+    "no installed Spanish catalogs measured",
+    "no model-wide locale guarantee",
+    "native Windows v2 mandatory and never rebaselined"
+  ]
+}
