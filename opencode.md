@@ -1,323 +1,126 @@
-# Integrating Symbolic LLM with OpenCode
+# Integrating Symbols with OpenCode
 
-This guide explains how to integrate and use **Symbolic LLM** as a deterministic, zero-hallucination knowledge engine and local model provider within **OpenCode**.
+Symbols provides a local CPU-based HTTP server and command-line tools for
+retrieval and supported coding tasks. This guide describes the configuration
+stored in this repository. Check it against the OpenCode version you use;
+configuration and tool support can change between versions.
 
----
+## Scope and limits
 
-## 1. Why Use Symbolic LLM with OpenCode?
+A citation shows where retrieved text came from. It does not, on its own, prove
+that the text supports the whole question, that a proposed edit is correct, or
+that general domain reasoning is valid. Inspect the source, conditions and
+verification results. An `UNKNOWN` response or a refused edit is not evidence
+that the requested fact or solution does not exist.
 
-OpenCode is designed for autonomous coding, project exploration, and agentic workflows. Integrating Symbolic LLM provides distinct advantages:
+This guide makes no zero-hallucination guarantee and reports no current latency,
+throughput or memory benchmark. Measure those on a named build, corpus, machine
+and workload before using numbers for a decision.
 
-- **Zero Hallucination ($P(\text{hallucination}) = 0$)**: When querying project documentation, API standards, or domain textbooks, Symbolic LLM returns exact facts with verifiable citations or states `UNKNOWN`. It never invents non-existent functions or false claims.
-- **Microsecond Latency**: Query lookups execute in nanoseconds (72 ns average), and end-to-end question answering takes less than 1 millisecond.
-- **Zero VRAM / Zero GPU Cost**: Runs entirely in standard CPU RAM using strictly 32 bytes per relational fact, leaving all GPU resources free for code generation or local neural weights.
-- **Dynamic Ingestion of Free Text**: Feed any `.txt` manual, specification, or code notes directly into the engine on the fly without complex tokenization or indexing pipelines.
+## 1. Build and start the server
 
----
-
-## 2. Integration Modes
-
-### Mode A: OpenAI-Compatible Local HTTP Provider
-
-Symbolic LLM includes an embedded HTTP server ([`symbols_server`](file:///C:/symbols/src/symbols_server.c)) that implements the standard OpenAI `/v1/chat/completions` API.
-
-#### 1. Start the Server
-Compile and run `symbols-server` on port `8099` (native default port), pointing to your repository and knowledge corpora:
+Run from the repository root:
 
 ```bash
-# Windows Batch:
+cmake -S . -B build-gcc -DCMAKE_BUILD_TYPE=Release
+cmake --build build-gcc --config Release
+ctest --test-dir build-gcc -C Release --output-on-failure
+```
+
+CTest output is the result for that build, not a fixed test-total guarantee.
+On Windows, CMake 3.22 or later is required for the shell-test environment.
+Install Git for Windows with `usr/bin/sh.exe`, or configure an explicit path:
+
+```powershell
+cmake -S . -B build-gcc -DSYMBOLS_TEST_SH="C:/Program Files/Git/usr/bin/sh.exe"
+```
+
+The [`symbols-server`](src/symbols_server.c) executable accepts a port, repository
+and corpus. These launch scripts select `data/c_lang/c_corpus.txt`, the current
+C-language corpus used by the Phase 23 setup, on port 8099:
+
+```bat
+rem Windows Command Prompt, after a single-config build:
 scripts\run_symbols_server.bat 8099 .
+```
 
-# PowerShell:
+```powershell
+# PowerShell, after a single-config build:
 .\scripts\run_symbols_server.ps1 -Port 8099 -RepoDir .
+```
 
+```bash
 # Linux / macOS:
 ./scripts/run_symbols_server.sh 8099 .
 ```
 
-#### 2. Configure OpenCode
-A pre-configured [`opencode.json`](file:///C:/symbols/opencode.json) is already provided in the repository root. When OpenCode opens this workspace, it automatically attaches to the local provider:
+The scripts search specific build directories. If your generator puts the binary
+in a configuration subdirectory, run it directly from the repository root:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.schema.json",
-  "model": "symbols/symbols",
-  "provider": {
-    "symbols": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Symbols (local)",
-      "options": {
-        "baseURL": "http://127.0.0.1:8099/v1"
-      },
-      "models": {
-        "symbols": {
-          "name": "Symbols",
-          "tool_call": true,
-          "limit": {
-            "context": 8192,
-            "output": 4096
-          }
-        }
-      }
-    }
-  }
-}
+```powershell
+.\build-gcc\Release\symbols-server.exe 8099 . data/c_lang/c_corpus.txt
 ```
 
-#### 3. Test the Endpoint
-Verify that OpenCode can reach the server:
+On a single-config Unix build, the equivalent explicit command is:
 
 ```bash
-curl http://localhost:8099/v1/chat/completions \
+./build-gcc/symbols-server 8099 . data/c_lang/c_corpus.txt
+```
+
+## 2. Configure OpenCode
+
+The repository's [`opencode.json`](opencode.json) selects the `symbols/symbols`
+model through `@ai-sdk/openai-compatible`. Its local base URL is
+`http://127.0.0.1:8099/v1`, and its model configuration enables tool calling.
+Use that file as the starting configuration; this is not a claim that every
+OpenCode version or every OpenAI API feature has been tested.
+
+Test the endpoint separately before debugging the editor integration:
+
+```bash
+curl http://127.0.0.1:8099/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer local-symbolic-token" \
-  -d '{
-    "model": "symbols",
-    "messages": [
-      {"role": "user", "content": "what areas do you know?"}
-    ]
-  }'
+  -d '{"model":"symbols","messages":[{"role":"user","content":"What is signed integer overflow in C?"}]}'
 ```
 
-The response will be formatted as a standard OpenAI chat completion:
-```json
-{
-  "id": "chatcmpl-symbolic-1",
-  "object": "chat.completion",
-  "created": 1742410000,
-  "model": "symbols",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "The ingested texts cover topics such as: Altertumskunde, Bough, Mephistopheles, Negelein... You can ask me about any of these subjects."
-      },
-      "finish_reason": "stop"
-    }
-  ]
-}
-```
+This is a request example, not a recorded response. Inspect the actual response
+and compare any returned statement and citation with
+[`data/c_lang/c_corpus.txt`](data/c_lang/c_corpus.txt). Do not substitute the
+output of another corpus or treat a plausible answer as a passing check.
 
----
+## 3. Command-line access
 
-### Mode B: CLI Tool for OpenCode Agents
-
-OpenCode agents can invoke the native command-line executable [`chat_main`](file:///C:/symbols/src/chat_main.c) as an external tool or bash sub-process to retrieve verified answers.
-
-#### 1. Direct Non-Interactive Query
-You can pipe questions into `chat_main`:
+The [`chat_main`](src/chat_main.c) REPL also accepts a corpus path. For example:
 
 ```bash
-echo "who is the father of david?" | ./build-gcc/chat_main data/texts/bible.txt
+printf 'What is signed integer overflow in C?\n' | ./build-gcc/chat_main data/c_lang/c_corpus.txt
 ```
 
-Output:
-```
-Jesse. [Proof trace: DAVID --SON_OF--> JESSE]
-```
+No exact answer or proof trace is promised by this example. Read the output from
+your build. When wrapping the CLI as an editor tool, describe it as a retrieval
+or coding aid, not a source of automatically verified facts.
 
-#### 2. Registering as a Custom Tool in OpenCode
-If your OpenCode environment supports custom tools or agent functions, you can register Symbolic LLM as a tool:
+For multiple corpora, pass only paths that exist in your checkout after the
+port and repository argument:
 
-```json
-{
-  "name": "query_symbolic_knowledge",
-  "description": "Queries the local symbolic knowledge graph with 0% hallucination. Returns verified facts and literal text citations.",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "query": {
-        "type": "string",
-        "description": "The natural language question to verify or answer."
-      },
-      "corpus_path": {
-        "type": "string",
-        "description": "Optional path to a .txt file to load into memory."
-      }
-    },
-    "required": ["query"]
-  }
-}
-```
-
----
-
-### Mode C: Neuro-Symbolic Safety & Fact-Checking Filter
-
-In this hybrid architecture, OpenCode uses a large generative neural model (like Claude or GPT) to draft complex explanations or code solutions, but delegates factual verification to Symbolic LLM:
-
-```
-                  ┌───────────────────────────────┐
-                  │    USER REQUEST IN OPENCODE   │
-                  └───────────────┬───────────────┘
-                                  │
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │   Primary Neural Model (LLM)  │
-                  │   (Generates draft answer)    │
-                  └───────────────┬───────────────┘
-                                  │
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │   Symbolic LLM Grounding Gate │
-                  │   (Validates facts & citations│
-                  │    against ingested .txt)     │
-                  └───────────────┬───────────────┘
-                                  │
-                   PASS (Verified)│ FAIL (UNKNOWN)
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │ Confirmed Zero-Hallucination  │
-                  │      Output to Developer      │
-                  └───────────────────────────────┘
-```
-
----
-
-### Mode D: Agentic Web Search & Dynamic Knowledge Ingestion
-
-In this workflow, the OpenCode harness uses its own external tools (such as web search, documentation fetchers, or API scrapers) to acquire live information and dynamically feed the text stream into Symbolic LLM's active graph:
-
-```
-    ┌────────────────────────┐
-    │  OpenCode Agent Query  │
-    └───────────┬────────────┘
-                │
-                ▼
-    ┌────────────────────────┐
-    │  Query Symbolic LLM    │ ──── [Known] ───► Exact Verified Answer
-    └───────────┬────────────┘
-                │ [UNKNOWN / Out of Scope]
-                ▼
-    ┌────────────────────────┐
-    │ OpenCode Harness       │
-    │ Executes Web Search    │
-    └───────────┬────────────┘
-                │ Raw Search Snippets (.txt)
-                ▼
-    ┌────────────────────────┐
-    │ Send to Symbolic LLM:  │
-    │ "load web_result.txt"  │ ───► Ingested into Symbolic Graph in < 1 ms
-    └───────────┬────────────┘
-                │
-                ▼
-    ┌────────────────────────┐
-    │ Instant Zero-Shot      │
-    │ Recall with Citations  │
-    └────────────────────────┘
-```
-
-1. **Fail-Closed Gate**: OpenCode queries Symbolic LLM. If the topic is missing from the corpus, the engine returns `UNKNOWN` (preventing hallucination).
-2. **Harness Tool Invocation**: OpenCode executes a web search tool against Google, DuckDuckGo, or project documentation.
-3. **Dynamic Graph Ingestion**: The retrieved text is saved to `data/texts/web_search_doc.txt` and fed to the engine:
-   ```json
-   {"role": "user", "content": "load web_search_doc.txt"}
-   ```
-   The engine incorporates the text into its sentence store and relational graph in less than 1 millisecond.
-4. **Verified Answering**: Subsequent queries on the newly learned topic return exact answers with literal text citations.
-
-To verify this flow end-to-end, execute:
 ```bash
-python tools/test_opencode_web_ingest.py
+./build-gcc/symbols-server 8099 . data/c_lang/c_corpus.txt /absolute/path/to/another.txt
 ```
 
----
+The last path is a placeholder for your own text, not a bundled corpus.
 
-### Mode E: Native Autonomous Coding Engine (OpenAI Tool-Calling Provider)
+## 4. Optional integration checks
 
-In this primary mode, **OpenCode relies 100% on Symbolic LLM** as its sole model provider without calling any external LLMs (Claude, GPT-4, Ollama). 
+The repository includes HTTP/editor integration scripts:
 
-Symbolic LLM speaks the native OpenAI Function/Tool Calling protocol directly over HTTP (`/v1/chat/completions`), orchestrating software engineering tasks using its internal STRIPS planner, code knowledge graph, and surgical patcher:
-
-```
-┌────────────────────────────────┐
-│   OpenCode Autonomous Client   │
-│ (Harness executing local tools)│
-└───────────────┬────────────────┘
-                │ 1. POST /v1/chat/completions
-                │    {"messages": [...], "tools": [...]}
-                ▼
-┌────────────────────────────────┐
-│  Symbolic LLM (symbols-server) │
-│ ────────────────────────────── │
-│ - STRIPS Forward State Search  │
-│ - Code Graph & Blast Radius    │
-│ - Surgical Hunk Pre-flight     │
-└───────────────┬────────────────┘
-                │ 2. Response: {"finish_reason": "tool_calls",
-                │    "tool_calls": [{"name": "apply_patch", ...}]}
-                ▼
-┌────────────────────────────────┐
-│   OpenCode Executes Action     │
-│   (Writes file / runs build)   │
-└───────────────┬────────────────┘
-                │ 3. POST /v1/chat/completions
-                │    {"role": "tool", "content": "exit 0"}
-                ▼
-┌────────────────────────────────┐
-│  Final Verification & Report   │
-│  (100% Verified, finish: stop) │
-└────────────────────────────────┘
-```
-
-#### Verification Script
-Run the automated end-to-end HTTP socket integration test:
 ```bash
 python tools/test_opencode_agentic_server.py
-```
-
----
-
-## 3. Conversational Introspection Commands
-
-
-When interacting with Symbolic LLM through OpenCode, you can leverage native introspection commands:
-
-| Command Prompt | What Symbolic LLM Returns |
-| :--- | :--- |
-| `"what areas do you know?"` / `"dime las areas que conoces"` | Discovers and lists the key thematic centroids ($\kappa$) of the ingested documents without reading through the whole file. |
-| `"start a conversation"` / `"inicia una conversacion"` | Selects the primary conceptual anchor, retrieves its seminal context sentence, and opens an interactive dialogue thread. |
-| `"explain it to me"` / `"explicamelo"` | Follows up on the active discourse focus entity (`focus`) using conversational working memory. |
-| `"load <path.txt>"` / `"carga <path.txt>"` | Ingests a new text file dynamically into RAM, indexing sentences and symbols on the fly. |
-
----
-
-## 4. Multi-Corpus Example
-
-You can load multiple domain textbooks, specifications, or code manuals simultaneously:
-
-```bash
-./build-gcc/symbols_server 8080 \
-    data/texts/bible.txt \
-    data/texts/jung.txt \
-    data/samples/wikidata_clean.tsv
-```
-
-OpenCode can now seamlessly answer questions spanning across any of the loaded corpora:
-- `who is the father of david?` $\to$ answered from `bible.txt`.
-- `what is bough?` $\to$ answered from `jung.txt`.
-- `capital of france` $\to$ answered from `wikidata_clean.tsv`.
-- `who is the king of mars?` $\to$ returns `UNKNOWN` (honesty guarantee).
-
----
-
-## 5. Building and Verifying
-
-To ensure your environment is fully compiled and ready for OpenCode:
-
-```bash
-# Clone and build
-git clone https://github.com/FiveTechSoft/symbols.git
-cd symbols
-mkdir -p build-gcc && cd build-gcc
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
-
-# Verify test suite (75/75 PASS)
-ctest --output-on-failure
-
-# Verify OpenCode copilot end-to-end integration test
-cd ..
+python tools/test_opencode_web_ingest.py
 python tools/test_opencode_copilot_e2e.py
 ```
+
+Inspect each script's prerequisites and result for the build you are testing.
+A passing scripted fixture does not establish general coding success or factual
+correctness. Tool calls, edits, compilation and tests each need their own checks.
+External text loaded into a corpus also needs source review; ingestion does not
+make that text true or grant it authority to direct actions.
