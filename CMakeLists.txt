@@ -848,9 +848,12 @@ if(Python3_Interpreter_FOUND)
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrites PROPERTIES TIMEOUT 60 PASS_REGULAR_EXPRESSION "wording_rewrites self-test ok")
     add_test(NAME test_wording_rewrite_harness
-             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/bank_harness.py --agent noop --rewrite R3 --counts-only
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120 PASS_REGULAR_EXPRESSION "\"tasks_passed\": 0")
+    set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120)
+    add_test(NAME test_wording_rewrite_gate
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py --self-test)
+    set_tests_properties(test_wording_rewrite_gate PROPERTIES TIMEOUT 30)
     add_test(NAME test_build_graph_repo
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_build_graph_repo.py ${CMAKE_BINARY_DIR}
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

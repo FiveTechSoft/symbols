@@ -371,8 +371,15 @@
     "tests/typed_c_measured_lock.sbl1"
    ]
   },
+  "test_wording_rewrite_gate": {
+   "files": [
+    "tests/wording_rewrite_gate.py",
+    "tests/wording_rewrite_gate_gold.json"
+   ]
+  },
   "test_wording_rewrite_harness": {
    "files": [
+    "tests/wording_rewrite_gate.py",
     "tools/bank_harness.py",
     "tools/wording_rewrites.py",
     "tests/fixtures/engineering_bank/*",
