@@ -1,12 +1,9 @@
 /* ============================================================
-   test_agent_core: Verification of Agentic AI Core & Tool Contracts
-   in a Real Development Scenario (OpenCode-compatible).
-   Verifies:
-     1. Formal tool contract integrity (grep, find, view, replace, command).
-     2. Deterministic serialization/deserialization on wire protocol.
-     3. Complete perception-action-observation loop in a bug repair scenario.
-     4. Abductive error diagnosis and recovery upon build failure.
-     5. Strict fail-closed termination via ACTION_FINAL.
+   test_agent_core: shared metadata and fixture-only protocol/state tests.
+   Observations below are simulated, not results from an executed compiler,
+   editor, or OpenCode integration. Fixed replacement strings are fixture
+   behavior. ACTION_FINAL is a state transition, not proof of real repair.
+   Existing assertions exercise the demonstration, not a safety verifier.
    ============================================================ */
 
 #include <stdio.h>
@@ -78,8 +75,8 @@ int main(void)
           strcmp(act_parsed.args, "Query='MySymbol' SearchPath='src'") == 0,
           "Parseo inverso exacto sin perdida de argumentos");
 
-    /* --- TEST 3: ESCENARIO REAL DE REPARACION DE BUG MULTI-PASO --- */
-    printf("\n--- TEST 3: Escenario Real: Reparacion Autonoma de Bug en 5 Pasos ---\n");
+    /* --- TEST 3: SIMULATED MULTI-STEP FIXTURE --- */
+    printf("\n--- TEST 3: Fixture simulado: transiciones de reparacion en 5 pasos ---\n");
     AGENT_SESSION session;
     AgentSessionInit(&session, "Fix undefined OldFunction bug", "OldFunction", "mingw32-make test");
 
@@ -158,8 +155,8 @@ int main(void)
     check(act5.type == ACTION_FINAL && strstr(act5.prompt, "verified") != NULL,
           "Paso 5: Agente concluye formalmente con ACTION_FINAL");
 
-    /* --- TEST 4: RECUPERACION ANTE FALLOS (ABDUCCION POR EXIT != 0) --- */
-    printf("\n--- TEST 4: Recuperacion ante Fallos y Abduccion de Errores ---\n");
+    /* --- TEST 4: SIMULATED FAILURE-STATE TRANSITION --- */
+    printf("\n--- TEST 4: Fixture simulado: transicion ante exit != 0 ---\n");
     AGENT_SESSION session_fail;
     AgentSessionInit(&session_fail, "Fix compiler error", "BuggySym", "gcc test.c");
     session_fail.state = AGENT_STATE_VERIFYING_BUILD;

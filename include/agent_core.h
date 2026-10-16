@@ -1,20 +1,19 @@
 /* ============================================================
-   agent_core: Agentic AI Core & Tool Contract Dispatcher for OpenCode.
-   Pure C11, zero tensors, zero backprop, fail-closed truth preservation.
+   agent_core: shared tool metadata and fixture-only session demonstrations.
 
-   Core capabilities:
-     1. TOOL CONTRACT SPECIFICATION: Formal preconditions, arguments, and effects
-        for standard OpenCode tools (grep_search, view_file, replace_file_content, run_command).
-     2. GOAL-TO-TOOL ACTION DISPATCHING: Deterministic state machine advancing
-        through perception, inspection, patch application, and test verification.
-     3. OBSERVATION INGESTION & STATE TRANSITIONS: Ingests environment feedback,
-        updates Working Memory, and triggers abductive error diagnosis on failure.
-     4. PROTOCOL INTEGRATION: Emits standard ACTION_TOOL_CALL, ACTION_FINAL,
-        and ACTION_ABSTAIN serialized for OpenCode harness execution.
+   AgentSessionInit, AgentDecideNextAction and AgentProcessObservation are
+   fixture-only APIs for deterministic protocol/state-transition tests. They
+   remain linked and callable in the common library: this is not runtime
+   enforcement. Do not execute their generated actions against arbitrary
+   projects. They are not a general repair API or an execution-safety gate.
 
-   Design principles:
-     - HARDCODING=0: Tool contracts and state rules are declarative.
-     - Fail-closed: Never executes unverified mutations without inspection.
+   Their fixed fallback is src/engine.c:10; patch choices include
+   OldFunction/NewFunctionFixed and wrong.h/correct.h, independent of the
+   inspected source. Exit code zero can produce COMPLETED/FINAL; generated
+   verification wording is a simulated result, not proof of a real repair.
+
+   OpenCodeToolId, TOOL_CONTRACT_SPEC and AgentGetToolContract remain shared
+   tool metadata. Including this header does not invoke the fixture routines.
    ============================================================ */
 
 #ifndef AGENT_CORE_H
@@ -54,7 +53,7 @@ typedef struct
     uint32_t       is_mutating;     /* 1 if alters disk state, 0 if read-only */
 } TOOL_CONTRACT_SPEC;
 
-/* Current cognitive state of the agent in a multi-step task */
+/* State of the fixture-only multi-step session demonstration. */
 typedef enum
 {
     AGENT_STATE_IDLE = 0,
@@ -66,7 +65,7 @@ typedef enum
     AGENT_STATE_COMPLETED          /* Goal satisfied -> ACTION_FINAL */
 } AGENT_TASK_STATE;
 
-/* The agent's working session in the OpenCode harness */
+/* Session storage for the fixture-only demonstration. */
 typedef struct
 {
     char             task_goal[AGENT_MAX_GOAL_LEN];
@@ -84,28 +83,30 @@ typedef struct
     PROVENANCE_TABLE pt;
 } AGENT_SESSION;
 
-/* Initialize an agentic session for a goal */
+/* Fixture-only: initialize a demonstration session, not a production task. */
 void AgentSessionInit(
     AGENT_SESSION *session,
     const char *goal,
     const char *initial_symbol,
     const char *verification_command);
 
-/* Decide the next formal action based on the task state and working memory */
+/* Fixture-only: emit the next demonstration action. Do not execute it against
+   arbitrary projects; this function does not validate its safety or intent. */
 int AgentDecideNextAction(
     AGENT_SESSION *session,
     const GRAPH *graph,
     const COGNITIVE_LEARNER *learner,
     AgentAction *out_action);
 
-/* Process observation returned by the OpenCode harness */
+/* Fixture-only: consume a simulated observation and select fixed transitions.
+   Patch strings are not inferred from the observation or verified as correct. */
 int AgentProcessObservation(
     AGENT_SESSION *session,
     GRAPH *graph,
     COGNITIVE_LEARNER *learner,
     const AgentObservation *obs);
 
-/* Inspect tool contracts */
+/* Inspect shared tool metadata, independently of the fixture session API. */
 const TOOL_CONTRACT_SPEC *AgentGetToolContract(OpenCodeToolId id);
 
 #endif /* AGENT_CORE_H */

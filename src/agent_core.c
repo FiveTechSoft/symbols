@@ -1,10 +1,18 @@
 /* ============================================================
-   agent_core: Agentic AI Core & Tool Contract Dispatcher for OpenCode.
-   Pure C11, zero tensors, zero backprop, fail-closed truth preservation.
+   agent_core: shared tool metadata and a fixture-only session state machine.
 
-   English code comments (project rule); protocol keywords follow
-   agent_action specification.
-   HARDCODING=0: All tool contracts and transitions are declarative.
+   AgentSessionInit, AgentDecideNextAction and AgentProcessObservation are
+   callable protocol/state-transition demonstrations, not a general repair
+   engine. They remain linked in the common library; fixture-only is a usage
+   contract, not runtime enforcement. Do not execute their generated actions
+   against arbitrary projects.
+
+   Fixed fixture behavior includes the src/engine.c:10 fallback,
+   OldFunction/NewFunctionFixed substitutions, and wrong.h/correct.h includes.
+   Inspection and diagnosis do not derive those edits from observed code.
+   Exit code zero moves the demonstration to COMPLETED; its generated FINAL
+   wording does not prove a real repair, safety, or formal verification.
+   Tool IDs, TOOL_CONTRACT_SPEC and AgentGetToolContract are shared metadata.
    ============================================================ */
 
 #include <stdio.h>
@@ -13,7 +21,7 @@
 #include <ctype.h>
 #include "agent_core.h"
 
-/* Declarative specification of OpenCode-compatible tools */
+/* Shared tool metadata; these entries are not an execution-safety verifier. */
 static const TOOL_CONTRACT_SPEC g_contracts[OP_TOOL_COUNT] = {
     [OP_TOOL_NONE] = {
         .id = OP_TOOL_NONE,
@@ -172,7 +180,7 @@ int AgentDecideNextAction(
 
         case AGENT_STATE_DIAGNOSING_ERROR:
         {
-            /* Trigger abductive diagnosis */
+            /* Fixture transition: request a header view, not general diagnosis. */
             out_action->type = ACTION_TOOL_CALL;
             strncpy(out_action->tool, g_contracts[OP_TOOL_VIEW_FILE].name, sizeof(out_action->tool) - 1);
             snprintf(out_action->args, sizeof(out_action->args),
@@ -233,7 +241,7 @@ int AgentProcessObservation(
                 session->state = AGENT_STATE_INSPECTING_CODE;
                 return 1;
             }
-            /* Fallback if grep returned simple path */
+            /* Fixed fixture fallback; the nonempty observed path is not used. */
             if (strlen(out) > 0)
             {
                 strncpy(session->target_file, "src/engine.c", sizeof(session->target_file) - 1);
@@ -247,7 +255,7 @@ int AgentProcessObservation(
 
         case AGENT_STATE_INSPECTING_CODE:
         {
-            /* Code inspected: formulate patch */
+            /* Fixed fixture replacement, not a patch derived from inspected code. */
             strncpy(session->patch_target, "void OldFunction(void);", sizeof(session->patch_target) - 1);
             strncpy(session->patch_replacement, "void NewFunctionFixed(void);", sizeof(session->patch_replacement) - 1);
             session->state = AGENT_STATE_APPLYING_FIX;
@@ -256,7 +264,7 @@ int AgentProcessObservation(
 
         case AGENT_STATE_APPLYING_FIX:
         {
-            /* Patch applied: transition to verification */
+            /* Simulated patch response: transition without validating a real edit. */
             session->state = AGENT_STATE_VERIFYING_BUILD;
             return 1;
         }
@@ -271,7 +279,7 @@ int AgentProcessObservation(
             }
             else
             {
-                /* Compilation or test failure: diagnose error */
+                /* Nonzero simulated result selects the fixture diagnosis state. */
                 strncpy(session->last_error_diag, obs->output, sizeof(session->last_error_diag) - 1);
                 session->state = AGENT_STATE_DIAGNOSING_ERROR;
                 return 1;
@@ -280,7 +288,7 @@ int AgentProcessObservation(
 
         case AGENT_STATE_DIAGNOSING_ERROR:
         {
-            /* Error diagnosed via abductive recovery: re-plan patch */
+            /* Fixed fixture include replacement, not evidence-based recovery. */
             strncpy(session->patch_target, "#include <wrong.h>", sizeof(session->patch_target) - 1);
             strncpy(session->patch_replacement, "#include <correct.h>", sizeof(session->patch_replacement) - 1);
             session->state = AGENT_STATE_APPLYING_FIX;
