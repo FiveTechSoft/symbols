@@ -1,0 +1,84 @@
+{
+  "base": "f04616658a91d245658855a5f4179847b99b5845",
+  "prior_gold_sha256": "e1221d3374cde545438447e0f08f146f62951e5f886742c013cb3262c67fb854",
+  "cases": [
+    {
+      "id": "reserved_alias_empty",
+      "status": 3,
+      "source": "empty unchanged",
+      "destination": "inside/c absent",
+      "native_prior610_status": 0,
+      "prior_destination_observed": false
+    },
+    {
+      "id": "reserved_long_empty",
+      "status": 3,
+      "source": "empty unchanged",
+      "destination": "inside/c absent"
+    },
+    {
+      "id": "ordinary_alias_empty",
+      "status": 0,
+      "source": "empty unchanged",
+      "destination": "byte-exact empty"
+    },
+    {
+      "id": "ordinary_alias_nonempty",
+      "status": 0,
+      "source": "COPY! unchanged",
+      "destination": "byte-exact COPY!"
+    },
+    {
+      "id": "final_name_unavailable",
+      "status": 3,
+      "basis": "wc_final_reserved returns-1; refuse rather than treat unknown as ordinary",
+      "native_injected_case": false
+    },
+    {
+      "id": "batch_reserved_literal",
+      "status": 1,
+      "source": "empty unchanged",
+      "basis": "wb_path_ok maps all validation refusals toINVALID"
+    },
+    {
+      "id": "batch_chain",
+      "kills": 9,
+      "counts": [
+        9,
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+        0,
+        0
+      ],
+      "basis": "three shared old pins+three new stages+three new pins; one deletion per killed process; tenth finishes0"
+    },
+    {
+      "id": "old_lock_oracle_rejected",
+      "accepted": false,
+      "reason": "foreign_long.batch_replace3e not1e"
+    },
+    {
+      "id": "old_batch_oracle_rejected",
+      "accepted": false,
+      "reason": "kills6 remainder3 wrong for shared old pins"
+    },
+    {
+      "id": "copy_alias_bypass_rejected",
+      "accepted": false,
+      "reason": "foreign_alias.copy_source0e never accepted"
+    }
+  ],
+  "nonclaims": [
+    "new strengthened destination-absence assertion not executed before repair",
+    "no generic win_open change",
+    "no oracle change to accept reserved alias copying",
+    "no all-renames or hard-link-alias safety proof",
+    "no old regex green treated as evidence"
+  ]
+}
