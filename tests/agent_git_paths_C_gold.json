@@ -1,0 +1,527 @@
+{
+  "base": "c105e107cf4dbfda888c475569b288a7ed3f3d23",
+  "contract": "portable separator conversion, existing whitelist, no spaces; state checks read-only; cursor migration preserves old LF splitting",
+  "case_count": 61,
+  "cases": [
+    {
+      "id": "plain",
+      "group": "normalize",
+      "input": "p.patch",
+      "valid": true,
+      "normalized": "p.patch"
+    },
+    {
+      "id": "slash",
+      "group": "normalize",
+      "input": "dir/p.patch",
+      "valid": true,
+      "normalized": "dir/p.patch"
+    },
+    {
+      "id": "backslash",
+      "group": "normalize",
+      "input": "dir\\p.patch",
+      "valid": true,
+      "normalized": "dir/p.patch"
+    },
+    {
+      "id": "mixed",
+      "group": "normalize",
+      "input": "dir\\sub/p.patch",
+      "valid": true,
+      "normalized": "dir/sub/p.patch"
+    },
+    {
+      "id": "dot",
+      "group": "normalize",
+      "input": "./p.patch",
+      "valid": true,
+      "normalized": "./p.patch"
+    },
+    {
+      "id": "dot_backslash",
+      "group": "normalize",
+      "input": ".\\p.patch",
+      "valid": true,
+      "normalized": "./p.patch"
+    },
+    {
+      "id": "inner_dash",
+      "group": "normalize",
+      "input": "dir/-p.patch",
+      "valid": true,
+      "normalized": "dir/-p.patch"
+    },
+    {
+      "id": "repeat_slash",
+      "group": "normalize",
+      "input": "dir//p.patch",
+      "valid": true,
+      "normalized": "dir//p.patch"
+    },
+    {
+      "id": "repeat_backslash",
+      "group": "normalize",
+      "input": "dir\\\\p.patch",
+      "valid": true,
+      "normalized": "dir//p.patch"
+    },
+    {
+      "id": "allowed_ascii",
+      "group": "normalize",
+      "input": "Az09._-/p.patch",
+      "valid": true,
+      "normalized": "Az09._-/p.patch"
+    },
+    {
+      "id": "max255",
+      "group": "normalize",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.patch",
+      "valid": true,
+      "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.patch"
+    },
+    {
+      "id": "null",
+      "group": "normalize",
+      "input": null,
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "empty",
+      "group": "normalize",
+      "input": "",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "root_slash",
+      "group": "normalize",
+      "input": "/p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "root_backslash",
+      "group": "normalize",
+      "input": "\\p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "unc",
+      "group": "normalize",
+      "input": "\\\\server\\share\\p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "drive",
+      "group": "normalize",
+      "input": "C:\\p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "drive_relative",
+      "group": "normalize",
+      "input": "C:p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "leading_dash",
+      "group": "normalize",
+      "input": "-p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "parent",
+      "group": "normalize",
+      "input": "../p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "parent_backslash",
+      "group": "normalize",
+      "input": "..\\p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "inner_parent",
+      "group": "normalize",
+      "input": "dir\\..\\p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "double_dot_word",
+      "group": "normalize",
+      "input": "a..b.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "space",
+      "group": "normalize",
+      "input": "dir with space/p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "quote",
+      "group": "normalize",
+      "input": "p\".patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "single_quote",
+      "group": "normalize",
+      "input": "p'.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "semicolon",
+      "group": "normalize",
+      "input": "p.patch;true",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "percent",
+      "group": "normalize",
+      "input": "%PATH%.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "bang",
+      "group": "normalize",
+      "input": "!p.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "ampersand",
+      "group": "normalize",
+      "input": "p&x.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "dollar",
+      "group": "normalize",
+      "input": "p$(x).patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "backtick",
+      "group": "normalize",
+      "input": "p`x`.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "newline",
+      "group": "normalize",
+      "input": "p\n.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "tab",
+      "group": "normalize",
+      "input": "p\t.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "unicode",
+      "group": "normalize",
+      "input": "\u00e9.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "max256",
+      "group": "normalize",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.patch",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "oversized",
+      "group": "normalize",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "valid": false,
+      "public_result": "CHECK_FAILED",
+      "shell_calls": 0
+    },
+    {
+      "id": "lf",
+      "group": "scanner",
+      "input": "one\ntwo\n",
+      "raw_lines": [
+        "one",
+        "two"
+      ]
+    },
+    {
+      "id": "crlf",
+      "group": "scanner",
+      "input": "one\r\ntwo\r\n",
+      "raw_lines": [
+        "one\r",
+        "two\r"
+      ]
+    },
+    {
+      "id": "no_final_lf",
+      "group": "scanner",
+      "input": "one\ntwo",
+      "raw_lines": [
+        "one",
+        "two"
+      ]
+    },
+    {
+      "id": "skip_blank",
+      "group": "scanner",
+      "input": "\n\none\n\ntwo\n\n",
+      "raw_lines": [
+        "one",
+        "two"
+      ]
+    },
+    {
+      "id": "empty_lines",
+      "group": "scanner",
+      "input": "\n\n",
+      "raw_lines": []
+    },
+    {
+      "id": "empty_buffer",
+      "group": "scanner",
+      "input": "",
+      "raw_lines": []
+    },
+    {
+      "id": "only_cr",
+      "group": "scanner",
+      "input": "\r",
+      "raw_lines": [
+        "\r"
+      ]
+    },
+    {
+      "id": "interleaved_scanners",
+      "group": "scanner",
+      "expected": "two local cursors preserve each other and an outer strtok continuation"
+    },
+    {
+      "id": "compare_outer_strtok",
+      "group": "scanner",
+      "expected": "CompareChanges leaves caller strtok continuation at second token"
+    },
+    {
+      "id": "forward",
+      "group": "public_stub",
+      "path": "dir\\p.patch",
+      "exits": [
+        0
+      ],
+      "result": "NOT_APPLIED",
+      "commands": [
+        "git apply --check \"dir/p.patch\""
+      ],
+      "caller_input_unchanged": true
+    },
+    {
+      "id": "reverse",
+      "group": "public_stub",
+      "path": "dir\\p.patch",
+      "exits": [
+        1,
+        0
+      ],
+      "result": "ALREADY_APPLIED",
+      "commands": [
+        "git apply --check \"dir/p.patch\"",
+        "git apply --check --reverse \"dir/p.patch\""
+      ],
+      "caller_input_unchanged": true
+    },
+    {
+      "id": "neither",
+      "group": "public_stub",
+      "path": "dir\\p.patch",
+      "exits": [
+        1,
+        1
+      ],
+      "result": "NO_MATCH",
+      "commands": [
+        "git apply --check \"dir/p.patch\"",
+        "git apply --check --reverse \"dir/p.patch\""
+      ],
+      "caller_input_unchanged": true
+    },
+    {
+      "id": "parse_error",
+      "group": "public_stub",
+      "path": "dir\\p.patch",
+      "exits": [
+        128
+      ],
+      "result": "CHECK_FAILED",
+      "commands": [
+        "git apply --check \"dir/p.patch\""
+      ],
+      "caller_input_unchanged": true
+    },
+    {
+      "id": "reverse_parse_error",
+      "group": "public_stub",
+      "path": "dir\\p.patch",
+      "exits": [
+        1,
+        128
+      ],
+      "result": "CHECK_FAILED",
+      "commands": [
+        "git apply --check \"dir/p.patch\"",
+        "git apply --check --reverse \"dir/p.patch\""
+      ],
+      "caller_input_unchanged": true
+    },
+    {
+      "id": "launch_failure",
+      "group": "public_stub",
+      "result": "CHECK_FAILED"
+    },
+    {
+      "id": "timeout",
+      "group": "public_stub",
+      "result": "CHECK_FAILED"
+    },
+    {
+      "id": "stdout_truncation",
+      "group": "public_stub",
+      "result": "CHECK_FAILED"
+    },
+    {
+      "id": "stderr_truncation",
+      "group": "public_stub",
+      "result": "CHECK_FAILED"
+    },
+    {
+      "id": "native_fresh",
+      "group": "native_real_git",
+      "state": "fresh",
+      "paths": [
+        "dir/p.patch",
+        "dir\\p.patch"
+      ],
+      "result": "NOT_APPLIED",
+      "repository_and_patch_bytes_unchanged": true,
+      "required": [
+        "POSIX",
+        "MSVC_RELEASE",
+        "MSVC_ASAN"
+      ]
+    },
+    {
+      "id": "native_uncommitted",
+      "group": "native_real_git",
+      "state": "applied_uncommitted",
+      "paths": [
+        "dir/p.patch",
+        "dir\\p.patch"
+      ],
+      "result": "ALREADY_APPLIED",
+      "repository_and_patch_bytes_unchanged": true,
+      "required": [
+        "POSIX",
+        "MSVC_RELEASE",
+        "MSVC_ASAN"
+      ]
+    },
+    {
+      "id": "native_committed",
+      "group": "native_real_git",
+      "state": "applied_committed",
+      "paths": [
+        "dir/p.patch",
+        "dir\\p.patch"
+      ],
+      "result": "ALREADY_APPLIED",
+      "repository_and_patch_bytes_unchanged": true,
+      "required": [
+        "POSIX",
+        "MSVC_RELEASE",
+        "MSVC_ASAN"
+      ]
+    },
+    {
+      "id": "native_diverged",
+      "group": "native_real_git",
+      "state": "diverged",
+      "paths": [
+        "dir/p.patch",
+        "dir\\p.patch"
+      ],
+      "result": "NO_MATCH",
+      "repository_and_patch_bytes_unchanged": true,
+      "required": [
+        "POSIX",
+        "MSVC_RELEASE",
+        "MSVC_ASAN"
+      ]
+    },
+    {
+      "id": "native_mixed",
+      "group": "native_real_git",
+      "path": "dir\\sub/p.patch",
+      "state": "fresh",
+      "result": "NOT_APPLIED"
+    },
+    {
+      "id": "missing_patch",
+      "group": "public_stub",
+      "path": "dir\\missing.patch",
+      "result": "CHECK_FAILED",
+      "shell_calls": 0
+    }
+  ]
+}
