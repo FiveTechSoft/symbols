@@ -54,6 +54,12 @@ jobs:
         run: |
           python .\tests\shell_resource_gate.py -- .\build\Release\test_shell_file_resource_win.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native spawn v2 contract (exit and evidence)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python .\tests\shell_spawn_v2_gate.py -- .\build\Release\test_shell_spawn_win.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Tests
         if: ${{ !cancelled() }}
         run: ctest --test-dir build -C Release --output-on-failure
@@ -158,10 +164,13 @@ jobs:
           $snapshotExit = $LASTEXITCODE
           python .\tests\shell_resource_gate.py -- .\build-asan\Debug\test_shell_file_resource_win.exe
           $resourceExit = $LASTEXITCODE
+          python .\tests\shell_spawn_v2_gate.py -- .\build-asan\Debug\test_shell_spawn_win.exe
+          $spawnV2Exit = $LASTEXITCODE
           ctest --test-dir build-asan -C Debug --output-on-failure
           $suiteExit = $LASTEXITCODE
           if ($diagnosticExit -ne 0) { exit $diagnosticExit }
           if ($ownerExit -ne 0) { exit $ownerExit }
           if ($snapshotExit -ne 0) { exit $snapshotExit }
           if ($resourceExit -ne 0) { exit $resourceExit }
+          if ($spawnV2Exit -ne 0) { exit $spawnV2Exit }
           exit $suiteExit
