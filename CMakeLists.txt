@@ -1347,3 +1347,11 @@ if(WIN32)
     set_tests_properties(test_shell_handle_snapshot_win PROPERTIES TIMEOUT 120
         PASS_REGULAR_EXPRESSION "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1")
 endif()
+
+# Isolated external resource queries, separate from the frozen snapshot fixture.
+if(WIN32)
+    add_executable(test_shell_file_resource_win tests/test_shell_file_resource_win.c)
+    add_test(NAME test_shell_file_resource_win COMMAND test_shell_file_resource_win)
+    set_tests_properties(test_shell_file_resource_win PROPERTIES TIMEOUT 180
+        PASS_REGULAR_EXPRESSION "WINDOWS_FILE_RESOURCE arms=3; candidate_not_closed=1; owner_unproven=1; complete=1")
+endif()
