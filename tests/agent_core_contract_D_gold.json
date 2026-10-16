@@ -1,0 +1,86 @@
+{
+  "base": "679c45ba0677276675d2345fd081d408b43b7d5d",
+  "scope": "fixture-only documentation contract; no runtime enforcement or behavior change",
+  "cases": [
+    {
+      "id": "source_fixture",
+      "expected": "source opening calls session state machine fixture-only and callable, not runtime enforced"
+    },
+    {
+      "id": "header_fixture",
+      "expected": "public header warns fixture-only session functions, not arbitrary-project repair API"
+    },
+    {
+      "id": "source_fixed_values",
+      "expected": "source contract names src/engine.c:10, OldFunction/NewFunctionFixed and wrong.h/correct.h"
+    },
+    {
+      "id": "header_fixed_values",
+      "expected": "public header explains fixed fallback and substitutions"
+    },
+    {
+      "id": "registry_shared",
+      "expected": "registry and OpenCodeToolId metadata remain shared, not fixture-only"
+    },
+    {
+      "id": "session_api_labels",
+      "expected": "comments on all three session APIs identify fixture-only scope"
+    },
+    {
+      "id": "no_absolute_promises",
+      "expected": "source/header no HARDCODING=0 or fail-closed/general diagnosis promise"
+    },
+    {
+      "id": "simulated_final",
+      "expected": "contract says generated FINAL and exit0 do not prove real repair"
+    },
+    {
+      "id": "test_honesty",
+      "expected": "test header/comments/display labels name simulated responses, not real autonomous repair or proof"
+    },
+    {
+      "id": "no_enforcement_claim",
+      "expected": "public header explicitly says linked/callable and no runtime enforcement"
+    },
+    {
+      "id": "source_token_identity",
+      "expected": "C lexer removes comments/whitespace; every remaining source token exactly base"
+    },
+    {
+      "id": "header_token_identity",
+      "expected": "same token equality for public header"
+    },
+    {
+      "id": "test_assertions_identity",
+      "expected": "all check(...) calls and inputs/state assignments/exit expression exactly base; only printf labels/comments may differ"
+    },
+    {
+      "id": "runtime_literals_identity",
+      "expected": "all production C string literals exactly base"
+    },
+    {
+      "id": "call_inventory",
+      "expected": "no direct calls to session state-machine APIs outside definitions/declarations and tests; report actual checked paths"
+    },
+    {
+      "id": "local_core",
+      "expected": "existing test_agent_core passes without changed oracle"
+    },
+    {
+      "id": "local_code_graph",
+      "expected": "existing test_code_graph passes with caller/source lookup"
+    },
+    {
+      "id": "shared_build",
+      "expected": "existing planner/runner targets compile with unchanged header ABI"
+    },
+    {
+      "id": "protected_scope",
+      "expected": "CMake/workflows/shell/E/C/v2 byte-identical"
+    },
+    {
+      "id": "native_full",
+      "expected": "final sameSHA MSVC Release+ASAN full green, core/code_graph/E/C/v2 gates actually run"
+    }
+  ]
+}
