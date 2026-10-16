@@ -1,0 +1,14 @@
+# MSVC warning gate narrowed to exact source spans
+
+2026-10-17. Original623 full-source direct cl failed CRT discovery; doc-only624 inherited that failure. Correction625 fixed CRT/SDK using CMake/VS, then MSVC Release /W4 /WX exposed a distinct pre-existing C4702 unreachable-code warning at i18n.c:388, LangTemplate's final return. Original results remain failed. Do not suppress C4702, drop /WX, edit LangTemplate or claim625 passed. ASAN625 result must be read independently, not inferred from Release.
+
+Parent scope decision01:25: MSVC gate checks header plus exact selected LangFindByCode extraction, not the whole translation unit. Keep GNU strict full-source branch unchanged. The two removed return const and gold23inputsx3states remain identical. C4702 belongs to a separate future design/gold slice; this correction does not fix it.
+
+Driver MSVC still uses parent generator/platform/toolset/config CMake subproject, /W4 /WX on header OBJECT and lookup EXE. lookup now compiles selected.c rather than full i18n.c. selected.c contains explicit dependency headers then verbatim source spans from current src/i18n.c: s_lang definition, LANG_CODES definition, LangSet, LangGet and LangFindByCode definitions. The same actual state setter/getter support existing no-state-change gold, not stubs. No hand-rewritten lookup body or table. Narrow anchored unique source-format patterns must each match exactly once, and fail closed if format changes. This is not a C parser and does not prove arbitrary future source semantics; named extraction is deliberate bounded coverage. Header declaration still compiled intact; source_contract rejects reintroduced return const. Preserve const parameter, every function body and data byte.
+
+Local controls: GNU full-source original warning tests and gold remain green after existing2constfix; selected spans hash/byte comparison against original slices; compile selected.c (POSIX dependency header strings.h in local probe only) with GCC -Wall -Wextra -Werror and run identical23inputsx3states; restoration/header/sourceconst and wrong lookup/state mutants still rejected. Invalid duplicate or missing selected definition fails extraction. These controls are not native MSVC proof. Final Release+ASAN CTest must run both strict MSVC targets+gold with exit0; no skip or partial marker. lookup subproject is not claimed ASAN-instrumented; main project ASAN gate and localGNUASAN/UBSan measurement stay separate.
+
+No full-i18n.c MSVC warning-clean claim follows. A real newly discovered source warning is recorded, not hidden or counted as fixed. No workflow/allowlist, production source beyond existing2const, strcasecmp,255 or ownership changes. Same currentHEAD expected check and reviewed patch SHA sequence before one dispatch, preserving all original failed runs and raw reasons.
+
+Observed raw625Release:
+https://github.com/FiveTechSoft/symbols/commit/1fa20ad7d5ed5276691b41b6fda7ca8481fc0dba/checks/117238895203/logs
