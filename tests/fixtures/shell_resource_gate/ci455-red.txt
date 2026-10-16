@@ -1,0 +1,42 @@
+RESOURCE_CONTROLS complete=1
+PSS_CHECKPOINT arm=count_only_pipe pid=5316 stage=0 count=62 read=0x0 write=0x0
+PSS_CHECKPOINT arm=count_only_pipe pid=5316 stage=1 count=65 read=0xc4 write=0xc8
+PSS_CHECKPOINT arm=count_only_pipe pid=5316 stage=2 count=63 read=0x0 write=0x0
+PSS_CHECKPOINT arm=count_only_pipe pid=5316 stage=3 count=65 read=0xc8 write=0xc4
+PSS_CHECKPOINT arm=count_only_pipe pid=5316 stage=4 count=63 read=0x0 write=0x0
+PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1
+PSS_CHECKPOINT arm=snapshot_only_no_pipe pid=2372 stage=0 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=0 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=0 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CHECKPOINT arm=snapshot_only_no_pipe pid=2372 stage=1 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=1 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CHECKPOINT arm=snapshot_only_no_pipe pid=2372 stage=2 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=2 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CHECKPOINT arm=snapshot_only_no_pipe pid=2372 stage=3 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=3 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CHECKPOINT arm=snapshot_only_no_pipe pid=2372 stage=4 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=snapshot_only_no_pipe stage=4 child_count=62 entries=62 walk_status=259 complete=1
+PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0
+PSS_CHECKPOINT arm=external_snapshot_pipe pid=1220 stage=0 count=62 read=0x0 write=0x0
+PSS_CAPTURE arm=external_snapshot_pipe stage=0 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CAPTURE arm=external_snapshot_pipe stage=0 child_count=62 entries=62 walk_status=259 complete=1
+PSS_CHECKPOINT arm=external_snapshot_pipe pid=1220 stage=1 count=65 read=0xbc write=0xc0
+PSS_CAPTURE arm=external_snapshot_pipe stage=1 child_count=65 entries=65 walk_status=259 complete=1
+PSS_OBJECT arm=external_snapshot_pipe stage=1 change=added value=0xb8 flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_OBJECT arm=external_snapshot_pipe stage=1 change=added value=0xbc flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_OBJECT arm=external_snapshot_pipe stage=1 change=added value=0xc0 flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_CHECKPOINT arm=external_snapshot_pipe pid=1220 stage=2 count=63 read=0x0 write=0x0
+PSS_CAPTURE arm=external_snapshot_pipe stage=2 child_count=63 entries=63 walk_status=259 complete=1
+PSS_OBJECT arm=external_snapshot_pipe stage=2 change=removed value=0xbc flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_OBJECT arm=external_snapshot_pipe stage=2 change=removed value=0xc0 flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_CHECKPOINT arm=external_snapshot_pipe pid=1220 stage=3 count=65 read=0xc0 write=0xbc
+PSS_CAPTURE arm=external_snapshot_pipe stage=3 child_count=65 entries=65 walk_status=259 complete=1
+PSS_OBJECT arm=external_snapshot_pipe stage=3 change=added value=0xbc flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_OBJECT arm=external_snapshot_pipe stage=3 change=added value=0xc0 flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_CHECKPOINT arm=external_snapshot_pipe pid=1220 stage=4 count=63 read=0x0 write=0x0
+PSS_CAPTURE arm=external_snapshot_pipe stage=4 child_count=63 entries=63 walk_status=259 complete=1
+PSS_OBJECT arm=external_snapshot_pipe stage=4 change=removed value=0xbc flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_OBJECT arm=external_snapshot_pipe stage=4 change=removed value=0xc0 flags=5 object_type=0 type_bytes=10 type=File name_bytes=0 name_status=unavailable name=
+PSS_IDENTIFICATION arm=external_snapshot_pipe new=3 persistent=1 complete=0
+PSS_ARM arm=external_snapshot_pipe complete=0 child_error=0 last_error=0
+##[error]Process completed with exit code 1.

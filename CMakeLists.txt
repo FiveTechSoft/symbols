@@ -1351,7 +1351,20 @@ endif()
 # Isolated external resource queries, separate from the frozen snapshot fixture.
 if(WIN32)
     add_executable(test_shell_file_resource_win tests/test_shell_file_resource_win.c)
-    add_test(NAME test_shell_file_resource_win COMMAND test_shell_file_resource_win)
-    set_tests_properties(test_shell_file_resource_win PROPERTIES TIMEOUT 180
-        PASS_REGULAR_EXPRESSION "WINDOWS_FILE_RESOURCE arms=3; candidate_not_closed=1; owner_unproven=1; complete=1")
+    if(NOT Python3_Interpreter_FOUND)
+        message(FATAL_ERROR "Python3 is required for the native resource evidence gate")
+    endif()
+    add_test(NAME test_shell_file_resource_win
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_resource_gate.py
+        -- $<TARGET_FILE:test_shell_file_resource_win>)
+    set_tests_properties(test_shell_file_resource_win PROPERTIES TIMEOUT 200)
+endif()
+
+# Portable counted UTF-16 type and evidence-gate mechanics, not resource efficacy.
+add_executable(test_shell_resource_type tests/test_shell_resource_type.c)
+add_test(NAME test_shell_resource_type COMMAND test_shell_resource_type)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME test_shell_resource_gate
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_shell_resource_gate.py)
+    set_tests_properties(test_shell_resource_gate PROPERTIES TIMEOUT 120)
 endif()

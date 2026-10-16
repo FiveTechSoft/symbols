@@ -1,22 +1,5 @@
 {
  "tests": {
-  "test_metrics_snapshot": {
-   "files": [
-    "tests/test_metrics_snapshot.py",
-    "tests/metrics_snapshot_gold.json",
-    "tools/metrics_snapshot.py",
-    "tools/metrics.py",
-    "tools/metrics/current.json"
-   ]
-  },
-  "test_relprobe_cite_context": {
-   "files": [
-    "tests/test_relprobe_cite_context.py"
-   ],
-   "targets": [
-    "relprobe"
-   ]
-  },
   "test_ast_inspect": {
    "files": [
     "tests/test_ast_inspect.py",
@@ -31,6 +14,13 @@
     "tools/wording_rewrites.py"
    ]
   },
+  "test_build_graph": {
+   "files": [
+    "tests/test_build_graph.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_*"
+   ]
+  },
   "test_build_graph_dynamic": {
    "files": [
     "tests/test_build_graph_dynamic.py",
@@ -43,20 +33,6 @@
     "tests/test_build_graph_dynamic.py",
     "tools/build_graph.py",
     "tests/fixtures/graph_dynamic/*"
-   ]
-  },
-  "test_build_graph_spelling": {
-   "files": [
-    "tests/test_build_graph_spelling.py",
-    "tools/build_graph.py",
-    "tests/fixtures/graph_dynamic/*"
-   ]
-  },
-  "test_build_graph": {
-   "files": [
-    "tests/test_build_graph.py",
-    "tools/build_graph.py",
-    "tests/fixtures/graph_*"
    ]
   },
   "test_build_graph_mc": {
@@ -108,10 +84,37 @@
     "tools/build_graph_inputs.json"
    ]
   },
-  "test_ctest_report_locations": {
+  "test_build_graph_repo_mc_glob": {
    "files": [
-    "tests/test_ctest_report_locations.py",
-    "tools/ctest_report.py"
+    "tests/test_build_graph_repo.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json"
+   ]
+  },
+  "test_build_graph_spelling": {
+   "files": [
+    "tests/test_build_graph_spelling.py",
+    "tools/build_graph.py",
+    "tests/fixtures/graph_dynamic/*"
+   ]
+  },
+  "test_builder_rootfs_policy": {
+   "files": [
+    "tests/test_builder_rootfs_policy.py",
+    "tools/builder_rootfs/*"
+   ]
+  },
+  "test_c_source_qa": {
+   "files": [
+    "tests/test_c_source_qa.py",
+    "tools/ast_inspect/*"
+   ]
+  },
+  "test_ctest_report": {
+   "files": [
+    "tests/test_ctest_report.py",
+    "tools/ctest_report.py",
+    "tests/fixtures/ctest_report/*"
    ]
   },
   "test_ctest_report_json_duplicates": {
@@ -120,9 +123,9 @@
     "tools/ctest_report.py"
    ]
   },
-  "test_ctest_report_values": {
+  "test_ctest_report_locations": {
    "files": [
-    "tests/test_ctest_report_values.py",
+    "tests/test_ctest_report_locations.py",
     "tools/ctest_report.py"
    ]
   },
@@ -139,54 +142,10 @@
     "tests/fixtures/ctest_report/*"
    ]
   },
-  "test_ctest_report": {
+  "test_ctest_report_values": {
    "files": [
-    "tests/test_ctest_report.py",
-    "tools/ctest_report.py",
-    "tests/fixtures/ctest_report/*"
-   ]
-  },
-  "test_select_hook": {
-   "files": [
-    "tests/test_select_hook.py",
-    "*.c",
-    "*.h",
-    "*.inc"
-   ],
-   "targets": [
-    "symbols-agent"
-   ]
-  },
-  "test_select_report": {
-   "files": [
-    "tests/test_select_report.py",
-    "tools/build_graph.py",
-    "tools/build_graph_inputs.json",
-    "*.c",
-    "*.h",
-    "*.inc"
-   ],
-   "targets": [
-    "symbols-agent"
-   ]
-  },
-  "test_build_graph_repo_mc_glob": {
-   "files": [
-    "tests/test_build_graph_repo.py",
-    "tools/build_graph.py",
-    "tools/build_graph_inputs.json"
-   ]
-  },
-  "test_builder_rootfs_policy": {
-   "files": [
-    "tests/test_builder_rootfs_policy.py",
-    "tools/builder_rootfs/*"
-   ]
-  },
-  "test_c_source_qa": {
-   "files": [
-    "tests/test_c_source_qa.py",
-    "tools/ast_inspect/*"
+    "tests/test_ctest_report_values.py",
+    "tools/ctest_report.py"
    ]
   },
   "test_engineering_bank": {
@@ -239,6 +198,15 @@
     "lexical_impact"
    ]
   },
+  "test_metrics_snapshot": {
+   "files": [
+    "tests/test_metrics_snapshot.py",
+    "tests/metrics_snapshot_gold.json",
+    "tools/metrics_snapshot.py",
+    "tools/metrics.py",
+    "tools/metrics/current.json"
+   ]
+  },
   "test_minimal_initramfs": {
    "files": [
     "tests/test_minimal_initramfs.py",
@@ -284,6 +252,14 @@
     "tools/qemu_closure/*"
    ]
   },
+  "test_relprobe_cite_context": {
+   "files": [
+    "tests/test_relprobe_cite_context.py"
+   ],
+   "targets": [
+    "relprobe"
+   ]
+  },
   "test_repository_c_repair_e2e": {
    "files": [
     "tests/test_repository_c_repair.sh",
@@ -292,6 +268,30 @@
    ],
    "targets": [
     "symbols-server"
+   ]
+  },
+  "test_select_hook": {
+   "files": [
+    "tests/test_select_hook.py",
+    "*.c",
+    "*.h",
+    "*.inc"
+   ],
+   "targets": [
+    "symbols-agent"
+   ]
+  },
+  "test_select_report": {
+   "files": [
+    "tests/test_select_report.py",
+    "tools/build_graph.py",
+    "tools/build_graph_inputs.json",
+    "*.c",
+    "*.h",
+    "*.inc"
+   ],
+   "targets": [
+    "symbols-agent"
    ]
   },
   "test_session_isolation_e2e": {
@@ -303,6 +303,13 @@
    ],
    "targets": [
     "symbols-server"
+   ]
+  },
+  "test_shell_resource_gate": {
+   "files": [
+    "tests/test_shell_resource_gate.py",
+    "tests/shell_resource_gate.py",
+    "tests/fixtures/shell_resource_gate/*"
    ]
   },
   "test_shell_routing_e2e": {

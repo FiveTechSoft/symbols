@@ -1,0 +1,82 @@
+{
+  "base": "c7d078b9e8677357526fc7d6c4205ad83ef88b85",
+  "scope": "resource queries, not source-owner attribution",
+  "pipe_arm_deltas": [
+    0,
+    3,
+    1,
+    3,
+    1
+  ],
+  "snapshot_only_deltas": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "duplicate_pre_tables_equal": true,
+  "all_snapshots_complete_and_count_equal": true,
+  "persistent_candidates": 1,
+  "candidate_pss_type": "File",
+  "candidate_not_closed": true,
+  "candidate_present_after_second_close_and_every_query": true,
+  "queries_after_fifth_checkpoint_only": true,
+  "duplicate_flags": "DUPLICATE_SAME_ACCESS",
+  "duplicate_close_source": false,
+  "duplicate_destination": "fresh isolated helper per query",
+  "query_apis": [
+    "GetFileType",
+    "GetFinalPathNameByHandleW(FILE_NAME_OPENED|VOLUME_NAME_NT)",
+    "NtQueryInformationFile(FileNameInformation=9)"
+  ],
+  "query_count_per_candidate": 3,
+  "raw_return_status_error_required": true,
+  "native_pending_is_success": false,
+  "target_tables_and_counts_equal_before_after_each_query": true,
+  "query_buffer_bytes_max": 65536,
+  "silent_clipping": false,
+  "controls": [
+    "known_disk_type_and_exact_name",
+    "known_pipe_type",
+    "invalid_handle_error",
+    "forced_helper_timeout_kill_reap"
+  ],
+  "helper_limit_ms": 3000,
+  "checkpoint_limit_ms": 20000,
+  "target_lifetime_limit_ms": 60000,
+  "ctest_outer_seconds": 200,
+  "known_pipe_name_success_required": false,
+  "predicted_candidate_file_type": null,
+  "predicted_candidate_name": null,
+  "full_resource_result": "nonempty complete NT final path observed",
+  "partial_name_or_category_only": "blocked and nonzero; not resource identification",
+  "source_owner_established_by_name": false,
+  "observer_effect_timeout_or_incomplete": "red or blocked, never redefine gold",
+  "original_fixture_gold_and_production_unchanged": true,
+  "automatic_escalation_to_etw_debugger_or_undocumented_query": false,
+  "revision": "PSS counted UTF16 type + exitcode AND complete evidence gate",
+  "prior_gold_preserved": true,
+  "type_match": {
+    "ascii": "File",
+    "valid_byte_lengths": [
+      8,
+      10
+    ],
+    "ten_bytes_require_one_terminal_nul": true,
+    "no_interior_or_multiple_nul": true,
+    "exact_case": true,
+    "flag_required": true
+  },
+  "runner_timeout_seconds": 180,
+  "success_requires": [
+    "native_exit_zero",
+    "three_candidate_queries_ordered_0_1_2",
+    "six_before_after_captures_complete",
+    "all_frozen_controls_and_arms",
+    "mode1_complete_nonempty_NT_Device_path",
+    "stable_resource_result_and_exact_final_marker"
+  ],
+  "pass_regex_removed_for_resource_only": true,
+  "gate_bank": "synthetic mechanically valid stream positive; nonzero/partial/missing/duplicate/reordered/timeout/pending/cleanup/observer/encoding/frozen455failure negatives plus subprocess and actual CTest mini-project"
+}

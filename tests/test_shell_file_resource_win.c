@@ -4,6 +4,7 @@
 #include <processsnapshot.h>
 #include <winternl.h>
 #include <wchar.h>
+#include "shell_resource_type.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -173,7 +174,7 @@ static int validate_tables(const char *arm,TABLE *tables,ULONG_PTR returned[2][2
             if(!lookup(&tables[open_stage],h) || lookup(&tables[prior_stage],h) || lookup(&tables[closed_stage],h))goto fail;
         }
     }
-    if(candidate->type_bytes!=4*sizeof(WCHAR) || memcmp(candidate->type_name,L"File",4*sizeof(WCHAR)))goto fail;
+    if(!resource_type_file(candidate->type_name,candidate->type_bytes,candidate->flags))goto fail;
     /* Every baseline identity and the new candidate must survive all later tables. */
     for(j=1;j<5;j++) {
         for(i=0;i<tables[0].count;i++)
