@@ -1,0 +1,1006 @@
+{
+  "base": "51df50c7eb49fec50902d99d96467fe58524f961",
+  "contract": "Native exit0 AND one exact complete final line with all current oracle groups; not semicolon OR",
+  "gates": {
+    "aliases_short": {
+      "test_name": "test_fs_win_aliases_short",
+      "final_line": "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
+    },
+    "lock_alias": {
+      "test_name": "test_fs_win_lock_alias",
+      "final_line": "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
+    },
+    "sweep_foreign": {
+      "test_name": "test_fs_win_sweep_foreign",
+      "final_line": "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
+    },
+    "batch_replace": {
+      "test_name": "test_fs_win_batch_replace",
+      "final_line": "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
+    },
+    "dual_win": {
+      "test_name": "test_shell_dual_win",
+      "final_line": "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
+    },
+    "snapshot_win": {
+      "test_name": "test_shell_handle_snapshot_win",
+      "final_line": "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false,
+      "arm_summaries": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1"
+      ]
+    }
+  },
+  "vectors": [
+    {
+      "id": "aliases_short_full",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "aliases_short_crlf",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "aliases_short_nonzero",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_empty",
+      "kind": "aliases_short",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_empty_nonzero",
+      "kind": "aliases_short",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_duplicate",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0",
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_wrong_field",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=99 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_prefix",
+      "kind": "aliases_short",
+      "lines": [
+        "prefix fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_suffix",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0 suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_trailing_garbage",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_bad_utf8",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "aliases_short_launch_error",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "aliases_short_timeout",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3 ; ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0 ; empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "aliases_short_fragment_0",
+      "kind": "aliases_short",
+      "lines": [
+        "fs win short cells: lock: create=R3 copy_target=R3 copy_source=R3 move_target=R3 move_source=R3 replace=R3 remove=R3 batch_create=R3 batch_replace=R3"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_fragment_1",
+      "kind": "aliases_short",
+      "lines": [
+        "ordinary_alias: create=3 copy_target=3 copy_source=0 move_target=3 move_source=0 replace=0 remove=0 batch_create=3 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "aliases_short_fragment_2",
+      "kind": "aliases_short",
+      "lines": [
+        "empty_long: copy_source=0 move_source=0 replace=0 remove=0 batch_replace=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_full",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "lock_alias_crlf",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "lock_alias_nonzero",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_empty",
+      "kind": "lock_alias",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_empty_nonzero",
+      "kind": "lock_alias",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_duplicate",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_wrong_field",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e wrong"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_prefix",
+      "kind": "lock_alias",
+      "lines": [
+        "prefix lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_suffix",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_trailing_garbage",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_bad_utf8",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "lock_alias_launch_error",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "lock_alias_timeout",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e ; foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "lock_alias_fragment_0",
+      "kind": "lock_alias",
+      "lines": [
+        "lock alias cells: held_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_fragment_1",
+      "kind": "lock_alias",
+      "lines": [
+        "foreign_long: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "lock_alias_fragment_2",
+      "kind": "lock_alias",
+      "lines": [
+        "foreign_alias: copy_source=3e move_source=3e replace=3e remove=3e batch_replace=3e"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_full",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "sweep_foreign_crlf",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "sweep_foreign_nonzero",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_empty",
+      "kind": "sweep_foreign",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_empty_nonzero",
+      "kind": "sweep_foreign",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_duplicate",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o",
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_wrong_field",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o wrong"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_prefix",
+      "kind": "sweep_foreign",
+      "lines": [
+        "prefix sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_suffix",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_trailing_garbage",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_bad_utf8",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "sweep_foreign_launch_error",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "sweep_foreign_timeout",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "sweep_foreign_fragment_0",
+      "kind": "sweep_foreign",
+      "lines": [
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "sweep_foreign_fragment_1",
+      "kind": "sweep_foreign",
+      "lines": [
+        "replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_full",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "batch_replace_crlf",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "batch_replace_nonzero",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_empty",
+      "kind": "batch_replace",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_empty_nonzero",
+      "kind": "batch_replace",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_duplicate",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_wrong_field",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 wrong"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_prefix",
+      "kind": "batch_replace",
+      "lines": [
+        "prefix sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_suffix",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_trailing_garbage",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_bad_utf8",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "batch_replace_launch_error",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "batch_replace_timeout",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "batch_replace_fragment_0",
+      "kind": "batch_replace",
+      "lines": [
+        "sweep chain: kills 6 counts 9 8 7 6 5 4 3 3"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "batch_replace_fragment_1",
+      "kind": "batch_replace",
+      "lines": [
+        "test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_full",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "dual_win_crlf",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "dual_win_nonzero",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "dual_win_empty",
+      "kind": "dual_win",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_empty_nonzero",
+      "kind": "dual_win",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "dual_win_duplicate",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5",
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_wrong_field",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=99; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_prefix",
+      "kind": "dual_win",
+      "lines": [
+        "prefix WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_suffix",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5 suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_trailing_garbage",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_bad_utf8",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "dual_win_launch_error",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "dual_win_timeout",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0; native cases=5"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "dual_win_fragment_0",
+      "kind": "dual_win",
+      "lines": [
+        "WINDOWS_CONCURRENT_DUAL_STREAM failures=0"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "dual_win_fragment_1",
+      "kind": "dual_win",
+      "lines": [
+        "native cases=5"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_full",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": true
+    },
+    {
+      "id": "snapshot_win_crlf",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": true,
+      "framing": "CRLF"
+    },
+    {
+      "id": "snapshot_win_nonzero",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_empty",
+      "kind": "snapshot_win",
+      "lines": [],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_empty_nonzero",
+      "kind": "snapshot_win",
+      "lines": [],
+      "exit": 1,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_duplicate",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_wrong_field",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1 wrong"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_prefix",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "prefix WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_suffix",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1 suffix"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_trailing_garbage",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1",
+        "late_failure"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_bad_utf8",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false,
+      "encoding": "invalid_utf8"
+    },
+    {
+      "id": "snapshot_win_launch_error",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "OSError"
+    },
+    {
+      "id": "snapshot_win_timeout",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false,
+      "failure": "TimeoutExpired"
+    },
+    {
+      "id": "snapshot_win_fragment_0",
+      "kind": "snapshot_win",
+      "lines": [
+        "WINDOWS_HANDLE_SNAPSHOT arms=3"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_fragment_1",
+      "kind": "snapshot_win",
+      "lines": [
+        "candidate_not_closed=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_fragment_2",
+      "kind": "snapshot_win",
+      "lines": [
+        "complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_control_only",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_IDENTIFICATION complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_missing_arm",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_wrong_arm_deltas",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,2,0,2,0",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_reordered_arms",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    },
+    {
+      "id": "snapshot_win_duplicate_arm",
+      "kind": "snapshot_win",
+      "lines": [
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=count_only_pipe complete=1 deltas=0,3,1,3,1",
+        "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
+        "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1",
+        "WINDOWS_HANDLE_SNAPSHOT arms=3; candidate_not_closed=1; complete=1"
+      ],
+      "exit": 0,
+      "valid": false
+    }
+  ],
+  "vector_count": 98,
+  "native_required": [
+    "MSVC_RELEASE",
+    "MSVC_ASAN"
+  ]
+}
