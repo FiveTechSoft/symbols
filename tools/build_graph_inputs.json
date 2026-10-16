@@ -446,6 +446,12 @@
    "files": [
     "tests/compiler_environment_win_mutant_gate.py"
    ]
+  },
+  "test_shell_diag_gate": {
+   "files": [
+    "tests/shell_diag_gate.py",
+    "tests/shell_diag_gate_gold.json"
+   ]
   }
  },
  "version": 1

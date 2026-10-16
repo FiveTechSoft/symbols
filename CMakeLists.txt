@@ -851,6 +851,9 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120)
+    add_test(NAME test_shell_diag_gate
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_diag_gate.py --self-test)
+    set_tests_properties(test_shell_diag_gate PROPERTIES TIMEOUT 30)
     add_test(NAME test_wording_rewrite_gate
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py --self-test)
     set_tests_properties(test_wording_rewrite_gate PROPERTIES TIMEOUT 30)
@@ -1410,9 +1413,10 @@ endif()
 if(WIN32)
     add_executable(test_shell_spawn_handles_win tests/test_shell_spawn_handles_win.c)
     target_link_libraries(test_shell_spawn_handles_win symbolic)
-    add_test(NAME test_shell_spawn_handles_win COMMAND test_shell_spawn_handles_win)
-    set_tests_properties(test_shell_spawn_handles_win PROPERTIES TIMEOUT 90
-        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_HANDLE_DIAG calls=27; counts=28")
+    add_test(NAME test_shell_spawn_handles_win
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_diag_gate.py
+                     --kind handles -- $<TARGET_FILE:test_shell_spawn_handles_win>)
+    set_tests_properties(test_shell_spawn_handles_win PROPERTIES TIMEOUT 90)
 endif()
 
 # Separate private-translation-unit API boundary diagnostic. No production hook.
@@ -1420,9 +1424,10 @@ if(WIN32)
     add_executable(test_shell_handle_owner_win tests/test_shell_handle_owner_win.c
         tests/shell_handle_boundary_win.c)
     target_link_libraries(test_shell_handle_owner_win symbolic)
-    add_test(NAME test_shell_handle_owner_win COMMAND test_shell_handle_owner_win)
-    set_tests_properties(test_shell_handle_owner_win PROPERTIES TIMEOUT 180
-        PASS_REGULAR_EXPRESSION "WINDOWS_SPAWN_OWNER_DIAG arms=2; calls_per_arm=27")
+    add_test(NAME test_shell_handle_owner_win
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/shell_diag_gate.py
+                     --kind owner -- $<TARGET_FILE:test_shell_handle_owner_win>)
+    set_tests_properties(test_shell_handle_owner_win PROPERTIES TIMEOUT 180)
 endif()
 
 # Documented PSS observation from a separate parent, never inside the child.
