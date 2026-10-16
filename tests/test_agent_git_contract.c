@@ -47,6 +47,43 @@ static GIT_CHANGES_STATUS head(const GIT_EXPECTED_CHANGE *e,size_t n,char *err)
 { return AgentGitHeadCommitMatches(R,e,n,err,GIT_ERROR_MAX); }
 static GIT_PATCH_STATE pstate(const char *p,char *err)
 { return AgentGitPatchState(R,p,err,GIT_ERROR_MAX); }
+/* Audit C: same read-only query through actual Git and the normal shell on
+   POSIX and native Windows. Snapshots include refs, index and working diff;
+   patch bytes are checked independently, not inferred from Git status. */
+static int ReadPatch(const char *path,char *out,size_t n)
+{
+    FILE *f=fopen(path,"rb");size_t got;
+    if(!f)return 0;
+    got=fread(out,1,n-1,f);
+    if(ferror(f)||!feof(f)){fclose(f);return 0;}
+    out[got]=0;return fclose(f)==0;
+}
+static int PathSnapshot(char *out,size_t n)
+{
+    SHELL_EXEC_RESULT r;
+    if(!AgentShellExec("git rev-parse HEAD && git for-each-ref && git status --porcelain=v2 --untracked-files=all && git ls-files -s && git diff --no-ext-diff --binary",S "/r2",20000,&r)||
+       r.execution_failed||r.timed_out||r.exit_code||r.stdout_truncated||r.stderr_truncated||strlen(r.stdout_buf)>=n)return 0;
+    strcpy(out,r.stdout_buf);return 1;
+}
+static int NativePathState(GIT_PATCH_STATE expected,int mixed_only)
+{
+    const char *paths[]={"dir/p.patch","dir\\p.patch","dir\\sub/p.patch"};
+    char before[8192],after[8192],patch[4096],again[4096],err[GIT_ERROR_MAX];
+    size_t i;
+    if(!PathSnapshot(before,sizeof(before))||!ReadPatch(S "/r2/dir/p.patch",patch,sizeof(patch)))return 0;
+    for(i=mixed_only?2:0;i<(mixed_only?3:2);i++)
+        if(AgentGitPatchState(S "/r2",paths[i],err,sizeof(err))!=expected)return 0;
+    return PathSnapshot(after,sizeof(after))&&!strcmp(before,after)&&
+           ReadPatch(S "/r2/dir/p.patch",again,sizeof(again))&&!strcmp(patch,again)&&
+           ReadPatch(S "/r2/dir/sub/p.patch",again,sizeof(again))&&!strcmp(patch,again);
+}
+static int SetupNestedPatch(void)
+{
+    char patch[4096];
+    return MKDIR(S "/r2/dir")==0&&MKDIR(S "/r2/dir/sub")==0&&
+           ReadPatch(S "/r2/p.patch",patch,sizeof(patch))&&
+           Put(S "/r2/dir/p.patch",patch)&&Put(S "/r2/dir/sub/p.patch",patch);
+}
 int main(void)
 {
     char err[GIT_ERROR_MAX]="",before[8192],after[8192];
@@ -99,14 +136,20 @@ int main(void)
     CHECK(Run(S "/r2","git config user.name F",0)&&Run(S "/r2","git config user.email f@example.invalid",0)&&Run(S "/r2","git config core.autocrlf false",0),"identity 2");
     CHECK(Put(S "/r2/f.txt","1\n2\n3\n4\n5\n")&&Run(S "/r2","git add f.txt",0)&&Run(S "/r2","git commit -q -m base",0),"base 2");
     CHECK(Put(S "/r2/f.txt","1\n2\nTHREE\n4\n5\n")&&Run(S "/r2","git diff > p.patch",0)&&Run(S "/r2","git checkout -q -- f.txt",0),"patch made, tree restored");
+    CHECK(SetupNestedPatch(),"nested patch fixtures");
+    CHECK(NativePathState(GIT_PATCH_NOT_APPLIED,0),"native_fresh");
+    CHECK(NativePathState(GIT_PATCH_NOT_APPLIED,1),"native_mixed");
     {char snap1[4096],snap2[4096];SHELL_EXEC_RESULT r;
      CHECK(AgentShellExec("git rev-parse HEAD && git status --porcelain=v2",S "/r2",20000,&r)&&r.exit_code==0,"snapshot r2");snprintf(snap1,sizeof(snap1),"%s",r.stdout_buf);
      CHECK(AgentGitPatchState(S "/r2","p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_NOT_APPLIED,"fresh patch: not applied");
      CHECK(AgentShellExec("git rev-parse HEAD && git status --porcelain=v2",S "/r2",20000,&r),"snapshot r2 again");snprintf(snap2,sizeof(snap2),"%s",r.stdout_buf);
      CHECK(!strcmp(snap1,snap2),"state check changed nothing");}
     CHECK(Run(S "/r2","git apply p.patch",0)&&AgentGitPatchState(S "/r2","p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_ALREADY_APPLIED,"applied, uncommitted: already applied");
+    CHECK(NativePathState(GIT_PATCH_ALREADY_APPLIED,0),"native_uncommitted");
     CHECK(Run(S "/r2","git commit -q -am applied",0)&&AgentGitPatchState(S "/r2","p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_ALREADY_APPLIED,"applied and committed: already applied");
+    CHECK(NativePathState(GIT_PATCH_ALREADY_APPLIED,0),"native_committed");
     CHECK(Put(S "/r2/f.txt","1\n2\nELSE\n4\n5\n")&&AgentGitPatchState(S "/r2","p.patch",err,GIT_ERROR_MAX)==GIT_PATCH_NO_MATCH,"same lines changed again: neither direction");
+    CHECK(NativePathState(GIT_PATCH_NO_MATCH,0),"native_diverged");
     CHECK(Run(S "/r2","git checkout -q -- f.txt",0)&&AgentGitPatchState(S "/r2","nope.patch",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"missing patch file: check failed");
     CHECK(AgentGitPatchState(S "/r2","p.patch; echo x",err,GIT_ERROR_MAX)==GIT_PATCH_CHECK_FAILED,"unsafe patch path: check failed");
     CHECK(Run(S "/r2",COPY_HOSTILE,0),"patch copies with hostile names");

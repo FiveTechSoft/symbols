@@ -122,8 +122,11 @@ typedef enum
 
 /* Tell a retry whether a patch is already present. Uses git apply --check,
    which writes nothing. Forward application wins when both directions apply.
-   The patch path is interpolated into a command line, so only
-   [A-Za-z0-9._/-] is accepted: relative, no leading '-' or '/', no "..". The check is against the
+   Backslashes are converted to slashes in a local copy (on all platforms).
+   The normalized path is quoted in the command and must still contain only
+   [A-Za-z0-9._/-]: 1..255 bytes, relative, no leading '-' or '/', no "..".
+   Spaces remain rejected. No canonicalization or containment is promised.
+   The check is against the
    working tree, so run it after a clean preflight. */
 GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
                                    const char *patch_path,

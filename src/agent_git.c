@@ -21,6 +21,33 @@ static void TrimLine(char *text)
         text[--n] = '\0';
 }
 
+/* A caller-owned LF cursor: preserve strtok's skipped empty LF fields, but
+   never borrow the process-global strtok continuation. CR handling stays with
+   the existing callers. The last line does not need a final LF. */
+static char *NextGitLine(char **cursor)
+{
+    char *line, *end;
+    if (cursor == NULL || *cursor == NULL)
+        return NULL;
+    line = *cursor;
+    while (*line == '\n')
+        line++;
+    if (*line == '\0')
+    {
+        *cursor = NULL;
+        return NULL;
+    }
+    end = strchr(line, '\n');
+    if (end != NULL)
+    {
+        *end = '\0';
+        *cursor = end + 1;
+    }
+    else
+        *cursor = NULL;
+    return line;
+}
+
 /* Fs* control artifacts (lock, intents, stage/pin files) live in the workspace
    root while AgentPatch edits files. They are internal, not user changes. */
 static int IsFsControlEntry(const char *line)
@@ -76,7 +103,7 @@ GIT_INSPECT_STATUS AgentGitInspect(const char *working_dir,
     SHELL_EXEC_RESULT result;
     GIT_INSPECT_STATUS status;
     char status_text[SHELL_BUFFER_MAX];
-    char *line;
+    char *line, *cursor;
 
     if (working_dir == NULL || working_dir[0] == '\0' || out == NULL)
     {
@@ -144,7 +171,8 @@ GIT_INSPECT_STATUS AgentGitInspect(const char *working_dir,
         return GIT_INSPECT_COMMAND_FAILED;
     }
     snprintf(status_text, sizeof(status_text), "%s", result.stdout_buf);
-    line = strtok(status_text, "\n");
+    cursor = status_text;
+    line = NextGitLine(&cursor);
     while (line != NULL)
     {
         size_t n = strlen(line);
@@ -179,7 +207,7 @@ GIT_INSPECT_STATUS AgentGitInspect(const char *working_dir,
             SetError(error, error_size, "Unknown Git status entry");
             return GIT_INSPECT_MALFORMED_OUTPUT;
         }
-        line = strtok(NULL, "\n");
+        line = NextGitLine(&cursor);
     }
     return GIT_INSPECT_OK;
 }
@@ -201,6 +229,30 @@ static int SafeRefName(const char *s)
     return strstr(s, "..") == NULL;
 }
 
+/* Portable separators for the patch-file argument only. Keep SafeRefName's
+   exact accepted language after conversion, including its 255-byte limit.
+   Never truncate or change the caller's buffer. This is not canonicalization
+   or a containment check. */
+static int NormalizePatchPath(const char *input, char out[GIT_BRANCH_MAX])
+{
+    size_t n;
+    if (input == NULL)
+        return 0;
+    for (n = 0; n < GIT_BRANCH_MAX; n++)
+    {
+        char c = input[n];
+        if (c == '\0')
+        {
+            out[n] = '\0';
+            return SafeRefName(out);
+        }
+        if (n == GIT_BRANCH_MAX - 1)
+            return 0;
+        out[n] = c == '\\' ? '/' : c;
+    }
+    return 0;
+}
+
 /* Read-only comparison with the upstream branch tip. Never fetches. */
 static GIT_PREFLIGHT_STATUS RemoteCheck(const char *working_dir,
                                         GIT_REPOSITORY_STATE *observed,
@@ -208,7 +260,7 @@ static GIT_PREFLIGHT_STATUS RemoteCheck(const char *working_dir,
 {
     SHELL_EXEC_RESULT result;
     char remotes[SHELL_BUFFER_MAX], command[512];
-    char upstream[GIT_BRANCH_MAX], best[GIT_BRANCH_MAX] = "", *line;
+    char upstream[GIT_BRANCH_MAX], best[GIT_BRANCH_MAX] = "", *line, *cursor;
     size_t i, hex;
     if (observed->detached_head || observed->branch[0] == '\0')
     {
@@ -239,7 +291,7 @@ static GIT_PREFLIGHT_STATUS RemoteCheck(const char *working_dir,
         return GIT_PREFLIGHT_INSPECTION_FAILED;
     }
     snprintf(remotes, sizeof(remotes), "%s", result.stdout_buf);
-    for (line = strtok(remotes, "\n"); line; line = strtok(NULL, "\n"))
+    for (cursor = remotes; (line = NextGitLine(&cursor)) != NULL;)
     {
         size_t n;
         TrimLine(line);
@@ -381,7 +433,7 @@ static GIT_CHANGES_STATUS CompareChanges(const char *command,
 {
     SHELL_EXEC_RESULT result;
     unsigned char seen[EXPECTED_MAX];
-    char text[SHELL_BUFFER_MAX], *line;
+    char text[SHELL_BUFFER_MAX], *line, *cursor;
     size_t i, found = 0;
     memset(seen, 0, sizeof(seen));
     if (RunReadOnly(command, working_dir, &result, error, error_size) != GIT_INSPECT_OK)
@@ -392,7 +444,7 @@ static GIT_CHANGES_STATUS CompareChanges(const char *command,
         return GIT_CHANGES_INSPECTION_FAILED;
     }
     snprintf(text, sizeof(text), "%s", result.stdout_buf);
-    for (line = strtok(text, "\n"); line; line = strtok(NULL, "\n"))
+    for (cursor = text; (line = NextGitLine(&cursor)) != NULL;)
     {
         char status;
         const char *path;
@@ -489,19 +541,19 @@ GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
                                    size_t error_size)
 {
     SHELL_EXEC_RESULT result;
-    char command[512];
+    char command[512], normalized[GIT_BRANCH_MAX];
     FILE *probe;
-    if (!SafeRefName(patch_path) || strlen(patch_path) > 300)
+    if (!NormalizePatchPath(patch_path, normalized))
     {
         SetError(error, error_size, "Patch path is not a plain relative name");
         return GIT_PATCH_CHECK_FAILED;
     }
-    probe = fopen(patch_path, "rb");
+    probe = fopen(normalized, "rb");
     if (probe == NULL)
     {
         /* The path is relative to the caller, git runs in working_dir. */
         char joined[640];
-        snprintf(joined, sizeof(joined), "%s/%s", working_dir ? working_dir : ".", patch_path);
+        snprintf(joined, sizeof(joined), "%s/%s", working_dir ? working_dir : ".", normalized);
         probe = fopen(joined, "rb");
     }
     if (probe == NULL)
@@ -510,7 +562,7 @@ GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
         return GIT_PATCH_CHECK_FAILED;
     }
     fclose(probe);
-    snprintf(command, sizeof(command), "git apply --check %s", patch_path);
+    snprintf(command, sizeof(command), "git apply --check \"%s\"", normalized);
     if (RunReadOnly(command, working_dir, &result, error, error_size) != GIT_INSPECT_OK)
         return GIT_PATCH_CHECK_FAILED;
     if (result.exit_code == 0)
@@ -522,9 +574,9 @@ GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
     }
 #ifdef AGENT_GIT_PATCH_STATE_MUTANT
     /* Test only: forget the reverse check, so an applied patch is never recognised. */
-    snprintf(command, sizeof(command), "git apply --check %s", patch_path);
+    snprintf(command, sizeof(command), "git apply --check \"%s\"", normalized);
 #else
-    snprintf(command, sizeof(command), "git apply --check --reverse %s", patch_path);
+    snprintf(command, sizeof(command), "git apply --check --reverse \"%s\"", normalized);
 #endif
     if (RunReadOnly(command, working_dir, &result, error, error_size) != GIT_INSPECT_OK)
         return GIT_PATCH_CHECK_FAILED;
