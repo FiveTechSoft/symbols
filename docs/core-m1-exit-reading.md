@@ -1,5 +1,36 @@
 # M1 exit gap reading (Phase 1: Structured filesystem)
 
+## Correction dated 2026-10-16: incomplete regex evidence and a copy-source bug
+
+This correction supersedes the two claims below that an old CTest pass proved a complete
+`lock_alias` or `sweep chain` line. `PASS_REGULAR_EXPRESSION` accepts any matching list entry;
+semicolons split that list, and an ordinary nonzero exit does not by itself fail this property.
+Those historical green rows did not establish the whole predicted table or chain. Other
+historical claims in this document supported only by such regex passes remain unverified by
+this narrow correction. Historical predictions are retained as predictions, not measurements.
+
+The strict six-gate runner in run 610, actual checkout `f04616658a91d245658855a5f4179847b99b5845`,
+exposed two red tests in both MSVC Release and ASAN: 252 PASS, 16 SKIP, 2 FAIL of 270.
+The raw lock table printed `foreign_long.batch_replace=1e` and `foreign_alias.copy_source=0e`;
+the chain printed `kills 9 counts 9 8 7 6 5 4 3 2 1 0 0`. These were not three reasons to accept
+new output: source inspection established two mistaken expectations and one real copy bug.
+See [Release610 raw](https://github.com/FiveTechSoft/symbols/commit/93c42bc128da1179c8a030922678f13dbba875b1/checks/116989167658/logs)
+and [ASAN610 raw](https://github.com/FiveTechSoft/symbols/commit/93c42bc128da1179c8a030922678f13dbba875b1/checks/116989167942/logs).
+
+Repair 612, actual checkout `d3f0dccbad1392c3bc3e899d32f89dcaca88c89d`, adds normalized
+final-name checks on the two copy-source handle opens without changing generic `win_open`.
+Its source-derived oracle corrections are explained in the two detailed sections below.
+Both [Release612 raw](https://github.com/FiveTechSoft/symbols/commit/9d68aa937f76fda411e6c9bb6297e2db174084ce/checks/117023726832/logs)
+and [ASAN612 raw](https://github.com/FiveTechSoft/symbols/commit/9d68aa937f76fda411e6c9bb6297e2db174084ce/checks/117023726846/logs)
+verify that checkout and report 254 PASS, 16 SKIP, 0 FAIL of 270. All six wrapped native gates
+and the 101-vector selftest actually pass, with no skips for those tests and no requested repeats.
+The raw-link commit component is the workflow head, not the checked-out repair SHA.
+The strengthened lock-alias producer asserts reserved copy sources are DENIED, the source is
+unchanged and `inside/c` is absent with exactly `ERROR_FILE_NOT_FOUND`; both ordinary real 8.3
+copy controls (empty and `COPY!`) return OK with byte-exact destinations and unchanged sources.
+This is fixture evidence on the recorded runners, not a proof for all aliases, outside renames,
+hard links or power loss. It does not declare M1.
+
 Reading of the five Phase 1 exit criteria in `ROADMAP.md` against the tests on `master`, per platform,
 with the open gaps named. It is a reading of sources and of CI results already recorded in
 [core-m0-m1-exit-audit.md](core-m0-m1-exit-audit.md); nothing here is a new measurement. M1 is not declared.
@@ -12,8 +43,8 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
 
 | # | Criterion | Linux | Windows |
 |---|---|---|---|
-| C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. 8.3 short names: **shown for one cell set** (the short name of the `.fstxn.lock` control file is refused by all 9 operations, `test_fs_win_aliases_short`, see the 8.3 bullet below; the ordinary-file alias is accepted, not refused). Since m204 the 8.3 alias of any reserved-prefix file is refused by a final-name check in `wc_open` (`test_fs_win_lock_alias`; before m204 it was accepted, a defect found in m203). The alias of a reserved-prefix directory as a path component was accepted until m207 (`test_fs_win_reserved_alias`, found in m206). Per-directory case flag: **shown for a flagged subdirectory, a flagged workspace root and two-entry batches in a flagged directory** (names that differ only by case are different entries, the library acts on the exact-case entry, a batch naming two spellings is refused whole; see the section "C1 on Windows: per-directory case flag" below). **Not shown:** other 8.3 cases (a reserved journal file reached through its alias, directories with short names, a volume where short names are off), other accounts, a parent swapped to a junction with the writers and limits of `test_fs_win_race` cell E and `test_fs_win_race_swap` (m209) only, other operations, other interleavings and other swap targets are not covered (see the section "C1 on Windows: parent swapped to a junction" below). |
-| C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file create, copy, move and remove recovery does not sweep pre-intent orphans (same as POSIX, which has no sweep; single-file replace recovery sweeps since m139; see the bullet "Single-file calls and the sweep" below); an unshared `.fsrp-` pin is kept by design; the sweep killed after its first removal (m184 to m186) and, through chained kills, after its 2nd to 6th removal in `FsBatchRecover` mode (m211, run 37318504276; the other two entry points are not chained); a foreign inode at a target is refused, not restored (same on POSIX). |
+| C1 | `..`, absolute, symlink escape, rename races fail closed | **Shown** for the listed cells: `test_fs_adversarial`, `test_fs_read`, `test_fs_race_parent` (parent flipped to a symlink under writers, mutant `test_fs_race_parent_mc`). | **Shown** for the listed cells: `test_fs_win_symlink_leaf` (m101), `test_fs_win_fileparent`, fuzz fixed pass. 8.3 short names: **shown for one cell set** (the short name of the `.fstxn.lock` control file is refused by all 9 operations, `test_fs_win_aliases_short`, see the 8.3 bullet below; the ordinary-file alias is accepted, not refused). The m204 final-name check in `wc_open` did not cover copy sources opened through generic `win_open`: run 610 exposed the remaining bypass. Repair 612 adds copy-source handle checks; the listed reserved-file fixture is refused, with destination absence asserted and ordinary empty/nonempty copy-alias controls accepted. This does not establish refusal for every reserved-prefix file or every alias. The alias of a reserved-prefix directory as a path component was accepted until m207 (`test_fs_win_reserved_alias`, found in m206). Per-directory case flag: **shown for a flagged subdirectory, a flagged workspace root and two-entry batches in a flagged directory** (names that differ only by case are different entries, the library acts on the exact-case entry, a batch naming two spellings is refused whole; see the section "C1 on Windows: per-directory case flag" below). **Not shown:** other 8.3 cases (a reserved journal file reached through its alias, directories with short names, a volume where short names are off), other accounts, a parent swapped to a junction with the writers and limits of `test_fs_win_race` cell E and `test_fs_win_race_swap` (m209) only, other operations, other interleavings and other swap targets are not covered (see the section "C1 on Windows: parent swapped to a junction" below). |
+| C2 | Interrupted multi-file create and replace commit fully or restore the original bytes | **Shown** for the listed cells: `test_fs_batch`, `test_fs_batch_replace`, `test_fs_replace`. | **Partial.** Crash-point matrices and mutants in `test_fs_win_batch_create`, `test_fs_win_batch_replace`, `test_fs_win_replace` (orphan sweep since `530adeb`, run 37186804952). Open: single-file create, copy, move and remove recovery does not sweep pre-intent orphans (same as POSIX, which has no sweep; single-file replace recovery sweeps since m139; see the bullet "Single-file calls and the sweep" below); an unshared `.fsrp-` pin is kept by design; the sweep killed after its first removal (m184 to m186) and, through chained kills, after its 2nd to 9th removal in `FsBatchRecover` mode (repair 612, strict full-line gate and source-derived count; the old m211 six-kill claim was unsupported, and the other two entry points are not chained); a foreign inode at a target is refused, not restored (same on POSIX). |
 | C3 | Unified-diff behaviour on the structured API, no regression | **Shown** for the listed cells: `test_agent_patch`, `test_agent_patch_eol` (cells A to S, lone-CR mutant killed), `test_agent_patch_fs` T1 to T9. | **Shown for the listed cells, partial against POSIX parity.** `test_agent_patch_fs_win` T1 to T8, `test_agent_patch_ntfs_win` N1 to N6, `test_agent_patch_eol` cells. Crash phases 0 to 6 through `AgentPatch` shown since m142; T9 analogue shown for cells L1 to L5 since m146 (`test_agent_patch_lock_win`); the hard-linked lock is an accepted documented limit, and a Windows mutant of the diff-apply drift guard (mutant 12, m149) is killed by exactly four cells; lock contention with a waiting process, power loss and other runners are the gaps below. |
 | C4 | Separator, case, permission, long path, newline, locked file fixtures | **Shown** for the six aspects within limits (`test_fs_c4_posix` and others). | **Shown** for the six aspects on the listed cells (`test_fs_win_case`, long-path, locked-file and EOL tests), not "met". Mutants only for permission. |
 | C5 | Fuzzing of malformed paths and manifests: no out-of-workspace write | **Shown** for path operations and manifests with logged seeds: default, 1, 7, 12648430 at 400 iterations. | **Shown for the same operations with fewer iterations on the default seed** (see correction). Seeds 1, 7, 12648430 at 400. |
@@ -281,8 +312,27 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   belong to this test) and left both Windows jobs red until m185. Limits: only the kill after the FIRST removal, one
   3-item replace batch as the source of the orphans, one runner, a process kill and not power loss. A kill after a later
   removal is not injected. Orphan names in the root before the killed sweep and after it: 9 and 8 in all three modes (read on msvc and asan, both printed this line in run 37260112093 of m188: the first guess of 6 and 5 was wrong, a 3-item batch leaves three names per item, the old `.fsrp-` pin, the `.fst-` stage and the new `.fsp-` pin). The test asserts that line.
-- **Windows orphan sweep killed after later removals (`tests/test_fs_win_batch_replace.c` `sc_sweepchain`, m211, run 37318504276, commit 2a63783): measured as a pass of a pinned line, msvc and asan.**
-  The crash point 37 fires on the first removal of a process, so a chain of `FsBatchRecover` children each killed at 37 removes one more orphan per child. The setup is the same as above (a writer killed at point 23, 9 orphan names). Prediction before the run: counts 9 8 7 6 5 4 3 3, that is 6 kills and then a finishing child leaving 3 names (the unshared `.fsrp-` pins kept by design); I put it at about 50 percent because I had not read which names are shared. It held: the CMake regex pins the line and the test Passed on msvc (204 of 204) and asan (204 of 204); the line is known from that regex pass, not read in the log. Asserted at every step: a killed child exits 117 and removed exactly one name, the three targets keep their old bytes; at the end the finishing child exits 200, `FsBatchRecover` twice is OK and changes nothing, the old bytes are intact and the batch works. So a sweep killed after its 2nd, 3rd up to 6th removal leaves a tree that the next recovery finishes. Limits: only the `FsBatchRecover` entry point is chained (a finishing `FsBatchCreate` or `FsBatchReplace` child would change the tree itself); one 3-item replace batch as the source of the orphans; no mutant for this cell (mutant 12 would change every child the same way); one runner; a process kill, not power loss.
+- **Windows orphan sweep killed after later removals (`sc_sweepchain`): historical m211 prediction retracted; corrected evidence from610 and612.**
+  The historical prediction for m211 (run 37318504276, commit 2a63783) was 6 kills and counts
+  `9 8 7 6 5 4 3 3`, leaving 3 supposedly unshared old pins. The previous text said this
+  "held" because the old CMake regex passed, without reading the actual line. That inference
+  is withdrawn: a semicolon alternative could pass on the later summary alone. The historical
+  full line is not established here, and the old 6-kill prediction is not current measured evidence.
+  In 610 both actual raw logs instead show 9 kills and counts `9 8 7 6 5 4 3 2 1 0 0`.
+  Source derivation, independent of that output: writer crash 23 in `src/fs_batch_win.inc`
+  has already made 3 old `.fsrp-` pins, 3 new `.fst-` stages and 3 new `.fsp-` pins. Each old pin
+  still shares its inode with a live old target, so has 2 links, not 1. `wb_sweep_orphans` removes
+  those shared old pins and the new stages/pins, making all 9 names eligible. Every child killed
+  at 37 removes exactly 1 name; the tenth child finishes with 0 names left. `CHAIN_MAX=12` allows
+  that chain. The two legitimate expectation corrections and copy-source repair are documented
+  in [audit-copy-alias-fix-design.md](audit-copy-alias-fix-design.md).
+  In 612 both strict gates accept that source-derived full line with exit 0. The unchanged native
+  producer checks that every killed child exits 117 and removes exactly 1 name, all three targets
+  keep old bytes at every step, the finishing child exits 200, two subsequent recoveries leave
+  the tree unchanged and the next batch works. This covers kills after the 2nd through 9th
+  removals in this one 3-item fixture, only through `FsBatchRecover`; the other entry points
+  are not chained. No separate mutant belongs to this chain cell. Process termination is not
+  power loss; no broader runner or interleaving claim is made.
 - **Single-file calls and the sweep (read in m212, not measured here).** In `src/fs_create_win.inc`, `wr_recover_locked` (replace) runs the orphan sweep when there is no intent and no marker (m139), so single-file replace recovery sweeps. `wc_recover_locked` (create and copy) returns OK when it finds neither record and does not sweep; `FsRemoveRecover` and `FsMoveRecover` go through `wo_recover_locked`, which I did not read for this. `tests/test_fs_win_journal.c` says rows 1 and 2 (crash with a stage only, and stage plus pin, before the intent) leave untracked orphans that the test removes itself. On POSIX, `src/fs_read.c` has a comment that a crash at the create stage "may leave an orphan stage instead" (line 530), and a search of the file for sweep, orphan and readdir found no function that removes orphans. So the missing sweep for single-file create, copy, move and remove is parity with POSIX, a known limit and not a Windows-only defect; the earlier phrase "single-file calls do not sweep" was too broad for replace. Not measured: whether such an orphan is removed by a later batch call on Windows (the batch sweep matches the `.fst-` and `.fsp-` shapes, which I read but did not run for this case), and what the orphans cost (a stage holds the bytes of one file).
 
 - **Content fuzzing: shown for the Windows write path (m218), not for patch text.** The path and manifest fuzz above still generates paths and
@@ -339,22 +389,34 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   temporarily); only the lock file here (the foreign reserved-prefix file is the next bullet), and only a single directory level; an alias accepted for
   an ordinary file is the same file inside the tree (not an escape), nothing here shows more.
 
-- **Why the lock alias is refused, a finding and its repair (m203, run 37294782982, commit ddd236f; m204, run 37297634708, commit 89deb1b):** `test_fs_win_lock_alias` runs the
-  five operations that pass expected bytes "" (copy source, move source, replace, remove, batch replace) on an empty target in three groups, one fresh fixture per
-  cell, with 8.3 names switched on by the test as above. The CMake regex pins the line, so a pass is the line (I did not read the line itself in the CI log).
-  m203 measured, and all my predictions matched: (1) an ordinary empty file reached by its long name while the test holds `LockFileEx` on byte 0 with another handle:
-  all five refused with DENIED, file intact, so a held byte-range lock is enough to make these operations refuse, which fits the explanation for the lock file
-  (this was shown on an ordinary file, not on the lock file itself); (2) a foreign empty `.fstxn.foreign` in the root through its long name: all five refused by
-  name; (3) **the same foreign file through its 8.3 name was accepted by all five**: copy source and batch replace read it, move source moved it away, replace wrote
-  `NEW!`, remove deleted it. That is a defect in the name-only reserved check: the 8.3 alias of a reserved-prefix file that nobody locks bypassed it (the lock file
-  was protected only by its held lock). I stopped, the parent chose a repair, and m204 added `wc_final_reserved` and a check in `wc_open`: after a successful open of
-  a leaf that is not itself reserved, the final name of the handle (`GetFinalPathNameByHandleW`, normalized, volume name none) is read, and a reserved leaf or an
-  unreadable name returns DENIED. Library-internal opens use reserved names literally and skip it. Result in m204 (msvc 202 of 202, asan 202 of 202;
-  linux 184, ninja 10): the foreign-alias group is now refused by all five (the line changed from `0e 0- 0n 0- 0n` to `3e` five times), the other groups and
-  every other test are unchanged. My m204 predictions all matched, the named risk (a handle with an extra hard link under a reserved pin name reporting that name)
-  did not happen on this runner. Limits: one runner, one volume, a foreign file with an empty body; **not covered by m204:** the 8.3 alias of a reserved-prefix directory used as a
-  path component (parents are opened by `win_open` in `src/fs_read.c`, not `wc_open`; measured and repaired in m206 and m207, next bullet), a writer
-  that sets arbitrary short names, other filesystems. A final name read from a handle is a check for cooperating use, not a defence against a hostile writer.
+- **Lock alias findings and incomplete m204 repair: corrected 2026-10-16.**
+  `test_fs_win_lock_alias` uses five operations with expected bytes "" in three groups, one
+  fresh fixture per cell, with real 8.3 names enabled: an ordinary long-named file with a held
+  byte-range lock, a foreign empty `.fstxn.foreign` through its long name, and that foreign
+  file through its short alias. The historical m203 report (run 37294782982, commit ddd236f)
+  described the alias accepted by all five, and m204 (run 37297634708, commit 89deb1b) added
+  `wc_final_reserved` in `wc_open`. The old text claimed all five m204 predictions matched
+  solely from the regex pass. That complete-line inference is withdrawn; this correction does
+  not recover those historical raw transcripts or establish their entire tables.
+  The m204 source check reads the opened handle's normalized final name and refuses reserved
+  or unreadable names for public nonreserved-looking leaves; internal literal reserved opens
+  skip it. However, `FsCopyFile` and `wc_copy_source` used generic `win_open`, not `wc_open`,
+  so the copy source never reached that check. Both 610 raw tables show the ordinary held-lock
+  group `3e` five times, the foreign-long group `3e 3e 3e 3e 1e`, and the foreign-alias group
+  `0e 3e 3e 3e 3e`. Here e describes the source as empty/present, not destination absence.
+  The alias copy status 0 was a real library bug, not an expectation to relax: it could read
+  a reserved source through an ordinary-looking alias. The literal batch status 1 was instead
+  correct: `wb_path_ok` maps every batch path-validation refusal to `FS_READ_INVALID`, while
+  the other literal-name operations report `FS_READ_DENIED` (enum values 1 and 3 respectively).
+  Repair 612 keeps alias-copy expectation 3e and adds final-name validation to both source-handle
+  checks, leaving generic reads unchanged. Both native strict gates pass the complete corrected
+  table. The strengthened producer also asserts DENIED plus unchanged source and absent
+  `inside/c` for reserved long and alias copy requests, and byte-exact successful copies for
+  ordinary real 8.3 aliases of empty and `COPY!` sources. See the dated correction's actual 612
+  raw links and checkout SHA, not the old regex green rows, for this evidence.
+  Limits remain one fixture/volume per recorded runner, cooperating use, not hostile outside
+  renames or all hard-link aliases. A reserved directory reached through an alias was a separate
+  m206/m207 issue; this copy repair does not certify all such paths or arbitrary short names.
 - **The other reserved prefixes and a reserved directory (m206, run 37303780972, commit 654eb94; m207, run 37305908222, commit 2d64aa2):** `test_fs_win_reserved_alias` puts an
   empty foreign file `<prefix>foreign` in the root for each of the nine prefixes of `wc_reserved` (`.fstxn.`, `.fst-`, `.fsp-`, `.fsj-`, `.fsrp-`, `.fsrs-`, `.fsrb-`, `.fsrm-`,
   `.fsmv-`; the names never equal a real control name, so the library does not read them as journals) and replaces it through its long name and through its 8.3 name; one fresh
