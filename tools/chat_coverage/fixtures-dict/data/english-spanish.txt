@@ -1,3 +1,5 @@
 # Pinned minimal dictionary for the harness dict configuration.
-# Isolates the tested mechanism: only the discriminating word of the memory/enmemory cells.
+# Isolates the tested mechanisms: sueno for the memory/enmemory cells,
+# nevera for the cocina summarize cell (unaccented corpus word with a dict entry).
 sueno = dream
+nevera = refrigerator
