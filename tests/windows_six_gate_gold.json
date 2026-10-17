@@ -28,7 +28,7 @@
     },
     "batch_replace": {
       "test_name": "test_fs_win_batch_replace",
-      "final_line": "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+      "final_line": "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
       "native_exit": 0,
       "final_unique": true,
       "last_nonempty_line": true,
@@ -498,7 +498,7 @@
       "id": "batch_replace_full",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": true
@@ -507,7 +507,7 @@
       "id": "batch_replace_crlf",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": true,
@@ -517,7 +517,7 @@
       "id": "batch_replace_nonzero",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 1,
       "valid": false
@@ -540,8 +540,8 @@
       "id": "batch_replace_duplicate",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false
@@ -550,7 +550,7 @@
       "id": "batch_replace_wrong_field",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 wrong"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 wrong"
       ],
       "exit": 0,
       "valid": false
@@ -559,7 +559,7 @@
       "id": "batch_replace_prefix",
       "kind": "batch_replace",
       "lines": [
-        "prefix sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "prefix sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false
@@ -568,7 +568,7 @@
       "id": "batch_replace_suffix",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 suffix"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8 suffix"
       ],
       "exit": 0,
       "valid": false
@@ -577,7 +577,7 @@
       "id": "batch_replace_trailing_garbage",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8",
         "late_failure"
       ],
       "exit": 0,
@@ -587,7 +587,7 @@
       "id": "batch_replace_bad_utf8",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,
@@ -597,7 +597,7 @@
       "id": "batch_replace_launch_error",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,
@@ -607,7 +607,7 @@
       "id": "batch_replace_timeout",
       "kind": "batch_replace",
       "lines": [
-        "sweep chain: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
+        "sweep chain mode1: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode0: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; mode2: kills 9 counts 9 8 7 6 5 4 3 2 1 0 0; test_fs_win_batch_replace ok, sweep crash cells 3, orphans before/after mode1 9/8 mode2 9/8 mode0 9/8"
       ],
       "exit": 0,
       "valid": false,

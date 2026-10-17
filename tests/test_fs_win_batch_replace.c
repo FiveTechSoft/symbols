@@ -165,35 +165,46 @@ static void sc_sweepcrash(const char *exe,int mode)
  ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"batch works after the resumed sweep");is_new();
  FsReadClose(r);cleanup();}
 /* m211: the sweep killed after a LATER removal. Point 37 fires only on the first removal of a process, so a chain of
-   FsBatchRecover children, each killed at point 37, removes one more orphan per child: the state after child k is the state
+   children, each killed at point 37, removes one more orphan per child: the state after child k is the state
    of a sweep killed after its k-th removal overall. The chain runs until a child is not killed (exit 200, its sweep finished).
    Asserted: every killed child removes exactly one name, the chain has at least 3 kills, the finishing child exits 200, the
-   targets keep their old bytes at every step, a later FsBatchRecover (twice) is OK and changes nothing, and the batch then
-   works. g_chain holds the orphan counts: before the first kill, after each kill, after the finishing child. Only mode 1
-   (FsBatchRecover) is chained: a finishing FsBatchCreate or FsBatchReplace child would also change the tree. No mutant
-   belongs to this cell: mutant 12 would change every child the same way. */
+   targets keep their old bytes at every killed step, a later FsBatchRecover (twice) is OK and changes nothing. g_chain holds
+   the orphan counts per slot: before the first kill, after each kill, after the finishing child.
+   Slice I (2026-10-17): the chain now runs through all three batch entry points named in the exit reading, not only mode 1
+   (FsBatchRecover). A killed child is identical in every mode (it dies during the sweep, before its batch call starts, so
+   the old bytes are intact); only the finishing child differs: mode 1 leaves the old tree, mode 0 (FsBatchReplace) completes
+   the replace (new tree), mode 2 (FsBatchCreate) completes the create (zz1/zz2 added). No mutant belongs to this cell:
+   mutant 12 would change every child the same way. */
 #define CHAIN_MAX 12
-static int g_chain[CHAIN_MAX+2],g_chainn=0,g_chainkills=0;
-static void sc_sweepchain(const char *exe)
+static int g_chain[3][CHAIN_MAX+2],g_chainn[3]={0,0,0},g_chainkills[3]={0,0,0};
+static void sc_sweepchain_mode(const char *exe,int mode,int slot)
 {FS_READ_ROOT *r;int prev,now,code,i;
  fixture();put_old();ck(FsReadOpen(ROOT,&r)==FS_READ_OK,"open sweep chain");
  ck(run_child(exe,23,0)==80+23,"chain setup writer killed before any journal");
  prev=count(ROOT "\\*")-3;ck(prev>=4,"chain: orphan names are in the root");
- g_chain[g_chainn++]=prev;g_chainkills=0;
+ g_chain[slot][g_chainn[slot]++]=prev;g_chainkills[slot]=0;
  for(i=0;i<CHAIN_MAX;i++){
-  code=run_child(exe,37,1);
+  code=run_child(exe,37,mode);
   now=count(ROOT "\\*")-3;
-  g_chain[g_chainn++]=now;
-  is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
-  if(code==80+37){ck(now==prev-1,"chain: a killed sweep removed exactly one orphan");g_chainkills++;prev=now;}
-  else{ck(code==200,"chain: the finishing child exits 200");prev=now;break;}}
+  if(code==80+37){
+   is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
+   ck(now==prev-1,"chain: a killed sweep removed exactly one orphan");g_chainkills[slot]++;prev=now;}
+  else{
+   ck(code==200,"chain: the finishing child exits 200");
+   if(mode==0)is_new();
+   else if(mode==2){is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
+    is_file(ROOT "\\zz1","x",0);is_file(ROOT "\\zz2","x",0);now-=2;}
+   else is_old();
+   prev=now;}
+  g_chain[slot][g_chainn[slot]++]=now;
+  if(code!=80+37)break;}
  ck(i<CHAIN_MAX,"chain: the sweep finished within the cap");
- ck(g_chainkills>=3,"chain: at least three kills");
+ ck(g_chainkills[slot]>=3,"chain: at least three kills");
+ {int before=count(ROOT "\\*");
  ck(FsBatchRecover(r)==FS_READ_OK,"chain: recover");
- ck(count(ROOT "\\*")-3==prev,"chain: recover changes nothing after a finished sweep");
  ck(FsBatchRecover(r)==FS_READ_OK,"chain: recover twice");
- is_old();
- ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"chain: batch works after the chained sweep");is_new();
+ ck(count(ROOT "\\*")==before,"chain: recoveries change nothing after a finished sweep");}
+ if(mode==1){ck(FsBatchReplace(r,trio,3)==FS_READ_OK,"chain: batch works after the chained sweep");is_new();}
  FsReadClose(r);cleanup();}
 /* m191: a process that holds the workspace lock is killed from outside (TerminateProcess) while another
    process waits on that lock. The holder is the batch writer parked by FS_WIN_BATCH_HOLD=k (journal
@@ -362,13 +373,13 @@ int main(int argc,char **argv)
  sc_foreign_pin(exe);
  /* Sweep killed after its first removal, three entry points. */
  sc_sweepcrash(exe,1);sc_sweepcrash(exe,2);sc_sweepcrash(exe,0);
- sc_sweepchain(exe);
+ sc_sweepchain_mode(exe,1,0);sc_sweepchain_mode(exe,0,1);sc_sweepchain_mode(exe,2,2);
  /* Lock holder killed from outside while a second process waits, hold points 0 to 2. */
  for(int k=0;k<3;k++)sc_killholder(exe,k);
  /* Mutants: each must fail the scenario that targets it. */
  for(int m=6;m<=13;m++){char a[32];int code;if(m==11)continue; /* mutant 11 belongs to another test */sprintf(a,"rmutant %d",m);code=run_proc(exe,a);nuke();
   if(code!=1){fprintf(stderr,"mutant %d SURVIVED (exit %d)\n",m,code);exit(1);}}
- {int i;printf("sweep chain: kills %d counts",g_chainkills);for(i=0;i<g_chainn;i++)printf(" %d",g_chain[i]);printf("; ");}
+ {int s,i;static const char *mn[3]={"mode1","mode0","mode2"};for(s=0;s<3;s++){printf("sweep chain %s: kills %d counts",mn[s],g_chainkills[s]);for(i=0;i<g_chainn[s];i++)printf(" %d",g_chain[s][i]);printf("; ");}}
  printf("test_fs_win_batch_replace ok, sweep crash cells %d, orphans before/after mode1 %d/%d mode2 %d/%d mode0 %d/%d\n",g_swn,g_sw[0][0],g_sw[0][1],g_sw[1][0],g_sw[1][1],g_sw[2][0],g_sw[2][1]);
  return 0;
 }
