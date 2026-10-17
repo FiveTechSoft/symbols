@@ -64,8 +64,14 @@ static void twolink(const char *prefix,int mode,char *a,char *b)
  ck(FsReadOpen(WS,&r)==FS_READ_OK,"open twolink");
  ck(recover(r,mode)==FS_READ_OK,"recover twolink returns OK");
  *a=state(path);*b=state(WS "\\other.txt");FsReadClose(r);}
-int main(void)
+int main(int argc,char**argv)
 {
+ /* Slice H2 (2026-10-17): the mutant arrives as argv[1] and is activated in-process (test only). Two
+    out-of-process deliveries of FS_WIN_BATCH_MUTANT (a CTest ENVIRONMENT property, then the gate
+    wrapper's own env=) both failed to reach this binary through the python wrapper on the Windows
+    runner while the same property reaches directly-run binaries (mc10/mc11); an argument cannot get
+    lost between processes. */
+ if(argc>1)_putenv_s("FS_WIN_BATCH_MUTANT",argv[1]);
  static const char *pre[8]={".fst-",".fsp-",".fsrp-",".fsrs-",".fsj-",".fsrb-",".fsrm-",".fsmv-"};
  static const char *name[5]={"batch","replace","create","remove","move"};
  char out[2048]="";int m,i;

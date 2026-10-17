@@ -84,22 +84,7 @@ sys.exit(int(sys.argv[2]))
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 result = gate.run(kind, [sys.executable, str(child), str(payload), '0', 'stderr'])
             check(result == 1, kind + '_stderr_fragment')
-        # Slice H (2026-10-17): the kind-owned mutant env injection of run() is wired for the mutant
-        # kind only (the CTest ENVIRONMENT property it replaces never reached the native binary).
-        env_child = temp / 'env_child.py'
-        env_child.write_text('''import os,pathlib,sys
-pathlib.Path(sys.argv[1]).write_text(str(os.environ.get('FS_WIN_BATCH_MUTANT')),encoding='utf-8')
-sys.stdout.write(pathlib.Path(sys.argv[2]).read_text(encoding='utf-8'))
-''', encoding='utf-8')
-        for kind, want in (('sweep_foreign_mc13', '13'), ('sweep_foreign', 'None')):
-            seen = temp / (kind + '.env')
-            payload = temp / (kind + '.env.bin')
-            payload.write_bytes(('\n'.join(GOLD['gates'][kind].get('arm_summaries', []) + [GOLD['gates'][kind]['final_line']]) + '\n').encode('utf-8'))
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                result = gate.run(kind, [sys.executable, str(env_child), str(seen), str(payload)])
-            check(result == 0, kind + '_env_control_exit')
-            check(seen.read_text(encoding='utf-8') == want, kind + '_env_control_value')
-    print('WINDOWS_SIX_SELFTEST vectors=' + str(len(executed)) + ' derived_omissions=' + str(omissions) + ' subprocess_controls=23 complete=1')
+    print('WINDOWS_SIX_SELFTEST vectors=' + str(len(executed)) + ' derived_omissions=' + str(omissions) + ' subprocess_controls=21 complete=1')
     return 0
 
 

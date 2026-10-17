@@ -443,10 +443,10 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_sweep_foreign PROPERTIES TIMEOUT 300)
     # Slice G mutant 13 (test only): the sweep keeps shared .fsrm-/.fsmv- pins, so the rm2/mv2 cells read oo; the normal entry kills the mutant with -o.
-    # Slice H (2026-10-17): the mutant env is injected by windows_six_gate.py itself; the CTest ENVIRONMENT
-    # property registered here before did not reach the native binary through the wrapper on the Windows runner.
+    # Slice H2 (2026-10-17): the mutant number goes as a plain argument (activated in-process by the test);
+    # both env deliveries through the wrapper failed on the Windows runner (see the test's comment).
     add_test(NAME test_fs_win_sweep_foreign_mc13 COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign_mc13 -- $<TARGET_FILE:test_fs_win_sweep_foreign>
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign_mc13 -- $<TARGET_FILE:test_fs_win_sweep_foreign> 13
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_sweep_foreign_mc13 PROPERTIES TIMEOUT 300)
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c

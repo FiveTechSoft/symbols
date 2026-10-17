@@ -2,7 +2,6 @@
 """Six native Windows gates: exit zero AND the complete frozen output line."""
 import argparse
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -43,16 +42,9 @@ def emit(raw):
 
 
 def run(kind, command, timeout=None):
-    # Slice H (2026-10-17): kind-owned test-only env. sweep_foreign_mc13 needs the mutant active in the
-    # native binary; injecting it here (instead of the CTest ENVIRONMENT property, which did not reach the
-    # binary through this wrapper on the Windows runner) keeps the wiring verifiable off-Windows.
-    env = None
-    if kind == 'sweep_foreign_mc13':
-        env = dict(os.environ)
-        env['FS_WIN_BATCH_MUTANT'] = '13'
     try:
         p = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           timeout=LIMITS[kind] if timeout is None else timeout, env=env)
+                           timeout=LIMITS[kind] if timeout is None else timeout)
         emit(p.stdout)
         validate(kind, p.stdout, p.returncode)
     except (OSError, subprocess.TimeoutExpired, UnicodeError, ValueError) as exc:
