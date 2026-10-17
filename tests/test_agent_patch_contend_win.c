@@ -26,6 +26,12 @@
    Each child writes contend_child_<which>.log (rc, io_diag); the parent prints them after W2.
    Predicted kill set: exactly one cell, W2 "exactly one applier won". Then both children exit 10 and the
    later one overwrites the earlier. W1 and the other W2 cells pass in the mutant build.
+   W3 a foreign lock HOLDER is killed (TerminateProcess) while a child waits in PatchApplyAtomic:
+      the OS releases the byte-0 lock with the dead process, so the waiter then applies; asserted:
+      still waiting after 1500 ms, applies within 20 s of the kill, bytes NEW, no leftovers. The
+      no-lock mutant (FS_WIN_BATCH_MUTANT=13, wc_lock takes no lock) makes the waiter not wait, so
+      the first check fails: the test re-runs the cell as "m13" and requires exit 1. A holder parked
+      INSIDE PatchApplyAtomic would need a new src/ hook and is not tried.
    Limits: one runner, one account, two writers; the waiting child is not killed, power loss is not
    tried, a waiter that is killed while it holds the lock is not tried; the 1500 ms timings assume the
    children start and read within that window (if one did not, W2 can pass in the mutant build, and the
@@ -154,6 +160,70 @@ static int child_main(const char *which, int delay)
     return rc == 1 ? EXIT_APPLIED : rc == 0 ? EXIT_REFUSED : EXIT_OTHER;
 }
 
+/* ---- W3: a foreign holder that DIES while a child waits ---- */
+static int spawn(const char *which, int delay, PROCESS_INFORMATION *pi);
+static int still_running(HANDLE h);
+static DWORD finish(PROCESS_INFORMATION *pi, const char *name);
+static int lockhold_main(const char *sync)
+{
+    HANDLE lk, h;
+    OVERLAPPED o;
+    char ready[160];
+    lk = CreateFileA(LK, GENERIC_READ | GENERIC_WRITE,
+                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_ALWAYS,
+                     FILE_ATTRIBUTE_NORMAL, NULL);
+    if (lk == INVALID_HANDLE_VALUE) return 3;
+    memset(&o, 0, sizeof(o));
+    if (!LockFileEx(lk, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &o)) return 4;
+    snprintf(ready, sizeof(ready), "%s.ready", sync);
+    h = CreateFileA(ready, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS,
+                    FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+    Sleep(60000); /* the parent kills us; the lock dies with the process */
+    return 0;
+}
+
+/* The W3 cell, shared by the normal run and the "m13" no-lock mutant re-run. */
+static void w3_cell(int *ran)
+{
+    PROCESS_INFORMATION ph, pi;
+    DWORD code;
+    int i;
+    reset();
+    {
+        char exe[MAX_PATH], cmd[MAX_PATH + 80];
+        STARTUPINFOA si;
+        DWORD n = GetModuleFileNameA(NULL, exe, sizeof(exe));
+        ck(n != 0 && n < sizeof(exe), "exe path");
+        snprintf(cmd, sizeof(cmd), "\"%s\" lockhold contend_sync", exe);
+        memset(&si, 0, sizeof(si));
+        si.cb = sizeof(si);
+        memset(&ph, 0, sizeof(ph));
+        ck(CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &ph) != 0,
+           "lock holder started");
+    }
+    for (i = 0; i < 1000 && GetFileAttributesA("contend_sync.ready") == INVALID_FILE_ATTRIBUTES; i++)
+        Sleep(20);
+    if (GetFileAttributesA("contend_sync.ready") == INVALID_FILE_ATTRIBUTES)
+        TerminateProcess(ph.hProcess, 78);
+    ck(GetFileAttributesA("contend_sync.ready") != INVALID_FILE_ATTRIBUTES, "holder took the lock");
+    ck(spawn("9", 0, &pi), "waiter child started");
+    Sleep(1500);
+    ck(still_running(pi.hProcess), "W3 the child is still waiting after 1500 ms");
+    ck(is(WS "\\a.c", OLDC), "a.c is still OLD while the holder lives");
+    ck(TerminateProcess(ph.hProcess, 77) != 0, "kill the lock holder");
+    CloseHandle(ph.hProcess);
+    CloseHandle(ph.hThread);
+    code = finish(&pi, "W3 child");
+    printf("  (measured: W3 child exit %lu, a.c %s)\n", (unsigned long)code,
+           is(WS "\\a.c", NEW9) ? "x = 9" : is(WS "\\a.c", OLDC) ? "OLD" : "OTHER");
+    ck(code == EXIT_APPLIED, "after the holder was killed the child applied");
+    ck(is(WS "\\a.c", NEW9), "a.c holds the child's text");
+    ck(leftovers() == 0, "no leftover names");
+    DeleteFileA("contend_sync.ready");
+    if (ran) (*ran)++;
+}
+
 /* ---- parent ---- */
 static int spawn(const char *which, int delay, PROCESS_INFORMATION *pi)
 {
@@ -193,6 +263,17 @@ int main(int argc, char **argv)
     int ran = 0;
     if (argc >= 3 && !strcmp(argv[1], "child"))
         return child_main(argv[2], argc >= 4 ? atoi(argv[3]) : 0);
+    if (argc >= 3 && !strcmp(argv[1], "lockhold"))
+        return lockhold_main(argv[2]);
+    if (argc >= 2 && !strcmp(argv[1], "m13"))
+    {
+        int m13fails;
+        _putenv_s("FS_WIN_BATCH_MUTANT", "13"); /* wc_lock takes no lock: the waiter must NOT wait */
+        w3_cell(NULL);
+        m13fails = fails;
+        printf("m13 no-lock run: %s (%d failures)\n", m13fails ? "FAILED AS REQUIRED" : "UNEXPECTED PASS", m13fails);
+        return m13fails ? 1 : 0;
+    }
 
     puts("W1 a child waits behind a foreign exclusive lock, then applies");
     {
@@ -244,6 +325,27 @@ int main(int argc, char **argv)
         ck(applied != 1 || is(WS "\\a.c", winner9 ? NEW9 : NEW7), "a.c holds the text of the child that applied");
         ck(leftovers() == 0, "no leftover names");
         ran++;
+    }
+
+    puts("W3 a foreign lock holder is KILLED while a child waits; the child then applies");
+    w3_cell(&ran);
+    {
+        /* The no-lock mutant must break the waiting check: re-run the cell as "m13", require exit 1. */
+        char exe[MAX_PATH], cmd[MAX_PATH + 32];
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pm;
+        DWORD n = GetModuleFileNameA(NULL, exe, sizeof(exe)), mcode = 0;
+        ck(n != 0 && n < sizeof(exe), "exe path for m13");
+        snprintf(cmd, sizeof(cmd), "\"%s\" m13", exe);
+        memset(&si, 0, sizeof(si));
+        si.cb = sizeof(si);
+        memset(&pm, 0, sizeof(pm));
+        ck(CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pm) != 0, "m13 re-run started");
+        if (WaitForSingleObject(pm.hProcess, 60000) == WAIT_OBJECT_0)
+            GetExitCodeProcess(pm.hProcess, &mcode);
+        CloseHandle(pm.hProcess);
+        CloseHandle(pm.hThread);
+        ck(mcode == 1, "no-lock mutant breaks the W3 waiting check");
     }
 
     wipe();

@@ -305,7 +305,7 @@ if(WIN32)
     target_compile_definitions(test_agent_patch_contend_win PRIVATE FS_CREATE_TEST_CRASH=1 AGENT_PATCH_TEST_HOOK=1)
     add_test(NAME test_agent_patch_contend_win COMMAND test_agent_patch_contend_win
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(test_agent_patch_contend_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch contention cells ran: 2")
+    set_tests_properties(test_agent_patch_contend_win PROPERTIES PASS_REGULAR_EXPRESSION "agentpatch contention cells ran: 3")
     # Mutant 12 again: the drift guard is dropped. The same test must fail exactly one cell.
     add_executable(test_agent_patch_contend_win_mc tests/test_agent_patch_contend_win.c src/agent_patch.c
         src/fs_read.c src/fs_manifest.c)
