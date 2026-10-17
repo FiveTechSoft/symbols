@@ -52,7 +52,7 @@ Build the library normally, then compile the read-only adapter (POSIX example fr
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target symbolic --parallel 1
 cc -O2 -Iinclude tools/chat_coverage/probe.c build/libsymbolic.a -lm -lpthread -o /tmp/chat-coverage-probe
-python3 tools/chat_coverage/run.py --probe /tmp/chat-coverage-probe --cwd "$PWD" --output /tmp/chat-coverage-new.json
+python3 tools/chat_coverage/run.py --probe /tmp/chat-coverage-probe --output /tmp/chat-coverage-new.json
 ```
 
 Use a new output filename. The adapter disables episodic auto-save; source fixtures are read-only. The runner fixes query/source hashes, checks repetitions, authentic receipt spans and prefix/state invariants. It records raw outcomes, never calls semantic misses green. It is an external measurement harness, not a CTest addition and not part of the Windows CI execution. `--replay existing.json` validates a saved raw matrix without rerunning the engine; replay is not a fresh integration measurement.
@@ -62,3 +62,26 @@ Reproducing the original SHA and reproducing these exact empirical outputs are d
 ## Next gate
 
 Keep the public contract at topic retrieval. A future full-support path needs an explicit representation of requested relations/conditions and a separately checked support or derivation contract, tested on new unseen questions. Receipts and token overlap alone are insufficient. Neither these counts nor the existing source-calibrated guard declares a roadmap phase exit.
+
+## Addendum 2026-10-17: UTF-8 accent fold in the coverage gate (slice B)
+
+The matrix above was measured at a7b5ca8 and reproduced at b3a468a. Its wrong-condition and under-coverage cells shared one root cause: the TQ gate tokenized the corpus with byte-wise C-locale `isalnum` while the query path folds accents through `FoldChar`. Accented UTF-8 corpus words split (`colisión` -> `colisi`, `sueño` -> `sue`), so folded query words missed the vocabulary check (`sueno` rejected, `nk` undercount) or scored exact-support sentences below threshold (`colision` is not a byte substring of `colisi\xc3\xb3n`: c = 0.43 < 0.50 for the exact astronomy sentence). Where the discriminating word dropped out of the known set, a wrong-condition sentence passed at c = 1.00 and was quoted with an authentic receipt.
+
+Fix (this slice): the gate consumes corpus bytes through the same `FoldChar` used by the query path (UTF-8 0xC3 map, Latin-1, CP850; unmappable bytes fold to `?` and break the word like punctuation), in `TqWords` and `TqCoverage`. Selection among coverage-passing candidates now answers the sentence covering the most of the question instead of the first score-ranked pass; a looser sentence (c = 0.52) can no longer win over the exact one (c = 1.00). Shown sentences stay excluded from selection (advance, never repeat); the previous verify pass could re-quote an already shown sentence, and now cannot. Try contract, retrieval, receipts, emission format, thresholds and calibration are unchanged; `TqCalibrate` still only runs at nsent >= 8, so these 3-sentence fixtures keep thr = 0.50. The 23-byte word cap is a documented limit.
+
+Design, frozen expectations and the executable derivation (Python replica of the gate, validated in pre-fix mode against the instrumented values c = 0.43 / 1.00 / 0.13 at b3a468a) live in `tools/chat_coverage/slice-b-utf8-fold-design.md`, `gold-v2.json` and `sim.py`. Expectations were frozen before the patched engine was run; the measured matrix below reproduces them exactly (288/288 cells: 24 cases x {fresh, stateful} x {resolve, handle} x {32, 4096}; try arm records the structural reject). Gold lineage: `4833519d` (design review) -> `32b73f77` (harness keys restored) -> `b78ef950` (try-mode contract note). The case array and all predictions are byte-identical across the three versions (canonical cases SHA-256 `b5a058729a3110cc...` in every version); only harness metadata and notes changed.
+
+Post-fix measured matrix (24 questions: the original 16 as regression plus 8 new accented-condition cases over `cocina.txt` / `taller.txt`):
+
+| Arm | Full support | Safe negatives (explicit-no / not-described quote) | Abstentions | Wrong-condition |
+| --- | --- | --- | --- | --- |
+| Fresh Resolve/Handle | 12 | 12 | 0 | 0 |
+| Stateful Resolve/Handle | 6 | 12 | 6 | 0 |
+
+Declared stateful regression (safe direction): memory-3, astronomy-3, physics-3 (and the new cocina-4, taller-4 follow-ups) now abstain. Their correct sentence was already shown by the preceding negative query; never-repeat excludes it and the remaining candidates score <= 0.29 < 0.50. Resetting the shown list on gate failure was rejected because it would re-quote already shown text. math-3 already abstained before this fix. No wrong-condition answer remains in the matrix.
+
+Try handled none of the 24 questions in either arm, before and after: every query is a structured wh-question and `ChatTryTextLineCore` rejects those by design (status 0, no quote). Verified identical with the pre-patch probe at b3a468a. Do not score those unhandled lines as supported answers or semantic safety wins.
+
+Measurement configuration pin: `run.py` now runs the probe from an empty temporary working directory by default. This matters because `ChatInit` loads `data/english-spanish.txt` relative to the cwd when present, and the dictionary maps query words before the gate (`sueno` -> `dream`): with the repo root as cwd the discriminating word leaves the known set (nk = 3), the exact and wrong-condition sentences tie at c = 1.00, and retrieval order quotes the wrong-condition one even after this fix. Every measurement behind this document (gap map, frozen gold, the matrix above) used a dictionary-free cwd; the harness now enforces it. The dictionary divergence itself (query translation misaligned with the corpus vocabulary) is pre-existing, unchanged by this slice, and recorded here as future work, not certified either way. Pass `--cwd` only to reproduce a specific historical configuration.
+
+The same caveats as the base measurement apply: closed fictional world, one machine/configuration, Spanish-only, small corpora, no semantic certification. `run.py` now takes `--gold` (default `gold-v2.json`, SHA-pinned) and derives the expected cell count from the gold; `--replay` validates against the same gold.

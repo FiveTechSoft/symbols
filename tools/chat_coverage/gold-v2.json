@@ -18,7 +18,7 @@
   "stateful_domain_sequence"
  ],
  "scoring": "Semantic misses logged as red outcomes; technical integrity errors stop. Quote-only negative does not fulfill full support; marked substitute is separate. No semantic correctness inferred from source provenance.",
- "notes": "Slice B (accented UTF-8 condition words): 16 existing cells kept as regression with recomputed post-fix expectations; 8 new accented-condition cells (cocina, taller). Predictions frozen from an exact Python replica of the gate (validated against SYMBOLS_TQ_DEBUG values 0.43/1.00/0.13 at b3a468a), not tuned on runs.",
+ "notes": "Slice B (accented UTF-8 condition words): 16 existing cells kept as regression with recomputed post-fix expectations; 8 new accented-condition cells (cocina, taller). Predictions frozen from an exact Python replica of the gate (validated against SYMBOLS_TQ_DEBUG values 0.43/1.00/0.13 at b3a468a), not tuned on runs. v2.1: per-mode expectations; try mode encodes the pre-existing structural reject (found during pre-dispatch local measurement; not a selection change).",
  "cases": [
   {
    "id": "memory-1",
@@ -754,5 +754,6 @@
     }
    }
   }
- ]
+ ],
+ "try_mode_contract": "All 24 queries are structured wh-questions; ChatTryTextLineCore rejects them by design (status 0, no quote, no selection) via LooksLikeQuestionWord on token 0. Verified identical pre/post patch (old probe at b3a468a and patched probe both return status 0). Selection expectations below apply to the resolve and handle modes."
 }

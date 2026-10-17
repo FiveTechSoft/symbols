@@ -61,6 +61,8 @@ typedef struct {
 } TQ_CALIB;
 static TQ_CALIB g_tq;
 
+static int FoldChar(const char *s, char *out);
+
 static uint32_t TqHash(const char *w)
 {
     uint32_t h = 2166136261u;
@@ -91,11 +93,20 @@ static uint32_t TqWords(const char *s, char out[][24], uint32_t max)
     {
         char w[24];
         size_t l = 0;
-        while (*s && !isalnum((unsigned char)*s)) s++;
-        while (*s && isalnum((unsigned char)*s))
+        /* same fold as the query path (FoldChar): accented UTF-8, Latin-1
+           and CP850 letters join words as their ASCII base; a byte FoldChar
+           cannot map becomes '?' and breaks the word like punctuation */
+        while (*s)
         {
-            if (l + 1 < sizeof(w)) w[l++] = (char)tolower((unsigned char)*s);
-            s++;
+            char fc;
+            int adv = FoldChar(s, &fc);
+            if (!isalnum((unsigned char)fc))
+            {
+                if (l == 0) { s += adv; continue; }
+                break;
+            }
+            if (l + 1 < sizeof(w)) w[l++] = fc;
+            s += adv;
         }
         w[l] = '\0';
         if (l < 3) continue;
@@ -120,10 +131,17 @@ static float TqCoverage(const char *const *words, uint32_t nw, const char *sent)
 {
     char low[2048];
     uint32_t k;
-    size_t i;
+    size_t i = 0;
     float hit = 0.0f, all = 0.0f;
-    for (i = 0; sent[i] && i + 1 < sizeof(low); i++)
-        low[i] = (char)tolower((unsigned char)sent[i]);
+    /* fold the sentence like the query path so accented corpus letters
+       match the folded query words byte for byte */
+    while (*sent && i + 1 < sizeof(low))
+    {
+        char fc;
+        int adv = FoldChar(sent, &fc);
+        low[i++] = fc;
+        sent += adv;
+    }
     low[i] = '\0';
     for (k = 0; k < nw; k++)
     {
@@ -131,7 +149,8 @@ static float TqCoverage(const char *const *words, uint32_t nw, const char *sent)
         size_t n = 0;
         const char *h;
         float idf;
-        while (words[k][n] && n + 1 < sizeof(w)) { w[n] = (char)tolower((unsigned char)words[k][n]); n++; }
+        /* idempotent: query words arrive pre-folded from Split/FoldChar */
+        while (words[k][n] && n + 2 < sizeof(w)) { char fc; int adv = FoldChar(words[k] + n, &fc); w[n] = fc; n += (size_t)adv; }
         w[n] = '\0';
         if (n == 0) continue;
         idf = TqIdf(w);
@@ -214,9 +233,10 @@ static void TqCalibrate(const TEXTLEX *tl)
     for (len = 1; len <= TQ_MAXLEN; len++) fprintf(stderr, " %.2f", g_tq.thr[len]);
     fputc('\n', stderr);
 }
-static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent, int majority)
+static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent, int majority, float *cov_out)
 {
     float c;
+    if (cov_out) *cov_out = 0.0f;
     if (nw == 0)
         return 1;
     TqCalibrate(tl);
@@ -257,6 +277,7 @@ static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint3
         if (nk == 0 || (majority && 2 * nk < ncount))
             return 0;
         c = TqCoverage(kw, nk, sent);
+        if (cov_out) *cov_out = c;
         if (getenv("SYMBOLS_TQ_DEBUG")) { fprintf(stderr, "[tq] nw=%u nk=%u c=%.2f thr=%.2f words:", nw, nk, c, g_tq.thr[nk]); for (k = 0; k < nw; k++) fprintf(stderr, " %s", words[k]); fprintf(stderr, " | %.60s\n", sent); }
         /* chance95 of 1.00 means the test has no power at this length:
            a known word that the sentence contains is then all we can ask */
@@ -265,7 +286,12 @@ static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint3
 }
 static int TextQueryCovered(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent)
 {
-    return TextQueryCoveredEx(tl, words, nw, sent, 1);
+    return TextQueryCoveredEx(tl, words, nw, sent, 1, NULL);
+}
+/* pass/fail plus the coverage value, for coverage-ranked selection */
+static int TextQueryCoveredVal(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent, float *cov_out)
+{
+    return TextQueryCoveredEx(tl, words, nw, sent, 1, cov_out);
 }
 
 
@@ -5135,17 +5161,16 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
         {
             char sent[2048];
             int covered = 1;
-            if (TextLexSentenceText(&ch->tlex[bestf], best,
-                                    ch->tlex[bestf].image,
-                                    ch->tlex[bestf].imagelen, sent,
-                                    sizeof(sent)) > 0 &&
-                !p->t_following && !TextQueryCovered(&ch->tlex[bestf], words, nw, sent))
-                covered = 0;
-            if (!covered)
+            if (!p->t_following)
             {
-                /* verify the other retrieved candidates before abstaining:
-                   keep the best-ranked one that the test accepts */
-                float vsc = 0.0f;
+                /* coverage-select: among the retrieved candidates the test
+                   accepts, answer the one that covers the most of the
+                   question; a passing sentence must not win on retrieval
+                   score alone (a looser sentence can pass over the exact
+                   one). Ties keep retrieval order. Shown sentences stay
+                   excluded: advance, never repeat. */
+                float bcov = -1.0f;
+                covered = 0;
                 for (f = 0; f < ch->ntfiles; f++)
                 {
                     uint32_t idx[16], nret, r;
@@ -5156,15 +5181,29 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                     for (r = 0; r < nret; r++)
                     {
                         char cs[2048];
-                        if ((covered && sc[r] <= vsc) || ch->tlex[f].image == NULL ||
+                        float cc = 0.0f;
+                        uint32_t ckey = (f << 24) | (idx[r] & 0xFFFFFFu);
+                        int seen = 0;
+                        for (k = 0; k < ch->ntshown; k++)
+                        {
+                            if (ch->tshown[k] == ckey)
+                            {
+                                seen = 1;
+                                break;
+                            }
+                        }
+                        if (seen || ch->tlex[f].image == NULL ||
                             TextLexSentenceText(&ch->tlex[f], idx[r], ch->tlex[f].image,
                                                 ch->tlex[f].imagelen, cs, sizeof(cs)) == 0 ||
-                            !TextQueryCovered(&ch->tlex[f], words, nw, cs))
+                            !TextQueryCoveredVal(&ch->tlex[f], words, nw, cs, &cc))
                             continue;
-                        covered = 1;
-                        vsc = sc[r];
-                        best = idx[r];
-                        bestf = f;
+                        if (!covered || cc > bcov)
+                        {
+                            covered = 1;
+                            bcov = cc;
+                            best = idx[r];
+                            bestf = f;
+                        }
                     }
                 }
             }
@@ -8474,7 +8513,7 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out,
        way; here only require that the quoted sentence covers the known ones
        above chance (no majority rule: request words like "sirve" are not in
        the corpus) */
-    return TextQueryCoveredEx(tl, wp, nw, sbuf, 0);
+    return TextQueryCoveredEx(tl, wp, nw, sbuf, 0, NULL);
 }
 
 int ChatHandleToBufEx(CHAT *ch, const char *line, char *out, size_t size, CHAT_CITATION *citation)
