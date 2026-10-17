@@ -24,6 +24,27 @@ def source_contract(root):
             raise RuntimeError('scalar return declaration/definition contract: '+path)
 
 
+
+def selected_source(root):
+    """Fail-closed source-format extraction, not a general C parser."""
+    text = (root/'src/i18n.c').read_text(encoding='utf-8')
+    patterns = [
+        r'(?m)^static LANG_ID s_lang = LANG_EN;\n',
+        r'(?m)^static const char \*const LANG_CODES\[LANG_COUNT\] = \{[^\n]+\};\n',
+        r'(?ms)^void LangSet\(LANG_ID id\)\n\{\n.*?^\}\n',
+        r'(?ms)^LANG_ID LangGet\(void\)\n\{\n.*?^\}\n',
+        r'(?ms)^LANG_ID LangFindByCode\(const char \*code\)\n\{\n.*?^\}\n',
+    ]
+    spans = []
+    for pattern in patterns:
+        matches = list(re.finditer(pattern, text))
+        if len(matches) != 1:
+            raise RuntimeError('selected-source format changed: '+pattern)
+        spans.append(matches[0].group(0))
+    # Boilerplate declares dependencies; each body/data span is copied verbatim.
+    return '#include <string.h>\n#include "i18n.h"\n' + '\n'.join(spans)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compiler', required=True)
@@ -57,11 +78,12 @@ def main():
         if args.compiler_id == 'MSVC':
             # Visual Studio's build selects CRT/SDK; CTest need not inherit vcvars.
             # Keep both consumer compilation and implementation under /W4 /WX.
+            (tmp/'selected.c').write_text(selected_source(root), encoding='utf-8')
             project = [
                 'cmake_minimum_required(VERSION 3.16)',
                 'project(i18n_warning_probe C)',
                 'add_library(header_probe OBJECT header.c)',
-                'add_executable(lookup lookup.c "'+(root/'src/i18n.c').as_posix()+'")',
+                'add_executable(lookup lookup.c selected.c)',
                 'foreach(t header_probe lookup)',
                 '  target_include_directories(${t} PRIVATE "'+(root/'include').as_posix()+'")',
                 '  target_compile_options(${t} PRIVATE /W4 /WX)',
