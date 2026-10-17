@@ -1,5 +1,9 @@
 # Core exit audit: Phase 0 (M0) and Phase 1 (M1)
 
+## Current-state pointer (2026-10-17; no M0 or M1 declaration)
+
+The dated audit tables and original red runs below are preserved as historical evidence. They are not an unchecked implementation backlog. The [current source reconciliation](core-m1-exit-reading.md#current-source-reconciliation-2026-10-17-f14de34-no-phase-declaration) records the already-landed POSIX race-parent clearing/floor, the separate Windows default-seed 400-iteration entry, and the existing bounded AgentPatch waiting-process cells. For the later M0 Windows spawn and concurrent-stream work, see [spawn scope](shell-spawn-win.md) and [dual-stream scope](shell-dual-win.md), as routed from the ROADMAP. These are bounded fixtures, not a phase declaration. Current native status and the legacy regex-only evidence caveat are stated in that reconciliation. No historical failure or prediction is converted into a measurement by this pointer.
+
 Audited commit: `94c04ce58985ecd1aa4efc319338baf4743d69c3`. The criteria are the "Exit criteria" lists of Phase 0 and Phase 1 in [ROADMAP.md](../ROADMAP.md). A phase closes only when every one of its criteria is shown on a final SHA. "Not shown" never means "met".
 
 Status words: **shown** (a test and its CI result cover the whole criterion), **partial** (some of it is covered), **not shown** (no test found), **not met** (the repository contradicts the criterion).
