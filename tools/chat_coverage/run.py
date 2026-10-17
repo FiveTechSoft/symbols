@@ -11,6 +11,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 GOLD_SHA = {
     'gold-v3.json': 'a76c8e31e9ac61bd88bf554b8bdf536fd511a64f784a423479a5a82fb8d8bbe4',
     'gold-v3-dict.json': '55b04c8f1b3998720d759e507f71268f053fe1cc8d4f3c67e06c40395a5aaa7b',
+    'gold-v4.json': '75e1383916cf16e1838e71fd0b1cfd31f431d05fe2c0bcfb74600f73c8cbee3f',
+    'gold-v4-dict.json': '706ab087c299ac42ed255f393c8a11c2764e74051da83ad125d2ec3c2e9fd1a7',
 }
 
 def validate(result, expected_cells):
@@ -76,7 +78,7 @@ if __name__ == '__main__':
                         help='Working directory for the probe; default is an empty temp dir so no '
                              'cwd-relative dictionary/embeddings leak into the measurement')
     parser.add_argument('--replay', type=pathlib.Path, help='Validate an existing raw matrix; does not execute the engine')
-    parser.add_argument('--gold', type=pathlib.Path, default=HERE / 'gold-v3.json', help='Frozen gold file (SHA-pinned)')
+    parser.add_argument('--gold', type=pathlib.Path, default=HERE / 'gold-v4.json', help='Frozen gold file (SHA-pinned)')
     parser.add_argument('--output', type=pathlib.Path, required=True)
     args = parser.parse_args()
     if args.replay:
