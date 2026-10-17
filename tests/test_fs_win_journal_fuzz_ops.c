@@ -159,6 +159,7 @@ static int predicted(int kind,int phase,int cls,int it,int *state)
  case C_SHAPE:case C_PAIR:return 1;
  case C_DELETE:{int sub=(phase==4)?it%3:0;
    if(phase==4&&sub==1)*state=0;
+   if(kind==2&&phase==3)*state=1; /* slice H (2026-10-17): the swept move cell lands on the moved-only state */
    return 2;}
  default:return 0;}}
 static void hexname(WCHAR *dst,const WCHAR *orig)
@@ -258,19 +259,19 @@ static int leftover_names(void)
    with the exact outcome. Group names are kind*10+point. A, B: remove point 3 and move point 3, source name
    resealed to a missing leaf "other" in the journal: rollback relinks the pin under the resealed name, OK, the
    file is at inside/other (read by name here), the source is empty, nothing at the move target, no leftover.
-   C..I: the journal is gone (same class as the POSIX limit F5): recovery returns OK and does nothing; the
-   expected state is spelled out per group in lim[]. */
+   F, H: the journal is gone (same class as the POSIX limit F5) and the pin is the ONLY link to the old bytes:
+   the sweep never removes an unshared pin, so recovery returns OK and the file lives on only as the pin.
+   Slice H (2026-10-17): the old C, D, G and I rows (a shared pin left by a deleted journal) are gone: since
+   slice G the no-journal recovery sweeps a SHARED pin (the bytes survive under the source or the target
+   name), so those cells are clean strict cells now. E keeps its row with updated numbers: the cross-linked
+   source and target stay (2 links each) and only the redundant third pin link is swept. */
 static struct {int kind,phase,cls,sub;int S,T,O,Sl,Tl,left,Ll;} lim[]={
  /* kind phase class         sub  S T O Sl Tl left Ll */
  {1,3,C_NAME,1,   0,0,1,0,0,0,0},   /* A remove point 3, source -> other */
  {2,3,C_NAME,1,   0,0,1,0,0,0,0},   /* B move point 3, source -> other */
- {1,1,C_DELETE,0, 1,0,0,2,0,1,2},   /* C remove point 1, intent deleted: pin = 2nd link of the source */
- {2,1,C_DELETE,0, 1,0,0,2,0,1,2},   /* D move point 1, intent deleted */
- {2,2,C_DELETE,0, 1,1,0,3,3,1,3},   /* E move point 2, intent deleted: source and target, 3 links each */
+ {2,2,C_DELETE,0, 1,1,0,2,2,0,0},   /* E move point 2, intent deleted (slice H: shared pin swept) */
  {1,3,C_DELETE,0, 0,0,0,0,0,1,1},   /* F remove point 3, intent deleted: the file lives only as the pin */
- {2,3,C_DELETE,0, 0,1,0,0,2,1,2},   /* G move point 3, intent deleted: at the target + pin */
  {1,4,C_DELETE,2, 0,0,0,0,0,1,1},   /* H remove point 4, both files deleted: file only as the pin */
- {2,4,C_DELETE,2, 0,1,0,0,2,1,2},   /* I move point 4, both files deleted: at the target + pin */
 };
 static int limit_row(int kind,int phase,int cls,int sub)
 {size_t i;for(i=0;i<sizeof(lim)/sizeof(lim[0]);i++)

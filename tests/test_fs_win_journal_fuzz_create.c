@@ -12,11 +12,15 @@
    leave a journal), one journal file is damaged here, then FsCreateRecover runs. Claim checked: a refusal
    (FS_READ_DENIED) leaves every file in the workspace unchanged; an OK leaves the target absent (rolled back)
    or with exactly the new bytes and a single link, no stage, pin or journal name left, the decoy unchanged,
-   and a second recovery is OK and changes nothing. "Sealed" damage recomputes the FNV-1a checksum, so only
+   and a second recovery is OK and, outside the two pinned limit cells, changes nothing (slice H (2026-10-17):
+   in a limit cell the first recovery consumes the journal and leaves an orphan, so the second recovery must
+   sweep exactly that name - the slice G F8 contract - and a third one must be a no-op). "Sealed" damage
+   recomputes the FNV-1a checksum, so only
    the semantic checks of recovery can refuse it. Every cell also asserts the outcome predicted before the
    first run (see predicted below). The strict oracle treats any leftover as a miss except the pinned known limits (limit_kind); misses are grouped.
    Reproduce with FS_WJFUZZ_SEED=<n> FS_WJFUZZ_ITERS=<n>. Not covered: crash points 1 and 2 (stage, or stage
-   and pin, with no journal: recovery returns OK and leaves them by design), remove, move and batch journals,
+   and pin, with no journal: since slice G (2026-10-17) the no-journal recovery sweeps those orphans; that
+   contract is gated in tests/test_fs_win_sweep_foreign.c), remove, move and batch journals,
    power loss, two journal files damaged differently except the pair-mismatch class. */
 #define ROOT "test_fs_winjfuzz_c_scratch"
 #define INS ROOT "\\inside"
@@ -252,16 +256,15 @@ static int leftover_names(void)
    m177 with the exact outcome. Kind 1: phase 3, stage name resealed to a missing name: the stage lookup of a
    missing name is accepted, so the real .fst- stays (one name, 1 link, new bytes), target absent. Kind 2: the
    pin is left as a second link of a finished target (target new, 2 links, one .fsp- name, new bytes): phase 6
-   with the pin name resealed in both files (sub 3 of name_sealed, a recomputing writer), and the journal
-   deleted after the publish (delete class at phases 4 and 5, and both files at phase 6): nothing is left
-   to recover from, same class as the POSIX limit F5. Kind 3: phase 3 with the intent deleted: stage and
-   pin both stay (2 names, each 2 links, new bytes), target absent. */
+   with the pin name resealed in both files (sub 3 of name_sealed, a recomputing writer).
+   Slice H (2026-10-17): the three journal-deleted kinds of the old table (phase 3; phases 4/5; both files at
+   phase 6 - the "nothing is left to recover from" cells, same class as the POSIX limit F5) are gone: since
+   slice G the no-journal recovery sweeps those orphans, so they are clean strict cells now (target absent or
+   new with a single link, no leftover names). The two remaining kinds still leave their orphan at the FIRST
+   recovery (the resealed journal blocks the sweep), and the cell requires the SECOND recovery to sweep it. */
 static int limit_kind(int phase,int cls,int sub)
 {if(cls==C_NAME&&phase==3&&sub==2)return 1;
  if(cls==C_NAME&&phase==6&&sub==3)return 2;
- if(cls==C_DELETE&&phase==3)return 3;
- if(cls==C_DELETE&&(phase==4||phase==5)&&sub==0)return 2;
- if(cls==C_DELETE&&phase==6&&sub==2)return 2;
  return 0;}
 /* g_ex holds "dir\\name " entries from leftover_names(); copy them into paths[] */
 static int split_names(char paths[4][600])
@@ -329,7 +332,18 @@ int main(int argc,char **argv)
      snap(after,sizeof(after));
      if(FsCreateRecover(r)!=FS_READ_OK)FAIL("second recovery not OK");
      snap(again,sizeof(again));
-     if(strcmp(after,again))FAIL("second recovery changed the workspace");
+     /* Slice H (2026-10-17): a limit cell ends its first recovery with an orphan whose journal is gone, so
+        the second recovery sweeps exactly that name (slice G F8 contract); a third one is a no-op. */
+     if(lk){
+       if(leftover_names())FAIL("second recovery did not sweep the orphan the first recovery left");
+       if(lk==1&&exists(INS "\\newfile"))FAIL("second recovery created the target");
+       if(lk==2&&(!file_is(INS "\\newfile","newbytes")||links_of(INS "\\newfile")!=1))FAIL("second recovery did not settle the pinned target");
+       if(!file_is(INS "\\decoy","old"))FAIL("second recovery changed the decoy");
+       snap(after,sizeof(after));
+       if(FsCreateRecover(r)!=FS_READ_OK)FAIL("third recovery not OK");
+       snap(again,sizeof(again));
+       if(strcmp(after,again))FAIL("third recovery changed the workspace");
+     }else if(strcmp(after,again))FAIL("second recovery changed the workspace");
    }else{
      fprintf(stderr,"status=%d\n",(int)s);FAIL("recovery returned neither OK nor DENIED");
    }
