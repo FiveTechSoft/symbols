@@ -71,11 +71,14 @@ int main(int argc,char**argv)
     wrapper's own env=) both failed to reach this binary through the python wrapper on the Windows
     runner while the same property reaches directly-run binaries (mc10/mc11); an argument cannot get
     lost between processes. */
- if(argc>1)_putenv_s("FS_WIN_BATCH_MUTANT",argv[1]);
- /* Slice H3 (2026-10-17), TEMPORARY diagnostic (remove when mc13 is resolved): the merged gate stream
-    allows extra lines before the unique final line, so this prints whether the argument arrived and
-    whether the in-process env activation stuck. */
- fprintf(stderr,"sweep foreign diag argc=%d mutant_env=%s\n",argc,getenv("FS_WIN_BATCH_MUTANT")?getenv("FS_WIN_BATCH_MUTANT"):"(null)");
+ if(argc>1){
+ /* Slice H4 (2026-10-17): a mutant run must fail loudly when the hook is compiled out. This exe was
+    built without FS_CREATE_TEST_CRASH until now, so wb_mutant was a macro 0 and mutant 13 never
+    existed in the binary; every env/argv delivery then "passed" silently through to the normal line. */
+#ifndef FS_CREATE_TEST_CRASH
+ fprintf(stderr,"sweep foreign mutant hook NOT compiled in\n");return 90;
+#endif
+ _putenv_s("FS_WIN_BATCH_MUTANT",argv[1]);}
  static const char *pre[8]={".fst-",".fsp-",".fsrp-",".fsrs-",".fsj-",".fsrb-",".fsrm-",".fsmv-"};
  static const char *name[5]={"batch","replace","create","remove","move"};
  char out[2048]="";int m,i;

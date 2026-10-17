@@ -438,6 +438,10 @@ if(WIN32)
     add_executable(test_fs_win_sweep_foreign tests/test_fs_win_sweep_foreign.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_sweep_foreign PRIVATE include)
+    # Slice H4 (2026-10-17): the mutant hook must be COMPILED IN for the mc13 entry; without
+    # FS_CREATE_TEST_CRASH wb_mutant is a macro 0 in this binary and mutant 13 cannot exist
+    # (diagnosed via the slice H3 stderr line: argc=2 mutant_env=13, normal sweep line printed).
+    target_compile_definitions(test_fs_win_sweep_foreign PRIVATE FS_CREATE_TEST_CRASH=1)
     add_test(NAME test_fs_win_sweep_foreign COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign -- $<TARGET_FILE:test_fs_win_sweep_foreign>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

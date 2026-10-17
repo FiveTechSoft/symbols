@@ -84,21 +84,7 @@ sys.exit(int(sys.argv[2]))
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 result = gate.run(kind, [sys.executable, str(child), str(payload), '0', 'stderr'])
             check(result == 1, kind + '_stderr_fragment')
-        # Slice H3 (2026-10-17): the native binary prints a diagnostic line to stderr ahead of the
-        # final line (merged into the gate stream); the gate must accept it for both sweep kinds.
-        diag_child = temp / 'diag_child.py'
-        diag_child.write_text('''import pathlib,sys
-sys.stderr.write("sweep foreign diag argc=2 mutant_env=13"+chr(10));sys.stderr.flush()
-sys.stdout.write(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
-''', encoding='utf-8')
-        for kind in ('sweep_foreign', 'sweep_foreign_mc13'):
-            payload = temp / (kind + '.diag.bin')
-            payload.write_bytes(('\n'.join(GOLD['gates'][kind].get('arm_summaries', []) + [GOLD['gates'][kind]['final_line']]) + '\n').encode('utf-8'))
-            eout, eerr = io.StringIO(), io.StringIO()
-            with contextlib.redirect_stdout(eout), contextlib.redirect_stderr(eerr):
-                result = gate.run(kind, [sys.executable, str(diag_child), str(payload)])
-            check(result == 0, kind + '_diag_line_accepted ' + eerr.getvalue()[:160])
-    print('WINDOWS_SIX_SELFTEST vectors=' + str(len(executed)) + ' derived_omissions=' + str(omissions) + ' subprocess_controls=23 complete=1')
+    print('WINDOWS_SIX_SELFTEST vectors=' + str(len(executed)) + ' derived_omissions=' + str(omissions) + ' subprocess_controls=21 complete=1')
     return 0
 
 
