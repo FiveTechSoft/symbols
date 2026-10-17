@@ -348,6 +348,20 @@ Status words: **shown** (named test, named run), **partial**, **not shown**.
   removals in this one 3-item fixture, only through `FsBatchRecover`; the other entry points
   are not chained. No separate mutant belongs to this chain cell. Process termination is not
   power loss; no broader runner or interleaving claim is made.
+- **Slice I (2026-10-17, run 39041299875, msvc and asan): the chain now runs through all three batch entry points.**
+  `sc_sweepchain_mode` runs the same kill-at-37 chain through `FsBatchRecover` (mode 1),
+  `FsBatchReplace` (mode 0) and `FsBatchCreate` (mode 2). A killed child is identical in every
+  mode (it dies during the sweep, before its batch call starts, so the old bytes are intact);
+  only the finishing child differs: mode 1 leaves the old tree, mode 0 completes the replace
+  (new tree), mode 2 completes the create (zz1/zz2 added). Measured on both Windows jobs:
+  kills 9 counts `9 8 7 6 5 4 3 2 1 0 0` and orphans before/after 9/8 in each of the three
+  modes, exactly the source-derived counts above. The first slice-I dispatch gated red on
+  test #69 in both Windows jobs solely because the dispatched gold line transcribed the
+  per-mode summary without the `sweep chain` prefix that the producer prints before each
+  mode's segment; the corrected gold repeats the prefix per mode. That correction is a
+  transcription fix, not a change of prediction: every measured counter matched the
+  prediction on the first measurement. The clause "the other entry points are not chained"
+  in the paragraph above is superseded by this bullet.
 - **Single-file calls and the sweep (read in m212, not measured here).** In `src/fs_create_win.inc`, `wr_recover_locked` (replace) runs the orphan sweep when there is no intent and no marker (m139), so single-file replace recovery sweeps. `wc_recover_locked` (create and copy) returns OK when it finds neither record and does not sweep; `FsRemoveRecover` and `FsMoveRecover` go through `wo_recover_locked`, which I did not read for this. `tests/test_fs_win_journal.c` says rows 1 and 2 (crash with a stage only, and stage plus pin, before the intent) leave untracked orphans that the test removes itself. On POSIX, `src/fs_read.c` has a comment that a crash at the create stage "may leave an orphan stage instead" (line 530), and a search of the file for sweep, orphan and readdir found no function that removes orphans. So the missing sweep for single-file create, copy, move and remove is parity with POSIX, a known limit and not a Windows-only defect; the earlier phrase "single-file calls do not sweep" was too broad for replace. Not measured: whether such an orphan is removed by a later batch call on Windows (the batch sweep matches the `.fst-` and `.fsp-` shapes, which I read but did not run for this case), and what the orphans cost (a stage holds the bytes of one file).
 
 - **Content fuzzing: shown for the Windows write path (m218), not for patch text.** The path and manifest fuzz above still generates paths and
