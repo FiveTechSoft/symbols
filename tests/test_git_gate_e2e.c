@@ -9,12 +9,16 @@
 #define RMTREE(p) "if exist " p " rmdir /s /q " p
 #define NOERR "2>nul"
 #define DELFILE "del third.txt"
+#define SLEEP30 "ping -n 30 127.0.0.1 >nul"
+#define DELFILE4 "del fourth.txt"
 #else
 #include <sys/stat.h>
 #define MKDIR(p) mkdir(p, 0755)
 #define RMTREE(p) "rm -rf " p
 #define NOERR "2>/dev/null"
 #define DELFILE "rm third.txt"
+#define SLEEP30 "sleep 30"
+#define DELFILE4 "rm fourth.txt"
 #endif
 /* M2: the workflow sequence end to end against a real bare remote, with the remote advancing
    after the first preflight and before the push (what apply-patch.yml does not guard in its
@@ -57,6 +61,14 @@ static int Run(const char *cwd, const char *cmd, int want)
                r.exit_code, want, r.execution_failed, r.timed_out, r.stdout_buf, r.stderr_buf);
     }
     return !r.execution_failed && !r.timed_out && r.exit_code == want;
+}
+/* Runs cmd and expects the shell's timeout to KILL it (a real process-tree kill, not a simulation). */
+static int RunKilled(const char *cwd, const char *cmd, unsigned ms)
+{
+    SHELL_EXEC_RESULT r;
+    if (!AgentShellExec(cmd, cwd, ms, &r)) return 0;
+    if (!r.timed_out) printf("    expected a kill by timeout: exit %d, failed %d\n    stdout: %.200s\n    stderr: %.200s\n", r.exit_code, r.execution_failed, r.stdout_buf, r.stderr_buf);
+    return r.timed_out;
 }
 static int Out(const char *cwd, const char *cmd, char *buf, size_t n)
 {
@@ -207,6 +219,38 @@ int main(void)
               Out(S "/b.git", "git rev-list --count main", count2, sizeof count2) && !strcmp(count1, count2), "R5: a second push is a no-op, tip and commit count unchanged");
         rc = Gate("patch-state", ".git/change3.patch", "--dir", L, NULL, NULL, NULL, NULL);
         CHECKR(rc == 3 && strstr(gout, "already applied"), "R6: patch-state after the push still reports already applied, exit 3");
+    }
+
+    /* S1: a REAL kill. One shell command applies, stages, commits and writes a flag file, then
+       sleeps; the shell timeout kills its process tree before the push in the same command runs.
+       Predictions, written before the first run:
+         K1 the command is killed by the timeout (timed_out)
+         K2 the commit and the flag exist, the remote tip is unchanged (the push never ran)
+         R7 patch-state: already applied, exit 3
+         R8 verify-head passes (exit 0)
+         R9 the push finishes once: tip equals the commit, exactly one more commit
+         R10 a second push is a no-op
+         R11 patch-state after the push still reports already applied, exit 3 */
+    {
+        char before[80] = "", count0[32] = "", count1[32] = "", count2[32] = "", c4[80] = "", tip4[80] = "";
+        CHECK(Out(L, "git rev-parse HEAD", before, sizeof before) && Out(S "/b.git", "git rev-list --count main", count0, sizeof count0) &&
+              Put(L "/fourth.txt", "f\n") && Run(L, "git add -A -N && git diff --binary > .git/change4.patch && git reset -q && " DELFILE4, 0),
+              "killed run: patch made, tree clean");
+        CHECK(RunKilled(L, "git apply .git/change4.patch && git add -A && git commit -q -m change4 && echo done > .git/k4.flag && " SLEEP30 " && git push origin HEAD:main", 8000),
+              "K1: the sequence is killed by the timeout before the push");
+        CHECK(Out(L, "git rev-parse HEAD", c4, sizeof c4) && strcmp(c4, before) != 0 && Run(L, "git cat-file -e HEAD:fourth.txt", 0) &&
+              Out(S "/b.git", "git rev-parse main", tip4, sizeof tip4) && !strcmp(tip4, before) &&
+              Out(S "/b.git", "git rev-list --count main", count1, sizeof count1) && !strcmp(count1, count0),
+              "K2: commit exists, the remote is unchanged (the push never ran)");
+        rc = Gate("patch-state", ".git/change4.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        if (rc != 3) printf("    got exit %d out=%s err=%s\n", rc, gout, gerr);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R7: patch-state after the real kill reports already applied, exit 3");
+        CHECK(Gate("verify-head", ".git/change4.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0, "R8: verify-head passes after the real kill");
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-parse main", tip4, sizeof tip4) && !strcmp(tip4, c4) &&
+              Out(S "/b.git", "git rev-list --count main", count1, sizeof count1) && atoi(count1) == atoi(count0) + 1, "R9: the push finishes once, one more commit on the remote");
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-list --count main", count2, sizeof count2) && !strcmp(count1, count2), "R10: a second push is a no-op");
+        rc = Gate("patch-state", ".git/change4.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R11: patch-state after the push still reports already applied, exit 3");
     }
 
     printf("\n%d/%d passed\n", pass_n, run_n);
