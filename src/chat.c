@@ -5201,6 +5201,19 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                 }
             }
         }
+        /* t_sub carries the marked geometric/dictionary substitute word.
+           The file loops below honor it only when it actually names a
+           loaded text (named-text restriction); a substituted word never
+           matches a file path, and must not skip every file. */
+        int tsub_is_file;
+        {
+            uint32_t tf;
+            for (tf = 0; tf < ch->ntfiles; tf++)
+                if (p->t_sub[0] != '\0' &&
+                    strcmp(ch->tfiles[tf], p->t_sub) == 0)
+                    break;
+            tsub_is_file = p->t_sub[0] != '\0' && tf < ch->ntfiles;
+        }
         if (!have && !p->t_following)
         {
             /* Wrap-around: all matching candidates have been shown in this dialogue;
@@ -5212,7 +5225,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                 float sc[16];
                 uint32_t nret;
                 uint32_t r;
-                if (p->t_sub[0] != '\0' &&
+                if (tsub_is_file &&
                     strcmp(ch->tfiles[f], p->t_sub) != 0)
                     continue;
                 nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph,
@@ -5250,7 +5263,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                 {
                     uint32_t idx[16], nret, r;
                     float sc[16];
-                    if (p->t_sub[0] != '\0' && strcmp(ch->tfiles[f], p->t_sub) != 0)
+                    if (tsub_is_file && strcmp(ch->tfiles[f], p->t_sub) != 0)
                         continue;
                     nret = TextLexRetrieve(&ch->tlex[f], ch->tgraph, ch->temb, words, nw, idx, sc, 16);
                     for (r = 0; r < nret; r++)
@@ -8572,12 +8585,33 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out,
         char w[CHAT_TOKEN_MAX];
         size_t l = 0;
         const char *tr;
-        while (*s && !isalnum((unsigned char)*s)) s++;
-        while (*s && isalnum((unsigned char)*s)) { if (l + 1 < sizeof(w)) w[l++] = *s; s++; }
+        /* Fold each letter like the answer path (FoldChar): the raw line's
+           multibyte letters must not split into sub-token pieces the
+           dictionary can never match. */
+        while (*s)
+        {
+            char fc; int adv = FoldChar(s, &fc);
+            if (isalnum((unsigned char)fc)) break;
+            s += adv;
+        }
+        while (*s)
+        {
+            char fc; int adv = FoldChar(s, &fc);
+            if (!isalnum((unsigned char)fc)) break;
+            if (l + 1 < sizeof(w)) w[l++] = fc;
+            s += adv;
+        }
         w[l] = '\0';
         if (l < 3 || IsStopTok(w)) continue;
         tr = DictTranslate(&ch->dict, w);
-        snprintf(words[nw], CHAT_TOKEN_MAX, "%s", (tr && tr[0]) ? tr : w);
+        /* Rule (a), same as the answer path: keep a corpus-language word;
+           translate only when the original is unknown to the corpus and
+           the translation is known. */
+        if (tr != NULL && tr[0] != '\0' &&
+            !TqCorpusKnown(ch, w) && TqCorpusKnown(ch, tr))
+            snprintf(words[nw], CHAT_TOKEN_MAX, "%s", tr);
+        else
+            snprintf(words[nw], CHAT_TOKEN_MAX, "%s", w);
         wp[nw] = words[nw];
         if (TextLexFindSymbol(ch->tgraph, words[nw]) != SYMBOL_INVALID) known++;
         nw++;
