@@ -5383,7 +5383,14 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
         {
             char w[CHAT_TOKEN_MAX];
             const char *tr = DictTranslate(&ch->dict, p->toks[i]);
-            strncpy(w, (tr && tr[0]) ? tr : p->toks[i], CHAT_TOKEN_MAX - 1);
+            const char *tw = p->toks[i];
+            /* Rule (a), same as the answer path and the quote guard: keep
+               a corpus-language word; translate only when the original is
+               unknown to the corpus and the translation is known. */
+            if (tr != NULL && tr[0] != '\0' &&
+                !TqCorpusKnown(ch, tw) && TqCorpusKnown(ch, tr))
+                tw = tr;
+            strncpy(w, tw, CHAT_TOKEN_MAX - 1);
             w[CHAT_TOKEN_MAX - 1] = '\0';
             if (IsStopTok(w)) continue;
             words[nw++] = w;
