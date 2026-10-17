@@ -8,7 +8,10 @@ import subprocess
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
-GOLD_SHA = 'b78ef950860e69a19be8223ea16e0f4eb6e74cfbb5b8a31454c17360bd27b4bb'
+GOLD_SHA = {
+    'gold-v3.json': 'a76c8e31e9ac61bd88bf554b8bdf536fd511a64f784a423479a5a82fb8d8bbe4',
+    'gold-v3-dict.json': '55b04c8f1b3998720d759e507f71268f053fe1cc8d4f3c67e06c40395a5aaa7b',
+}
 
 def validate(result, expected_cells):
     rows = result['rows']
@@ -29,8 +32,12 @@ def validate(result, expected_cells):
     return result
 
 def load_gold(gold_path):
-    assert hashlib.sha256(gold_path.read_bytes()).hexdigest() == GOLD_SHA, 'gold changed'
-    return json.loads(gold_path.read_text())
+    assert hashlib.sha256(gold_path.read_bytes()).hexdigest() == GOLD_SHA[gold_path.name], 'gold changed'
+    gold = json.loads(gold_path.read_text())
+    if 'dict_fixture' in gold:
+        d = HERE / gold['dict_fixture']['path']
+        assert hashlib.sha256(d.read_bytes()).hexdigest() == gold['dict_fixture']['sha256'], 'dict fixture changed'
+    return gold
 
 def expected_cells(gold):
     return 2 * len(gold['cases']) * len(gold['modes']) * len(gold['capacities'])
@@ -38,7 +45,7 @@ def expected_cells(gold):
 def measure(probe, cwd, gold_path):
     gold = load_gold(gold_path)
     groups = [('fresh', c['id'], [c]) for c in gold['cases']]
-    groups += [('stateful', d, [c for c in gold['cases'] if c['corpus'] == d + '.txt']) for d in ['memory', 'astronomy', 'physics', 'math', 'cocina', 'taller']]
+    groups += [('stateful', d, [c for c in gold['cases'] if c['corpus'] == d + '.txt']) for d in ['memory', 'astronomy', 'physics', 'math', 'cocina', 'taller', 'enmemory']]
     rows = []
     with tempfile.TemporaryDirectory(prefix='chat-coverage-') as td:
         query_file = pathlib.Path(td) / 'queries.txt'
@@ -60,7 +67,7 @@ def measure(probe, cwd, gold_path):
                     assert len(reps[0]) == len(cases), 'query count'
                     for c, q in zip(cases, reps[0]):
                         rows.append({'id': c['id'], 'positive': c['positive'], 'arm': arm, 'mode': mode, 'capacity': cap, 'record': q})
-    return validate({'status': 'TECHNICAL_MEASUREMENT_GREEN', 'semantic_scoring': 'not_certified', 'gold_sha256': GOLD_SHA, 'base_of_original_measurement': gold['base'], 'cells': len(rows), 'rows': rows}, expected_cells(gold))
+    return validate({'status': 'TECHNICAL_MEASUREMENT_GREEN', 'semantic_scoring': 'not_certified', 'gold_sha256': GOLD_SHA[gold_path.name], 'base_of_original_measurement': gold['base'], 'cells': len(rows), 'rows': rows}, expected_cells(gold))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
@@ -69,7 +76,7 @@ if __name__ == '__main__':
                         help='Working directory for the probe; default is an empty temp dir so no '
                              'cwd-relative dictionary/embeddings leak into the measurement')
     parser.add_argument('--replay', type=pathlib.Path, help='Validate an existing raw matrix; does not execute the engine')
-    parser.add_argument('--gold', type=pathlib.Path, default=HERE / 'gold-v2.json', help='Frozen gold file (SHA-pinned)')
+    parser.add_argument('--gold', type=pathlib.Path, default=HERE / 'gold-v3.json', help='Frozen gold file (SHA-pinned)')
     parser.add_argument('--output', type=pathlib.Path, required=True)
     args = parser.parse_args()
     if args.replay:

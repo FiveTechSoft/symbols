@@ -1,0 +1,3 @@
+# Pinned minimal dictionary for the harness dict configuration.
+# Isolates the tested mechanism: only the discriminating word of the memory/enmemory cells.
+sueno = dream
