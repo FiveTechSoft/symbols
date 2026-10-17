@@ -608,3 +608,122 @@ const char *AgentGitPreflightStatusName(GIT_PREFLIGHT_STATUS status)
         default: return "unknown";
     }
 }
+
+/* ---- Opt-in single-file guard (see agent_git.h) ---- */
+
+/* Test mutants (AGENT_GIT_GUARD_MUTANT): 1 skips the HEAD comparison, 2 skips the target-dirty check. */
+static GIT_GUARD_STATUS GuardHead(const char *working_dir, char head[GIT_HEAD_MAX],
+                                  char *error, size_t error_size)
+{
+    SHELL_EXEC_RESULT result;
+    GIT_INSPECT_STATUS st;
+    st = RunReadOnly("git rev-parse --is-inside-work-tree", working_dir, &result, error, error_size);
+    if (st != GIT_INSPECT_OK)
+        return GIT_GUARD_INSPECTION_FAILED;
+    TrimLine(result.stdout_buf);
+    if (result.exit_code != 0 || strcmp(result.stdout_buf, "true") != 0)
+    {
+        SetError(error, error_size, "Working directory is not inside a Git work tree");
+        return GIT_GUARD_NOT_REPOSITORY;
+    }
+    st = RunReadOnly("git rev-parse --verify HEAD", working_dir, &result, error, error_size);
+    if (st != GIT_INSPECT_OK)
+        return GIT_GUARD_INSPECTION_FAILED;
+    TrimLine(result.stdout_buf);
+    if (result.exit_code != 0 || result.stdout_buf[0] == '\0' ||
+        strlen(result.stdout_buf) >= GIT_HEAD_MAX)
+    {
+        SetError(error, error_size, "Repository has no verifiable HEAD");
+        return GIT_GUARD_INSPECTION_FAILED;
+    }
+    snprintf(head, GIT_HEAD_MAX, "%s", result.stdout_buf);
+    return GIT_GUARD_OK;
+}
+
+static GIT_GUARD_STATUS GuardPathClean(const char *working_dir, const char *rel_path,
+                                       char *error, size_t error_size)
+{
+    SHELL_EXEC_RESULT result;
+    GIT_INSPECT_STATUS st;
+    char normalized[GIT_BRANCH_MAX];
+    char command[GIT_BRANCH_MAX + 96];
+    if (!NormalizePatchPath(rel_path, normalized))
+    {
+        SetError(error, error_size, "Target path is not a plain relative path git can be asked about");
+        return GIT_GUARD_INSPECTION_FAILED;
+    }
+#if defined(AGENT_GIT_GUARD_MUTANT) && AGENT_GIT_GUARD_MUTANT == 2
+    return GIT_GUARD_OK;
+#endif
+    snprintf(command, sizeof(command),
+             "git --no-optional-locks status --porcelain=v1 --untracked-files=all -- \"%s\"", normalized);
+    st = RunReadOnly(command, working_dir, &result, error, error_size);
+    if (st != GIT_INSPECT_OK)
+        return GIT_GUARD_INSPECTION_FAILED;
+    if (result.exit_code != 0)
+    {
+        SetError(error, error_size, "Git could not report the target's status");
+        return GIT_GUARD_INSPECTION_FAILED;
+    }
+    if (result.stdout_buf[0] != '\0')
+    {
+        SetError(error, error_size, "Target has uncommitted changes");
+        return GIT_GUARD_PATH_DIRTY;
+    }
+    return GIT_GUARD_OK;
+}
+
+GIT_GUARD_STATUS AgentGitGuardBegin(const char *working_dir, const char *rel_path,
+                                    GIT_GUARD *guard, char *error, size_t error_size)
+{
+    GIT_GUARD_STATUS st;
+    if (working_dir == NULL || working_dir[0] == '\0' || rel_path == NULL || guard == NULL)
+    {
+        SetError(error, error_size, "A working directory, a target path and output are required");
+        return GIT_GUARD_INSPECTION_FAILED;
+    }
+    memset(guard, 0, sizeof(*guard));
+    SetError(error, error_size, "");
+    st = GuardHead(working_dir, guard->head, error, error_size);
+    if (st != GIT_GUARD_OK)
+        return st;
+    return GuardPathClean(working_dir, rel_path, error, error_size);
+}
+
+GIT_GUARD_STATUS AgentGitGuardCheck(const char *working_dir, const char *rel_path,
+                                    const GIT_GUARD *guard, char *error, size_t error_size)
+{
+    GIT_GUARD_STATUS st;
+    char head[GIT_HEAD_MAX];
+    if (working_dir == NULL || working_dir[0] == '\0' || rel_path == NULL || guard == NULL ||
+        guard->head[0] == '\0')
+    {
+        SetError(error, error_size, "A begun guard, a working directory and a target path are required");
+        return GIT_GUARD_INSPECTION_FAILED;
+    }
+    SetError(error, error_size, "");
+    st = GuardHead(working_dir, head, error, error_size);
+    if (st != GIT_GUARD_OK)
+        return st;
+#if !(defined(AGENT_GIT_GUARD_MUTANT) && AGENT_GIT_GUARD_MUTANT == 1)
+    if (strcmp(head, guard->head) != 0)
+    {
+        SetError(error, error_size, "HEAD moved since the guard began");
+        return GIT_GUARD_HEAD_MOVED;
+    }
+#endif
+    return GuardPathClean(working_dir, rel_path, error, error_size);
+}
+
+const char *AgentGitGuardStatusName(GIT_GUARD_STATUS status)
+{
+    switch (status)
+    {
+    case GIT_GUARD_OK: return "ok";
+    case GIT_GUARD_NOT_REPOSITORY: return "not_repository";
+    case GIT_GUARD_HEAD_MOVED: return "head_moved";
+    case GIT_GUARD_PATH_DIRTY: return "path_dirty";
+    case GIT_GUARD_INSPECTION_FAILED: return "inspection_failed";
+    }
+    return "unknown";
+}

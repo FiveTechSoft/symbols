@@ -135,4 +135,35 @@ GIT_PATCH_STATE AgentGitPatchState(const char *working_dir,
 
 const char *AgentGitPreflightStatusName(GIT_PREFLIGHT_STATUS status);
 
+/* Opt-in guard for an in-process edit of one file (AgentRunnerSetGitGuard).
+   Begin snapshots HEAD and refuses when the target path has uncommitted changes
+   (staged, unstaged or untracked); Check, run again just before the edit, refuses
+   when HEAD moved or the target became dirty. Unrelated dirty files are ignored.
+   Read only: fixed git commands, --no-optional-locks, no fetch, no ref or tree
+   change. Not a repository, a path git would quote or that is outside
+   [A-Za-z0-9._/-] (spaces included), an unreadable HEAD or truncated output
+   all fail closed. The check and the later edit are not atomic: another process
+   can still change the tree in between (residual TOCTOU); the hunk content check
+   in PatchApplyAtomic stays the last line of defence. rel_path is relative to
+   working_dir (see PatchResolveTarget). */
+typedef struct
+{
+    char head[GIT_HEAD_MAX];
+} GIT_GUARD;
+
+typedef enum
+{
+    GIT_GUARD_OK = 0,
+    GIT_GUARD_NOT_REPOSITORY,
+    GIT_GUARD_HEAD_MOVED,
+    GIT_GUARD_PATH_DIRTY,
+    GIT_GUARD_INSPECTION_FAILED
+} GIT_GUARD_STATUS;
+
+GIT_GUARD_STATUS AgentGitGuardBegin(const char *working_dir, const char *rel_path,
+                                    GIT_GUARD *guard, char *error, size_t error_size);
+GIT_GUARD_STATUS AgentGitGuardCheck(const char *working_dir, const char *rel_path,
+                                    const GIT_GUARD *guard, char *error, size_t error_size);
+const char *AgentGitGuardStatusName(GIT_GUARD_STATUS status);
+
 #endif

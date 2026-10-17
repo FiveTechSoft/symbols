@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <time.h>
 #include "engineering_episode.h"
+#include "agent_git.h"
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -19,6 +20,7 @@
 #include <unistd.h>
 #endif
 #include "agent_runner.h"
+#include "agent_git.h"
 
 /* Fault outcomes exist only in the isolated test archive. No environment hook. */
 #ifdef RUNNER_ROLLBACK_TEST_FAULTS
@@ -136,6 +138,12 @@ AGENT_RUNNER *AgentRunnerCreate(const char *workspace_dir, uint32_t max_replans)
         strncpy(runner->workspace_dir, ".", sizeof(runner->workspace_dir) - 1);
 
     return runner;
+}
+
+void AgentRunnerSetGitGuard(AGENT_RUNNER *runner, bool enabled)
+{
+    if (runner)
+        runner->git_guard = enabled;
 }
 
 void AgentRunnerDestroy(AGENT_RUNNER *runner)
@@ -479,6 +487,23 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
                      task->fixed_snippet,
                      task->context_after);
 
+    /* Opt-in Git guard: snapshot HEAD and refuse a dirty target before verification. */
+    GIT_GUARD git_guard;
+    char git_guard_rel[MAX_PATCH_PATH] = {0};
+    char git_guard_err[GIT_ERROR_MAX];
+    if (runner->git_guard)
+    {
+        const char *ws = runner->workspace_dir[0] ? runner->workspace_dir : ".";
+        if (!PatchResolveTarget(ws, task->target_file, git_guard_rel, sizeof(git_guard_rel)) ||
+            AgentGitGuardBegin(ws, git_guard_rel, &git_guard, git_guard_err,
+                               sizeof(git_guard_err)) != GIT_GUARD_OK)
+        {
+            PatchPlanFree(&patch);
+            out_result->is_solved = false;
+            return 0;
+        }
+    }
+
     PATCH_VERIFY_REPORT rep;
     int ok_verify = PatchVerifyPlan(&patch, &rep);
     if (!ok_verify || !rep.is_applicable)
@@ -511,6 +536,11 @@ int AgentRunnerSolveTask(AGENT_RUNNER *runner,
     {
         char before[EE_STR]={0};
         int before_ok=audit && runner_file_hash(task->target_file,before);
+        if (attempt == 0 && runner->git_guard &&
+            AgentGitGuardCheck(runner->workspace_dir[0] ? runner->workspace_dir : ".",
+                               git_guard_rel, &git_guard, git_guard_err,
+                               sizeof(git_guard_err)) != GIT_GUARD_OK)
+            break;
         if (!PatchApplyAtomic(&patch))
             break;
 

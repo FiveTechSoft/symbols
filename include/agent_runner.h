@@ -96,6 +96,7 @@ typedef struct
     CODE_GRAPH   *code_graph;
     uint32_t      max_replans;
     char          workspace_dir[MAX_PATCH_PATH];
+    bool          git_guard; /* opt-in, default off; see AgentRunnerSetGitGuard */
 } AGENT_RUNNER;
 
 /* ============================================================
@@ -104,6 +105,13 @@ typedef struct
 
 AGENT_RUNNER *AgentRunnerCreate(const char *workspace_dir, uint32_t max_replans);
 void          AgentRunnerDestroy(AGENT_RUNNER *runner);
+
+/* Opt-in Git guard for AgentRunnerSolveTask, default off (nothing changes for existing callers).
+   When on, a solve is refused (is_solved false, target untouched) if the workspace is not a Git
+   work tree, the target file has uncommitted changes, git cannot be read, or HEAD moved between
+   the start of the solve and the first edit. Unrelated dirty files are ignored. See
+   AgentGitGuardBegin in agent_git.h for the exact contract and the residual race. */
+void          AgentRunnerSetGitGuard(AGENT_RUNNER *runner, bool enabled);
 
 /* Index the entire workspace directory recursively into the runner's code graph */
 uint32_t      AgentRunnerIndexWorkspace(AGENT_RUNNER *runner);
