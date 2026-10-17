@@ -54,6 +54,17 @@ The table above was written before commit `4130c66` (Windows ports of the stream
 
 Summary after this reading: criterion 3 is shown and criterion 6 is shown within the limits above, both stale rows superseded; criterion 4 is shown; criteria 1 and 2 stay partial for the stated reasons; criterion 5 was not re-read. M0 is not declared by this update. `ROADMAP.md` still lists the stress repeat as work to do in the "What is missing for core v1" list; that line is not changed here.
 
+## M0 reading of 2026-10-17 at 8961c7d8 (criteria 1 and 2; no phase declaration)
+
+Frozen expectations and the reading contract for this update are in [core-m0-evidence-reading-2026-10-17-gold.json](core-m0-evidence-reading-2026-10-17-gold.json), written before any log was opened. Source reading at `8961c7d8c48f07b638accf3fbf5399fe0d57a099`: both Windows fixtures run under strict Python gates (`tests/shell_spawn_v2_gate.py`, `tests/windows_six_gate.py --kind dual_win`), registered WIN32-only with no `PASS_REGULAR_EXPRESSION`, so a Passed row is the gate's exit status, not a regex match.
+
+Run 39021946451 (`https://github.com/FiveTechSoft/symbols/actions/runs/39021946451`). Each cited job log shows its checkout step at `8961c7d8c48f07b638accf3fbf5399fe0d57a099` ("HEAD is now at 8961c7d"), so the evidence is for that exact SHA.
+
+- Criterion 1 (invalid `cwd` and spawn failures, zero side effects): job build-test-msvc, `264/274 Test #264: test_shell_spawn_win ... Passed 3.63 sec`; job asan-msvc, `264/274 ... Passed 4.68 sec`. The v2 contract this gate checks (27 rejected calls, exact per-call handle delta, PSS table comparison, invalid-image private fixture, real-shell positive control) is documented in [shell-spawn-win-v2.md](shell-spawn-win-v2.md). Invalid `cwd` itself and POSIX spawn failure were already tested per the reading above. Status: **shown for the listed cells** on both platforms, the Windows side within the fixture's one failure class. Limits: one hosted runner, one account; CTest suppresses passing stdout, so the gate's exit status is the check, not the internal counters. Stable error categories remain a separate open deliverable, not closed here.
+- Criterion 2 (100,000 bytes to both streams concurrently, no deadlock or false timeout): job build-test-msvc, `263/274 Test #263: test_shell_dual_win ... Passed 0.86 sec`; job asan-msvc, `263/274 ... Passed 0.52 sec`. The fixture (two native writer threads released from a common event, exact 100000-byte totals, stream purity, truncation flags, sensitivity modes) is documented in [shell-dual-win.md](shell-dual-win.md); the POSIX concurrent test was already covered above. Status: **shown for the listed cells** on both platforms. Limits: one hosted runner, one account.
+
+This supersedes the "criteria 1 and 2 stay partial" grading in the summary above for the listed cells only; criteria 3, 4, 5 and 6 and every other row are unchanged. M0 is not declared here; that declaration is Antonio's.
+
 ## M1: Phase 1, structured filesystem
 
 Present in the repository: typed `stat`, `list`, `read`, `create`, `replace`, `move`, `copy`, `remove` (POSIX), a workspace-root capability, create-intent journal and recovery, read-only operation manifest and transaction planning, batch create, and Windows NTFS handle-relative create, replace, move and remove with a process-crash journal.

@@ -1,0 +1,40 @@
+{
+  "slice": "F: M0 c1/c2 + race_parent Linux evidence reading (docs-only)",
+  "frozen_before_opening_logs": true,
+  "frozen_at_local": "2026-10-17",
+  "cited_master": "8961c7d8c48f07b638accf3fbf5399fe0d57a099",
+  "source_readings_at_cited_master": {
+    "test_shell_spawn_win": "CMakeLists.txt registers it WIN32-only via tests/shell_spawn_v2_gate.py strict python gate, TIMEOUT 200, no PASS_REGULAR_EXPRESSION; exit status is the check",
+    "test_shell_dual_win": "CMakeLists.txt registers it WIN32-only via tests/windows_six_gate.py --kind dual_win, TIMEOUT 180, no PASS_REGULAR_EXPRESSION; exit status is the check",
+    "test_fs_race_parent": "non-mutant prints 'swaps N, writer calls OK a b (floor 50 each)' and 'ALL PASS (0 outside mismatches)'; RP_OK_FLOOR=50; ci.yml build-test-linux has a dedicated step running it -V and grepping those lines, so they appear in the log even on pass"
+  },
+  "runs": [
+    {
+      "run_id": 39021946451,
+      "role": "candidate exact-SHA CI for cited master (slice E apply+CI run)",
+      "sha_verification": "EACH cited job log must show actual checkout of 8961c7d8c48f07b638accf3fbf5399fe0d57a099 in its checkout step; a job that shows any other SHA is not evidence for this master and the reading records that fact instead of substituting another run silently"
+    }
+  ],
+  "expected_rows": {
+    "build-test-msvc": [
+      "row matching 'test_shell_spawn_win' with result Passed (not Skipped, not Failed)",
+      "row matching 'test_shell_dual_win' with result Passed (not Skipped, not Failed)"
+    ],
+    "asan-msvc": [
+      "row matching 'test_shell_spawn_win' with result Passed (not Skipped, not Failed)",
+      "row matching 'test_shell_dual_win' with result Passed (not Skipped, not Failed)"
+    ],
+    "build-test-linux": [
+      "row matching 'test_fs_race_parent' with result Passed",
+      "verbose line matching 'swaps [0-9]+, writer calls OK [0-9]+ [0-9]+' with both OK counts >= 50",
+      "line 'ALL PASS' for test_fs_race_parent; no INCONCLUSIVE"
+    ]
+  },
+  "evidence_failure_contract": "a missing row, a Skipped row, a Failed row, an OK count below 50, or a checkout-SHA mismatch is recorded as-is in the reading and the criterion is NOT upgraded by it; no expectation is widened after logs are opened",
+  "doc_updates": [
+    "docs/core-m0-m1-exit-audit.md: new dated (2026-10-17) reading for M0 criterion 1 (invalid cwd + spawn, zero side effects) and criterion 2 (concurrent dual-stream, both platforms), citing run id + per-job verified checkout SHA + strict-gate source reading; grading wording 'shown for the listed cells' with stated limits (one hosted runner, one account, windows jobs only for the WIN32 tests; no M0 declaration, which is Antonio's)",
+    "docs/core-m1-exit-reading.md: dated note under the C1/race_parent area that RP-LIVE (unwedge + RP_OK_FLOOR) is now measured in a named Linux run with per-writer OK counts, superseding the 'not a new Linux run' caveat for this run only"
+  ],
+  "gold_file_in_patch": "docs/core-m0-evidence-reading-2026-10-17-gold.json (this file, committed verbatim)",
+  "out_of_scope": "no code changes, no workflow changes, no re-grading of other criteria, no phase declarations, no C2/C3/C5 content"
+}
