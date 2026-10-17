@@ -251,8 +251,8 @@ static void sc_killholder(const char *exe,int k)
    batches until recovery (src/fs_batch_win.inc: "A pending batch (journal or marker) blocks new batches
    until recovery"), so the asserted oracle is: the waiter is still waiting 1500 ms after its start
    (mutant 13, no lock, breaks this), after the holder is killed it finishes within 20 s with
-   FS_READ_DENIED, the tree keeps the old bytes with the journal kept, then FsBatchRecover is OK and the
-   waiter's own batch works. */
+   FS_READ_DENIED, the tree keeps items < k published and the rest old with the journal kept, then
+   FsBatchRecover rolls the published prefix back (old bytes for every k) and the waiter's own batch works. */
 static int g_wk=0;
 static void sc_killholder_waiter(const char *exe,int k,char mode)
 {FS_READ_ROOT *r;char sync[64]="test_fs_winbatch_sync3",f1[96],f2[96],cmd[1024];
@@ -276,7 +276,13 @@ static void sc_killholder_waiter(const char *exe,int k,char mode)
  ck(GetExitCodeProcess(wp.hProcess,&code),"entry waiter exit");
  CloseHandle(hp.hThread);CloseHandle(hp.hProcess);CloseHandle(wp.hThread);CloseHandle(wp.hProcess);
  ck(code==(DWORD)(100+(int)FS_READ_DENIED),"entry waiter is DENIED while the killed holder journal is pending");
- is_file(ROOT "\\r1","one-old",0);is_file(ROOT "\\sub\\r2","two-old!",0);is_file(ROOT "\\r3","three",0);
+ /* WB_BEFORE_RENAME(k) parks the holder before the rename of item k, so items
+    0..k-1 are already published and the DENIED waiter runs no recovery: before
+    FsBatchRecover the tree keeps items < k new and the rest old (k=1 measured
+    in CI: r1 already "ONE-NEW-LONGER" when the holder dies). */
+ if(k>=1)is_file(ROOT "\\r1","ONE-NEW-LONGER",0);else is_file(ROOT "\\r1","one-old",0);
+ if(k>=2)is_file(ROOT "\\sub\\r2","",0);else is_file(ROOT "\\sub\\r2","two-old!",0);
+ is_file(ROOT "\\r3","three",0);
  ck(GetFileAttributesA(ROOT "\\.fstxn.batch")!=INVALID_FILE_ATTRIBUTES,"journal of the killed holder is kept");
  ck(FsBatchRecover(r)==FS_READ_OK,"recover after the killed holder");is_old();
  if(mode=='c'){FS_BATCH_CREATE zz[2]={{"zz1","x",1,0644},{"zz2","x",1,0644}};
