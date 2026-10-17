@@ -72,6 +72,10 @@ int main(int argc,char**argv)
     runner while the same property reaches directly-run binaries (mc10/mc11); an argument cannot get
     lost between processes. */
  if(argc>1)_putenv_s("FS_WIN_BATCH_MUTANT",argv[1]);
+ /* Slice H3 (2026-10-17), TEMPORARY diagnostic (remove when mc13 is resolved): the merged gate stream
+    allows extra lines before the unique final line, so this prints whether the argument arrived and
+    whether the in-process env activation stuck. */
+ fprintf(stderr,"sweep foreign diag argc=%d mutant_env=%s\n",argc,getenv("FS_WIN_BATCH_MUTANT")?getenv("FS_WIN_BATCH_MUTANT"):"(null)");
  static const char *pre[8]={".fst-",".fsp-",".fsrp-",".fsrs-",".fsj-",".fsrb-",".fsrm-",".fsmv-"};
  static const char *name[5]={"batch","replace","create","remove","move"};
  char out[2048]="";int m,i;
