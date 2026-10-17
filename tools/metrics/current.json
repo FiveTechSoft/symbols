@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "subject_sha": "1ae65742e420e1c464452f6bc7429059b8529e37",
+  "subject_sha": "fe57c4826c4b60982c7e0fe1e66c57e14fd2a27a",
   "entries": [
     {
       "id": "final_ci",
       "title": "Final-SHA CI",
       "claim_type": "technical_result",
-      "measured_sha": "1ae65742e420e1c464452f6bc7429059b8529e37",
-      "date": "2026-10-15",
-      "environment": "GitHub Linux and Windows; run 583, attempt 2",
-      "source_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38773260537",
-      "value": "5 of 5 latest jobs success. One MSVC rerun after a 60-second fixture-check timeout; no code change."
+      "measured_sha": "fe57c4826c4b60982c7e0fe1e66c57e14fd2a27a",
+      "date": "2026-10-17",
+      "environment": "GitHub Linux and Windows; apply-patch run 39057398125 (apply, linux, msvc, asan-msvc, ast-inspect-windows-ninja)",
+      "source_url": "https://github.com/FiveTechSoft/symbols/actions/runs/39057398125",
+      "value": "5 of 5 jobs success (conclusions read from the run that landed this commit; the checked-out SHA inside each job log was not read). Per-test counts not read for this run."
     },
     {
       "id": "doc_sync_boundary",
