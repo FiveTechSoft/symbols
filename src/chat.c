@@ -233,6 +233,80 @@ static void TqCalibrate(const TEXTLEX *tl)
     for (len = 1; len <= TQ_MAXLEN; len++) fprintf(stderr, " %.2f", g_tq.thr[len]);
     fputc('\n', stderr);
 }
+/* Query-translation gate: a query word is translated only when the
+   corpus does not know the original form but does know the translated
+   form. "Known" uses the same folded vocabulary as the coverage gate
+   (TqWords over every loaded sentence), so a Spanish corpus keeps its
+   Spanish query words and an English corpus receives the translation.
+   Rebuilt lazily when the loaded text set changes. */
+static char (*g_cv)[24];
+static uint32_t g_cvsig;
+static uint32_t TqCorpusSig(const CHAT *ch)
+{
+    uint32_t f, s2 = (ch->ntfiles + 1u) * 2654435761u;
+    for (f = 0; f < ch->ntfiles; f++)
+        s2 = s2 * 31u + (uint32_t)(uintptr_t)ch->tlex[f].image
+             + (uint32_t)ch->tlex[f].imagelen + TextLexSentCount(&ch->tlex[f]);
+    return s2;
+}
+static uint32_t TqCvHash(const char *w)
+{
+    uint32_t h = 5381u;
+    while (*w) h = h * 33u + (unsigned char)*w++;
+    return h & (TQ_HASH - 1);
+}
+static int TqCorpusKnown(CHAT *ch, const char *w)
+{
+    uint32_t sig = TqCorpusSig(ch);
+    uint32_t h, n = 0;
+    char fw[24];
+    const char *u;
+    if (g_cv == NULL)
+    {
+        g_cv = calloc(TQ_HASH, sizeof(*g_cv));
+        if (g_cv == NULL) return 0;
+        g_cvsig = 0;
+    }
+    if (g_cvsig != sig)
+    {
+        uint32_t f, i;
+        memset(g_cv, 0, TQ_HASH * sizeof(*g_cv));
+        for (f = 0; f < ch->ntfiles; f++)
+            for (i = 0; i < TextLexSentCount(&ch->tlex[f]); i++)
+            {
+                char sent[2048];
+                char sw[64][24];
+                uint32_t nw2;
+                if (TextLexSentenceText(&ch->tlex[f], i, ch->tlex[f].image,
+                                        ch->tlex[f].imagelen, sent, sizeof(sent)) == 0)
+                    continue;
+                nw2 = TqWords(sent, sw, 64);
+                while (nw2--)
+                {
+                    uint32_t hh = TqCvHash(sw[nw2]);
+                    while (g_cv[hh][0] && strcmp(g_cv[hh], sw[nw2]) != 0)
+                        hh = (hh + 1) & (TQ_HASH - 1);
+                    if (!g_cv[hh][0])
+                        memcpy(g_cv[hh], sw[nw2], sizeof(g_cv[hh]));
+                }
+            }
+        g_cvsig = sig;
+    }
+    for (u = w; *u && n + 2 < sizeof(fw); )
+    {
+        char fc; int adv = FoldChar(u, &fc);
+        fw[n++] = fc; u += adv;
+    }
+    fw[n] = '\0';
+    if (n == 0) return 0;
+    h = TqCvHash(fw);
+    while (g_cv[h][0])
+    {
+        if (strcmp(g_cv[h], fw) == 0) return 1;
+        h = (h + 1) & (TQ_HASH - 1);
+    }
+    return 0;
+}
 static int TextQueryCoveredEx(const TEXTLEX *tl, const char *const *words, uint32_t nw, const char *sent, int majority, float *cov_out)
 {
     float c;
@@ -5054,7 +5128,8 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
             {
                 const char *w = p->toks[i];
                 const char *tr = DictTranslate(&ch->dict, p->toks[i]);
-                if (tr != NULL && tr[0] != '\0')
+                if (tr != NULL && tr[0] != '\0' &&
+                    !TqCorpusKnown(ch, w) && TqCorpusKnown(ch, tr))
                 {
                     strncpy(qcanon[nw], tr, CHAT_TOKEN_MAX - 1);
                     qcanon[nw][CHAT_TOKEN_MAX - 1] = '\0';
