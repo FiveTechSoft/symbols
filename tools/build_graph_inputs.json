@@ -460,6 +460,14 @@
     "include/i18n.h",
     "src/i18n.c"
    ]
+  },
+  "test_i18n_template_warning": {
+   "files": [
+    "tests/test_i18n_template_warning.py",
+    "tests/i18n_template_gold.json",
+    "include/i18n.h",
+    "src/i18n.c"
+   ]
   }
  },
  "version": 1

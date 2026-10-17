@@ -385,7 +385,6 @@ const char *LangTemplate(const I18N_KEY key, const LANG_ID id, int variant)
         default:      return F_EXTRACT[0];
         }
     }
-    return "";
 }
 
 const char *LangString(const I18N_KEY key, int variant)

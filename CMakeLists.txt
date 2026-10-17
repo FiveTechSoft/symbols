@@ -851,6 +851,13 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/wording_rewrite_gate.py
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_wording_rewrite_harness PROPERTIES TIMEOUT 120)
+    add_test(NAME test_i18n_template_warning
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_i18n_template_warning.py
+                     --compiler ${CMAKE_C_COMPILER} --compiler-id ${CMAKE_C_COMPILER_ID}
+                     --cmake ${CMAKE_COMMAND} --generator "${CMAKE_GENERATOR}"
+                     --platform "${CMAKE_GENERATOR_PLATFORM}" --toolset "${CMAKE_GENERATOR_TOOLSET}"
+                     --config $<CONFIG>)
+    set_tests_properties(test_i18n_template_warning PROPERTIES TIMEOUT 240)
     add_test(NAME test_i18n_warning
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_i18n_warning.py
                      --compiler ${CMAKE_C_COMPILER} --compiler-id ${CMAKE_C_COMPILER_ID}
