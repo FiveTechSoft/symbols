@@ -1,0 +1,758 @@
+{
+ "version": 2,
+ "base": "b3a468a8785e6de10a60b6af3a1e82c7c06ff8e4",
+ "created_before_execution": true,
+ "synthetic_closed_world": true,
+ "modes": [
+  "resolve",
+  "try",
+  "handle"
+ ],
+ "capacities": [
+  32,
+  4096
+ ],
+ "repetitions": 2,
+ "arms": [
+  "fresh_per_query",
+  "stateful_domain_sequence"
+ ],
+ "scoring": "Semantic misses logged as red outcomes; technical integrity errors stop. Quote-only negative does not fulfill full support; marked substitute is separate. No semantic correctness inferred from source provenance.",
+ "notes": "Slice B (accented UTF-8 condition words): 16 existing cells kept as regression with recomputed post-fix expectations; 8 new accented-condition cells (cocina, taller). Predictions frozen from an exact Python replica of the gate (validated against SYMBOLS_TQ_DEBUG values 0.43/1.00/0.13 at b3a468a), not tuned on runs.",
+ "cases": [
+  {
+   "id": "memory-1",
+   "corpus": "memory.txt",
+   "query": "¿Qué conserva el hipocampo durante el sueño?",
+   "condition": "sueño",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "hipocampo conserva recuerdos durante el sueño",
+   "topic_expected": true,
+   "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.4291,
+      "2": 0.1555
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.4291,
+      "2": 0.1555
+     }
+    }
+   }
+  },
+  {
+   "id": "memory-2",
+   "corpus": "memory.txt",
+   "query": "¿Qué conserva el hipocampo durante la vigilia?",
+   "condition": "vigilia",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.4291,
+      "1": 1.0,
+      "2": 0.1555
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.1555
+     }
+    }
+   }
+  },
+  {
+   "id": "memory-3",
+   "corpus": "memory.txt",
+   "query": "¿Qué conserva la corteza durante la vigilia?",
+   "condition": "vigilia",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "corteza conserva recuerdos",
+   "topic_expected": true,
+   "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.2938,
+      "1": 1.0,
+      "2": 0.2938
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {
+      "2": 0.2938
+     }
+    }
+   }
+  },
+  {
+   "id": "memory-4",
+   "corpus": "memory.txt",
+   "query": "¿Qué conserva la corteza durante la anestesia?",
+   "condition": "anestesia",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "bcaba5231ac240b5d43d5bbdd4d6493ba822bc8f3d94c59f82b55628c6f91b8c",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.2938,
+      "1": 0.5226,
+      "2": 0.7712
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7712
+     }
+    }
+   }
+  },
+  {
+   "id": "astronomy-1",
+   "corpus": "astronomy.txt",
+   "query": "¿Qué emite la colisión durante el destello?",
+   "condition": "destello",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "colisión emite fotones durante el destello",
+   "topic_expected": true,
+   "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "astronomy-2",
+   "corpus": "astronomy.txt",
+   "query": "¿Qué emite la colisión durante la pausa?",
+   "condition": "pausa",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.5226,
+      "1": 1.0,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "astronomy-3",
+   "corpus": "astronomy.txt",
+   "query": "¿Qué emite la estrella durante la pausa?",
+   "condition": "pausa",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "estrella emite fotones",
+   "topic_expected": true,
+   "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.2938,
+      "1": 1.0,
+      "2": 0.2938
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {
+      "2": 0.2938
+     }
+    }
+   }
+  },
+  {
+   "id": "astronomy-4",
+   "corpus": "astronomy.txt",
+   "query": "¿Qué emite la estrella durante el eclipse?",
+   "condition": "eclipse",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "d9fc5b9ec9d008937813db3d6b2793d163d125915fa1f1f62438d8056abb550a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.2938,
+      "1": 0.5226,
+      "2": 0.7712
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7712
+     }
+    }
+   }
+  },
+  {
+   "id": "physics-1",
+   "corpus": "physics.txt",
+   "query": "¿Qué mide el sensor durante el movimiento?",
+   "condition": "movimiento",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "sensor mide velocidad durante el movimiento",
+   "topic_expected": true,
+   "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "physics-2",
+   "corpus": "physics.txt",
+   "query": "¿Qué mide el sensor durante el reposo?",
+   "condition": "reposo",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.5226,
+      "1": 1.0,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "physics-3",
+   "corpus": "physics.txt",
+   "query": "¿Qué mide el detector durante el reposo?",
+   "condition": "reposo",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "detector mide velocidad",
+   "topic_expected": true,
+   "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.2938,
+      "1": 1.0,
+      "2": 0.2938
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {
+      "2": 0.2938
+     }
+    }
+   }
+  },
+  {
+   "id": "physics-4",
+   "corpus": "physics.txt",
+   "query": "¿Qué mide el detector durante la aceleración?",
+   "condition": "aceleración",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "33727b4e9dc05ebef45b4f5320ede014043d523ee628134c7d878bb50f6d2b08",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.2938,
+      "1": 0.5226,
+      "2": 0.7712
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7712
+     }
+    }
+   }
+  },
+  {
+   "id": "math-1",
+   "corpus": "math.txt",
+   "query": "¿Qué devuelve la función durante la evaluación?",
+   "condition": "evaluación",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "función devuelve dos durante la evaluación",
+   "topic_expected": true,
+   "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "math-2",
+   "corpus": "math.txt",
+   "query": "¿Qué devuelve la función durante la inversión?",
+   "condition": "inversión",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.5226,
+      "1": 1.0,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "math-3",
+   "corpus": "math.txt",
+   "query": "¿Qué devuelve el operador durante la inversión?",
+   "condition": "inversión",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "operador devuelve dos",
+   "topic_expected": true,
+   "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.2938,
+      "1": 1.0,
+      "2": 0.2938
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {
+      "2": 0.2938
+     }
+    }
+   }
+  },
+  {
+   "id": "math-4",
+   "corpus": "math.txt",
+   "query": "¿Qué devuelve el operador durante la integración?",
+   "condition": "integración",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "8ebddeff0152e290518f6b111203db3879e1b5ea907a6f19a3c1a5ab6c803d2a",
+   "slice": "regression",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.2938,
+      "1": 0.5226,
+      "2": 0.7712
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7712
+     }
+    }
+   }
+  },
+  {
+   "id": "cocina-1",
+   "corpus": "cocina.txt",
+   "query": "¿Qué calienta el horno durante la ebullición?",
+   "condition": "ebullición",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "horno calienta mezcla durante la ebullición",
+   "topic_expected": true,
+   "source_sha256": "4b5f7d25670739087bc211f35d26ae4a5db26a7cdd91d11ec09367d33f720452",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.5226,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "cocina-2",
+   "corpus": "cocina.txt",
+   "query": "¿Qué calienta el horno durante el enfriamiento?",
+   "condition": "enfriamiento",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "4b5f7d25670739087bc211f35d26ae4a5db26a7cdd91d11ec09367d33f720452",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.5226,
+      "1": 1.0,
+      "2": 0.065
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.065
+     }
+    }
+   }
+  },
+  {
+   "id": "cocina-3",
+   "corpus": "cocina.txt",
+   "query": "¿Qué calienta la mezcla durante la congelación?",
+   "condition": "congelación",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "4b5f7d25670739087bc211f35d26ae4a5db26a7cdd91d11ec09367d33f720452",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.4291,
+      "1": 0.4291,
+      "2": 0.7264
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7264
+     }
+    }
+   }
+  },
+  {
+   "id": "cocina-4",
+   "corpus": "cocina.txt",
+   "query": "¿Qué enfría la nevera durante el enfriamiento?",
+   "condition": "enfriamiento",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "nevera enfría mezcla",
+   "topic_expected": true,
+   "source_sha256": "4b5f7d25670739087bc211f35d26ae4a5db26a7cdd91d11ec09367d33f720452",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.0434,
+      "1": 1.0,
+      "2": 0.0434
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {}
+    }
+   }
+  },
+  {
+   "id": "taller-1",
+   "corpus": "taller.txt",
+   "query": "¿Qué dibuja el niño durante el otoño?",
+   "condition": "otoño",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "niño dibuja montañas durante el otoño",
+   "topic_expected": true,
+   "source_sha256": "52420f5d462a01e424bd2340ac3e31f943eb75faf704d87ad126d9775f0f6201",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.4291,
+      "2": 0.1555
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 0,
+     "coverage": {
+      "0": 1.0,
+      "1": 0.4291,
+      "2": 0.1555
+     }
+    }
+   }
+  },
+  {
+   "id": "taller-2",
+   "corpus": "taller.txt",
+   "query": "¿Qué dibuja el niño durante la primavera?",
+   "condition": "primavera",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "explicit_negative",
+   "topic_expected": true,
+   "source_sha256": "52420f5d462a01e424bd2340ac3e31f943eb75faf704d87ad126d9775f0f6201",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.4291,
+      "1": 1.0,
+      "2": 0.1555
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "1": 1.0,
+      "2": 0.1555
+     }
+    }
+   }
+  },
+  {
+   "id": "taller-3",
+   "corpus": "taller.txt",
+   "query": "¿Qué dibuja el niño durante el verano?",
+   "condition": "verano",
+   "positive": false,
+   "full_support_gold": "abstain_or_explicit_no_support",
+   "basis": "not_described",
+   "topic_expected": true,
+   "source_sha256": "52420f5d462a01e424bd2340ac3e31f943eb75faf704d87ad126d9775f0f6201",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "0": 0.4291,
+      "1": 0.4291,
+      "2": 0.7264
+     }
+    },
+    "stateful": {
+     "result": "ANSWER",
+     "sentence": 2,
+     "coverage": {
+      "2": 0.7264
+     }
+    }
+   }
+  },
+  {
+   "id": "taller-4",
+   "corpus": "taller.txt",
+   "query": "¿Qué dibuja la niña durante la primavera?",
+   "condition": "primavera",
+   "positive": true,
+   "full_support_gold": "stated_fact",
+   "basis": "niña dibuja ríos",
+   "topic_expected": true,
+   "source_sha256": "52420f5d462a01e424bd2340ac3e31f943eb75faf704d87ad126d9775f0f6201",
+   "slice": "accented_condition",
+   "expected": {
+    "fresh": {
+     "result": "ANSWER",
+     "sentence": 1,
+     "coverage": {
+      "0": 0.2353,
+      "1": 1.0,
+      "2": 0.0521
+     }
+    },
+    "stateful": {
+     "result": "ABSTAIN-gate",
+     "sentence": null,
+     "coverage": {}
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,3 @@
+En el archivo de prueba, el horno calienta la mezcla durante la ebullición.
+Durante el enfriamiento, el horno no calienta la mezcla; la nevera enfría la mezcla.
+El archivo no describe la mezcla durante la congelación.

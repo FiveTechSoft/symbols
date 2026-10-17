@@ -1,0 +1,3 @@
+En el archivo de prueba, el niño dibuja montañas durante el otoño.
+Durante la primavera, el niño no dibuja montañas; la niña dibuja ríos.
+El archivo no describe dibujos del niño durante el verano.
