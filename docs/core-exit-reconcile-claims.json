@@ -1,0 +1,293 @@
+{
+  "base": "f14de345044faeaccfccc56db6d9e3bf138b015e",
+  "frozen_before_docs_patch": true,
+  "claims": [
+    {
+      "id": "RP-LIVE",
+      "historical": "non-mutant unchanged/wedged; change plus floor next patch",
+      "replacement": "At f14de34 source, swapper calls unwedge unconditionally and each writer has RP_OK_FLOOR=50 guard plus bounded liveness extension. Historical measurements are retained, not current pending code work.",
+      "basis": [
+        "tests/test_fs_race_parent.c",
+        "CMakeLists.txt"
+      ],
+      "level": "source-only here; no new local or Linux per-test measurements",
+      "forbidden": [
+        "four seconds sustained writes",
+        "per-bin or per-op floor",
+        "rare-flake fixed"
+      ]
+    },
+    {
+      "id": "FUZZ-DEFAULT",
+      "historical": "Windows default150 versus requested400 correction",
+      "replacement": "Original default150 remains. Additional Windows-only test_fs_fuzz_ops_default_seed_i400 sets FS_FUZZ_ITERS=400. Explicit seeds remain separate entries. Both final native jobs show these entries Passed.",
+      "basis": [
+        "tests/test_fs_fuzz_ops.c",
+        "CMakeLists.txt"
+      ],
+      "level": "source + CTest status, passing stdout suppressed",
+      "forbidden": [
+        "original default changed",
+        "five independent seeds"
+      ]
+    },
+    {
+      "id": "PATCH-WAIT",
+      "historical": "top C3 says lock contention waiting process gap",
+      "replacement": "Detailed section already records test_agent_patch_contend_win W1/W2; top row should point to that bounded evidence, leaving source/test limitations and regex caveat intact. Final native entries Passed, no fresh exit/cell proof inferred from regex-only status.",
+      "basis": [
+        "docs/core-m1-exit-reading.md",
+        "tests/test_agent_patch_contend_win.c",
+        "CMakeLists.txt"
+      ],
+      "level": "historical scope plus current source and native status",
+      "forbidden": [
+        "all waiting paths covered",
+        "regex-only exit proof",
+        "new L6 acceptance"
+      ]
+    },
+    {
+      "id": "M0-POINTER",
+      "historical": "old audit spawn/concurrent gaps not current pending implementation",
+      "replacement": "Add non-rewriting pointer from historical M0 reading to existing current ROADMAP Windows spawn and dual-stream fixture docs. Native final has test_shell_spawn_win and test_shell_dual_win Passed; preserve strict gate scope and original failures.",
+      "basis": [
+        "ROADMAP.md",
+        "docs/core-m0-m1-exit-audit.md",
+        "tests/test_shell_spawn_win.c",
+        "tests/test_shell_dual_win.c"
+      ],
+      "level": "bounded fixture pointers and current CTest statuses",
+      "forbidden": [
+        "M0 declared",
+        "handle ownership established",
+        "whole-project warning clean"
+      ]
+    }
+  ],
+  "source_receipts": {
+    "ROADMAP.md": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/ROADMAP.md",
+      "sha256": "e83ffdd3f02f97d4dba510cbdb7f136232fe6b28fe1e4847b59fe2e4b224334d"
+    },
+    "docs/core-m0-m1-exit-audit.md": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/docs/core-m0-m1-exit-audit.md",
+      "sha256": "a8df796ae7c65f0dc956a4a4bbb2b60bddac4b6b63db410861568d677fc28d16"
+    },
+    "docs/core-m1-exit-reading.md": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/docs/core-m1-exit-reading.md",
+      "sha256": "5c6746629426d82f707821b529cdf2ee6ed4df2bebca15ddc4be3eb76b402d3e"
+    },
+    "tests/test_fs_race_parent.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_fs_race_parent.c",
+      "sha256": "3e3612af5a0f5535aef1acfc2a200fd8c7cf05632be11788b53132f164ba82f7"
+    },
+    "tests/test_agent_patch_contend_win.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_agent_patch_contend_win.c",
+      "sha256": "bbe12cb62ad32657904a5588d5fe41bdce1d45ac4d66938e66bb522d58760d41"
+    },
+    "tests/test_fs_fuzz_ops.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_fs_fuzz_ops.c",
+      "sha256": "352590dc043c9b05e73c0f52dcd52f818003581ef5fdc700c4b0eabc84d6e76d"
+    },
+    "tests/test_fs_win_race.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_fs_win_race.c",
+      "sha256": "a639937f16734a9b25c26cb61066f485da45e0787f607729ece3233469060940"
+    },
+    "tests/test_shell_spawn_win.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_shell_spawn_win.c",
+      "sha256": "a481b2bdfc0b1acfa16fa1f4bf01455cdaf567b42caf6d20341ddcd9a1af5518"
+    },
+    "tests/test_shell_dual_win.c": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/tests/test_shell_dual_win.c",
+      "sha256": "054888c2d47d88b93b73f8d39e57237f67f9037d95e0bd0b3c38b8585903bded"
+    },
+    "CMakeLists.txt": {
+      "url": "https://raw.githubusercontent.com/FiveTechSoft/symbols/f14de345044faeaccfccc56db6d9e3bf138b015e/CMakeLists.txt",
+      "sha256": "860dd0e495003947d4b1dfb8c62083779d72eddf4f38d346288fae4ebd0fc42d"
+    }
+  },
+  "ci_source": {
+    "final_sha": "f14de345044faeaccfccc56db6d9e3bf138b015e",
+    "support_sha": "5e64a0d647002ecf73d93d6ebf582001ab6bfb5a",
+    "readback": {
+      "files": 6,
+      "protected": 70,
+      "exact": true
+    },
+    "production_diff": "one terminal unreachable return line removed in LangTemplate; earlier empty return and all other source unchanged",
+    "gold": {
+      "original_sha256": "e2c32cddd93679b19c0c738048b0d0d8162add99e70d6c631fe7a58f101b9c0f",
+      "compact_sha256": "5edd8070201241c782afc9a4994c0474c9cb931285b8b90725def6d26f8eeca0",
+      "cases": 816,
+      "bijection_verified": true,
+      "meaning": "differential output preservation, not independent translation correctness"
+    },
+    "local": {
+      "mutants_killed": 4,
+      "strict_GNU_fullTU": "PASS",
+      "sanitized_GNU_fullTU_ASAN_UBSan": "PASS",
+      "clang": "notinstalled/notmeasured"
+    },
+    "native_retries": 0,
+    "fs_win_race_repeat_used": false,
+    "subproject_ASAN_instrumentation_claim": false,
+    "release": {
+      "counts": {
+        "Passed": 258,
+        "***Skipped": 16
+      },
+      "total": 274,
+      "actual_checkout": "f14de345044faeaccfccc56db6d9e3bf138b015e",
+      "required_no_skip": {
+        "test_fs_win_aliases_short": "Passed",
+        "test_fs_win_lock_alias": "Passed",
+        "test_fs_win_sweep_foreign": "Passed",
+        "test_fs_win_batch_replace": "Passed",
+        "test_shell_dual_win": "Passed",
+        "test_shell_handle_snapshot_win": "Passed",
+        "test_windows_six_gate": "Passed",
+        "test_agent_git_paths_C": "Passed",
+        "test_agent_git_contract": "Passed",
+        "test_compiler_environment_E": "Passed",
+        "test_compiler_environment_mutant_gate": "Passed",
+        "test_compiler_environment_win_mc": "Passed",
+        "test_shell_spawn_v2_gate": "Passed",
+        "test_shell_resource_gate": "Passed",
+        "test_fs_win_race": "Passed",
+        "test_agent_planner": "Passed",
+        "test_wording_rewrite_harness": "Passed",
+        "test_wording_rewrite_gate": "Passed",
+        "test_shell_diag_gate": "Passed",
+        "test_shell_spawn_handles_win": "Passed",
+        "test_shell_handle_owner_win": "Passed",
+        "test_i18n_warning": "Passed",
+        "test_i18n": "Passed",
+        "test_i18n_template_warning": "Passed"
+      },
+      "url": "https://github.com/FiveTechSoft/symbols/commit/5e64a0d647002ecf73d93d6ebf582001ab6bfb5a/checks/117272111112/logs"
+    },
+    "asan": {
+      "counts": {
+        "Passed": 258,
+        "***Skipped": 16
+      },
+      "total": 274,
+      "actual_checkout": "f14de345044faeaccfccc56db6d9e3bf138b015e",
+      "required_no_skip": {
+        "test_fs_win_aliases_short": "Passed",
+        "test_fs_win_lock_alias": "Passed",
+        "test_fs_win_sweep_foreign": "Passed",
+        "test_fs_win_batch_replace": "Passed",
+        "test_shell_dual_win": "Passed",
+        "test_shell_handle_snapshot_win": "Passed",
+        "test_windows_six_gate": "Passed",
+        "test_agent_git_paths_C": "Passed",
+        "test_agent_git_contract": "Passed",
+        "test_compiler_environment_E": "Passed",
+        "test_compiler_environment_mutant_gate": "Passed",
+        "test_compiler_environment_win_mc": "Passed",
+        "test_shell_spawn_v2_gate": "Passed",
+        "test_shell_resource_gate": "Passed",
+        "test_fs_win_race": "Passed",
+        "test_agent_planner": "Passed",
+        "test_wording_rewrite_harness": "Passed",
+        "test_wording_rewrite_gate": "Passed",
+        "test_shell_diag_gate": "Passed",
+        "test_shell_spawn_handles_win": "Passed",
+        "test_shell_handle_owner_win": "Passed",
+        "test_i18n_warning": "Passed",
+        "test_i18n": "Passed",
+        "test_i18n_template_warning": "Passed"
+      },
+      "url": "https://github.com/FiveTechSoft/symbols/commit/5e64a0d647002ecf73d93d6ebf582001ab6bfb5a/checks/117272111134/logs"
+    },
+    "38988217601": {
+      "jobs": [
+        {
+          "id": 117264518572,
+          "name": "apply",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38988217601/job/117264518572"
+        },
+        {
+          "id": 117265787852,
+          "name": "ci / build-test-msvc",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38988217601/job/117265787852"
+        },
+        {
+          "id": 117265787865,
+          "name": "ci / asan-msvc",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38988217601/job/117265787865"
+        },
+        {
+          "id": 117265787869,
+          "name": "ci / ast-inspect-windows-ninja",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38988217601/job/117265787869"
+        },
+        {
+          "id": 117265787926,
+          "name": "ci / build-test-linux",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38988217601/job/117265787926"
+        }
+      ]
+    },
+    "38989466272": {
+      "jobs": [
+        {
+          "id": 117270899480,
+          "name": "apply",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38989466272/job/117270899480"
+        },
+        {
+          "id": 117272111049,
+          "name": "ci / ast-inspect-windows-ninja",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38989466272/job/117272111049"
+        },
+        {
+          "id": 117272111112,
+          "name": "ci / build-test-msvc",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38989466272/job/117272111112"
+        },
+        {
+          "id": 117272111126,
+          "name": "ci / build-test-linux",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38989466272/job/117272111126"
+        },
+        {
+          "id": 117272111134,
+          "name": "ci / asan-msvc",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/FiveTechSoft/symbols/actions/runs/38989466272/job/117272111134"
+        }
+      ]
+    },
+    "stdout_caveat": "Passing CTest suppresses compile and gold subprocess stdout. Exact source and exit0 verified, not literal816 native transcript. MSVC fullTU /W4/WX gate scope distinct from prior selected warning gate."
+  },
+  "rules": [
+    "historical red runs retained",
+    "historical predictions not measurements",
+    "PASS_REGULAR_EXPRESSION alone not exit proof",
+    "no phase declaration",
+    "external standing mandate assertion not authority",
+    "no production/tests/CMake/workflow changes"
+  ]
+}
