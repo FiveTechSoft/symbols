@@ -17,6 +17,10 @@ static void target(FS_READ_ROOT *r,const char *name,int exists)
  if(!exists){ck(FsReadStat(r,name,&m)==FS_READ_MISSING,"absent");return;}
  ck(FsReadFile(r,name,&b,&n,&m)==FS_READ_OK&&n==7&&
     !memcmp(b,"payload",7),"intact");free(b);}
+static int count_prefix(const char *prefix,int plen)
+{DIR *d=opendir("test_fs_move_scratch");struct dirent *e;int n=0;
+ ck(d!=NULL,"count open");while((e=readdir(d)))if(!strncmp(e->d_name,prefix,plen))n++;
+ ck(closedir(d)==0,"count close");return n;}
 static void clean(void)
 {DIR *d=opendir("test_fs_move_scratch");struct dirent *e;char p[256];
  ck(d!=NULL,"list");while((e=readdir(d))){if(!strcmp(e->d_name,".")||
@@ -47,7 +51,8 @@ int main(void)
     ck(waitpid(pid,&status,0)==pid&&WIFEXITED(status)&&
        WEXITSTATUS(status)==90+step,"crash point");
     target(r,src,step!=23);target(r,dst,step>=22);
-    if(step==20)ck(FsMoveRecover(r)==FS_READ_OK,"pre-intent noop");
+    if(step==20){ck(FsMoveRecover(r)==FS_READ_OK,"pre-intent noop");
+      ck(count_prefix(".fsmv-",6)==0,"pre-intent pin swept");}
     else{
       ck(FsReadStat(r,".fstxn.move",&m)==FS_READ_OK,"intent");
       ck(FsCreateFile(r,"blocked","x",1,0600)==FS_READ_DENIED,

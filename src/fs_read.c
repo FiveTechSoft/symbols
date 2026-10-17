@@ -461,6 +461,7 @@ static FS_READ_STATUS batch_state(const FS_READ_ROOT *r,int *batch,int *commit);
 static FS_READ_STATUS remove_state(const FS_READ_ROOT *r,int *intent,int *commit);
 static FS_READ_STATUS move_state(const FS_READ_ROOT *r,int *intent,int *commit);
 static FS_READ_STATUS replace_state(const FS_READ_ROOT *r,int *intent,int *commit);
+static void sweep_orphans(const FS_READ_ROOT *r);
 static FS_READ_STATUS pending_intent(const FS_READ_ROOT *r,int *present)
 {
     struct stat st;
@@ -559,7 +560,13 @@ FS_READ_STATUS FsCreateRecover(const FS_READ_ROOT *r)
      if(s!=FS_READ_OK||repl||commit){unlock_workspace(lockfd);
          return s==FS_READ_OK?FS_READ_DENIED:s;}
     }
-    s=recover_locked(r);unlock_workspace(lockfd);return s;
+    {int own=0;
+     s=pending_intent(r,&own);
+     if(s==FS_READ_OK)s=recover_locked(r);
+     /* Sweep only the pre-intent case: with a create journal present the
+        recovery owns the outcome and foreign stage names stay (slice G). */
+     if(s==FS_READ_OK&&!own)sweep_orphans(r);}
+    unlock_workspace(lockfd);return s;
 }
 static int write_all(int fd,const unsigned char *bytes,size_t len)
 {
@@ -1358,8 +1365,13 @@ FS_READ_STATUS FsRemoveRecover(const FS_READ_ROOT *r)
       s=move_state(r,&mv,&mc);
       if(s==FS_READ_OK){int repl=0,pc=0;
        s=replace_state(r,&repl,&pc);
-       if(s==FS_READ_OK)s=(pending||batch||commit||mv||mc||repl||pc)?
-           FS_READ_DENIED:remove_recover_locked(r);
+       if(s==FS_READ_OK){int ri=0,rcm=0;
+        s=remove_state(r,&ri,&rcm);
+        if(s==FS_READ_OK)s=(pending||batch||commit||mv||mc||repl||pc)?
+            FS_READ_DENIED:remove_recover_locked(r);
+        /* Sweep only the pre-intent case (slice G). */
+        if(s==FS_READ_OK&&!ri&&!rcm)sweep_orphans(r);
+       }
       }
     }
     unlock_workspace(lock);return s;
@@ -1573,8 +1585,13 @@ FS_READ_STATUS FsMoveRecover(const FS_READ_ROOT *r)
     if(s==FS_READ_OK)s=remove_state(r,&remove,&rc);
     if(s==FS_READ_OK){int repl=0,pc=0;
      s=replace_state(r,&repl,&pc);
-     if(s==FS_READ_OK)s=(pending||batch||commit||remove||rc||repl||pc)?
-         FS_READ_DENIED:move_recover_locked(r);
+     if(s==FS_READ_OK){int mi=0,mcm=0;
+      s=move_state(r,&mi,&mcm);
+      if(s==FS_READ_OK)s=(pending||batch||commit||remove||rc||repl||pc)?
+          FS_READ_DENIED:move_recover_locked(r);
+      /* Sweep only the pre-intent case (slice G). */
+      if(s==FS_READ_OK&&!mi&&!mcm)sweep_orphans(r);
+     }
     }
     unlock_workspace(lock);return s;
 }
@@ -1701,6 +1718,55 @@ static FS_READ_STATUS replace_state(const FS_READ_ROOT *r,int *intent,int *commi
     if(fstatat(r->fd,FS_REPLACE_COMMIT,&st,AT_SYMLINK_NOFOLLOW)==0)*commit=1;
     else if(errno!=ENOENT)return FS_READ_DENIED;
     return FS_READ_OK;
+}
+/* Pre-intent orphan sweep (slice G). A writer killed between its first
+   temporary name and its journal leaves root names nothing refers to; a
+   leftover SHARED old-inode pin makes its target a two-link file, so every
+   later replace of it is DENIED. Runs only under the workspace lock and only
+   when no journal or marker of any protocol exists (re-checked here). Root
+   names of the exact shape prefix + 32 lowercase hex, regular files only.
+   ".fst-" only ever names a NEW staged inode and is removed whatever its
+   link count; ".fsrp-", ".fsrm-" and ".fsmv-" may pin an OLD inode and are
+   removed only when shared (two or more links): an unshared name may be the
+   last link to bytes someone still needs, and it stays. An unshared ".fsrp-"
+   orphan of the NEW replace stage also stays (POSIX has no ".fsrs-";
+   recorded limit). Best effort: a name that cannot be removed stays, and
+   the sweep never fails the recovery. At most 128 names per call. */
+#define FS_SWEEP_MAX 128
+static int sweep_shape(const char *name)
+{
+    size_t n=strlen(name),off;
+    if(n==37&&!strncmp(name,".fst-",5))off=5;
+    else if(n==38&&(!strncmp(name,".fsrp-",6)||!strncmp(name,".fsrm-",6)||
+                    !strncmp(name,".fsmv-",6)))off=6;
+    else return 0;
+    return strspn(name+off,"0123456789abcdef")==32;
+}
+static void sweep_orphans(const FS_READ_ROOT *r)
+{
+    char names[FS_SWEEP_MAX][48];size_t n=0,k;DIR *dir;struct dirent *ent;
+    int fd,pending=0,batch=0,bc=0,rem=0,rc=0,mv=0,mc=0,rp=0,rpc=0;
+    if(pending_intent(r,&pending)!=FS_READ_OK||
+       batch_state(r,&batch,&bc)!=FS_READ_OK||
+       remove_state(r,&rem,&rc)!=FS_READ_OK||
+       move_state(r,&mv,&mc)!=FS_READ_OK||
+       replace_state(r,&rp,&rpc)!=FS_READ_OK)return;
+    if(pending||batch||bc||rem||rc||mv||mc||rp||rpc)return;
+    fd=dup(r->fd);if(fd<0)return;
+    dir=fdopendir(fd);if(!dir){close(fd);return;}
+    /* A dup shares the directory offset with the root handle; a previous
+       listing may have left it at the end. Restart it explicitly. */
+    rewinddir(dir);
+    while(n<FS_SWEEP_MAX&&(ent=readdir(dir))){
+        struct stat st;
+        if(!sweep_shape(ent->d_name))continue;
+        if(fstatat(r->fd,ent->d_name,&st,AT_SYMLINK_NOFOLLOW)<0||
+           !S_ISREG(st.st_mode))continue;
+        if(strncmp(ent->d_name,".fst-",5)&&st.st_nlink<2)continue;
+        memcpy(names[n],ent->d_name,strlen(ent->d_name)+1);n++;
+    }
+    closedir(dir);
+    for(k=0;k<n;k++)(void)unlinkat(r->fd,names[k],0);
 }
 static int replace_valid(const FS_REPLACE_RECORD *i)
 {
@@ -1877,8 +1943,13 @@ FS_READ_STATUS FsReplaceRecover(const FS_READ_ROOT *r)
     if(s==FS_READ_OK)s=batch_state(r,&batch,&bc);
     if(s==FS_READ_OK)s=remove_state(r,&rem,&rc);
     if(s==FS_READ_OK)s=move_state(r,&mv,&mc);
-    if(s==FS_READ_OK)s=(pending||batch||bc||rem||rc||mv||mc)?
-        FS_READ_DENIED:replace_recover_locked(r);
+    if(s==FS_READ_OK){int rp=0,rpc=0;
+     s=replace_state(r,&rp,&rpc);
+     if(s==FS_READ_OK)s=(pending||batch||bc||rem||rc||mv||mc)?
+         FS_READ_DENIED:replace_recover_locked(r);
+     /* Sweep only the pre-intent case (slice G). */
+     if(s==FS_READ_OK&&!rp&&!rpc)sweep_orphans(r);
+    }
     unlock_workspace(lock);return s;
 }
 FS_READ_STATUS FsReplaceFile(const FS_READ_ROOT *r,const char *path,

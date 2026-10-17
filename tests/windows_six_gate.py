@@ -8,7 +8,8 @@ import sys
 
 GOLD = json.loads(Path(__file__).with_name('windows_six_gate_gold.json').read_text(encoding='utf-8'))
 LIMITS = {'dual_win': 170, 'snapshot_win': 110, 'aliases_short': 285,
-          'lock_alias': 285, 'sweep_foreign': 285, 'batch_replace': 285}
+          'lock_alias': 285, 'sweep_foreign': 285, 'batch_replace': 285,
+          'sweep_foreign_mc13': 285}
 
 
 def validate(kind, output, returncode):

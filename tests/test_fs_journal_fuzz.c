@@ -21,7 +21,7 @@
    (signal or hang = failure). Claim checked: a refusal leaves every workspace byte unchanged; an OK leaves
    the files in one of the two states the operation allows (before or after), no journal or stage name,
    every other file unchanged; nothing outside the workspace changes; a second recovery is OK and changes
-   nothing. Known limits F2, F4, F5, F6, F7 are pinned (see CMakeLists.txt). Reproduce with FS_JFUZZ_SEED=<n> FS_JFUZZ_ITERS=<n> (iterations per kind). Not covered here:
+   nothing. Known limits F2, F4, F5, F6, F7 and the F8 sweep contract (slice G) are pinned (see CMakeLists.txt). Reproduce with FS_JFUZZ_SEED=<n> FS_JFUZZ_ITERS=<n> (iterations per kind). Not covered here:
    Windows, power loss, damage to two journal files at once. */
 #define WS "test_fs_journal_fuzz_scratch"
 #define OUT "test_fs_journal_fuzz_outside"
@@ -41,31 +41,35 @@ typedef struct {
     int phases[8], nph, ncls, njf;
     JFILE jf[2];
     const char *stage_pref;   /* stage name prefix of the operation */
-    const char *decoy;        /* decoy that a rewritten stage field points at */
+    const char *decoy;        /* foreign file planted before the crash; recovery must never remove it */
+    const char *fstage;       /* value a rewritten stage field points at (class stage_decoy) */
     const char *stage2;       /* stage value for class temp_decoy */
     const char *decoy2;       /* decoy planted for class temp_decoy */
 } KIND;
 static const KIND K[NKIND] = {
     {{41, 42, 43, 48, 51, 52, 53}, 7, 8, 2,
      {{".fstxn.replace", 1, {40, -1}, 1064, 1112}, {".fstxn.pcommit", 1, {64, -1}, 1088, 1136}},
-     ".fsrp-", ".fsrp-" H32D, ".fsrp-" H32E, ".fsrb-" H32E},
+     ".fsrp-", ".fsrp-" H32D, ".fsrp-" H32D, ".fsrp-" H32E, ".fsrb-" H32E},
     {{2, 3, 4}, 3, 8, 1,
      {{".fstxn.intent", 1, {24, -1}, 1048, -1}, {0, 0, {-1, -1}, -1, -1}},
-     ".fst-", ".fst-" H32D, ".fst-" H32E, ".fstxn-" H32E},
+     /* slice G (2026-10-17): the planted decoy keeps a foreign, never-swept shape (.fstx-); the
+        journal-visible fake stage keeps the valid ".fst-"+32hex shape intent_valid requires. A real
+        ".fst-"+32hex orphan with no journal IS swept now - the F8 pins below assert exactly that. */
+     ".fst-", ".fstx-" H32D, ".fst-" H32D, ".fst-" H32E, ".fstxn-" H32E},
     {{11, 12, 14}, 3, 7, 2,
      {{".fstxn.remove", 1, {24, -1}, 1048, -1}, {".fstxn.rcommit", 0, {-1, -1}, -1, -1}},
-     ".fsrm-", ".fsrm-" H32D, 0, 0},
+     ".fsrm-", ".fsrm-" H32D, ".fsrm-" H32D, 0, 0},
     {{21, 22, 23, 25}, 4, 7, 2,
      {{".fstxn.move", 2, {24, 1048}, 2072, -1}, {".fstxn.mcommit", 0, {-1, -1}, -1, -1}},
-     ".fsmv-", ".fsmv-" H32D, 0, 0},
+     ".fsmv-", ".fsmv-" H32D, ".fsmv-" H32D, 0, 0},
     /* batch create: item = target[1024] stage[48] dev ino (1088 bytes), items start at 16 */
     {{5, 6, 7}, 3, 8, 2,
      {{".fstxn.batch", 2, {16, 1104}, 1040, -1}, {".fstxn.commit", 0, {-1, -1}, -1, -1}},
-     ".fst-", ".fst-" H32D, ".fst-" H32E, ".fst-" H32E},
+     ".fst-", ".fst-" H32D, ".fst-" H32D, ".fst-" H32E, ".fst-" H32E},
     /* batch replace: item = target[1024] oldstage[48] newstage[48] 4 x u64 (1152 bytes) */
     {{60, 61, 62, 63}, 4, 8, 2,
      {{".fstxn.batch", 2, {16, 1168}, 1040, 1088}, {".fstxn.commit", 0, {-1, -1}, -1, -1}},
-     ".fsrp-", ".fsrp-" H32D, ".fsrp-" H32E, ".fsrb-" H32E},
+     ".fsrp-", ".fsrp-" H32D, ".fsrp-" H32D, ".fsrp-" H32E, ".fsrb-" H32E},
 };
 static uint32_t g_seed = 0x6a7f0001u, rs;
 static unsigned g_iter;
@@ -289,7 +293,7 @@ static void damage(int cls)
         {
             if (present[i]->off_stage < 0) continue;
             n++;
-            if (cls == 6) field(present[i]->name, present[i]->off_stage, k->decoy, strlen(k->decoy));
+            if (cls == 6) field(present[i]->name, present[i]->off_stage, k->fstage, strlen(k->fstage));
             else field(present[i]->name, present[i]->off_stage2 >= 0 ? present[i]->off_stage2 : present[i]->off_stage, k->stage2, strlen(k->stage2));
         }
         for (int i = 0; i < np; i++) if (present[i]->off_stage >= 0) refresh_crc(present[i]->name);
@@ -562,6 +566,26 @@ static void pinned_cells(void)
     good = rc == 40 + FS_READ_OK && is_content("target", "payload") && !has("t2") && !has(".fstxn.batch");
     FsReadClose(r);
     pin_report("F5", good, "F5 batch journal deleted while half published, recovery OK, half applied (known limit, outside the crash model)");
+    /* F8 (slice G, 2026-10-17): create orphan-stage sweep contract. FsCreateFile holds the workspace lock for
+       the whole operation, so under the recovery lock a ".fst-"+32hex stage with NO journal is a proven crash
+       orphan and recovery sweeps it; with a valid intent journal the same name is never swept. The old C2
+       contract left such orphans forever; this pin replaces it deliberately. */
+    wipe(WS); wipe(OUT);
+    if (mkdir(WS, 0700) || mkdir(OUT, 0700)) die("mkdir");
+    put(WS, "keep", "keep");
+    put(WS, ".fst-0123456789abcdef0123456789abcdef", "orphan");
+    if (FsReadOpen(WS, &r) != FS_READ_OK) die("open");
+    g_kind = K_CREATE;
+    rc = run_child(0, 1, r);
+    good = rc == 40 + FS_READ_OK && !has(".fst-0123456789abcdef0123456789abcdef") && is_content("keep", "keep");
+    FsReadClose(r);
+    pin_report("F8", good, "F8 create orphan stage without journal is swept (slice G contract)");
+    pin_prepare(K_CREATE, 2, &r);
+    put(WS, ".fst-0123456789abcdef0123456789abcdef", "orphan");
+    rc = run_child(0, 1, r);
+    good = rc == 40 + FS_READ_OK && is_content(".fst-0123456789abcdef0123456789abcdef", "orphan");
+    FsReadClose(r);
+    pin_report("F8-journal", good, "F8 create orphan stage with a valid intent journal stays");
 }
 /* Legacy cells: a journal as the previous build wrote it (no trailer) must still be recovered, at every crash point of
    every kind. Deterministic, no random numbers. */

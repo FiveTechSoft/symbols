@@ -12,8 +12,8 @@
 static void ck(int ok,const char *m){if(!ok){fprintf(stderr,"FAIL %s\n",m);exit(1);}}
 static void clean_root(void)
 {
-    /* Test-only teardown via a held scratch directory, including a deliberate
-       orphan from the pre-intent crash. */
+    /* Test-only teardown via a held scratch directory. The pre-intent
+       orphan is swept by recovery since slice G; teardown asserts that. */
     char full[256];struct dirent *e;DIR *d=opendir("test_fs_recover_scratch");
     ck(d!=NULL,"teardown open");
     while((e=readdir(d))){if(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."))continue;
@@ -22,6 +22,16 @@ static void clean_root(void)
     }
     ck(closedir(d)==0&&rmdir("test_fs_recover_scratch")==0,"teardown root");
 }
+static int count_prefix(const char *dirpath,const char *prefix,int plen)
+{
+    int n=0;struct dirent *e;DIR *d=opendir(dirpath);ck(d!=NULL,"count open");
+    while((e=readdir(d)))if(!strncmp(e->d_name,prefix,plen))n++;
+    ck(closedir(d)==0,"count close");return n;
+}
+static int exists_plain(const char *p){struct stat st;return stat(p,&st)==0;}
+static void plant(const char *name,const char *v)
+{char full[256];FILE *f;snprintf(full,sizeof(full),"test_fs_recover_scratch/%s",name);
+ f=fopen(full,"wb");ck(f!=NULL&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"plant");}
 static void read_target(FS_READ_ROOT *r,const char *name,int exists)
 {
     unsigned char *b;size_t n;FS_READ_META m;
@@ -45,6 +55,8 @@ int main(void)
            WEXITSTATUS(status)==90+step,"crash point");
         if(step==1){read_target(r,path,0);
             ck(FsCreateRecover(r)==FS_READ_OK,"no intent");
+            ck(count_prefix("test_fs_recover_scratch",".fst-",5)==0,
+               "stage orphan swept");
         }else{
             ck(FsReadStat(r,".fstxn.intent",&m)==FS_READ_OK,"intent exists");
             ck(FsCreateFile(r,"blocked","x",1,0600)==FS_READ_DENIED,
@@ -120,6 +132,64 @@ int main(void)
     ck(FsCreateFile(r,"fresh","payload",7,0600)==FS_READ_OK,
        "create after replay");
     read_target(r,"fresh",1);
+    /* Copy runs the same create protocol: a pre-intent crash leaves the
+       same .fst- orphan and recovery sweeps it. */
+    ck(FsCreateFile(r,"copy-source","payload",7,0600)==FS_READ_OK,"copy source");
+    child=fork();ck(child>=0,"copy fork");
+    if(child==0){setenv("FS_CREATE_TEST_CRASH","1",1);
+        (void)FsCopyFile(r,"copy-source","copy-target","payload",7);_exit(20);}
+    ck(waitpid(child,&status,0)==child&&WIFEXITED(status)&&
+       WEXITSTATUS(status)==91,"copy crash point");
+    ck(FsCreateRecover(r)==FS_READ_OK,"copy orphan recovery");
+    ck(count_prefix("test_fs_recover_scratch",".fst-",5)==0,
+       "copy stage orphan swept");
+    ck(FsRemoveFile(r,"copy-source","payload",7)==FS_READ_OK,"copy source cleanup");
+    /* Slice G sweep controls: foreign exact-shape and near-shape names. */
+    plant(".fst-0123456789abcdef0123456789abcdef","foreign");   /* new-stage shape: swept */
+    plant(".fsrp-0123456789abcdef0123456789abcdef","foreign");  /* unshared old-pin shape: kept */
+    plant(".fsrm-0123456789abcdef0123456789abcdef","foreign");  /* kept */
+    plant(".fsmv-0123456789abcdef0123456789abcdef","foreign");  /* kept */
+    plant(".fst-0123456789abcdef0123456789abcde","x");          /* 31 hex: kept */
+    plant(".fst-0123456789ABCDEF0123456789ABCDEF","x");         /* uppercase: kept */
+    plant(".fstx-0123456789abcdef0123456789abcdef","x");        /* wrong prefix: kept */
+    ck(mkdir("test_fs_recover_scratch/.fst-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",0700)==0,
+       "plant directory of exact shape");
+    ck(FsCreateRecover(r)==FS_READ_OK,"control recovery");
+    ck(!exists_plain("test_fs_recover_scratch/.fst-0123456789abcdef0123456789abcdef"),
+       "new-stage shape swept");
+    ck(exists_plain("test_fs_recover_scratch/.fsrp-0123456789abcdef0123456789abcdef"),
+       "unshared .fsrp- kept (last-link rule)");
+    ck(exists_plain("test_fs_recover_scratch/.fsrm-0123456789abcdef0123456789abcdef"),
+       "unshared .fsrm- kept");
+    ck(exists_plain("test_fs_recover_scratch/.fsmv-0123456789abcdef0123456789abcdef"),
+       "unshared .fsmv- kept");
+    ck(exists_plain("test_fs_recover_scratch/.fst-0123456789abcdef0123456789abcde"),
+       "31-hex name kept");
+    ck(exists_plain("test_fs_recover_scratch/.fst-0123456789ABCDEF0123456789ABCDEF"),
+       "uppercase name kept");
+    ck(exists_plain("test_fs_recover_scratch/.fstx-0123456789abcdef0123456789abcdef"),
+       "wrong-prefix name kept");
+    {struct stat st;ck(stat("test_fs_recover_scratch/.fst-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",&st)==0&&
+       S_ISDIR(st.st_mode),"directory of exact shape kept");}
+    /* With a journal of any protocol present the sweep must not run. */
+    plant(".fst-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","foreign");
+    plant(".fstxn.batch","bad");
+    ck(FsCreateRecover(r)==FS_READ_DENIED,"foreign batch journal blocks");
+    ck(exists_plain("test_fs_recover_scratch/.fst-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+       "orphan kept while a journal exists (sweep did not run)");
+    ck(unlink("test_fs_recover_scratch/.fstxn.batch")==0,"clear batch fixture");
+    ck(FsCreateRecover(r)==FS_READ_OK,"recovery after journal cleared");
+    ck(!exists_plain("test_fs_recover_scratch/.fst-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+       "orphan swept once journals are clear");
+    /* Control fixture cleanup (teardown only unlinks files). */
+    ck(unlink("test_fs_recover_scratch/.fsrp-0123456789abcdef0123456789abcdef")==0&&
+       unlink("test_fs_recover_scratch/.fsrm-0123456789abcdef0123456789abcdef")==0&&
+       unlink("test_fs_recover_scratch/.fsmv-0123456789abcdef0123456789abcdef")==0&&
+       unlink("test_fs_recover_scratch/.fst-0123456789abcdef0123456789abcde")==0&&
+       unlink("test_fs_recover_scratch/.fst-0123456789ABCDEF0123456789ABCDEF")==0&&
+       unlink("test_fs_recover_scratch/.fstx-0123456789abcdef0123456789abcdef")==0&&
+       rmdir("test_fs_recover_scratch/.fst-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")==0,
+       "control fixture cleanup");
     FsReadClose(r);
     clean_root();
     puts("create recovery crash points passed");return 0;

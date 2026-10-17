@@ -401,7 +401,10 @@ done:
    shared, because an unshared one may be the last link to bytes someone still
    needs (the target is gone), and then it stays. Best
    effort: a name that cannot be deleted stays, as before. At most 128 names per
-   call. Mutant 10 (test only) skips the sweep; mutant 11 keeps an unshared .fsrs-; mutant 12 stops after one removal. */
+   call. A shared .fsrm- or .fsmv- pin (old-inode pins of the remove and move
+   protocols) is swept by the same shared-only rule as .fsrp-; an unshared one stays.
+   Mutant 10 (test only) skips the sweep; mutant 11 keeps an unshared .fsrs-;
+   mutant 12 stops after one removal; mutant 13 keeps .fsrm- and .fsmv- pins. */
 #define WB_SWEEP_MAX 128
 static void wb_sweep_orphans(const FS_READ_ROOT *r)
 {
@@ -430,7 +433,7 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
             if(wn>=1&&wn<47&&n<WB_SWEEP_MAX&&
                !(item->FileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT))){
                 memcpy(name,item->FileName,wn*sizeof(WCHAR));name[wn]=0;
-                if(wc_random_name(name,L".fst-")||wc_random_name(name,L".fsp-")||wc_random_name(name,L".fsrp-")||wc_random_name(name,L".fsrs-")){
+                if(wc_random_name(name,L".fst-")||wc_random_name(name,L".fsp-")||wc_random_name(name,L".fsrp-")||wc_random_name(name,L".fsrs-")||wc_random_name(name,L".fsrm-")||wc_random_name(name,L".fsmv-")){
                     memcpy(names[n],name,(wn+1)*sizeof(WCHAR));n++;
                 }
             }
@@ -446,7 +449,8 @@ static void wb_sweep_orphans(const FS_READ_ROOT *r)
         if(win_meta(h,&m)==FS_READ_OK&&m.kind==FS_KIND_FILE&&wc_id(h,&ids[k])&&
            GetFileInformationByHandleEx(h,FileStandardInfo,&si,sizeof(si))){
             links[k]=si.NumberOfLinks;
-            drop[k]=si.NumberOfLinks>=2||!wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5)||(!wb_mutant(11)&&!wcsncmp(names[k],L".fsrs-",6));
+            drop[k]=(si.NumberOfLinks>=2&&!(wb_mutant(13)&&(!wcsncmp(names[k],L".fsrm-",6)||!wcsncmp(names[k],L".fsmv-",6))))||
+                !wcsncmp(names[k],L".fst-",5)||!wcsncmp(names[k],L".fsp-",5)||(!wb_mutant(11)&&!wcsncmp(names[k],L".fsrs-",6));
         }
         CloseHandle(h);
     }

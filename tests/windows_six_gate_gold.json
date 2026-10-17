@@ -1,5 +1,5 @@
 {
-  "base": "51df50c7eb49fec50902d99d96467fe58524f961",
+  "base": "4ea559e45815d6e5446b613cfb3015df92019f0a",
   "contract": "Native exit0 AND one exact complete final line with all current oracle groups; not semicolon OR",
   "gates": {
     "aliases_short": {
@@ -20,7 +20,7 @@
     },
     "sweep_foreign": {
       "test_name": "test_fs_win_sweep_foreign",
-      "final_line": "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o",
+      "final_line": "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; create: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; remove: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; move: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o",
       "native_exit": 0,
       "final_unique": true,
       "last_nonempty_line": true,
@@ -54,6 +54,14 @@
         "PSS_ARM arm=snapshot_only_no_pipe complete=1 deltas=0,0,0,0,0",
         "PSS_ARM arm=external_snapshot_pipe complete=1 deltas=0,3,1,3,1"
       ]
+    },
+    "sweep_foreign_mc13": {
+      "test_name": "test_fs_win_sweep_foreign",
+      "final_line": "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=oo mv2=oo; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=oo mv2=oo; create: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=oo mv2=oo; remove: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=oo mv2=oo; move: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=oo mv2=oo",
+      "native_exit": 0,
+      "final_unique": true,
+      "last_nonempty_line": true,
+      "skip_permitted": false
     }
   },
   "vectors": [
@@ -353,7 +361,7 @@
       "id": "sweep_foreign_full",
       "kind": "sweep_foreign",
       "lines": [
-        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; create: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; remove: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; move: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o"
       ],
       "exit": 0,
       "valid": true
@@ -362,7 +370,7 @@
       "id": "sweep_foreign_crlf",
       "kind": "sweep_foreign",
       "lines": [
-        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; create: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; remove: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; move: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o"
       ],
       "exit": 0,
       "valid": true,
@@ -372,7 +380,7 @@
       "id": "sweep_foreign_nonzero",
       "kind": "sweep_foreign",
       "lines": [
-        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o"
+        "sweep foreign cells: batch: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; replace: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; create: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; remove: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o; move: .fst-=- .fsp-=- .fsrp-=o .fsrs-=- .fsj-=o .fsrb-=o .fsrm-=o .fsmv-=o twolink=-o rm2=-o mv2=-o"
       ],
       "exit": 1,
       "valid": false

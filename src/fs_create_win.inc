@@ -629,6 +629,8 @@ static void wo_crash(unsigned kind,int phase)
 #else
 #define wo_remove_pin wr_remove_pin
 #endif
+/* Defined in fs_batch_win.inc; also called on the no-journal path below. */
+static void wb_sweep_orphans(const FS_READ_ROOT *r);
 static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
 {
     const WCHAR *intent_name=kind==1?WO_REMOVE:WO_MOVE;
@@ -642,7 +644,7 @@ static FS_READ_STATUS wo_recover_locked(const FS_READ_ROOT *r,unsigned kind)
     if(s!=FS_READ_OK)return s;
     s=wo_read(r->handle,intent_name,kind,&i,&iid,&intent);if(s!=FS_READ_OK)return s;
     s=wo_read(r->handle,mark_name,kind,&c,&cid,&mark);if(s!=FS_READ_OK)return s;
-    if(!intent&&!mark)return FS_READ_OK;
+    if(!intent&&!mark){wb_sweep_orphans(r);return FS_READ_OK;}
     if(intent&&mark&&memcmp(&i,&c,sizeof(i)))return FS_READ_DENIED;
     if(!intent)i=c;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||!wc_ntfs(r->handle))return FS_READ_DENIED;
@@ -824,7 +826,8 @@ static FS_READ_STATUS wc_recover_locked(const FS_READ_ROOT *r)
     FS_READ_STATUS s=wc_record_read(r->handle,WC_INTENT,&i,&iid,&intent);
     if(s!=FS_READ_OK)return s;
     s=wc_record_read(r->handle,WC_COMMIT,&c,&cid,&commit);
-    if(s!=FS_READ_OK||(!intent&&!commit))return s;
+    if(s!=FS_READ_OK)return s;
+    if(!intent&&!commit){wb_sweep_orphans(r);return FS_READ_OK;}
     if(commit&&intent&&memcmp(&i,&c,sizeof(i)))return FS_READ_DENIED;
     if(!intent)i=c;
     if(!wc_id(r->handle,&rid)||!wc_same(&rid,&i.root)||

@@ -434,7 +434,7 @@ if(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_reserved_alias PROPERTIES
         PASS_REGULAR_EXPRESSION "reserved alias cells: .fstxn.=3e3e .fst-=3e3e .fsp-=3e3e .fsj-=3e3e .fsrp-=3e3e .fsrs-=3e3e .fsrb-=3e3e .fsrm-=3e3e .fsmv-=3e3e dir=3o3o dirord=0n0n")
-    # m213: the orphan sweep against a FOREIGN file of the exact shape of a control name. The regex holds my predictions (.fst- .fsp- .fsrs- deleted, one-link .fsrp- and the four other prefixes kept, a two-link .fsrp- loses the name only); a wrong one goes red and prints the measured line.
+    # m213: the orphan sweep against a FOREIGN file of the exact shape of a control name. The gate gold holds my predictions (.fst- .fsp- .fsrs- deleted, one-link old-pin shapes and the two unswept prefixes kept, two-link old pins lose the swept name only); a wrong one goes red and prints the measured line. Slice G extended the sweep to .fsrm-/.fsmv- (shared-only) and to the create/remove/move recovery calls, and added the mc13 mutant entry.
     add_executable(test_fs_win_sweep_foreign tests/test_fs_win_sweep_foreign.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_sweep_foreign PRIVATE include)
@@ -442,6 +442,12 @@ if(WIN32)
         ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign -- $<TARGET_FILE:test_fs_win_sweep_foreign>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_fs_win_sweep_foreign PROPERTIES TIMEOUT 300)
+    # Slice G mutant 13 (test only): the sweep keeps shared .fsrm-/.fsmv- pins, so the rm2/mv2 cells read oo; the normal entry kills the mutant with -o.
+    add_test(NAME test_fs_win_sweep_foreign_mc13 COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/windows_six_gate.py --kind sweep_foreign_mc13 -- $<TARGET_FILE:test_fs_win_sweep_foreign>
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_fs_win_sweep_foreign_mc13 PROPERTIES
+        ENVIRONMENT "FS_WIN_BATCH_MUTANT=13" TIMEOUT 300)
     add_executable(test_fs_win_longpath tests/test_fs_win_longpath.c
         src/fs_read.c src/fs_manifest.c)
     target_include_directories(test_fs_win_longpath PRIVATE include)

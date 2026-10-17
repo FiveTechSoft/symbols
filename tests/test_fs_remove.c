@@ -1,6 +1,7 @@
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
 #include "fs_remove.h"
+#include "fs_replace.h"
 #include "fs_write.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,10 @@ static void target(FS_READ_ROOT *r,const char *name,int exists)
  if(!exists){ck(FsReadStat(r,name,&m)==FS_READ_MISSING,"target absent");return;}
  ck(FsReadFile(r,name,&b,&n,&m)==FS_READ_OK&&n==7&&
     !memcmp(b,"payload",7),"target intact");free(b);}
+static int count_prefix(const char *prefix,int plen)
+{DIR *d=opendir("test_fs_remove_scratch");struct dirent *e;int n=0;
+ ck(d!=NULL,"count open");while((e=readdir(d)))if(!strncmp(e->d_name,prefix,plen))n++;
+ ck(closedir(d)==0,"count close");return n;}
 static void clean(void)
 {DIR *d=opendir("test_fs_remove_scratch");struct dirent *e;char p[256];
  ck(d!=NULL,"list");while((e=readdir(d))){if(!strcmp(e->d_name,".")||
@@ -44,7 +49,11 @@ int main(void)
       (void)FsRemoveFile(r,path,"payload",7);_exit(20);}
     ck(waitpid(pid,&status,0)==pid&&WIFEXITED(status)&&
        WEXITSTATUS(status)==90+step,"crash point");
-    if(step==10){target(r,path,1);ck(FsRemoveRecover(r)==FS_READ_OK,"no intent");}
+    if(step==10){target(r,path,1);ck(FsRemoveRecover(r)==FS_READ_OK,"no intent");
+      ck(count_prefix(".fsrm-",6)==0,"pre-intent pin swept");
+      ck(FsReplaceFile(r,path,"payload",7,"again",5)==FS_READ_OK,
+         "target replaceable after sweep (no two-link DENIED)");
+      ck(FsReplaceFile(r,path,"again",5,"payload",7)==FS_READ_OK,"restore");}
     else{
       ck(FsReadStat(r,".fstxn.remove",&m)==FS_READ_OK,"intent");
       ck(FsCreateFile(r,"blocked","x",1,0600)==FS_READ_DENIED,"create blocked");

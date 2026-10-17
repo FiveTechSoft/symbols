@@ -11,6 +11,10 @@
 #include <sys/wait.h>
 #include <dirent.h>
 static void ck(int x,const char *m){if(!x){fprintf(stderr,"FAIL %s\n",m);exit(1);}}
+static int count_prefix(const char *prefix,int plen)
+{DIR *d=opendir("test_fs_replace_scratch");struct dirent *e;int n=0;
+ ck(d!=NULL,"count open");while((e=readdir(d)))if(!strncmp(e->d_name,prefix,plen))n++;
+ ck(closedir(d)==0,"count close");return n;}
 static void put(const char *p,const char *v)
 {FILE *f=fopen(p,"wb");ck(f&&fwrite(v,1,strlen(v),f)==strlen(v)&&fclose(f)==0,"put");}
 static void check(FS_READ_ROOT *r,const char *p,const char *v)
@@ -48,6 +52,14 @@ int main(void)
    ck(FsReplaceRecover(r)==FS_READ_OK,"recover");
    check(r,p,(point==51||point==53)?"new":"old");
    ck(FsReplaceRecover(r)==FS_READ_OK,"idempotent replay");
+   if(point==40){
+     /* Slice G: the shared old pin is swept; the unshared NEW stage stays
+        (POSIX has no ".fsrs-", recorded limit), and the target is
+        replaceable again (no two-link DENIED). */
+     ck(count_prefix(".fsrp-",6)==1,"shared pin swept, unshared new stage stays");
+     ck(FsReplaceFile(r,p,"old",3,"new",3)==FS_READ_OK,"replace works after sweep");
+     ck(FsReplaceFile(r,p,"new",3,"old",3)==FS_READ_OK,"restore after sweep");
+   }
  }
  /* Generate rollback checkpoints by first crashing after publication. */
  for(int point=44;point<=55;point++){
