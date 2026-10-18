@@ -68,6 +68,7 @@ typedef struct
     uint32_t         depth;        /* 1 = direct caller/user, 2 = 2-hop, etc. */
     char             file_path[MAX_CODE_PATH];
     uint32_t         line_number;
+    bool             low_confidence; /* reached through a call edge no include chain backs (see CODE_EDGE_LABEL) */
 } BLAST_RADIUS_ENTRY;
 
 /* Blast radius calculation result */
@@ -81,6 +82,48 @@ typedef struct
     uint32_t            max_depth_reached;
     IMPACT_RISK_LEVEL   risk_level;
 } CODE_BLAST_RADIUS;
+
+/* ------------------------------------------------------------
+   Call-edge provenance and resolution (C sources).
+   Every call the C lexer sees is also kept as a call SITE (caller, callee, file, line). The name-level
+   `calls` edge stays as before (it is what the legacy queries return) and now carries its first call
+   site's file in RELATION.source. A site is resolved lazily, file-aware, when asked:
+     EXTRACTED  the callee is defined in the same file as the call: no cross-file inference.
+     INFERRED   the callee is defined in another file and a header reachable through #include from the
+                call's file declares or defines that name (one definition left after narrowing).
+     AMBIGUOUS  the name is defined in several files and the includes do not pick one.
+     UNLINKED   the name is defined somewhere in the corpus, but nothing the call's file includes
+                declares it: most likely a foreign function (libc, WinAPI) that shares a name with a
+                corpus function. Not part of the resolved graph.
+     EXTERNAL   no definition of the name in the corpus.
+   The lexer is text based, not a compiler: includes are followed by file name (basename), macros are
+   not expanded, and function pointers are not tracked. Upper-case identifiers (TEST, ASSERT_X) are
+   treated as macros, not functions.
+   ------------------------------------------------------------ */
+typedef enum
+{
+    CODE_EDGE_EXTRACTED = 0,
+    CODE_EDGE_INFERRED,
+    CODE_EDGE_AMBIGUOUS,
+    CODE_EDGE_UNLINKED,
+    CODE_EDGE_EXTERNAL
+} CODE_EDGE_LABEL;
+
+typedef struct
+{
+    SYMBOL_ID caller;
+    SYMBOL_ID callee;
+    SYMBOL_ID file;     /* file symbol of the call site */
+    uint32_t  line;     /* 1-based line of the callee token */
+} CODE_CALL_SITE;
+
+typedef struct
+{
+    char            file[MAX_CODE_PATH];        /* where the call is */
+    uint32_t        line;
+    CODE_EDGE_LABEL label;
+    char            target_file[MAX_CODE_PATH]; /* defining file when resolved (EXTRACTED/INFERRED), else "" */
+} CODE_CALL_EVIDENCE;
 
 /* The Code Knowledge Graph state */
 typedef struct
@@ -110,6 +153,15 @@ typedef struct
     uint32_t   total_structs;
     uint32_t   total_classes;
     uint32_t   total_calls;
+    /* Added after the original layout. Zero-initialized by CodeGraphCreate. */
+    SYMBOL_ID  rel_declares_func;   /* file -> name: a prototype at top level */
+    CODE_CALL_SITE *sites;
+    uint32_t   site_count;
+    uint32_t   site_capacity;
+    uint32_t   sites_dropped;       /* sites not kept because the table hit its bound */
+    uint32_t   macro_names_skipped; /* upper-case identifiers not taken as functions or calls */
+    uint32_t   files_skipped_unchanged; /* re-ingests skipped because the content hash was equal */
+    void      *aux;                 /* internal: site index, content hashes, resolver cache */
 } CODE_GRAPH;
 
 /* ============================================================
@@ -210,5 +262,38 @@ int  CodeGraphFormatBlastRadius(const CODE_GRAPH *cg,
                                 const CODE_BLAST_RADIUS *radius,
                                 char *buffer,
                                 size_t buffer_size);
+
+/* ============================================================
+   Provenance, resolution, path and explain queries (deterministic, no LLM)
+   ============================================================ */
+
+const char *CodeGraphEdgeLabelName(CODE_EDGE_LABEL label);
+
+/* Resolve one recorded call site file-aware (see CODE_EDGE_LABEL). Not thread safe: it uses a cache. */
+void CodeGraphResolveSite(const CODE_GRAPH *cg, const CODE_CALL_SITE *site, CODE_CALL_EVIDENCE *out);
+
+/* All recorded call sites of caller -> callee with their resolution. Returns the number written. */
+uint32_t CodeGraphGetCallEvidence(const CODE_GRAPH *cg, const char *caller, const char *callee,
+                                  CODE_CALL_EVIDENCE *out, uint32_t max_results);
+
+/* Best label over the sites of caller -> callee (EXTRACTED beats INFERRED beats the rest), or false when
+   no site is recorded for that pair. */
+bool CodeGraphGetEdgeLabel(const CODE_GRAPH *cg, const char *caller, const char *callee,
+                           CODE_EDGE_LABEL *label);
+
+/* Like CodeGraphGetCallers/Callees, restricted to edges with at least one EXTRACTED or INFERRED site. */
+uint32_t CodeGraphGetResolvedCallers(const CODE_GRAPH *cg, const char *func_name,
+                                     char results[][MAX_CODE_NAME], uint32_t max_results);
+uint32_t CodeGraphGetResolvedCallees(const CODE_GRAPH *cg, const char *func_name,
+                                     char results[][MAX_CODE_NAME], uint32_t max_results);
+
+/* Shortest call path from -> to over resolved edges (breadth first, at most max_depth edges). Writes the
+   names from `from` to `to` inclusive and returns the node count, or 0 when there is no path. */
+uint32_t CodeGraphFindCallPath(const CODE_GRAPH *cg, const char *from, const char *to,
+                               uint32_t max_depth, char path[][MAX_CODE_NAME], uint32_t max_nodes);
+
+/* Human-readable provenance of caller -> callee: label, file:line of each site, target file. */
+int CodeGraphExplainEdge(const CODE_GRAPH *cg, const char *caller, const char *callee,
+                         char *buffer, size_t buffer_size);
 
 #endif /* CODE_GRAPH_H */

@@ -68,6 +68,28 @@ static bool is_type_keyword(const char *name)
     return false;
 }
 
+/* Upper-case identifiers (TEST, TEST_ASSERT_EQUAL, CJSON_PUBLIC) are macros in C practice. The text lexer
+   cannot expand them, so it must not take them for functions or calls. */
+static bool is_macro_name(const char *name)
+{
+    size_t n = strlen(name);
+    bool letter = false;
+    if (n < 2)
+        return false;
+    for (size_t i = 0; i < n; i++)
+    {
+        char c = name[i];
+        if (c >= 'A' && c <= 'Z')
+            letter = true;
+        else if (!((c >= '0' && c <= '9') || c == '_'))
+            return false;
+    }
+    return letter;
+}
+
+static void cg_record_call(CODE_GRAPH *cg, SYMBOL_ID caller, SYMBOL_ID callee, SYMBOL_ID file, uint32_t line);
+static int cg_file_unchanged(CODE_GRAPH *cg, const char *file_path, const char *text);
+
 /* ============================================================
    Lifecycle API
    ============================================================ */
@@ -106,9 +128,12 @@ CODE_GRAPH *CodeGraphCreate(uint32_t symbol_capacity, uint32_t relation_capacity
     cg->rel_inherited_by   = GraphAddSymbol(cg->graph, "inherited_by");
     cg->rel_imports        = GraphAddSymbol(cg->graph, "imports");
     cg->rel_imported_by    = GraphAddSymbol(cg->graph, "imported_by");
+    cg->rel_declares_func  = GraphAddSymbol(cg->graph, "declares_func");
 
     return cg;
 }
+
+static void cg_aux_free(CODE_GRAPH *cg);
 
 void CodeGraphDestroy(CODE_GRAPH *cg)
 {
@@ -118,6 +143,8 @@ void CodeGraphDestroy(CODE_GRAPH *cg)
     if (cg->graph)
         GraphDestroy(cg->graph);
 
+    cg_aux_free(cg);
+    free(cg->sites);
     free(cg);
 }
 
@@ -140,6 +167,9 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
 
     char current_func[MAX_CODE_NAME]   = {0};
     char current_struct[MAX_CODE_NAME] = {0};
+    bool prev_extern = false;      /* the last token was `extern` */
+    bool extern_c_str = false;     /* extern "C" seen, waiting for its '{' */
+    uint32_t extern_c_open = 0;    /* extern "C" { blocks that do not count as nesting */
 
     while (*p)
     {
@@ -185,6 +215,9 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
         /* 5. String literal */
         if (*p == '"')
         {
+            if (prev_extern && p[1] == 'C' && p[2] == '"')
+                extern_c_str = true;
+            prev_extern = false;
             p++;
             while (*p && *p != '"')
             {
@@ -278,6 +311,15 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
         /* 8. Braces handling */
         if (*p == '{')
         {
+            if (extern_c_str && brace_depth == 0)
+            {
+                /* extern "C" { ... } is linkage, not a body: keep the declarations inside at top level */
+                extern_c_open++;
+                extern_c_str = false;
+                p++;
+                continue;
+            }
+            extern_c_str = false;
             brace_depth++;
             p++;
             continue;
@@ -285,6 +327,12 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
 
         if (*p == '}')
         {
+            if (brace_depth == 0 && extern_c_open > 0)
+            {
+                extern_c_open--;
+                p++;
+                continue;
+            }
             if (brace_depth > 0)
                 brace_depth--;
 
@@ -296,8 +344,7 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
                     const char *q = p + 1;
                     while (*q && isspace((unsigned char)*q))
                     {
-                        if (*q == '\n')
-                            line_number++;
+                        /* lookahead only: the main loop counts these newlines when it reaches them */
                         q++;
                     }
                     if (is_id_start(*q))
@@ -335,17 +382,16 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
                 token[len++] = *p++;
             }
             token[len] = '\0';
+            prev_extern = (strcmp(token, "extern") == 0);
+            if (!prev_extern)
+                extern_c_str = false;
 
             /* Struct detection */
             if (strcmp(token, "struct") == 0)
             {
                 const char *q = p;
                 while (*q && isspace((unsigned char)*q))
-                {
-                    if (*q == '\n')
-                        line_number++;
-                    q++;
-                }
+                    q++; /* lookahead only: the main loop counts these newlines */
                 if (is_id_start(*q))
                 {
                     const char *tag_start = q;
@@ -396,13 +442,12 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
             {
                 const char *q = p;
                 while (*q && isspace((unsigned char)*q))
-                {
-                    if (*q == '\n')
-                        line_number++;
-                    q++;
-                }
+                    q++; /* lookahead only: the main loop counts these newlines */
 
-                if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token))
+                if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token) &&
+                    is_macro_name(token))
+                    cg->macro_names_skipped++;
+                else if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token))
                 {
                     /* Scan matching closing parenthesis */
                     int p_depth = 1;
@@ -451,6 +496,14 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
                         }
                     }
 
+                    /* A prototype at top level: remember which file declares the name, so a call can be
+                       tied to a header it can actually see. */
+                    if (*q == ';')
+                    {
+                        SYMBOL_ID fn_sym = GraphAddSymbol(cg->graph, token);
+                        GraphAddRelation(cg->graph, file_sym, cg->rel_declares_func, fn_sym);
+                    }
+
                     /* If '{', this is a function definition */
                     if (*q == '{')
                     {
@@ -471,13 +524,17 @@ static int CodeGraphIngestC(CODE_GRAPH *cg, const char *file_path, const char *s
                 while (*q && isspace((unsigned char)*q))
                     q++;
 
-                if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token))
+                if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token) &&
+                    is_macro_name(token))
+                    cg->macro_names_skipped++;
+                else if (*q == '(' && !is_control_keyword(token) && !is_type_keyword(token))
                 {
                     SYMBOL_ID caller_sym = GraphAddSymbol(cg->graph, current_func);
                     SYMBOL_ID callee_sym = GraphAddSymbol(cg->graph, token);
                     GraphAddRelation(cg->graph, caller_sym, cg->rel_calls, callee_sym);
                     GraphAddRelation(cg->graph, callee_sym, cg->rel_called_by, caller_sym);
                     cg->total_calls++;
+                    cg_record_call(cg, caller_sym, callee_sym, file_sym, line_number);
                 }
             }
 
@@ -1364,6 +1421,13 @@ int CodeGraphIngestSource(CODE_GRAPH *cg, const char *file_path, const char *sou
     if (!cg || !file_path || !source_code)
         return 0;
 
+    /* Same file, same text as before: nothing to learn, and a repeat would double the counters. */
+    if (cg_file_unchanged(cg, file_path, source_code))
+    {
+        cg->files_skipped_unchanged++;
+        return 1;
+    }
+
     CODE_LANGUAGE lang = CodeGraphDetectLanguage(file_path);
     if (lang == CODE_LANG_PYTHON)
         return CodeGraphIngestPython(cg, file_path, source_code);
@@ -1763,9 +1827,24 @@ int CodeGraphComputeBlastRadius(const CODE_GRAPH *cg,
         uint32_t n_callers = GraphQuerySubjectRelation(cg->graph, curr.sym_id,
                                                        cg->rel_called_by,
                                                        caller_rels, 64);
+        /* Resolved callers (EXTRACTED/INFERRED, or no recorded site) first, then the legacy name-only edges
+           that no include chain backs; those entries are flagged low confidence. */
+        for (uint32_t pass = 0; pass < 2; pass++)
         for (uint32_t i = 0; i < n_callers; i++)
         {
             SYMBOL_ID caller_id = caller_rels[i]->object;
+            bool low_conf = false;
+            {
+                const SYMBOL *cs = SymbolGet(cg->graph->symbols, caller_id);
+                const SYMBOL *ts = SymbolGet(cg->graph->symbols, curr.sym_id);
+                CODE_EDGE_LABEL lab;
+                if (cs && cs->name && ts && ts->name &&
+                    CodeGraphGetEdgeLabel(cg, cs->name, ts->name, &lab) &&
+                    lab != CODE_EDGE_EXTRACTED && lab != CODE_EDGE_INFERRED)
+                    low_conf = true;
+            }
+            if ((pass == 1) != low_conf)
+                continue;
             bool already_visited = false;
             for (uint32_t v = 0; v < visited_count; v++)
             {
@@ -1786,6 +1865,7 @@ int CodeGraphComputeBlastRadius(const CODE_GRAPH *cg,
                     strncpy(ent->symbol_name, sym->name, MAX_CODE_NAME - 1);
                     ent->kind = CODE_SYM_FUNCTION;
                     ent->depth = curr.depth + 1;
+                    ent->low_confidence = low_conf;
 
                     const char *f = CodeGraphGetFunctionFile(cg, sym->name);
                     if (f)
@@ -2040,10 +2120,11 @@ int CodeGraphFormatBlastRadius(const CODE_GRAPH *cg,
             if (radius->entries[i].depth == d)
             {
                 written = snprintf(buffer + offset, buffer_size - (size_t)offset,
-                                   "  - `%s` (%s)\n",
+                                   "  - `%s` (%s)%s\n",
                                    radius->entries[i].symbol_name,
                                    radius->entries[i].file_path[0] ?
-                                   radius->entries[i].file_path : "unlocated");
+                                   radius->entries[i].file_path : "unlocated",
+                                   radius->entries[i].low_confidence ? " [low confidence: name match only]" : "");
                 if (written > 0 && (size_t)(offset + written) < buffer_size)
                     offset += written;
             }
@@ -2221,3 +2302,699 @@ uint32_t CodeGraphIngestDirectory(CODE_GRAPH *cg, const char *root_dir)
     return IngestDirectoryRec(cg, clean_root, 0);
 }
 
+
+/* ============================================================
+   Call sites, provenance, file-aware resolution, path and explain
+   ============================================================ */
+
+#define CG_MAX_SITES      (4u * 1024u * 1024u)
+#define CG_MAX_CANDIDATES 64
+#define CG_MAX_CLOSURE    2048
+#define CG_MAX_INCLUDES   256
+
+typedef struct { uint32_t h; SYMBOL_ID file; } CG_BASE_ENTRY;
+typedef struct { SYMBOL_ID file; uint64_t hash; } CG_FILE_HASH;
+
+typedef struct
+{
+    /* (caller, callee) -> chain of site indexes */
+    uint32_t *bucket;
+    uint32_t  bucket_count;
+    uint32_t *next;
+    uint32_t  next_capacity;
+    /* content hash per ingested file, for the unchanged-file skip */
+    CG_FILE_HASH *hashes;
+    uint32_t      hash_count, hash_capacity;
+    /* resolver cache, valid while the relation count is unchanged */
+    uint32_t       cache_relations;
+    int            cache_valid;
+    CG_BASE_ENTRY *base;           /* basename hash -> file, sorted by hash */
+    uint32_t       base_count;
+    SYMBOL_ID      closure_file;
+    int            closure_valid;
+    SYMBOL_ID     *closure;
+    uint32_t       closure_count;
+} CG_AUX;
+
+static CG_AUX *cg_aux(CODE_GRAPH *cg)
+{
+    if (!cg->aux)
+        cg->aux = calloc(1, sizeof(CG_AUX));
+    return (CG_AUX *)cg->aux;
+}
+
+static void cg_aux_free(CODE_GRAPH *cg)
+{
+    CG_AUX *a = (CG_AUX *)cg->aux;
+    if (!a)
+        return;
+    free(a->bucket);
+    free(a->next);
+    free(a->hashes);
+    free(a->base);
+    free(a->closure);
+    free(a);
+    cg->aux = NULL;
+}
+
+static uint32_t cg_pair_hash(SYMBOL_ID a, SYMBOL_ID b)
+{
+    uint64_t x = ((uint64_t)a * 0x9E3779B97F4A7C15ull) ^ ((uint64_t)b * 0xC2B2AE3D27D4EB4Full);
+    x ^= x >> 29;
+    return (uint32_t)(x ^ (x >> 32));
+}
+
+static int cg_index_rebuild(CODE_GRAPH *cg, uint32_t want_buckets)
+{
+    CG_AUX *a = cg_aux(cg);
+    uint32_t nb = 1024, i;
+    if (!a)
+        return 0;
+    while (nb < want_buckets)
+        nb <<= 1;
+    free(a->bucket);
+    a->bucket = (uint32_t *)malloc((size_t)nb * sizeof(uint32_t));
+    if (!a->bucket)
+    {
+        a->bucket_count = 0;
+        return 0;
+    }
+    a->bucket_count = nb;
+    for (i = 0; i < nb; i++)
+        a->bucket[i] = UINT32_MAX;
+    if (a->next_capacity < cg->site_capacity)
+    {
+        uint32_t *n2 = (uint32_t *)realloc(a->next, (size_t)cg->site_capacity * sizeof(uint32_t));
+        if (!n2)
+            return 0;
+        a->next = n2;
+        a->next_capacity = cg->site_capacity;
+    }
+    for (i = 0; i < cg->site_count; i++)
+    {
+        uint32_t b = cg_pair_hash(cg->sites[i].caller, cg->sites[i].callee) & (nb - 1);
+        a->next[i] = a->bucket[b];
+        a->bucket[b] = i;
+    }
+    return 1;
+}
+
+static void cg_record_call(CODE_GRAPH *cg, SYMBOL_ID caller, SYMBOL_ID callee, SYMBOL_ID file, uint32_t line)
+{
+    CG_AUX *a = cg_aux(cg);
+    RELATION *r;
+    uint32_t b;
+    if (!a)
+        return;
+    /* Provenance on the name-level edge: the first call site's file (the line is in the site table). */
+    r = GraphFindRelation(cg->graph, caller, cg->rel_calls, callee);
+    if (r && r->source == 0)
+        RelationSetSource(r, file);
+    r = GraphFindRelation(cg->graph, callee, cg->rel_called_by, caller);
+    if (r && r->source == 0)
+        RelationSetSource(r, file);
+    if (cg->site_count >= CG_MAX_SITES)
+    {
+        cg->sites_dropped++;
+        return;
+    }
+    if (cg->site_count == cg->site_capacity)
+    {
+        uint32_t nc = cg->site_capacity ? cg->site_capacity * 2 : 4096;
+        CODE_CALL_SITE *n = (CODE_CALL_SITE *)realloc(cg->sites, (size_t)nc * sizeof(CODE_CALL_SITE));
+        if (!n)
+        {
+            cg->sites_dropped++;
+            return;
+        }
+        cg->sites = n;
+        cg->site_capacity = nc;
+    }
+    cg->sites[cg->site_count].caller = caller;
+    cg->sites[cg->site_count].callee = callee;
+    cg->sites[cg->site_count].file = file;
+    cg->sites[cg->site_count].line = line;
+    cg->site_count++;
+    if (a->bucket_count == 0 || cg->site_count > a->bucket_count * 2 || a->next_capacity < cg->site_capacity)
+    {
+        if (!cg_index_rebuild(cg, a->bucket_count ? a->bucket_count * 2 : 1024))
+            return;
+        return; /* the rebuild indexed the site just added */
+    }
+    b = cg_pair_hash(caller, callee) & (a->bucket_count - 1);
+    a->next[cg->site_count - 1] = a->bucket[b];
+    a->bucket[b] = cg->site_count - 1;
+}
+
+/* FNV-1a 64 over the file text. */
+static uint64_t cg_hash_text(const char *s)
+{
+    uint64_t h = 1469598103934665603ull;
+    for (; *s; s++)
+    {
+        h ^= (unsigned char)*s;
+        h *= 1099511628211ull;
+    }
+    return h;
+}
+
+/* Returns 1 when the file was ingested with exactly this text before (nothing to do). When the text
+   changed, the file's old call sites are dropped; edges already in the graph stay (additive). */
+static int cg_file_unchanged(CODE_GRAPH *cg, const char *file_path, const char *text)
+{
+    CG_AUX *a = cg_aux(cg);
+    SYMBOL_ID fsym;
+    uint64_t h;
+    uint32_t i;
+    if (!a)
+        return 0;
+    fsym = GraphAddSymbol(cg->graph, file_path);
+    h = cg_hash_text(text);
+    for (i = 0; i < a->hash_count; i++)
+    {
+        if (a->hashes[i].file != fsym)
+            continue;
+        if (a->hashes[i].hash == h)
+            return 1;
+        a->hashes[i].hash = h;
+        {   /* drop this file's old sites */
+            uint32_t w = 0, k;
+            for (k = 0; k < cg->site_count; k++)
+                if (cg->sites[k].file != fsym)
+                    cg->sites[w++] = cg->sites[k];
+            cg->site_count = w;
+            cg_index_rebuild(cg, a->bucket_count ? a->bucket_count : 1024);
+        }
+        return 0;
+    }
+    if (a->hash_count == a->hash_capacity)
+    {
+        uint32_t nc = a->hash_capacity ? a->hash_capacity * 2 : 256;
+        CG_FILE_HASH *n = (CG_FILE_HASH *)realloc(a->hashes, (size_t)nc * sizeof(CG_FILE_HASH));
+        if (!n)
+            return 0;
+        a->hashes = n;
+        a->hash_capacity = nc;
+    }
+    a->hashes[a->hash_count].file = fsym;
+    a->hashes[a->hash_count].hash = h;
+    a->hash_count++;
+    return 0;
+}
+
+/* ---- resolver ---- */
+
+static const char *cg_basename(const char *path)
+{
+    const char *b = path, *p;
+    for (p = path; *p; p++)
+        if (*p == '/' || *p == '\\')
+            b = p + 1;
+    return b;
+}
+
+static uint32_t cg_name_hash(const char *s)
+{
+    uint32_t h = 2166136261u;
+    for (; *s; s++)
+    {
+        h ^= (unsigned char)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+/* Hash of the base name without its extension: "include/agent_git.h" and "src/agent_git.c" agree. */
+static uint32_t cg_stem_hash(const char *path)
+{
+    const char *b = cg_basename(path);
+    const char *dot = strrchr(b, '.');
+    uint32_t h = 2166136261u;
+    const char *e = dot ? dot : b + strlen(b);
+    for (; b < e; b++)
+    {
+        h ^= (unsigned char)*b;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static int cg_base_cmp(const void *x, const void *y)
+{
+    const CG_BASE_ENTRY *a = (const CG_BASE_ENTRY *)x, *b = (const CG_BASE_ENTRY *)y;
+    if (a->h != b->h)
+        return a->h < b->h ? -1 : 1;
+    return a->file < b->file ? -1 : (a->file > b->file);
+}
+
+static int cg_cache_build(CODE_GRAPH *cg)
+{
+    CG_AUX *a = cg_aux(cg);
+    RELATION_TABLE *rt = cg->graph->relations;
+    uint32_t i, n = 0, cap = 0;
+    if (!a)
+        return 0;
+    if (a->cache_valid && a->cache_relations == rt->count)
+        return 1;
+    free(a->base);
+    a->base = NULL;
+    a->base_count = 0;
+    a->closure_valid = 0;
+    /* every symbol that is the subject of includes, defines_func or declares_func is a file */
+    for (i = 0; i < rt->count; i++)
+    {
+        const RELATION *r = &rt->items[i];
+        if (r->polarity != POLARITY_POSITIVE)
+            continue;
+        if (r->relation == cg->rel_includes || r->relation == cg->rel_defines_func ||
+            r->relation == cg->rel_declares_func)
+        {
+            const SYMBOL *s = SymbolGet(cg->graph->symbols, r->subject);
+            if (!s || !s->name)
+                continue;
+            if (n > 0 && a->base[n - 1].file == r->subject)
+                continue;
+            if (n == cap)
+            {
+                uint32_t nc = cap ? cap * 2 : 1024;
+                CG_BASE_ENTRY *nb = (CG_BASE_ENTRY *)realloc(a->base, (size_t)nc * sizeof(CG_BASE_ENTRY));
+                if (!nb)
+                    return 0;
+                a->base = nb;
+                cap = nc;
+            }
+            a->base[n].h = cg_name_hash(cg_basename(s->name));
+            a->base[n].file = r->subject;
+            n++;
+        }
+    }
+    qsort(a->base, n, sizeof(CG_BASE_ENTRY), cg_base_cmp);
+    {   /* unique */
+        uint32_t w = 0;
+        for (i = 0; i < n; i++)
+            if (w == 0 || a->base[w - 1].h != a->base[i].h || a->base[w - 1].file != a->base[i].file)
+                a->base[w++] = a->base[i];
+        n = w;
+    }
+    a->base_count = n;
+    a->cache_relations = rt->count;
+    a->cache_valid = 1;
+    if (!a->closure)
+        a->closure = (SYMBOL_ID *)malloc(CG_MAX_CLOSURE * sizeof(SYMBOL_ID));
+    return a->closure != NULL;
+}
+
+static int cg_closure_has(const CG_AUX *a, SYMBOL_ID f)
+{
+    for (uint32_t i = 0; i < a->closure_count; i++)
+        if (a->closure[i] == f)
+            return 1;
+    return 0;
+}
+
+/* Files whose declarations the call's file can see: itself plus everything reachable through #include,
+   matched by base name (an include name is not a path). Over-approximates when two directories hold the
+   same header name. */
+static void cg_closure_build(CODE_GRAPH *cg, SYMBOL_ID file)
+{
+    CG_AUX *a = cg_aux(cg);
+    uint32_t head = 0;
+    if (a->closure_valid && a->closure_file == file)
+        return;
+    a->closure_count = 0;
+    a->closure[a->closure_count++] = file;
+    while (head < a->closure_count)
+    {
+        RELATION *inc[CG_MAX_INCLUDES];
+        SYMBOL_ID cur = a->closure[head++];
+        uint32_t n = GraphQuerySubjectRelation(cg->graph, cur, cg->rel_includes, inc, CG_MAX_INCLUDES), k;
+        for (k = 0; k < n; k++)
+        {
+            const SYMBOL *hs = SymbolGet(cg->graph->symbols, inc[k]->object);
+            uint32_t h, lo, hi;
+            if (!hs || !hs->name)
+                continue;
+            h = cg_name_hash(cg_basename(hs->name));
+            lo = 0;
+            hi = a->base_count;
+            while (lo < hi)
+            {
+                uint32_t mid = (lo + hi) / 2;
+                if (a->base[mid].h < h)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+            for (; lo < a->base_count && a->base[lo].h == h; lo++)
+            {
+                const SYMBOL *fs = SymbolGet(cg->graph->symbols, a->base[lo].file);
+                if (!fs || !fs->name || strcmp(cg_basename(fs->name), cg_basename(hs->name)) != 0)
+                    continue;
+                if (!cg_closure_has(a, a->base[lo].file) && a->closure_count < CG_MAX_CLOSURE)
+                    a->closure[a->closure_count++] = a->base[lo].file;
+            }
+        }
+    }
+    a->closure_file = file;
+    a->closure_valid = 1;
+}
+
+const char *CodeGraphEdgeLabelName(CODE_EDGE_LABEL label)
+{
+    switch (label)
+    {
+    case CODE_EDGE_EXTRACTED: return "EXTRACTED";
+    case CODE_EDGE_INFERRED:  return "INFERRED";
+    case CODE_EDGE_AMBIGUOUS: return "AMBIGUOUS";
+    case CODE_EDGE_UNLINKED:  return "UNLINKED";
+    case CODE_EDGE_EXTERNAL:  return "EXTERNAL";
+    }
+    return "UNKNOWN";
+}
+
+static void cg_set_str(char *dst, size_t n, const char *src)
+{
+    if (!src)
+        src = "";
+    snprintf(dst, n, "%s", src);
+}
+
+void CodeGraphResolveSite(const CODE_GRAPH *cgc, const CODE_CALL_SITE *site, CODE_CALL_EVIDENCE *out)
+{
+    CODE_GRAPH *cg = (CODE_GRAPH *)cgc; /* the cache is internal; documented as not thread safe */
+    SYMBOL_ID cands[CG_MAX_CANDIDATES];
+    RELATION *infile[CG_MAX_CANDIDATES];
+    uint32_t nc = 0, i, k;
+    const SYMBOL *fs;
+    CG_AUX *a;
+    if (!out)
+        return;
+    memset(out, 0, sizeof(*out));
+    out->label = CODE_EDGE_EXTERNAL;
+    if (!cg || !cg->graph || !site)
+        return;
+    fs = SymbolGet(cg->graph->symbols, site->file);
+    cg_set_str(out->file, sizeof(out->file), fs ? fs->name : "");
+    out->line = site->line;
+    /* files that define the callee as a function */
+    {
+        uint32_t n = GraphQuerySubjectRelation(cg->graph, site->callee, cg->rel_in_file, infile, CG_MAX_CANDIDATES);
+        for (i = 0; i < n; i++)
+            if (GraphFindRelation(cg->graph, infile[i]->object, cg->rel_defines_func, site->callee))
+                cands[nc++] = infile[i]->object;
+    }
+    if (nc == 0)
+        return; /* EXTERNAL */
+    for (i = 0; i < nc; i++)
+        if (cands[i] == site->file)
+        {
+            out->label = CODE_EDGE_EXTRACTED;
+            cg_set_str(out->target_file, sizeof(out->target_file), fs ? fs->name : "");
+            return;
+        }
+    if (!cg_cache_build(cg))
+    {
+        out->label = CODE_EDGE_AMBIGUOUS;
+        return;
+    }
+    a = (CG_AUX *)cg->aux;
+    cg_closure_build(cg, site->file);
+    {
+        int declared = 0;
+        SYMBOL_ID decl_files[64];
+        uint32_t nd = 0;
+        SYMBOL_ID inclos[CG_MAX_CANDIDATES];
+        uint32_t ni = 0;
+        for (k = 0; k < a->closure_count; k++)
+        {
+            SYMBOL_ID h = a->closure[k];
+            if (GraphFindRelation(cg->graph, h, cg->rel_declares_func, site->callee) ||
+                GraphFindRelation(cg->graph, h, cg->rel_defines_func, site->callee))
+            {
+                declared = 1;
+                if (nd < 64)
+                    decl_files[nd++] = h;
+            }
+        }
+        if (!declared)
+        {
+            out->label = CODE_EDGE_UNLINKED;
+            return;
+        }
+        for (i = 0; i < nc; i++)
+            if (cg_closure_has(a, cands[i]))
+                inclos[ni++] = cands[i];
+        if (ni == 1)
+        {
+            const SYMBOL *ts = SymbolGet(cg->graph->symbols, inclos[0]);
+            out->label = CODE_EDGE_INFERRED;
+            cg_set_str(out->target_file, sizeof(out->target_file), ts ? ts->name : "");
+            return;
+        }
+        {   /* the candidate sharing a stem with a header that declares the name */
+            SYMBOL_ID pick = 0;
+            uint32_t hits = 0;
+            for (i = 0; i < nc; i++)
+            {
+                const SYMBOL *cs = SymbolGet(cg->graph->symbols, cands[i]);
+                int match = 0;
+                if (!cs || !cs->name)
+                    continue;
+                for (k = 0; k < nd && !match; k++)
+                {
+                    const SYMBOL *ds = SymbolGet(cg->graph->symbols, decl_files[k]);
+                    if (ds && ds->name && cg_stem_hash(ds->name) == cg_stem_hash(cs->name))
+                        match = 1;
+                }
+                if (match)
+                {
+                    pick = cands[i];
+                    hits++;
+                }
+            }
+            if (hits == 1)
+            {
+                const SYMBOL *ts = SymbolGet(cg->graph->symbols, pick);
+                out->label = CODE_EDGE_INFERRED;
+                cg_set_str(out->target_file, sizeof(out->target_file), ts ? ts->name : "");
+                return;
+            }
+        }
+        if (nc == 1)
+        {
+            const SYMBOL *ts = SymbolGet(cg->graph->symbols, cands[0]);
+            out->label = CODE_EDGE_INFERRED;
+            cg_set_str(out->target_file, sizeof(out->target_file), ts ? ts->name : "");
+            return;
+        }
+        out->label = CODE_EDGE_AMBIGUOUS;
+    }
+}
+
+/* ---- queries over sites ---- */
+
+uint32_t CodeGraphGetCallEvidence(const CODE_GRAPH *cg, const char *caller, const char *callee,
+                                  CODE_CALL_EVIDENCE *out, uint32_t max_results)
+{
+    CG_AUX *a;
+    SYMBOL_ID c, d;
+    uint32_t n = 0, i;
+    if (!cg || !cg->graph || !caller || !callee || !out || max_results == 0 || !cg->aux)
+        return 0;
+    a = (CG_AUX *)cg->aux;
+    if (a->bucket_count == 0)
+        return 0;
+    c = SymbolFind(cg->graph->symbols, caller);
+    d = SymbolFind(cg->graph->symbols, callee);
+    if (c == SYMBOL_INVALID || d == SYMBOL_INVALID)
+        return 0;
+    /* the chain is newest first; collect then reverse so results are in ingest order */
+    for (i = a->bucket[cg_pair_hash(c, d) & (a->bucket_count - 1)]; i != UINT32_MAX; i = a->next[i])
+        if (cg->sites[i].caller == c && cg->sites[i].callee == d)
+        {
+            if (n < max_results)
+                CodeGraphResolveSite(cg, &cg->sites[i], &out[n]);
+            n++;
+        }
+    if (n > max_results)
+        n = max_results;
+    for (i = 0; i < n / 2; i++)
+    {
+        CODE_CALL_EVIDENCE t = out[i];
+        out[i] = out[n - 1 - i];
+        out[n - 1 - i] = t;
+    }
+    return n;
+}
+
+bool CodeGraphGetEdgeLabel(const CODE_GRAPH *cg, const char *caller, const char *callee, CODE_EDGE_LABEL *label)
+{
+    CODE_CALL_EVIDENCE ev[32];
+    uint32_t n = CodeGraphGetCallEvidence(cg, caller, callee, ev, 32), i;
+    CODE_EDGE_LABEL best = CODE_EDGE_EXTERNAL;
+    if (n == 0)
+        return false;
+    for (i = 0; i < n; i++)
+        if (ev[i].label < best)
+            best = ev[i].label;
+    if (label)
+        *label = best;
+    return true;
+}
+
+static bool cg_resolved_edge(const CODE_GRAPH *cg, const char *caller, const char *callee)
+{
+    CODE_EDGE_LABEL l;
+    return CodeGraphGetEdgeLabel(cg, caller, callee, &l) &&
+           (l == CODE_EDGE_EXTRACTED || l == CODE_EDGE_INFERRED);
+}
+
+static uint32_t cg_resolved_list(const CODE_GRAPH *cg, const char *func_name, int callers,
+                                 char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    char (*raw)[MAX_CODE_NAME];
+    uint32_t n, i, count = 0;
+    if (!cg || !func_name || !results || max_results == 0)
+        return 0;
+    raw = (char (*)[MAX_CODE_NAME])malloc((size_t)64 * MAX_CODE_NAME);
+    if (!raw)
+        return 0;
+    n = callers ? CodeGraphGetCallers(cg, func_name, raw, 64) : CodeGraphGetCallees(cg, func_name, raw, 64);
+    for (i = 0; i < n && count < max_results; i++)
+    {
+        bool ok = callers ? cg_resolved_edge(cg, raw[i], func_name) : cg_resolved_edge(cg, func_name, raw[i]);
+        if (ok)
+        {
+            strncpy(results[count], raw[i], MAX_CODE_NAME - 1);
+            results[count][MAX_CODE_NAME - 1] = '\0';
+            count++;
+        }
+    }
+    free(raw);
+    return count;
+}
+
+uint32_t CodeGraphGetResolvedCallers(const CODE_GRAPH *cg, const char *func_name,
+                                     char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    return cg_resolved_list(cg, func_name, 1, results, max_results);
+}
+
+uint32_t CodeGraphGetResolvedCallees(const CODE_GRAPH *cg, const char *func_name,
+                                     char results[][MAX_CODE_NAME], uint32_t max_results)
+{
+    return cg_resolved_list(cg, func_name, 0, results, max_results);
+}
+
+uint32_t CodeGraphFindCallPath(const CODE_GRAPH *cg, const char *from, const char *to,
+                               uint32_t max_depth, char path[][MAX_CODE_NAME], uint32_t max_nodes)
+{
+    enum { MAXN = 2048 };
+    SYMBOL_ID *node, *parent;
+    uint32_t *depth;
+    uint32_t head = 0, tail = 0, i;
+    SYMBOL_ID f, t;
+    uint32_t found = UINT32_MAX;
+    if (!cg || !cg->graph || !from || !to || !path || max_nodes == 0)
+        return 0;
+    f = SymbolFind(cg->graph->symbols, from);
+    t = SymbolFind(cg->graph->symbols, to);
+    if (f == SYMBOL_INVALID || t == SYMBOL_INVALID)
+        return 0;
+    node = (SYMBOL_ID *)malloc(MAXN * sizeof(SYMBOL_ID));
+    parent = (SYMBOL_ID *)malloc(MAXN * sizeof(SYMBOL_ID));
+    depth = (uint32_t *)malloc(MAXN * sizeof(uint32_t));
+    if (!node || !parent || !depth)
+    {
+        free(node); free(parent); free(depth);
+        return 0;
+    }
+    node[tail] = f; parent[tail] = UINT32_MAX; depth[tail] = 0; tail++;
+    if (f == t)
+        found = 0;
+    while (found == UINT32_MAX && head < tail)
+    {
+        RELATION *rels[1024];
+        const SYMBOL *cs = SymbolGet(cg->graph->symbols, node[head]);
+        uint32_t n, k;
+        if (depth[head] >= max_depth || !cs || !cs->name)
+        {
+            head++;
+            continue;
+        }
+        n = GraphQuerySubjectRelation(cg->graph, node[head], cg->rel_calls, rels, 1024);
+        for (k = 0; k < n && found == UINT32_MAX; k++)
+        {
+            const SYMBOL *ds = SymbolGet(cg->graph->symbols, rels[k]->object);
+            uint32_t j;
+            int seen = 0;
+            if (!ds || !ds->name || !cg_resolved_edge(cg, cs->name, ds->name))
+                continue;
+            for (j = 0; j < tail; j++)
+                if (node[j] == rels[k]->object)
+                {
+                    seen = 1;
+                    break;
+                }
+            if (seen || tail >= MAXN)
+                continue;
+            node[tail] = rels[k]->object;
+            parent[tail] = head;
+            depth[tail] = depth[head] + 1;
+            if (rels[k]->object == t)
+                found = tail;
+            tail++;
+        }
+        head++;
+    }
+    {
+        uint32_t len = 0;
+        if (found != UINT32_MAX)
+        {
+            uint32_t cur;
+            for (cur = found; cur != UINT32_MAX; cur = parent[cur])
+                len++;
+            if (len <= max_nodes)
+            {
+                uint32_t w = len;
+                for (cur = found; cur != UINT32_MAX; cur = parent[cur])
+                {
+                    const SYMBOL *s = SymbolGet(cg->graph->symbols, node[cur]);
+                    w--;
+                    strncpy(path[w], s ? s->name : "", MAX_CODE_NAME - 1);
+                    path[w][MAX_CODE_NAME - 1] = '\0';
+                }
+            }
+            else
+                len = 0;
+        }
+        (void)i;
+        free(node); free(parent); free(depth);
+        return len;
+    }
+}
+
+int CodeGraphExplainEdge(const CODE_GRAPH *cg, const char *caller, const char *callee,
+                         char *buffer, size_t buffer_size)
+{
+    CODE_CALL_EVIDENCE ev[64];
+    uint32_t n, i;
+    size_t used = 0;
+    if (!cg || !caller || !callee || !buffer || buffer_size == 0)
+        return 0;
+    buffer[0] = '\0';
+    n = CodeGraphGetCallEvidence(cg, caller, callee, ev, 64);
+    if (n == 0)
+    {
+        snprintf(buffer, buffer_size, "%s -> %s: no call site recorded", caller, callee);
+        return 0;
+    }
+    used += (size_t)snprintf(buffer + used, buffer_size - used, "%s -> %s: %u call site(s)\n", caller, callee, n);
+    for (i = 0; i < n && used < buffer_size; i++)
+        used += (size_t)snprintf(buffer + used, buffer_size - used, "  %s:%u  %s%s%s\n", ev[i].file, ev[i].line,
+                                 CodeGraphEdgeLabelName(ev[i].label), ev[i].target_file[0] ? " -> " : "",
+                                 ev[i].target_file);
+    if (used >= buffer_size)
+        buffer[buffer_size - 1] = '\0';
+    return 1;
+}
