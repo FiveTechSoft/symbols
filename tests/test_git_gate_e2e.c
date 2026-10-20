@@ -11,6 +11,7 @@
 #define DELFILE "del third.txt"
 #define SLEEP30 "ping -n 30 127.0.0.1 >nul"
 #define DELFILE4 "del fourth.txt"
+#define DELFILE5 "del fifth.txt"
 #else
 #include <sys/stat.h>
 #define MKDIR(p) mkdir(p, 0755)
@@ -19,6 +20,7 @@
 #define DELFILE "rm third.txt"
 #define SLEEP30 "sleep 30"
 #define DELFILE4 "rm fourth.txt"
+#define DELFILE5 "rm fifth.txt"
 #endif
 /* M2: the workflow sequence end to end against a real bare remote, with the remote advancing
    after the first preflight and before the push (what apply-patch.yml does not guard in its
@@ -251,6 +253,46 @@ int main(void)
         CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-list --count main", count2, sizeof count2) && !strcmp(count1, count2), "R10: a second push is a no-op");
         rc = Gate("patch-state", ".git/change4.patch", "--dir", L, NULL, NULL, NULL, NULL);
         CHECKR(rc == 3 && strstr(gout, "already applied"), "R11: patch-state after the push still reports already applied, exit 3");
+    }
+
+    /* S1b: a second crash point. The kill lands between STAGE and COMMIT (S1 killed between
+       commit and push). One shell command applies, stages and sleeps; the shell timeout kills
+       its process tree before the commit in the same command runs.
+       Predictions, written before the first run:
+         K3 the command is killed by the timeout (timed_out)
+         K4 the staged tree holds the change, HEAD and the remote are unchanged (the commit
+           never ran)
+         R12 verify-staged passes (exit 0): the staged tree matches the manifest
+         R13 patch-state: already applied, exit 3
+         R14 after the retry commit, verify-head passes and the push finishes once
+         R15 a second push is a no-op
+         R16 patch-state after the push still reports already applied, exit 3
+       Mutant: the existing AGENT_GIT_PATCH_STATE_MUTANT (patch-state never recognises an
+       applied patch) fails R13 and R16, so it stays killed; no new mutant is needed. */
+    {
+        char before5[80] = "", count5a[32] = "", count5b[32] = "", c5[80] = "", tip5[80] = "", staged5[512] = "";
+        CHECK(Out(L, "git rev-parse HEAD", before5, sizeof before5) && Out(S "/b.git", "git rev-list --count main", count5a, sizeof count5a) &&
+              Put(L "/fifth.txt", "g\n") && Run(L, "git add -A -N && git diff --binary > .git/change5.patch && git reset -q && " DELFILE5, 0),
+              "killed run 2: patch made, tree clean");
+        CHECK(RunKilled(L, "git apply .git/change5.patch && git add -A && " SLEEP30 " && git commit -q -m change5 && git push origin HEAD:main", 8000),
+              "K3: the sequence is killed by the timeout between stage and commit");
+        CHECK(Out(L, "git rev-parse HEAD", c5, sizeof c5) && !strcmp(c5, before5) &&
+              Out(L, "git diff --cached --name-only", staged5, sizeof staged5) && strstr(staged5, "fifth.txt") &&
+              Out(S "/b.git", "git rev-parse main", tip5, sizeof tip5) && !strcmp(tip5, before5) &&
+              Out(S "/b.git", "git rev-list --count main", count5b, sizeof count5b) && !strcmp(count5b, count5a),
+              "K4: the change is staged, HEAD and the remote are unchanged (the commit never ran)");
+        CHECK(Gate("verify-staged", ".git/change5.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0, "R12: verify-staged passes after the kill");
+        rc = Gate("patch-state", ".git/change5.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        if (rc != 3) printf("    got exit %d out=%s err=%s\n", rc, gout, gerr);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R13: patch-state after the staged kill reports already applied, exit 3");
+        CHECK(Run(L, "git commit -q -m change5 " NOERR, 0) && Gate("verify-head", ".git/change5.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0 &&
+              Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-parse main", tip5, sizeof tip5) &&
+              Out(S "/b.git", "git rev-list --count main", count5b, sizeof count5b) && atoi(count5b) == atoi(count5a) + 1,
+              "R14: retry commit, verify-head passes, the push finishes once");
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-list --count main", count5b, sizeof count5b) &&
+              atoi(count5b) == atoi(count5a) + 1, "R15: a second push is a no-op");
+        rc = Gate("patch-state", ".git/change5.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R16: patch-state after the push still reports already applied, exit 3");
     }
 
     printf("\n%d/%d passed\n", pass_n, run_n);
