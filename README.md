@@ -66,15 +66,15 @@ tests, the solver, the bank or a server. `tools/metrics.py --write` is deprecate
 and refuses before measuring anything; measurement-only use remains separate.
 
 <!-- METRICS:BEGIN -->
-Evidence snapshot for subject commit `5d6ab34e4a23dac2d5e4acbc647873d17f8f8292`.
+Evidence snapshot for subject commit `f9b85de141ec89ded2fb028456da043019b92ec3`.
 
 Curated source claims, not new measurements. CI success is not semantic efficacy.
 
 | Metric | Evidence class | Value | Measurement context | Source |
 |---|---|---|---|---|
-| Final-SHA CI | Current technical | 5 of 5 jobs success (conclusions read from the run that landed this commit; the checked-out SHA inside each job log was not read). Per-test counts not read for this run. | 2026-10-18; GitHub Linux and Windows; apply-patch run 39116377153 (apply, linux, msvc, asan-msvc, ast-inspect-windows-ninja); `5d6ab34e4a23dac2d5e4acbc647873d17f8f8292` | [source](https://github.com/FiveTechSoft/symbols/actions/runs/39116377153) |
+| Final-SHA CI | Current technical | 5 of 5 jobs success (conclusions read from the run that landed this commit; the checked-out SHA inside each job log was not read). Per-test counts not read for this run. | 2026-10-20; GitHub Linux and Windows; apply-patch run 39393906972 (apply, linux, msvc, asan-msvc, ast-inspect-windows-ninja); `f9b85de141ec89ded2fb028456da043019b92ec3` | [source](https://github.com/FiveTechSoft/symbols/actions/runs/39393906972) |
 | Documentation assertion edit boundary | Historical developer | 9 refusal fixtures; mutant reopens exactly 6 unique plans. Two useful prior developer updates are deliberately lost, not efficacy gains. | 2026-10-15; Nine fixed developer fixtures; fault-only reopening mutant; `1ae65742e420e1c464452f6bc7429059b8529e37` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
-| Current solver, bank and corpus QA effectiveness | Unmeasured on subject SHA | Unmeasured | 2026-10-15; No fresh efficacy run authorized for this snapshot; `5d6ab34e4a23dac2d5e4acbc647873d17f8f8292` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
+| Current solver, bank and corpus QA effectiveness | Unmeasured on subject SHA | Unmeasured | 2026-10-15; No fresh efficacy run authorized for this snapshot; `f9b85de141ec89ded2fb028456da043019b92ec3` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
 <!-- METRICS:END -->
 
 ## 3. Architecture
