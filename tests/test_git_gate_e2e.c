@@ -12,6 +12,7 @@
 #define SLEEP30 "ping -n 30 127.0.0.1 >nul"
 #define DELFILE4 "del fourth.txt"
 #define DELFILE5 "del fifth.txt"
+#define DELFILE6 "del sixth.txt"
 #else
 #include <sys/stat.h>
 #define MKDIR(p) mkdir(p, 0755)
@@ -21,6 +22,7 @@
 #define SLEEP30 "sleep 30"
 #define DELFILE4 "rm fourth.txt"
 #define DELFILE5 "rm fifth.txt"
+#define DELFILE6 "rm sixth.txt"
 #endif
 /* M2: the workflow sequence end to end against a real bare remote, with the remote advancing
    after the first preflight and before the push (what apply-patch.yml does not guard in its
@@ -293,6 +295,52 @@ int main(void)
               atoi(count5b) == atoi(count5a) + 1, "R15: a second push is a no-op");
         rc = Gate("patch-state", ".git/change5.patch", "--dir", L, NULL, NULL, NULL, NULL);
         CHECKR(rc == 3 && strstr(gout, "already applied"), "R16: patch-state after the push still reports already applied, exit 3");
+    }
+
+    /* S1c: the third crash point. The kill lands between APPLY and STAGE (S1 killed between
+       commit and push, S1b between stage and commit). One shell command applies and sleeps;
+       the shell timeout kills its process tree before the stage in the same command runs.
+       Predictions, written before the first run:
+         K5 the command is killed by the timeout (timed_out)
+         K6 the working tree holds the change as an untracked file, the index is empty, HEAD
+           and the remote are unchanged (the stage never ran). The shell capture trims the
+           trailing newline, so the porcelain oracle compares without it
+         R17 patch-state: already applied, exit 3 (its check reads the working tree, so an
+           applied-but-unstaged patch is recognised)
+         R18 a naive second `git apply` of the patch is refused (git exit 1) and changes
+           nothing: HEAD, index and working tree unchanged
+         R19 after the retry stage and commit, verify-head passes and the push finishes once
+         R20 a second push is a no-op
+         R21 patch-state after the push still reports already applied, exit 3
+       Mutant: the existing AGENT_GIT_PATCH_STATE_MUTANT fails R17 and R21, so it stays
+       killed; no new mutant is needed. */
+    {
+        char before6[80] = "", count6a[32] = "", count6b[32] = "", c6[80] = "", tip6[80] = "", st6[512] = "", idx6[256] = "";
+        CHECK(Out(L, "git rev-parse HEAD", before6, sizeof before6) && Out(S "/b.git", "git rev-list --count main", count6a, sizeof count6a) &&
+              Put(L "/sixth.txt", "i\n") && Run(L, "git add -A -N && git diff --binary > .git/change6.patch && git reset -q && " DELFILE6, 0),
+              "killed run 3: patch made, tree clean");
+        CHECK(RunKilled(L, "git apply .git/change6.patch && " SLEEP30 " && git add -A && git commit -q -m change6 && git push origin HEAD:main", 8000),
+              "K5: the sequence is killed by the timeout between apply and stage");
+        CHECK(Out(L, "git rev-parse HEAD", c6, sizeof c6) && !strcmp(c6, before6) &&
+              Out(L, "git diff --cached --name-only", idx6, sizeof idx6) && idx6[0] == 0 &&
+              Out(L, "git status --porcelain", st6, sizeof st6) && !strcmp(st6, "?? sixth.txt") &&
+              Out(S "/b.git", "git rev-parse main", tip6, sizeof tip6) && !strcmp(tip6, before6) &&
+              Out(S "/b.git", "git rev-list --count main", count6b, sizeof count6b) && !strcmp(count6b, count6a),
+              "K6: the change is only in the working tree (untracked); index, HEAD and the remote are unchanged");
+        rc = Gate("patch-state", ".git/change6.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        if (rc != 3) printf("    got exit %d out=%s err=%s\n", rc, gout, gerr);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R17: patch-state after the applied-unstaged kill reports already applied, exit 3");
+        CHECK(Run(L, "git apply .git/change6.patch " NOERR, 1) && Out(L, "git rev-parse HEAD", c6, sizeof c6) && !strcmp(c6, before6) &&
+              Out(L, "git status --porcelain", st6, sizeof st6) && !strcmp(st6, "?? sixth.txt"),
+              "R18: a naive second git apply is refused and changes nothing");
+        CHECK(Run(L, "git add -A && git commit -q -m change6 " NOERR, 0) && Gate("verify-head", ".git/change6.patch", "--dir", L, NULL, NULL, NULL, NULL) == 0 &&
+              Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-parse main", tip6, sizeof tip6) &&
+              Out(S "/b.git", "git rev-list --count main", count6b, sizeof count6b) && atoi(count6b) == atoi(count6a) + 1,
+              "R19: retry stage and commit, verify-head passes, the push finishes once");
+        CHECK(Run(L, "git push origin HEAD:main " NOERR, 0) && Out(S "/b.git", "git rev-list --count main", count6b, sizeof count6b) &&
+              atoi(count6b) == atoi(count6a) + 1, "R20: a second push is a no-op");
+        rc = Gate("patch-state", ".git/change6.patch", "--dir", L, NULL, NULL, NULL, NULL);
+        CHECKR(rc == 3 && strstr(gout, "already applied"), "R21: patch-state after the push still reports already applied, exit 3");
     }
 
     printf("\n%d/%d passed\n", pass_n, run_n);
