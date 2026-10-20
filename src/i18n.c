@@ -161,8 +161,8 @@ static const char *const S_SOCIAL[3] = {
 static const char *const F_SOCIAL[3] = {
     "Bonjour.",
     "Note.",
-    "Je stocke des symboles et des relations. Apprends-les-moi avec "
-    "/learn S P O."
+    ("Je stocke des symboles et des relations. Apprends-les-moi avec "
+    "/learn S P O.")
 };
 
 static const char *const E_LEARNED[3] = {
