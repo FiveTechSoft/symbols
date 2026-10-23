@@ -14,6 +14,12 @@
     "tools/wording_rewrites.py"
    ]
   },
+  "test_bench_runner": {
+   "files": [
+    "tests/test_bench_runner.py",
+    "tools/bench_runner.py"
+   ]
+  },
   "test_build_graph": {
    "files": [
     "tests/test_build_graph.py",

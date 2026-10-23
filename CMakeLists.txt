@@ -801,6 +801,12 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(test_windows_six_gate PROPERTIES TIMEOUT 60)
 endif()
 if(Python3_Interpreter_FOUND)
+    add_test(NAME test_bench_runner
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bench_runner.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_bench_runner PROPERTIES TIMEOUT 120)
+endif()
+if(Python3_Interpreter_FOUND)
     add_test(NAME test_typed_c_schema
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_typed_c_schema.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
