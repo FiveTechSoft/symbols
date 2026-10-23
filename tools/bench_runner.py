@@ -300,6 +300,13 @@ def main(argv):
             cver = cache.get('CMAKE_C_COMPILER_VERSION', '')
             if toolchain is None and cid and cver:
                 toolchain = '%s %s' % (cid, cver)
+            if toolchain is None:
+                cc = cache.get('CMAKE_C_COMPILER', '')
+                if cc:
+                    probe = subprocess.run([cc, '--version'], capture_output=True,
+                                           text=True, timeout=30)
+                    if probe.returncode == 0 and probe.stdout.splitlines():
+                        toolchain = probe.stdout.splitlines()[0].strip()
             if build_type is None:
                 build_type = cache.get('CMAKE_BUILD_TYPE') or None
         if toolchain is None or not is_text(toolchain):

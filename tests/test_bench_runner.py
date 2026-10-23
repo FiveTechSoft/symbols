@@ -180,6 +180,38 @@ def main():
         expect_refuse(tmp, 'undeclared', 'undeclared')
         expect_refuse(tmp, 'few', 'few')
 
+        # Toolchain fallback: cache with only CMAKE_C_COMPILER and a stub cc
+        # that prints a version line must be recorded as the toolchain.
+        stub_dir = os.path.join(tmp, 'stubcc')
+        os.makedirs(stub_dir)
+        cc = os.path.join(stub_dir, 'cc')
+        with open(cc, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('#!/bin/sh\necho "stubcc 9.9.9 (fake)"\n')
+        os.chmod(cc, 0o755)
+        cache_build = os.path.join(tmp, 'cachebuild')
+        os.makedirs(cache_build)
+        with open(os.path.join(cache_build, 'CMakeCache.txt'), 'w',
+                  encoding='utf-8') as f:
+            f.write('CMAKE_C_COMPILER:FILEPATH=%s\n' % cc)
+            f.write('CMAKE_BUILD_TYPE:STRING=Release\n')
+        if platform.system() == 'Windows':
+            check('toolchain fallback (posix stub)', True, 'skipped on Windows')
+        else:
+            out = os.path.join(tmp, 'fallback.json')
+            p = subprocess.run([sys.executable, RUNNER, '--exe', sys.executable,
+                                '--exe-arg', fixture, '--exe-arg', 'ok',
+                                '--build-dir', cache_build, '--fixture-id', 'synthetic',
+                                '--corpus-version', 'seed:42', '--min-samples', '30',
+                                '--phase', 'work', '--out', out,
+                                '--subject-sha', 'c' * 40],
+                               capture_output=True, text=True, timeout=120)
+            check('toolchain fallback rc', p.returncode == 0, p.stderr.strip()[:120])
+            if p.returncode == 0:
+                rec = json.load(open(out, encoding='utf-8'))
+                check('toolchain fallback value',
+                      rec['environment']['toolchain'] == 'stubcc 9.9.9 (fake)',
+                      rec['environment']['toolchain'])
+
         # Missing environment: no CMakeCache and no overrides must refuse.
         empty_build = os.path.join(tmp, 'emptybuild')
         os.makedirs(empty_build)

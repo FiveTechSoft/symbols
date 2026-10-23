@@ -20,6 +20,13 @@
     "tools/bench_runner.py"
    ]
   },
+  "test_bench_1m_contract": {
+   "files": [
+    "tests/test_bench_1m_contract.py",
+    "tools/bench_runner.py",
+    "tests/bench_1m_relations.c"
+   ]
+  },
   "test_build_graph": {
    "files": [
     "tests/test_build_graph.py",

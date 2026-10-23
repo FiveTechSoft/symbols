@@ -1,7 +1,13 @@
+/* bench_1m_relations.c - 1M relations hash benchmark (M3 C5 contract).
+   Emits per-block SAMPLE lines for tools/bench_runner.py:
+     SAMPLE insert <ns>   (one per block of inserts)
+     SAMPLE query  <ns>   (one per block of queries)
+   then BENCH_DONE and exit 0. Human lines are informational only.
+   Memory high-water is measured externally by the runner; this program
+   prints no memory figure. Usage: bench_1m [num_relations] [num_queries]. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -25,24 +31,36 @@ static double GetTimeSeconds(void)
 #include "symbol.h"
 #include "relation.h"
 
-#define NUM_RELATIONS 1000000
-#define NUM_QUERIES   100000
-#define BENCH_SEED    42
+#define DEFAULT_RELATIONS 1000000u
+#define DEFAULT_QUERIES   100000u
+#define BENCH_SEED_INSERT 42u
+#define BENCH_SEED_QUERY  99999u
+#define NUM_BLOCKS        100u
 
-int main(void)
+static long long SecondsToNs(double seconds)
 {
-    printf("=========================================================\n");
-    printf("  SYMBOLIC LLM - BENCHMARK 1M RELATIONS (HASH O(1))      \n");
-    printf("=========================================================\n\n");
+    return (long long)(seconds * 1e9);
+}
 
-    double t0, t1;
+int main(int argc, char **argv)
+{
+    uint32_t num_relations = (argc > 1) ? (uint32_t)strtoul(argv[1], NULL, 10) : DEFAULT_RELATIONS;
+    uint32_t num_queries   = (argc > 2) ? (uint32_t)strtoul(argv[2], NULL, 10) : DEFAULT_QUERIES;
+    uint32_t insert_block  = num_relations / NUM_BLOCKS;
+    uint32_t query_block   = num_queries / NUM_BLOCKS;
 
-    /* --------------------------------------------------------
-       1. Crear tabla de simbolos y poblarla
-       -------------------------------------------------------- */
-    printf("1. Creando tabla de simbolos...\n");
-    t0 = GetTimeSeconds();
+    if (num_relations < NUM_BLOCKS || num_queries < NUM_BLOCKS)
+    {
+        fprintf(stderr, "sizes below %u blocks are not measurable\n", NUM_BLOCKS);
+        return EXIT_FAILURE;
+    }
 
+    setvbuf(stdout, NULL, _IONBF, 0);
+    printf("=== bench_1m_relations ===\n");
+    printf("config: relations=%u queries=%u seed_insert=%u seed_query=%u blocks=%u\n",
+           num_relations, num_queries, BENCH_SEED_INSERT, BENCH_SEED_QUERY, NUM_BLOCKS);
+
+    /* 1. Symbol table setup (not part of the measured phases). */
     SYMBOL_TABLE *symbols = SymbolTableCreate(4096);
     for (uint32_t i = 0; i < 10000; i++)
     {
@@ -50,139 +68,86 @@ int main(void)
         snprintf(name, sizeof(name), "SYM_%05u", i);
         SymbolAdd(symbols, name);
     }
+    printf("symbols: %u\n", SymbolCount(symbols));
 
-    t1 = GetTimeSeconds();
-    printf("   Simbolos: %u (en %.4f s)\n\n", SymbolCount(symbols), t1 - t0);
-
-    /* --------------------------------------------------------
-       2. Insertar 1M relaciones
-       -------------------------------------------------------- */
-    printf("2. Insertando %u relaciones unicas...\n", NUM_RELATIONS);
-    t0 = GetTimeSeconds();
-
-    RELATION_TABLE *relations = RelationTableCreate(NUM_RELATIONS + 1000);
+    RELATION_TABLE *relations = RelationTableCreate(num_relations + 1000);
     if (relations == NULL)
     {
-        fprintf(stderr, "Error: no se pudo crear la tabla de relaciones.\n");
+        fprintf(stderr, "could not create relation table\n");
         return EXIT_FAILURE;
     }
 
-    srand(BENCH_SEED);
-    uint32_t inserted = 0;
-    uint32_t duplicates = 0;
-
-    for (uint32_t i = 0; i < NUM_RELATIONS; i++)
+    /* 2. Insert phase: one SAMPLE per block. */
+    srand(BENCH_SEED_INSERT);
+    double t0 = GetTimeSeconds();
+    for (uint32_t i = 0; i < num_relations; i++)
     {
         SYMBOL_ID s = (rand() % 10000) + 1;
         SYMBOL_ID p = (rand() % 100) + 1;
         SYMBOL_ID o = (rand() % 10000) + 1;
-
-        int ok = RelationAdd(relations, s, p, o);
-        if (ok)
+        (void)RelationAdd(relations, s, p, o);
+        if ((i + 1) % insert_block == 0)
         {
-            inserted++;
-            /* RelationAdd returns 1 for both new and existing (incremented) */
+            double t1 = GetTimeSeconds();
+            printf("SAMPLE insert %lld\n", SecondsToNs(t1 - t0));
+            t0 = t1;
         }
     }
 
-    t1 = GetTimeSeconds();
-    double insert_time = t1 - t0;
+    /* Counts are honest: attempts vs unique edges actually in the table. */
+    uint32_t unique_count = RelationCount(relations);
+    printf("insert: attempts=%u unique=%u duplicates=%u\n",
+           num_relations, unique_count, num_relations - unique_count);
 
-    printf("   Relaciones en tabla: %u\n", RelationCount(relations));
-    printf("   Tiempo de insercion: %.4f s\n", insert_time);
-    printf("   Tasa de insercion: %.0f rel/seg\n\n",
-           RelationCount(relations) / insert_time);
-
-    /* --------------------------------------------------------
-       3. Benchmark de busqueda O(1)
-       -------------------------------------------------------- */
-    printf("3. Ejecutando %u consultas aleatorias...\n", NUM_QUERIES);
-    t0 = GetTimeSeconds();
-
-    srand(99999);
+    /* 3. Query phase: one SAMPLE per block. */
+    srand(BENCH_SEED_QUERY);
     uint32_t found_count = 0;
-
-    for (uint32_t i = 0; i < NUM_QUERIES; i++)
+    t0 = GetTimeSeconds();
+    for (uint32_t i = 0; i < num_queries; i++)
     {
         SYMBOL_ID s = (rand() % 10000) + 1;
         SYMBOL_ID p = (rand() % 100) + 1;
         SYMBOL_ID o = (rand() % 10000) + 1;
-
         RELATION *r = RelationFind(relations, s, p, o);
         if (r != NULL)
             found_count++;
+        if ((i + 1) % query_block == 0)
+        {
+            double t1 = GetTimeSeconds();
+            printf("SAMPLE query %lld\n", SecondsToNs(t1 - t0));
+            t0 = t1;
+        }
     }
+    printf("query: found=%u of %u\n", found_count, num_queries);
 
-    t1 = GetTimeSeconds();
-    double query_time = t1 - t0;
-
-    printf("   Encontradas: %u / %u\n", found_count, NUM_QUERIES);
-    printf("   Tiempo de busqueda: %.4f s\n", query_time);
-    printf("   Latencia media: %.3f us/query\n\n",
-           query_time * 1e6 / NUM_QUERIES);
-
-    /* --------------------------------------------------------
-       4. Medicion de memoria
-       -------------------------------------------------------- */
-    printf("4. Uso de memoria:\n");
-    size_t sym_mem = (size_t)symbols->capacity * sizeof(SYMBOL) +
-                     (size_t)symbols->capacity * sizeof(uint32_t);
-    size_t rel_mem = (size_t)relations->capacity * sizeof(RELATION) +
-                     (size_t)relations->capacity * sizeof(uint32_t);
-    size_t str_mem = 0;
-    for (uint32_t i = 0; i < symbols->count; i++)
-    {
-        if (symbols->items[i].name)
-            str_mem += strlen(symbols->items[i].name) + 1;
-    }
-
-    printf("   Simbolos: %.2f MB (items + buckets + strings)\n",
-           (double)(sym_mem + str_mem) / (1024.0 * 1024.0));
-    printf("   Relaciones: %.2f MB (items + buckets)\n",
-           (double)rel_mem / (1024.0 * 1024.0));
-    printf("   Total estimado: %.2f MB\n\n",
-           (double)(sym_mem + str_mem + rel_mem) / (1024.0 * 1024.0));
-
-    /* --------------------------------------------------------
-       5. Verificar integridad
-       -------------------------------------------------------- */
-    printf("5. Verificando integridad...\n");
-    srand(BENCH_SEED);
+    /* 4. Integrity check on a fixed sample. */
+    srand(BENCH_SEED_INSERT);
     int errors = 0;
-
     for (uint32_t i = 0; i < 1000; i++)
     {
         SYMBOL_ID s = (rand() % 10000) + 1;
         SYMBOL_ID p = (rand() % 100) + 1;
         SYMBOL_ID o = (rand() % 10000) + 1;
-
         RELATION *r = RelationFind(relations, s, p, o);
-        if (r != NULL)
-        {
-            if (r->subject != s || r->relation != p || r->object != o)
-            {
-                printf("   ERROR: tripleta corrupta en indice %u\n", i);
-                errors++;
-            }
-        }
+        if (r != NULL && (r->subject != s || r->relation != p || r->object != o))
+            errors++;
+    }
+    printf("verify: samples=1000 errors=%d\n", errors);
+    if (errors != 0)
+    {
+        RelationTableDestroy(relations);
+        SymbolTableDestroy(symbols);
+        return EXIT_FAILURE;
     }
 
-    printf("   Muestras verificadas: 1000 | Errores: %d\n\n", errors);
+    /* 5. Summary while the tables are still alive (the previous harness
+       printed RelationCount after RelationTableDestroy: use-after-free). */
+    printf("summary: unique=%u attempts=%u found=%u\n",
+           unique_count, num_relations, found_count);
 
-    /* Limpieza */
     RelationTableDestroy(relations);
     SymbolTableDestroy(symbols);
 
-    printf("=========================================================\n");
-    printf("Resumen Benchmark 1M:\n");
-    printf("  Relaciones      : %u\n", RelationCount(relations));
-    printf("  Insercion       : %.2f ms (%.0f rel/seg)\n",
-           insert_time * 1000.0, RelationCount(relations) / insert_time);
-    printf("  Busquedas O(1)  : %.3f us/query\n",
-           query_time * 1e6 / NUM_QUERIES);
-    printf("  Memoria total   : %.2f MB\n",
-           (double)(sym_mem + str_mem + rel_mem) / (1024.0 * 1024.0));
-    printf("=========================================================\n");
-
+    printf("BENCH_DONE\n");
     return EXIT_SUCCESS;
 }

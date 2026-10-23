@@ -805,6 +805,10 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bench_runner.py
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(test_bench_runner PROPERTIES TIMEOUT 120)
+    add_test(NAME test_bench_1m_contract
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_bench_1m_contract.py ${CMAKE_BINARY_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(test_bench_1m_contract PROPERTIES TIMEOUT 300)
 endif()
 if(Python3_Interpreter_FOUND)
     add_test(NAME test_typed_c_schema
