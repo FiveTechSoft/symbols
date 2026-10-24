@@ -19,7 +19,7 @@ static int numeric(const char*s,long*v){if(!s||!*s||*s=='+')return 0;const char*
 static int assertion_scope(const char *line,const char *uses) {
  if(!uses||uses==line)return 0;
  size_t subject=(size_t)(uses-line);
- if(subject<4||memcmp(line+subject-3,"ing",3))return 0;
+ if(subject<4||subject>=128||memcmp(line+subject-3,"ing",3))return 0;
  for(size_t i=0;i<subject;i++)if(!((line[i]>='A'&&line[i]<='Z')||(line[i]>='a'&&line[i]<='z')))return 0;
  for(const char *p=line;*p;p++)if(strchr("\"'`;|&()[]{}<>:\\",*p))return 0;
  /* Every coordinate clause must be complete, not just the selected one. */
@@ -36,6 +36,22 @@ static int assertion_scope(const char *line,const char *uses) {
  }
  return 1;
 }
+/* Only a controlled unconditional denial of the same activity/command/shell
+   tuple can conflict. Citation and conditional syntax are never promoted. */
+static int source_denial(const unsigned char *bytes,size_t size,const char *subject,
+                         const char *command,const char *shell,size_t *a,size_t *b) {
+ size_t off=0;char expected[640];
+ int n=snprintf(expected,sizeof(expected),"%s never uses %s in %s.",subject,command,shell);
+ if(n<0||(size_t)n>=sizeof(expected))return 0;
+ while(off<size){size_t end=off;while(end<size&&bytes[end]!='\n')end++;size_t last=end;
+  if(last>off&&bytes[last-1]=='\r')last--;
+  if(last-off==(size_t)n&&!memcmp(bytes+off,expected,(size_t)n)){
+   *a=off;*b=last;return 1;
+  }
+  off=end<size?end+1:end;
+ }
+ return 0;
+}
 static int join_envelope(const char*q,const char*corpus,const char*fact,char*out,size_t cap){
  if(!q||strncmp(q,"duration-fact ",14))return 0;
  if(!out||!cap)return 1;out[0]=0;
@@ -48,18 +64,27 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  size_t fn,cn;unsigned char*fb=readall(fact,&fn);char fh[65],ch[65];if(!fb){snprintf(out,cap,"MISSING_FACT: no reviewed parameter evidence loaded.");return 1;}digest(fb,fn,fh);free(fb);
  if(strcmp(fh,WINDOWS_TIMEOUT_FACT_SHA)){snprintf(out,cap,"UNVERIFIED_FACT: sidecar differs from the reviewed byte identity.");return 1;}
  unsigned char*cb=readall(corpus,&cn);if(!cb){snprintf(out,cap,"UNSUPPORTED_SOURCE: corpus bytes unavailable or unsupported.");return 1;}digest(cb,cn,ch);
- unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;size_t offset=0;
+ unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;size_t offset=0;int conflict=0;size_t pos_a=0,pos_b=0,neg_a=0,neg_b=0;
  while(offset<cn){size_t end=offset;while(end<cn&&cb[end]!='\n')end++;size_t line_end=end;while(line_end>offset&&cb[line_end-1]=='\r')line_end--;char*line=malloc(line_end-offset+1);if(!line){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: allocation failure.");return 1;}memcpy(line,cb+offset,line_end-offset);line[line_end-offset]=0;char*uses=strstr(line," uses ");
   if(assertion_scope(line,uses)){char*cursor=uses+6;while(*cursor){char*sep=strstr(cursor,", ");if(!sep)sep=strstr(cursor," and ");char*last=sep?sep:line+strlen(line);size_t len=(size_t)(last-cursor);char segment[512];if(len<sizeof(segment)){memcpy(segment,cursor,len);segment[len]=0;if(!strncmp(segment,"and ",4))memmove(segment,segment+4,strlen(segment+4)+1);char*in=strstr(segment," in ");if(in){*in=0;char*sh=in+4;size_t sl=strlen(sh);if(sl&&sh[sl-1]=='.')sh[--sl]=0;
     if(!strcmp(sh,shell)){int nb=0;
      if(WindowsTimeoutFactMatches(segment,requested,qualifier,&nb)){
       size_t command_len=strlen(segment);char*original=cursor;if(!strncmp(original,"and ",4))original+=4;count++;chosen_a=offset+(size_t)(original-line);chosen_b=chosen_a+command_len;snprintf(chosen,sizeof(chosen),"%s",segment);chosen_nobreak=nb;
+      char subject[128];size_t subject_len=(size_t)(uses-line);
+      if(subject_len<sizeof(subject)){
+       memcpy(subject,line,subject_len);subject[subject_len]=0;
+       size_t da=0,db=0;
+       if(source_denial(cb,cn,subject,segment,shell,&da,&db)){
+        conflict=1;pos_a=offset;pos_b=line_end;neg_a=da;neg_b=db;
+       }
+      }
      }
     }
    }}if(!sep)break;cursor=sep+(!strncmp(sep,", ",2)?2:5);}}
   free(line);offset=end<cn?end+1:end;
  }
- if(count==0)snprintf(out,cap,"NO_SUPPORT: no unambiguous source clause and reviewed parameter fact support this numeric request and qualifier. No duration, sentinel or unit conversion is inferred.");
+ if(conflict){int w=snprintf(out,cap,"SOURCE_CONFLICT: controlled positive and negative corpus assertions disagree on the same activity, command and shell. No command selected.\nCorpus: %s sha256=%s\nPositive assertion bytes[%zu,%zu)\nNegative assertion bytes[%zu,%zu)\nThis describes corpus assertions only; Microsoft parameter documentation is not invalidated and no general semantic conflict detection is claimed.",corpus,ch,pos_a,pos_b,neg_a,neg_b);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
+ else if(count==0)snprintf(out,cap,"NO_SUPPORT: no unambiguous source clause and reviewed parameter fact support this numeric request and qualifier. No duration, sentinel or unit conversion is inferred.");
  else if(count>1)snprintf(out,cap,"AMBIGUOUS: %u source clauses match; no command selected.",count);
  else if(chosen_b>cn||memcmp(cb+chosen_a,chosen,chosen_b-chosen_a))snprintf(out,cap,"UNSUPPORTED_SOURCE: evidence range mismatch.");
  else {int w=snprintf(out,cap,"DOCUMENTATION-SUPPORTED, not Windows execution\nCommand from corpus: %s\nInterpreted request: platform=%s shell=%s value=%ld unit=%s qualifier=%s\nRule: same shell + command timeout + parameter /t + integer value + seconds\nKeyboard: %s. No exact wall-clock guarantee.\nCorpus: %s sha256=%s bytes[%zu,%zu)\nParameter fact: microsoft.cmd.timeout.t.seconds sha256=%s\nSource: %s\nFact excerpt: /t specifies seconds, range -1..99999; -1 is indefinite until keystroke. /nobreak ignores key strokes.\nNatural-language morphology and number words are NOT interpreted by this diagnostic.",chosen,platform,shell,requested,unit,qualifier,chosen_nobreak?"key strokes ignored":"a key stroke may resume early",corpus,ch,chosen_a,chosen_b,fh,WINDOWS_TIMEOUT_SOURCE_URL);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}

@@ -10,7 +10,7 @@ cmake --build build-duration --config Release --target symbols-duration-research
 ctest --test-dir build-duration -C Release -R "^duration_.*research_directed$" --output-on-failure
 ```
 
-These three tests are directed development checks, not independent holdout tests.
+These four tests are directed development checks, not independent holdout tests.
 They are registered only when the research flag is ON. No workflow or guard
 changes are needed. A fresh default configuration has neither these targets
 nor these tests. MSVC execution has not yet been verified.
@@ -36,3 +36,13 @@ unit conversion or synthesized commands. Complete token consumption still
 refuses negation, extra actions and unsupported conditions. Hyphenated number
 words and arbitrary paraphrases remain unsupported. The request-frame matrix
 is directed development testing, not an independent language holdout.
+
+Controlled corpus conflict handling recognizes the exact unconditional denial
+`LABEL never uses COMMAND in SHELL.` for the same activity label, exact command
+and shell as a supported positive clause. Matching assertions report
+`SOURCE_CONFLICT` with both full assertion byte ranges, regardless of order.
+This describes conflicting corpus assertions, not invalid vendor documentation
+or general contradiction detection. Other subjects, shells, quantities,
+quoted text and conditional clauses are not treated as matching denials.
+Activity labels are ASCII and shorter than 128 bytes. This narrow syntax does
+not infer an unstated denial or promote conditional text into a fact.
