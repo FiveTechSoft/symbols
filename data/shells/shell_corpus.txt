@@ -1,0 +1,198 @@
+# Shell Knowledge Corpus (Bash, CMD, PowerShell, macOS/Darwin shells)
+# Original content authored for the Symbols project. Structured conceptual, normative, and practical guide.
+
+# Section 1: Shell Fundamentals and Execution Models
+A shell is a command interpreter that reads commands, expands them, and asks the operating system to run programs.
+An interactive shell reads commands from a terminal while a non-interactive shell reads commands from a script file.
+The POSIX standard specifies portable shell behavior and Bash, zsh, dash, and ksh implement it with extensions.
+A shell script is a text file whose commands the shell executes sequentially from top to bottom.
+The shebang line on the first line of a script names the interpreter, for example #!/usr/bin/env bash.
+A login shell reads profile files at session start while a non-login interactive shell reads rc files instead.
+The shell is a process, and every command it launches becomes a child process with its own process identifier.
+Environment variables form a key-value map that a process passes to the children it spawns.
+The PATH variable lists directories the shell searches in order when resolving a bare command name.
+The current working directory is process state, and changing it with cd affects subsequent relative paths.
+Exit status zero means success and any non-zero exit status means failure across all shells covered here.
+
+# Section 2: Bash Variables, Quoting, and Expansions
+Bash variables are assigned with name=value and must not contain spaces around the equals sign.
+Reading a variable requires the dollar prefix, so $HOME expands to the home directory path.
+The export builtin marks a variable so that child processes inherit it in their environment.
+Single quotes preserve every character literally and prevent all expansion inside them.
+Double quotes allow variable expansion and command substitution but protect spaces and glob characters.
+Brace expansion like file{1..3}.txt expands to file1.txt file2.txt file3.txt before the command runs.
+Tilde expansion replaces ~ with the current user's home directory at the start of a word.
+Command substitution $(command) captures the standard output of command and is preferred over legacy backticks.
+Arithmetic expansion $((expression)) evaluates integer arithmetic without launching external tools.
+The special parameter $? holds the exit status of the most recently finished foreground pipeline.
+The special parameter $$ holds the process identifier of the running shell itself.
+The special parameters $@ and $* expand to positional arguments, and quoted $@ preserves each argument separately.
+Parameter expansion ${var:-default} yields a default when var is unset or empty.
+Parameter expansion ${#var} yields the length of the variable's value in characters.
+Word splitting divides unquoted expansion results on spaces, tabs, and newlines, which is why quoting matters.
+Pathname expansion, also called globbing, turns patterns like *.log into matching filenames after word splitting.
+
+# Section 3: Bash Redirection, Pipes, and Control Flow
+The operator > redirects standard output to a file and truncates the file first.
+The operator >> appends standard output to a file without truncating existing content.
+The operator 2> redirects standard error, and 2>&1 merges standard error into standard output.
+The operator &> redirects both standard output and standard error to the same file in Bash.
+A pipe | connects the standard output of the left command to the standard input of the right command.
+The exit status of a pipeline is the exit status of its last command unless pipefail is set.
+The command set -euo pipefail makes a script exit on error, fail on unset variables, and catch mid-pipe failures.
+The && operator runs the next command only when the previous one succeeded.
+The || operator runs the next command only when the previous one failed.
+Single bracket tests [ -f file ] follow POSIX test semantics and require careful quoting.
+Double bracket tests [[ $x == pattern* ]] support pattern matching and avoid word splitting surprises.
+String equality in single bracket tests uses = while numeric comparison uses -eq, -ne, -lt, -le, -gt, and -ge.
+The test flags -f, -d, -e, -r, -w, and -x check regular file, directory, existence, and permissions.
+A for loop iterates over words, as in for f in *.txt; do echo "$f"; done.
+A while loop repeats while its condition succeeds, commonly while read -r line for line-by-line reading.
+The read builtin with -r prevents backslash mangling and IFS= preserves leading whitespace.
+A case statement matches a value against glob patterns and replaces chains of elif branches.
+Functions are declared with name() { commands; } and receive arguments as positional parameters.
+The local keyword confines a variable to the function that declares it.
+Command grouping with ( commands ) runs in a subshell so cd and variable changes do not persist.
+Command grouping with { commands; } runs in the current shell so changes persist after the group.
+
+# Section 4: Bash Everyday Toolbox
+grep prints lines matching a pattern, and grep -r searches directories recursively.
+grep -i ignores case, grep -v inverts the match, and grep -c counts matching lines.
+find locates files by predicates, as in find . -name '*.log' -mtime +7 for old log files.
+Combining find with -exec runs a command per match, and -print0 with xargs -0 survives spaces in names.
+xargs builds command lines from standard input, and xargs -I{} places each item explicitly.
+sed edits streams, and sed 's/old/new/g' replaces every occurrence on each line.
+GNU sed edits files in place with sed -i while BSD sed requires a backup suffix argument.
+awk processes columns, and awk '{print $1}' prints the first whitespace-separated field.
+sort orders lines, sort -n compares numerically, and sort -u removes duplicates after sorting.
+uniq removes adjacent duplicate lines, which is why pipelines usually sort before uniq.
+head and tail print file ends, and tail -f follows a growing log file live.
+cut -d: -f1 extracts colon-delimited fields such as usernames from /etc/passwd.
+tr translates or deletes characters, and tr -d '\r' strips carriage returns from Windows files.
+ps aux lists running processes on Linux and pgrep matches processes by name.
+kill sends SIGTERM by default, and kill -9 sends SIGKILL which a process cannot catch or ignore.
+chmod changes permission bits, and chmod +x makes a script executable.
+chown changes file ownership and usually requires administrator rights.
+ssh runs commands on remote machines and scp copies files over the same encrypted channel.
+curl transfers data from URLs, and curl -fsSL fails silently on errors while following redirects.
+tar archives directories, and tar -czf creates a gzip-compressed archive while tar -xzf extracts one.
+df -h shows free disk space in human-readable units and du -sh summarizes directory sizes.
+man opens the reference manual for a command and is the primary local documentation source.
+
+# Section 5: CMD Essentials on Windows
+CMD is the traditional Windows command interpreter launched as cmd.exe.
+CMD variables are assigned with set VAR=value and read by surrounding the name with percent signs as %VAR%.
+Spaces around the equals sign in a set command become part of the variable name or value.
+setx writes a variable persistently to the user or machine registry but does not affect the current session.
+The echo command prints text, and echo off with the at prefix disables command echoing in batch files.
+dir lists directory contents, and dir /b prints bare names suitable for scripting.
+cd changes directory, and cd /d also changes the current drive letter.
+copy, move, del, ren, md, and rd handle file and directory operations in CMD.
+The %ERRORLEVEL% variable holds the exit code of the previous command.
+The idiom if %errorlevel% neq 0 branches on failure inside batch files.
+The operators > and >> redirect output, and 2>&1 merges error output just like in Bash.
+CMD pipes pass text between commands, not structured objects.
+findstr searches text with regular expressions and is the CMD counterpart of grep.
+The where command locates executables on PATH and is the CMD counterpart of which.
+CMD does not expand wildcard patterns itself; each command performs its own wildcard matching.
+A for /f loop parses command output or file lines, as in for /f %i in ('dir /b') do echo %i.
+Batch files use double percent signs like %%i for loop variables while the interactive prompt uses single %i.
+Delayed expansion with setlocal enabledelayedexpansion and !var! reads values updated inside loop bodies.
+The call command runs another batch file and returns control to the caller when it finishes.
+tasklist shows running processes and taskkill /pid n or taskkill /im name.exe terminates them.
+sc query and sc stop manage Windows services from the command line.
+The choice, pause, and timeout commands interact with or wait for the user in batch scripts.
+
+# Section 6: PowerShell Fundamentals
+PowerShell is a task automation shell built on .NET whose pipelines carry objects instead of text.
+Windows PowerShell 5.1 ships with Windows as powershell.exe while PowerShell 7 installs as pwsh and runs cross-platform.
+Cmdlets follow a Verb-Noun naming convention such as Get-Process, Set-Location, and Remove-Item.
+Parameters use a leading dash with full names, and tab completion expands both cmdlet and parameter names.
+Get-Help displays cmdlet documentation and Get-Help name -Examples shows usage examples.
+Get-Member reveals the type, properties, and methods of objects flowing through a pipeline.
+PowerShell variables start with a dollar sign like $name and can hold any .NET object.
+Comparison operators are word-like: -eq, -ne, -gt, -lt, -like for wildcards, and -match for regular expressions.
+PowerShell comparisons are case-insensitive by default, and the c-prefixed variants like -ceq force case sensitivity.
+Aliases map familiar names to cmdlets, so dir and ls resolve to Get-ChildItem and cat resolves to Get-Content.
+The echo alias resolves to Write-Output and cd resolves to Set-Location.
+Familiar aliases exist for interactive compatibility, but scripts should use full cmdlet names for clarity.
+The automatic variable $_ or $PSItem references the current object inside pipeline script blocks.
+$LASTEXITCODE holds the exit code of the last native program, while $? reports success of the last operation.
+$Error is an array of recent error records and $ErrorActionPreference controls non-terminating error behavior.
+An execution policy gates script running, and Get-ExecutionPolicy plus Set-ExecutionPolicy RemoteSigned is the common setup.
+Execution policy is a safety preference, not a security boundary, and can be bypassed per invocation.
+PowerShell profiles are scripts run at startup, located under the path stored in the $PROFILE variable.
+
+# Section 7: PowerShell Pipelines and Data Handling
+Because pipelines carry objects, filtering happens by property instead of by parsing text.
+Where-Object filters objects, as in Get-Process | Where-Object { $_.CPU -gt 100 }.
+Select-Object picks properties or limits rows, and Select-Object -First 5 takes the first five objects.
+Sort-Object orders by property, and Sort-Object WorkingSet64 -Descending sorts processes by memory.
+ForEach-Object runs a script block per object and replaces many shell loops.
+Measure-Object counts, averages, or sums, and Get-Content file | Measure-Object -Line counts lines.
+Group-Object buckets objects by property value and exposes counts per group.
+ConvertTo-Json and ConvertFrom-Json round-trip objects through JSON for interoperability.
+Export-Csv and Import-Csv persist tabular object data without losing types as plain text would.
+Out-File, Set-Content, and Add-Content write text, and default encodings differ between PowerShell 5.1 and 7.
+Get-Content reads files line by line, and Get-Content -Wait follows a growing log like tail -f.
+Select-String searches file content with regular expressions and is the PowerShell counterpart of grep.
+Get-ChildItem with -Recurse and -Filter walks directory trees like a constrained find.
+Test-Path checks file or directory existence and returns a Boolean.
+Invoke-Command runs script blocks on remote machines over WSMan or SSH transports.
+Get-Process and Stop-Process inspect and terminate processes by name or Id.
+Get-Service, Stop-Service, and Restart-Service manage Windows services with structured status objects.
+New-Item, Copy-Item, Move-Item, Rename-Item, and Remove-Item manipulate the filesystem as objects.
+The -WhatIf and -Confirm common parameters preview or gate destructive cmdlet operations.
+PowerShell parses native command output as plain text, so structured handling of external tools needs explicit conversion.
+
+# Section 8: macOS and Darwin Shells
+The default interactive shell on macOS has been zsh since macOS Catalina 10.15 in 2019.
+macOS still ships Bash, but it is version 3.2 because Apple avoids the GPLv3 license of Bash 4 and later.
+zsh arrays are one-indexed by default, so ${array[1]} is the first element, unlike zero-indexed Bash arrays.
+zsh does not word-split unquoted variable expansions by default, which removes a common Bash quoting bug class.
+zsh offers recursive globbing with **/*.txt without enabling any option, while Bash needs shopt -s globstar.
+The userland tools on macOS come from BSD, not GNU, and their flags differ in load-bearing ways.
+BSD sed requires a backup suffix for in-place edits, so sed -i '' 's/a/b/' f mirrors GNU sed -i 's/a/b/' f.
+BSD date computes relative times with -v, as in date -v-1d, where GNU date uses date -d 'yesterday'.
+BSD stat prints file size with stat -f %z while GNU stat uses stat -c %s.
+BSD ps aux behaves like Linux ps aux, but many other flags diverge, so scripts must not assume GNU semantics.
+Homebrew on Apple Silicon installs under /opt/homebrew while on Intel Macs it installs under /usr/local.
+System Integrity Protection blocks writes to system paths like /usr even for root on modern macOS.
+launchd and launchctl manage services on macOS instead of systemd and systemctl on Linux.
+The open command launches files and apps with their default handlers, and pbcopy and pbpaste bridge the clipboard.
+The PATH on macOS commonly grows via /etc/paths.d entries and shell profile additions.
+Filesystems on macOS are case-insensitive by default, so Makefile and makefile refer to the same file on a default APFS volume.
+Rosetta 2 lets Apple Silicon Macs run Intel binaries, which affects which architecture a shell script receives.
+Terminal emulators on macOS start login shells by default, so .zprofile runs for each new terminal window.
+
+# Section 9: Cross-Shell Task Equivalences
+Listing files uses ls in Bash, dir in CMD, and Get-ChildItem or its dir alias in PowerShell.
+Printing the working directory uses pwd in Bash, cd without arguments in CMD, and Get-Location in PowerShell.
+Showing an environment variable uses echo $NAME in Bash, echo %NAME% in CMD, and $env:NAME in PowerShell.
+Searching file contents uses grep in Bash, findstr in CMD, and Select-String in PowerShell.
+Locating a program on PATH uses type -a or which in Bash, where in CMD, and Get-Command in PowerShell.
+Reading the previous exit code uses $? in Bash, %ERRORLEVEL% in CMD, and $LASTEXITCODE in PowerShell after native commands.
+Following a growing log uses tail -f in Bash and Get-Content -Wait in PowerShell, with no direct CMD builtin.
+Killing a process uses kill in Bash, taskkill in CMD, and Stop-Process in PowerShell.
+Sleeping uses sleep 5 in Bash, timeout /t 5 in CMD, and Start-Sleep -Seconds 5 in PowerShell.
+Creating a directory uses mkdir in Bash and CMD and New-Item -ItemType Directory in PowerShell, which also accepts the mkdir function.
+Environment variables are set for the session with export NAME=value in Bash, set NAME=value in CMD, and $env:NAME='value' in PowerShell.
+Counting lines uses wc -l in Bash, find /c /v "" in CMD, and Get-Content file | Measure-Object -Line in PowerShell.
+Downloading a URL uses curl or wget in Bash, curl.exe on modern Windows CMD, and Invoke-WebRequest in PowerShell.
+Editing environment for a single command uses VAR=value cmd in Bash, while CMD and PowerShell require a set step first.
+
+# Section 10: Portability Traps and Common Misconceptions
+Windows text files end lines with CRLF while Unix files use LF, and a Bash script with CRLF fails with carriage return errors.
+Linux filesystems are case-sensitive while Windows and default macOS filesystems are case-insensitive, hiding bugs that appear only on Linux.
+PowerShell pipelines carry structured objects while CMD and Bash pipelines carry byte streams, so grep-style parsing is a Bash pattern, not a PowerShell one.
+Bash splits unquoted variable expansions into words and expands globs, while zsh and CMD do neither by default.
+CMD wildcard matching is performed by each command, so dir *.txt works while the equivalent pattern logic differs per tool.
+A command that exists on every system may still accept different flags because GNU and BSD userlands diverge.
+The rm -rf and Remove-Item -Recurse -Force commands delete recursively and irreversibly, and typos in their paths are unrecoverable.
+Bash 3.2 on macOS lacks associative arrays, mapfile, and globstar, which modern Bash scripts often assume.
+PowerShell 5.1 writes UTF-16LE by default on some cmdlets while PowerShell 7 and Unix tools default to UTF-8 without BOM.
+Aliases that make PowerShell feel like Bash are interactive conveniences, and scripts relying on them stay less readable to maintainers.
+An execution policy of Restricted blocks scripts but never blocks interactive commands or a -File bypass invocation.
+Assuming bash exists at /bin/bash fails on systems where it lives elsewhere, which is why env-shebangs are recommended.
+Sourcing a script with dot or . runs it in the current shell, while executing it normally spawns a subshell that cannot export changes upward.
+The set -e option in Bash does not catch every failure mode, notably inside command substitution and some compound commands.
