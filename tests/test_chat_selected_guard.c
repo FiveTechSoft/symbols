@@ -29,5 +29,24 @@ int main(void){
   ChatHandleToBufEx(b,"hola",z,sizeof(z),&r);ck(strncmp(z,"Segun",5)!=0&&r.state==CHAT_CITE_NONE,"greeting no stale receipt");
   done(a);done(b);
  }
+ {
+  CHAT*c=make("data/shells/shell_corpus.txt"); char out[8192],expected[2048]; CHAT_CITATION r;
+  FILE*f=fopen("data/shells/shell_corpus.txt","rb"); int found=0;
+  if(!f)return 2;
+  while(fgets(expected,sizeof(expected),f))if(strncmp(expected,"Sleeping uses ",14)==0){found=1;break;}
+  fclose(f);ck(found,"literal entity source located in unchanged corpus");
+  if(found){
+   size_t n=strlen(expected);while(n&&(expected[n-1]=='\n'||expected[n-1]=='\r'))expected[--n]=0;
+   for(int mode=0;mode<2;mode++){
+    if(mode)ChatHandleToBufEx(c,"How do I sleep for 5 seconds in CMD?",out,sizeof(out),&r);
+    else ChatHandleToBuf(c,"How do I sleep for 5 seconds in CMD?",out,sizeof(out));
+    const char*q=strstr(out,": ");
+    ck(q&&strncmp(q+2,expected,n)==0&&q[2+n]=='\n'&&q[3+n]==0,"ENTITY quote preserves source punctuation and whitespace");
+   }
+   ChatHandleToBuf(c,"Which CMD command sleeps for five seconds?",out,sizeof(out));
+   ck(strncmp(out,"No tengo constancia suficiente",29)==0,"literal repair does not change unresolved paraphrase selection");
+  }
+  done(c);
+ }
  remove(paths[0]);remove(paths[1]);printf("test_chat_selected_guard: %d failed\n",fails);return fails?1:0;
 }

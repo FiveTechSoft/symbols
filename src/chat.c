@@ -6176,7 +6176,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
             if (have && bestsc > 0.1f && ch->tlex[bestf].image != NULL)
             {
                 char sent[2048];
-                if (TextLexSentenceText(&ch->tlex[bestf], best,
+                if (TextLexSentenceSourceText(&ch->tlex[bestf], best,
                                         ch->tlex[bestf].image,
                                         ch->tlex[bestf].imagelen, sent,
                                         sizeof(sent)) > 0)
