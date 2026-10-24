@@ -191,9 +191,10 @@ static int HexVal(char c, unsigned *v)
 
 /* copy a JSON string starting at the opening quote; *pp ends past
    the closing quote. Returns 1 on success. */
-static int TakeJsonString(const char **pp, char *out, size_t size)
+static int TakeJsonStringEx(const char **pp, char *out, size_t size, int *overflow)
 {
     size_t o = 0;
+    if (overflow) *overflow = 0;
     const char *p;
     unsigned pending_hi = 0;
     int have_hi = 0;
@@ -221,6 +222,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
             {
                 if (o + 1 < size)
                     out[o++] = esc_c;
+                else if (overflow) *overflow = 1;
                 p++;
             }
             else if (*p == 'u')
@@ -234,6 +236,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
                     v = (v << 4) | d;
                     p++;
                 }
+                if (v == 0) return 0; /* C strings cannot preserve embedded NUL. */
                 if (have_hi)
                 {
                     /* second half must be a low surrogate */
@@ -245,6 +248,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
                     /* non-BMP: emit replacement */
                     if (o + 1 < size)
                         out[o++] = '?';
+                    else if (overflow) *overflow = 1;
                 }
                 else if (v >= 0xD800 && v <= 0xDBFF)
                 {
@@ -261,6 +265,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
                         memcpy(out + o, tmp, (size_t)nb);
                         o += (size_t)nb;
                     }
+                    else if (overflow) *overflow = 1;
                 }
             }
             else
@@ -272,6 +277,7 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
         {
             if (o + 1 < size)
                 out[o++] = *p;
+            else if (overflow) *overflow = 1;
             p++;
         }
     }
@@ -284,9 +290,52 @@ static int TakeJsonString(const char **pp, char *out, size_t size)
     return 1;
 }
 
+static int TakeJsonString(const char **pp, char *out, size_t size)
+{
+    return TakeJsonStringEx(pp, out, size, NULL);
+}
+static int TakeJsonStringExact(const char **pp, char *out, size_t size)
+{
+    int overflow = 0;
+    const char *end = *pp;
+    int ok = TakeJsonStringEx(&end, out, size, &overflow);
+    if (!ok || overflow) return 0;
+    *pp = end;
+    return 1;
+}
+
 static int IsWs(char c)
 {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+/* This wire path supports one text block only. Never execute a first block
+   while silently dropping a later restriction or action. */
+static int SingleTextBlock(const char *p)
+{
+    unsigned depth = 0, texts = 0;
+    char token[32];
+    if (*p != '[') return 0;
+    do
+    {
+        if (*p == '"')
+        {
+            if (!TakeJsonString(&p, token, sizeof(token))) return 0;
+            if (strcmp(token, "text") == 0)
+            {
+                const char *q = p;
+                while (IsWs(*q)) q++;
+                if (*q == ':' && ++texts > 1) return 0;
+            }
+        }
+        else
+        {
+            if (*p == '[') depth++;
+            if (*p == ']') depth--;
+            p++;
+        }
+    } while (*p && depth);
+    return depth == 0 && texts == 1;
 }
 
 static int ExtractRoleContent(const char *body, const char *want_role, int want_last,
@@ -294,7 +343,7 @@ static int ExtractRoleContent(const char *body, const char *want_role, int want_
 {
     const char *p;
     char last[4096];
-    int found = 0;
+    int found = 0, last_invalid = 0;
     if (body == NULL || out == NULL || size == 0)
         return 0;
     out[0] = '\0';
@@ -360,16 +409,28 @@ static int ExtractRoleContent(const char *body, const char *want_role, int want_
                         while (IsWs(*s))
                             s++;
                         if (*s == '"' &&
-                            TakeJsonString(&s, content,
+                            TakeJsonStringExact(&s, content,
                                            sizeof(content)))
                         {
                             strncpy(last, content,
                                     sizeof(last) - 1);
                             found = 1;
+                            last_invalid = 0;
                             ok = 1;
+                        }
+                        else if (*s == '"')
+                        {
+                            found = 1;
+                            last_invalid = 1;
                         }
                         else if (*s == '[')
                         {
+                            if (!SingleTextBlock(s))
+                            {
+                                found = 1;
+                                last_invalid = 1;
+                                break;
+                            }
                             const char *tkey = strstr(s, "\"text\"");
                             if (tkey != NULL)
                             {
@@ -378,11 +439,17 @@ static int ExtractRoleContent(const char *body, const char *want_role, int want_
                                 {
                                     tc++;
                                     while (IsWs(*tc)) tc++;
-                                    if (*tc == '"' && TakeJsonString(&tc, content, sizeof(content)))
+                                    if (*tc == '"' && TakeJsonStringExact(&tc, content, sizeof(content)))
                                     {
                                         strncpy(last, content, sizeof(last) - 1);
                                         found = 1;
+                                        last_invalid = 0;
                                         ok = 1;
+                                    }
+                                    else if (*tc == '"')
+                                    {
+                                        found = 1;
+                                        last_invalid = 1;
                                     }
                                 }
                             }
@@ -401,8 +468,9 @@ static int ExtractRoleContent(const char *body, const char *want_role, int want_
         }
         p++;
     }
-    if (!found)
+    if (!found || last_invalid)
         return 0;
+    if (strlen(last) >= size) return 0;
     strncpy(out, last, size - 1);
     out[size - 1] = '\0';
     return 1;
@@ -410,6 +478,20 @@ static int ExtractRoleContent(const char *body, const char *want_role, int want_
 
 int ServerExtractQuery(const char *body, char *out, size_t size)
 {
+    const char *p = body;
+    char checked[4096];
+    if (!body || !out || !size) return 0;
+    out[0] = '\0';
+    /* Validate every string before selecting a message. An invalid later text
+       block, role or history entry must not expose an earlier executable prefix. */
+    while (*p)
+    {
+        if (*p == '"')
+        {
+            if (!TakeJsonString(&p, checked, sizeof(checked))) return 0;
+        }
+        else p++;
+    }
     return ExtractRoleContent(body, "user", 1, out, size);
 }
 
@@ -2000,7 +2082,7 @@ static int ReplacementToken(const char **p, char *out, size_t n)
     if (**p == '\'' || **p == '"' || **p == '`') quote = *(*p)++;
     while (**p && (quote ? **p != quote : **p != ' ' && **p != '\t'))
     {
-        if (**p == '\n' || **p == '\r' || **p == '\\' || k + 1 >= n) return 0;
+        if ((unsigned char)**p < 0x20 || (unsigned char)**p == 0x7f || **p == '\\' || k + 1 >= n) return 0;
         if (!quote && (**p == '\'' || **p == '"' || **p == '`')) return 0;
         out[k++] = *(*p)++;
     }
@@ -2018,22 +2100,36 @@ int ServerParseReplacement(const char *text, char *file, size_t fn,
 {
     char verb[64], sep[16], target[16], extra[260];
     const char *p = text;
-    int spanish;
+    int spanish, file_first = 0;
     size_t i;
     if (!text) return 0;
     ReplacementSpace(&p);
     if (*p == '\'' || *p == '\"' || *p == '`') return 0;
     if (!ReplacementToken(&p, verb, sizeof(verb))) return 0;
     for (i = 0; verb[i]; i++) verb[i] = (char)tolower((unsigned char)verb[i]);
+    if (strcmp(verb, "replace") == 0 || strcmp(verb, "cambia") == 0 ||
+        strcmp(verb, "reemplaza") == 0 || strcmp(verb, "edita") == 0)
+        for (i = 0; text[i]; i++)
+            if ((unsigned char)text[i] < 0x20 || (unsigned char)text[i] == 0x7f) return -1;
     spanish = strcmp(verb, "cambia") == 0 || strcmp(verb, "reemplaza") == 0;
+    if (strcmp(verb, "edita") == 0)
+    {
+        if (FindIstr(text, " por ") == NULL) return 0;
+        if (!ReplacementToken(&p, file, fn) ||
+            !ReplacementToken(&p, sep, sizeof(sep)) || strcmp(sep, "y") ||
+            !ReplacementToken(&p, verb, sizeof(verb)) || strcmp(verb, "cambia")) return -1;
+        file_first = 1;
+        spanish = 1;
+    }
     if (!spanish && strcmp(verb, "replace") != 0) return 0;
     if (!ReplacementToken(&p, old_s, on) ||
         !ReplacementToken(&p, sep, sizeof(sep)) ||
         strcmp(sep, spanish ? "por" : "with") != 0 ||
-        !ReplacementToken(&p, new_s, nn) ||
-        !ReplacementToken(&p, target, sizeof(target)) ||
-        strcmp(target, spanish ? "en" : "in") != 0 ||
-        !ReplacementToken(&p, file, fn)) return -1;
+        !ReplacementToken(&p, new_s, nn)) return -1;
+    if (!file_first &&
+        (!ReplacementToken(&p, target, sizeof(target)) ||
+         strcmp(target, spanish ? "en" : "in") != 0 ||
+         !ReplacementToken(&p, file, fn))) return -1;
     ReplacementSpace(&p);
     if (*p || !ServerExtractFileRef(file, extra, sizeof(extra)) || strcmp(file, extra)) return -1;
     return 1;
@@ -2050,6 +2146,16 @@ int ServerReplacementNeedsClarification(const char *text)
     for (i = 0; text[i] && i + 1 < sizeof(lower); i++)
         lower[i] = (char)tolower((unsigned char)text[i]);
     lower[i] = '\0';
+    {
+        int has_control = 0;
+        for (i = 0; lower[i]; i++)
+            if ((unsigned char)lower[i] < 0x20 || (unsigned char)lower[i] == 0x7f)
+            {
+                lower[i] = ' ';
+                has_control = 1;
+            }
+        if (has_control && MatchEditVerb(lower)) return 1;
+    }
     parsed = ServerParseReplacement(text, file, sizeof(file), old_s, sizeof(old_s),
                                     new_s, sizeof(new_s));
     if (parsed) return parsed < 0;
