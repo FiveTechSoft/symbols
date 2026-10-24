@@ -77,6 +77,8 @@ Curated source claims, not new measurements. CI success is not semantic efficacy
 | Current solver, bank and corpus QA effectiveness | Unmeasured on subject SHA | Unmeasured | 2026-10-15; No fresh efficacy run authorized for this snapshot; `f9b85de141ec89ded2fb028456da043019b92ec3` | [source](https://github.com/FiveTechSoft/symbols/commit/1ae65742e420e1c464452f6bc7429059b8529e37) |
 <!-- METRICS:END -->
 
+Benchmark records live under [docs/records/bench/](docs/records/bench/); each is a dated, self-describing development measurement, not a latency guarantee.
+
 ## 3. Architecture
 
 ### 3.1 Base structures
