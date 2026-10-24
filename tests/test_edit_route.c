@@ -110,5 +110,33 @@ int main(void)
         snprintf(body, sizeof(body), "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"%s\"},{\"text\":\"%s\"}]}]}", first, second);
         check("combined text overflow cannot drop second block", !ServerExtractQuery(body, out, sizeof(out)));
     }
+    {
+        char query[1024], quotes[181], expected[361];
+        char names[2][64] = {"edit", "bash"};
+        OPENAI_TOOL_CALL call;
+        unsigned i;
+        memset(quotes, '\"', 180); quotes[180] = 0;
+        for (i = 0; i < 180; i++) { expected[2*i] = '\\'; expected[2*i+1] = '\"'; }
+        expected[360] = 0;
+        snprintf(query, sizeof(query), "replace '%s' with value in sample.txt", quotes);
+        check("expanded old string not truncated", ServerMapEditToolCall(query, names, 2, &call) && strstr(call.arguments, expected) != NULL);
+        snprintf(query, sizeof(query), "replace old with '%s' in sample.txt", quotes);
+        check("expanded new string not truncated", ServerMapEditToolCall(query, names, 2, &call) && strstr(call.arguments, expected) != NULL);
+    }
+    {
+        char query[2048], quotes[256], escaped[511], file[260], expected[4096];
+        char names[1][64] = {"edit"};
+        OPENAI_TOOL_CALL call;
+        unsigned i;
+        memset(quotes, '\"', 255); quotes[255] = 0;
+        for (i = 0; i < 255; i++) { escaped[2*i] = '\\'; escaped[2*i+1] = '\"'; }
+        escaped[510] = 0;
+        memset(file, 'f', 255); memcpy(file + 255, ".txt", 5);
+        snprintf(query, sizeof(query), "replace '%s' with '%s' in %s", quotes, quotes, file);
+        snprintf(expected, sizeof(expected), "{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}", file, escaped, escaped);
+        check("maximum bounded edit JSON exact and complete", ServerMapEditToolCall(query, names, 1, &call) && strcmp(call.arguments, expected) == 0 && strlen(call.arguments) < sizeof(call.arguments));
+        strcpy(names[0], "apply_patch");
+        check("maximum bounded patch JSON fits", ServerMapEditToolCall(query, names, 1, &call) && strlen(call.arguments) < sizeof(call.arguments) && call.arguments[strlen(call.arguments)-1] == '}');
+    }
     return failed ? 1 : 0;
 }

@@ -2271,7 +2271,7 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
                           uint32_t nnames, OPENAI_TOOL_CALL *out)
 {
     char file[260], old_s[256], new_s[256];
-    char esc_file[320], esc_old[320], esc_new[320];
+    char esc_file[2048], esc_old[2048], esc_new[2048];
     int has_rep = 0;
     int has_edit = 0, has_read = 0, has_patch = 0;
     uint32_t i;
@@ -2292,24 +2292,34 @@ int ServerMapEditToolCall(const char *query, const char names[][64],
         if (strcmp(names[i], "apply_patch") == 0)
             has_patch = 1;
     }
-    JsonEscapeArg(file, esc_file, sizeof(esc_file));
-    JsonEscapeArg(old_s, esc_old, sizeof(esc_old));
-    JsonEscapeArg(new_s, esc_new, sizeof(esc_new));
+    if (!ServerJsonEscape(file, esc_file, sizeof(esc_file)) ||
+        !ServerJsonEscape(old_s, esc_old, sizeof(esc_old)) ||
+        !ServerJsonEscape(new_s, esc_new, sizeof(esc_new))) return 0;
     strncpy(out->id, "call_edit_1", sizeof(out->id) - 1);
     if (has_rep && has_edit)
     {
         strncpy(out->name, "edit", sizeof(out->name) - 1);
-        snprintf(out->arguments, sizeof(out->arguments),
+        int written = snprintf(out->arguments, sizeof(out->arguments),
                  "{\"filePath\":\"%s\",\"oldString\":\"%s\",\"newString\":\"%s\"}",
                  esc_file, esc_old, esc_new);
+        if (written < 0 || (size_t)written >= sizeof(out->arguments))
+        {
+            memset(out, 0, sizeof(*out));
+            return 0;
+        }
         return 1;
     }
     if (has_rep && has_patch)
     {
         strncpy(out->name, "apply_patch", sizeof(out->name) - 1);
-        snprintf(out->arguments, sizeof(out->arguments),
+        int written = snprintf(out->arguments, sizeof(out->arguments),
                  "{\"file\":\"%s\",\"diff\":\"--- a/%s\\n+++ b/%s\\n@@ -1 +1 @@\\n-%s\\n+%s\\n\"}",
                  esc_file, esc_file, esc_file, esc_old, esc_new);
+        if (written < 0 || (size_t)written >= sizeof(out->arguments))
+        {
+            memset(out, 0, sizeof(*out));
+            return 0;
+        }
         return 1;
     }
     /* No replacement text: for append/add/write intents, dispatch read
