@@ -1586,3 +1586,8 @@ if(SYMBOLS_DURATION_JOIN_RESEARCH)
         ${CMAKE_SOURCE_DIR}/tests/research/test_duration_source_conflict.py
         $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-source-conflict.json)
 endif()
+if(SYMBOLS_DURATION_JOIN_RESEARCH)
+    add_test(NAME duration_symmetric_source_research_directed COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/research/test_duration_symmetric_source.py
+        $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-symmetric-source.json)
+endif()

@@ -10,7 +10,7 @@ cmake --build build-duration --config Release --target symbols-duration-research
 ctest --test-dir build-duration -C Release -R "^duration_.*research_directed$" --output-on-failure
 ```
 
-These four tests are directed development checks, not independent holdout tests.
+These five tests are directed development checks, not independent holdout tests.
 They are registered only when the research flag is ON. No workflow or guard
 changes are needed. A fresh default configuration has neither these targets
 nor these tests. MSVC execution has not yet been verified.
@@ -53,3 +53,26 @@ offset ordering preserve the first identical denial occurrence. Positive
 clause scan order and duplicate/ambiguity decisions remain unchanged. Index
 allocation failure refuses explicitly. CLI timing measurements are not TUI
 latency guarantees or a claim about arbitrary corpus inference.
+
+The symmetric source-reader slice uses the same controlled clause reader for
+positive `LABEL uses ...` and negative `LABEL never uses ...` assertions.
+A final period is optional for both, and both support complete coordinated
+command/shell clauses. Polarity is retained, not normalized away. Exact tuple
+lookup uses activity, command and shell; conflict receipts keep full original
+assertion ranges and positive command ranges. Tests compare exact offsets,
+including CRLF, both line orders and coordinated-clause positions.
+A clearly conditional denial is not an unconditional denial and does not
+suppress an independent valid positive assertion. External quoted text is
+also not promoted into a denial. This slice does not add a keyword-based
+uncertainty detector or general conditional/prose semantics.
+
+Storage is counted with the same transactional reader before allocating the
+actual clause array. A byte-sized scratch copy is reused for both passes;
+the denial index allocates only actual negative clauses. Counting discards
+malformed coordinated lines in full, just as the filling pass does. Temporary
+valid prefixes cannot overflow an array sized for accepted complete lines.
+At the 1 MiB source limit with one valid clause and unrelated filler, measured
+malloc requests are 1255 bytes for the fact, 1048577 each for source and scratch,
+and 696 each for the single clause and minimum index allocation. This replaces
+the previous draft's roughly 90 MiB clause reservation. Allocation failure
+returns an explicit unsupported result, with no selected command.

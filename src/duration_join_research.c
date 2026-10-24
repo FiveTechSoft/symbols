@@ -12,60 +12,70 @@
 static unsigned char *readall(const char*p,size_t*n){FILE*f=fopen(p,"rb");if(!f)return NULL;if(fseek(f,0,SEEK_END)){fclose(f);return NULL;}long z=ftell(f);if(z<0||z>1048576||fseek(f,0,SEEK_SET)){fclose(f);return NULL;}unsigned char*b=malloc((size_t)z+1);if(!b){fclose(f);return NULL;}*n=fread(b,1,(size_t)z,f);fclose(f);if(*n!=(size_t)z||memchr(b,0,*n)){free(b);return NULL;}b[*n]=0;return b;}
 static void digest(const unsigned char*b,size_t n,char*h){unsigned char d[32];TLSha256(b,n,d);for(unsigned k=0;k<32;k++)sprintf(h+2*k,"%02x",d[k]);}
 static int numeric(const char*s,long*v){if(!s||!*s||*s=='+')return 0;const char*p=*s=='-'?s+1:s;if(!*p||(*p=='0'&&p[1]))return 0;for(;*p;p++)if(*p<'0'||*p>'9')return 0;errno=0;char*end;*v=strtol(s,&end,10);return !errno&&!*end;}
-/* Deliberately controlled assertion grammar, not prose inference:
-   one ASCII activity label ending in "ing", followed by " uses ".
-   Quotes, condition punctuation, shell operators and extra subject words are
-   refused. A line outside this syntax cannot establish a positive assertion. */
-static int assertion_scope(const char *line,const char *uses) {
- if(!uses||uses==line)return 0;
- size_t subject=(size_t)(uses-line);
- if(subject<4||subject>=128||memcmp(line+subject-3,"ing",3))return 0;
- for(size_t i=0;i<subject;i++)if(!((line[i]>='A'&&line[i]<='Z')||(line[i]>='a'&&line[i]<='z')))return 0;
- for(const char *p=line;*p;p++)if(strchr("\"'`;|&()[]{}<>:\\",*p))return 0;
- /* Every coordinate clause must be complete, not just the selected one. */
- const char *cursor=uses+6;
+typedef struct {
+ char activity[128],command[512],shell[16];
+ size_t command_a,command_b,line_a,line_b;
+ int negative;
+} SourceClause;
+/* One complete controlled clause reader for both polarities. No text is
+   rewritten: every range refers to original corpus bytes. */
+static int read_line_clauses(char *line,size_t offset,size_t end,
+                             SourceClause *out,size_t capacity,size_t *count){
+ char *uses=strstr(line," never uses ");int negative=uses!=NULL;
+ if(!uses)uses=strstr(line," uses ");if(!uses)return 1;
+ size_t subject=(size_t)(uses-line);if(subject<4||subject>=128||memcmp(line+subject-3,"ing",3))return 1;
+ for(size_t i=0;i<subject;i++)if(!((line[i]>='A'&&line[i]<='Z')||(line[i]>='a'&&line[i]<='z')))return 1;
+ for(char *p=line;*p;p++)if(strchr("\"'`;|&()[]{}<>:\\",*p))return 1;
+ char *cursor=uses+(negative?12:6);size_t original_count=*count;
  while(*cursor){
-  const char *sep=strstr(cursor,", ");if(!sep)sep=strstr(cursor," and ");
-  const char *end=sep?sep:line+strlen(line);if(end>cursor&&end[-1]=='.')end--;
+  char *comma=strstr(cursor,", "),*and=strstr(cursor," and ");
+  char *sep=comma&&and?(comma<and?comma:and):(comma?comma:and);
+  char *last=sep?sep:line+strlen(line);if(!sep&&last>cursor&&last[-1]=='.')last--;
   if(!strncmp(cursor,"and ",4))cursor+=4;
-  const char *in=strstr(cursor," in ");if(!in||in>=end)return 0;
-  const char *sh=in+4;size_t n=(size_t)(end-sh);
-  if(!((n==3&&!memcmp(sh,"CMD",3))||(n==4&&!memcmp(sh,"Bash",4))||(n==10&&!memcmp(sh,"PowerShell",10))))return 0;
-  for(const char *p=cursor;p<in;p++)if(*p=='.'||*p==',')return 0;
+  char *in=strstr(cursor," in ");if(!in||in>=last){*count=original_count;return 1;}
+  size_t command_len=(size_t)(in-cursor),shell_len=(size_t)(last-(in+4));
+  if(!command_len||command_len>=512||!((shell_len==3&&!memcmp(in+4,"CMD",3))||(shell_len==4&&!memcmp(in+4,"Bash",4))||(shell_len==10&&!memcmp(in+4,"PowerShell",10)))){*count=original_count;return 1;}
+  for(char *p=cursor;p<in;p++)if(*p=='.'||*p==','){*count=original_count;return 1;}
+  if(*count==capacity)return 0;
+  SourceClause *c=out?&out[*count]:NULL;(*count)++;
+  if(c){memset(c,0,sizeof(*c));
+  memcpy(c->activity,line,subject);memcpy(c->command,cursor,command_len);memcpy(c->shell,in+4,shell_len);
+  c->negative=negative;c->line_a=offset;c->line_b=end;
+  c->command_a=offset+(size_t)(cursor-line);c->command_b=c->command_a+command_len;}
   if(!sep)break;cursor=sep+(!strncmp(sep,", ",2)?2:5);
+  if(!*cursor){*count=original_count;return 1;}
  }
  return 1;
 }
-/* Only a controlled unconditional denial of the same activity/command/shell
-   tuple can conflict. Citation and conditional syntax are never promoted. */
-typedef struct { const unsigned char *bytes;size_t size,offset; } SourceLine;
-static int line_compare(const void *av,const void *bv){
- const SourceLine *a=av,*b=bv;size_t n=a->size<b->size?a->size:b->size;
- int c=memcmp(a->bytes,b->bytes,n);if(c)return c;
- if(a->size!=b->size)return a->size<b->size?-1:1;
- return a->offset<b->offset?-1:a->offset>b->offset?1:0;
-}
-/* Index complete source lines once, without rewriting source bytes. Sorting
-   offset last preserves first occurrence for identical denial assertions. */
-static SourceLine *source_index(const unsigned char *bytes,size_t size,size_t *count){
- size_t n=0;for(size_t i=0;i<size;i++)if(bytes[i]=='\n')n++;
- if(size&&bytes[size-1]!='\n')n++;
- SourceLine *lines=malloc((n?n:1)*sizeof(*lines));if(!lines)return NULL;
- size_t off=0,k=0;while(off<size){size_t end=off;while(end<size&&bytes[end]!='\n')end++;
-  size_t last=end;if(last>off&&bytes[last-1]=='\r')last--;
-  lines[k].bytes=bytes+off;lines[k].size=last-off;lines[k].offset=off;k++;
-  off=end<size?end+1:end;
+static SourceClause *source_clauses(const unsigned char *bytes,size_t size,size_t *count){
+ /* Count with the same transactional reader, then allocate actual clauses.
+    Reuse one byte-sized scratch buffer across both passes. */
+ char *scratch=malloc(size+1);if(!scratch)return NULL;
+ SourceClause *clauses=NULL;size_t capacity=size/8+1;
+ for(unsigned pass=0;pass<2;pass++){
+  memcpy(scratch,bytes,size);scratch[size]=0;size_t off=0;*count=0;
+  while(off<size){size_t end=off;while(end<size&&scratch[end]!='\n')end++;size_t last=end;
+   if(last>off&&scratch[last-1]=='\r')last--;
+   scratch[last]=0;
+   size_t line_count=0;
+   if(!read_line_clauses(scratch+off,off,last,NULL,size/8+1,&line_count)){free(clauses);free(scratch);return NULL;}
+   if(!pass)*count+=line_count;
+   else if(line_count&&!read_line_clauses(scratch+off,off,last,clauses,capacity,count)){free(clauses);free(scratch);return NULL;}
+   off=end<size?end+1:end;
+  }
+  if(!pass){capacity=*count;clauses=malloc((capacity?capacity:1)*sizeof(*clauses));if(!clauses){free(scratch);return NULL;}}
  }
- qsort(lines,k,sizeof(*lines),line_compare);*count=k;return lines;
+ free(scratch);return clauses;
 }
-static int source_denial(const SourceLine *lines,size_t count,const char *subject,
-                         const char *command,const char *shell,size_t *a,size_t *b) {
- char expected[640];int n=snprintf(expected,sizeof(expected),"%s never uses %s in %s.",subject,command,shell);
- if(n<0||(size_t)n>=sizeof(expected))return 0;
- SourceLine key={(const unsigned char*)expected,(size_t)n,0};size_t lo=0,hi=count;
- while(lo<hi){size_t mid=lo+(hi-lo)/2;if(line_compare(&lines[mid],&key)<0)lo=mid+1;else hi=mid;}
- if(lo==count||lines[lo].size!=(size_t)n||memcmp(lines[lo].bytes,expected,(size_t)n))return 0;
- *a=lines[lo].offset;*b=*a+lines[lo].size;return 1;
+static int tuple_compare(const void *av,const void *bv){
+ const SourceClause *a=av,*b=bv;int c=strcmp(a->activity,b->activity);if(!c)c=strcmp(a->command,b->command);if(!c)c=strcmp(a->shell,b->shell);
+ if(c)return c;return a->line_a<b->line_a?-1:a->line_a>b->line_a?1:0;
+}
+static const SourceClause *find_denial(const SourceClause *index,size_t count,const SourceClause *positive){
+ SourceClause key=*positive;key.line_a=0;size_t lo=0,hi=count;
+ while(lo<hi){size_t mid=lo+(hi-lo)/2;if(tuple_compare(&index[mid],&key)<0)lo=mid+1;else hi=mid;}
+ if(lo==count||strcmp(index[lo].activity,key.activity)||strcmp(index[lo].command,key.command)||strcmp(index[lo].shell,key.shell))return NULL;
+ return &index[lo];
 }
 static int join_envelope(const char*q,const char*corpus,const char*fact,char*out,size_t cap){
  if(!q||strncmp(q,"duration-fact ",14))return 0;
@@ -79,32 +89,27 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  size_t fn,cn;unsigned char*fb=readall(fact,&fn);char fh[65],ch[65];if(!fb){snprintf(out,cap,"MISSING_FACT: no reviewed parameter evidence loaded.");return 1;}digest(fb,fn,fh);free(fb);
  if(strcmp(fh,WINDOWS_TIMEOUT_FACT_SHA)){snprintf(out,cap,"UNVERIFIED_FACT: sidecar differs from the reviewed byte identity.");return 1;}
  unsigned char*cb=readall(corpus,&cn);if(!cb){snprintf(out,cap,"UNSUPPORTED_SOURCE: corpus bytes unavailable or unsupported.");return 1;}digest(cb,cn,ch);
- size_t indexed_count=0;SourceLine *indexed=source_index(cb,cn,&indexed_count);if(!indexed){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: index allocation failure.");return 1;}
- unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;size_t offset=0;int conflict=0;size_t pos_a=0,pos_b=0,neg_a=0,neg_b=0;
- while(offset<cn){size_t end=offset;while(end<cn&&cb[end]!='\n')end++;size_t line_end=end;while(line_end>offset&&cb[line_end-1]=='\r')line_end--;char*line=malloc(line_end-offset+1);if(!line){free(indexed);free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: allocation failure.");return 1;}memcpy(line,cb+offset,line_end-offset);line[line_end-offset]=0;char*uses=strstr(line," uses ");
-  if(assertion_scope(line,uses)){char*cursor=uses+6;while(*cursor){char*sep=strstr(cursor,", ");if(!sep)sep=strstr(cursor," and ");char*last=sep?sep:line+strlen(line);size_t len=(size_t)(last-cursor);char segment[512];if(len<sizeof(segment)){memcpy(segment,cursor,len);segment[len]=0;if(!strncmp(segment,"and ",4))memmove(segment,segment+4,strlen(segment+4)+1);char*in=strstr(segment," in ");if(in){*in=0;char*sh=in+4;size_t sl=strlen(sh);if(sl&&sh[sl-1]=='.')sh[--sl]=0;
-    if(!strcmp(sh,shell)){int nb=0;
-     if(WindowsTimeoutFactMatches(segment,requested,qualifier,&nb)){
-      size_t command_len=strlen(segment);char*original=cursor;if(!strncmp(original,"and ",4))original+=4;count++;chosen_a=offset+(size_t)(original-line);chosen_b=chosen_a+command_len;snprintf(chosen,sizeof(chosen),"%s",segment);chosen_nobreak=nb;
-      char subject[128];size_t subject_len=(size_t)(uses-line);
-      if(subject_len<sizeof(subject)){
-       memcpy(subject,line,subject_len);subject[subject_len]=0;
-       size_t da=0,db=0;
-       if(source_denial(indexed,indexed_count,subject,segment,shell,&da,&db)){
-        conflict=1;pos_a=offset;pos_b=line_end;neg_a=da;neg_b=db;
-       }
-      }
-     }
-    }
-   }}if(!sep)break;cursor=sep+(!strncmp(sep,", ",2)?2:5);}}
-  free(line);offset=end<cn?end+1:end;
+ size_t clause_count=0;SourceClause *clauses=source_clauses(cb,cn,&clause_count);
+ if(!clauses){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE_SCOPE: clause allocation or capacity failure.");return 1;}
+ size_t negative_count=0;for(size_t i=0;i<clause_count;i++)if(clauses[i].negative)negative_count++;
+ SourceClause *indexed=malloc((negative_count?negative_count:1)*sizeof(*indexed));
+ if(!indexed){free(clauses);free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: index allocation failure.");return 1;}
+ size_t indexed_count=0;for(size_t i=0;i<clause_count;i++)if(clauses[i].negative)indexed[indexed_count++]=clauses[i];
+ qsort(indexed,indexed_count,sizeof(*indexed),tuple_compare);
+ unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;int conflict=0;size_t pos_a=0,pos_b=0,neg_a=0,neg_b=0;
+ for(size_t i=0;i<clause_count;i++){
+  const SourceClause *c=&clauses[i];if(c->negative||strcmp(c->shell,shell))continue;
+  int nb=0;if(!WindowsTimeoutFactMatches(c->command,requested,qualifier,&nb))continue;
+  count++;chosen_a=c->command_a;chosen_b=c->command_b;snprintf(chosen,sizeof(chosen),"%s",c->command);chosen_nobreak=nb;
+  const SourceClause *denial=find_denial(indexed,indexed_count,c);
+  if(denial){conflict=1;pos_a=c->line_a;pos_b=c->line_b;neg_a=denial->line_a;neg_b=denial->line_b;}
  }
  if(conflict){int w=snprintf(out,cap,"SOURCE_CONFLICT: controlled positive and negative corpus assertions disagree on the same activity, command and shell. No command selected.\nCorpus: %s sha256=%s\nPositive assertion bytes[%zu,%zu)\nNegative assertion bytes[%zu,%zu)\nThis describes corpus assertions only; Microsoft parameter documentation is not invalidated and no general semantic conflict detection is claimed.",corpus,ch,pos_a,pos_b,neg_a,neg_b);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
  else if(count==0)snprintf(out,cap,"NO_SUPPORT: no unambiguous source clause and reviewed parameter fact support this numeric request and qualifier. No duration, sentinel or unit conversion is inferred.");
  else if(count>1)snprintf(out,cap,"AMBIGUOUS: %u source clauses match; no command selected.",count);
  else if(chosen_b>cn||memcmp(cb+chosen_a,chosen,chosen_b-chosen_a))snprintf(out,cap,"UNSUPPORTED_SOURCE: evidence range mismatch.");
  else {int w=snprintf(out,cap,"DOCUMENTATION-SUPPORTED, not Windows execution\nCommand from corpus: %s\nInterpreted request: platform=%s shell=%s value=%ld unit=%s qualifier=%s\nRule: same shell + command timeout + parameter /t + integer value + seconds\nKeyboard: %s. No exact wall-clock guarantee.\nCorpus: %s sha256=%s bytes[%zu,%zu)\nParameter fact: microsoft.cmd.timeout.t.seconds sha256=%s\nSource: %s\nFact excerpt: /t specifies seconds, range -1..99999; -1 is indefinite until keystroke. /nobreak ignores key strokes.\nNatural-language morphology and number words are NOT interpreted by this diagnostic.",chosen,platform,shell,requested,unit,qualifier,chosen_nobreak?"key strokes ignored":"a key stroke may resume early",corpus,ch,chosen_a,chosen_b,fh,WINDOWS_TIMEOUT_SOURCE_URL);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
- free(indexed);free(cb);return 1;
+ free(indexed);free(clauses);free(cb);return 1;
 }
 
 /* Bounded English query grammar. This is not arbitrary QA or a semantic parser.
