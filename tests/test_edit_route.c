@@ -138,5 +138,20 @@ int main(void)
         strcpy(names[0], "apply_patch");
         check("maximum bounded patch JSON fits", ServerMapEditToolCall(query, names, 1, &call) && strlen(call.arguments) < sizeof(call.arguments) && call.arguments[strlen(call.arguments)-1] == '}');
     }
+    {
+        char out[8192];
+        const char *escaped = "{\"messages\":[{\"role\":\"user\",\"content\":\"replace \\\"\\ud83d\\ude00\\\" with done in sample.txt\"}]}";
+        check("surrogate pair exact UTF8", ServerExtractQuery(escaped, out, sizeof(out)) && strstr(out, "\xf0\x9f\x98\x80") != NULL && strchr(out, '?') == NULL);
+        check("isolated high surrogate rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\"}]}", out, sizeof(out)));
+        check("isolated low surrogate rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ude00\"}]}", out, sizeof(out)));
+        check("high followed by non-low rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\\u0041\"}]}", out, sizeof(out)));
+        check("four-byte exact output capacity", ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\\ude00\"}]}", out, 5) && strlen(out) == 4);
+        check("four-byte short output rejects without prefix", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\\ude00\"}]}", out, 4));
+    }
+    {
+        char out[8192];
+        check("pair interrupted by raw text rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83dx\\ude00\"}]}", out, sizeof(out)));
+        check("pair interrupted by escaped newline rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\\n\\ude00\"}]}", out, sizeof(out)));
+    }
     return failed ? 1 : 0;
 }

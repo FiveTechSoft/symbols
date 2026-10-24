@@ -204,6 +204,7 @@ static int TakeJsonStringEx(const char **pp, char *out, size_t size, int *overfl
     out[0] = '\0';
     while (*p != '\0' && *p != '"')
     {
+        if (have_hi && !(*p == '\\' && p[1] == 'u')) return 0;
         if (*p == '\\')
         {
             unsigned v = 0, d = 0;
@@ -245,9 +246,14 @@ static int TakeJsonStringEx(const char **pp, char *out, size_t size, int *overfl
                     v = 0x10000 + ((pending_hi - 0xD800) << 10) +
                         (v - 0xDC00);
                     have_hi = 0;
-                    /* non-BMP: emit replacement */
-                    if (o + 1 < size)
-                        out[o++] = '?';
+                    /* Preserve a valid surrogate pair as its exact UTF-8 scalar. */
+                    if (o + 4 < size)
+                    {
+                        out[o++] = (char)(0xF0 | (v >> 18));
+                        out[o++] = (char)(0x80 | ((v >> 12) & 0x3F));
+                        out[o++] = (char)(0x80 | ((v >> 6) & 0x3F));
+                        out[o++] = (char)(0x80 | (v & 0x3F));
+                    }
                     else if (overflow) *overflow = 1;
                 }
                 else if (v >= 0xD800 && v <= 0xDBFF)
