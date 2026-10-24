@@ -1547,3 +1547,6 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(test_compiler_environment_win_mc PROPERTIES TIMEOUT 35)
     endif()
 endif()
+
+# Fresh explicit questions may reuse evidence; continuations still advance.
+sllm_test(test_chat_repeat tests/test_chat_repeat.c)

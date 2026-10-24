@@ -5188,7 +5188,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
             {
                 uint32_t key = (f << 24) | (idx[r] & 0xFFFFFFu);
                 int seen = 0;
-                for (k = 0; k < ch->ntshown; k++)
+                for (k = 0; p->t_following && k < ch->ntshown; k++)
                 {
                     if (ch->tshown[k] == key)
                     {
@@ -5283,7 +5283,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                         float cc = 0.0f;
                         uint32_t ckey = (f << 24) | (idx[r] & 0xFFFFFFu);
                         int seen = 0;
-                        for (k = 0; k < ch->ntshown; k++)
+                        for (k = 0; p->t_following && k < ch->ntshown; k++)
                         {
                             if (ch->tshown[k] == ckey)
                             {
