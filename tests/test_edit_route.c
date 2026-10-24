@@ -153,5 +153,14 @@ int main(void)
         check("pair interrupted by raw text rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83dx\\ude00\"}]}", out, sizeof(out)));
         check("pair interrupted by escaped newline rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"\\ud83d\\n\\ude00\"}]}", out, sizeof(out)));
     }
+    {
+        char out[4096];
+        check("invalid JSON escape rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"replace need\\qle with done in sample.txt\"}]}", out, sizeof(out)));
+        check("raw JSON control rejected", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"replace need\tle with done in sample.txt\"}]}", out, sizeof(out)));
+        check("unterminated JSON cannot recover earlier user", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"replace old with DANGER in old.txt\"},{\"role\":\"user\",\"content\":\"replace needle with done in sample.txt}]}", out, sizeof(out)));
+        check("invalid escape cannot reuse earlier user", !ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"replace old with DANGER in old.txt\"},{\"role\":\"user\",\"content\":\"need\\qle\"}]}", out, sizeof(out)));
+        check("valid protocol escapes retain exact bytes", ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"quote\\\" slash\\/ backslash\\\\ bs\\b ff\\f lf\\n cr\\r tab\\t\"}]}", out, sizeof(out)) && strcmp(out, "quote\" slash/ backslash\\ bs\b ff\f lf\n cr\r tab\t") == 0);
+        check("valid escaped protocol newline retained", ServerExtractQuery("{\"messages\":[{\"role\":\"user\",\"content\":\"hello\\nworld\"}]}", out, sizeof(out)) && strcmp(out, "hello\nworld") == 0);
+    }
     return failed ? 1 : 0;
 }

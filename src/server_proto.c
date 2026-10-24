@@ -275,12 +275,11 @@ static int TakeJsonStringEx(const char **pp, char *out, size_t size, int *overfl
                 }
             }
             else
-            {
-                if (*p != '\0') p++;
-            }
+                return 0; /* JSON has no other string escape forms. */
         }
         else
         {
+            if ((unsigned char)*p < 0x20) return 0;
             if (o + 1 < size)
                 out[o++] = *p;
             else if (overflow) *overflow = 1;
