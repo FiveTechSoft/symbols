@@ -99,6 +99,34 @@ def cmake_cache(build_dir):
     return out
 
 
+def cmake_compiler_id_version(build_dir):
+    """Read compiler id+version from CMakeFiles/<ver>/CMakeCCompiler.cmake.
+
+    Every generator writes it, including multi-config ones whose cache lacks
+    CMAKE_C_COMPILER_ID/VERSION entries. Returns 'ID VERSION' or None.
+    """
+    import glob
+    hits = sorted(glob.glob(os.path.join(build_dir, 'CMakeFiles', '*',
+                                         'CMakeCCompiler.cmake')))
+    if len(hits) != 1:
+        return None
+    cid = cver = None
+    try:
+        with open(hits[0], 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                m = re.match(r'set\(CMAKE_C_COMPILER_ID "([^"]+)"\)', line.strip())
+                if m:
+                    cid = m.group(1)
+                m = re.match(r'set\(CMAKE_C_COMPILER_VERSION "([^"]+)"\)', line.strip())
+                if m:
+                    cver = m.group(1)
+    except OSError:
+        return None
+    if cid and cver:
+        return '%s %s' % (cid, cver)
+    return None
+
+
 def run_child(argv):
     """Run argv once. Return (rc, stdout_bytes, peak_rss_bytes, method).
 
@@ -295,20 +323,22 @@ def main(argv):
         cache = cmake_cache(args.build_dir)
         toolchain = args.toolchain
         build_type = args.build_type
-        if cache is not None:
+        if cache is not None and toolchain is None:
             cid = cache.get('CMAKE_C_COMPILER_ID', '')
             cver = cache.get('CMAKE_C_COMPILER_VERSION', '')
-            if toolchain is None and cid and cver:
+            if cid and cver:
                 toolchain = '%s %s' % (cid, cver)
-            if toolchain is None:
-                cc = cache.get('CMAKE_C_COMPILER', '')
-                if cc:
-                    probe = subprocess.run([cc, '--version'], capture_output=True,
-                                           text=True, timeout=30)
-                    if probe.returncode == 0 and probe.stdout.splitlines():
-                        toolchain = probe.stdout.splitlines()[0].strip()
-            if build_type is None:
-                build_type = cache.get('CMAKE_BUILD_TYPE') or None
+        if toolchain is None:
+            toolchain = cmake_compiler_id_version(args.build_dir)
+        if toolchain is None and cache is not None:
+            cc = cache.get('CMAKE_C_COMPILER', '')
+            if cc:
+                probe = subprocess.run([cc, '--version'], capture_output=True,
+                                       text=True, timeout=30)
+                if probe.returncode == 0 and probe.stdout.splitlines():
+                    toolchain = probe.stdout.splitlines()[0].strip()
+        if build_type is None and cache is not None:
+            build_type = cache.get('CMAKE_BUILD_TYPE') or None
         if toolchain is None or not is_text(toolchain):
             raise Refuse('toolchain unknown (no CMakeCache and no --toolchain)')
         if build_type is None or not is_text(build_type):

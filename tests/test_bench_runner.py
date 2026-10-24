@@ -212,6 +212,30 @@ def main():
                       rec['environment']['toolchain'] == 'stubcc 9.9.9 (fake)',
                       rec['environment']['toolchain'])
 
+        # CMakeFiles fallback: id+version from CMakeCCompiler.cmake (the file
+        # every generator writes, incl. multi-config MSVC).
+        cmf_build = os.path.join(tmp, 'cmfbuild')
+        os.makedirs(os.path.join(cmf_build, 'CMakeFiles', '3.28.0'))
+        with open(os.path.join(cmf_build, 'CMakeFiles', '3.28.0',
+                               'CMakeCCompiler.cmake'), 'w', encoding='utf-8') as f:
+            f.write('set(CMAKE_C_COMPILER_ID "MSVC")\n')
+            f.write('set(CMAKE_C_COMPILER_VERSION "19.44.35207")\n')
+        out = os.path.join(tmp, 'cmf.json')
+        p = subprocess.run([sys.executable, RUNNER, '--exe', sys.executable,
+                            '--exe-arg', fixture, '--exe-arg', 'ok',
+                            '--build-dir', cmf_build, '--fixture-id', 'synthetic',
+                            '--corpus-version', 'seed:42', '--min-samples', '30',
+                            '--phase', 'work', '--out', out,
+                            '--subject-sha', 'd' * 40,
+                            '--build-type', 'Release'],
+                           capture_output=True, text=True, timeout=120)
+        check('CMakeFiles fallback rc', p.returncode == 0, p.stderr.strip()[:120])
+        if p.returncode == 0:
+            rec = json.load(open(out, encoding='utf-8'))
+            check('CMakeFiles fallback value',
+                  rec['environment']['toolchain'] == 'MSVC 19.44.35207',
+                  rec['environment']['toolchain'])
+
         # Missing environment: no CMakeCache and no overrides must refuse.
         empty_build = os.path.join(tmp, 'emptybuild')
         os.makedirs(empty_build)

@@ -46,6 +46,12 @@ def main():
         return 1
     exe = found[0]
     print('using benchmark: %s' % exe)
+    # Multi-config trees carry the configuration in the exe's parent dir; the
+    # runner must record it because the cache has no CMAKE_BUILD_TYPE there.
+    config = os.path.basename(os.path.dirname(exe))
+    extra = []
+    if config in ('Release', 'Debug', 'RelWithDebInfo', 'MinSizeRel'):
+        extra = ['--build-type', config]
 
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, 'record.json')
@@ -54,7 +60,7 @@ def main():
                 '--build-dir', build, '--fixture-id', 'bench_1m_relations',
                 '--corpus-version', 'seed:42/99999', '--min-samples', '30',
                 '--phase', 'insert', '--phase', 'query',
-                '--out', out]
+                '--out', out] + extra
         p = subprocess.run(argv, capture_output=True, text=True, timeout=300)
         check('runner rc', p.returncode == 0, p.stderr.strip()[:200])
         if p.returncode != 0:
