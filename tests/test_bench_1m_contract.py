@@ -33,10 +33,19 @@ def main():
         return 1
     build = os.path.abspath(sys.argv[1])
     suffix = '.exe' if os.name == 'nt' else ''
-    exe = os.path.join(build, 'bench_1m' + suffix)
-    if not os.path.isfile(exe):
-        print('FAIL: bench_1m not found at %s' % exe)
+    # Single-config generators place the exe at the build root; multi-config
+    # generators (Visual Studio) place it under <config>/. Accept exactly one
+    # candidate anywhere one level deep; ambiguous or missing fails closed.
+    import glob as globmod
+    pattern = os.path.join(build, '*', 'bench_1m' + suffix)
+    found = [c for c in [os.path.join(build, 'bench_1m' + suffix)]
+             if os.path.isfile(c)]
+    found += [c for c in sorted(globmod.glob(pattern)) if os.path.isfile(c)]
+    if len(found) != 1:
+        print('FAIL: bench_1m candidates found: %s' % (found or 'none'))
         return 1
+    exe = found[0]
+    print('using benchmark: %s' % exe)
 
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, 'record.json')
