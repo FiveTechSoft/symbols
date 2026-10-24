@@ -1,6 +1,7 @@
 #include "duration_join_research.h"
 #include "tl_sha256.h"
 #include "windows_timeout_fact_research.h"
+#include "powershell_sleep_fact_research.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,17 +78,20 @@ static const SourceClause *find_denial(const SourceClause *index,size_t count,co
  if(lo==count||strcmp(index[lo].activity,key.activity)||strcmp(index[lo].command,key.command)||strcmp(index[lo].shell,key.shell))return NULL;
  return &index[lo];
 }
-static int join_envelope(const char*q,const char*corpus,const char*fact,char*out,size_t cap){
+static int join_envelope(const char*q,const char*corpus,const char*fact,const char*psfact,char*out,size_t cap){
  if(!q||strncmp(q,"duration-fact ",14))return 0;
  if(!out||!cap)return 1;out[0]=0;
  char platform[32],shell[32],value[32],unit[32],qualifier[32],tail;long requested;
  int fields=sscanf(q,"duration-fact platform=%31s shell=%31s value=%31s unit=%31s qualifier=%31s %c",platform,shell,value,unit,qualifier,&tail);
  if(fields!=5||!numeric(value,&requested)||requested<0){snprintf(out,cap,"UNSUPPORTED_REQUEST: explicit interpreted numeric envelope required; natural-language normalization is not implemented.");return 1;}
- if(strcmp(platform,"Windows")||strcmp(shell,"CMD")){snprintf(out,cap,"OUT_OF_SCOPE: reviewed fact is Windows CMD only.");return 1;}
+ int powershell=!strcmp(shell,"PowerShell");
+ if(powershell&&!psfact){snprintf(out,cap,"OUT_OF_SCOPE: PowerShell evidence is not enabled for this call.");return 1;}
+ if(powershell&&strcmp(platform,"unspecified")){snprintf(out,cap,"UNSUPPORTED_PLATFORM: explicit PowerShell platform combination is not reviewed.");return 1;}
+ if(!powershell&&(strcmp(platform,"Windows")||strcmp(shell,"CMD"))){snprintf(out,cap,"OUT_OF_SCOPE: reviewed fact is Windows CMD only.");return 1;}
  if(strcmp(unit,"seconds")){snprintf(out,cap,"UNSUPPORTED_UNIT: no conversion rule is loaded.");return 1;}
  if(strcmp(qualifier,"default")&&strcmp(qualifier,"ignore_keyboard")&&strcmp(qualifier,"exact_wall")){snprintf(out,cap,"UNSUPPORTED_QUALIFIER");return 1;}
- size_t fn,cn;unsigned char*fb=readall(fact,&fn);char fh[65],ch[65];if(!fb){snprintf(out,cap,"MISSING_FACT: no reviewed parameter evidence loaded.");return 1;}digest(fb,fn,fh);free(fb);
- if(strcmp(fh,WINDOWS_TIMEOUT_FACT_SHA)){snprintf(out,cap,"UNVERIFIED_FACT: sidecar differs from the reviewed byte identity.");return 1;}
+ size_t fn,cn;const char *selected_fact=powershell?psfact:fact;unsigned char*fb=selected_fact?readall(selected_fact,&fn):NULL;char fh[65],ch[65];if(!fb){snprintf(out,cap,"MISSING_FACT: no reviewed parameter evidence loaded.");return 1;}digest(fb,fn,fh);free(fb);
+ if(strcmp(fh,powershell?POWERSHELL_SLEEP_FACT_SHA:WINDOWS_TIMEOUT_FACT_SHA)){snprintf(out,cap,"UNVERIFIED_FACT: sidecar differs from the reviewed byte identity.");return 1;}
  unsigned char*cb=readall(corpus,&cn);if(!cb){snprintf(out,cap,"UNSUPPORTED_SOURCE: corpus bytes unavailable or unsupported.");return 1;}digest(cb,cn,ch);
  size_t clause_count=0;SourceClause *clauses=source_clauses(cb,cn,&clause_count);
  if(!clauses){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE_SCOPE: clause allocation or capacity failure.");return 1;}
@@ -99,7 +103,7 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;int conflict=0;size_t pos_a=0,pos_b=0,neg_a=0,neg_b=0;
  for(size_t i=0;i<clause_count;i++){
   const SourceClause *c=&clauses[i];if(c->negative||strcmp(c->shell,shell))continue;
-  int nb=0;if(!WindowsTimeoutFactMatches(c->command,requested,qualifier,&nb))continue;
+  int nb=0;if(powershell?!PowerShellSleepFactMatches(c->command,requested,qualifier):!WindowsTimeoutFactMatches(c->command,requested,qualifier,&nb))continue;
   count++;chosen_a=c->command_a;chosen_b=c->command_b;snprintf(chosen,sizeof(chosen),"%s",c->command);chosen_nobreak=nb;
   const SourceClause *denial=find_denial(indexed,indexed_count,c);
   if(denial){conflict=1;pos_a=c->line_a;pos_b=c->line_b;neg_a=denial->line_a;neg_b=denial->line_b;}
@@ -108,6 +112,7 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  else if(count==0)snprintf(out,cap,"NO_SUPPORT: no unambiguous source clause and reviewed parameter fact support this numeric request and qualifier. No duration, sentinel or unit conversion is inferred.");
  else if(count>1)snprintf(out,cap,"AMBIGUOUS: %u source clauses match; no command selected.",count);
  else if(chosen_b>cn||memcmp(cb+chosen_a,chosen,chosen_b-chosen_a))snprintf(out,cap,"UNSUPPORTED_SOURCE: evidence range mismatch.");
+ else if(powershell){int w=snprintf(out,cap,"DOCUMENTATION-SUPPORTED, not PowerShell execution\nCommand from corpus: %s\nInterpreted request: platform=unspecified shell=PowerShell value=%ld unit=seconds qualifier=default\nRule: documented Microsoft.PowerShell.Utility Start-Sleep cmdlet + literal -Seconds + integer subset 0..99; not a vendor maximum.\nAssumption: unqualified command refers to documented cmdlet; target session runtime identity is NOT verified and names can be shadowed.\nConditions: Ctrl+C interrupts Start-Sleep. No exact wall-clock guarantee or ignore-keyboard claim.\nCorpus: %s sha256=%s bytes[%zu,%zu)\nParameter fact: microsoft.powershell.start-sleep.seconds.integer-subset sha256=%s\nSources: %s\n%s\nVersions checked: Windows PowerShell 5.1 (Seconds Int32), PowerShell 7.6 (Seconds Double; fractions since 6.2 excluded). Platform unspecified, not inferred Windows.\nNatural-language morphology and number words are NOT interpreted by this diagnostic.",chosen,requested,corpus,ch,chosen_a,chosen_b,fh,POWERSHELL_SLEEP_SOURCE_51,POWERSHELL_SLEEP_SOURCE_76);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
  else {int w=snprintf(out,cap,"DOCUMENTATION-SUPPORTED, not Windows execution\nCommand from corpus: %s\nInterpreted request: platform=%s shell=%s value=%ld unit=%s qualifier=%s\nRule: same shell + command timeout + parameter /t + integer value + seconds\nKeyboard: %s. No exact wall-clock guarantee.\nCorpus: %s sha256=%s bytes[%zu,%zu)\nParameter fact: microsoft.cmd.timeout.t.seconds sha256=%s\nSource: %s\nFact excerpt: /t specifies seconds, range -1..99999; -1 is indefinite until keystroke. /nobreak ignores key strokes.\nNatural-language morphology and number words are NOT interpreted by this diagnostic.",chosen,platform,shell,requested,unit,qualifier,chosen_nobreak?"key strokes ignored":"a key stroke may resume early",corpus,ch,chosen_a,chosen_b,fh,WINDOWS_TIMEOUT_SOURCE_URL);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
  free(indexed);free(clauses);free(cb);return 1;
 }
@@ -123,9 +128,9 @@ static int word_number(const char *s) {
  for(int i=0;i<8;i++)if(!strcmp(s,tens[i]))return (i+2)*10;
  return -1;
 }
-int DurationJoinResearch(const char *query,const char *corpus,const char *fact,char *out,size_t cap) {
+int DurationJoinResearchWithFacts(const char *query,const char *corpus,const char *fact,const char *psfact,char *out,size_t cap) {
  if(!query)return 0;
- if(!strncmp(query,"duration-fact ",14))return join_envelope(query,corpus,fact,out,cap);
+ if(!strncmp(query,"duration-fact ",14))return join_envelope(query,corpus,fact,psfact,out,cap);
  char tokens[48][40];size_t starts[48],ends[48];unsigned n=0;size_t pos=0;
  int malformed=0,has_duration=0;
  while(query[pos]) {
@@ -145,14 +150,14 @@ int DurationJoinResearch(const char *query,const char *corpus,const char *fact,c
  if(!n||(strcmp(tokens[0],"which")&&strcmp(tokens[0],"what")&&strcmp(tokens[0],"how"))||!has_duration)return 0;
  if(!out||!cap)return 1;
  #define IS(k,s) ((k)<n&&!strcmp(tokens[(k)],(s)))
- unsigned i=1;const char *platform="Windows",*shell=NULL;long value=-1;unsigned number_at=0,number_end=0;
+ unsigned i=1;const char *platform="Windows",*shell=NULL;int explicit_platform=0;long value=-1;unsigned number_at=0,number_end=0;
  int how=IS(0,"how");
  if(how){
   if(!IS(i,"do")||!IS(i+1,"i"))malformed=1;else i+=2;
   if(!(IS(i,"sleep")||IS(i,"wait")||IS(i,"pause")))malformed=1;else i++;
   if(!IS(i,"for"))malformed=1;else i++;
  }else{
-  if(IS(i,"windows")||IS(i,"linux")){platform=IS(i,"windows")?"Windows":"Linux";i++;}
+  if(IS(i,"windows")||IS(i,"linux")){explicit_platform=1;platform=IS(i,"windows")?"Windows":"Linux";i++;}
   if(IS(i,"command")&&IS(i+1,"in")){i+=2;if(i<n)shell=tokens[i++];}
   else {if(i<n)shell=tokens[i++];if(!IS(i,"command"))malformed=1;else i++;}
   if(!(IS(i,"sleeps")||IS(i,"waits")||IS(i,"pauses")))malformed=1;else i++;
@@ -167,13 +172,16 @@ int DurationJoinResearch(const char *query,const char *corpus,const char *fact,c
  if(how){if(!IS(i,"in"))malformed=1;else i++;if(i<n)shell=tokens[i++];}
  if(IS(i,"without")&&IS(i+1,"keyboard")&&IS(i+2,"interruption")){if(strcmp(qualifier,"default"))malformed=1;qualifier="ignore_keyboard";i+=3;}
  if(malformed||!shell||value<0||!unit||i!=n||number_at==number_end){snprintf(out,cap,"UNSUPPORTED_NATURAL_REQUEST: bounded duration grammar requires a complete positive question, explicit shell, finite number, unit and supported condition; no tokens were dropped.");return 1;}
- char envelope[256];int w=snprintf(envelope,sizeof(envelope),"duration-fact platform=%s shell=%s value=%ld unit=%s qualifier=%s",platform,!strcmp(shell,"cmd")?"CMD":shell,value,unit,qualifier);
+ int ps=!strcmp(shell,"powershell");if(ps&&!explicit_platform)platform="unspecified";
+ char envelope[256];int w=snprintf(envelope,sizeof(envelope),"duration-fact platform=%s shell=%s value=%ld unit=%s qualifier=%s",platform,!strcmp(shell,"cmd")?"CMD":ps?"PowerShell":shell,value,unit,qualifier);
  if(w<0||(size_t)w>=sizeof(envelope)){snprintf(out,cap,"UNSUPPORTED_NATURAL_REQUEST: interpreted query overflow.");return 1;}
- int r=join_envelope(envelope,corpus,fact,out,cap);
+ int r=join_envelope(envelope,corpus,fact,psfact,out,cap);
  const char *old="Natural-language morphology and number words are NOT interpreted by this diagnostic.";
  char *note=strstr(out,old);if(note)*note=0;
- size_t used=strlen(out);w=snprintf(out+used,cap-used,"\nNormalization: bounded English duration question; number bytes[%zu,%zu) -> %ld; verb=sleep/wait/pause inflection. All query tokens consumed. No arbitrary QA or Windows execution.",starts[number_at],ends[number_end-1],value);
+ size_t used=strlen(out);w=snprintf(out+used,cap-used,"\nNormalization: bounded English duration question; number bytes[%zu,%zu) -> %ld; verb=sleep/wait/pause inflection. All query tokens consumed. No arbitrary QA or %s execution.",starts[number_at],ends[number_end-1],value,ps?"PowerShell":"Windows");
  if(w<0||(size_t)w>=cap-used)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");
  return r;
  #undef IS
 }
+
+int DurationJoinResearch(const char *query,const char *corpus,const char *fact,char *out,size_t cap){return DurationJoinResearchWithFacts(query,corpus,fact,NULL,out,cap);}

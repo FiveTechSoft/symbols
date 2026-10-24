@@ -1,0 +1,13 @@
+{
+  "schema": "symbols.source_specific_parameter_fact.v1",
+  "fact_id": "microsoft.powershell.start-sleep.seconds.integer-subset",
+  "scope": {"platform": "unspecified", "shell": "PowerShell", "implementation": "Microsoft.PowerShell.Utility Start-Sleep documented cmdlet", "versions_checked": ["Windows PowerShell 5.1", "PowerShell 7.6"], "runtime_identity_verified": false},
+  "research_subset": {"literal_command": "Start-Sleep -Seconds N", "number": "non-negative decimal integer", "minimum": 0, "maximum": 99, "unit": "seconds", "qualifier": "default", "subset_not_vendor_maximum": true},
+  "conditions": {"ctrl_c_interrupts": true, "exact_wall_clock_guarantee": false, "unqualified_name_may_be_shadowed": true},
+  "sources": [
+    {"url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/start-sleep?view=powershell-5.1", "retrieved_date": "2026-10-24", "seconds_type": "Int32", "parameter_excerpt": "Specifies how long the resource sleeps in seconds.", "example": "Start-Sleep -Seconds 5", "interruption_excerpt": "Ctrl+C breaks out of Start-Sleep."},
+    {"url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/start-sleep?view=powershell-7.6", "retrieved_date": "2026-10-24", "seconds_type": "Double", "version_excerpt": "Beginning in PowerShell 6.2.0, this parameter now accepts fractional values.", "example": "Start-Sleep -Seconds 5", "interruption_excerpt": "Ctrl+C breaks out of Start-Sleep."},
+    {"url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.6", "retrieved_date": "2026-10-24", "precedence_excerpt": "Alias, Function, Cmdlet, External executable files"}
+  ],
+  "exclusions": ["fractions", "milliseconds", "Duration", "abbreviations", "positional parameters", "pipelines", "expressions", "conversions", "explicit platform", "exact_wall", "ignore_keyboard", "runtime execution"]
+}

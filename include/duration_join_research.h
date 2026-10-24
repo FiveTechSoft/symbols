@@ -6,4 +6,6 @@
    stated unresolved condition. No shell/tool execution occurs. */
 int DurationJoinResearch(const char *query,const char *corpus,const char *fact,
                          char *out,size_t capacity);
+int DurationJoinResearchWithFacts(const char *query,const char *corpus,const char *cmd_fact,
+ const char *powershell_fact,char *out,size_t capacity);
 #endif

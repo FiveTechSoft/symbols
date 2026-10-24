@@ -2274,7 +2274,8 @@ static void HandleCompletions(socket_t s, const char *body,
     /* Opt-in bounded duration query or explicit diagnostic envelope. */
     {
         const char *fact = getenv("SYMBOLS_DURATION_FACT");
-        if (fact && DurationJoinResearch(query, corpus, fact, content, sizeof(content)))
+        const char *psfact = getenv("SYMBOLS_POWERSHELL_DURATION_FACT");
+        if ((fact || psfact) && DurationJoinResearchWithFacts(query, corpus, fact, psfact, content, sizeof(content)))
         {
             if (ServerWantsStream(body))
             {

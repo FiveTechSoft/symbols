@@ -1556,8 +1556,8 @@ sllm_test(test_edit_route tests/test_edit_route.c)
 # Separate opt-in diagnostic server, never the default target.
 option(SYMBOLS_DURATION_JOIN_RESEARCH "Build scoped source-grounded duration research server" OFF)
 if(SYMBOLS_DURATION_JOIN_RESEARCH)
-    add_executable(symbols-duration-research src/symbols_server.c src/duration_join_research.c src/windows_timeout_fact_research.c)
-    add_executable(duration-join-research-cli tests/research/duration_join_cli.c src/duration_join_research.c src/windows_timeout_fact_research.c)
+    add_executable(symbols-duration-research src/symbols_server.c src/duration_join_research.c src/windows_timeout_fact_research.c src/powershell_sleep_fact_research.c)
+    add_executable(duration-join-research-cli tests/research/duration_join_cli.c src/duration_join_research.c src/windows_timeout_fact_research.c src/powershell_sleep_fact_research.c)
     target_link_libraries(duration-join-research-cli PRIVATE symbolic)
     target_compile_definitions(symbols-duration-research PRIVATE SYMBOLS_DURATION_JOIN_RESEARCH)
     target_link_libraries(symbols-duration-research PRIVATE symbolic)
@@ -1590,4 +1590,9 @@ if(SYMBOLS_DURATION_JOIN_RESEARCH)
     add_test(NAME duration_symmetric_source_research_directed COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_SOURCE_DIR}/tests/research/test_duration_symmetric_source.py
         $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-symmetric-source.json)
+endif()
+if(SYMBOLS_DURATION_JOIN_RESEARCH)
+    add_test(NAME duration_powershell_research_directed COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/research/test_duration_powershell.py
+        $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-powershell.json)
 endif()

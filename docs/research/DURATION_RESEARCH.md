@@ -10,7 +10,7 @@ cmake --build build-duration --config Release --target symbols-duration-research
 ctest --test-dir build-duration -C Release -R "^duration_.*research_directed$" --output-on-failure
 ```
 
-These five tests are directed development checks, not independent holdout tests.
+These six tests are directed development checks, not independent holdout tests.
 They are registered only when the research flag is ON. No workflow or guard
 changes are needed. A fresh default configuration has neither these targets
 nor these tests. MSVC execution has not yet been verified.
@@ -76,3 +76,48 @@ malloc requests are 1255 bytes for the fact, 1048577 each for source and scratch
 and 696 each for the single clause and minimum index allocation. This replaces
 the previous draft's roughly 90 MiB clause reservation. Allocation failure
 returns an explicit unsupported result, with no selected command.
+
+## PowerShell documentation subset (local research)
+
+A separate source-specific byte-pinned sidecar documents the literal
+`Start-Sleep -Seconds N` command for the Microsoft.PowerShell.Utility cmdlet,
+checked against Windows PowerShell 5.1 and PowerShell 7.6 vendor references.
+Only decimal integers 0..99, seconds and the default qualifier are accepted.
+This range is a deliberate subset, not the vendor's maximum. Fractions,
+milliseconds, Duration, aliases, parameter abbreviations, positional arguments,
+pipelines, expressions, conversions and generated commands remain excluded.
+Ctrl+C interrupts Start-Sleep; exact-wall and ignore-keyboard claims are not
+supported. An unqualified name may be shadowed. Output states the documented
+cmdlet assumption and does not claim runtime identity or execution.
+
+Enable only in the opt-in research build, with the independent environment
+variable `SYMBOLS_POWERSHELL_DURATION_FACT` pointing to
+`docs/research/parameter_facts/powershell-start-sleep.json`. The existing
+`SYMBOLS_DURATION_FACT` remains the CMD fact path. `DurationJoinResearch` keeps
+its old single-fact scope; `DurationJoinResearchWithFacts` takes both paths
+explicitly. The CLI's optional fifth argument supplies the PowerShell fact.
+
+A natural PowerShell question without a platform now builds an explicit
+`platform=unspecified shell=PowerShell` research envelope, not an inferred
+Windows claim. An explicit Windows/Linux platform for PowerShell is rejected
+as unreviewed when PowerShell evidence is enabled. Existing explicit envelopes
+are not changed or reinterpreted; CMD keeps its documented Windows contract.
+The first slice does not add a platform-aware How grammar: extra platform
+words there fail complete request consumption. No Bash adapter is added.
+
+Sources (retrieved 2026-10-24):
+- https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/start-sleep?view=powershell-5.1
+- https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/start-sleep?view=powershell-7.6
+- https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.6
+
+Version differences are preserved: 5.1 documents Seconds as Int32; 7.6 documents
+Double and fractional support since 6.2. Neither fact is generalized into a
+cross-version fractional contract. No PowerShell runtime, Windows execution,
+MSVC opt-in build or independent holdout is claimed by these directed tests.
+
+Compatibility claim is limited: 200 CMD responses were compared byte for byte
+with the prior reader. The legacy single-fact API still rejects PowerShell,
+but its OUT_OF_SCOPE message and natural-language normalization wording differ;
+no full legacy-response equivalence is claimed. With only the PowerShell fact
+path configured, PowerShell works and CMD reports MISSING_FACT without loading
+an unrelated fact or crashing.
