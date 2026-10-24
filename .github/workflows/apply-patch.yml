@@ -170,6 +170,10 @@ jobs:
           if [ -d docs ]; then
             git add -- docs
           fi
+          # Include additions, edits and deletion of the last tracked shell file.
+          if [ -d data/shells ] || git ls-files --error-unmatch -- 'data/shells/*' >/dev/null 2>&1; then
+            git add -A -- data/shells
+          fi
           git diff --cached --quiet && { echo 'Nothing to commit'; exit 1; }
           # The index must hold exactly the files of the reviewed patch.
           "$GATE" verify-staged .git/change.patch
