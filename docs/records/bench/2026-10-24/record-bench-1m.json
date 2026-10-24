@@ -1,0 +1,74 @@
+{
+  "command": [
+    "tools/bench_runner.py",
+    "--exe",
+    "/tmp/b1/bench_1m",
+    "--build-dir",
+    "/tmp/b1",
+    "--fixture-id",
+    "bench_1m_relations",
+    "--corpus-version",
+    "seed:42/99999",
+    "--min-samples",
+    "30",
+    "--phase",
+    "insert",
+    "--phase",
+    "query",
+    "--out",
+    "docs/records/bench/2026-10-24/record-bench-1m.json"
+  ],
+  "complete": true,
+  "date_utc": "2026-10-24T00:46:53Z",
+  "environment": {
+    "arch": "x86_64",
+    "build_type": "Release",
+    "ci": "none",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.60GHz",
+    "os": "Linux",
+    "os_release": "6.1.158+",
+    "toolchain": "GNU 11.4.0"
+  },
+  "executable_sha256": "5f8a161fc4d8fb5651ab7ee8eae167292e4832248f17d1e49c9d1ec64af2a804",
+  "fixture": {
+    "corpus_version": "seed:42/99999",
+    "id": "bench_1m_relations"
+  },
+  "limitations": [
+    "single machine, no CPU pinning or isolation",
+    "development measurement, not a latency guarantee",
+    "no comparative or baseline claim"
+  ],
+  "memory": {
+    "method": "wait4-ru_maxrss",
+    "peak_rss_bytes": 55431168
+  },
+  "min_samples": 30,
+  "phases": {
+    "insert": {
+      "max": 4934352,
+      "mean": 1279211.25,
+      "median": 1164389.5,
+      "min": 1037275,
+      "n": 100,
+      "p95": 1658397,
+      "p99": 1695638,
+      "stdev": 410882.17337960465,
+      "unit": "ns"
+    },
+    "query": {
+      "max": 147072,
+      "mean": 121665.97,
+      "median": 119305.0,
+      "min": 109962,
+      "n": 100,
+      "p95": 136202,
+      "p99": 143775,
+      "stdev": 7749.511080648895,
+      "unit": "ns"
+    }
+  },
+  "repetitions": 1,
+  "subject_sha": "e3ad2a677605b7c2a9315ea183450238d8b8bd94",
+  "version": 1
+}
