@@ -16,6 +16,9 @@
 #include "learn.h"
 #include "chat.h"
 #include "server_proto.h"
+#ifdef SYMBOLS_DURATION_JOIN_RESEARCH
+#include "duration_join_research.h"
+#endif
 #include "server_subagent.h"
 #include "output_contract.h"
 #include "c_edit_ops.h"
@@ -2266,6 +2269,27 @@ static void HandleCompletions(socket_t s, const char *body,
         SendError(s, 400, "Bad Request", "no user message found");
         return;
     }
+
+#ifdef SYMBOLS_DURATION_JOIN_RESEARCH
+    /* Opt-in bounded duration query or explicit diagnostic envelope. */
+    {
+        const char *fact = getenv("SYMBOLS_DURATION_FACT");
+        if (fact && DurationJoinResearch(query, corpus, fact, content, sizeof(content)))
+        {
+            if (ServerWantsStream(body))
+            {
+                char sse[16384];
+                if (ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse)))
+                    SendRaw(s, 200, "OK", "text/event-stream", sse);
+                else SendError(s, 500, "Internal Error", "research evidence too large");
+            }
+            else if (ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp)))
+                SendJson(s, 200, "OK", resp);
+            else SendError(s, 500, "Internal Error", "research evidence too large");
+            return;
+        }
+    }
+#endif
 
     /* Track last file/entity mentioned for enclitic pronoun resolution */
     {

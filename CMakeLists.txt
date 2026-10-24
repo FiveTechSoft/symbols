@@ -1552,3 +1552,27 @@ endif()
 sllm_test(test_chat_repeat tests/test_chat_repeat.c)
 
 sllm_test(test_edit_route tests/test_edit_route.c)
+
+# Separate opt-in diagnostic server, never the default target.
+option(SYMBOLS_DURATION_JOIN_RESEARCH "Build scoped source-grounded duration research server" OFF)
+if(SYMBOLS_DURATION_JOIN_RESEARCH)
+    add_executable(symbols-duration-research src/symbols_server.c src/duration_join_research.c src/windows_timeout_fact_research.c)
+    add_executable(duration-join-research-cli tests/research/duration_join_cli.c src/duration_join_research.c src/windows_timeout_fact_research.c)
+    target_link_libraries(duration-join-research-cli PRIVATE symbolic)
+    target_compile_definitions(symbols-duration-research PRIVATE SYMBOLS_DURATION_JOIN_RESEARCH)
+    target_link_libraries(symbols-duration-research PRIVATE symbolic)
+    if(WIN32)
+        target_link_libraries(symbols-duration-research PRIVATE ws2_32)
+    endif()
+endif()
+
+# Explicit research test registration; no effect on default inventory.
+if(SYMBOLS_DURATION_JOIN_RESEARCH)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME duration_join_research_directed COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/research/test_duration_join_c_development.py
+        $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-directed.json)
+    add_test(NAME duration_natural_research_directed COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/research/test_duration_natural_development.py
+        $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-natural.json)
+endif()

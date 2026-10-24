@@ -1,0 +1,17 @@
+{
+  "schema": "symbols.command_parameter_fact.v1",
+  "fact_id": "microsoft.cmd.timeout.t.seconds",
+  "scope": {"platform": "Windows", "shell": "CMD", "command": "timeout", "implementation": "Microsoft Windows command processor"},
+  "parameter": {"selector": "/t", "type": "integer", "unit": "seconds", "minimum": -1, "maximum": 99999, "sentinels": {"-1": "indefinite_until_keystroke"}},
+  "options": {"/nobreak": {"ignores_keyboard_interrupt": true}},
+  "default_conditions": {"keyboard_can_resume_early": true, "wall_clock_guarantee": false},
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/timeout",
+    "retrieved_date": "2026-10-24",
+    "evidence_kind": "vendor_documentation_not_runtime",
+    "syntax_excerpt": "timeout /t <timeoutinseconds> [/nobreak]",
+    "parameter_excerpt": "Specifies the decimal number of seconds (between -1 and 99999) to wait before the command processor continues processing. The value -1 causes the computer to wait indefinitely for a keystroke.",
+    "interruption_excerpt": "A user keystroke resumes the command processor execution immediately, even if the timeout period has not expired.",
+    "option_excerpt": "Specifies to ignore user key strokes."
+  }
+}
