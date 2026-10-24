@@ -10,7 +10,7 @@ cmake --build build-duration --config Release --target symbols-duration-research
 ctest --test-dir build-duration -C Release -R "^duration_.*research_directed$" --output-on-failure
 ```
 
-These two tests are directed development checks, not independent holdout tests.
+These three tests are directed development checks, not independent holdout tests.
 They are registered only when the research flag is ON. No workflow or guard
 changes are needed. A fresh default configuration has neither these targets
 nor these tests. MSVC execution has not yet been verified.
@@ -27,3 +27,12 @@ The sidecar must match the reviewed byte identity. This is not generic JSON
 fact loading. `/nobreak` concerns keyboard interruption, not exact wall time.
 No command is synthesized: quantity and unit must join a command present in
 the supplied corpus to the reviewed fact. Unsupported requests return limits.
+
+The additional request-frame slice accepts `How do I sleep|wait|pause for
+NUMBER UNIT in SHELL?` and explicit command questions with optional `for`,
+such as `Which CMD command waits five seconds?`. Quantity, unit and qualifier
+parsing is shared with the existing question frame. This adds no facts, shells,
+unit conversion or synthesized commands. Complete token consumption still
+refuses negation, extra actions and unsupported conditions. Hyphenated number
+words and arbitrary paraphrases remain unsupported. The request-frame matrix
+is directed development testing, not an independent language holdout.

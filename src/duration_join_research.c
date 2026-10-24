@@ -96,21 +96,29 @@ int DurationJoinResearch(const char *query,const char *corpus,const char *fact,c
   if(!strcmp(tokens[n],"sleep")||!strcmp(tokens[n],"sleeps")||!strcmp(tokens[n],"wait")||!strcmp(tokens[n],"waits")||!strcmp(tokens[n],"pause")||!strcmp(tokens[n],"pauses"))has_duration=1;
   n++;
  }
- if(!n||(strcmp(tokens[0],"which")&&strcmp(tokens[0],"what"))||!has_duration)return 0;
+ if(!n||(strcmp(tokens[0],"which")&&strcmp(tokens[0],"what")&&strcmp(tokens[0],"how"))||!has_duration)return 0;
  if(!out||!cap)return 1;
  #define IS(k,s) ((k)<n&&!strcmp(tokens[(k)],(s)))
  unsigned i=1;const char *platform="Windows",*shell=NULL;long value=-1;unsigned number_at=0,number_end=0;
- if(IS(i,"windows")||IS(i,"linux")){platform=IS(i,"windows")?"Windows":"Linux";i++;}
- if(IS(i,"command")&&IS(i+1,"in")){i+=2;if(i<n)shell=tokens[i++];}
- else {if(i<n)shell=tokens[i++];if(!IS(i,"command"))malformed=1;else i++;}
- if(!(IS(i,"sleeps")||IS(i,"waits")||IS(i,"pauses")))malformed=1;else i++;
- if(!IS(i,"for"))malformed=1;else i++;
+ int how=IS(0,"how");
+ if(how){
+  if(!IS(i,"do")||!IS(i+1,"i"))malformed=1;else i+=2;
+  if(!(IS(i,"sleep")||IS(i,"wait")||IS(i,"pause")))malformed=1;else i++;
+  if(!IS(i,"for"))malformed=1;else i++;
+ }else{
+  if(IS(i,"windows")||IS(i,"linux")){platform=IS(i,"windows")?"Windows":"Linux";i++;}
+  if(IS(i,"command")&&IS(i+1,"in")){i+=2;if(i<n)shell=tokens[i++];}
+  else {if(i<n)shell=tokens[i++];if(!IS(i,"command"))malformed=1;else i++;}
+  if(!(IS(i,"sleeps")||IS(i,"waits")||IS(i,"pauses")))malformed=1;else i++;
+  if(IS(i,"for"))i++; /* Optional only in the explicit command question. */
+ }
  const char *qualifier="default";
  if(IS(i,"exactly")){qualifier="exact_wall";i++;}
  number_at=i;
  if(i<n){if(numeric(tokens[i],&value)){i++;}else {int w=word_number(tokens[i]);if(w>=0){value=w;i++;if(w>=20&&i<n){int u=word_number(tokens[i]);if(u>0&&u<10){value+=u;i++;}}}}}
  number_end=i;
  const char *unit=NULL;if(i<n){unit=tokens[i++];if(!strcmp(unit,"second"))unit="seconds";}
+ if(how){if(!IS(i,"in"))malformed=1;else i++;if(i<n)shell=tokens[i++];}
  if(IS(i,"without")&&IS(i+1,"keyboard")&&IS(i+2,"interruption")){if(strcmp(qualifier,"default"))malformed=1;qualifier="ignore_keyboard";i+=3;}
  if(malformed||!shell||value<0||!unit||i!=n||number_at==number_end){snprintf(out,cap,"UNSUPPORTED_NATURAL_REQUEST: bounded duration grammar requires a complete positive question, explicit shell, finite number, unit and supported condition; no tokens were dropped.");return 1;}
  char envelope[256];int w=snprintf(envelope,sizeof(envelope),"duration-fact platform=%s shell=%s value=%ld unit=%s qualifier=%s",platform,!strcmp(shell,"cmd")?"CMD":shell,value,unit,qualifier);

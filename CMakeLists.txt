@@ -1576,3 +1576,8 @@ if(SYMBOLS_DURATION_JOIN_RESEARCH)
         ${CMAKE_SOURCE_DIR}/tests/research/test_duration_natural_development.py
         $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-natural.json)
 endif()
+if(SYMBOLS_DURATION_JOIN_RESEARCH)
+    add_test(NAME duration_request_frames_research_directed COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/research/test_duration_request_frames.py
+        $<TARGET_FILE:duration-join-research-cli> ${CMAKE_BINARY_DIR}/duration-request-frames.json)
+endif()
