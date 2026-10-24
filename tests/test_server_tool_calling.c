@@ -285,6 +285,18 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(strstr(synth, "ReverseString") != NULL, "invertir prompt emits ReverseString");
     TEST_ASSERT(strstr(synth, "strlen") != NULL, "invertir prompt has a real body");
 
+    /* Question forms are not synthesis, and unmatched synthesis abstains. */
+    TEST_ASSERT(ServerIsCodeSynthesisTask("How do I write a systemd unit file with a Restart policy?") == 0,
+                "how-to question is not code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("Do PowerShell 5.1 and PowerShell 7 write the same default file encoding?") == 0,
+                "encoding question is not code synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("write a function to calculate factorial") == 1,
+                "imperative synthesis request stays synthesis");
+    TEST_ASSERT(ServerIsCodeSynthesisTask("funcion fibonacci en C?") == 1,
+                "C-flavored question still reaches synthesis");
+    ServerSynthesizeCode("write a haiku about kernels", synth, sizeof(synth));
+    TEST_ASSERT(strcmp(synth, "I don't know.") == 0, "unmatched synthesis abstains instead of emitting a vacuous skeleton");
+
     /* Conversational greetings and identity queries */
     TEST_ASSERT(ServerIsGreeting("hola") == 1, "Detects 'hola' as greeting");
     TEST_ASSERT(ServerIsGreeting("¡Hola!") == 1, "Detects '¡Hola!' as greeting");

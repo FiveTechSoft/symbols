@@ -3065,7 +3065,16 @@ static void HandleCompletions(socket_t s, const char *body,
         }
         else if (g_server_code_graph != NULL)
         {
-            snprintf(content, sizeof(content),
+            /* A coding-flavored question can still be grounded in the text
+               corpus. The repository summary only fits tasks about the
+               repository itself; anything else abstains instead of dumping
+               unrelated statistics. */
+            char raw3[8192];
+            if (g_session_ready && ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) && !ServerIsUnknown(raw3))
+                ServerMapContent(raw3, content, sizeof(content));
+            else if (is_repository_task)
+            {
+                snprintf(content, sizeof(content),
                      "### Repositorio de Codigo Indexado\n\n"
                      "- **Archivos**: %u\n"
                      "- **Funciones**: %u\n"
@@ -3078,6 +3087,9 @@ static void HandleCompletions(socket_t s, const char *body,
                      g_server_code_graph->total_structs,
                      g_server_code_graph->total_classes,
                      g_server_code_graph->total_calls);
+            }
+            else
+                snprintf(content, sizeof(content), "I don't know.");
         }
         else
         {

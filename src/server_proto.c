@@ -2694,6 +2694,16 @@ int ServerIsCodeSynthesisTask(const char *text)
     if (LooksLikeDefinitionQuestion(lower))
         return 0;
 
+    /* Questions ask; imperatives synthesize. A request ending in '?' is a
+       question unless it explicitly asks for C code or a known algorithm. */
+    {
+        size_t qlen = strlen(lower);
+        if (qlen > 0 && lower[qlen - 1] == '?' && !MatchesAlgorithmKeyword(lower) &&
+            strstr(lower, " en c ") == NULL && strstr(lower, " in c ") == NULL &&
+            strstr(lower, " en c?") == NULL && strstr(lower, " in c?") == NULL)
+            return 0;
+    }
+
     if (ServerIsFileCreationTask(text))
         return 0;
 
@@ -3538,13 +3548,9 @@ void ServerSynthesizeCode(const char *query, char *out, size_t out_sz)
         return;
     }
 
-    snprintf(out, out_sz,
-        "Aqui tienes la estructura en C (C11) para tu solicitud ('%s'):\n\n"
-        "```c\n"
-        "#include <stdio.h>\n"
-        "int main(void) { return 0; }\n"
-        "```\n",
-        query);
+    /* No template covers this request: abstain instead of emitting a
+       vacuous skeleton that pretends to answer it. */
+    snprintf(out, out_sz, "I don't know.");
 }
 
 int ServerIsRepositoryTask(const char *text)
