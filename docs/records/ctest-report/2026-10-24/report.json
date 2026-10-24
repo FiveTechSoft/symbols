@@ -1,0 +1,2013 @@
+{
+ "counts": {
+  "passed": 241,
+  "failed": 2,
+  "timed_out": 0,
+  "crashed": 0,
+  "skipped": 7,
+  "not_run": 0,
+  "unknown": 0
+ },
+ "tests": [
+  {
+   "name": "test_action",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00181111"
+  },
+  {
+   "name": "test_agent_core",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00184166"
+  },
+  {
+   "name": "test_agent_diagnose",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00183993"
+  },
+  {
+   "name": "test_agent_git",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.633882"
+  },
+  {
+   "name": "test_agent_git_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.412277"
+  },
+  {
+   "name": "test_agent_git_guard",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.358684"
+  },
+  {
+   "name": "test_agent_git_guard_mc1",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.376705"
+  },
+  {
+   "name": "test_agent_git_guard_mc2",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.341965"
+  },
+  {
+   "name": "test_agent_git_paths_C",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00211005"
+  },
+  {
+   "name": "test_agent_git_remote",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.653062"
+  },
+  {
+   "name": "test_agent_git_submodule",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.328247"
+  },
+  {
+   "name": "test_agent_hard_tasks",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.102901"
+  },
+  {
+   "name": "test_agent_patch",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0235139"
+  },
+  {
+   "name": "test_agent_patch_ctx_fuzz",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "2.86323"
+  },
+  {
+   "name": "test_agent_patch_ctxm_fuzz",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "2.79347"
+  },
+  {
+   "name": "test_agent_patch_eol",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.139462"
+  },
+  {
+   "name": "test_agent_patch_eol_crmc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.160764"
+  },
+  {
+   "name": "test_agent_patch_eol_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.153162"
+  },
+  {
+   "name": "test_agent_patch_fs",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0771387"
+  },
+  {
+   "name": "test_agent_patch_git_state",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.157185"
+  },
+  {
+   "name": "test_agent_patch_multi",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0984281"
+  },
+  {
+   "name": "test_agent_patch_multi_fuzz",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "4.40703"
+  },
+  {
+   "name": "test_agent_patch_multi_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.129443"
+  },
+  {
+   "name": "test_agent_patch_nul",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0230043"
+  },
+  {
+   "name": "test_agent_patch_nul_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0357358"
+  },
+  {
+   "name": "test_agent_patch_overlap",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0243771"
+  },
+  {
+   "name": "test_agent_patch_overlap_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0479961"
+  },
+  {
+   "name": "test_agent_planner",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0163222"
+  },
+  {
+   "name": "test_agent_runner",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.192526"
+  },
+  {
+   "name": "test_agent_runner_external",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.2405"
+  },
+  {
+   "name": "test_agent_runner_git_guard",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.269097"
+  },
+  {
+   "name": "test_agent_runner_heldout",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.136156"
+  },
+  {
+   "name": "test_agent_runner_learning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.06272"
+  },
+  {
+   "name": "test_agent_shell",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "3.12207"
+  },
+  {
+   "name": "test_analogical",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00395372"
+  },
+  {
+   "name": "test_ast_inspect",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.071245"
+  },
+  {
+   "name": "test_atomic_store",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00703507"
+  },
+  {
+   "name": "test_atomic_store_durability",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0820631"
+  },
+  {
+   "name": "test_atomic_store_mutant_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.09294"
+  },
+  {
+   "name": "test_attempt_capture",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00595939"
+  },
+  {
+   "name": "test_attention",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00555984"
+  },
+  {
+   "name": "test_bank_harness_setup",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.521053"
+  },
+  {
+   "name": "test_bench_1m_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.114224"
+  },
+  {
+   "name": "test_bench_runner",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.69695"
+  },
+  {
+   "name": "test_build_graph",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "8.9369"
+  },
+  {
+   "name": "test_build_graph_dynamic",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.921429"
+  },
+  {
+   "name": "test_build_graph_dynamic_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.983599"
+  },
+  {
+   "name": "test_build_graph_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "9.18528"
+  },
+  {
+   "name": "test_build_graph_mc_always",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "8.92488"
+  },
+  {
+   "name": "test_build_graph_mc_decl",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "8.82193"
+  },
+  {
+   "name": "test_build_graph_mc_scan",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "8.88018"
+  },
+  {
+   "name": "test_build_graph_mc_sidecar",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "8.8142"
+  },
+  {
+   "name": "test_build_graph_repo",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.114286"
+  },
+  {
+   "name": "test_build_graph_repo_mc_drop",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.116701"
+  },
+  {
+   "name": "test_build_graph_repo_mc_glob",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.12485"
+  },
+  {
+   "name": "test_build_graph_spelling",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.96184"
+  },
+  {
+   "name": "test_build_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00205151"
+  },
+  {
+   "name": "test_builder_rootfs_policy",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0437878"
+  },
+  {
+   "name": "test_c_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00229412"
+  },
+  {
+   "name": "test_c_contract_static",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00171044"
+  },
+  {
+   "name": "test_c_edit_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00204248"
+  },
+  {
+   "name": "test_c_fix_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0381271"
+  },
+  {
+   "name": "test_c_source_qa",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0695529"
+  },
+  {
+   "name": "test_c_synthesis",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.259043"
+  },
+  {
+   "name": "test_ccg_realizer",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.12852"
+  },
+  {
+   "name": "test_chat_buffer",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.368178"
+  },
+  {
+   "name": "test_chat_citation",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.071959"
+  },
+  {
+   "name": "test_chat_reasoning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.397171"
+  },
+  {
+   "name": "test_chat_selected_guard",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0417506"
+  },
+  {
+   "name": "test_chat_text_cleanup",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0109258"
+  },
+  {
+   "name": "test_clarify",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00304518"
+  },
+  {
+   "name": "test_code_graph",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00249964"
+  },
+  {
+   "name": "test_code_graph_indexer",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00254842"
+  },
+  {
+   "name": "test_code_graph_polyglot",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00210335"
+  },
+  {
+   "name": "test_code_graph_provenance",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00220794"
+  },
+  {
+   "name": "test_cognitive_learning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0020828"
+  },
+  {
+   "name": "test_command_policy",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00366786"
+  },
+  {
+   "name": "test_commonsense",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0336494"
+  },
+  {
+   "name": "test_compile_repair",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.231898"
+  },
+  {
+   "name": "test_compiler_environment_E",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.17673"
+  },
+  {
+   "name": "test_compiler_environment_mutant_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0256226"
+  },
+  {
+   "name": "test_composite",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00306899"
+  },
+  {
+   "name": "test_concepts",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00392297"
+  },
+  {
+   "name": "test_condition_match",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0395959"
+  },
+  {
+   "name": "test_condition_parse",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00296221"
+  },
+  {
+   "name": "test_condition_query",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00448526"
+  },
+  {
+   "name": "test_context",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00169713"
+  },
+  {
+   "name": "test_contradictions",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00191536"
+  },
+  {
+   "name": "test_conversation",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00181461"
+  },
+  {
+   "name": "test_core_fuzz",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0843068"
+  },
+  {
+   "name": "test_cs_battery",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "2.31581"
+  },
+  {
+   "name": "test_ctest_report",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "5.26323"
+  },
+  {
+   "name": "test_ctest_report_json_duplicates",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0836047"
+  },
+  {
+   "name": "test_ctest_report_locations",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0540423"
+  },
+  {
+   "name": "test_ctest_report_registered",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.162549"
+  },
+  {
+   "name": "test_ctest_report_structure",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "7.58309"
+  },
+  {
+   "name": "test_ctest_report_values",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0494454"
+  },
+  {
+   "name": "test_deep_nlg",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0018625"
+  },
+  {
+   "name": "test_doc_sync_guard",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.667028"
+  },
+  {
+   "name": "test_doc_sync_guard_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.733502"
+  },
+  {
+   "name": "test_embedding",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00161497"
+  },
+  {
+   "name": "test_engineering_bank",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.91416"
+  },
+  {
+   "name": "test_engineering_episode",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0258732"
+  },
+  {
+   "name": "test_episode_replay_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.74629"
+  },
+  {
+   "name": "test_episode_shadow",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.54766"
+  },
+  {
+   "name": "test_episodic_memory",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0149445"
+  },
+  {
+   "name": "test_episodic_memory_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_episodic_session",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00993806"
+  },
+  {
+   "name": "test_eval_conjunctive",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00513682"
+  },
+  {
+   "name": "test_eval_count",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00549058"
+  },
+  {
+   "name": "test_eval_default",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00558027"
+  },
+  {
+   "name": "test_eval_multihop",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00640722"
+  },
+  {
+   "name": "test_eval_negation",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00518419"
+  },
+  {
+   "name": "test_eval_qa",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00916075"
+  },
+  {
+   "name": "test_eval_reverse",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00645005"
+  },
+  {
+   "name": "test_family2",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00212486"
+  },
+  {
+   "name": "test_fixtures",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00191209"
+  },
+  {
+   "name": "test_fs_adversarial",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00202351"
+  },
+  {
+   "name": "test_fs_batch",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0232917"
+  },
+  {
+   "name": "test_fs_batch_replace",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0782183"
+  },
+  {
+   "name": "test_fs_c4_posix",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.89496"
+  },
+  {
+   "name": "test_fs_copy",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00850639"
+  },
+  {
+   "name": "test_fs_create",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0129751"
+  },
+  {
+   "name": "test_fs_create_recover",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0332225"
+  },
+  {
+   "name": "test_fs_create_windows",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00158999"
+  },
+  {
+   "name": "test_fs_fuzz_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.28238"
+  },
+  {
+   "name": "test_fs_fuzz_ops_seed_12648430_i400",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.283014"
+  },
+  {
+   "name": "test_fs_fuzz_ops_seed_1_i400",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.263188"
+  },
+  {
+   "name": "test_fs_fuzz_ops_seed_7_i400",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.28436"
+  },
+  {
+   "name": "test_fs_journal_fuzz_marker_seed_12648430",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.30551"
+  },
+  {
+   "name": "test_fs_journal_fuzz_marker_seed_1786707970",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.29759"
+  },
+  {
+   "name": "test_fs_journal_fuzz_marker_seed_305419896",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.26355"
+  },
+  {
+   "name": "test_fs_journal_fuzz_mc_mstage",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.7108"
+  },
+  {
+   "name": "test_fs_journal_fuzz_mc_rstage",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.51962"
+  },
+  {
+   "name": "test_fs_journal_fuzz_mc_stage",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.56525"
+  },
+  {
+   "name": "test_fs_journal_fuzz_mc_temp",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.69585"
+  },
+  {
+   "name": "test_fs_journal_fuzz_mc_tmp",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.67259"
+  },
+  {
+   "name": "test_fs_journal_fuzz_seed_0",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.54042"
+  },
+  {
+   "name": "test_fs_journal_fuzz_seed_1",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.14989"
+  },
+  {
+   "name": "test_fs_journal_fuzz_seed_12648430",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.291"
+  },
+  {
+   "name": "test_fs_journal_fuzz_seed_1786707969",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.49456"
+  },
+  {
+   "name": "test_fs_journal_fuzz_seed_7",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "6.14145"
+  },
+  {
+   "name": "test_fs_manifest",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00197454"
+  },
+  {
+   "name": "test_fs_move",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0244759"
+  },
+  {
+   "name": "test_fs_race",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0700943"
+  },
+  {
+   "name": "test_fs_race_parent",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "4.06051"
+  },
+  {
+   "name": "test_fs_race_parent_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.106532"
+  },
+  {
+   "name": "test_fs_read",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00210639"
+  },
+  {
+   "name": "test_fs_remove",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0320703"
+  },
+  {
+   "name": "test_fs_replace",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.109786"
+  },
+  {
+   "name": "test_fs_txn_plan",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00198075"
+  },
+  {
+   "name": "test_generator",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00183261"
+  },
+  {
+   "name": "test_git_destructive_audit",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0143579"
+  },
+  {
+   "name": "test_git_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.24212"
+  },
+  {
+   "name": "test_git_gate_e2e",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "24.7981"
+  },
+  {
+   "name": "test_git_gate_e2e_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "24.7839"
+  },
+  {
+   "name": "test_git_inquiry_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_git_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.53819"
+  },
+  {
+   "name": "test_graph",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00173025"
+  },
+  {
+   "name": "test_graph_fuzzy",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00210256"
+  },
+  {
+   "name": "test_graph_reasoning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00191617"
+  },
+  {
+   "name": "test_i18n",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00183862"
+  },
+  {
+   "name": "test_i18n_template_warning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.212401"
+  },
+  {
+   "name": "test_i18n_warning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.103887"
+  },
+  {
+   "name": "test_impact_compare",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0791641"
+  },
+  {
+   "name": "test_ingest",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00193353"
+  },
+  {
+   "name": "test_learn",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0023432"
+  },
+  {
+   "name": "test_learning",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0017236"
+  },
+  {
+   "name": "test_liveness_window",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00189194"
+  },
+  {
+   "name": "test_metacognition",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00219748"
+  },
+  {
+   "name": "test_metaschema",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00209378"
+  },
+  {
+   "name": "test_metrics_snapshot",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.112751"
+  },
+  {
+   "name": "test_minimal_initramfs",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0987347"
+  },
+  {
+   "name": "test_model",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00184776"
+  },
+  {
+   "name": "test_model_embeddings",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00183238"
+  },
+  {
+   "name": "test_model_generic_rel",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00374842"
+  },
+  {
+   "name": "test_multi_hop",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.89037"
+  },
+  {
+   "name": "test_neuro_prolog",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00226586"
+  },
+  {
+   "name": "test_neuro_prolog_rules",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00195794"
+  },
+  {
+   "name": "test_numeric",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00271591"
+  },
+  {
+   "name": "test_open_qa",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "2.6821"
+  },
+  {
+   "name": "test_opencode_parent",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00257394"
+  },
+  {
+   "name": "test_opencode_repository_stream_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_opencode_subagent",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00183429"
+  },
+  {
+   "name": "test_opencode_subagent_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_output_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0081772"
+  },
+  {
+   "name": "test_passage_nlg",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00210582"
+  },
+  {
+   "name": "test_persona",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.124598"
+  },
+  {
+   "name": "test_provenance",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00179887"
+  },
+  {
+   "name": "test_qa_debug",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00441982"
+  },
+  {
+   "name": "test_qa_hidden",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00879823"
+  },
+  {
+   "name": "test_qa_hygiene",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00907676"
+  },
+  {
+   "name": "test_qa_layer",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "13.1798"
+  },
+  {
+   "name": "test_qemu_closure",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0481827"
+  },
+  {
+   "name": "test_qemu_collection",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.117678"
+  },
+  {
+   "name": "test_qemu_trace",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0465805"
+  },
+  {
+   "name": "test_queryplan",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00250855"
+  },
+  {
+   "name": "test_reflect",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00200635"
+  },
+  {
+   "name": "test_relation_subject_index",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00167093"
+  },
+  {
+   "name": "test_relprobe_cite_context",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.23702"
+  },
+  {
+   "name": "test_repository_c_repair_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_runner_episode_shadow",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0740461"
+  },
+  {
+   "name": "test_runner_rollback_boundary",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.151508"
+  },
+  {
+   "name": "test_schema",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00193311"
+  },
+  {
+   "name": "test_select_hook",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.27459"
+  },
+  {
+   "name": "test_select_report",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "24.2282"
+  },
+  {
+   "name": "test_self_reference",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00176927"
+  },
+  {
+   "name": "test_server_git_inquiry",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00194062"
+  },
+  {
+   "name": "test_server_session",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0016647"
+  },
+  {
+   "name": "test_server_taskops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.131135"
+  },
+  {
+   "name": "test_server_tool_calling",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0144754"
+  },
+  {
+   "name": "test_session_isolation_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_shell_contract",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00184901"
+  },
+  {
+   "name": "test_shell_diag_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.632558"
+  },
+  {
+   "name": "test_shell_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00847497"
+  },
+  {
+   "name": "test_shell_resource_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.477115"
+  },
+  {
+   "name": "test_shell_resource_type",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00195834"
+  },
+  {
+   "name": "test_shell_routing_e2e",
+   "class": "skipped",
+   "detail": "SKIP_RETURN_CODE=77",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": null
+  },
+  {
+   "name": "test_shell_spawn_v2_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.434827"
+  },
+  {
+   "name": "test_stats",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00415616"
+  },
+  {
+   "name": "test_stem",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00178141"
+  },
+  {
+   "name": "test_stochastic_nlg",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00208469"
+  },
+  {
+   "name": "test_swe_bench_harness",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0899205"
+  },
+  {
+   "name": "test_swe_bench_harness_fs",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0293098"
+  },
+  {
+   "name": "test_symbol",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0604799"
+  },
+  {
+   "name": "test_tagged_term",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00389351"
+  },
+  {
+   "name": "test_task_ops",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "13.0482"
+  },
+  {
+   "name": "test_task_ops_refactor_guard",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.519992"
+  },
+  {
+   "name": "test_task_ops_refactor_guard_mc",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.330856"
+  },
+  {
+   "name": "test_task_ops_rollback",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.506972"
+  },
+  {
+   "name": "test_textlex",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.779366"
+  },
+  {
+   "name": "test_tokenizer",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00178224"
+  },
+  {
+   "name": "test_toolconfig",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00202846"
+  },
+  {
+   "name": "test_tps_benchmark",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0511677"
+  },
+  {
+   "name": "test_typed_c_binary_preview",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.487761"
+  },
+  {
+   "name": "test_typed_c_framing",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0716732"
+  },
+  {
+   "name": "test_typed_c_lock_wire",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.298363"
+  },
+  {
+   "name": "test_typed_c_preview",
+   "class": "failed",
+   "detail": "Failed",
+   "exit_code": "Failed",
+   "exit_value": "1",
+   "seconds": "0.107607"
+  },
+  {
+   "name": "test_typed_c_schema",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0533461"
+  },
+  {
+   "name": "test_typed_c_verify",
+   "class": "failed",
+   "detail": "Failed",
+   "exit_code": "Failed",
+   "exit_value": "1",
+   "seconds": "0.138373"
+  },
+  {
+   "name": "test_typed_c_verify_lock",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "2.15047"
+  },
+  {
+   "name": "test_verify_3_points",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00225524"
+  },
+  {
+   "name": "test_vsa",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0347241"
+  },
+  {
+   "name": "test_wiki_inference",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00476229"
+  },
+  {
+   "name": "test_wiki_ingest",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00233128"
+  },
+  {
+   "name": "test_wikidata_ingest",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.00230472"
+  },
+  {
+   "name": "test_windows_six_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "1.88106"
+  },
+  {
+   "name": "test_wording_rewrite_gate",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0814158"
+  },
+  {
+   "name": "test_wording_rewrite_harness",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "3.34133"
+  },
+  {
+   "name": "test_wording_rewrites",
+   "class": "passed",
+   "detail": "",
+   "exit_code": null,
+   "exit_value": null,
+   "seconds": "0.0196465"
+  }
+ ]
+}
