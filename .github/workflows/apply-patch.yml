@@ -108,7 +108,7 @@ jobs:
           test "$(wc -l < "$RUNNER_TEMP/numstat")" -le 40 || { echo 'Patch changes more than 40 files'; exit 1; }
           while IFS=$'\t' read -r added deleted path; do
             case "$path" in
-              src/*|include/*|tests/*|tools/*|CMakeLists.txt|README.md|ROADMAP.md|COORDINATION.md|AGENTS.md|CHANGELOG.md|.gitignore|docs/*) ;;
+              src/*|include/*|tests/*|tools/*|CMakeLists.txt|README.md|ROADMAP.md|COORDINATION.md|AGENTS.md|CHANGELOG.md|.gitignore|docs/*|data/shells/*) ;;
               *) echo "Disallowed path: $path"; exit 1 ;;
             esac
           done < "$RUNNER_TEMP/numstat"
