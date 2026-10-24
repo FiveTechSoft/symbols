@@ -121,3 +121,24 @@ but its OUT_OF_SCOPE message and natural-language normalization wording differ;
 no full legacy-response equivalence is claimed. With only the PowerShell fact
 path configured, PowerShell works and CMD reports MISSING_FACT without loading
 an unrelated fact or crashing.
+
+## Conditional test declarations for affected-test reports
+
+The six opt-in Python duration tests declare their exact scripts, facts, corpus
+and the duration-join-research-cli target in tools/build_graph_inputs.json.
+Each declaration is conditional on the real BOOL configuration
+SYMBOLS_DURATION_JOIN_RESEARCH being ON. The condition is read from cache-v2
+in the same CMake File API generation as the codemodel, then checked against
+the current CMakeCache.txt. Missing, stale, malformed or non-BOOL condition
+evidence is unknown and selects the full gate. Reconfigure through the existing
+build_graph.py configure command to request both codemodel-v2 and cache-v2.
+
+An OFF condition allows only the declared test's expected absence. A test
+unexpectedly present while OFF or absent while ON remains unknown. Unrelated
+unknown tests, missing dependencies, target names and malformed declarations
+keep the previous fail-closed behavior. No test is excluded or renamed and
+this read-only report still does not skip the default full gate.
+
+Repository drop-declaration and stale-glob mutants choose an unconditional
+active declaration, rather than accidentally choosing a new optional OFF
+entry. This preserves their original expected failures in both configurations.

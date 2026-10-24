@@ -1,5 +1,90 @@
 {
  "tests": {
+  "duration_join_research_directed": {
+   "files": [
+    "tests/research/test_duration_join_c_development.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
+  "duration_natural_research_directed": {
+   "files": [
+    "tests/research/test_duration_natural_development.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
+  "duration_powershell_research_directed": {
+   "files": [
+    "tests/research/test_duration_powershell.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json",
+    "docs/research/parameter_facts/powershell-start-sleep.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
+  "duration_request_frames_research_directed": {
+   "files": [
+    "tests/research/test_duration_request_frames.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
+  "duration_source_conflict_research_directed": {
+   "files": [
+    "tests/research/test_duration_source_conflict.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
+  "duration_symmetric_source_research_directed": {
+   "files": [
+    "tests/research/test_duration_symmetric_source.py",
+    "data/shells/shell_corpus.txt",
+    "docs/research/parameter_facts/windows-timeout.json"
+   ],
+   "targets": [
+    "duration-join-research-cli"
+   ],
+   "when": {
+    "cache_bool": "SYMBOLS_DURATION_JOIN_RESEARCH",
+    "equals": true
+   }
+  },
   "test_ast_inspect": {
    "files": [
     "tests/test_ast_inspect.py",

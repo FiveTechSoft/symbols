@@ -7,7 +7,7 @@ matches at least one file of the source tree). The File API reply is made by
 re-running cmake on the build directory when it is missing, which rewrites the
 generated build files with the same content. Mutants run on a copy of the sidecar
 and exit 0 only on the exact expected failing set. Windows prints SKIP."""
-import fnmatch, json, os, shutil, sys, tempfile
+import fnmatch, json, os, shutil, sys, tempfile, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(SRC, "tools"))
@@ -37,9 +37,17 @@ def main():
         if MUTANT:
             d = json.load(open(sidecar))
             if MUTANT == "drop_decl":
-                d["tests"].pop(sorted(d["tests"])[0])
+                inventory = {t["name"] for t in json.loads(subprocess.run(
+                    ["ctest", "--show-only=json-v1"], cwd=build, capture_output=True, text=True, check=True).stdout)["tests"]}
+                active = sorted(n for n, e in d["tests"].items() if "when" not in e and n in inventory)
+                assert active, "no active unconditional declaration for mutant"
+                d["tests"].pop(active[0])
             elif MUTANT == "stale_glob":
-                d["tests"][sorted(d["tests"])[0]]["files"].append("no_such_dir/no_such_file.*")
+                inventory = {t["name"] for t in json.loads(subprocess.run(
+                    ["ctest", "--show-only=json-v1"], cwd=build, capture_output=True, text=True, check=True).stdout)["tests"]}
+                active = sorted(n for n, e in d["tests"].items() if "when" not in e and n in inventory)
+                assert active, "no active unconditional declaration for mutant"
+                d["tests"][active[0]]["files"].append("no_such_dir/no_such_file.*")
             sidecar = os.path.join(tmp, "inputs.json")
             json.dump(d, open(sidecar, "w"))
         reply = os.path.join(build, ".cmake", "api", "v1", "reply")

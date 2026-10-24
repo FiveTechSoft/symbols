@@ -120,6 +120,71 @@ def recall_script(src, b, stats):
     return ok
 
 
+def conditional_contract(tmp):
+    """Exact ON/OFF declarations; missing/stale evidence must stay full."""
+    sc = os.path.join(tmp, "conditional.json")
+    name = "research_test"
+    entry = {"files": ["check.py", "fact.json", "corpus.txt"], "targets": ["cli"],
+             "when": {"cache_bool": "RESEARCH", "equals": True}}
+    def load(e, tests, values, targets={"cli"}):
+        json.dump({"version": 1, "tests": {name: e}}, open(sc, "w"))
+        return bg.load_sidecar(sc, tests, targets, values)
+    assert load(entry, {name}, {"RESEARCH": True})[1] == []
+    assert load(entry, set(), {"RESEARCH": False}) == ({}, [])
+    for tests, values in [(set(), {"RESEARCH": True}), ({name}, {"RESEARCH": False}),
+                          (set(), {}), ({name}, {})]:
+        assert load(entry, tests, values)[1]
+    for bad in [None, {}, {"cache_bool": "RESEARCH", "equals": "ON"},
+                {"cache_bool": "RESEARCH", "equals": True, "extra": 1}]:
+        e = dict(entry, when=bad);assert load(e, {name}, {"RESEARCH": True})[1]
+    assert load(entry, {name}, {"RESEARCH": True}, set())[1]
+    # Unknown unconditioned test must not become an optional omission.
+    assert load({"files": ["check.py"]}, set(), {"RESEARCH": False})[1]
+    # The condition is established by coherent File API + live cache values.
+    reply = os.path.join(tmp, "reply");os.mkdir(reply)
+    cache = os.path.join(tmp, "CMakeCache.txt")
+    index = {"objects": [{"kind": "cache", "version": {"major": 2}, "jsonFile": "cache.json"}]}
+    for value in ["ON", "OFF"]:
+        open(cache, "w").write("RESEARCH:BOOL=" + value + "\n")
+        json.dump({"entries": [{"name": "RESEARCH", "type": "BOOL", "value": value}]}, open(os.path.join(reply, "cache.json"), "w"))
+        assert bg.conditional_cache(tmp, reply, index) == {"RESEARCH": value == "ON"}
+    open(cache, "w").write("RESEARCH:BOOL=ON\n")
+    assert bg.conditional_cache(tmp, reply, index) == {} # stale OFF reply
+    assert bg.conditional_cache(tmp, reply, {}) == {}
+    for bad in [[], {}, {"entries": [None]}, {"entries": [{"name": "RESEARCH", "type": "BOOL", "value": 1}]}]:
+        json.dump(bad, open(os.path.join(reply, "cache.json"), "w"))
+        assert bg.conditional_cache(tmp, reply, index) == {}
+    assert load({"when": entry["when"]}, set(), {"RESEARCH": False})[1]
+    for bad_index in [None, [], {}, {"objects": None}, {"objects": [None]},
+                      {"objects": [{"kind": "cache", "version": None}]},
+                      {"objects": [{"kind": "cache", "version": []}]},
+                      {"objects": [{"kind": "cache", "version": {"major": 2}, "jsonFile": None}]},
+                      {"objects": [{"kind": "cache", "version": {"major": 2}, "jsonFile": "../cache.json"}]}]:
+        assert bg.conditional_cache(tmp, reply, bad_index) == {}
+    entry_bool = {"name": "RESEARCH", "type": "BOOL", "value": "ON"}
+    for entries in [[entry_bool, dict(entry_bool, value="OFF")], [entry_bool, entry_bool]]:
+        json.dump({"entries": entries}, open(os.path.join(reply, "cache.json"), "w"))
+        assert bg.conditional_cache(tmp, reply, index) == {}
+    json.dump({"entries": [entry_bool]}, open(os.path.join(reply, "cache.json"), "w"))
+    for value in ["ON", "OFF"]:
+        open(cache, "w").write("RESEARCH:BOOL=ON\nRESEARCH:BOOL=" + value + "\n")
+        assert bg.conditional_cache(tmp, reply, index) == {}
+    # Every declared script/fact/corpus/CLI dependency selects the test. Removing
+    # a dependency is observable as either full fallback or a missed recall.
+    declared, problems = load(entry, {name}, {"RESEARCH": True});assert not problems
+    g = {"unknown": [], "targets": [{"name": "cli", "sources": ["cli.c"], "deps": []}],
+         "tests": [{"name": name, "target": None, "declared": declared[name]}]}
+    for f in entry["files"] + ["cli.c"]:
+        assert bg.select(g, [f])["tests"] == [name]
+    for f in entry["files"]:
+        mutant = json.loads(json.dumps(g));mutant["tests"][0]["declared"]["files"].remove(f)
+        assert bg.select(mutant, [f])["mode"] == "full"
+    mutant = json.loads(json.dumps(g));mutant["tests"][0]["declared"]["targets"] = []
+    assert name not in bg.select(mutant, ["cli.c"])["tests"]
+    g["unknown"] = ["unexplained new test"]
+    assert bg.select(g, ["check.py"])["mode"] == "full"
+
+
 def main():
     global GEN
     GEN = gen_name()
@@ -128,6 +193,7 @@ def main():
         return 77
     fails, stats = [], []
     with tempfile.TemporaryDirectory() as tmp:
+        conditional_contract(tmp)
         for name in ("basic", "mixed", "incl"):
             _, b = setup(name, tmp)
             if view(bg.load_graph(b)) != expected(name):

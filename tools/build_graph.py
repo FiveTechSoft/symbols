@@ -20,6 +20,7 @@ def configure(src, build, generator=None):
     q = os.path.join(build, ".cmake", "api", "v1", "query")
     os.makedirs(q, exist_ok=True)
     open(os.path.join(q, "codemodel-v2"), "w").close()
+    open(os.path.join(q, "cache-v2"), "w").close()
     cmd = ["cmake", "-S", src, "-B", build]
     if generator:
         cmd += ["-G", generator]
@@ -38,10 +39,54 @@ def _rel(path, root):
 SIDECAR = "tools/build_graph_inputs.json"
 
 
-def load_sidecar(path, tests, targets):
+def conditional_cache(build, reply, index):
+    """Use cache-v2 from the same File API generation, checked against disk.
+    Missing, stale or non-BOOL evidence remains unknown, never an assumed OFF.
+    """
+    try:
+        if not isinstance(index, dict) or not isinstance(index.get("objects"), list):
+            return {}
+        if any(not isinstance(o, dict) for o in index["objects"]):
+            return {}
+        objects = [o for o in index["objects"] if o.get("kind") == "cache"]
+        if len(objects) != 1:
+            return {}
+        obj = objects[0]
+        if not isinstance(obj.get("version"), dict) or obj["version"].get("major") != 2:
+            return {}
+        filename = obj.get("jsonFile")
+        if not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+\.json", filename):
+            return {}
+        cache = json.load(open(os.path.join(reply, filename)))
+        if not isinstance(cache, dict) or not isinstance(cache.get("entries"), list):
+            return {}
+        if any(not isinstance(e, dict) or not isinstance(e.get("name"), str) or
+               not isinstance(e.get("value"), str) for e in cache["entries"]):
+            return {}
+        live = {}
+        for line in open(os.path.join(build, "CMakeCache.txt"), encoding="utf-8"):
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*):BOOL=(.*)\n?", line)
+            if m:
+                if m[1] in live:
+                    return {}
+                live[m[1]] = m[2].strip().upper()
+        result, names = {}, set()
+        for e in cache["entries"]:
+            if e["name"] in names:
+                return {}
+            names.add(e["name"])
+            if e.get("type") == "BOOL" and e["value"].upper() in ("ON", "OFF"):
+                if live.get(e["name"]) == e["value"].upper():
+                    result[e["name"]] = e["value"].upper() == "ON"
+        return result
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def load_sidecar(path, tests, targets, cache_bools=None):
     """Declared inputs for tests the codemodel cannot map (scripts, wrappers).
     Format: {"version": 1, "tests": {NAME: {"files": [glob...], "targets": [name...],
-    "always": true}}}. "always" marks a test that reads so much that no file list is
+    "always": true, "when": {"cache_bool": "OPTION", "equals": true}}}}. "always" marks a test that reads so much that no file list is
     honest: it is selected in every subset selection and claims no inputs, so an
     unknown file still selects the full gate. Returns (declared, problems).
     Fail-closed: any problem is a reason for the full gate, and an entry with no
@@ -58,12 +103,23 @@ def load_sidecar(path, tests, targets):
                                          all(isinstance(x, str) for x in e.get(k, []))
                                          for k in ("files", "targets")) and \
             isinstance(e.get("always", False), bool)
+        when = e.get("when") if isinstance(e, dict) else None
+        if isinstance(e, dict) and "when" in e:
+            ok = ok and isinstance(when, dict) and set(when) == {"cache_bool", "equals"} and \
+                isinstance(when.get("cache_bool"), str) and \
+                bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", when.get("cache_bool", ""))) and \
+                isinstance(when.get("equals"), bool)
         if not ok:
             problems.append("sidecar entry malformed: %s" % name)
-        elif name not in tests:
-            problems.append("sidecar names an unknown test: %s" % name)
         elif not e.get("files") and not e.get("targets") and not e.get("always"):
             problems.append("sidecar entry declares nothing: %s" % name)
+        elif when is not None and when["cache_bool"] not in (cache_bools or {}):
+            problems.append("sidecar condition unavailable: %s" % name)
+        elif when is not None and cache_bools[when["cache_bool"]] != when["equals"]:
+            if name in tests:
+                problems.append("sidecar inactive test unexpectedly present: %s" % name)
+        elif name not in tests:
+            problems.append("sidecar names an unknown test: %s" % name)
         elif any(t not in targets for t in e.get("targets", [])):
             problems.append("sidecar names an unknown target for test %s" % name)
         else:
@@ -141,7 +197,8 @@ def load_graph(build, config=None, inputs=None, use_sidecar=True):
     sc = inputs or os.path.join(src_root, SIDECAR)
     if use_sidecar and os.path.exists(sc):
         declared, problems = load_sidecar(sc, {t["name"] for t in g["tests"]},
-                                          {t["name"] for t in g["targets"]})
+                                          {t["name"] for t in g["targets"]},
+                                          conditional_cache(build, reply, index))
         g["unknown"] += problems
         for t in g["tests"]:
             if t["target"] is None and t["name"] in declared:
