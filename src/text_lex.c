@@ -260,6 +260,50 @@ TL_CITE_RESULT TextLexCitationCopy(const TEXTLEX *tl,
     return TL_CITE_OK;
 }
 
+/* Display the contiguous source span, not a token reconstruction. Punctuation
+   and whitespace can be executable syntax or significant prose. Keep the
+   existing marked display-only truncation and token-count return contract. */
+uint32_t TextLexSentenceSourceText(const TEXTLEX *tl, uint32_t idx,
+                             const unsigned char *img, size_t imglen,
+                             char *out, size_t size)
+{
+    const TL_SENT *s;
+    uint64_t first, end, previous;
+    uint32_t i;
+    size_t n, copied;
+    static const char cut[] = " [...]";
+    if (out && size) out[0] = '\0';
+    if (!tl || idx >= tl->nsent || !img || !out || !size) return 0;
+    s = &tl->sents[idx];
+    if (!s->ntok || !s->offs || !s->lens) return 0;
+    previous = first = s->offs[0];
+    for (i = 0; i < s->ntok; i++)
+    {
+        uint64_t off = s->offs[i];
+        if (!s->lens[i] || off < previous || off > imglen ||
+            s->lens[i] > imglen - off) return 0;
+        previous = off + s->lens[i];
+    }
+    end = previous;
+    if (first >= end || end - first > (uint64_t)SIZE_MAX) return 0;
+    n = (size_t)(end - first);
+    if (n < size)
+    {
+        memcpy(out, img + first, n);
+        out[n] = '\0';
+    }
+    else
+    {
+        size_t marker = sizeof(cut) - 1;
+        copied = size > marker + 1 ? size - marker - 1 : 0;
+        if (copied) memcpy(out, img + first, copied);
+        marker = marker < size - 1 ? marker : size - 1;
+        memcpy(out + copied, cut, marker);
+        out[copied + marker] = '\0';
+    }
+    return s->ntok;
+}
+
 /* Literal display: join token byte slices with single spaces
    (words byte-exact; wrap whitespace normalized, source intact).
    Over-long sentences truncate with a marked tail (display-only;

@@ -29,6 +29,6 @@ int main(void)
  const char*queries[]={"seconds","what is seconds?","postulado","que es postulado?","zzyyzzbufferabsent20261013","hola"};size_t caps[]={1,8,14,15,16,32,64,4096,8192};
  for(unsigned m=0;m<3;m++)for(unsigned q=0;q<sizeof(queries)/sizeof(*queries);q++)for(unsigned c=0;c<sizeof(caps)/sizeof(*caps);c++)compare(path,queries[q],m,caps[c]);
  /* This fixture must exercise quotes, not pass by abstaining in both runs. */
- {CHAT*c=create(path);char out[4096];GoalCause cause;int r=ChatResolveLine(c,"seconds",out,sizeof(out),NULL,0,NULL,0,&cause);check(r==GOAL_ANSWER&&strstr(out,"1 . 7 seconds"),"wide quote acceptance gold retained");destroy(c);}
+ {CHAT*c=create(path);char out[4096];GoalCause cause;int r=ChatResolveLine(c,"seconds",out,sizeof(out),NULL,0,NULL,0,&cause);check(r==GOAL_ANSWER&&strstr(out,"1.7 seconds"),"wide quote acceptance gold retained");destroy(c);}
  remove(path);printf("test_chat_buffer: %d failed\n",failures);return failures?1:0;
 }

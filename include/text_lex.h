@@ -145,8 +145,12 @@ int TextLexRetrievalSpans(const TEXTLEX *tl, uint32_t idx,
 /* first symbol id matching w under ASCII case variants
    (exact, First-upper, UPPER, lower); INVALID when absent */
 SYMBOL_ID TextLexFindSymbol(const GRAPH *graph, const char *w);
-/* Literal display: join token byte slices with single spaces
-   (words byte-exact; wrap whitespace normalized, source intact). */
+/* Literal display: contiguous original byte span, preserving punctuation and
+   whitespace. Overlong display is explicitly marked, source remains intact. */
+uint32_t TextLexSentenceSourceText(const TEXTLEX *tl, uint32_t idx,
+                             const unsigned char *img, size_t imglen,
+                             char *out, size_t size);
+/* Legacy lexical reconstruction for matching/ranking only, not literal output. */
 uint32_t TextLexSentenceText(const TEXTLEX *tl, uint32_t idx,
                              const unsigned char *img, size_t imglen,
                              char *out, size_t size);

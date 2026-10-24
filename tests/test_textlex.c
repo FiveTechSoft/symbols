@@ -576,10 +576,31 @@ int main(void)
             }
             check("seconds retrieves complete decimal sentence", complete);
             check("retrieved source span preserves 1.7 seconds bytes", original);
-            check("decimal display remains token-space normalized", unchanged);
+            check("legacy matching display remains token-space normalized", unchanged);
             TextLexFree(dt); EmbeddingTableDestroy(de); GraphDestroy(dg);
         }
         check("decimal fixture removed", remove(fixture) == 0);
+    }
+    {
+        /* Literal evidence is syntax: punctuation, tabs and line breaks
+           cannot be reconstructed by separating all lexical tokens. */
+        static const unsigned char source[] = "Use sed -i 's/a/b/' file.txt and $env:PATH, \"quoted\"\tpaths;\nkeep ${x:-default}, 1.7 and UTF-8 café intact.";
+        uint64_t off[] = {0, 4, 8, sizeof(source)-8};
+        uint32_t len[] = {3, 3, 2, 7};
+        TL_SENT sn;
+        TEXTLEX tl;
+        char display[512], tiny[8], one[1];
+        memset(&sn, 0, sizeof(sn)); memset(&tl, 0, sizeof(tl));
+        sn.ntok=4; sn.offs=off; sn.lens=len; tl.nsent=1; tl.sents=&sn;
+        check("literal display returns token count", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,display,sizeof(display))==4);
+        check("literal display byte exact incl punctuation whitespace UTF8", strcmp(display,(const char *)source)==0);
+        check("literal display exact fit", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,display,sizeof(source))==4 && strcmp(display,(const char *)source)==0);
+        check("literal display marked truncation", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,tiny,sizeof(tiny))==4 && strcmp(tiny,"U [...]")==0);
+        check("literal display capacity one bounded", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,one,1)==4 && one[0]==0);
+        off[2]=UINT64_MAX;
+        check("literal display invalid offset fail closed", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,display,sizeof(display))==0 && display[0]==0);
+        off[2]=5;
+        check("literal display overlapping token fail closed", TextLexSentenceSourceText(&tl,0,source,sizeof(source)-1,display,sizeof(display))==0);
     }
     CheckRetrievalSpans();
     CheckCitations();

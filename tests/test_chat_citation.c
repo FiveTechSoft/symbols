@@ -26,7 +26,7 @@ static void compare(const char*p,int mode,size_t n){
    size_t needed=0;unsigned char raw[4096];char display[2048];const TEXTLEX*tl=&b->tlex[r.file_slot];
    check(r.source.version==1&&r.quote_first<r.visible_quote_end&&r.visible_quote_end<=r.quote_end&&r.copied_bytes==strlen(y),"receipt visible display span valid");
    check(TextLexCitationCopy(tl,&r.source,raw,sizeof(raw),&needed)==TL_CITE_OK&&needed==r.source.end-r.source.first&&memcmp(raw,tl->image+r.source.first,needed)==0,"receipt byte-exact source");
-   check(TextLexSentenceText(tl,r.sentence_index,tl->image,tl->imagelen,display,sizeof(display))>0&&memcmp(y+r.quote_first,display,r.visible_quote_end-r.quote_first)==0,"receipt source identity binds display prefix");
+   check((TextLexSentenceText(tl,r.sentence_index,tl->image,tl->imagelen,display,sizeof(display))>0&&memcmp(y+r.quote_first,display,r.visible_quote_end-r.quote_first)==0)||(TextLexSentenceSourceText(tl,r.sentence_index,tl->image,tl->imagelen,display,sizeof(display))>0&&memcmp(y+r.quote_first,display,r.visible_quote_end-r.quote_first)==0),"receipt source identity binds display prefix");
    check(r.output_truncated==(r.copied_bytes<r.answer_bytes),"receipt presentation truncation explicit");
    TL_CITATION wrong=r.source;wrong.source_sha256[0]^=1;check(TextLexCitationCopy(tl,&wrong,raw,sizeof(raw),&needed)==TL_CITE_SOURCE_MISMATCH&&needed==0,"receipt source mismatch fails closed");
   }else check(r.source.version==0,"no stale source receipt");

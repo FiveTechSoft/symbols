@@ -4651,7 +4651,6 @@ static void ChatCitationFinish(CHAT *ch, const CHAT_EMISSION *e,
 {
     const TL_SENT *sn;
     size_t display_bytes = 0;
-    uint32_t i;
     if (!c) return;
     if (!e || !e->selected) { if (e && e->answered) c->state = CHAT_CITE_NOT_SUPPORTED; return; }
     c->answer_bytes = strlen(answer);
@@ -4665,7 +4664,19 @@ static void ChatCitationFinish(CHAT *ch, const CHAT_EMISSION *e,
     if (e->file >= ch->ntfiles) return;
     sn = TextLexSentence(&ch->tlex[e->file], e->sentence);
     if (!sn) return;
-    for (i = 0; i < sn->ntok; i++) display_bytes += sn->lens[i] + (i != 0);
+    if (!sn->ntok) return;
+    {
+        const TEXTLEX *tl = &ch->tlex[e->file];
+        size_t source_bytes = (size_t)(sn->offs[sn->ntok - 1] + sn->lens[sn->ntok - 1] - sn->offs[0]);
+        size_t quote_bytes = e->end - e->first;
+        if (quote_bytes == source_bytes &&
+            memcmp(answer + e->first, tl->image + sn->offs[0], source_bytes) == 0)
+            display_bytes = source_bytes;
+        else {
+            uint32_t i;
+            for (i = 0; i < sn->ntok; i++) display_bytes += sn->lens[i] + (i != 0);
+        }
+    }
     c->display_truncated = e->display_truncated || display_bytes > e->end - e->first;
     /* Internal display cuts are outside this pilot. Preserve the answer,
        but never turn the full source sentence into an emission receipt. */
@@ -5302,7 +5313,7 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
                 st = GOAL_UNKNOWN;
                 EMIT("No tengo constancia suficiente para responder a eso.\n");
             }
-            else if (TextLexSentenceText(&ch->tlex[bestf], best,
+            else if (TextLexSentenceSourceText(&ch->tlex[bestf], best,
                                     ch->tlex[bestf].image,
                                     ch->tlex[bestf].imagelen, sent,
                                     sizeof(sent)) > 0)
@@ -8585,6 +8596,11 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out,
     i = e ? (size_t)(e - sent) : strlen(sent);
     if (i >= sizeof(sbuf)) i = sizeof(sbuf) - 1;
     memcpy(sbuf, sent, i); sbuf[i] = '\0';
+    /* Relevance calibration still consumes its original lexical view. The
+       selected identity, not rendered punctuation/whitespace, binds evidence. */
+    if (emission && emission->selected && emission->file < ch->ntfiles)
+        TextLexSentenceText(tl, emission->sentence, tl->image, tl->imagelen,
+                            sbuf, sizeof(sbuf));
     for (i = 0; line[i] && i + 1 < sizeof(low); i++) low[i] = (char)tolower((unsigned char)line[i]);
     low[i] = '\0';
     for (const char *s = low; *s && nw < TQ_MAXLEN; )
