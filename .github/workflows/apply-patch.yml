@@ -72,7 +72,6 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${COMMIT_MESSAGE//[[:space:]]/}" || { echo 'Commit message is empty'; exit 1; }
-          test "$EXPECTED_HEAD" = "$(git rev-parse HEAD)" || { echo 'master moved; refusing stale patch'; exit 1; }
           # Exactly one source. Keep the existing inline decoding path for small diffs.
           if [ -n "$PATCH_BASE64" ]; then
             test -z "$PATCH_URL" && test -z "$PATCH_SHA256" || { echo 'Choose one patch source'; exit 1; }
@@ -122,10 +121,10 @@ jobs:
         run: |
           set -euo pipefail
           GATE="$RUNNER_TEMP/symbols_git_gate"
-          "$GATE" preflight --expected-head "$EXPECTED_HEAD" --branch master
-          # Explicit remote check: master on origin must be exactly this HEAD.
-          remote="$(git ls-remote --exit-code origin refs/heads/master | cut -f1)"
-          test "$remote" = "$(git rev-parse HEAD)" || { echo "origin/master is $remote, not $(git rev-parse HEAD)"; exit 1; }
+          # actions/checkout does not configure an upstream; pin it so the gate
+          # remote check compares against origin/master deterministically.
+          git branch --set-upstream-to=origin/master master
+          "$GATE" preflight --expected-head "$EXPECTED_HEAD" --branch master --remote-sync
           # The patch goes to a relative path under .git: not tracked, not shown by
           # git status, not picked up by git add, and a relative path as the gate requires.
           cp "$RUNNER_TEMP/change.patch" .git/change.patch
