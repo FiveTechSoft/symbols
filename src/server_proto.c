@@ -1913,6 +1913,15 @@ int ServerExtractEditSpec(const char *text, char *file, size_t fn,
         new_s[0] = '\0';
     if (text == NULL)
         return 0;
+    {
+        int parsed = ServerParseReplacement(text, file, fn, old_s, on, new_s, nn);
+        if (parsed != 0)
+        {
+            if (parsed < 0) return 0;
+            if (has_replace) *has_replace = 1;
+            return 1;
+        }
+    }
     if (file && fn)
     {
         /* Use ServerExtractFileRef for strict extension-only matching
@@ -1961,6 +1970,103 @@ int ServerExtractEditSpec(const char *text, char *file, size_t fn,
 }
 
 /* Detect edit verbs (with or without enclitics) — no file check */
+static int StartsWithEditVerb(const char *text)
+{
+    char verb[64];
+    size_t n = 0;
+    if (!text) return 0;
+    while (*text == ' ' || *text == '\t') text++;
+    while (text[n] && text[n] != ' ' && text[n] != '\t' && n + 1 < sizeof(verb))
+    {
+        verb[n] = (char)tolower((unsigned char)text[n]);
+        n++;
+    }
+    if (text[n] && text[n] != ' ' && text[n] != '\t') return 0;
+    verb[n] = '\0';
+    return MatchEditVerb(verb);
+}
+
+/* Parse one explicit replacement, not arbitrary prose. Return -1 when an
+   initial replacement imperative is incomplete or has unsupported clauses. */
+static void ReplacementSpace(const char **p)
+{
+    while (**p == ' ' || **p == '\t') (*p)++;
+}
+static int ReplacementToken(const char **p, char *out, size_t n)
+{
+    size_t k = 0;
+    char quote = 0;
+    ReplacementSpace(p);
+    if (**p == '\'' || **p == '"' || **p == '`') quote = *(*p)++;
+    while (**p && (quote ? **p != quote : **p != ' ' && **p != '\t'))
+    {
+        if (**p == '\n' || **p == '\r' || **p == '\\' || k + 1 >= n) return 0;
+        if (!quote && (**p == '\'' || **p == '"' || **p == '`')) return 0;
+        out[k++] = *(*p)++;
+    }
+    if (quote)
+    {
+        if (**p != quote) return 0;
+        (*p)++;
+    }
+    if (**p && **p != ' ' && **p != '\t') return 0;
+    out[k] = '\0';
+    return k != 0;
+}
+int ServerParseReplacement(const char *text, char *file, size_t fn,
+                           char *old_s, size_t on, char *new_s, size_t nn)
+{
+    char verb[64], sep[16], target[16], extra[260];
+    const char *p = text;
+    int spanish;
+    size_t i;
+    if (!text) return 0;
+    ReplacementSpace(&p);
+    if (*p == '\'' || *p == '\"' || *p == '`') return 0;
+    if (!ReplacementToken(&p, verb, sizeof(verb))) return 0;
+    for (i = 0; verb[i]; i++) verb[i] = (char)tolower((unsigned char)verb[i]);
+    spanish = strcmp(verb, "cambia") == 0 || strcmp(verb, "reemplaza") == 0;
+    if (!spanish && strcmp(verb, "replace") != 0) return 0;
+    if (!ReplacementToken(&p, old_s, on) ||
+        !ReplacementToken(&p, sep, sizeof(sep)) ||
+        strcmp(sep, spanish ? "por" : "with") != 0 ||
+        !ReplacementToken(&p, new_s, nn) ||
+        !ReplacementToken(&p, target, sizeof(target)) ||
+        strcmp(target, spanish ? "en" : "in") != 0 ||
+        !ReplacementToken(&p, file, fn)) return -1;
+    ReplacementSpace(&p);
+    if (*p || !ServerExtractFileRef(file, extra, sizeof(extra)) || strcmp(file, extra)) return -1;
+    return 1;
+}
+
+/* All replacement-looking prose must pass the same parser before the legacy
+   edit/target/planner routes. Existing literal shell shapes stay unchanged. */
+int ServerReplacementNeedsClarification(const char *text)
+{
+    char file[260], old_s[256], new_s[256], lower[2048];
+    size_t i;
+    int parsed;
+    if (!text) return 0;
+    for (i = 0; text[i] && i + 1 < sizeof(lower); i++)
+        lower[i] = (char)tolower((unsigned char)text[i]);
+    lower[i] = '\0';
+    parsed = ServerParseReplacement(text, file, sizeof(file), old_s, sizeof(old_s),
+                                    new_s, sizeof(new_s));
+    if (parsed) return parsed < 0;
+    if (FindIstr(lower, " with ") == NULL && FindIstr(lower, " por ") == NULL) return 0;
+    for (i = 0; lower[i]; i++)
+        if (lower[i] == '\'' || lower[i] == '\"' || lower[i] == '`') lower[i] = ' ';
+    if (!MatchEditVerb(lower)) return 0;
+    return !ServerIsShellTask(text);
+}
+
+int ServerIsExplicitReplaceTask(const char *text)
+{
+    char file[260], old_s[256], new_s[256];
+    return ServerParseReplacement(text, file, sizeof(file), old_s, sizeof(old_s),
+                                  new_s, sizeof(new_s)) == 1;
+}
+
 int ServerHasEditVerb(const char *text)
 {
     char lower[1024];
@@ -1973,7 +2079,7 @@ int ServerHasEditVerb(const char *text)
         i++;
     }
     lower[i] = '\0';
-    return MatchEditVerb(lower);
+    return StartsWithEditVerb(lower);
 }
 
 int ServerIsSwapLinesTask(const char *text)
@@ -2013,7 +2119,7 @@ int ServerIsEditTask(const char *text)
         i++;
     }
     lower[i] = '\0';
-    if (MatchEditVerb(lower))
+    if (StartsWithEditVerb(lower))
         has_verb = 1;
     if (!has_verb)
         return 0;

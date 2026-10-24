@@ -1550,3 +1550,5 @@ endif()
 
 # Fresh explicit questions may reuse evidence; continuations still advance.
 sllm_test(test_chat_repeat tests/test_chat_repeat.c)
+
+sllm_test(test_edit_route tests/test_edit_route.c)

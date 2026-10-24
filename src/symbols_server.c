@@ -2628,6 +2628,16 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    if (!has_tool_resp)
+    {
+        if (ServerReplacementNeedsClarification(query))
+        {
+            snprintf(content, sizeof(content), "No file changed. Specify one replacement and one file: replace OLD with NEW in FILE (quote multiword text).");
+            SendContentForRequest(s, body, ++g_seq, content, query, resp, sizeof(resp), sse, sizeof(sse));
+            return;
+        }
+    }
+
     int is_repository_task = ServerIsRepositoryTask(query);
     int is_coding = ServerIsCodingTask(query);
 
@@ -2636,7 +2646,7 @@ static void HandleCompletions(socket_t s, const char *body,
     char proc_scope[32];
     SERVER_PROC_TRACE proc_tr;
     memset(&proc_tr, 0, sizeof(proc_tr));
-    if (sess->declared_tools_count > 0)
+    if (sess->declared_tools_count > 0 && !ServerIsExplicitReplaceTask(query))
     {
         ProcEnsure();
         ServerProcScope(body, proc_scope, sizeof(proc_scope));

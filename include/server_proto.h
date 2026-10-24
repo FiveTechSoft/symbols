@@ -252,6 +252,10 @@ int ServerIsEditTask(const char *text);
 
 /* Detect edit verbs (with or without enclitics) — no file check */
 int ServerHasEditVerb(const char *text);
+int ServerIsExplicitReplaceTask(const char *text);
+int ServerReplacementNeedsClarification(const char *text);
+int ServerParseReplacement(const char *text, char *file, size_t fn,
+                           char *old_s, size_t on, char *new_s, size_t nn);
 
 /* Exact bounded intent: swap the two lines of the active file. */
 int ServerIsSwapLinesTask(const char *text);
