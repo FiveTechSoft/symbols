@@ -1,0 +1,81 @@
+id	cat	question	mode	pattern	note
+A01	paraphrase	In Bash, how can a child process see a variable I set?	contains	export	
+A02	paraphrase	Which Bash quoting style prevents every kind of expansion?	contains	single quote	
+A03	paraphrase	What does the special parameter ? expand to after a foreground pipeline finishes in Bash?	contains	exit status	
+A04	paraphrase	How do I append command output to a file without erasing it in Bash?	contains	>>	
+A05	paraphrase	Which Bash option makes a pipeline fail when an intermediate command fails?	contains	pipefail	
+A06	paraphrase	How do I make grep search directories recursively?	contains	-r	
+A07	paraphrase	What command follows a growing log file live on Linux?	contains	tail|-f	
+A08	paraphrase	How do I send SIGKILL to a stubborn process in Bash?	contains	kill|-9	
+A09	paraphrase	What makes a script file executable on Linux?	contains	chmod|+x	
+A10	paraphrase	Which classic tool prints the first whitespace-separated column of each line?	contains	awk	
+A11	paraphrase	In CMD, how do you read the value of a variable named PATH?	contains	%PATH%	
+A12	paraphrase	Which CMD command searches text with regular expressions like grep does?	contains	findstr	
+A13	paraphrase	What CMD variable holds the exit code of the previous command?	contains	errorlevel	
+A14	paraphrase	How are for-loop variables written in CMD batch files compared to the interactive prompt?	contains	%%	
+A15	paraphrase	Which CMD command locates executables on PATH?	contains	where	
+A16	paraphrase	What flows through a PowerShell pipeline instead of plain text?	contains	object	
+A17	paraphrase	What naming convention do PowerShell cmdlets follow?	contains	verb-noun	
+A18	paraphrase	Which PowerShell cmdlet filters pipeline objects by a condition?	contains	where-object	
+A19	paraphrase	What is the PowerShell counterpart of grep for searching file content?	contains	select-string	
+A20	paraphrase	Which PowerShell variable holds the exit code of the last native program?	contains	lastexitcode	
+A21	paraphrase	What is the default interactive shell on modern macOS?	contains	zsh	
+A22	paraphrase	Why is the Bash shipped with macOS stuck at version 3.2?	contains	gpl	
+A23	paraphrase	What extra argument does BSD sed require for in-place edits compared to GNU sed?	contains	suffix	
+A24	paraphrase	What manages background services on macOS instead of systemd?	contains	launchd	
+A25	paraphrase	Where does Homebrew install on Apple Silicon Macs?	contains	/opt/homebrew	
+B01	cross-shell	I know tail -f on Linux. How do I follow a growing log in PowerShell?	contains	get-content|-wait	
+B02	cross-shell	What is the PowerShell equivalent of the bash kill command?	contains	stop-process	
+B03	cross-shell	How do I print the working directory in CMD?	contains	cd	
+B04	cross-shell	How do I set an environment variable for the session in PowerShell?	contains	$env:	
+B05	cross-shell	What is the CMD counterpart of the Unix which command?	contains	where	
+B06	cross-shell	How do I count the lines of a file in CMD?	contains	find /c	
+B07	cross-shell	How do I count lines in PowerShell?	contains	measure-object	
+B08	cross-shell	What command sleeps for five seconds in CMD?	contains	timeout	
+B09	cross-shell	What sleeps for seconds in PowerShell?	contains	start-sleep	
+B10	cross-shell	What downloads a URL in PowerShell?	contains	invoke-webrequest	
+B11	cross-shell	How do I search file contents in CMD?	contains	findstr	
+B12	cross-shell	What lists running processes in CMD?	contains	tasklist	
+B13	cross-shell	How do I terminate a process in CMD?	contains	taskkill	
+B14	cross-shell	Which shopt option does Bash need for recursive globbing with double-star?	contains	globstar	
+B15	cross-shell	What creates a directory in CMD?	contains	mkdir	
+B16	cross-shell	How do I show an environment variable called NAME in PowerShell?	contains	$env:	
+B17	cross-shell	What cmdlet is the PowerShell equivalent of ls?	contains	get-childitem	
+B18	cross-shell	What is the PowerShell way to delete recursively and forcefully?	contains	remove-item	
+B19	cross-shell	How does BSD date compute yesterday compared to GNU date?	contains	-v	
+B20	cross-shell	What is the PowerShell equivalent of cat?	contains	get-content	
+C01	negative	How do I write a systemd unit file with a Restart policy?	abstain		
+C02	negative	What is the syntax for the fish shell string builtin?	abstain		
+C03	negative	How do I add Windows registry keys with reg add?	abstain		
+C04	negative	How do I write a cron expression for every weekday at 6am?	abstain		
+C05	negative	How do I enable ssh-agent forwarding?	abstain		
+C06	negative	How does zsh compsys completion registration work?	abstain		
+C07	negative	How do I mount an SMB network share from CMD?	abstain		
+C08	negative	How do I create a symlink with mklink on Windows?	abstain		
+C09	negative	How do I parse JSON with jq filters?	abstain		
+C10	negative	What does sudoedit do differently from sudo vi?	abstain		
+C11	negative	How do I write AppleScript to control Terminal?	abstain		
+C12	negative	How do I use Desired State Configuration resources in PowerShell?	abstain		
+C13	negative	What is the difference between exec and spawn in Tcl?	abstain		
+C14	negative	How do I set up key-based authentication in sshd_config?	abstain		
+C15	negative	What is Bash PROMPT_COMMAND used for?	abstain		
+C16	negative	How do I create a Windows scheduled task with schtasks?	abstain		
+C17	negative	How do I use tput to colorize Bash output?	abstain		
+C18	negative	What is the syntax of iptables firewall rules?	abstain		
+C19	negative	How do I compress files with zstd?	abstain		
+C20	negative	How do I manage tmux sessions and windows?	abstain		
+D01	trap	PowerShell pipelines plain text between commands, right?	contains	object	
+D02	trap	macOS ships with the latest Bash 5, doesn't it?	contains	3.2	
+D03	trap	In zsh, array indexes start at zero like in Bash, right?	contains	one-indexed|1	
+D04	trap	The CMD shell expands wildcard patterns itself before running commands, correct?	contains	does not expand|each command	
+D05	trap	Linux filesystems treat Makefile and makefile as the same file, right?	contains	case-sensitive	
+D06	trap	Single quotes in Bash allow variable expansion, true?	contains	literal	
+D07	trap	Does zsh word-split unquoted variable expansions like Bash?	contains	does not	
+D08	trap	Is the PowerShell execution policy a strong security boundary?	contains	not a security boundary	
+D09	trap	GNU sed and BSD sed use identical -i semantics, don't they?	contains	suffix	
+D10	trap	The exit status of a Bash pipeline comes from its first command, right?	contains	last	
+D11	trap	Does setx update the current CMD session immediately?	contains	does not affect	
+D12	trap	Does kill send SIGKILL by default?	contains	sigterm	
+D13	trap	Does Bash expand recursive double-star globs without any option?	contains	globstar	
+D14	trap	Do PowerShell 5.1 and PowerShell 7 write the same default file encoding?	contains	utf-16	
+D15	trap	Is the dir command in PowerShell a separate program?	contains	alias	
