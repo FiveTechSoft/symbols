@@ -46,3 +46,10 @@ or general contradiction detection. Other subjects, shells, quantities,
 quoted text and conditional clauses are not treated as matching denials.
 Activity labels are ASCII and shorter than 128 bytes. This narrow syntax does
 not infer an unstated denial or promote conditional text into a fact.
+
+The research conflict lookup indexes complete source lines once per request,
+without copying or rewriting their bytes. Exact byte comparison and source
+offset ordering preserve the first identical denial occurrence. Positive
+clause scan order and duplicate/ambiguity decisions remain unchanged. Index
+allocation failure refuses explicitly. CLI timing measurements are not TUI
+latency guarantees or a claim about arbitrary corpus inference.

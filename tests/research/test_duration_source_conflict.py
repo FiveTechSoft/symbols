@@ -23,4 +23,9 @@ for name,other in [('subject','Sleeping never uses timeout /t 5 in CMD.'),('shel
 check('negative_only',neg+'\n','NO_SUPPORT')
 check('conditional_only','Waiting uses timeout /t 5 in CMD if ready.\n','NO_SUPPORT')
 check('duplicate_positive',pos+'\n'+pos+'\n','AMBIGUOUS')
+# Indexed lookup must retain earliest identical negative and latest matching positive.
+check('duplicate_negative',neg+'\n'+pos+'\n'+neg+'\n','SOURCE_CONFLICT')
+check('multiple_positive_conflict',pos+'\n'+neg+'\n'+pos+'\n','SOURCE_CONFLICT')
+check('empty_lines','\n\n'+pos+'\n'+neg+'\n','SOURCE_CONFLICT')
+check('no_final_newline',pos+'\n'+neg,'SOURCE_CONFLICT')
 pathlib.Path(sys.argv[2]).write_text(json.dumps(rows,indent=2));print(len(rows),'controlled source-conflict checks PASS')

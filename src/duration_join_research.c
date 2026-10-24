@@ -38,19 +38,34 @@ static int assertion_scope(const char *line,const char *uses) {
 }
 /* Only a controlled unconditional denial of the same activity/command/shell
    tuple can conflict. Citation and conditional syntax are never promoted. */
-static int source_denial(const unsigned char *bytes,size_t size,const char *subject,
-                         const char *command,const char *shell,size_t *a,size_t *b) {
- size_t off=0;char expected[640];
- int n=snprintf(expected,sizeof(expected),"%s never uses %s in %s.",subject,command,shell);
- if(n<0||(size_t)n>=sizeof(expected))return 0;
- while(off<size){size_t end=off;while(end<size&&bytes[end]!='\n')end++;size_t last=end;
-  if(last>off&&bytes[last-1]=='\r')last--;
-  if(last-off==(size_t)n&&!memcmp(bytes+off,expected,(size_t)n)){
-   *a=off;*b=last;return 1;
-  }
+typedef struct { const unsigned char *bytes;size_t size,offset; } SourceLine;
+static int line_compare(const void *av,const void *bv){
+ const SourceLine *a=av,*b=bv;size_t n=a->size<b->size?a->size:b->size;
+ int c=memcmp(a->bytes,b->bytes,n);if(c)return c;
+ if(a->size!=b->size)return a->size<b->size?-1:1;
+ return a->offset<b->offset?-1:a->offset>b->offset?1:0;
+}
+/* Index complete source lines once, without rewriting source bytes. Sorting
+   offset last preserves first occurrence for identical denial assertions. */
+static SourceLine *source_index(const unsigned char *bytes,size_t size,size_t *count){
+ size_t n=0;for(size_t i=0;i<size;i++)if(bytes[i]=='\n')n++;
+ if(size&&bytes[size-1]!='\n')n++;
+ SourceLine *lines=malloc((n?n:1)*sizeof(*lines));if(!lines)return NULL;
+ size_t off=0,k=0;while(off<size){size_t end=off;while(end<size&&bytes[end]!='\n')end++;
+  size_t last=end;if(last>off&&bytes[last-1]=='\r')last--;
+  lines[k].bytes=bytes+off;lines[k].size=last-off;lines[k].offset=off;k++;
   off=end<size?end+1:end;
  }
- return 0;
+ qsort(lines,k,sizeof(*lines),line_compare);*count=k;return lines;
+}
+static int source_denial(const SourceLine *lines,size_t count,const char *subject,
+                         const char *command,const char *shell,size_t *a,size_t *b) {
+ char expected[640];int n=snprintf(expected,sizeof(expected),"%s never uses %s in %s.",subject,command,shell);
+ if(n<0||(size_t)n>=sizeof(expected))return 0;
+ SourceLine key={(const unsigned char*)expected,(size_t)n,0};size_t lo=0,hi=count;
+ while(lo<hi){size_t mid=lo+(hi-lo)/2;if(line_compare(&lines[mid],&key)<0)lo=mid+1;else hi=mid;}
+ if(lo==count||lines[lo].size!=(size_t)n||memcmp(lines[lo].bytes,expected,(size_t)n))return 0;
+ *a=lines[lo].offset;*b=*a+lines[lo].size;return 1;
 }
 static int join_envelope(const char*q,const char*corpus,const char*fact,char*out,size_t cap){
  if(!q||strncmp(q,"duration-fact ",14))return 0;
@@ -64,8 +79,9 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  size_t fn,cn;unsigned char*fb=readall(fact,&fn);char fh[65],ch[65];if(!fb){snprintf(out,cap,"MISSING_FACT: no reviewed parameter evidence loaded.");return 1;}digest(fb,fn,fh);free(fb);
  if(strcmp(fh,WINDOWS_TIMEOUT_FACT_SHA)){snprintf(out,cap,"UNVERIFIED_FACT: sidecar differs from the reviewed byte identity.");return 1;}
  unsigned char*cb=readall(corpus,&cn);if(!cb){snprintf(out,cap,"UNSUPPORTED_SOURCE: corpus bytes unavailable or unsupported.");return 1;}digest(cb,cn,ch);
+ size_t indexed_count=0;SourceLine *indexed=source_index(cb,cn,&indexed_count);if(!indexed){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: index allocation failure.");return 1;}
  unsigned count=0;size_t chosen_a=0,chosen_b=0;char chosen[512]="";int chosen_nobreak=0;size_t offset=0;int conflict=0;size_t pos_a=0,pos_b=0,neg_a=0,neg_b=0;
- while(offset<cn){size_t end=offset;while(end<cn&&cb[end]!='\n')end++;size_t line_end=end;while(line_end>offset&&cb[line_end-1]=='\r')line_end--;char*line=malloc(line_end-offset+1);if(!line){free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: allocation failure.");return 1;}memcpy(line,cb+offset,line_end-offset);line[line_end-offset]=0;char*uses=strstr(line," uses ");
+ while(offset<cn){size_t end=offset;while(end<cn&&cb[end]!='\n')end++;size_t line_end=end;while(line_end>offset&&cb[line_end-1]=='\r')line_end--;char*line=malloc(line_end-offset+1);if(!line){free(indexed);free(cb);snprintf(out,cap,"UNSUPPORTED_SOURCE: allocation failure.");return 1;}memcpy(line,cb+offset,line_end-offset);line[line_end-offset]=0;char*uses=strstr(line," uses ");
   if(assertion_scope(line,uses)){char*cursor=uses+6;while(*cursor){char*sep=strstr(cursor,", ");if(!sep)sep=strstr(cursor," and ");char*last=sep?sep:line+strlen(line);size_t len=(size_t)(last-cursor);char segment[512];if(len<sizeof(segment)){memcpy(segment,cursor,len);segment[len]=0;if(!strncmp(segment,"and ",4))memmove(segment,segment+4,strlen(segment+4)+1);char*in=strstr(segment," in ");if(in){*in=0;char*sh=in+4;size_t sl=strlen(sh);if(sl&&sh[sl-1]=='.')sh[--sl]=0;
     if(!strcmp(sh,shell)){int nb=0;
      if(WindowsTimeoutFactMatches(segment,requested,qualifier,&nb)){
@@ -74,7 +90,7 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
       if(subject_len<sizeof(subject)){
        memcpy(subject,line,subject_len);subject[subject_len]=0;
        size_t da=0,db=0;
-       if(source_denial(cb,cn,subject,segment,shell,&da,&db)){
+       if(source_denial(indexed,indexed_count,subject,segment,shell,&da,&db)){
         conflict=1;pos_a=offset;pos_b=line_end;neg_a=da;neg_b=db;
        }
       }
@@ -88,7 +104,7 @@ static int join_envelope(const char*q,const char*corpus,const char*fact,char*out
  else if(count>1)snprintf(out,cap,"AMBIGUOUS: %u source clauses match; no command selected.",count);
  else if(chosen_b>cn||memcmp(cb+chosen_a,chosen,chosen_b-chosen_a))snprintf(out,cap,"UNSUPPORTED_SOURCE: evidence range mismatch.");
  else {int w=snprintf(out,cap,"DOCUMENTATION-SUPPORTED, not Windows execution\nCommand from corpus: %s\nInterpreted request: platform=%s shell=%s value=%ld unit=%s qualifier=%s\nRule: same shell + command timeout + parameter /t + integer value + seconds\nKeyboard: %s. No exact wall-clock guarantee.\nCorpus: %s sha256=%s bytes[%zu,%zu)\nParameter fact: microsoft.cmd.timeout.t.seconds sha256=%s\nSource: %s\nFact excerpt: /t specifies seconds, range -1..99999; -1 is indefinite until keystroke. /nobreak ignores key strokes.\nNatural-language morphology and number words are NOT interpreted by this diagnostic.",chosen,platform,shell,requested,unit,qualifier,chosen_nobreak?"key strokes ignored":"a key stroke may resume early",corpus,ch,chosen_a,chosen_b,fh,WINDOWS_TIMEOUT_SOURCE_URL);if(w<0||(size_t)w>=cap)snprintf(out,cap,"UNSUPPORTED_OUTPUT: evidence would be truncated.");}
- free(cb);return 1;
+ free(indexed);free(cb);return 1;
 }
 
 /* Bounded English query grammar. This is not arbitrary QA or a semantic parser.
