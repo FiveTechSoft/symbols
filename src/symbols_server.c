@@ -298,6 +298,7 @@ typedef struct
 
     /* Verification telemetry & self-healing state */
     int               had_error;
+    int               had_unverified_tool;
     int               had_edit;
     int               replan_count;
     DIAGNOSTIC_REPORT last_diagnostic;
@@ -1923,6 +1924,13 @@ static void HandleCompletions(socket_t s, const char *body,
     {
         sess->last_active = time(NULL);
 
+        /* Plain text is an observation, not a success receipt. Edits require
+           postcondition verification beyond a generic zero process status. */
+        if (!tool_resp.has_exit_code ||
+            strcmp(sess->last_tool_call_name, "edit") == 0 ||
+            strcmp(sess->last_tool_call_name, "write") == 0)
+            sess->had_unverified_tool = 1;
+
         /* Save tool output for inspection reporting */
         if (tool_resp.content[0] != '\0')
         {
@@ -2052,7 +2060,7 @@ static void HandleCompletions(socket_t s, const char *body,
                          "Inspection tool reported failure");
             }
         }
-        else if (tool_resp.is_error || diag.error_count > 0)
+        else if (tool_resp.is_error || (tool_resp.has_exit_code && tool_resp.exit_code != 0) || diag.error_count > 0)
         {
             step_failed = 1;
             sess->had_error = 1;
@@ -2181,6 +2189,12 @@ static void HandleCompletions(socket_t s, const char *body,
                          "Repository changes have not been certified. Review diagnostics above.",
                          sess->current_issue,
                          sess->last_error_summary[0] ? sess->last_error_summary : "Errors reported during tool execution");
+            }
+            else if (sess->had_unverified_tool)
+            {
+                snprintf(content, sizeof(content),
+                    "Tool output (execution or file effects not independently verified):\n\n%.14000s",
+                    sess->last_tool_output[0] ? sess->last_tool_output : "No output receipt.");
             }
             else
             {
@@ -2591,6 +2605,29 @@ static void HandleCompletions(socket_t s, const char *body,
         return;
     }
 
+    /* Answer explanatory requests before previous-target resolution, editing,
+       synthesis or STRIPS. A prior file mention must not turn a question into
+       permission to write that file. Native Git state queries above stay live. */
+    if (!has_tool_resp && ServerIsKnowledgeQuestion(query))
+    {
+        char raw[8192];
+        if (ServerAnswerQuery(&g_session, query, raw, sizeof(raw)) && !ServerIsUnknown(raw))
+            ServerMapContent(raw, content, sizeof(content));
+        else
+            snprintf(content, sizeof(content), "I don't know.");
+        if (ServerWantsStream(body))
+        {
+            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
+            SendRaw(s, 200, "OK", "text/event-stream", sse);
+        }
+        else
+        {
+            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+            SendJson(s, 200, "OK", resp);
+        }
+        return;
+    }
+
     int is_repository_task = ServerIsRepositoryTask(query);
     int is_coding = ServerIsCodingTask(query);
 
@@ -2830,6 +2867,7 @@ static void HandleCompletions(socket_t s, const char *body,
             sess->agent_active = 1;
             sess->had_edit = 1;
             sess->had_error = 0;
+            sess->had_unverified_tool = 0;
             sess->current_step_idx = 0;
             sess->replan_count = 0;
             strncpy(sess->current_issue, query, sizeof(sess->current_issue) - 1);
@@ -3022,6 +3060,7 @@ static void HandleCompletions(socket_t s, const char *body,
         sess->agent_active = 1;
         sess->current_step_idx = 0;
         sess->had_error = 0;
+        sess->had_unverified_tool = 0;
         sess->had_edit = 0;
         sess->replan_count = 0;
         sess->last_error_summary[0] = '\0';

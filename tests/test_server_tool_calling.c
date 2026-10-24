@@ -260,6 +260,10 @@ static void test_coding_task_intent(void)
     TEST_ASSERT(ServerIsCodeSynthesisTask("What is a FILE in C") == 0, "Definitional FILE question is not synthesis");
 
     char synth[8192];
+    TEST_ASSERT(ServerIsKnowledgeQuestion("How do I write a systemd unit file") == 1, "knowledge without punctuation");
+    TEST_ASSERT(ServerIsKnowledgeQuestion("Cómo escribo un fichero") == 1, "Spanish knowledge intent");
+    TEST_ASSERT(ServerIsKnowledgeQuestion("dime cómo cambio una variable") == 1, "explanation not mutation");
+    TEST_ASSERT(ServerIsKnowledgeQuestion("write result.txt") == 0, "imperative remains action");
     ServerSynthesizeCode("ordenar con qsort en C", synth, sizeof(synth));
     TEST_ASSERT(strstr(synth, "qsort(") != NULL, "qsort prompt emits qsort(");
     TEST_ASSERT(strstr(synth, "Partition") == NULL, "qsort prompt does not emit Quicksort Partition");

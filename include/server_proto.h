@@ -234,6 +234,7 @@ int ServerIsInspectionTask(const char *text);
 
 /* Classify whether a prompt represents a direct code generation or synthesis task */
 int ServerIsCodeSynthesisTask(const char *text);
+int ServerIsKnowledgeQuestion(const char *text);
 
 /* Classify whether a prompt asks to create a new file in the workspace */
 int ServerIsFileCreationTask(const char *text);

@@ -2208,6 +2208,30 @@ static int LooksLikeDefinitionQuestion(const char *lower)
     return 0;
 }
 
+/* A request for explanation is not authority to mutate a remembered target.
+   Match question intent, not trailing punctuation. Unknown forms still follow
+   the existing fail-closed routing; this is not a claim of full NLP parsing. */
+int ServerIsKnowledgeQuestion(const char *text)
+{
+    char lower[1024];
+    size_t i = 0;
+    static const char *prefixes[] = {
+        "how do i ", "how can i ", "how to ", "what is ", "what are ",
+        "which ", "why ", "explain ", "tell me how ",
+        "como ", "cómo ", "que es ", "qué es ", "cual ", "cuál ",
+        "explica ", "explicame ", "explícame ", "dime como ", "dime cómo "
+    };
+    if (!text) return 0;
+    while (isspace((unsigned char)*text)) text++;
+    while (text[i] && i + 1 < sizeof(lower)) {
+        lower[i] = (char)tolower((unsigned char)text[i]); i++;
+    }
+    lower[i] = '\0';
+    for (i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++)
+        if (strncmp(lower, prefixes[i], strlen(prefixes[i])) == 0) return 1;
+    return 0;
+}
+
 int ServerIsInspectionTask(const char *text)
 {
     if (text == NULL || text[0] == '\0')
