@@ -11,7 +11,7 @@ enum { QS_MATCH=1, QS_OPPOSITE, QS_NO_MATCH, QS_UNKNOWN, QS_UNSUPPORTED_FORM, QS
 enum { QS_EXPLICIT=1, QS_FIELD_UNKNOWN, QS_NOT_REQUESTED };
 enum { QS_MANDATORY=1, QS_NOT_APPLICABLE };
 enum { QS_COMPLETE=1, QS_PARTIAL, QS_FORM_UNSUPPORTED, QS_LIMIT };
-enum { QS_MANUAL=1, QS_EXTRACTION_UNKNOWN };
+enum { QS_MANUAL=1, QS_EXTRACTION_UNKNOWN, QS_GRAMMAR_RECORD };
 enum { QS_AFFIRMATIVE=1, QS_NEGATIVE, QS_NO_INFORMATION };
 enum { QS_EQUAL=1, QS_MISMATCH, QS_UNCERTAIN };
 enum { QS_UNVERIFIED_EXTRACTION=1 };
@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
  QSIdentity identity;
  uint32_t state,goal_count,field_count,completeness_origin;
+ uint32_t origin_rule; /* 0 supplied/manual,1 assignment grammar */
  QSField fields[QS_FIELDS];
 } QSRequest;
 typedef struct {
@@ -44,7 +45,7 @@ typedef struct {
 } QSResult;
 #define QS_SIZE_CHECK(T,N) typedef char QS_size_##T[(sizeof(T)==(N))?1:-1]
 QS_SIZE_CHECK(QSSpan,8); QS_SIZE_CHECK(QSIdentity,40); QS_SIZE_CHECK(QSField,56);
-QS_SIZE_CHECK(QSRequest,728); QS_SIZE_CHECK(QSAssertion,736);
+QS_SIZE_CHECK(QSRequest,732); QS_SIZE_CHECK(QSAssertion,736);
 QS_SIZE_CHECK(QSAssertionSet,5896); QS_SIZE_CHECK(QSResult,1568);
 static int QSSpanInside(QSSpan s,QSSpan outer) {
  return s.first<s.end && s.first>=outer.first && s.end<=outer.end;
@@ -75,6 +76,79 @@ static int QSFieldsValid(const QSField *f,uint32_t count,QSSpan outer) {
 static const QSField *QSFind(const QSField *f,uint32_t n,uint32_t kind) {
  uint32_t i; for(i=0;i<n;i++) if(f[i].kind==kind) return &f[i]; return NULL;
 }
+/* Closed ASCII assignment grammar. No free subject/predicate capture. */
+static int QSAlpha(unsigned char c) {return (c>='A'&&c<='Z')||(c>='a'&&c<='z');}
+static int QSTake(const unsigned char*b,uint32_t end,uint32_t*p,const char*s){
+ uint32_t n=(uint32_t)strlen(s);if(*p>end||n>end-*p||memcmp(b+*p,s,n))return 0;*p+=n;return 1;
+}
+static int QSName(const unsigned char*b,uint32_t end,uint32_t*p,int atom){
+ uint32_t start=*p;if(start>=end||(!QSAlpha(b[start])&&!(atom&&b[start]=='_')))return 0;
+ while(*p<end&&(QSAlpha(b[*p])||(b[*p]>='0'&&b[*p]<='9')||b[*p]=='_')){
+  if(*p-start==31)return 0; /* Inspect at most32 bytes, never scan tail. */
+  (*p)++;
+ }
+ return *p-start<=31;
+}
+static QSField QSGrammarField(uint32_t kind,uint32_t first,uint32_t end){
+ QSField f;memset(&f,0,sizeof(f));f.kind=kind;f.presence=QS_EXPLICIT;f.requirement=QS_MANDATORY;
+ f.origin_count=1;f.value.first=first;f.value.end=end;f.origins[0]=f.value;return f;
+}
+static QSRecordRelation QSParseAssignmentQuery(const unsigned char*b,uint32_t n,QSRequest*out){
+ uint32_t p=0,start,subject_end,relation;
+ if(!out)return QS_INVALID;
+ memset(out,0,sizeof(*out));
+ if(!b&&n)return QS_INVALID;
+ if(n>4096)return QS_UNSUPPORTED_FORM;
+ if(!QSTake(b,n,&p,"How are "))return QS_UNSUPPORTED_FORM;
+ start=p;
+ if(!QSName(b,n,&p,0)||!QSTake(b,n,&p," variables"))return QS_UNSUPPORTED_FORM;
+ subject_end=p;
+ if(!QSTake(b,n,&p," "))return QS_UNSUPPORTED_FORM;
+ relation=p;
+ if(!QSTake(b,n,&p,"assigned?")||p!=n)return QS_UNSUPPORTED_FORM;
+ out->identity.byte_count=n;TLSha256(b,n,out->identity.sha256);
+ out->state=QS_COMPLETE;out->goal_count=1;out->field_count=2;out->completeness_origin=1;out->origin_rule=1;
+ out->fields[0]=QSGrammarField(1,start,subject_end);out->fields[1]=QSGrammarField(2,relation,relation+8);
+ return QS_MATCH;
+}
+static QSRecordRelation QSExtractAssignmentSentence(const unsigned char*b,uint32_t n,QSSpan span,QSAssertion*out){
+ uint32_t p=span.first,start=p,subject_end,relation,value,end;
+ if(!out)return QS_INVALID;
+ memset(out,0,sizeof(*out));
+ if((!b&&n)||!QSSpanInside(span,(QSSpan){0,n}))return QS_INVALID;
+ if(n>65536)return QS_UNSUPPORTED_FORM;
+ end=span.end;
+ if(!QSName(b,end,&p,0)||!QSTake(b,end,&p," variables"))return QS_UNSUPPORTED_FORM;
+ subject_end=p;
+ if(!QSTake(b,end,&p," are "))return QS_UNSUPPORTED_FORM;
+ relation=p;
+ if(!QSTake(b,end,&p,"assigned "))return QS_UNSUPPORTED_FORM;
+ value=p;
+ if(!QSTake(b,end,&p,"with ")||!QSName(b,end,&p,1)||!QSTake(b,end,&p,"=")||!QSName(b,end,&p,1))return QS_UNSUPPORTED_FORM;
+ if(p<end&&b[p]!='.'&&!QSTake(b,end,&p," and must not contain spaces around the equals sign"))return QS_UNSUPPORTED_FORM;
+ if(!QSTake(b,end,&p,".")||p!=end)return QS_UNSUPPORTED_FORM;
+ out->identity.byte_count=n;TLSha256(b,n,out->identity.sha256);out->assertion_span=span;
+ out->extraction_state=QS_GRAMMAR_RECORD;out->rule_id=1;out->field_count=3;out->assertion_kind=QS_AFFIRMATIVE;
+ out->fields[0]=QSGrammarField(1,start,subject_end);out->fields[1]=QSGrammarField(2,relation,relation+8);
+ out->fields[2]=QSGrammarField(3,value,end-1);return QS_MATCH;
+}
+/* Explicit member comparison, no padding-dependent struct memcmp. */
+static int QSIdentitySame(const QSIdentity*a,const QSIdentity*b){return !memcmp(a->sha256,b->sha256,32)&&a->byte_count==b->byte_count&&a->reserved==b->reserved;}
+static int QSSpanSame(QSSpan a,QSSpan b){return a.first==b.first&&a.end==b.end;}
+static int QSAllFieldsSame(const QSField*a,const QSField*b){
+ uint32_t i,j;for(i=0;i<QS_FIELDS;i++){
+  if(a[i].kind!=b[i].kind||a[i].presence!=b[i].presence||a[i].requirement!=b[i].requirement||a[i].origin_count!=b[i].origin_count||!QSSpanSame(a[i].value,b[i].value))return 0;
+  for(j=0;j<QS_ORIGINS;j++)if(!QSSpanSame(a[i].origins[j],b[i].origins[j]))return 0;
+ }return 1;
+}
+static int QSGrammarRequestValid(const unsigned char*b,uint32_t n,const QSRequest*q){
+ QSRequest expected;if(QSParseAssignmentQuery(b,n,&expected)!=QS_MATCH)return 0;
+ return QSIdentitySame(&q->identity,&expected.identity)&&q->state==expected.state&&q->goal_count==expected.goal_count&&q->field_count==expected.field_count&&q->completeness_origin==expected.completeness_origin&&q->origin_rule==expected.origin_rule&&QSAllFieldsSame(q->fields,expected.fields);
+}
+static int QSGrammarAssertionValid(const unsigned char*b,uint32_t n,const QSAssertion*a){
+ QSAssertion expected;if(QSExtractAssignmentSentence(b,n,a->assertion_span,&expected)!=QS_MATCH)return 0;
+ return QSIdentitySame(&a->identity,&expected.identity)&&QSSpanSame(a->assertion_span,expected.assertion_span)&&a->extraction_state==expected.extraction_state&&a->rule_id==expected.rule_id&&a->field_count==expected.field_count&&a->assertion_kind==expected.assertion_kind&&QSAllFieldsSame(a->fields,expected.fields);
+}
 static QSRecordRelation QSFinish(QSResult *r,uint32_t state,uint32_t reason) {
  r->relation=state; r->reason=reason; return state;
 }
@@ -91,6 +165,8 @@ static QSRecordRelation QSCheckRecords(const unsigned char *query,uint32_t query
   return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
  /* Counts checked before any array access. Exceeding capacity is a limit,
     not an attempt to inspect absent records. */
+ if(request->origin_rule==1 && request->field_count>QS_FIELDS)
+  return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
  if(request->field_count>QS_FIELDS || set->count>QS_ASSERTIONS || query_bytes>4096 || source_bytes>65536)
   return QSFinish(result,QS_UNSUPPORTED_FORM,QS_REASON_LIMIT);
  if(request->identity.reserved || request->identity.byte_count!=query_bytes ||
@@ -101,11 +177,20 @@ static QSRecordRelation QSCheckRecords(const unsigned char *query,uint32_t query
   return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
  for(i=0;i<set->count;i++) {
   const QSAssertion *a=&set->assertions[i];
-  if(a->field_count>QS_FIELDS) return QSFinish(result,QS_UNSUPPORTED_FORM,QS_REASON_LIMIT);
+  if(a->field_count>QS_FIELDS) return QSFinish(result,a->rule_id==1?QS_INVALID:QS_UNSUPPORTED_FORM,a->rule_id==1?QS_REASON_FORMAT:QS_REASON_LIMIT);
   if(a->identity.reserved || a->identity.byte_count!=source_bytes ||
-     a->extraction_state<QS_MANUAL || a->extraction_state>QS_EXTRACTION_UNKNOWN ||
-     a->rule_id!=0 || a->assertion_kind<QS_AFFIRMATIVE || a->assertion_kind>QS_NO_INFORMATION ||
+     a->extraction_state<QS_MANUAL || a->extraction_state>QS_GRAMMAR_RECORD ||
+     a->rule_id>1 || a->assertion_kind<QS_AFFIRMATIVE || a->assertion_kind>QS_NO_INFORMATION ||
      !QSSpanInside(a->assertion_span,sr) || !QSFieldsValid(a->fields,a->field_count,a->assertion_span))
+   return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
+ }
+ if(request->origin_rule>1 || (request->origin_rule==1 && !QSGrammarRequestValid(query,query_bytes,request)))
+  return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
+ for(i=0;i<set->count;i++) {
+  const QSAssertion *a=&set->assertions[i];
+  if((request->origin_rule==1 && (a->rule_id!=1||a->extraction_state!=QS_GRAMMAR_RECORD)) ||
+     (request->origin_rule==0 && (a->rule_id!=0||a->extraction_state==QS_GRAMMAR_RECORD)) ||
+     (a->rule_id==1 && !QSGrammarAssertionValid(source,source_bytes,a)))
    return QSFinish(result,QS_INVALID,QS_REASON_FORMAT);
  }
  TLSha256(query,query_bytes,qhash); TLSha256(source,source_bytes,shash);
