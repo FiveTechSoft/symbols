@@ -83,3 +83,132 @@ The test now accepts exactly two separately pinned original byte images, never n
 as_checkout_span recomputes SHA over actual bytes, selects a representation by hash AND length, derives line18 offsets from the SAME image, then requires those offsets and exact sentence bytes to match that representation's pin. It does not equate canonical SHA with checkout SHA. Every query/source record and verifier origin uses actual bytes. Unknown representation, mixed line endings, wrong length, bitflip or other-representation span fails. No .gitattributes, workflow, CMake or corpus change. Future canonical content changes need explicit oracle review and deliberate replacement of BOTH pinned representations, not automatic hash refresh.
 
 An in-memory image transform creates the other representation only as explicit test data; the input corpus is not rewritten by the test. Both image forms run full adapter+verifier end-to-end. Mutants cover representation-span swap, record SHA mutation, source bitflip, mixed-EOL and length mismatch. Local full target run on LF and on a temporarily CRLF checkout each1157PASS, original canonical corpus restored exact SHA afterwards. Pure sanitizer289PASS with leakON, zero diagnostics; prior273pure preserved except replacing the five failing LF-only fixture checks with representation-aware checks. No claim of fixed MSVC CI until new approved publication is actually checked. No retry of the original failed run.
+
+## Local real action/scope serving increment (25 October 2026)
+
+Unlike the test-only sections above, this increment changes serving CHAT for one
+closed documentary form. It is directed development, not independent evaluation,
+not a shell executor and not general prose entailment. Outside the form, legacy
+behavior is unchanged and uncertified by this increment.
+
+Whole ASCII query: optional `I know COMMAND on SCOPE. ` followed by
+`How do I VERB a OBJECT in SCOPE?`. Whole source: `Upper(VERB)ing a OBJECT uses
+COMMAND in SCOPE and COMMAND in SCOPE` optionally followed by
+`, with no direct SCOPE builtin`, then a period. VERB and object words are lowercase
+ASCII, 1..31 bytes. OBJECT has 1..6 words. SCOPE is a case-sensitive identifier,
+1..31 bytes. COMMAND is 1..8 tokens of letters/digits/underscore/hyphen, each
+1..63 bytes. Structural delimiters and listed condition/negation words are
+reserved; quotes, compound scopes, third alternatives, trailing context and
+unknown morphology are unsupported. No synonyms, heading inheritance, shell
+names or command lists supply semantics. Source candidate must parse whole,
+not a clipped clause. Repeated target scope or target-negative suffix conflicts.
+A command cannot consume the delimiter: `in`, `on`, `and`, `uses`, `not`, `if`,
+`unless`, `when` are reserved command tokens, making this parse deterministic.
+
+One private ParseIntent adapter runs only after existing ParseIntentToks success,
+only with a loaded documentary session and NONE/QA/TEXTQ result, and only on a
+whole-input parse. It does not replace failed/action/load intents. Self, fastpath,
+plan, Resolve and semantic guards keep their order. Private PARSED contains a
+borrowed pointer valid only for that synchronous call; public ChatParse copies
+value slots, and no CHAT, plan or session stores the pointer. Query is reparsed
+from the original immutable bytes before use. Query cap is 1024 bytes, overflow
+fails closed, not truncated. Existing planner token arrays remain unchanged.
+
+Within TEXTQ the verb, object and target supply the same retrieval mechanism,
+with existing top16 and no score/threshold changes. Context scope is not target.
+Only one positive candidate without conflicts emits its whole literal source;
+zero matches/conflicts produce unknown. A per-call private emission records
+that this closed match passed; legacy truncated lexical verification does not
+reclassify it. Existing citation hashes the full file image and binds the quote.
+It certifies the documentary target-command binding under this grammar, not
+world truth, builtin absence on every installation, execution, source authenticity
+or general answer correctness. Exhaustiveness/conflict checking is limited to
+retrieved candidates, not a complete scan of all corpus statements.
+
+Canonical shells source: 18094 bytes, SHA256
+`daefd50882510d9c4f12fa847c915d246371f6cc59e622201909b12d0ec7f294`.
+Comparison content [15345,15454) binds Bash command [15374,15381) and PowerShell
+command [15394,15411); PowerShell target [15415,15425). Full original question,
+including optional preface and target beyond the old token budget, is retained.
+Actual full-query retrieval places this comparison second of top16 for the
+PowerShell question. Display stays the whole comparison, not a synthesized command.
+
+Directed checks cover simple/prefaced/fresh/context/long questions, inverse target,
+CMD negative suffix, unknown scope, changed action/object, duplicated scopes,
+fictional and permuted alternatives, invalid source/query boundaries, oversized
+input and caller-buffer lifetime. Actual OpenCode 1.18.32 with the local Symbols
+binary displays useful comparison answers for PowerShell/Bash; CMD and unknown
+scope abstain. These are narrow directed acceptance cases, not exposed80 accuracy.
+Initial baseline simple CMD incorrectly returned the comparison with unsupported
+citation; its failure is preserved in evidence. The final simple/prefaced CMD
+cases abstain, which is not a claim of universal builtin absence.
+
+Historical v1 Linux native suite reconciled by bounded serial blocks: 252 tests registered,
+245 PASS, seven explicitly SKIPPED integration gates. No interrupted invocation
+counts as completion. First parallel git-gate calls failed on shared index.lock;
+separate independent archive/git-init validation ran both serially PASS. Those
+tests also committed their containing disposable repository, so patch comparison
+uses explicit base 9840c67d473d84b0b5b66c03866d4696543bdf2f, not current HEAD.
+Metadata/remotes/common-dir identities were inspected; no shared operational git
+metadata is used. First typed-C preview/verify checks failed because the generator
+was built outside their fixed expected build path. Copying the existing local
+compiled c_contract_static into that expected scratch build path made both PASS;
+no source/workflow/tool change or install was made. Existing citation target also
+passes ASan+UBSan with leak detection, zero sanitizer diagnostics. These local
+results do not substitute for publication review or later Windows CI.
+
+### Review v2 corrections (local, not published)
+
+The bounded query length loop tests its numeric limit before reading the next
+byte. Both 1024-byte malformed and 1025-byte oversized envelopes reject rather
+than admit truncated forms. Grammar limits have 31/32 identifier, 6/7 object-word
+and 8/9 command-token boundary tests. The isolated endpoint mutant reparses a
+fresh request before changing only the source endpoint.
+
+The per-call action emission does not itself authorize a lexical-guard bypass.
+ChatQuoteVerified rechecks the current file/sentence citation, literal quote
+length and bytes, whole original query and source comparison, and target binding
+before accepting it. Small caller outputs retain explicit output_truncated rather
+than certify a complete displayed quote. Current-image mutations do not reuse
+old parsed binding. ParseIntentToks clears the entire private PARSED at entry
+before its first return or recursive parse; planner copies use this entry, while
+public ChatParse returns copied value slots only.
+
+The public matcher compares supplied query length and target boundaries, then
+uses re-parsed query/source fields. It does not certify integrity of every field
+in the caller-supplied assertion structure. Those fields grant no proof.
+
+Seven prior native skips were all missing server binaries in the scripts' fixed
+build/build-gcc lookup paths, not unsupported platforms. An existing server built
+from the correct source/config was fingerprinted and placed in each independent
+clone's expected build path. Candidate seven gates now execute PASS without SKIP.
+Original failed/skip logs remain evidence, not promoted results. Full comparable
+baseline validation is separately recorded, not inferred from the candidate.
+
+Initial runtime evidence stored the last transport as the answer, which could be
+a later title-generation call. That v1 summary is preserved as discrepant. The v2
+receipt classifies requests by their actual system/user body and response ID.
+Title-generation output is never counted as the documentary answer. Current
+recaptures bind /proc/exe hash to the final compiled binary and retain before/after
+source/corpus hashes and raw final/title streams separately. They do not prove
+historical process identity retroactively.
+
+### Final local v2 validation
+
+Candidate and explicit archive810d0510 baseline each complete 252/252 native
+PASS, zero SKIP, reconciled from completed serial bounded blocks. Earlier
+interrupted calls are not completion evidence. Candidate citation target has
+1251 directed assertions PASS (including both conflicting-candidate orders),
+ASan+UBSan with leak detection enabled and zero sanitizer diagnostics. Initial
+baseline benchmark refused an archive lacking git subject identity; independent
+git-init supplied that required local identity, then the benchmark PASS. No
+operational git common-dir or remote is shared. Built server and typed-generator
+source/config/path/SHA fingerprints accompany the evidence. This is local
+regression evidence, not an independent accuracy evaluation or a Windows claim.
+
+The final executable differs from v1 because of the reviewed guard corrections.
+Final long-query and CMD recaptures bind the new /proc/exe SHA to the compiled
+binary, current source/corpus before/after hashes, explicit ports/config, request
+body and response ID. Title and answer streams are classified separately. Long
+id1 is title and id2 the comparison; CMD id1 is title and id2 abstention. No
+historical screenshot is authenticated retroactively by this current receipt.

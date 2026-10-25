@@ -198,4 +198,24 @@ uint32_t TextLexFindSentenceBySymbol(const TEXTLEX *tl, SYMBOL_ID target_id);
    T < 1 sharpens (top-1 dominant), T > 1 softens (uniform). */
 void TextLexSetTemperature(float t);
 
+
+/* Bounded explicit action/scope comparison grammar, not arbitrary prose QA. */
+#define TL_ACTION_QUERY_MAX 1024
+typedef struct { uint32_t first,end; } TL_ACTION_SPAN;
+typedef struct {
+ TL_ACTION_SPAN verb,object,target,context;
+ uint32_t query_bytes;
+} TL_ACTION_REQUEST;
+typedef struct {
+ TL_ACTION_SPAN action,object,command[2],scope[2],negative_scope,whole;
+ uint32_t pairs;
+} TL_ACTION_ASSERTION;
+/* 1 unique whole-input parse, 0 unsupported/ambiguous, outputs cleared. */
+int TextLexParseActionRequest(const char *raw, TL_ACTION_REQUEST *out);
+int TextLexParseScopedAlternatives(const unsigned char *bytes,size_t n,
+                                   TL_ACTION_SPAN whole,TL_ACTION_ASSERTION *out);
+/* 1 matching unique positive pair,0 no match,-1 conflicting target binding. */
+int TextLexMatchActionScope(const char *query,const TL_ACTION_REQUEST *request,
+ const unsigned char *source,size_t source_bytes,const TL_ACTION_ASSERTION *assertion,
+ uint32_t *pair);
 #endif /* TEXT_LEX_H */

@@ -269,6 +269,80 @@ static void as_tests(void){
  check(QSParseAssignmentQuery(NULL,1,&qs_q)==QS_INVALID,"assignment null query invalid");
  check(QSExtractAssignmentSentence(as_s,sizeof(as_s)-1,(QSSpan){2,1},&qs_s.assertions[0])==QS_INVALID,"assignment reversed span invalid");
 }
+static void action_scope_tests(void){
+ const char*q="I know tail -f on Linux. How do I follow a growing log in PowerShell?";
+ const char*s="Following a growing log uses tail -f in Bash and Get-Content -Wait in PowerShell, with no direct CMD builtin.";
+ TL_ACTION_REQUEST r;TL_ACTION_ASSERTION a;uint32_t pair=99;
+ check(TextLexParseActionRequest(q,&r)&&r.target.first>50,"action fullraw target beyond16tokens preserved");
+ check(TextLexParseScopedAlternatives((const unsigned char*)s,strlen(s),(TL_ACTION_SPAN){0,(uint32_t)strlen(s)},&a),"action scoped comparison whole-source parse");
+ check(TextLexMatchActionScope(q,&r,(const unsigned char*)s,strlen(s),&a,&pair)==1&&pair==1,"action PowerShell binds second command not contextual Linux");
+ const char*badq[]={"How do I follow a growing log in PowerShell when empty?","How do I follow a growing log in PowerShell and Bash?","How do I not follow a growing log in PowerShell?","How do I follow a log when empty in PowerShell?","How do I follow a growing log in PowerShell? Extra.","How do I follow a growing log in PowerShell version 7?"};
+ for(unsigned i=0;i<sizeof(badq)/sizeof(*badq);i++)check(!TextLexParseActionRequest(badq[i],&r),"action unsupported qualifier/condition/compound query no clipping");
+ const char*bads[]={"Following a growing log uses tail -f in Bash and Get-Content -Wait in PowerShell if empty.","Following a growing log uses tail -f in Bash and Get-Content -Wait in PowerShell. Unless restricted.","# PowerShell\nFollowing a growing log uses tail -f in Bash and Get-Content -Wait in PowerShell.","Following a growing log uses 'in Bash' in Bash and Get-Content in PowerShell.","Following a growing log uses A in Bash and B in PowerShell and C in CMD."};
+ for(unsigned i=0;i<sizeof(bads)/sizeof(*bads);i++)check(!TextLexParseScopedAlternatives((const unsigned char*)bads[i],strlen(bads[i]),(TL_ACTION_SPAN){0,(uint32_t)strlen(bads[i])},&a),"action source context/quotes/thirdpair unsupported as whole unit");
+ const char*dup="Following a growing log uses A in Luma and B in Luma.";const char*dq="How do I follow a growing log in Luma?";
+ TextLexParseActionRequest(dq,&r);TextLexParseScopedAlternatives((const unsigned char*)dup,strlen(dup),(TL_ACTION_SPAN){0,(uint32_t)strlen(dup)},&a);
+ check(TextLexMatchActionScope(dq,&r,(const unsigned char*)dup,strlen(dup),&a,&pair)==-1,"action duplicate target scope conflict unknown");
+ const char*f="Sorting a green ledger uses Orb -a in Luma and Zed -b in Neri.";const char*fq="How do I sort a green ledger in Neri?";
+ check(TextLexParseActionRequest(fq,&r)&&TextLexParseScopedAlternatives((const unsigned char*)f,strlen(f),(TL_ACTION_SPAN){0,(uint32_t)strlen(f)},&a)&&TextLexMatchActionScope(fq,&r,(const unsigned char*)f,strlen(f),&a,&pair)==1&&pair==1,"action fictional relation command scope no shell list");
+ const char*permuted="Sorting a green ledger uses Zed -b in Neri and Orb -a in Luma.";
+ check(TextLexParseScopedAlternatives((const unsigned char*)permuted,strlen(permuted),(TL_ACTION_SPAN){0,(uint32_t)strlen(permuted)},&a)&&TextLexMatchActionScope(fq,&r,(const unsigned char*)permuted,strlen(permuted),&a,&pair)==1&&pair==0,"action permuted alternatives preserve scope not position");
+ const char*longq="I know A B C D E F G H on Luma. How do I follow a growing log in PowerShell?";
+ check(TextLexParseActionRequest(longq,&r)&&r.target.first==65,"action long prefaced original target after old token budget");
+ check(TextLexParseScopedAlternatives((const unsigned char*)s,strlen(s),(TL_ACTION_SPAN){0,(uint32_t)strlen(s)},&a)&&TextLexMatchActionScope(longq,&r,(const unsigned char*)s,strlen(s),&a,&pair)==1,"action long prefaced raw exact scope match");
+ r.target.first++;check(TextLexMatchActionScope(longq,&r,(const unsigned char*)s,strlen(s),&a,&pair)==0,"action tampered query span not trusted");
+ TextLexParseActionRequest(q,&r);a.whole.end--;check(TextLexMatchActionScope(q,&r,(const unsigned char*)s,strlen(s),&a,&pair)==0,"action tampered source endpoint fails full parse");
+ char boundary[1026];memset(boundary,'x',sizeof(boundary));boundary[1024]=0;
+ check(!TextLexParseActionRequest(boundary,&r),"action1024 malformed max envelope no truncated admission");boundary[1024]='x';boundary[1025]=0;
+ check(!TextLexParseActionRequest(boundary,&r),"action1025 exceeds cap no truncated admission");
+ const char*badcontext[]={"Unless restricted, Following a growing log uses A in Bash and B in PowerShell.","Following a growing log uses A in Bash and B in PowerShell unless restricted.","Following a growing log uses A in Bash and B in PowerShell; using C in CMD."};
+ for(unsigned i=0;i<3;i++)check(!TextLexParseScopedAlternatives((const unsigned char*)badcontext[i],strlen(badcontext[i]),(TL_ACTION_SPAN){0,(uint32_t)strlen(badcontext[i])},&a),"action conditional prefix/suffix/crossclause unsupported whole source");
+ char idq[160];sprintf(idq,"How do I follow a growing log in %s?","AbcdefghijklmnopqrstuvwxyzABCDE");check(TextLexParseActionRequest(idq,&r),"action31byte ID boundary admitted");
+ sprintf(idq,"How do I follow a growing log in %s?","AbcdefghijklmnopqrstuvwxyzABCDEF");check(!TextLexParseActionRequest(idq,&r),"action32byte ID boundary rejected");
+ check(TextLexParseActionRequest("How do I follow a one two three four five six in Luma?",&r),"action6object words boundary admitted");
+ check(!TextLexParseActionRequest("How do I follow a one two three four five six seven in Luma?",&r),"action7object words boundary rejected");
+ check(TextLexParseActionRequest("I know A B C D E F G H on Luma. How do I follow a log in Luma?",&r),"action8commandtokens boundary admitted");
+ check(!TextLexParseActionRequest("I know A B C D E F G H I on Luma. How do I follow a log in Luma?",&r),"action9commandtokens boundary rejected");
+ char overlong[1100];memset(overlong,'a',sizeof(overlong));overlong[sizeof(overlong)-1]=0;
+ check(!TextLexParseActionRequest(overlong,&r),"action oversized query no truncation admission");
+ const char*path="action_scope_fixture.txt";FILE*fp=fopen(path,"wb");if(!fp){check(0,"action fixture open");return;}fprintf(fp,"%s\n",s);fclose(fp);
+ CHAT*c=calloc(1,sizeof(*c));ChatInit(c,path);c->episodic.auto_save=0;char out[8192];CHAT_CITATION cite;
+ check(ChatHandleToBufEx(c,q,out,sizeof(out),&cite)&&strstr(out,"Get-Content -Wait in PowerShell")&&cite.state==CHAT_CITE_VERIFIED,"action REAL CHAT useful comparison and exact citation");
+ check(cite.source.first==0&&cite.source.end==strlen(s),"action source proof contains action and both scopebindings");
+ check(ChatHandleToBufEx(c,"How do I follow a growing log in CMD?",out,sizeof(out),&cite)&&!strstr(out,"Segun el texto")&&cite.state!=CHAT_CITE_VERIFIED,"action negative suffix never CMD positive recipe");
+ const char*good[]={q,longq,"How do I follow a growing log in PowerShell?","How do I follow a growing log in Bash?","I know Get-Content -Wait on PowerShell. How do I follow a growing log in Bash?"};
+ const char*unknown[]={"How do I follow a growing log in CMD?","I know tail -f on Linux. How do I follow a growing log in CMD?","How do I follow a growing log in Luma?","How do I sort a growing log in PowerShell?","How do I follow a green ledger in PowerShell?"};
+ for(unsigned k=0;k<3;k++){
+  for(unsigned i=0;i<sizeof(good)/sizeof(*good);i++){
+   if(k==0){ChatDestroy(c);free(c);c=calloc(1,sizeof(*c));ChatInit(c,path);c->episodic.auto_save=0;}
+   if(k==2)ChatHandleToBuf(c,"How do I follow a growing log in CMD?",out,sizeof(out));
+   ChatParse parse;check(ChatParseLine(c,good[i],&parse)&&!strcmp(parse.intent,"TEXTQ"),"action accepted wholequery dispatches TEXTQ only");
+   check(ChatHandleToBufEx(c,good[i],out,sizeof(out),&cite)&&strstr(out,s)&&cite.state==CHAT_CITE_VERIFIED,"action fresh/context/prefaced/simple target positive literal quote");
+  }
+  for(unsigned i=0;i<sizeof(unknown)/sizeof(*unknown);i++)check(ChatHandleToBufEx(c,unknown[i],out,sizeof(out),&cite)&&!strstr(out,"Segun el texto")&&cite.state!=CHAT_CITE_VERIFIED,"action fresh/context/simple/prefaced negative unknown");
+ }
+ {size_t caps[]={1,16,20,64};for(unsigned i=0;i<4;i++){
+  check(ChatHandleToBufEx(c,q,out,caps[i],&cite),"action small output handled");
+  check(cite.state!=CHAT_CITE_VERIFIED || cite.output_truncated,"action small output not complete falseproof");
+ }}
+ {TextLexParseActionRequest(q,&r);TextLexParseScopedAlternatives(c->tlex[0].image,c->tlex[0].imagelen,(TL_ACTION_SPAN){0,(uint32_t)strlen(s)},&a);
+  unsigned char original=c->tlex[0].image[0];c->tlex[0].image[0]='X';
+  check(TextLexMatchActionScope(q,&r,c->tlex[0].image,c->tlex[0].imagelen,&a,&pair)==0,"action current source image mutation not stale binding");c->tlex[0].image[0]=original;
+ }
+ /* Public parse is a value-only record, not an owner of caller raw pointers. */
+ { char mutableq[256];strcpy(mutableq,q);ChatParse parse;
+   check(ChatParseLine(c,mutableq,&parse),"action public parse succeeds before caller buffer ends");memset(mutableq,'x',strlen(mutableq));
+   check(!strcmp(parse.slot_a,"PowerShell"),"action public parse copies only bounded slots no borrowed raw query"); }
+ ChatDestroy(c);free(c);
+ for(unsigned order=0;order<2;order++){
+  fp=fopen(path,"wb");if(!fp){check(0,"action conflict fixture open");break;}
+  const char*other="Following a growing log uses Alt in Bash and Different in PowerShell.";
+  fprintf(fp,"%s\n\n%s\n",order?other:s,order?s:other);fclose(fp);
+  c=calloc(1,sizeof(*c));ChatInit(c,path);c->episodic.auto_save=0;
+  check(ChatHandleToBufEx(c,q,out,sizeof(out),&cite)&&!strstr(out,"Segun el texto")&&cite.state!=CHAT_CITE_VERIFIED,"action conflicting candidate order never firstwins");ChatDestroy(c);free(c);
+ }
+ remove(path);
+}
 static CHAT *create(const char*p){CHAT*c=calloc(1,sizeof(*c));if(c){ChatInit(c,p);c->episodic.auto_save=0;}return c;}
 static void destroy(CHAT*c){if(c){ChatDestroy(c);free(c);}}
 static int call(CHAT*c,const char*q,char*out,size_t n,int mode,CHAT_CITATION*r,GoalCause*cause){
@@ -301,7 +375,7 @@ static void compare(const char*p,int mode,size_t n){
  destroy(a);destroy(b);
 }
 int main(void){
- qs_tests();as_tests();
+ qs_tests();as_tests();action_scope_tests();
  const char*p="chat_citation_fixture.txt";FILE*f=fopen(p,"wb");if(!f)return 2;
  fputs("And those gamma rays came just 1.7 seconds after the gravitational wave signal.\nAnother seconds statement follows distinct observations.\nPrimer postulado (principio de relatividad) explains distant observations.\n",f);fclose(f);
  size_t caps[]={1,8,14,15,16,32,64,4096,8192};for(int m=0;m<3;m++)for(unsigned i=0;i<sizeof(caps)/sizeof(*caps);i++)compare(p,m,caps[i]);

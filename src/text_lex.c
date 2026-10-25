@@ -2204,3 +2204,105 @@ uint32_t TextLexFindSentenceBySymbol(const TEXTLEX *tl, SYMBOL_ID target_id)
     }
     return UINT32_MAX;
 }
+
+/* Explicit grammar only. No heading inheritance or topic-overlap proof. */
+static int ASAlpha(unsigned char c){return (c>='a'&&c<='z')||(c>='A'&&c<='Z');}
+static int ASLower(unsigned char c){return c>='a'&&c<='z';}
+static int ASTake(const unsigned char*b,uint32_t end,uint32_t*p,const char*s){
+ size_t n=strlen(s);if(*p>end||n>end-*p||memcmp(b+*p,s,n))return 0;*p+=(uint32_t)n;return 1;
+}
+static int ASWord(const unsigned char*b,uint32_t end,uint32_t*p,int id){
+ uint32_t st=*p;
+ if(st>=end||!(id?ASAlpha(b[st]):ASLower(b[st])))return 0;
+ while(*p<end&&(id?(ASAlpha(b[*p])||(b[*p]>='0'&&b[*p]<='9')||b[*p]=='_'):ASLower(b[*p]))){if(*p-st==31)return 0;(*p)++;}
+ return 1;
+}
+static int ASObject(const unsigned char*b,uint32_t end,uint32_t*p,const char*delimiter,TL_ACTION_SPAN*out){
+ uint32_t start=*p,words=0;
+ if(!ASTake(b,end,p,"a "))return 0;
+ for(;;){
+  uint32_t ws=*p;
+  if(!ASWord(b,end,p,0)||++words>6)return 0;
+  const char *blocked[]={"not","if","unless","when","except","without","and","or","version"};
+  for(uint32_t k=0;k<sizeof(blocked)/sizeof(*blocked);k++)if(strlen(blocked[k])==*p-ws&&!memcmp(b+ws,blocked[k],*p-ws))return 0;
+  uint32_t saved=*p;
+  if(ASTake(b,end,p,delimiter)){out->first=start;out->end=saved;return 1;}
+  *p=saved;if(!ASTake(b,end,p," "))return 0;
+ }
+}
+static int ASCommand(const unsigned char*b,uint32_t end,uint32_t*p,const char*delimiter,TL_ACTION_SPAN*out){
+ uint32_t st=*p,words=0;
+ for(;;){
+  uint32_t w=*p;
+  while(*p<end&&(ASAlpha(b[*p])||(b[*p]>='0'&&b[*p]<='9')||b[*p]=='_'||b[*p]=='-')){if(*p-w==63)return 0;(*p)++;}
+  if(w==*p||++words>8)return 0;
+  uint32_t len=*p-w;
+  const char*reserved[]={"and","in","on","uses","not","if","unless","when"};
+  for(uint32_t i=0;i<sizeof(reserved)/sizeof(*reserved);i++)if(strlen(reserved[i])==len&&!memcmp(b+w,reserved[i],len))return 0;
+  uint32_t saved=*p;
+  if(ASTake(b,end,p,delimiter)){out->first=st;out->end=saved;return 1;}
+  *p=saved;if(!ASTake(b,end,p," "))return 0;
+ }
+}
+int TextLexParseActionRequest(const char*raw,TL_ACTION_REQUEST*out){
+ uint32_t n=0,p=0,st;TL_ACTION_REQUEST r;
+ if(!out)return 0;
+ memset(out,0,sizeof(*out));memset(&r,0,sizeof(r));if(!raw)return 0;
+ while(n<=TL_ACTION_QUERY_MAX&&raw[n])n++;
+ if(!n||n>TL_ACTION_QUERY_MAX)return 0;
+ const unsigned char*b=(const unsigned char*)raw;
+ if(n>=7&&!memcmp(b,"I know ",7)){
+  TL_ACTION_SPAN command;p=7;
+  if(!ASCommand(b,n,&p," on ",&command))return 0;
+  st=p;if(!ASWord(b,n,&p,1)||!ASTake(b,n,&p,". "))return 0;
+  r.context.first=0;r.context.end=p;
+ }
+ if(!ASTake(b,n,&p,"How do I "))return 0;
+ st=p;if(!ASWord(b,n,&p,0))return 0;r.verb.first=st;r.verb.end=p;
+ if(!ASTake(b,n,&p," ")||!ASObject(b,n,&p," in ",&r.object))return 0;
+ st=p;if(!ASWord(b,n,&p,1))return 0;r.target.first=st;r.target.end=p;
+ if(!ASTake(b,n,&p,"?")||p!=n)return 0;
+ r.query_bytes=n;*out=r;return 1;
+}
+int TextLexParseScopedAlternatives(const unsigned char*b,size_t n,TL_ACTION_SPAN whole,TL_ACTION_ASSERTION*out){
+ TL_ACTION_ASSERTION a;uint32_t p=whole.first,st,end=whole.end;
+ if(!out)return 0;
+ memset(out,0,sizeof(*out));memset(&a,0,sizeof(a));
+ if(!b||n>UINT32_MAX||whole.first>=whole.end||whole.end>n||whole.end-whole.first>1024)return 0;
+ st=p;if(p>=end||b[p]<'A'||b[p]>'Z')return 0;p++;
+ while(p<end&&ASLower(b[p])){if(p-st==31)return 0;p++;}
+ if(p-st<4||memcmp(b+p-3,"ing",3))return 0;
+ a.action.first=st;a.action.end=p;
+ if(!ASTake(b,end,&p," ")||!ASObject(b,end,&p," uses ",&a.object))return 0;
+ for(uint32_t i=0;i<2;i++){
+  if(!ASCommand(b,end,&p," in ",&a.command[i]))return 0;
+  st=p;if(!ASWord(b,end,&p,1))return 0;a.scope[i].first=st;a.scope[i].end=p;
+  if(i==0&&!ASTake(b,end,&p," and "))return 0;
+ }
+ if(p<end&&b[p]==','){
+  if(!ASTake(b,end,&p,", with no direct "))return 0;
+  st=p;if(!ASWord(b,end,&p,1))return 0;a.negative_scope.first=st;a.negative_scope.end=p;
+  if(!ASTake(b,end,&p," builtin"))return 0;
+ }
+ if(!ASTake(b,end,&p,".")||p!=end)return 0;
+ a.whole=whole;a.pairs=2;*out=a;return 1;
+}
+static int ASEqual(const unsigned char*a,TL_ACTION_SPAN x,const unsigned char*b,TL_ACTION_SPAN y){
+ return x.first<x.end&&y.first<y.end&&x.end-x.first==y.end-y.first&&!memcmp(a+x.first,b+y.first,x.end-x.first);
+}
+int TextLexMatchActionScope(const char*q,const TL_ACTION_REQUEST*r,const unsigned char*b,size_t n,const TL_ACTION_ASSERTION*a,uint32_t*pair){
+ TL_ACTION_REQUEST qr;TL_ACTION_ASSERTION sa;uint32_t hit=0,found=0;
+ if(pair)*pair=0;
+ if(!q||!r||!a||!pair||!TextLexParseActionRequest(q,&qr)||!TextLexParseScopedAlternatives(b,n,a->whole,&sa))return 0;
+ /* Inputs are re-parsed from original bytes. Public structs do not grant proof. */
+ if(qr.query_bytes!=r->query_bytes||qr.target.first!=r->target.first||qr.target.end!=r->target.end)return 0;
+ r=&qr;a=&sa;uint32_t vn=r->verb.end-r->verb.first,gn=a->action.end-a->action.first;
+ if(gn!=vn+3||((unsigned char)q[r->verb.first]-'a'+'A')!=b[a->action.first]||
+    (vn>1&&memcmp(q+r->verb.first+1,b+a->action.first+1,vn-1))||
+    !ASEqual((const unsigned char*)q,r->object,b,a->object))return 0;
+ for(uint32_t i=0;i<2;i++)if(ASEqual((const unsigned char*)q,r->target,b,a->scope[i])){hit=i;found++;}
+ if(a->negative_scope.end&&ASEqual((const unsigned char*)q,r->target,b,a->negative_scope))return -1;
+ if(found>1)return -1;
+ if(!found)return 0;
+ *pair=hit;return 1;
+}

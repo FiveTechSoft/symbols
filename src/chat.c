@@ -2187,6 +2187,7 @@ typedef struct
     uint32_t ntoks;
     int    t_following;      /* TEXTQ follow-up: reuse cached topic */
     char   t_sub[CHAT_TOKEN_MAX]; /* geometric substitute (marked) */
+    const char *raw_action_query; /* per-call original bytes, never session state */
 } PARSED;
 
 /* token right after the first "de"/"of" following position from */
@@ -3853,8 +3854,19 @@ static int ParseIntent(const CHAT *ch, const char *line, PARSED *p)
     char toks[CHAT_MAX_TOKS][CHAT_TOKEN_MAX];
     SURFACE_FLAGS sf;
     uint32_t n = Split(line, toks, CHAT_MAX_TOKS, &sf);
-    return ParseIntentToks(ch, toks, n, sf.question, sf.genitive,
-                           sf.comma, p);
+    int result = ParseIntentToks(ch, toks, n, sf.question, sf.genitive, sf.comma, p);
+    TL_ACTION_REQUEST request;
+    /* Private PARSED lives only within this synchronous call. No CHAT/session
+       or public ChatParse stores this borrowed original-buffer pointer. */
+    if(result && ch->ntfiles && ch->tgraph && ch->temb &&
+       (p->intent==INT_NONE || p->intent==INT_TEXTQ ||
+        (p->intent>=INT_QA_ENTITY && p->intent<=INT_QA_AFFORDANCE)) &&
+       TextLexParseActionRequest(line,&request)){
+        p->intent=INT_TEXTQ;p->raw_action_query=line;p->t_following=0;
+        uint32_t len=request.target.end-request.target.first;
+        memcpy(p->a,line+request.target.first,len);p->a[len]=0;
+    }
+    return result;
 }
 
 /* ---- NLG (ES) ---- */
@@ -4640,6 +4652,7 @@ typedef struct {
     uint32_t file, sentence;
     size_t first, end;
     int display_truncated;
+    int action_scope_verified;
 } CHAT_EMISSION;
 static void ChatCitationClear(CHAT_CITATION *c)
 {
@@ -5054,6 +5067,47 @@ static void ChatAnswerToBufRaw(CHAT *ch, const PARSED *p, char *out,
     }
     case INT_TEXTQ:
     {
+        /* Closed whole-question action/scope path. Same top16 retrieval, no
+           heading inheritance, no paragraph clipping or score threshold change. */
+        if(p->raw_action_query){
+            TL_ACTION_REQUEST request;
+            const char *raw=p->raw_action_query;
+            char qw[10][CHAT_TOKEN_MAX];const char *wp[10];uint32_t qn=0;
+            int found=0,conflict=0;uint32_t ff=0,ss=0;
+            if(TextLexParseActionRequest(raw,&request)){
+                TL_ACTION_SPAN spans[3]={request.verb,request.object,request.target};
+                for(uint32_t z=0;z<3;z++){
+                    uint32_t at=spans[z].first;
+                    while(at<spans[z].end && qn<10){
+                        uint32_t st=at;while(at<spans[z].end&&raw[at]!=' ')at++;
+                        uint32_t len=at-st;
+                        if(len && !(len==1&&raw[st]=='a')){memcpy(qw[qn],raw+st,len);qw[qn][len]=0;wp[qn]=qw[qn];qn++;}
+                        if(at<spans[z].end)at++;
+                    }
+                }
+                for(uint32_t f=0;f<ch->ntfiles;f++){
+                    uint32_t idx[16];float scores[16];
+                    uint32_t count=TextLexRetrieve(&ch->tlex[f],ch->tgraph,ch->temb,wp,qn,idx,scores,16);
+                    for(uint32_t j=0;j<count;j++){
+                        TL_RETRIEVAL_SPANS spans2;TL_ACTION_ASSERTION assertion;uint32_t pair;
+                        if(!TextLexRetrievalSpans(&ch->tlex[f],idx[j],&spans2)||spans2.content_end>UINT32_MAX)continue;
+                        TL_ACTION_SPAN span={(uint32_t)spans2.content_first,(uint32_t)spans2.content_end};
+                        if(!TextLexParseScopedAlternatives(ch->tlex[f].image,ch->tlex[f].imagelen,span,&assertion))continue;
+                        int match=TextLexMatchActionScope(raw,&request,ch->tlex[f].image,ch->tlex[f].imagelen,&assertion,&pair);
+                        if(match<0){conflict=1;continue;}
+                        if(match){if(found)conflict=1;found=1;ff=f;ss=idx[j];}
+                    }
+                }
+            }
+            if(found&&!conflict){
+                char literal[2048];
+                if(TextLexSentenceSourceText(&ch->tlex[ff],ss,ch->tlex[ff].image,ch->tlex[ff].imagelen,literal,sizeof(literal))>0){
+                    EMIT_OK("Segun el texto: %s\n",literal);
+                    if(emission){emission->selected=1;emission->file=ff;emission->sentence=ss;emission->first=16;emission->end=16+strlen(literal);emission->action_scope_verified=1;}
+                } else EMIT("No tengo constancia suficiente para responder a eso.\n");
+            } else EMIT("No tengo constancia suficiente para responder a eso.\n");
+            break;
+        }
         /* QKV over session texts: best literal sentence wins.
            Follow-ups (KV-cache) reuse the cached topic and skip
            shown sentences: advance, never repeat. Fresh topics
@@ -8580,6 +8634,25 @@ static int ChatQuoteVerified(CHAT *ch, const char *line, const char *out,
     char low[512];
     uint32_t nw = 0, known = 0;
     size_t i;
+    /* The closed path already bound full raw request to this exact source
+       sentence. Do not reclassify it using legacy truncated lexical words. */
+    if(emission && emission->action_scope_verified){
+        TL_RETRIEVAL_SPANS spans;TL_ACTION_REQUEST request;
+        TL_ACTION_ASSERTION assertion;TL_CITATION citation;uint32_t pair;
+        if(!emission->selected || emission->file>=ch->ntfiles ||
+           emission->first!=16 || emission->end<emission->first ||
+           emission->end>strlen(out) || strncmp(out,"Segun el texto: ",16))return 0;
+        const TEXTLEX *source=&ch->tlex[emission->file];
+        if(!source->image || !TextLexRetrievalSpans(source,emission->sentence,&spans) ||
+           spans.content_end>UINT32_MAX ||
+           TextLexCitation(source,emission->sentence,&citation)!=TL_CITE_OK ||
+           emission->end-emission->first!=citation.end-citation.first ||
+           memcmp(out+emission->first,source->image+citation.first,(size_t)(citation.end-citation.first)) ||
+           !TextLexParseActionRequest(line,&request) ||
+           !TextLexParseScopedAlternatives(source->image,source->imagelen,
+               (TL_ACTION_SPAN){(uint32_t)spans.content_first,(uint32_t)spans.content_end},&assertion))return 0;
+        return TextLexMatchActionScope(line,&request,source->image,source->imagelen,&assertion,&pair)==1;
+    }
     if (ch->ntfiles == 0 || ch->tlex[0].image == NULL || strncmp(out, "Segun el texto", 14) != 0)
         return 1;
     /* Literal TEXTQ carries per-call identity. Other quote paths keep the
