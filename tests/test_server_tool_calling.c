@@ -991,8 +991,67 @@ static void TestWorkspacePlanningEvidence(void)
                 "case 5 enters repository route for clarification");
 }
 
+/* Durable observation-format contract; HTTP call-site coverage is separate. */
+static void test_corpus_observation(void)
+{
+    static char out[70000], old[16384], raw[8192];
+    ChatParse parsed;
+    const char *routes[] = {"knowledge_question", "coding_no_tools", "ordinary_chat"};
+    memset(&parsed, 0, sizeof(parsed));
+    strcpy(parsed.intent, "TEXTQ");
+    for (unsigned i = 0; i < 3; i++)
+    {
+        const ChatParse *p = i == 2 ? &parsed : NULL;
+        TEST_ASSERT(ServerBuildCorpusObservation("time", "symbols", routes[i],
+            "session-A", 42, 1, 0, "q", p, NULL, NULL, NULL, "mapped",
+            i == 2 ? "ANSWER" : "UNKNOWN", 0, 1, "raw", 1,
+            out, sizeof(out)), "v2 format succeeds for each corpus branch");
+        TEST_ASSERT(strstr(out, "\"observation_version\":2") &&
+            strstr(out, "\"response_seq\":42") &&
+            strstr(out, "\"core_status\":\"unknown\"") &&
+            strstr(out, "\"delivery\":\"unknown\"") &&
+            strstr(out, "\"response_exists\":true"), "observed response is not semantic/delivery proof");
+        if (i != 2)
+            TEST_ASSERT(strstr(out, "\"status\":\"UNKNOWN\"") &&
+                strstr(out, "\"status_kind\":\"unavailable\"") &&
+                strstr(out, "\"intent\":\"\"") && strstr(out, "\"prov\":[]"),
+                "early branch sentinel status and empty state are explicit");
+        else
+        {
+            TEST_ASSERT(ServerBuildObservation("time", "symbols", 1, 0,
+                "q", &parsed, "", "[]", "[]", "mapped", "ANSWER", 0,
+                old, sizeof(old)), "legacy formatter succeeds");
+            TEST_ASSERT(strncmp(old, out, strlen(old) - 1) == 0 &&
+                out[strlen(old) - 1] == ',', "ordinary legacy keys remain exact prefix");
+        }
+    }
+    memset(raw, 1, sizeof(raw) - 1); raw[sizeof(raw) - 1] = '\0';
+    TEST_ASSERT(ServerBuildCorpusObservation("time", "symbols", "knowledge_question",
+        "s\\\"", 43, 1, 0, "q", NULL, NULL, NULL, NULL, "mapped", "UNKNOWN",
+        0, 1, raw, 1, out, sizeof(out)), "8191 control bytes raw escape beyond16KiB succeeds");
+    TEST_ASSERT(strlen(out) > 49000 && strstr(out, "\\u0001") &&
+        strstr(out, "\"session_id\":\"s\\\\\\\"\""), "full escaped raw and session survive");
+    TEST_ASSERT(!ServerBuildCorpusObservation("time", "symbols", "ordinary_chat",
+        "s", 44, 1, 0, "q", NULL, NULL, NULL, NULL, "mapped", "UNKNOWN",
+        0, 1, raw, 1, out, 64) && out[0] == '\0', "capacity failure clears output not stale record");
+    TEST_ASSERT(ServerBuildCorpusObservation("time", "symbols", "ordinary_chat",
+        "s", 45, 1, 0, "q", NULL, NULL, NULL, NULL, "mapped", "UNKNOWN",
+        0, -1, NULL, 0, out, sizeof(out)) &&
+        strstr(out, "\"response_seq\":null") &&
+        strstr(out, "\"response_sequence_attempt\":45") &&
+        strstr(out, "\"payload_built\":false") &&
+        strstr(out, "\"response_exists\":null") &&
+        strstr(out, "\"raw_result_available\":false"), "failed payload never binds stale response identity");
+    TEST_ASSERT(!ServerBuildResponse("symbols", 1, 46, raw, "q", out, sizeof(out)) &&
+        out[0] == '\0', "actual JSON builder escape failure clears prior identity");
+    TEST_ASSERT(!ServerBuildStreamResponse("symbols", 1, 47, raw, out, sizeof(out)) &&
+        out[0] == '\0', "actual SSE builder escape failure clears prior identity");
+}
+
+
 int main(void)
 {
+    test_corpus_observation();
     TestWorkspacePlanningEvidence();
     printf("======================================================================\n");
     printf("  TEST SUITE: OPENAI TOOL CALLING WIRE PROTOCOL (OPENCODE INTEGRATION)\n");

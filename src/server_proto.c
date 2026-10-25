@@ -972,6 +972,69 @@ int ServerBuildObservation(const char *ts, const char *model, int nmsg,
     return (w > 0 && (size_t)w < size) ? 1 : 0;
 }
 
+/* Format only: no file I/O or interpretation of the answer text. */
+int ServerBuildCorpusObservation(const char *ts, const char *model,
+    const char *route, const char *session_id, unsigned long response_seq,
+    int nmsg, int has_system, const char *query, const ChatParse *parsed,
+    const char *focus, const char *entities, const char *provenance,
+    const char *content, const char *legacy_status, long latency_ms,
+    int response_exists, const char *raw_result, int payload_built,
+    char *out, size_t size)
+{
+    char eroute[128], esession[384], sequence[32];
+    const char *exists;
+    ChatParse empty;
+    char *eraw;
+    size_t n, raw_size;
+    int w;
+    if (out && size) out[0] = '\0';
+    if (!out || !size || !route || !session_id ||
+        response_exists < -1 || response_exists > 1 ||
+        (payload_built != 0 && payload_built != 1)) return 0;
+    memset(&empty, 0, sizeof(empty));
+    if (!ServerJsonEscape(route, eroute, sizeof(eroute)) ||
+        !ServerJsonEscape(session_id, esession, sizeof(esession))) return 0;
+    n = raw_result ? strlen(raw_result) : 0;
+    if (n > ((size_t)-1 - 1) / 6) return 0;
+    raw_size = 6 * n + 1;
+    eraw = (char *)malloc(raw_size);
+    if (!eraw) return 0;
+    if (!ServerJsonEscape(raw_result ? raw_result : "", eraw, raw_size) ||
+        !ServerBuildObservation(ts, model, nmsg, has_system, query,
+            parsed ? parsed : &empty, focus ? focus : "",
+            entities ? entities : "[]", provenance ? provenance : "[]",
+            content, legacy_status, latency_ms, out, size))
+    {
+        free(eraw); out[0] = '\0'; return 0;
+    }
+    n = strlen(out);
+    if (!n || out[n - 1] != '}')
+    {
+        free(eraw); out[0] = '\0'; return 0;
+    }
+    if (payload_built) snprintf(sequence, sizeof(sequence), "%lu", response_seq);
+    else snprintf(sequence, sizeof(sequence), "null");
+    exists = response_exists < 0 ? "null" : response_exists ? "true" : "false";
+    w = snprintf(out + n - 1, size - n + 1,
+        ",\"observation_version\":2,\"route\":\"%s\","
+        "\"session_id\":\"%s\",\"response_seq\":%s,"
+        "\"response_sequence_attempt\":%lu,\"response_exists\":%s,"
+        "\"core_status\":\"unknown\",\"status_kind\":\"%s\","
+        "\"latency_measured\":%s,\"raw_result\":\"%s\","
+        "\"raw_result_available\":%s,\"source_receipt\":\"unavailable\","
+        "\"payload_built\":%s,\"delivery\":\"unknown\"}",
+        eroute, esession, sequence, response_seq, exists,
+        parsed ? "legacy_text_classification" : "unavailable",
+        parsed ? "true" : "false", eraw, raw_result ? "true" : "false",
+        payload_built ? "true" : "false");
+    free(eraw);
+    if (w <= 0 || (size_t)w >= size - n + 1)
+    {
+        out[0] = '\0'; return 0;
+    }
+    return 1;
+}
+
 /* ============================================================
    OpenAI Tool Calling (Function Calling) Wire Implementation
    ============================================================ */

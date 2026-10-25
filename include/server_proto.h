@@ -66,6 +66,20 @@ int ServerBuildObservation(const char *ts, const char *model, int nmsg,
                            const char *status, long latency_ms,
                            char *out, size_t size);
 
+/* Observation-only v2 formatter. response_exists is the response-producing
+   API boolean (-1 unavailable), NOT semantic handled or GOAL status.
+   Returns 0 with empty output on invalid input/capacity/allocation failure.
+   payload_built binds response_seq only when true; delivery remains unknown.
+   Existing ServerBuildObservation API/keys are unchanged. */
+int ServerBuildCorpusObservation(const char *ts, const char *model,
+    const char *route, const char *session_id, unsigned long response_seq,
+    int nmsg, int has_system, const char *query, const ChatParse *parsed,
+    const char *focus, const char *entities, const char *provenance,
+    const char *content, const char *legacy_status, long latency_ms,
+    int response_exists, const char *raw_result, int payload_built,
+    char *out, size_t size);
+
+
 /* Minimal JSON string escaper for log fields. */
 int ServerJsonEscape(const char *in, char *out, size_t size);
 

@@ -958,6 +958,66 @@ static int StoFirstCall(ServerSession *sess, OPENAI_TOOL_CALL *call)
     return 0;
 }
 
+/* Observation v2 covers only the three corpus-answer branches below.
+   A response boolean is not semantic handled/GOAL status. Wire completion and
+   delivery are unknown here; best-effort logging cannot certify persistence. */
+static void ObserveCorpusAnswer(const char *route, const char *session_id,
+                                unsigned long response_seq, int nmsg,
+                                int has_system, const char *query,
+                                const ChatParse *parsed, const char *focus,
+                                const char *entities, const char *provenance,
+                                const char *content, const char *legacy_status,
+                                long latency_ms, int response_exists,
+                                const char *raw_result, int payload_built)
+{
+    char obs[32768], ts[32];
+    FILE *log;
+    IsoUtc(ts, sizeof(ts));
+    if (!ServerBuildCorpusObservation(ts, SERVER_MODEL_ID, route, session_id,
+                                     response_seq, nmsg, has_system, query,
+                                     parsed, focus, entities, provenance,
+                                     content, legacy_status, latency_ms,
+                                     response_exists, raw_result, payload_built,
+                                     obs, sizeof(obs)))
+    {
+        fprintf(stderr, "[observation] format failed route=%s seq=%lu\n", route, response_seq);
+        return;
+    }
+    /* CWD first (repo-adjacent log), Temp fallback: the request
+       is always served, the log never blocks it. */
+    log = fopen(SERVER_OBS_FILE, "a");
+    if (log == NULL)
+    {
+        char alt[640];
+#ifdef _WIN32
+        char tmp[512];
+        DWORD tn = GetTempPathA(sizeof(tmp), tmp);
+        if (tn > 0 && tn < sizeof(tmp))
+        {
+            snprintf(alt, sizeof(alt), "%s%s", tmp,
+                     SERVER_OBS_FILE);
+            log = fopen(alt, "a");
+        }
+#else
+        const char *tmp = getenv("TMPDIR");
+        if (tmp == NULL || tmp[0] == '\0')
+            tmp = getenv("TMP");
+        if (tmp == NULL || tmp[0] == '\0')
+            tmp = getenv("TEMP");
+        if (tmp == NULL || tmp[0] == '\0')
+            tmp = "/tmp";
+        snprintf(alt, sizeof(alt), "%s/%s", tmp, SERVER_OBS_FILE);
+        log = fopen(alt, "a");
+#endif
+    }
+    if (log != NULL)
+    {
+        fputs(obs, log);
+        fputc('\n', log);
+        fclose(log);
+    }
+}
+
 static void HandleCompletions(socket_t s, const char *body,
                               const char *corpus)
 {
@@ -965,7 +1025,7 @@ static void HandleCompletions(socket_t s, const char *body,
     static char content[32768];
     static char resp[65536];
     static char sse[65536];
-    char obs[16384], ts[32], ent_json[2048], prov_json[4096];
+    char ent_json[2048], prov_json[4096];
     char session_id[64] = "default";
     ServerSession *sess = NULL;
     ChatParse parsed;
@@ -973,7 +1033,6 @@ static void HandleCompletions(socket_t s, const char *body,
     const char *status;
     clock_t t0;
     long latency_ms;
-    FILE *log;
 
     g_reply_sess = NULL;
     ServerSetTextHook(ChildResultHook);
@@ -2635,21 +2694,26 @@ static void HandleCompletions(socket_t s, const char *body,
        permission to write that file. Native Git state queries above stay live. */
     if (!has_tool_resp && ServerIsKnowledgeQuestion(query))
     {
-        char raw[8192];
-        if (ServerAnswerQuery(&g_session, query, raw, sizeof(raw)) && !ServerIsUnknown(raw))
+        char raw[8192] = {0};
+        int response_exists = ServerAnswerQuery(&g_session, query, raw, sizeof(raw));
+        int payload_built;
+        if (response_exists && !ServerIsUnknown(raw))
             ServerMapContent(raw, content, sizeof(content));
         else
             snprintf(content, sizeof(content), "I don't know.");
         if (ServerWantsStream(body))
         {
-            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
+            payload_built = ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
             SendRaw(s, 200, "OK", "text/event-stream", sse);
         }
         else
         {
-            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+            payload_built = ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
         }
+        ObserveCorpusAnswer("knowledge_question", session_id, g_seq, nmsg, has_system,
+                            query, NULL, NULL, NULL, NULL, content, "UNKNOWN", 0,
+                            response_exists, response_exists ? raw : NULL, payload_built);
         return;
     }
 
@@ -3125,6 +3189,9 @@ static void HandleCompletions(socket_t s, const char *body,
     }
     else if (is_coding && sess->declared_tools_count == 0)
     {
+        int response_exists = -1, payload_built;
+        char observed_raw[8192];
+        const char *raw_observed = NULL;
         int is_creation = ServerIsFileCreationTask(query);
         if (is_creation)
         {
@@ -3144,7 +3211,11 @@ static void HandleCompletions(socket_t s, const char *body,
                repository itself; anything else abstains instead of dumping
                unrelated statistics. */
             char raw3[8192];
-            if (g_session_ready && ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) && !ServerIsUnknown(raw3))
+            raw3[0] = '\0';
+            response_exists = g_session_ready ? ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) : -1;
+            snprintf(observed_raw, sizeof(observed_raw), "%s", raw3);
+            raw_observed = response_exists > 0 ? observed_raw : NULL;
+            if (response_exists > 0 && !ServerIsUnknown(raw3))
                 ServerMapContent(raw3, content, sizeof(content));
             else if (is_repository_task)
             {
@@ -3170,7 +3241,11 @@ static void HandleCompletions(socket_t s, const char *body,
             /* No tools and no repository: a question about code can still be
                grounded in the text corpus; only fall back when it is not. */
             char raw3[8192];
-            if (g_session_ready && ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) && !ServerIsUnknown(raw3))
+            raw3[0] = '\0';
+            response_exists = g_session_ready ? ServerAnswerQuery(&g_session, query, raw3, sizeof(raw3)) : -1;
+            snprintf(observed_raw, sizeof(observed_raw), "%s", raw3);
+            raw_observed = response_exists > 0 ? observed_raw : NULL;
+            if (response_exists > 0 && !ServerIsUnknown(raw3))
                 ServerMapContent(raw3, content, sizeof(content));
             else
                 snprintf(content, sizeof(content),
@@ -3181,14 +3256,18 @@ static void HandleCompletions(socket_t s, const char *body,
         if (ServerWantsStream(body))
         {
             char sse[16384];
-            ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
+            payload_built = ServerBuildStreamResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, sse, sizeof(sse));
             SendRaw(s, 200, "OK", "text/event-stream", sse);
         }
         else
         {
-            ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
+            payload_built = ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL), ++g_seq, content, query, resp, sizeof(resp));
             SendJson(s, 200, "OK", resp);
         }
+        if (!is_creation)
+            ObserveCorpusAnswer("coding_no_tools", session_id, g_seq, nmsg, has_system,
+                            query, NULL, NULL, NULL, NULL, content, "UNKNOWN", 0,
+                            response_exists, raw_observed, payload_built);
         return;
     }
 
@@ -3218,7 +3297,8 @@ static void HandleCompletions(socket_t s, const char *body,
     memset(&parsed, 0, sizeof(parsed));
     ChatParseLine(&g_session, query, &parsed);
     t0 = clock();
-    if (!ServerAnswerQuery(&g_session, query, raw, sizeof(raw)))
+    int response_exists = ServerAnswerQuery(&g_session, query, raw, sizeof(raw));
+    if (!response_exists)
         strncpy(raw, "No entendi la pregunta.", sizeof(raw) - 1);
     latency_ms = (long)((clock() - t0) * 1000 / CLOCKS_PER_SEC);
 
@@ -3234,22 +3314,32 @@ static void HandleCompletions(socket_t s, const char *body,
 
     ServerMapContent(raw, content, sizeof(content));
     status = ServerStatusOf(raw);
+    int payload_built;
     if (ServerWantsStream(body))
     {
         char sse[16384];
-        if (!ServerBuildStreamResponse(SERVER_MODEL_ID,
+        payload_built = ServerBuildStreamResponse(SERVER_MODEL_ID,
                                        (long)time(NULL), ++g_seq,
-                                       content, sse, sizeof(sse)))
+                                       content, sse, sizeof(sse));
+        if (!payload_built)
         {
+            ObserveCorpusAnswer("ordinary_chat", session_id, g_seq, nmsg, has_system,
+                                query, &parsed, NULL, NULL, NULL, content, status,
+                                latency_ms, response_exists,
+                                response_exists ? raw : NULL, payload_built);
             SendError(s, 500, "Internal Error", "response too large");
             return;
         }
         SendRaw(s, 200, "OK", "text/event-stream", sse);
     }
-    else if (!ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL),
+    else if (!(payload_built = ServerBuildResponse(SERVER_MODEL_ID, (long)time(NULL),
                                   ++g_seq, content, query, resp,
-                                  sizeof(resp)))
+                                  sizeof(resp))))
     {
+        ObserveCorpusAnswer("ordinary_chat", session_id, g_seq, nmsg, has_system,
+                            query, &parsed, NULL, NULL, NULL, content, status,
+                            latency_ms, response_exists,
+                            response_exists ? raw : NULL, payload_built);
         SendError(s, 500, "Internal Error", "response too large");
         return;
     }
@@ -3258,47 +3348,10 @@ static void HandleCompletions(socket_t s, const char *body,
     BuildStrArray(g_session.exec.entities, g_session.exec.nent, ent_json,
                   sizeof(ent_json));
     BuildProvArray(&g_session, prov_json, sizeof(prov_json));
-    IsoUtc(ts, sizeof(ts));
-    if (ServerBuildObservation(ts, SERVER_MODEL_ID, nmsg, has_system,
-                               query, &parsed, g_session.focus_valid ?
-                               g_session.focus : "", ent_json, prov_json,
-                               content, status, latency_ms, obs,
-                               sizeof(obs)))
-    {
-        /* CWD first (repo-adjacent log), Temp fallback: the request
-           is always served, the log never blocks it. */
-        log = fopen(SERVER_OBS_FILE, "a");
-        if (log == NULL)
-        {
-            char alt[640];
-#ifdef _WIN32
-            char tmp[512];
-            DWORD tn = GetTempPathA(sizeof(tmp), tmp);
-            if (tn > 0 && tn < sizeof(tmp))
-            {
-                snprintf(alt, sizeof(alt), "%s%s", tmp,
-                         SERVER_OBS_FILE);
-                log = fopen(alt, "a");
-            }
-#else
-            const char *tmp = getenv("TMPDIR");
-            if (tmp == NULL || tmp[0] == '\0')
-                tmp = getenv("TMP");
-            if (tmp == NULL || tmp[0] == '\0')
-                tmp = getenv("TEMP");
-            if (tmp == NULL || tmp[0] == '\0')
-                tmp = "/tmp";
-            snprintf(alt, sizeof(alt), "%s/%s", tmp, SERVER_OBS_FILE);
-            log = fopen(alt, "a");
-#endif
-        }
-        if (log != NULL)
-        {
-            fputs(obs, log);
-            fputc('\n', log);
-            fclose(log);
-        }
-    }
+    ObserveCorpusAnswer("ordinary_chat", session_id, g_seq, nmsg, has_system,
+                        query, &parsed, g_session.focus_valid ? g_session.focus : "",
+                        ent_json, prov_json, content, status, latency_ms,
+                        response_exists, response_exists ? raw : NULL, payload_built);
     fprintf(stderr, "[symbols] q=%.60s status=%s latency=%ldms\n", query,
             status, latency_ms);
 }
