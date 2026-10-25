@@ -68,3 +68,18 @@ Practical value: demonstrates byte-origin-preserving parsing plus evidence check
 No __FILE__ dependency remains. Existing CMakeLists.txt sllm_test definition sets the target working directory to CMAKE_SOURCE_DIR. Open exactly data/shells/shell_corpus.txt from that root, no upward search or alternative directory guesses, and require the pinned SHA/byte length. Thus slash/backslash/relative compiler __FILE__ spellings are irrelevant; none is parsed. Direct invocation outside source root is not the supported fixture context; CTest supplies it on each platform. Future corpus content changes must fail this explicit pin until the fixture/oracle is reviewed and updated, never refresh hashes automatically.
 
 QSName stops on the32nd identifier byte instead of scanning arbitrarily long identifiers. Checks include31accepted/32rejected/emptyID,NULL0query,NULL0source,full4096query/full65536source and overcaps. No byte beyond caller count is read. Other grammar comparisons use bounded constant literals. These tests do not constitute a Windows execution claim; CI after approved publication would own that validation.
+
+## Portable checkout fixture correction (after MSVC failure)
+
+Publication29f7980's MSVC job121045691926 failed only the three real-corpus pin/span checks; fopen and other new/legacy checks passed. Local LF-to-CRLF conversion reproduced those exact three failures. Remote log did not print actual source SHA/length, so CRLF is a strongly reproduced explanation, NOT a measured remote fingerprint. No engine regression or general Windows semantic failure is established.
+
+The test now accepts exactly two separately pinned original byte images, never normalizes the image being certified:
+
+| Representation | Byte length | SHA-256 | Line18 span |
+| --- | --- | --- | --- |
+| canonical repository LF | 18094 | daefd50882510d9c4f12fa847c915d246371f6cc59e622201909b12d0ec7f294 | [1457,1552) |
+| explicit LF->CRLF checkout image | 18292 | cd527960cf247a8fb4b6a63781b9e71e2a30cbc5136dba988e38428cdcc8f581 | [1474,1569) |
+
+as_checkout_span recomputes SHA over actual bytes, selects a representation by hash AND length, derives line18 offsets from the SAME image, then requires those offsets and exact sentence bytes to match that representation's pin. It does not equate canonical SHA with checkout SHA. Every query/source record and verifier origin uses actual bytes. Unknown representation, mixed line endings, wrong length, bitflip or other-representation span fails. No .gitattributes, workflow, CMake or corpus change. Future canonical content changes need explicit oracle review and deliberate replacement of BOTH pinned representations, not automatic hash refresh.
+
+An in-memory image transform creates the other representation only as explicit test data; the input corpus is not rewritten by the test. Both image forms run full adapter+verifier end-to-end. Mutants cover representation-span swap, record SHA mutation, source bitflip, mixed-EOL and length mismatch. Local full target run on LF and on a temporarily CRLF checkout each1157PASS, original canonical corpus restored exact SHA afterwards. Pure sanitizer289PASS with leakON, zero diagnostics; prior273pure preserved except replacing the five failing LF-only fixture checks with representation-aware checks. No claim of fixed MSVC CI until new approved publication is actually checked. No retry of the original failed run.

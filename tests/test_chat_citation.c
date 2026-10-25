@@ -135,6 +135,41 @@ static void qs_tests(void){
 }
 static const unsigned char as_q[]="How are Bash variables assigned?";
 static const unsigned char as_s[]="Bash variables are assigned with name=value and must not contain spaces around the equals sign.";
+/* Explicit representations, never canonicalize the bytes being certified. */
+static int as_checkout_span(const unsigned char*b,uint32_t n,QSSpan*out){
+ static const unsigned char lf[32]={0xda,0xef,0xd5,0x08,0x82,0x51,0x0d,0x9c,0x4f,0x12,0xfa,0x84,0x7c,0x91,0x5d,0x24,0x63,0x71,0xf6,0xcc,0x59,0xe6,0x22,0x20,0x19,0x09,0xb1,0x2d,0x0e,0xc7,0xf2,0x94};
+ static const unsigned char crlf[32]={0xcd,0x52,0x79,0x60,0xcf,0x24,0x7a,0x8f,0xb4,0xb6,0xa6,0x37,0x81,0xb9,0xe7,0x1e,0x2a,0x30,0xcb,0xc5,0x13,0x6d,0xba,0x98,0x8e,0x38,0x42,0x8c,0xdc,0xc8,0xf5,0x81};
+ unsigned char h[32];uint32_t first=0,end,line=1,want_first,want_end;
+ if(!out)return 0;
+ out->first=out->end=0;
+ if(!b||(n!=18094&&n!=18292))return 0;
+ TLSha256(b,n,h);
+ if(n==18094&&!memcmp(h,lf,32)){want_first=1457;want_end=1552;}
+ else if(n==18292&&!memcmp(h,crlf,32)){want_first=1474;want_end=1569;}
+ else return 0;
+ while(first<n&&line<18){if(b[first++]=='\n')line++;}
+ end=first;while(end<n&&b[end]!='\r'&&b[end]!='\n')end++;
+ if(first!=want_first||end!=want_end||end-first!=sizeof(as_s)-1||memcmp(b+first,as_s,sizeof(as_s)-1))return 0;
+ out->first=first;out->end=end;return 1;
+}
+static void as_image_tests(unsigned char*b,uint32_t n){
+ QSSpan span;
+ check(as_checkout_span(b,n,&span),"assignment explicit checkout representation SHA/length/derived span pinned");
+ if(!span.end)return;
+ memset(&qs_s,0,sizeof(qs_s));qs_s.count=1;qs_s.enumeration_state=1;
+ check(QSParseAssignmentQuery(as_q,sizeof(as_q)-1,&qs_q)==QS_MATCH&&QSExtractAssignmentSentence(b,n,span,&qs_s.assertions[0])==QS_MATCH,"assignment checkout records use actual bytes and absolute origins");
+ check(QSCheckRecords(as_q,sizeof(as_q)-1,b,n,&qs_q,&qs_s,&qs_r)==QS_MATCH&&qs_r.semantic_evidence==QS_UNVERIFIED_EXTRACTION,"assignment checkout end-to-end quoted-span-relative only");
+ qs_s.assertions[0].assertion_span.first=span.first==1457?1474:1457;
+ qs_s.assertions[0].assertion_span.end=span.end==1552?1569:1552;
+ check(QSCheckRecords(as_q,sizeof(as_q)-1,b,n,&qs_q,&qs_s,&qs_r)==QS_INVALID,"assignment other representation span rejected against actual image");
+ check(QSExtractAssignmentSentence(b,n,span,&qs_s.assertions[0])==QS_MATCH,"assignment restore actual representation record");
+ qs_s.assertions[0].identity.sha256[0]^=1;
+ check(QSCheckRecords(as_q,sizeof(as_q)-1,b,n,&qs_q,&qs_s,&qs_r)==QS_INVALID,"assignment mutated pin invalid even with correct span");
+ check(QSExtractAssignmentSentence(b,n,span,&qs_s.assertions[0])==QS_MATCH,"assignment restore image identity");
+ b[span.first]^=1;
+ check(!as_checkout_span(b,n,&span)&&QSCheckRecords(as_q,sizeof(as_q)-1,b,n,&qs_q,&qs_s,&qs_r)==QS_INVALID,"assignment bitflip rejects pin and records");
+ b[qs_s.assertions[0].assertion_span.first]^=1;
+}
 static void as_reset(void){
  memset(&qs_s,0,sizeof(qs_s));qs_s.count=1;qs_s.enumeration_state=1;
  check(QSParseAssignmentQuery(as_q,sizeof(as_q)-1,&qs_q)==QS_MATCH,"assignment query grammar parsed");
@@ -181,15 +216,29 @@ static void as_tests(void){
 
  /* sllm_test sets WORKING_DIRECTORY CMAKE_SOURCE_DIR (CMakeLists:160).
     Fixed repo-relative fixture path, no __FILE__ or directory discovery. */
- {static unsigned char corpus[65536];FILE*f=fopen("data/shells/shell_corpus.txt","rb");size_t count=0;
+ {static unsigned char corpus[65536],other[65536];FILE*f=fopen("data/shells/shell_corpus.txt","rb");size_t count=0;
   check(f!=NULL,"assignment real source corpus accessible");
-  if(f){count=fread(corpus,1,sizeof(corpus),f);fclose(f);
-   static const unsigned char hash[32]={0xda,0xef,0xd5,0x08,0x82,0x51,0x0d,0x9c,0x4f,0x12,0xfa,0x84,0x7c,0x91,0x5d,0x24,0x63,0x71,0xf6,0xcc,0x59,0xe6,0x22,0x20,0x19,0x09,0xb1,0x2d,0x0e,0xc7,0xf2,0x94};unsigned char actual[32];TLSha256(corpus,count,actual);
-   check(count==18094&&!memcmp(actual,hash,32)&&!memcmp(corpus+1457,as_s,sizeof(as_s)-1),"assignment real corpus pinned SHA and line18 span1457..1552");
-   memset(&qs_s,0,sizeof(qs_s));qs_s.count=1;qs_s.enumeration_state=1;
-   check(QSParseAssignmentQuery(as_q,sizeof(as_q)-1,&qs_q)==QS_MATCH&&QSExtractAssignmentSentence(corpus,(uint32_t)count,(QSSpan){1457,1552},&qs_s.assertions[0])==QS_MATCH,"assignment real query/source records and absolute origins");
-   check(QSCheckRecords(as_q,sizeof(as_q)-1,corpus,(uint32_t)count,&qs_q,&qs_s,&qs_r)==QS_MATCH&&qs_r.semantic_evidence==QS_UNVERIFIED_EXTRACTION,"assignment real corpus demo only quoted-span-relative, unverified context");
-   corpus[1457]^=1;check(QSCheckRecords(as_q,sizeof(as_q)-1,corpus,(uint32_t)count,&qs_q,&qs_s,&qs_r)==QS_INVALID,"assignment source mutation invalidates grammar record");
+  if(f){count=fread(corpus,1,sizeof(corpus),f);fclose(f);QSSpan actual;
+   int valid=as_checkout_span(corpus,(uint32_t)count,&actual);
+   check(valid,"assignment actual checkout must be one explicit pinned representation");
+   if(valid){
+    uint32_t m=0;as_image_tests(corpus,(uint32_t)count);
+    /* Explicit test image transform only; the original corpus stays unchanged. */
+    for(uint32_t i=0;i<count;i++){
+     if(count==18094&&corpus[i]=='\n')other[m++]='\r';
+     if(count==18292&&corpus[i]=='\r')continue;
+     other[m++]=corpus[i];
+    }
+    as_image_tests(other,m);
+    check(as_checkout_span(corpus,(uint32_t)count,&actual),"assignment original checkout restored byteexact after mutant tests");
+    /* Keep length while corrupting just one EOL: mixed endings cannot match pin. */
+    for(uint32_t i=0;i<count;i++)if(corpus[i]=='\n'){
+     unsigned char old=corpus[i];corpus[i]='\r';
+     check(!as_checkout_span(corpus,(uint32_t)count,&actual),"assignment mixed line endings rejected, no oracle refresh");
+     corpus[i]=old;break;
+    }
+    check(!as_checkout_span(corpus,(uint32_t)count-1,&actual),"assignment mismatched checkout length rejected");
+   }
   }
  }
 
